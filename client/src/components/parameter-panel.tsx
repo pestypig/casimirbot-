@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap } from "lucide-react";
+import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity } from "lucide-react";
 import { DynamicControls } from "./dynamic-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

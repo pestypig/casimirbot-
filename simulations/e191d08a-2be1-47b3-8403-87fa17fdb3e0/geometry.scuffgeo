@@ -1,0 +1,11 @@
+# Parallel plate geometry
+OBJECT Plate1
+    MESHFILE plate1.msh
+    MATERIAL PEC
+ENDOBJECT
+
+OBJECT Plate2
+    MESHFILE plate2.msh
+    MATERIAL PEC
+    DISPLACED 0 0 0.004
+ENDOBJECT
