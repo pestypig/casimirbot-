@@ -19,11 +19,13 @@ export const simulationParametersSchema = z.object({
     coherence: z.boolean().default(true), // Include coherent effects
   }).optional(),
   
-  // Dynamic module parameters  
+  // Dynamic module parameters (based on math-gpt.org formulation)
   dynamicConfig: z.object({
-    frequency: z.number().positive().min(1).max(1e12).default(1e6), // Hz
-    amplitude: z.number().positive().min(0.1).max(1000).default(50), // pm
-    phases: z.number().int().min(10).max(1000).default(100), // Time steps
+    modulationFreqGHz: z.number().positive().min(0.1).max(100).default(15), // GHz (fₘ)
+    strokeAmplitudePm: z.number().positive().min(0.1).max(1000).default(50), // pm (δa)
+    burstLengthUs: z.number().positive().min(0.1).max(1000).default(10), // μs (t_burst)
+    cycleLengthUs: z.number().positive().min(1).max(10000).default(1000), // μs (t_cycle)
+    cavityQ: z.number().positive().min(1e3).max(1e12).default(1e9), // Q factor
   }).optional(),
   
   // Advanced computational parameters
@@ -43,13 +45,28 @@ export const simulationResultSchema = z.object({
   startTime: z.date(),
   endTime: z.date().optional(),
   results: z.object({
+    // Static Casimir results
     totalEnergy: z.number().optional(),
     energyPerArea: z.number().optional(),
     force: z.number().optional(),
     convergence: z.string().optional(),
     xiPoints: z.number().int().optional(),
     computeTime: z.string().optional(),
-    errorEstimate: z.string().optional()
+    errorEstimate: z.string().optional(),
+    
+    // Dynamic Casimir results (when moduleType === 'dynamic')
+    strokePeriodPs: z.number().optional(),
+    dutyFactor: z.number().optional(),
+    boostedEnergy: z.number().optional(),
+    cycleAverageEnergy: z.number().optional(),
+    totalExoticMass: z.number().optional(),
+    exoticEnergyDensity: z.number().optional(),
+    quantumInequalityMargin: z.number().optional(),
+    quantumSafetyStatus: z.enum(['safe', 'warning', 'violation']).optional(),
+    instantaneousPower: z.number().optional(),
+    averagePower: z.number().optional(),
+    isaacsonLimit: z.boolean().optional(),
+    greenWaldCompliance: z.boolean().optional()
   }).optional(),
   generatedFiles: z.array(z.object({
     id: z.string(),

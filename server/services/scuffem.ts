@@ -294,9 +294,15 @@ ENDOBJECT
   }
 
   private async parseResults(outputBase: string, params: SimulationParameters): Promise<any> {
-    // Use the new modular static Casimir calculation
-    const { calculateCasimirEnergy } = await import('../../modules/sim_core/static-casimir.js');
-    return calculateCasimirEnergy(params);
+    // Use the appropriate module based on moduleType
+    if (params.moduleType === 'dynamic') {
+      const { dynamicCasimirModule } = await import('../../modules/dynamic/dynamic-casimir.js');
+      return dynamicCasimirModule.calculate(params);
+    } else {
+      // Default to static calculations
+      const { calculateCasimirEnergy } = await import('../../modules/sim_core/static-casimir.js');
+      return calculateCasimirEnergy(params);
+    }
   }
 
   private async parseResultsLegacy(outputBase: string, params: SimulationParameters): Promise<any> {

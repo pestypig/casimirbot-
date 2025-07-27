@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, Sliders, Play, FileCode } from "lucide-react";
+import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap } from "lucide-react";
+import { DynamicControls } from "./dynamic-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -30,6 +31,19 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
       sagDepth: 100.0,
       material: "PEC",
       temperature: 20,
+      moduleType: "static",
+      dynamicConfig: {
+        modulationFreqGHz: 15,
+        strokeAmplitudePm: 50,
+        burstLengthUs: 10,
+        cycleLengthUs: 1000,
+        cavityQ: 1e9
+      },
+      arrayConfig: {
+        size: 1,
+        spacing: 1000,
+        coherence: true
+      },
       advanced: {
         xiMin: 0.001,
         maxXiPoints: 10000,
@@ -105,6 +119,46 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                 </FormItem>
               )}
             />
+
+            {/* Module Type Selection */}
+            <FormField
+              control={form.control}
+              name="moduleType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Physics Module</FormLabel>
+                  <FormControl>
+                    <RadioGroup value={field.value} onValueChange={field.onChange} className="space-y-3">
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                        <RadioGroupItem value="static" id="static" />
+                        <div className="flex-1">
+                          <Label htmlFor="static" className="font-medium cursor-pointer flex items-center gap-2">
+                            <Cpu className="h-4 w-4" />
+                            Static Casimir
+                          </Label>
+                          <p className="text-sm text-muted-foreground">Standard SCUFF-EM calculations</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
+                        <RadioGroupItem value="dynamic" id="dynamic" />
+                        <div className="flex-1">
+                          <Label htmlFor="dynamic" className="font-medium cursor-pointer flex items-center gap-2">
+                            <Zap className="h-4 w-4" />
+                            Dynamic Casimir
+                          </Label>
+                          <p className="text-sm text-muted-foreground">Moving boundaries with quantum inequality constraints</p>
+                        </div>
+                      </div>
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Dynamic Module Controls */}
+            <DynamicControls form={form} isVisible={form.watch("moduleType") === "dynamic"} />
 
             {/* Numerical Parameters */}
             <div className="space-y-4">

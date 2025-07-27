@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ChartVisualization from "@/components/chart-visualization";
+import { DynamicDashboard } from "@/components/dynamic-dashboard";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -75,6 +76,12 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
         </div>
 
         <TabsContent value="results" className="p-6">
+          {/* Dynamic Casimir Dashboard */}
+          <DynamicDashboard 
+            results={results} 
+            isVisible={simulation.parameters.moduleType === 'dynamic'} 
+          />
+          
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Energy Results */}
             <div>
