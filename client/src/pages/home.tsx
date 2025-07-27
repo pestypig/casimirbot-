@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import ParameterPanel from "@/components/parameter-panel";
 import SimulationStatus from "@/components/simulation-status";
 import ResultsPanel from "@/components/results-panel";
+import { MeshVisualization } from "@/components/mesh-visualization";
 import { createSimulation, startSimulation, generateScuffgeo, downloadFile, downloadAllFiles, createWebSocketConnection } from "@/lib/simulation-api";
 import { SimulationParameters, SimulationResult } from "@shared/schema";
 
@@ -244,6 +245,9 @@ export default function Home() {
               status={activeSimulation?.status || "idle"}
               currentStep={currentStep}
             />
+
+            {/* Mesh Visualization */}
+            <MeshVisualization />
 
             {/* Results Panel */}
             <ResultsPanel

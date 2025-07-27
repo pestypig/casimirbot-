@@ -102,3 +102,18 @@ Preferred communication style: Simple, everyday language.
 - **Migration Support**: Drizzle Kit for database schema management
 
 The application is designed to be easily deployable on platforms like Replit, with the ability to scale from in-memory development storage to full PostgreSQL production deployment.
+
+## Recent Changes: Latest modifications with dates
+
+### July 27, 2025
+- **Added Sag Depth Parameter**: Enhanced bowl geometry configuration with user-controlled sag depth parameter
+  - New sagDepth field in simulation schema (0.1-1000 nm range)
+  - Dynamic UI field that appears only when bowl geometry is selected
+  - Integrated Gmsh mesh generation for realistic concave spherical cap geometry
+  - Fixed form validation issues preventing NaN values in input fields
+  - Bowl mesh now uses 25 mm radius with user-specified sag depth as requested
+- **Added Cross-Section Visualization**: Created interactive mesh visualization component
+  - Real-time cross-section rendering showing curvature changes at different sag depths
+  - Side-by-side comparison of two different sag depths (default: 0 nm vs 50 nm)
+  - Mathematical curvature analysis with radius of curvature calculations
+  - SVG-based rendering with grid lines and proper scaling for scientific accuracy
