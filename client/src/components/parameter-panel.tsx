@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity } from "lucide-react";
+import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity, Rocket } from "lucide-react";
 import { DynamicControls } from "./dynamic-controls";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,32 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
   const handleGenerateOnly = () => {
     const data = form.getValues();
     onGenerateOnly(data);
+  };
+
+  const handleNeedleHullPreset = () => {
+    // Based on research papers: scaled for numerical stability while preserving physics ratios
+    // Geometry-Amplified Dynamic Casimir Effect parameters for warp bubble configuration
+    form.setValue("geometry", "bowl");
+    form.setValue("gap", 1.0); // 1 nm vacuum gap (design parameter)
+    form.setValue("radius", 25000); // Scaled to 25 mm radius for numerical stability
+    form.setValue("sagDepth", 800); // Scaled sag depth within validation limits (max 1000 nm)
+    form.setValue("material", "PEC"); // Nb₃Sn superconducting mirrors
+    form.setValue("temperature", 20); // 20 K operating temperature
+    form.setValue("moduleType", "dynamic");
+    form.setValue("dynamicConfig", {
+      modulationFreqGHz: 15, // 15 GHz AlN piezo modulation
+      strokeAmplitudePm: 50, // ±50 pm piston stroke amplitude
+      burstLengthUs: 10, // 10 μs burst duration
+      cycleLengthUs: 1000, // 1 ms cycle (1 kHz strobe frequency, S=400 sectors)
+      cavityQ: 1e9 // Q ≈ 10⁹ superconducting RF quality factor
+    });
+    form.setValue("advanced", {
+      xiMin: 0.001,
+      maxXiPoints: 25000, // Enhanced for Van-den-Broeck amplification
+      intervals: 100, // Higher precision for exotic mass calculations
+      absTol: 0,
+      relTol: 0.001 // Tighter tolerance for warp bubble requirements
+    });
   };
 
   return (
@@ -385,6 +411,28 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                   </div>
                 </CollapsibleContent>
               </Collapsible>
+            </div>
+
+            {/* Preset Configuration */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
+              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                <Rocket className="h-4 w-4" />
+                Warp Bubble Research Configuration
+              </h4>
+              <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
+                Configure parameters based on "Needle Hull" and "Geometry-Amplified Dynamic Casimir Effect" research papers
+                for theoretical warp bubble conditions. Scaled geometry maintains curvature ratios for γ ≈ 25 amplification.
+              </p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                className="w-full border-purple-300 hover:bg-purple-100 dark:border-purple-600 dark:hover:bg-purple-900/30"
+                onClick={handleNeedleHullPreset}
+                disabled={isLoading}
+              >
+                <Rocket className="w-4 h-4 mr-2" />
+                Apply Needle Hull Preset
+              </Button>
             </div>
 
             {/* Action Buttons */}
