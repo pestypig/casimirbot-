@@ -26,6 +26,11 @@ export const simulationParametersSchema = z.object({
     burstLengthUs: z.number().positive().min(0.1).max(1000).default(10), // μs (t_burst)
     cycleLengthUs: z.number().positive().min(1).max(10000).default(1000), // μs (t_cycle)
     cavityQ: z.number().positive().min(1e3).max(1e12).default(1e9), // Q factor
+    // Needle Hull sector strobing parameters
+    sectorCount: z.number().int().positive().min(1).max(1000).default(400), // Number of sectors
+    sectorDuty: z.number().positive().min(1e-6).max(1).default(2.5e-5), // Ship-wide duty factor
+    pulseFrequencyGHz: z.number().positive().min(0.1).max(100).default(15), // Pulse frequency
+    lightCrossingTimeNs: z.number().positive().min(1).max(1000).default(100) // Light crossing time
   }).optional(),
   
   // Advanced computational parameters
@@ -71,7 +76,15 @@ export const simulationResultSchema = z.object({
     exoticMassPerTile: z.number().optional(),
     exoticMassTotalLattice: z.number().optional(),
     isaacsonLimit: z.boolean().optional(),
-    greenWaldCompliance: z.boolean().optional()
+    greenWaldCompliance: z.boolean().optional(),
+    // Needle Hull / Natário metric support
+    stressEnergyT00: z.number().optional(),
+    stressEnergyT11: z.number().optional(), 
+    natarioShiftAmplitude: z.number().optional(),
+    sectorStrobingEfficiency: z.number().optional(),
+    grValidityCheck: z.boolean().optional(),
+    homogenizationRatio: z.number().optional(),
+    timeAveragedCurvature: z.number().optional()
   }).optional(),
   generatedFiles: z.array(z.object({
     id: z.string(),

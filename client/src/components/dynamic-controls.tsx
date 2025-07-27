@@ -228,15 +228,103 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
           </div>
         </div>
 
+        {/* Sector Strobing Controls for Needle Hull */}
+        <div className="p-4 border border-purple-200 rounded-lg bg-purple-50/50">
+          <h4 className="text-sm font-medium mb-3 text-purple-800">Sector Strobing (Needle Hull)</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="dynamicConfig.sectorCount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Sector Count</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="1" 
+                        min="1"
+                        max="1000"
+                        placeholder="400" 
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                        className="text-xs h-8"
+                      />
+                    </FormControl>
+                  </div>
+                  <FormDescription className="text-xs">Azimuthal sectors for strobing</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="dynamicConfig.sectorDuty"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Ship-wide Duty</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="1e-6" 
+                        min="1e-6"
+                        max="1"
+                        placeholder="2.5e-5" 
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        className="text-xs h-8"
+                      />
+                    </FormControl>
+                  </div>
+                  <FormDescription className="text-xs">d_eff = d/S factor</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="dynamicConfig.lightCrossingTimeNs"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Light Crossing Time</FormLabel>
+                  <div className="relative">
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="1" 
+                        min="1"
+                        max="1000"
+                        placeholder="100" 
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        className="text-xs h-8 pr-8"
+                      />
+                    </FormControl>
+                    <span className="absolute right-2 top-1 text-xs text-muted-foreground">ns</span>
+                  </div>
+                  <FormDescription className="text-xs">τ_LC for GR validity</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
         {/* Safety Information */}
         <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-700">
           <h5 className="font-medium text-amber-900 dark:text-amber-100 mb-1 flex items-center gap-2">
             <Power className="h-4 w-4" />
-            Quantum Safety
+            Quantum Safety & GR Validity
           </h5>
           <p className="text-xs text-amber-800 dark:text-amber-200">
-            Simulation includes quantum inequality monitoring (Ford-Roman bound), GR validity checks 
-            (Isaacson limit, Green-Wald compliance), and exotic mass generation tracking.
+            Simulation includes quantum inequality monitoring, GR validity checks via sector strobing, 
+            and Natário metric stress-energy tensor calculations for warp bubble conditions.
           </p>
         </div>
       </CardContent>

@@ -3,6 +3,7 @@
  * Based on math-gpt.org formulation reference and theoretical foundations
  */
 
+import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.js';
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 import type { CasimirModule } from '../core/module-registry.js';
 import type { SimulationParameters } from '../../shared/schema.js';
@@ -223,6 +224,45 @@ export const dynamicCasimirModule: CasimirModule = {
       tileCount: params.arrayConfig?.size ? Math.pow(params.arrayConfig.size, 2) : 1
     };
     
-    return calculateDynamicCasimir(dynamicParams);
+    return calculateDynamicCasimirWithNatario(dynamicParams, params);
   }
 };
+
+/**
+ * Calculate enhanced dynamic Casimir with Natário metric support
+ * Integrates sector strobing and GR validity checks
+ */
+export function calculateDynamicCasimirWithNatario(
+  params: DynamicCasimirParams,
+  simulationParams: SimulationParameters
+): DynamicCasimirResult & Partial<NatarioMetricResult> {
+  // Get base dynamic Casimir results
+  const baseResults = calculateDynamicCasimir(params);
+  
+  // Calculate Natário metric components if dynamic config is present
+  let natarioResults: Partial<NatarioMetricResult> = {};
+  
+  if (simulationParams.dynamicConfig) {
+    try {
+      const natarioMetric = calculateNatarioMetric(simulationParams, params.staticEnergy);
+      const grValidation = validateGRConsistency(natarioMetric);
+      
+      natarioResults = {
+        stressEnergyT00: natarioMetric.stressEnergyT00,
+        stressEnergyT11: natarioMetric.stressEnergyT11,
+        natarioShiftAmplitude: natarioMetric.natarioShiftAmplitude,
+        sectorStrobingEfficiency: natarioMetric.sectorStrobingEfficiency,
+        grValidityCheck: natarioMetric.grValidityCheck && grValidation.strategyA,
+        homogenizationRatio: natarioMetric.homogenizationRatio,
+        timeAveragedCurvature: natarioMetric.timeAveragedCurvature
+      };
+    } catch (error) {
+      console.warn('Natário metric calculation failed:', error);
+    }
+  }
+  
+  return {
+    ...baseResults,
+    ...natarioResults
+  };
+}

@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity, Rocket } from "lucide-react";
 import { DynamicControls } from "./dynamic-controls";
+import { NeedleHullPreset } from "./needle-hull-preset";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -182,6 +183,9 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                 </FormItem>
               )}
             />
+
+            {/* Needle Hull Preset Button */}
+            <NeedleHullPreset form={form} />
 
             {/* Dynamic Module Controls */}
             <DynamicControls form={form} isVisible={form.watch("moduleType") === "dynamic"} />
