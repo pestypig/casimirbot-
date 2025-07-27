@@ -45,6 +45,12 @@ export interface DynamicCasimirResult {
   // GR validity checks
   isaacsonLimit: boolean;        // High-frequency limit compliance
   greenWaldCompliance: boolean;  // Averaged null energy condition
+  
+  // Additional readouts for research verification
+  averagePowerPerTile: number;     // Power per tile for scaling
+  averagePowerTotalLattice: number; // Full lattice power (83 MW)
+  exoticMassPerTile: number;       // Mass per tile (1.5 kg target)
+  exoticMassTotalLattice: number;  // Total exotic mass
 }
 
 /**
@@ -106,7 +112,7 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   // 1. Geometric blue-shift γ_geo ≈ 25
   // 2. Q-enhancement from superconducting cavity ≈ √Q 
   // 3. Van-den-Broeck seed pocket γ_VdB ≈ 10¹¹
-  const totalEnhancement = gammaGeo * qFactor * gammaVdB;
+  const totalEnhancement = gammaGeo * qEnhancement * gammaVdB;
   
   // Apply duty cycle and amplification to get exotic mass per tile
   // Paper target: 1.5 kg per tile
