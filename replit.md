@@ -103,9 +103,20 @@ Preferred communication style: Simple, everyday language.
 
 The application is designed to be easily deployable on platforms like Replit, with the ability to scale from in-memory development storage to full PostgreSQL production deployment.
 
+## Future Expansion: Casimir-Tile Research Platform
+
+Based on the modular scaffold blueprint, the application is architected to support expansion into a comprehensive research platform covering:
+- **Dynamic Casimir Effects**: Moving boundary simulations with MEEP integration
+- **Array Physics**: N×N tile lattice calculations with collective effects
+- **Advanced Materials**: Superconducting thin films (Nb₃Sn) and frequency-dependent materials
+- **Research Integration**: Einstein Toolkit stress-energy tensor export and academic workflow tools
+- **Real SCUFF-EM**: Integration with actual computational electromagnetics binaries
+
+The current scientific foundation provides the authentic physics core that can be extended modularly without compromising the established SCUFF-EM accuracy.
+
 ## Recent Changes: Latest modifications with dates
 
-### July 27, 2025
+### July 27, 2025 - Latest Updates
 - **Added Sag Depth Parameter**: Enhanced bowl geometry configuration with user-controlled sag depth parameter
   - New sagDepth field in simulation schema (0-1000 nm range, allowing flat surfaces)
   - Dynamic UI field that appears only when bowl geometry is selected
@@ -125,3 +136,9 @@ The application is designed to be easily deployable on platforms like Replit, wi
   - Realistic Xi (imaginary frequency) integration points based on geometry-dependent cutoffs
   - Updated energy formatting to exponential notation with 3 decimal places (e.g., -1.402 × 10^3)
   - Computation times now scale with mesh complexity and frequency integration requirements
+- **Created Casimir-Tile Research Platform Roadmap**: Documented expansion path for modular research capabilities
+  - Established blueprint for Dynamic Casimir Effects (DCE) with MEEP integration
+  - Planned N×N tile array simulations with collective physics effects
+  - Integration pathway for real SCUFF-EM binaries and Einstein Toolkit compatibility
+  - Roadmap for advanced materials (Nb₃Sn superconductors) and research workflow tools
+  - Modular architecture allows incremental expansion while preserving current scientific accuracy
