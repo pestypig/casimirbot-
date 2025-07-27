@@ -1,0 +1,11 @@
+# Sphere above plate geometry
+OBJECT Sphere
+    MESHFILE sphere.msh
+    MATERIAL PEC
+ENDOBJECT
+
+OBJECT Plate
+    MESHFILE plate.msh
+    MATERIAL PEC
+    DISPLACED 0 0 0.006
+ENDOBJECT

@@ -79,6 +79,7 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
           {/* Dynamic Casimir Dashboard */}
           <DynamicDashboard 
             results={results} 
+            parameters={simulation.parameters}
             isVisible={simulation.parameters.moduleType === 'dynamic'} 
           />
           
