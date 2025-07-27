@@ -163,4 +163,8 @@ The current scientific foundation provides the authentic physics core that can b
     - Fixed exotic mass calculations to match paper's target of ≈1.5 kg per tile
     - Combined geometric blue-shift (γ_geo ≈ 25), Q-enhancement, and Van-den-Broeck factors
     - Cross-validated calculations against "83 MW Needle Hull" methodology for warp bubble conditions
+    - **Corrected Power Calculations**: Fixed sector strobing mitigation to achieve paper's 83 MW target
+      - Implemented 400-sector strobing with ship-wide duty factor d_eff = 2.5×10⁻⁵
+      - Reduced raw ~2 PW lattice load to target 83 MW electrical as specified in paper
+      - Applied proper duty-cycle mitigation matching research methodology
   - Integrated research-based parameters from "83 MW Needle Hull" and "Geometry-Amplified Dynamic Casimir Effect" papers
