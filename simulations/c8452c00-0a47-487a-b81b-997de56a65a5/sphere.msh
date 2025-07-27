@@ -1,0 +1,3 @@
+# Sphere mesh (radius: 10000 µm)
+# This is a simplified placeholder mesh
+# In production, use GMSH to generate proper tetrahedral mesh

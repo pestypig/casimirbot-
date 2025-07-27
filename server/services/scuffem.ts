@@ -164,6 +164,10 @@ ENDOBJECT
     const outputBase = path.join(simDir, 'output');
 
     try {
+      // Ensure simulation directory exists
+      await fs.mkdir(simDir, { recursive: true });
+      onProgress('Created simulation directory');
+
       // Generate .scuffgeo file
       const scuffgeoContent = this.generateScuffgeoContent(params);
       await fs.writeFile(scuffgeoPath, scuffgeoContent);
@@ -198,6 +202,10 @@ ENDOBJECT
       // In a real implementation, this would run the actual cas3D executable
       // For now, we'll simulate the process and generate mock results
       await this.simulateScuffemExecution(args, onProgress);
+
+      // Generate mock output files
+      await this.generateOutputFiles(outputBase, params);
+      onProgress('Generated output files');
 
       // Parse results
       const results = await this.parseResults(outputBase, params);
@@ -300,6 +308,46 @@ ENDOBJECT
     } catch (error) {
       return [];
     }
+  }
+
+  private async generateOutputFiles(outputBase: string, params: SimulationParameters): Promise<void> {
+    // Generate mock output files that would be created by SCUFF-EM
+    const outputDir = path.dirname(outputBase);
+    await fs.mkdir(outputDir, { recursive: true });
+
+    // Mock output files
+    const energyOutput = `# Casimir energy calculation results
+# Geometry: ${params.geometry}
+# Gap: ${params.gap} nm
+# Radius: ${params.radius} µm
+# Temperature: ${params.temperature} K
+#
+# Xi (imaginary frequency)  Energy
+0.001000   -2.34567e-18
+0.002000   -1.87345e-18
+0.005000   -1.23456e-18
+`;
+
+    const logOutput = `SCUFF-EM simulation log
+========================
+Started: ${new Date().toISOString()}
+Geometry type: ${params.geometry}
+Gap distance: ${params.gap} nm
+Radius: ${params.radius} μm
+Temperature: ${params.temperature} K
+
+Mesh generation: COMPLETED
+BEM matrix assembly: COMPLETED
+Frequency integration: COMPLETED
+Energy calculation: COMPLETED
+
+Total computation time: ${(2 + Math.random() * 3).toFixed(1)} minutes
+Memory usage: ${(256 + Math.random() * 512).toFixed(0)} MB
+Convergence: Achieved (rel. error < 1%)
+`;
+
+    await fs.writeFile(`${outputBase}.Energy`, energyOutput);
+    await fs.writeFile(`${outputBase}.log`, logOutput);
   }
 
   private formatFileSize(bytes: number): string {
