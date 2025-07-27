@@ -68,8 +68,8 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
     // Geometry-Amplified Dynamic Casimir Effect parameters for warp bubble configuration
     form.setValue("geometry", "bowl");
     form.setValue("gap", 1.0); // 1 nm vacuum gap (design parameter)
-    form.setValue("radius", 25000); // Scaled to 25 mm radius for numerical stability
-    form.setValue("sagDepth", 800); // Scaled sag depth within validation limits (max 1000 nm)
+    form.setValue("radius", 20000); // 40 μm diameter = 20 μm radius as per paper
+    form.setValue("sagDepth", 16); // 16 nm sag depth as specified in paper
     form.setValue("material", "PEC"); // Nb₃Sn superconducting mirrors
     form.setValue("temperature", 20); // 20 K operating temperature
     form.setValue("moduleType", "dynamic");
