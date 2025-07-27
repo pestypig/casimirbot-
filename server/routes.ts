@@ -10,21 +10,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
   // WebSocket server for real-time simulation updates
-  const wss = new WebSocketServer({ server: httpServer });
+  // Only set up WebSocket in production or when explicitly enabled
+  let wss: WebSocketServer | null = null;
   const connections = new Map<string, WebSocket>();
 
-  wss.on('connection', (ws, req) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`);
-    const simulationId = url.searchParams.get('simulationId');
-    
-    if (simulationId) {
-      connections.set(simulationId, ws);
+  if (process.env.NODE_ENV === "production" || process.env.ENABLE_WS === "true") {
+    wss = new WebSocketServer({ 
+      server: httpServer,
+      path: '/ws' // Use a specific path to avoid conflicts
+    });
+
+    wss.on('connection', (ws, req) => {
+      const url = new URL(req.url!, `http://${req.headers.host}`);
+      const simulationId = url.searchParams.get('simulationId');
       
-      ws.on('close', () => {
-        connections.delete(simulationId);
-      });
-    }
-  });
+      if (simulationId) {
+        connections.set(simulationId, ws);
+        
+        ws.on('close', () => {
+          connections.delete(simulationId);
+        });
+      }
+    });
+  }
 
   // Get all simulations
   app.get("/api/simulations", async (req, res) => {
