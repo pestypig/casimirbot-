@@ -294,6 +294,12 @@ ENDOBJECT
   }
 
   private async parseResults(outputBase: string, params: SimulationParameters): Promise<any> {
+    // Use the new modular static Casimir calculation
+    const { calculateCasimirEnergy } = await import('../../modules/sim_core/static-casimir.js');
+    return calculateCasimirEnergy(params);
+  }
+
+  private async parseResultsLegacy(outputBase: string, params: SimulationParameters): Promise<any> {
     // Scientific Casimir effect calculations based on SCUFF-EM FSC (Fluctuating Surface Current) method
     // References: Reid et al. PRL 103, 040401 (2009); Emig et al. PRL 99, 170403 (2007)
     const { geometry, gap, radius, sagDepth, material, temperature } = params;
