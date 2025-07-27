@@ -179,3 +179,10 @@ The current scientific foundation provides the authentic physics core that can b
   - Built automated test runner with 8 comprehensive test cases covering all physics modules
   - Added convergence validation: ≥5000 Xi points for 1nm gaps, ≤5% error bounds
   - Integrated quality metrics directly into results panel with ✓/✗ status indicators
+- **Target-Value Ledger Verification System**: Implemented comprehensive validation following research paper recipe
+  - Created DesignLedger component with real-time target verification against paper specifications
+  - Built target-validation service computing γ_geo, Q-enhancement, duty cycles, and Van den Broeck amplification
+  - Integrated API endpoints for validating calculations against 1.4×10³ kg exotic mass target
+  - Added traffic-light status indicators for mass target (±5%), power target (83 MW ±10%), and quantum safety (ζ < 1.0)
+  - Implemented working-backwards calculation from paper's target values to verify mathematical consistency
+  - Created comprehensive test suite validating both standard parameters and Needle Hull preset configurations

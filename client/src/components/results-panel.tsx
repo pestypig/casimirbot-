@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText } from "lucide-react";
+import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import ChartVisualization from "@/components/chart-visualization";
 import { DynamicDashboard } from "@/components/dynamic-dashboard";
+import { DesignLedger } from "./design-ledger";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -197,6 +198,25 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
               </div>
             </div>
           )}
+
+          {/* Design Ledger - Target Value Verification */}
+          <DesignLedger results={{
+            gammaGeo: simulation.parameters.geometry === 'bowl' && simulation.parameters.sagDepth ? 
+              Math.round(simulation.parameters.gap / (simulation.parameters.gap - simulation.parameters.sagDepth * 1e-6)) : 25,
+            cavityQ: simulation.parameters.dynamicConfig?.cavityQ,
+            dutyFactor: simulation.parameters.dynamicConfig ? 
+              (simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000) : undefined,
+            effectiveDuty: simulation.parameters.dynamicConfig ? 
+              ((simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) / 
+              (simulation.parameters.dynamicConfig.sectorCount || 400) : undefined,
+            energyPerTileCycleAvg: results?.exoticMassPerTile ? results.exoticMassPerTile * Math.pow(299792458, 2) : undefined,
+            totalExoticMass: results?.totalExoticMass,
+            zetaMargin: results?.quantumInequalityMargin,
+            quantumInequalityMargin: results?.quantumInequalityMargin,
+            averagePower: results?.averagePower,
+            massTargetCheck: results?.totalExoticMass ? Math.abs(results.totalExoticMass - 1400) <= 70 : false,
+            powerTargetCheck: results?.averagePower ? Math.abs(results.averagePower - 83e6) <= 8.3e6 : false
+          }} />
         </TabsContent>
 
         <TabsContent value="files" className="p-6">

@@ -5,6 +5,7 @@ import { scuffemService } from "./services/scuffem";
 import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
+import targetValidationRoutes from "./routes/target-validation.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -236,6 +237,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Add target validation routes
+  app.use('/api', targetValidationRoutes);
 
   return httpServer;
 }
