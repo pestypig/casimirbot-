@@ -1,0 +1,3 @@
+# Plate mesh (radius: 20 µm)
+# This is a simplified placeholder mesh
+# In production, use GMSH to generate proper surface mesh
