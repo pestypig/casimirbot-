@@ -91,3 +91,13 @@ export class ModuleRegistry {
 
 // Global module registry instance
 export const moduleRegistry = new ModuleRegistry();
+
+// Import and register physics modules
+import { staticCasimirModule } from '../sim_core/static-casimir.js';
+import { dynamicCasimirModule } from '../dynamic/dynamic-casimir.js';
+import { warpBubbleModule } from '../warp/warp-module.js';
+
+// Register all available modules
+moduleRegistry.register(staticCasimirModule);
+moduleRegistry.register(dynamicCasimirModule);
+moduleRegistry.register(warpBubbleModule);

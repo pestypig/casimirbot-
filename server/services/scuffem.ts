@@ -3,6 +3,7 @@ import { SimulationParameters } from '@shared/schema';
 import path from 'path';
 import fs from 'fs/promises';
 import { gmshService } from './gmsh';
+import { moduleRegistry } from '../../modules/core/module-registry.js';
 
 export class ScuffemService {
   private workingDir: string;
@@ -294,12 +295,14 @@ ENDOBJECT
   }
 
   private async parseResults(outputBase: string, params: SimulationParameters): Promise<any> {
-    // Use the appropriate module based on moduleType
-    if (params.moduleType === 'dynamic') {
-      const { dynamicCasimirModule } = await import('../../modules/dynamic/dynamic-casimir.js');
-      return dynamicCasimirModule.calculate(params);
-    } else {
-      // Default to static calculations
+    // Use the module registry to get the appropriate calculation module
+    try {
+      const moduleName = params.moduleType || 'static';
+      const results = await moduleRegistry.calculate(moduleName, params);
+      return results;
+    } catch (error) {
+      console.warn(`Module calculation failed, falling back to legacy method: ${error}`);
+      // Fallback to legacy static calculations
       const { calculateCasimirEnergy } = await import('../../modules/sim_core/static-casimir.js');
       return calculateCasimirEnergy(params);
     }

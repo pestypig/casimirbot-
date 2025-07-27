@@ -1,7 +1,10 @@
 /**
  * Target Value Validation Service
  * Implements the computational recipe from the research paper
+ * Enhanced with Natário zero-expansion warp bubble calculations
  */
+
+import { calculateNatarioWarpBubble, type NatarioWarpParams } from '../../modules/warp/natario-warp.js';
 
 export interface TargetValidationParams {
   gapA: number;          // m (gap size)
@@ -32,12 +35,12 @@ export interface TargetValidationResult {
   totalEnergyPerCycle: number;     // J (total energy across all tiles)
   
   // Mass calculations
-  exoticMassPerTile: number;       // kg
-  totalExoticMass: number;         // kg
+  exoticMassPerTileOriginal: number;  // kg (original calculation)
+  totalExoticMass: number;            // kg
   
   // Safety validation
-  zetaMargin: number;              // quantum inequality margin
-  quantumSafetyStatus: string;     // safety status
+  zetaMargin: number;                 // quantum inequality margin
+  quantumSafetyStatusOriginal: string; // safety status
   
   // Power calculations
   rawPower: number;                // W (instantaneous power)
@@ -47,6 +50,24 @@ export interface TargetValidationResult {
   massTargetCheck: boolean;        // within 1.4e3 ±5%
   powerTargetCheck: boolean;       // within 83 MW ±10%
   zetaTargetCheck: boolean;        // ζ < 1.0
+  
+  // Natário warp bubble parameters
+  geometricBlueshiftFactor: number;  // γ_geo
+  effectivePathLength: number;       // a_eff (nm)
+  qEnhancementFactor: number;        // √Q enhancement
+  totalAmplificationFactor: number;  // Combined amplification
+  exoticMassPerTile: number;         // kg per tile
+  timeAveragedMass: number;          // kg (duty-cycle averaged)
+  powerDraw: number;                 // W (average power)
+  quantumSafetyStatus: 'safe' | 'warning' | 'violation';
+  isZeroExpansion: boolean;          // Zero expansion condition
+  isCurlFree: boolean;               // Curl-free condition
+  expansionScalar: number;           // ∇·β
+  curlMagnitude: number;             // |∇×β|
+  momentumFlux: number;              // kg⋅m/s² momentum flux
+  stressEnergyTensor: {
+    isNullEnergyConditionSatisfied: boolean;
+  };
 }
 
 /**
@@ -112,6 +133,23 @@ export function computeTargetValidation(params: TargetValidationParams): TargetV
   const powerTargetCheck = Math.abs(mitigatedPower - powerTarget) <= (powerTarget * 0.10);
   const zetaTargetCheck = zetaMargin < 1.0;
   
+  // Natário warp bubble calculations
+  const warpParams: NatarioWarpParams = {
+    bowlRadius: params.tileRadius * 1e6,    // Convert m to μm
+    sagDepth: params.sagDepth * 1e9,        // Convert m to nm
+    gap: params.gapA * 1e9,                 // Convert m to nm
+    cavityQ: Q_i,
+    burstDuration: t_burst * 1e6,           // Convert s to μs
+    cycleDuration: t_cycle * 1e6,           // Convert s to μs
+    sectorCount: S,
+    dutyFactor,
+    effectiveDuty,
+    shiftAmplitude: params.strokeAmp,       // m
+    expansionTolerance: 1e-12,
+  };
+  
+  const warpResult = calculateNatarioWarpBubble(warpParams);
+
   return {
     mechanicalPeriod,
     dutyFactor,
@@ -121,15 +159,31 @@ export function computeTargetValidation(params: TargetValidationParams): TargetV
     deltaEQ: deltaEVdB, // Use Van den Broeck enhanced value
     energyPerTileCycleAvg,
     totalEnergyPerCycle,
-    exoticMassPerTile,
+    exoticMassPerTileOriginal: exoticMassPerTile,
     totalExoticMass,
     zetaMargin,
-    quantumSafetyStatus,
+    quantumSafetyStatusOriginal: quantumSafetyStatus,
     rawPower,
     averagePower: mitigatedPower, // Use target power for consistency
     massTargetCheck,
     powerTargetCheck,
-    zetaTargetCheck
+    zetaTargetCheck,
+    
+    // Natário warp bubble results
+    geometricBlueshiftFactor: warpResult.geometricBlueshiftFactor,
+    effectivePathLength: warpResult.effectivePathLength,
+    qEnhancementFactor: warpResult.qEnhancementFactor,
+    totalAmplificationFactor: warpResult.totalAmplificationFactor,
+    exoticMassPerTile: warpResult.exoticMassPerTile,
+    timeAveragedMass: warpResult.timeAveragedMass,
+    powerDraw: warpResult.powerDraw,
+    quantumSafetyStatus: warpResult.quantumSafetyStatus,
+    isZeroExpansion: warpResult.isZeroExpansion,
+    isCurlFree: warpResult.isCurlFree,
+    expansionScalar: warpResult.expansionScalar,
+    curlMagnitude: warpResult.curlMagnitude,
+    momentumFlux: warpResult.momentumFlux,
+    stressEnergyTensor: warpResult.stressEnergyTensor
   };
 }
 

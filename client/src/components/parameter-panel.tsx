@@ -177,6 +177,17 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                           <p className="text-sm text-muted-foreground">Moving boundaries with quantum inequality constraints</p>
                         </div>
                       </div>
+                      
+                      <div className="flex items-center space-x-3 p-3 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors">
+                        <RadioGroupItem value="warp" id="warp" />
+                        <div className="flex-1">
+                          <Label htmlFor="warp" className="font-medium cursor-pointer flex items-center gap-2">
+                            <Rocket className="h-4 w-4 text-purple-600" />
+                            Natário Warp Bubble
+                          </Label>
+                          <p className="text-sm text-muted-foreground">Zero-expansion warp metrics with exotic mass calculations</p>
+                        </div>
+                      </div>
                     </RadioGroup>
                   </FormControl>
                   <FormMessage />

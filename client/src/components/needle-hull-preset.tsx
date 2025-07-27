@@ -28,8 +28,8 @@ export function NeedleHullPreset({ form }: NeedleHullPresetProps) {
     form.setValue("material", "custom");
     form.setValue("temperature", 20); // 20 K operating temperature
     
-    // Dynamic Casimir configuration
-    form.setValue("moduleType", "dynamic");
+    // Natário Warp Bubble configuration
+    form.setValue("moduleType", "warp");
     form.setValue("dynamicConfig", {
       // 15 GHz modulation with ±50 pm stroke amplitude
       modulationFreqGHz: 15,
@@ -46,7 +46,12 @@ export function NeedleHullPreset({ form }: NeedleHullPresetProps) {
       sectorCount: 400, // 400 azimuthal sectors
       sectorDuty: 2.5e-5, // Ship-wide duty factor d_eff = 2.5×10⁻⁵
       pulseFrequencyGHz: 15, // 15 GHz pulse frequency
-      lightCrossingTimeNs: 100 // ~100 ns light crossing time for hull geometry
+      lightCrossingTimeNs: 100, // ~100 ns light crossing time for hull geometry
+      
+      // Warp field parameters
+      shiftAmplitude: 50e-12, // 50 pm shift amplitude for β(r) field
+      expansionTolerance: 1e-12, // Zero-expansion tolerance
+      warpFieldType: "natario" // Natário zero-expansion type
     });
     
     // Advanced computational parameters for high precision

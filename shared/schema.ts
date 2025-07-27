@@ -10,7 +10,7 @@ export const simulationParametersSchema = z.object({
   temperature: z.number().positive().min(0.1).max(1000).default(20), // K
   
   // Module system parameters (for future expansion)
-  moduleType: z.enum(["static", "dynamic", "array"]).default("static"),
+  moduleType: z.enum(["static", "dynamic", "array", "warp"]).default("static"),
   
   // Array module parameters
   arrayConfig: z.object({
@@ -30,7 +30,12 @@ export const simulationParametersSchema = z.object({
     sectorCount: z.number().int().positive().min(1).max(1000).default(400), // Number of sectors
     sectorDuty: z.number().positive().min(1e-6).max(1).default(2.5e-5), // Ship-wide duty factor
     pulseFrequencyGHz: z.number().positive().min(0.1).max(100).default(15), // Pulse frequency
-    lightCrossingTimeNs: z.number().positive().min(1).max(1000).default(100) // Light crossing time
+    lightCrossingTimeNs: z.number().positive().min(1).max(1000).default(100), // Light crossing time
+    
+    // Warp field parameters
+    shiftAmplitude: z.number().positive().min(1e-15).max(1e-9).default(50e-12), // m (shift amplitude for β field)
+    expansionTolerance: z.number().positive().min(1e-15).max(1e-6).default(1e-12), // Zero-expansion tolerance
+    warpFieldType: z.enum(["natario", "alcubierre"]).default("natario") // Warp field type
   }).optional(),
   
   // Advanced computational parameters
@@ -73,7 +78,7 @@ export const simulationResultSchema = z.object({
     // Additional power and mass readouts
     averagePowerPerTile: z.number().optional(),
     averagePowerTotalLattice: z.number().optional(),
-    exoticMassPerTile: z.number().optional(),
+    exoticMassPerTileDynamic: z.number().optional(),
     exoticMassTotalLattice: z.number().optional(),
     isaacsonLimit: z.boolean().optional(),
     greenWaldCompliance: z.boolean().optional(),
@@ -84,7 +89,23 @@ export const simulationResultSchema = z.object({
     sectorStrobingEfficiency: z.number().optional(),
     grValidityCheck: z.boolean().optional(),
     homogenizationRatio: z.number().optional(),
-    timeAveragedCurvature: z.number().optional()
+    timeAveragedCurvature: z.number().optional(),
+    
+    // Warp bubble results
+    geometricBlueshiftFactor: z.number().optional(),
+    effectivePathLength: z.number().optional(),
+    qEnhancementFactor: z.number().optional(),
+    totalAmplificationFactor: z.number().optional(),
+    exoticMassPerTile: z.number().optional(),
+    timeAveragedMass: z.number().optional(),
+    powerDraw: z.number().optional(),
+    quantumSafetyStatusWarp: z.enum(['safe', 'warning', 'violation']).optional(),
+    isZeroExpansion: z.boolean().optional(),
+    isCurlFree: z.boolean().optional(),
+    expansionScalar: z.number().optional(),
+    curlMagnitude: z.number().optional(),
+    momentumFlux: z.number().optional(),
+    nullEnergyConditionSatisfied: z.boolean().optional()
   }).optional(),
   generatedFiles: z.array(z.object({
     id: z.string(),

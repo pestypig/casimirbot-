@@ -31,6 +31,24 @@ interface DesignLedgerProps {
     // Target validation
     massTargetCheck?: boolean;
     powerTargetCheck?: boolean;
+    
+    // Natário warp bubble parameters
+    geometricBlueshiftFactor?: number;
+    effectivePathLength?: number;
+    qEnhancementFactor?: number;
+    totalAmplificationFactor?: number;
+    exoticMassPerTile?: number;
+    timeAveragedMass?: number;
+    powerDraw?: number;
+    quantumSafetyStatus?: 'safe' | 'warning' | 'violation';
+    isZeroExpansion?: boolean;
+    isCurlFree?: boolean;
+    expansionScalar?: number;
+    curlMagnitude?: number;
+    momentumFlux?: number;
+    stressEnergyTensor?: {
+      isNullEnergyConditionSatisfied: boolean;
+    };
   };
 }
 
@@ -229,6 +247,190 @@ export function DesignLedger({ results }: DesignLedgerProps) {
               <span className="text-sm font-medium text-red-800">
                 Warning: Exotic mass {results.totalExoticMass.toFixed(1)} kg is outside the target range of 1.4×10³ ±5% kg
               </span>
+            </div>
+          </div>
+        )}
+        
+        {/* Natário Warp Bubble Section */}
+        {(results.geometricBlueshiftFactor !== undefined || 
+          results.isZeroExpansion !== undefined ||
+          results.quantumSafetyStatus !== undefined) && (
+          <div className="mt-6 pt-4 border-t">
+            <h4 className="font-medium text-sm mb-3 text-primary">
+              Natário Zero-Expansion Warp Bubble
+            </h4>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              {/* Geometric Amplification */}
+              {results.geometricBlueshiftFactor !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">γ_geo (Blue-shift Factor)</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">
+                      {results.geometricBlueshiftFactor.toFixed(2)}
+                    </span>
+                    <Badge 
+                      variant={getValidationStatus(results.geometricBlueshiftFactor, targets.gammaGeo) === 'pass' ? 'secondary' : 'destructive'}
+                      className="text-[10px] px-1.5 py-0.5"
+                    >
+                      Target: {targets.gammaGeo}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+              
+              {/* Effective Path Length */}
+              {results.effectivePathLength !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">a_eff (Path Length)</div>
+                  <div className="font-mono">
+                    {results.effectivePathLength.toFixed(3)} nm
+                  </div>
+                </div>
+              )}
+              
+              {/* Q Enhancement */}
+              {results.qEnhancementFactor !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">√Q Enhancement</div>
+                  <div className="font-mono">
+                    {results.qEnhancementFactor.toExponential(2)}
+                  </div>
+                </div>
+              )}
+              
+              {/* Total Amplification */}
+              {results.totalAmplificationFactor !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Total Amplification</div>
+                  <div className="font-mono">
+                    {results.totalAmplificationFactor.toExponential(2)}
+                  </div>
+                </div>
+              )}
+              
+              {/* Per-Tile Exotic Mass */}
+              {results.exoticMassPerTile !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Mass per Tile</div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono">
+                      {results.exoticMassPerTile.toFixed(2)} kg
+                    </span>
+                    <Badge 
+                      variant={Math.abs(results.exoticMassPerTile - 1.5) / 1.5 < 0.1 ? 'secondary' : 'destructive'}
+                      className="text-[10px] px-1.5 py-0.5"
+                    >
+                      Target: 1.5 kg
+                    </Badge>
+                  </div>
+                </div>
+              )}
+              
+              {/* Time-Averaged Mass */}
+              {results.timeAveragedMass !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Time-Avg Mass</div>
+                  <div className="font-mono">
+                    {results.timeAveragedMass.toExponential(2)} kg
+                  </div>
+                </div>
+              )}
+              
+              {/* Zero-Expansion Status */}
+              {results.isZeroExpansion !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Zero Expansion</div>
+                  <div className="flex items-center gap-2">
+                    {results.isZeroExpansion ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className={results.isZeroExpansion ? 'text-green-600' : 'text-red-600'}>
+                      {results.isZeroExpansion ? 'Satisfied' : 'Violated'}
+                    </span>
+                    {results.expansionScalar !== undefined && (
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        (∇·β = {results.expansionScalar.toExponential(1)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Curl-Free Status */}
+              {results.isCurlFree !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Curl-Free Field</div>
+                  <div className="flex items-center gap-2">
+                    {results.isCurlFree ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className={results.isCurlFree ? 'text-green-600' : 'text-red-600'}>
+                      {results.isCurlFree ? 'Satisfied' : 'Violated'}
+                    </span>
+                    {results.curlMagnitude !== undefined && (
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        (|∇×β| = {results.curlMagnitude.toExponential(1)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Quantum Safety Status */}
+              {results.quantumSafetyStatus !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Quantum Safety</div>
+                  <div className="flex items-center gap-2">
+                    {results.quantumSafetyStatus === 'safe' ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : results.quantumSafetyStatus === 'warning' ? (
+                      <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className={
+                      results.quantumSafetyStatus === 'safe' ? 'text-green-600' :
+                      results.quantumSafetyStatus === 'warning' ? 'text-amber-600' : 'text-red-600'
+                    }>
+                      {results.quantumSafetyStatus.charAt(0).toUpperCase() + results.quantumSafetyStatus.slice(1)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Momentum Flux */}
+              {results.momentumFlux !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Momentum Flux</div>
+                  <div className="font-mono">
+                    {results.momentumFlux.toExponential(2)} N
+                  </div>
+                </div>
+              )}
+              
+              {/* Null Energy Condition */}
+              {results.stressEnergyTensor?.isNullEnergyConditionSatisfied !== undefined && (
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Null Energy Condition</div>
+                  <div className="flex items-center gap-2">
+                    {results.stressEnergyTensor.isNullEnergyConditionSatisfied ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <span className={
+                      results.stressEnergyTensor.isNullEnergyConditionSatisfied ? 'text-green-600' : 'text-red-600'
+                    }>
+                      {results.stressEnergyTensor.isNullEnergyConditionSatisfied ? 'Satisfied' : 'Violated'}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
