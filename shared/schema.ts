@@ -5,6 +5,7 @@ export const simulationParametersSchema = z.object({
   geometry: z.enum(["sphere", "parallel_plate", "bowl"]),
   gap: z.number().positive().min(0.01).max(1000), // nm
   radius: z.number().positive().min(1).max(100000), // µm
+  sagDepth: z.number().positive().min(0.1).max(1000).optional(), // nm, only for bowl geometry
   material: z.enum(["PEC", "custom"]).default("PEC"),
   temperature: z.number().positive().min(0.1).max(1000).default(20), // K
   advanced: z.object({

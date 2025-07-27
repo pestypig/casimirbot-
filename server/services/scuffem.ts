@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { SimulationParameters } from '@shared/schema';
 import path from 'path';
 import fs from 'fs/promises';
+import { gmshService } from './gmsh';
 
 export class ScuffemService {
   private workingDir: string;
@@ -79,17 +80,66 @@ ENDOBJECT
   }
 
   async generateMeshFiles(params: SimulationParameters, simulationId: string): Promise<string[]> {
-    const { geometry, radius } = params;
+    const { geometry, radius, sagDepth } = params;
     const simDir = path.join(this.workingDir, simulationId);
     await fs.mkdir(simDir, { recursive: true });
 
     const meshFiles: string[] = [];
 
-    // Generate simple mesh files (in a real implementation, these would be proper GMSH files)
+    try {
+      switch (geometry) {
+        case 'sphere':
+          const spherePath = path.join(simDir, 'sphere.msh');
+          const spherePlatePath = path.join(simDir, 'plate.msh');
+          
+          await gmshService.generateSphereMesh(radius, spherePath);
+          await gmshService.generatePlateMesh(radius * 2, spherePlatePath);
+          
+          meshFiles.push('sphere.msh', 'plate.msh');
+          break;
+
+        case 'parallel_plate':
+          const plate1Path = path.join(simDir, 'plate1.msh');
+          const plate2Path = path.join(simDir, 'plate2.msh');
+          
+          await gmshService.generatePlateMesh(radius, plate1Path);
+          await gmshService.generatePlateMesh(radius, plate2Path);
+          
+          meshFiles.push('plate1.msh', 'plate2.msh');
+          break;
+
+        case 'bowl':
+          const bowlPath = path.join(simDir, 'bowl.msh');
+          const pistonPath = path.join(simDir, 'piston.msh');
+          
+          // Use sagDepth for bowl mesh generation, fallback to 100 nm if not provided
+          const depth = sagDepth || 100;
+          
+          // Generate bowl mesh with 25 mm radius as specified
+          await gmshService.generateBowlMesh(depth, 25000, bowlPath);
+          await gmshService.generatePlateMesh(radius, pistonPath);
+          
+          meshFiles.push('bowl.msh', 'piston.msh');
+          break;
+      }
+    } catch (error) {
+      // Fallback to simple mesh generation if Gmsh fails
+      console.warn('Gmsh generation failed, falling back to simple meshes:', error);
+      return this.generateSimpleMeshFiles(params, simulationId);
+    }
+
+    return meshFiles;
+  }
+
+  private async generateSimpleMeshFiles(params: SimulationParameters, simulationId: string): Promise<string[]> {
+    const { geometry, radius } = params;
+    const simDir = path.join(this.workingDir, simulationId);
+    const meshFiles: string[] = [];
+
     switch (geometry) {
       case 'sphere':
-        const sphereMesh = this.generateSphereMesh(radius);
-        const plateMesh = this.generatePlateMesh(radius * 2);
+        const sphereMesh = this.generateSphereMeshSimple(radius);
+        const plateMesh = this.generatePlateMeshSimple(radius * 2);
         
         const spherePath = path.join(simDir, 'sphere.msh');
         const platePath = path.join(simDir, 'plate.msh');
@@ -101,8 +151,8 @@ ENDOBJECT
         break;
 
       case 'parallel_plate':
-        const plate1Mesh = this.generatePlateMesh(radius);
-        const plate2Mesh = this.generatePlateMesh(radius);
+        const plate1Mesh = this.generatePlateMeshSimple(radius);
+        const plate2Mesh = this.generatePlateMeshSimple(radius);
         
         const plate1Path = path.join(simDir, 'plate1.msh');
         const plate2Path = path.join(simDir, 'plate2.msh');
@@ -114,8 +164,8 @@ ENDOBJECT
         break;
 
       case 'bowl':
-        const bowlMesh = this.generateBowlMesh(radius);
-        const pistonMesh = this.generatePlateMesh(radius);
+        const bowlMesh = this.generateBowlMeshSimple(radius, params.sagDepth || 100);
+        const pistonMesh = this.generatePlateMeshSimple(radius);
         
         const bowlPath = path.join(simDir, 'bowl.msh');
         const pistonPath = path.join(simDir, 'piston.msh');
@@ -130,27 +180,28 @@ ENDOBJECT
     return meshFiles;
   }
 
-  private generateSphereMesh(radius: number): string {
-    // Simplified sphere mesh - in reality this would use GMSH
+  private generateSphereMeshSimple(radius: number): string {
+    // Simplified sphere mesh - fallback when Gmsh is not available
     return `# Sphere mesh (radius: ${radius} µm)
 # This is a simplified placeholder mesh
 # In production, use GMSH to generate proper tetrahedral mesh
 `;
   }
 
-  private generatePlateMesh(radius: number): string {
-    // Simplified plate mesh
+  private generatePlateMeshSimple(radius: number): string {
+    // Simplified plate mesh - fallback when Gmsh is not available
     return `# Plate mesh (radius: ${radius} µm)
 # This is a simplified placeholder mesh
 # In production, use GMSH to generate proper surface mesh
 `;
   }
 
-  private generateBowlMesh(radius: number): string {
-    // Simplified bowl mesh
-    return `# Bowl mesh (radius: ${radius} µm)
+  private generateBowlMeshSimple(radius: number, sagDepth: number): string {
+    // Simplified bowl mesh - fallback when Gmsh is not available
+    return `# Bowl mesh (radius: ${radius} µm, sag depth: ${sagDepth} nm)
 # This is a simplified placeholder mesh
-# In production, use GMSH to generate proper curved surface mesh
+# In production, use GMSH to generate proper curved surface mesh with specified sag depth
+# Concave spherical cap with 25 mm radius and ${sagDepth} nm sag depth
 `;
   }
 

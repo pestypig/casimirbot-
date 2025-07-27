@@ -27,6 +27,7 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
       geometry: "parallel_plate",
       gap: 1.0,
       radius: 25000,
+      sagDepth: 100.0,
       material: "PEC",
       temperature: 20,
       advanced: {
@@ -120,7 +121,8 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                           step="0.1" 
                           placeholder="1.0" 
                           {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                           className="pr-12"
                         />
                       </FormControl>
@@ -145,7 +147,8 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                           step="1" 
                           placeholder="25000" 
                           {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                           className="pr-12"
                         />
                       </FormControl>
@@ -179,6 +182,35 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                 )}
               />
 
+              {/* Sag Depth Field (only for bowl geometry) */}
+              {form.watch("geometry") === "bowl" && (
+                <FormField
+                  control={form.control}
+                  name="sagDepth"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sag Depth</FormLabel>
+                      <div className="relative">
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="1" 
+                            placeholder="100.0" 
+                            {...field}
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                            className="pr-12"
+                          />
+                        </FormControl>
+                        <span className="absolute right-3 top-2 text-sm text-muted-foreground">nm</span>
+                      </div>
+                      <FormDescription>Concave depth of the spherical cap (25 mm radius)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField
                 control={form.control}
                 name="temperature"
@@ -192,7 +224,8 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
                           step="0.1" 
                           placeholder="20" 
                           {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
                           className="pr-12"
                         />
                       </FormControl>
