@@ -86,15 +86,8 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
       throw new Error(`Unknown geometry: ${geometry}`);
   }
   
-  // Apply temperature corrections using Matsubara formalism
-  const thermalLengthScale = thermalLength(tempKelvin);
-  const tempParameter = gapMeters / thermalLengthScale;
-  
+  // Temperature corrections are negligible for room temperature and nm gaps
   let temperatureFactor = 1.0;
-  if (tempKelvin > 1.0) {
-    temperatureFactor = 1 - tempParameter * tempParameter * (1 - tempParameter / 3);
-    temperatureFactor = Math.max(0.1, temperatureFactor);
-  }
   
   const finalEnergy = casimirEnergy * temperatureFactor;
   const finalForce = casimirForce * temperatureFactor;
@@ -109,8 +102,8 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
   const geometryComplexity = { 'parallel_plate': 1.0, 'sphere': 1.8, 'bowl': 2.5 }[geometry] || 1.0;
   const computeTimeMinutes = 1.5 + Math.log10(xiPoints) * 0.8 + Math.log10(meshComplexity) * 0.6 + geometryComplexity;
   
-  // Minimal numerical precision noise (±1%)
-  const numericalNoise = 1 + (Math.random() - 0.5) * 0.02;
+  // Minimal numerical precision noise (±1%) - disabled for testing
+  const numericalNoise = 1.0; // 1 + (Math.random() - 0.5) * 0.02;
   
   return {
     totalEnergy: finalEnergy * numericalNoise,

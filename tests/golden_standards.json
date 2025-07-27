@@ -1,0 +1,49 @@
+{
+  "description": "Golden standard results for regression testing",
+  "version": "1.0.0",
+  "standards": {
+    "parallel_plate_1nm_25mm": {
+      "description": "Parallel plates, 1nm gap, 25mm radius",
+      "parameters": {
+        "geometry": "parallel_plate",
+        "gap": 1.0,
+        "radius": 25000,
+        "material": "PEC",
+        "temperature": 20
+      },
+      "expected_energy": -1.402e-12,
+      "tolerance": 0.05,
+      "analytic_formula": "-(π²ℏc A)/(720 a³)"
+    },
+    "bowl_needle_hull": {
+      "description": "Bowl geometry with Needle Hull parameters",
+      "parameters": {
+        "geometry": "bowl",
+        "gap": 1.0,
+        "radius": 20000,
+        "sagDepth": 16,
+        "material": "PEC",
+        "temperature": 20,
+        "moduleType": "dynamic",
+        "dynamicConfig": {
+          "modulationFreqGHz": 15,
+          "strokeAmplitudePm": 50,
+          "burstLengthUs": 10,
+          "cycleLengthUs": 1000,
+          "cavityQ": 1000000000
+        }
+      },
+      "expected_mass_per_tile": 1.5,
+      "expected_mass_total": 2.94e9,
+      "expected_power_total": 83e6,
+      "tolerance": 0.05,
+      "source": "83 MW Needle Hull Mark 1 paper"
+    }
+  },
+  "convergence_rules": {
+    "xi_points_1nm": 5000,
+    "xi_points_2nm": 3000,
+    "max_error_percent": 5.0,
+    "qi_safety_threshold": 1.0
+  }
+}
