@@ -35,8 +35,8 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
   const formatScientificNotation = (value: number) => {
     if (Math.abs(value) === 0) return "0";
     const exp = Math.floor(Math.log10(Math.abs(value)));
-    const mantissa = (value / Math.pow(10, exp)).toFixed(2);
-    return `${mantissa} × 10${exp >= 0 ? '' : ''}${exp}`;
+    const mantissa = (value / Math.pow(10, exp)).toFixed(3); // Show to 3 decimal places for precision
+    return `${mantissa} × 10^${exp}`;
   };
 
   const getFileIcon = (type: string) => {

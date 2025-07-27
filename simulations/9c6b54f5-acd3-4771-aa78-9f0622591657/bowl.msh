@@ -1,0 +1,4 @@
+# Bowl mesh (radius: 2000 µm, sag depth: 100 nm)
+# This is a simplified placeholder mesh
+# In production, use GMSH to generate proper curved surface mesh with specified sag depth
+# Concave spherical cap with 25 mm radius and 100 nm sag depth

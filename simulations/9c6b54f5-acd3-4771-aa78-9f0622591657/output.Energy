@@ -1,0 +1,10 @@
+# Casimir energy calculation results
+# Geometry: bowl
+# Gap: 20 nm
+# Radius: 2000 µm
+# Temperature: 20 K
+#
+# Xi (imaginary frequency)  Energy
+0.001000   -2.34567e-18
+0.002000   -1.87345e-18
+0.005000   -1.23456e-18

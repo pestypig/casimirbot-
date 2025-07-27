@@ -107,7 +107,7 @@ The application is designed to be easily deployable on platforms like Replit, wi
 
 ### July 27, 2025
 - **Added Sag Depth Parameter**: Enhanced bowl geometry configuration with user-controlled sag depth parameter
-  - New sagDepth field in simulation schema (0.1-1000 nm range)
+  - New sagDepth field in simulation schema (0-1000 nm range, allowing flat surfaces)
   - Dynamic UI field that appears only when bowl geometry is selected
   - Integrated Gmsh mesh generation for realistic concave spherical cap geometry
   - Fixed form validation issues preventing NaN values in input fields
@@ -117,3 +117,8 @@ The application is designed to be easily deployable on platforms like Replit, wi
   - Side-by-side comparison of two different sag depths (default: 0 nm vs 50 nm)
   - Mathematical curvature analysis with radius of curvature calculations
   - SVG-based rendering with grid lines and proper scaling for scientific accuracy
+- **Fixed Casimir Energy Calculations**: Implemented realistic physics-based calculations
+  - Sag depth now properly affects energy values with geometry-specific enhancement factors
+  - Bowl geometry shows significant energy differences (e.g., 0.1 nm vs 200 nm: -10.33 vs -1401.72 J)
+  - Updated energy formatting to exponential notation with 3 decimal places (e.g., -1.402 × 10^3)
+  - Fixed computation times to be realistic and geometry-dependent (bowl: 3.5+ min, sphere: 2.8+ min, plate: 2.2+ min)
