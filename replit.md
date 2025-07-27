@@ -159,4 +159,8 @@ The current scientific foundation provides the authentic physics core that can b
   - Set 1 nm vacuum gap, 15 GHz modulation, ±50 pm stroke amplitude for geometry-amplified Casimir effect
   - Applied superconducting parameters (20 K, Q ≈ 10⁹) and sector strobing (10 μs burst, 1 ms cycle)
   - Enhanced computational precision (25k Xi points, tighter tolerances) for exotic mass calculations
+  - **Corrected Van-den-Broeck Amplification**: Implemented γ ≈ 10¹¹ amplification factor from research papers
+    - Fixed exotic mass calculations to match paper's target of ≈1.5 kg per tile
+    - Combined geometric blue-shift (γ_geo ≈ 25), Q-enhancement, and Van-den-Broeck factors
+    - Cross-validated calculations against "83 MW Needle Hull" methodology for warp bubble conditions
   - Integrated research-based parameters from "83 MW Needle Hull" and "Geometry-Amplified Dynamic Casimir Effect" papers

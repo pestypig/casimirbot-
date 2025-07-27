@@ -421,7 +421,7 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
               </h4>
               <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
                 Configure parameters based on "Needle Hull" and "Geometry-Amplified Dynamic Casimir Effect" research papers
-                for theoretical warp bubble conditions. Scaled geometry maintains curvature ratios for γ ≈ 25 amplification.
+                for theoretical warp bubble conditions. Implements Van-den-Broeck amplification (γ ≈ 10¹¹) targeting ≈1.5 kg exotic mass per tile.
               </p>
               <Button 
                 type="button" 
