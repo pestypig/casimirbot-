@@ -71,6 +71,50 @@ export function DynamicDashboard({ results, parameters, isVisible }: DynamicDash
             </div>
           </div>
 
+          {/* Power Analysis */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-4">Power Analysis</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg">
+                <h5 className="font-medium text-orange-900 dark:text-orange-100">Per Tile</h5>
+                <p className="text-xl font-bold text-orange-700 dark:text-orange-200">
+                  {formatScientific(results.averagePowerPerTile)} MW
+                </p>
+                <p className="text-sm text-orange-600 dark:text-orange-300">Single tile average</p>
+              </div>
+              
+              <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+                <h5 className="font-medium text-red-900 dark:text-red-100">Total Lattice</h5>
+                <p className="text-xl font-bold text-red-700 dark:text-red-200">
+                  {formatScientific(results.averagePowerTotalLattice)} MW
+                </p>
+                <p className="text-sm text-red-600 dark:text-red-300">Full 1.96×10⁹ tiles</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Exotic Mass Analysis */}
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border">
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-4">Exotic Mass Analysis</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <h5 className="font-medium text-green-900 dark:text-green-100">Per Tile</h5>
+                <p className="text-xl font-bold text-green-700 dark:text-green-200">
+                  {formatScientific(results.exoticMassPerTile)} kg
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-300">Single tile mass</p>
+              </div>
+              
+              <div className="bg-cyan-50 dark:bg-cyan-900/20 p-4 rounded-lg">
+                <h5 className="font-medium text-cyan-900 dark:text-cyan-100">Total Lattice</h5>
+                <p className="text-xl font-bold text-cyan-700 dark:text-cyan-200">
+                  {formatScientific(results.exoticMassTotalLattice)} kg
+                </p>
+                <p className="text-sm text-cyan-600 dark:text-cyan-300">Target: 1.4×10³ kg</p>
+              </div>
+            </div>
+          </div>
+
           {/* Energy calculations */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">

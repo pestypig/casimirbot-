@@ -65,6 +65,11 @@ export const simulationResultSchema = z.object({
     quantumSafetyStatus: z.enum(['safe', 'warning', 'violation']).optional(),
     instantaneousPower: z.number().optional(),
     averagePower: z.number().optional(),
+    // Additional power and mass readouts
+    averagePowerPerTile: z.number().optional(),
+    averagePowerTotalLattice: z.number().optional(),
+    exoticMassPerTile: z.number().optional(),
+    exoticMassTotalLattice: z.number().optional(),
     isaacsonLimit: z.boolean().optional(),
     greenWaldCompliance: z.boolean().optional()
   }).optional(),
