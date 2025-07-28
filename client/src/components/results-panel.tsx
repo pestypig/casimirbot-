@@ -8,6 +8,7 @@ import ChartVisualization from "@/components/chart-visualization";
 import { DynamicDashboard } from "@/components/dynamic-dashboard";
 import { DesignLedger } from "./design-ledger";
 import { VisualProofCharts } from "./visual-proof-charts";
+import { VerificationTab } from "./verification-tab";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -80,7 +81,7 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
     <Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="border-b border-border">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="results" className="flex items-center gap-2">
               <ChartBar className="h-4 w-4" />
               Results
@@ -88,6 +89,10 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             <TabsTrigger value="visual-proofs" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
               Visual Proofs
+            </TabsTrigger>
+            <TabsTrigger value="verification" className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Verification
             </TabsTrigger>
             <TabsTrigger value="files" className="flex items-center gap-2">
               <Folder className="h-4 w-4" />
@@ -434,6 +439,22 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
               <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Visual proof charts will appear here</p>
               <p className="text-sm">Complete a simulation to see visual analysis</p>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="verification" className="p-6">
+          {/* Verification Tab - Paper-ready Evidence Tools */}
+          {simulation.status === 'completed' && results ? (
+            <VerificationTab 
+              simulation={simulation}
+              results={results}
+            />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Verification tools will appear here</p>
+              <p className="text-sm">Complete a simulation to access verification gadgets</p>
             </div>
           )}
         </TabsContent>
