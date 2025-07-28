@@ -78,6 +78,50 @@ export function DesignLedger({ results }: DesignLedgerProps) {
     return Math.abs(1 - ratio) <= tolerance ? 'pass' : 'warn';
   };
 
+  // LED Status Indicator Component
+  const StatusLED = ({ status, size = 'w-3 h-3' }: { status: 'pass' | 'warn' | 'fail' | 'unknown', size?: string }) => {
+    const colors = {
+      pass: 'bg-green-500',
+      warn: 'bg-amber-500', 
+      fail: 'bg-red-500',
+      unknown: 'bg-gray-400'
+    };
+    return <div className={`${size} rounded-full ${colors[status]} border border-gray-300`} />;
+  };
+
+  // Enhanced validation with traffic-light status
+  const getGammaGeoStatus = () => {
+    const actual = results.geometricBlueshiftFactor || results.gammaGeo;
+    if (!actual) return 'unknown';
+    if (Math.abs(actual - targets.gammaGeo) / targets.gammaGeo <= 0.1) return 'pass'; // ±10%
+    if (Math.abs(actual - targets.gammaGeo) / targets.gammaGeo <= 0.2) return 'warn'; // ±20%
+    return 'fail';
+  };
+
+  const getMassStatus = () => {
+    const actual = results.totalExoticMass || results.exoticMassPerTile;
+    if (!actual) return 'unknown';
+    if (Math.abs(actual - targets.exoticMassTarget) / targets.exoticMassTarget <= 0.05) return 'pass'; // ±5%
+    if (Math.abs(actual - targets.exoticMassTarget) / targets.exoticMassTarget <= 0.1) return 'warn'; // ±10%
+    return 'fail';
+  };
+
+  const getPowerStatus = () => {
+    const actual = results.powerDraw || results.averagePower;
+    if (!actual) return 'unknown';
+    if (Math.abs(actual - targets.powerTarget) / targets.powerTarget <= 0.1) return 'pass'; // ±10%
+    if (Math.abs(actual - targets.powerTarget) / targets.powerTarget <= 0.2) return 'warn'; // ±20%
+    return 'fail';
+  };
+
+  const getQuantumSafetyStatus = () => {
+    const zeta = results.quantumInequalityMargin || results.zetaMargin;
+    if (!zeta) return 'unknown';
+    if (zeta < 0.9) return 'pass';
+    if (zeta < 1.0) return 'warn';
+    return 'fail';
+  };
+
   const formatPower = (watts: number | undefined) => {
     if (!watts) return '—';
     if (watts >= 1e6) return `${(watts / 1e6).toFixed(1)} MW`;
@@ -103,8 +147,11 @@ export function DesignLedger({ results }: DesignLedgerProps) {
             <div className="flex justify-between items-center">
               <span className="text-sm">γ_geo:</span>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-sm">{results.gammaGeo || '—'}</span>
-                <Badge variant={getValidationStatus(results.gammaGeo, targets.gammaGeo) === 'pass' ? 'default' : 'secondary'}>
+                <StatusLED status={getGammaGeoStatus()} />
+                <span className="font-mono text-sm">
+                  {(results.geometricBlueshiftFactor || results.gammaGeo)?.toFixed(1) || '—'}
+                </span>
+                <Badge variant={getGammaGeoStatus() === 'pass' ? 'default' : 'secondary'}>
                   Target: {targets.gammaGeo}
                 </Badge>
               </div>
@@ -164,14 +211,14 @@ export function DesignLedger({ results }: DesignLedgerProps) {
             <div className="flex justify-between items-center">
               <span className="text-sm">Exotic mass:</span>
               <div className="flex items-center gap-2">
+                <StatusLED status={getMassStatus()} />
                 <span className="font-mono text-sm">
-                  {results.totalExoticMass ? `${results.totalExoticMass.toFixed(1)} kg` : '—'}
+                  {(results.totalExoticMass || results.exoticMassPerTile) ? 
+                    `${(results.totalExoticMass || results.exoticMassPerTile)!.toFixed(1)} kg` : '—'}
                 </span>
-                {results.totalExoticMass && (
-                  <Badge variant={getValidationStatus(results.totalExoticMass, targets.exoticMassTarget) === 'pass' ? 'default' : 'destructive'}>
-                    {getValidationStatus(results.totalExoticMass, targets.exoticMassTarget) === 'pass' ? '✓' : '⚠'}
-                  </Badge>
-                )}
+                <Badge variant={getMassStatus() === 'pass' ? 'default' : 'destructive'}>
+                  Target: 1.4×10³ kg
+                </Badge>
               </div>
             </div>
           </div>
@@ -183,16 +230,26 @@ export function DesignLedger({ results }: DesignLedgerProps) {
             <div className="flex justify-between items-center">
               <span className="text-sm">ζ margin:</span>
               <div className="flex items-center gap-2">
+                <StatusLED status={getQuantumSafetyStatus()} />
                 <span className={`font-mono text-sm font-bold text-${getZetaColor(results.zetaMargin || results.quantumInequalityMargin)}-600`}>
                   {(results.zetaMargin || results.quantumInequalityMargin)?.toFixed(3) || '—'}
                 </span>
-                {(results.zetaMargin || results.quantumInequalityMargin) && (
-                  <>
-                    {(results.zetaMargin || results.quantumInequalityMargin)! < 0.9 && <CheckCircle className="h-4 w-4 text-green-600" />}
-                    {(results.zetaMargin || results.quantumInequalityMargin)! >= 0.9 && (results.zetaMargin || results.quantumInequalityMargin)! < 1.0 && <AlertTriangle className="h-4 w-4 text-amber-600" />}
-                    {(results.zetaMargin || results.quantumInequalityMargin)! >= 1.0 && <XCircle className="h-4 w-4 text-red-600" />}
-                  </>
-                )}
+                <Badge variant={getQuantumSafetyStatus() === 'pass' ? 'default' : 'destructive'}>
+                  Safe: &lt; 1.0
+                </Badge>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm">Power:</span>
+              <div className="flex items-center gap-2">
+                <StatusLED status={getPowerStatus()} />
+                <span className="font-mono text-sm">
+                  {formatPower(results.powerDraw || results.averagePower)}
+                </span>
+                <Badge variant={getPowerStatus() === 'pass' ? 'default' : 'secondary'}>
+                  Target: 83 MW
+                </Badge>
               </div>
             </div>
             

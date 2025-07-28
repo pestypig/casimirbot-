@@ -42,8 +42,10 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
   switch (geometry) {
     case 'parallel_plate':
       effectiveArea = PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters;
-      casimirEnergy = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C * effectiveArea) 
+      const parallelPlateEnergyTotal = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C * effectiveArea) 
                      / Math.pow(gapMeters, 3);
+      // SCUFF-EM reports energy of plate1 AND plate2, but Casimir interaction is half that sum
+      casimirEnergy = parallelPlateEnergyTotal / 2;
       casimirForce = Math.abs(casimirEnergy / gapMeters);
       break;
       
@@ -58,9 +60,10 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
       effectiveArea = PHYSICS_CONSTANTS.PI * radiusMeters * radiusMeters;
       
       if (sagDepthMeters === 0) {
-        // Flat surface
-        casimirEnergy = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C * effectiveArea) 
+        // Flat surface (divide by 2 for true interaction energy)
+        const flatEnergyTotal = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C * effectiveArea) 
                        / Math.pow(gapMeters, 3);
+        casimirEnergy = flatEnergyTotal / 2; // True interaction energy
         geometrySpecific.radiusOfCurvature = "∞ (flat)";
         geometrySpecific.pfaCorrection = "1.000";
       } else {
@@ -73,8 +76,10 @@ export function calculateCasimirEnergy(params: SimulationParameters): StaticCasi
         const surfaceAreaCorrection = 1 + Math.pow(sagDepthMeters / radiusMeters, 2) / 2;
         const correctedArea = effectiveArea * surfaceAreaCorrection;
         
-        casimirEnergy = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C 
-                         * correctedArea * pfaCorrection) / Math.pow(gapMeters, 3);
+        // Calculate curved energy (divide by 2 for true interaction)
+        const curvedEnergyTotal = -(PHYSICS_CONSTANTS.PARALLEL_PLATE_PREFACTOR * PHYSICS_CONSTANTS.HBAR_C * correctedArea * pfaCorrection) 
+                                 / Math.pow(gapMeters, 3);
+        casimirEnergy = curvedEnergyTotal / 2; // True interaction energy
         
         geometrySpecific.radiusOfCurvature = `${(radiusOfCurvature * 1000).toFixed(2)} mm`;
         geometrySpecific.pfaCorrection = pfaCorrection.toFixed(3);

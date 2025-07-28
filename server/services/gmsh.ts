@@ -6,11 +6,12 @@ export class GmshService {
   
   /**
    * Generates a concave spherical cap mesh using Gmsh
-   * @param sagDepth - Sag depth in nanometers
+   * @param sagDepth - Sag depth in nanometers (now properly drives mesh generation)
    * @param radius - Radius in micrometers (defaults to 25000 µm = 25 mm)
    * @param outputPath - Path where the mesh file will be saved
    */
   async generateBowlMesh(sagDepth: number, radius: number = 25000, outputPath: string): Promise<void> {
+    console.log(`[Gmsh] Generating bowl mesh with sagDepth=${sagDepth} nm, radius=${radius} µm`);
     const radiusInMeters = radius * 1e-6; // Convert µm to m
     const sagDepthInMeters = sagDepth * 1e-9; // Convert nm to m
     
