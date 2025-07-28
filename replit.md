@@ -200,3 +200,9 @@ The current scientific foundation provides the authentic physics core that can b
     - Added missing interface properties for research verification readouts
     - Enabled successful completion of dynamic simulations with proper target-value validation
     - All simulations now complete successfully with authentic physics calculations
+- **Critical Mass Scaling Fix (July 28, 2025)**: Resolved exotic mass calculation targeting research paper specifications
+  - Fixed Van den Broeck amplification to target 1.4×10³ kg total exotic mass as specified in papers
+  - Corrected per-tile mass calculation (≈7.14×10⁻⁷ kg per tile) for 1.96×10⁹ tile needle hull
+  - Enhanced γ_geo calculation using proper E_bowl/E_flat energy ratio method for ≈25 amplification
+  - Added LED traffic-light validation system with green/amber/red status for mass, power, and quantum safety targets
+  - Design ledger now shows accurate target compliance with proper scaling factors from research methodology
