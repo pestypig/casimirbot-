@@ -532,19 +532,75 @@ interface PhaseDiagramProps {
   shipRadius?: number;
   onTileAreaChange?: (value: number) => void;
   onShipRadiusChange?: (value: number) => void;
+  currentSimulation?: any; // Current simulation results for Energy Pipeline integration
 }
 
 export default function PhaseDiagram({ 
   tileArea = 2500, 
   shipRadius = 5.0, 
   onTileAreaChange, 
-  onShipRadiusChange 
+  onShipRadiusChange,
+  currentSimulation
 }: PhaseDiagramProps) {
 
-  // Calculate current point diagnostics
-  const currentDiagnostics = useMemo(() => 
-    calculateViability(tileArea, shipRadius), [tileArea, shipRadius]
-  );
+  // Calculate current point diagnostics using Energy Pipeline results when available
+  const currentDiagnostics = useMemo(() => {
+    // If we have a completed simulation with Energy Pipeline results, use those
+    if (currentSimulation?.status === 'completed' && currentSimulation?.results?.totalExoticMass) {
+      const results = currentSimulation.results;
+      
+      // Extract Energy Pipeline values from actual simulation
+      const M_exotic = results.totalExoticMass || 1400;
+      const P_avg = results.powerDraw || 83e6;
+      const gamma_geo = results.geometricBlueshiftFactor || 25;
+      const zeta_actual = results.quantumInequalityMargin || 0.0014;
+      const TS_ratio = results.timeScaleSeparation || 0.20;
+      
+      // Calculate derived values
+      const A_tile = tileArea * 1e-4;  // cm² to m²
+      const N_tiles = Math.PI * Math.pow(shipRadius, 2) / A_tile;
+      const powerPerTile = P_avg / N_tiles;
+      
+      // Use Energy Pipeline values
+      const U_static_total = results.U_static_total || -2.55e-3;
+      const U_geo_raw = results.U_geo_raw || -3.99e-1;
+      const U_Q = results.U_Q || -3.99e8;
+      const U_cycle = results.U_cycle || -3.99e6;
+      const P_loss = results.P_loss || 6.01e9;
+      
+      // Create constraints check using Energy Pipeline values
+      const checks = {
+        mass_ok: M_exotic >= 1000 && M_exotic <= 2000,
+        power_ok: powerPerTile <= 1e6,
+        quantum_safe: zeta_actual < 1.0,
+        timescale_ok: TS_ratio < 1.0
+      };
+      
+      const viable = checks.mass_ok && checks.power_ok && checks.quantum_safe && checks.timescale_ok;
+      const fail_reason = viable ? "none" : "Energy Pipeline constraints";
+      
+      return {
+        viable,
+        fail_reason,
+        N_tiles,
+        powerPerTile,
+        M_exotic,
+        P_avg,
+        zeta: zeta_actual,
+        TS_ratio,
+        gamma_geo,
+        U_static_total,
+        U_geo_raw,
+        U_Q,
+        U_cycle,
+        P_loss,
+        checks
+      };
+    }
+    
+    // Fallback to shorthand calculation if no Energy Pipeline results available
+    return calculateViability(tileArea, shipRadius);
+  }, [tileArea, shipRadius, currentSimulation]);
 
   // Build viability grid (cached)
   const viabilityGrid = useMemo(() => 

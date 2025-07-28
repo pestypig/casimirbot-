@@ -502,6 +502,7 @@ export default function ResultsPanel({
             shipRadius={shipRadius}
             onTileAreaChange={onTileAreaChange}
             onShipRadiusChange={onShipRadiusChange}
+            currentSimulation={simulation}
           />
         </TabsContent>
 

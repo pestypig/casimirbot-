@@ -1,0 +1,11 @@
+# Bowl and piston geometry
+OBJECT Bowl
+    MESHFILE bowl.msh
+    MATERIAL PEC
+ENDOBJECT
+
+OBJECT Piston
+    MESHFILE piston.msh
+    MATERIAL PEC
+    DISPLACED 0 0 0.001
+ENDOBJECT
