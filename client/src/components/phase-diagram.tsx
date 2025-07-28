@@ -4,7 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, TestTube, TrendingUp, Zap } from 'lucide-react';
-import { viability, type ViabilityMeta } from '../../../sim_core/viability';
+import viability, { type ViabilityMeta } from '../../../sim_core/viability';
 import type { SimulationResult } from '@shared/schema';
 
 interface PhaseDiagramProps {

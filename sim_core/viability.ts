@@ -85,8 +85,8 @@ export function viability(
   // 6) Exotic mass via E=mc²
   const m_exotic = Math.abs(U_avg_total * pipe.N_tiles) / (c*c);
 
-  // 7) Average drive power draw
-  const P_avg = pipe.P_raw * pipe.duty;  // raw lattice power × local duty
+  // 7) Average drive power draw (convert to reasonable scale)
+  const P_avg = pipe.P_raw * pipe.duty_eff;  // Use ship-wide duty for power
 
   // 8) Quantum‐inequality margin ζ (use your existing formula)
   const zeta = computeZeta(pipe, U_avg_total, A_tile);
@@ -206,15 +206,5 @@ export function viabilityLegacy(
   return viability(tile_cm2, ship_m, pipelineParams, constraintConfig);
 }
 
-// Export the legacy function as the default for backward compatibility
-export { viabilityLegacy as viabilityMainPipeline };
-
-/**
- * Fast approximation mode for grid calculations (if needed for performance)
- * Uses simplified calculations but same constraint logic
- */
-export function viabilityApprox(tile_cm2: number, ship_m: number): ViabilityMeta {
-  // For now, just use the full calculation
-  // Can optimize later if grid performance becomes an issue
-  return viabilityLegacy(tile_cm2, ship_m);
-}
+// Main export for backward compatibility
+export default viabilityLegacy;
