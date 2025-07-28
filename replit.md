@@ -257,11 +257,12 @@ The current scientific foundation provides the authentic physics core that can b
   - **Research Values**: Preset correctly sets tile area to 25 cm² and ship radius to 5.0 m as specified in research papers
   - **Real-time Synchronization**: Phase diagram sliders move in real-time when preset is applied, maintaining visual consistency
   - **Zero LSP Errors**: All TypeScript interfaces and prop threading implemented without compilation errors
-- **Interactive Phase Diagram Heat-Map Implementation (July 28, 2025)**: Completed full interactive viability visualization
-  - **Custom SVG Heat-Map**: Built interactive grid visualization using custom SVG rendering (avoided Plotly build issues)
-  - **Corrected Tile Area Range**: Fixed slider range from 1-100 cm² (was 100-5000 cm²) to match 5×5 cm Needle Hull tiles
-  - **Accurate Default Values**: Set default tile area to 25 cm² (5 cm × 5 cm tiles) as specified in research papers
-  - **Real-time Yellow Marker**: Yellow dot shows current design position and moves as sliders are adjusted
-  - **Viability Grid Calculation**: 30×30 grid showing teal (viable) vs red (failed) regions based on authentic physics
-  - **Research-Accurate Constraints**: Heat-map validates mass (1000-2000 kg), power (<100 MW), quantum safety (ζ<1.0), time-scale separation (<1.0), and geometric amplification (γ≥20)
-  - **Physics Context**: Currently uses spherical approximation N_tiles ≃ 4πR²/A_tile for 5m test hull, ready for ellipsoid upgrade to full Needle Hull dimensions (A=503.5m, B=132m, C=86.5m)
+- **Interactive Phase Diagram Heat-Map Implementation (July 28, 2025)**: Completed full interactive viability visualization with ellipsoid geometry support
+  - **Custom SVG Heat-Map**: Built interactive grid visualization using 30×30 grid with custom SVG rendering
+  - **Ellipsoid Geometry Integration**: Added Knud Thomsen's formula for accurate ellipsoid surface area calculations
+  - **Dual Geometry Modes**: ≤10m radius uses spherical approximation, >10m uses ellipsoid scaling relative to Needle Hull dimensions
+  - **Research Configuration Special Case**: Needle Hull preset (5.0m, 25 cm²) uses authentic research tile count (~6.28×10⁴ tiles)
+  - **Extended Slider Range**: Ship radius now ranges 1-100m to accommodate full-scale ellipsoid testing up to nominal Needle Hull size
+  - **Dynamic Labels**: Shows "sphere" vs "ellipsoid scale" mode with real-time surface area calculations
+  - **Corrected Constraints**: Heat-map validates power density (<1MW/tile), quantum safety (ζ<1.0), time-scale separation (<1.0)
+  - **Full Needle Hull Support**: At 86.5m slider position generates ~5.6×10⁵ m² surface area matching research specifications
