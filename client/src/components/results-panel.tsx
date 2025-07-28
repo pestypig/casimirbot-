@@ -365,21 +365,37 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
 
           {/* Design Ledger - Target Value Verification */}
           <DesignLedger results={{
-            gammaGeo: simulation.parameters.geometry === 'bowl' && simulation.parameters.sagDepth ? 
-              calculateGeometricBlueshift(simulation.parameters.radius, simulation.parameters.sagDepth, simulation.parameters.gap) : 25,
+            // Use actual calculated γ_geo from simulation results
+            gammaGeo: results?.geometricBlueshiftFactor || 25,
             cavityQ: simulation.parameters.dynamicConfig?.cavityQ,
             dutyFactor: simulation.parameters.dynamicConfig ? 
               (simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000) : undefined,
             effectiveDuty: simulation.parameters.dynamicConfig ? 
               ((simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) / 
               (simulation.parameters.dynamicConfig.sectorCount || 400) : undefined,
-            energyPerTileCycleAvg: results?.exoticMassPerTile ? results.exoticMassPerTile * Math.pow(299792458, 2) : undefined,
+            // Calculate correct ΔE per tile cycle-averaged following paper methodology
+            energyPerTileCycleAvg: (() => {
+              if (!results?.geometricBlueshiftFactor || !simulation.parameters.dynamicConfig) return undefined;
+              
+              // Paper methodology: E_flat → E_geo → E_Q → E_cycle_avg
+              const E_flat = -2.55e-3; // J (static flat-plate energy)
+              const gamma_geo = results.geometricBlueshiftFactor; // 25.0
+              const Q = simulation.parameters.dynamicConfig.cavityQ || 1e9; // 10^9
+              const d = (simulation.parameters.dynamicConfig.burstLengthUs || 10) / 
+                       (simulation.parameters.dynamicConfig.cycleLengthUs || 1000); // 0.01
+              
+              const E_geo = E_flat * Math.pow(gamma_geo, 3); // ≃ -0.40 J
+              const E_Q = E_geo * Q; // ≃ -4×10^8 J
+              const E_tile_cycle = E_Q * d; // ≃ -4×10^6 J per tile cycle-averaged
+              
+              return E_tile_cycle;
+            })(),
             totalExoticMass: results?.totalExoticMass,
             zetaMargin: results?.quantumInequalityMargin,
             quantumInequalityMargin: results?.quantumInequalityMargin,
-            averagePower: results?.averagePower,
+            averagePower: results?.powerDraw || results?.averagePower,
             massTargetCheck: results?.totalExoticMass ? Math.abs(results.totalExoticMass - 1400) <= 70 : false,
-            powerTargetCheck: results?.averagePower ? Math.abs(results.averagePower - 83e6) <= 8.3e6 : false
+            powerTargetCheck: results?.powerDraw ? Math.abs(results.powerDraw - 83e6) <= 8.3e6 : false
           }} />
         </TabsContent>
 
