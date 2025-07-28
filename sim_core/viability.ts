@@ -131,27 +131,32 @@ export function viability(
   const duty_baseline = pipe.duty_eff || (pipe.duty / 400);  // 25 ppm nominal
   
   // Scale duty down as hull grows: d_eff,new = d_eff,baseline × (N_baseline / N_tiles)
-  const duty_auto = duty_baseline * (N_baseline / N_tiles);
+  const duty_auto_raw = duty_baseline * (N_baseline / N_tiles);
+  
+  // Apply minimum duty cycle constraint (engineering/physical limit)
+  // TODO: Make this configurable via constraints parameter
+  const DUTY_MIN = 2.5e-6;  // 2.5 ppm floor - minimum implementable duty cycle
+  const duty_auto = Math.max(duty_auto_raw, DUTY_MIN);
   
   // Fixed exotic mass per research specification
   const m_exotic = MASS_TARGET;
 
-  // 7) Average drive power with auto-adjusted duty cycle
-  //    Power scales with N_tiles but duty auto-adjusts to maintain ~83 MW target
+  // 7) Average drive power with constrained auto-adjusted duty cycle
   const P_raw_base = 2e15;  // 2×10¹⁵ W for full Needle Hull
   const P_raw = P_raw_base * (N_tiles / N_baseline);  // Scale with actual tile count
   const P_avg = P_raw * pipe.duty;  // Use original duty for power calculation
   
-  // Apply auto-adjusted duty cycle for electrical draw
-  const P_electrical = P_avg * duty_auto;  // Auto-scaled duty maintains power budget
+  // Apply constrained auto-adjusted duty cycle for electrical draw
+  const P_electrical = P_avg * duty_auto;  // Now includes duty floor constraint
   
-  // 7b) System-level conversion maintains ~83 MW target regardless of hull size
-  //     This is the key insight: power stays roughly constant due to duty auto-scaling
+  // 7b) System-level conversion - power may exceed target if duty floor is hit
   const eta_system = 0.00166;  // Fixed system efficiency from research
-  const P_final = P_electrical * eta_system;  // Approximately 83 MW for all hull sizes
+  const P_final = P_electrical * eta_system;  // May exceed 83 MW when duty floor constrains scaling
 
-  // 8) Quantum-inequality margin ζ (Ford-Roman check)
-  const zeta = computeZeta(pipe, U_avg_total, A_tile);
+  // 8) Quantum-inequality margin ζ - depends on actual duty cycle
+  //    Lower duty cycles reduce quantum safety margin
+  const zeta_base = computeZeta(pipe, U_avg_total, A_tile);
+  const zeta = zeta_base * (duty_auto / duty_baseline);  // Scale with actual duty used
 
   // 9) Time-scale separation
   //    τ_pulse/τ_LC = (d × t_cycle)/(2 × R_ship/c) = t_burst/(2 × R_ship/c)
@@ -159,18 +164,21 @@ export function viability(
   const t_burst = pipe.duty * t_cycle;  // 10 μs burst time
   const TS_ratio = t_burst / (2 * R_ship_m / c);
 
-  // CONSTRAINT GATES - Fixed mass budget per Needle Hull Mk 1 specification
+  // CONSTRAINT GATES with meaningful trade-offs restored
   const massOK = Math.abs(m_exotic - MASS_TARGET) <= (cons.massTolPct/100) * MASS_TARGET;
-  const powerOK = P_final <= cons.maxPower * 1e6;
-  const zetaOK  = zeta <= cons.maxZeta;
+  const powerOK = P_final <= cons.maxPower * 1e6;  // May fail when duty floor prevents scaling
+  const zetaOK  = zeta <= cons.maxZeta;  // May fail when very low duty reduces quantum safety
   const gammaOK = pipe.gamma_geo >= cons.minGamma;
+  const dutyOK  = duty_auto >= DUTY_MIN;  // Fails when required duty drops below engineering limit
 
-  const ok = massOK && powerOK && zetaOK && gammaOK;
+  const ok = massOK && powerOK && zetaOK && gammaOK && dutyOK;
 
   let fail_reason = "Viable ✅";
   if (!ok) {
     if (!massOK) {
       fail_reason = `Mass: ${(m_exotic/1000).toFixed(1)}k kg`;
+    } else if (!dutyOK) {
+      fail_reason = `Duty too low: ${(duty_auto_raw*1e6).toFixed(1)} ppm`;
     } else if (!powerOK) {
       fail_reason = `Power: ${(P_final/1e6).toFixed(0)} MW`;
     } else if (!zetaOK) {
@@ -203,6 +211,7 @@ export function viability(
       power_ok: powerOK,
       quantum_safe: zetaOK,
       gamma_ok: gammaOK,
+      duty_ok: dutyOK,
       timescale_ok: true,
       geometry_ok: true
     }

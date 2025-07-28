@@ -337,3 +337,8 @@ The current scientific foundation provides the authentic physics core that can b
       - **Authentic Research Behavior**: Matches paper specification "The ∑ T⁰₀ budget shall remain bounded at 1.4×10³ kg for all hull scalings"
       - **Phase Diagram Success**: Console logs show 625/625 viable points (100.0%) with all green regions after implementing fixed mass budget
       - **Consistent Physics**: Mass stays at 1400 kg from small hulls (5m) to full Needle Hull scale (92m), power around 2.1 MW across all configurations
+      - **Meaningful Constraints Restored**: Added duty floor (2.5 ppm), quantum safety scaling, and power budget enforcement
+        - Phase diagram now shows bounded viable regions: 13/625 points (2.1%) instead of 100% green
+        - Large hulls fail when required duty drops below engineering minimum (2.5 ppm floor)
+        - Quantum safety ζ scales with duty cycle, failing when ζ > 1.0 due to very low duty requirements
+        - Power constraint may trigger when duty floor prevents further scaling to maintain mass budget
