@@ -284,3 +284,9 @@ The current scientific foundation provides the authentic physics core that can b
     - **Performance Optimized**: Grid calculations now use only shorthand method to prevent hundreds of API calls
     - **Smart Fallback**: Live diagnostics fall back to shorthand calculation only when no Energy Pipeline results are available
     - **Consistent Integration**: Both components now share the same calculation foundation while maintaining optimal performance
+  - **Grid-Energy Pipeline Synchronization Fix (July 28, 2025)**: Resolved viability mismatch between heat-map grid and live diagnostics
+    - **Energy Pipeline Baseline Integration**: Heat-map grid now uses completed Energy Pipeline values as baseline for shorthand calculations
+    - **Automatic Grid Updates**: Grid recalculates when simulation completes, incorporating authentic U_static, γ_geo, Q-factor, and duty cycle values
+    - **Consistent Viability Assessment**: Grid and live diagnostics now show matching viable/failed status using same calculation foundation
+    - **Performance Maintained**: Grid updates automatically without creating additional API calls or simulation overhead
+    - **Seamless Workflow**: Users see default calculations initially, then authentic Energy Pipeline-calibrated results after simulation completion

@@ -64,36 +64,42 @@ function approximateEllipsoidArea(a: number, b: number, c: number): number {
 // calculations for the heat-map grid. Live diagnostics use Energy Pipeline results 
 // when available from currentSimulation prop.
 
-function calculateViabilityShorthand(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
-  // Fallback shorthand calculation (original method)
+function calculateViabilityShorthand(A_tile_cm2: number, R_ship_m: number, energyPipelineBaseline?: any): ViabilityResult {
+  // Enhanced shorthand calculation that can use Energy Pipeline baseline values
   const A_tile = A_tile_cm2 * 1e-4;  // cm² to m²
   const A_hull = 4 * Math.PI * R_ship_m * R_ship_m; // Spherical approximation
   const N_tiles = A_hull / A_tile;
   
-  // Simplified energy pipeline
-  const REFERENCE_STATIC_PER_TILE = -2.55e-3;
+  // Use Energy Pipeline baseline values if available, otherwise use defaults
+  const REFERENCE_STATIC_PER_TILE = energyPipelineBaseline?.baseStaticPerTile || -2.55e-3;
+  const REFERENCE_GAMMA_GEO = energyPipelineBaseline?.baseGamma || CONST.GAMMA_GEO;
+  const REFERENCE_Q_FACTOR = energyPipelineBaseline?.baseQ || CONST.Q_FACTOR;
+  const REFERENCE_DUTY = energyPipelineBaseline?.baseDuty || CONST.DUTY_EFF;
+  const REFERENCE_MASS_SCALE = energyPipelineBaseline?.baseMassScale || 1400;
+  
+  // Calculate using Energy Pipeline-calibrated values
   const U_static_per_tile = REFERENCE_STATIC_PER_TILE * (A_tile / 0.0025);
   const U_static_total = U_static_per_tile * N_tiles;
   
   const hull_effective_radius = Math.sqrt(A_hull / (4 * Math.PI));
-  const gamma_geo = Math.max(5.0, CONST.GAMMA_GEO * Math.pow(hull_effective_radius / 5.0, 0.3));
+  const gamma_geo = Math.max(5.0, REFERENCE_GAMMA_GEO * Math.pow(hull_effective_radius / 5.0, 0.3));
   
   const U_geo_raw = U_static_total * Math.pow(gamma_geo, 3);
-  const U_Q = U_geo_raw * CONST.Q_FACTOR; 
-  const U_cycle = U_Q * CONST.DUTY_EFF;
+  const U_Q = U_geo_raw * REFERENCE_Q_FACTOR; 
+  const U_cycle = U_Q * REFERENCE_DUTY;
   
   const energy_scale = Math.abs(U_cycle) / 3.99e6;
-  let M_exotic = 1400 * energy_scale;
+  let M_exotic = REFERENCE_MASS_SCALE * energy_scale;
   const tile_area_factor = Math.sqrt(A_tile / 0.0025);
   const hull_size_factor = Math.pow(hull_effective_radius / 5.0, 0.5);
   M_exotic = Math.max(100, M_exotic * tile_area_factor * hull_size_factor);
   
-  const P_loss = Math.abs(U_geo_raw * 15e9 / CONST.Q_FACTOR);
-  const P_avg = P_loss * CONST.DUTY_EFF;
+  const P_loss = Math.abs(U_geo_raw * 15e9 / REFERENCE_Q_FACTOR);
+  const P_avg = P_loss * REFERENCE_DUTY;
   
   const powerPerTile = P_avg / N_tiles;
   const zeta = M_exotic / 1e6; // Ford-Roman bound
-  const TS_ratio = 0.20; // Typical time-scale separation
+  const TS_ratio = energyPipelineBaseline?.baseTimeScale || 0.20;
   
   return createViabilityResult(A_tile_cm2, R_ship_m, M_exotic, P_avg, gamma_geo, 
                              powerPerTile, zeta, TS_ratio, N_tiles, U_static_total, 
@@ -160,9 +166,9 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
 }
 
 // Main calculation function for phase diagram - always uses shorthand for performance
-function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
+function calculateViability(A_tile_cm2: number, R_ship_m: number, energyPipelineBaseline?: any): ViabilityResult {
   // Use shorthand method for all grid calculations to avoid performance issues
-  return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
+  return calculateViabilityShorthand(A_tile_cm2, R_ship_m, energyPipelineBaseline);
 }
 
 // REMOVED: Async wrapper was referencing deleted function
@@ -487,12 +493,26 @@ export default function PhaseDiagram({
     }
     
     // Fallback to shorthand calculation if no Energy Pipeline results available
-    return calculateViability(tileArea, shipRadius);
+    return calculateViability(tileArea, shipRadius, null);
   }, [tileArea, shipRadius, currentSimulation]);
 
-  // Build viability grid (cached) - always use shorthand for performance
+  // Build viability grid using Energy Pipeline baseline when available
   const viabilityGrid = useMemo(() => {
-    // Use shorthand method (no API calls) for performance
+    // Extract Energy Pipeline baseline values if available
+    let energyPipelineBaseline = null;
+    if (currentSimulation?.status === 'completed' && currentSimulation?.results) {
+      const results = currentSimulation.results;
+      energyPipelineBaseline = {
+        baseStaticPerTile: results.U_static_total || -2.55e-3,
+        baseGamma: results.geometricBlueshiftFactor || 25,
+        baseQ: results.qEnhancementFactor || 1e9,
+        baseDuty: 2.5e-5, // Sector strobing duty
+        baseMassScale: results.totalExoticMass || 1400,
+        baseTimeScale: results.timeScaleSeparation || 0.20
+      };
+    }
+
+    // Use shorthand method with Energy Pipeline baseline (no API calls)
     const A_range: [number, number] = [1, 100]; // 1-100 cm²
     const R_range: [number, number] = [1, 100]; // 1-100 m
     const resolution = 20; // 20x20 grid
@@ -504,26 +524,27 @@ export default function PhaseDiagram({
       R_range[0] + (R_range[1] - R_range[0]) * i / (resolution - 1)
     );
     
-    // Use only shorthand calculations - no API calls
+    // Use Energy Pipeline-calibrated shorthand calculations
     const Z = R_vals.map(R => 
       A_vals.map(A => {
-        const result = calculateViabilityShorthand(A, R);
+        const result = calculateViabilityShorthand(A, R, energyPipelineBaseline);
         return result.viable ? 1 : 0;
       })
     );
     
     const hoverText = R_vals.map(R => 
       A_vals.map(A => {
-        const result = calculateViabilityShorthand(A, R);
+        const result = calculateViabilityShorthand(A, R, energyPipelineBaseline);
         const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
-        return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+        const statusLabel = energyPipelineBaseline ? "(Energy Pipeline)" : "(Default)";
+        return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status} ${statusLabel}<br>` +
                `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
                `ζ: ${result.zeta.toFixed(3)}`;
       })
     );
     
     return { A_vals, R_vals, Z, hoverText };
-  }, []); // No dependencies - compute once
+  }, [currentSimulation?.status, currentSimulation?.results]); // Recalculate when simulation completes
 
   const formatScientific = (value: number, decimals: number = 2) => {
     if (value === 0) return "0";
@@ -533,13 +554,28 @@ export default function PhaseDiagram({
   };
 
   const runTestPoints = () => {
-    const test1 = calculateViability(100, 30);  // Should fail
-    const test2 = calculateViability(2500, 5);  // Should pass
+    // Get current Energy Pipeline baseline for consistent testing
+    let baseline = null;
+    if (currentSimulation?.status === 'completed' && currentSimulation?.results) {
+      const results = currentSimulation.results;
+      baseline = {
+        baseStaticPerTile: results.U_static_total || -2.55e-3,
+        baseGamma: results.geometricBlueshiftFactor || 25,
+        baseQ: results.qEnhancementFactor || 1e9,
+        baseDuty: 2.5e-5,
+        baseMassScale: results.totalExoticMass || 1400,
+        baseTimeScale: results.timeScaleSeparation || 0.20
+      };
+    }
+    
+    const test1 = calculateViability(100, 30, baseline);  // Should fail
+    const test2 = calculateViability(2500, 5, baseline);  // Should pass
     
     const test1Result = !test1.viable ? "✅ PASS" : "❌ FAIL";
     const test2Result = test2.viable ? "✅ PASS" : "❌ FAIL";
     
-    alert(`Test Results:\n• 100 cm², 30m → ${test1Result} (expect fail)\n• 2500 cm², 5m → ${test2Result} (expect pass)`);
+    const mode = baseline ? "(Energy Pipeline)" : "(Default)";
+    alert(`Test Results ${mode}:\n• 100 cm², 30m → ${test1Result} (expect fail)\n• 2500 cm², 5m → ${test2Result} (expect pass)`);
   };
 
   return (
