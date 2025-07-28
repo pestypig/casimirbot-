@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp, Zap } from "lucide-react";
+import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp, Zap, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { DesignLedger } from "./design-ledger";
 import { VisualProofCharts } from "./visual-proof-charts";
 import { VerificationTab } from "./verification-tab";
 import { EnergyPipeline } from "./energy-pipeline";
+import PhaseDiagram from "./phase-diagram";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -82,7 +83,7 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
     <Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="border-b border-border">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="results" className="flex items-center gap-2">
               <ChartBar className="h-4 w-4" />
               Results
@@ -98,6 +99,10 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             <TabsTrigger value="verification" className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               Verification
+            </TabsTrigger>
+            <TabsTrigger value="phase-diagram" className="flex items-center gap-2">
+              <Layers className="h-4 w-4" />
+              Phase
             </TabsTrigger>
             <TabsTrigger value="files" className="flex items-center gap-2">
               <Folder className="h-4 w-4" />
@@ -475,6 +480,11 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
               <p className="text-sm">Complete a simulation to access verification gadgets</p>
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="phase-diagram" className="p-6">
+          {/* Phase Diagram - Design Space Exploration */}
+          <PhaseDiagram />
         </TabsContent>
 
         <TabsContent value="files" className="p-6">
