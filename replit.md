@@ -342,3 +342,8 @@ The current scientific foundation provides the authentic physics core that can b
         - Large hulls fail when required duty drops below engineering minimum (2.5 ppm floor)
         - Quantum safety ζ scales with duty cycle, failing when ζ > 1.0 due to very low duty requirements
         - Power constraint may trigger when duty floor prevents further scaling to maintain mass budget
+      - **Phase Diagram UI Enhancement (July 28, 2025)**: Moved interactive phase diagram to main page for immediate accessibility
+        - Phase diagram now visible before simulation completion for instant design space exploration
+        - Users can explore viable regions interactively without waiting for simulation results
+        - Live diagnostics work immediately, showing constraint compliance and failure reasons in real-time
+        - Maintains authentic Needle Hull Mk 1 physics with fixed mass budget and engineering constraints

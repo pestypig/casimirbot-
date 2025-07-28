@@ -7,6 +7,7 @@ import ParameterPanel from "@/components/parameter-panel";
 import SimulationStatus from "@/components/simulation-status";
 import ResultsPanel from "@/components/results-panel";
 import { MeshVisualization } from "@/components/mesh-visualization";
+import PhaseDiagram from "@/components/phase-diagram";
 import { createSimulation, startSimulation, generateScuffgeo, downloadFile, downloadAllFiles, createWebSocketConnection } from "@/lib/simulation-api";
 import { SimulationParameters, SimulationResult } from "@shared/schema";
 
@@ -315,40 +316,86 @@ export default function Home() {
             {/* Mesh Visualization */}
             <MeshVisualization />
 
-            {/* Results Panel */}
-            <ResultsPanel
-              simulation={activeSimulation}
-              onDownloadFile={handleDownloadFile}
-              onDownloadAll={handleDownloadAll}
-              tileArea={tileArea}
-              shipRadius={shipRadius}
-              onTileAreaChange={setTileArea}
-              onShipRadiusChange={setShipRadius}
-              gammaGeo={gammaGeo}
-              qFactor={qFactor}
-              duty={duty}
-              sagDepth={sagDepth}
-              temperature={temperature}
-              strokeAmplitude={strokeAmplitude}
-              burstTime={burstTime}
-              cycleTime={cycleTime}
-              xiPoints={xiPoints}
-              // Physics parameter callbacks
-              onGammaGeoChange={setGammaGeo}
-              onQFactorChange={setQFactor}
-              onDutyChange={setDuty}
-              onSagDepthChange={setSagDepth}
-              onGapChange={(value) => {}} // Gap distance control (placeholder)
-              // Constraint configuration props
-              massTolPct={massTolPct}
-              maxPower={maxPower}
-              maxZeta={maxZeta}
-              minGamma={minGamma}
-              onMassTolPctChange={setMassTolPct}
-              onMaxPowerChange={setMaxPower}
-              onMaxZetaChange={setMaxZeta}
-              onMinGammaChange={setMinGamma}
-            />
+            {/* Interactive Phase Diagram - Always Visible */}
+            <div className="bg-card rounded-lg border border-border">
+              <div className="p-6 border-b border-border">
+                <h3 className="text-lg font-semibold mb-2">Interactive Phase Diagram</h3>
+                <p className="text-sm text-muted-foreground">
+                  Explore the design space with authentic Needle Hull Mk 1 physics. Fixed 1400 kg exotic mass budget with auto-duty scaling.
+                </p>
+              </div>
+              <div className="p-6">
+                <PhaseDiagram
+                  tileArea={tileArea}
+                  shipRadius={shipRadius}
+                  onTileAreaChange={setTileArea}
+                  onShipRadiusChange={setShipRadius}
+                  // Physics parameters for live calculations
+                  gammaGeo={gammaGeo}
+                  qFactor={qFactor}
+                  duty={duty}
+                  sagDepth={sagDepth}
+                  temperature={temperature}
+                  strokeAmplitude={strokeAmplitude}
+                  burstTime={burstTime}
+                  cycleTime={cycleTime}
+                  xiPoints={xiPoints}
+                  // Constraint configuration
+                  massTolPct={massTolPct}
+                  maxPower={maxPower}
+                  maxZeta={maxZeta}
+                  minGamma={minGamma}
+                  onMassTolPctChange={setMassTolPct}
+                  onMaxPowerChange={setMaxPower}
+                  onMaxZetaChange={setMaxZeta}
+                  onMinGammaChange={setMinGamma}
+                  // Physics parameter callbacks
+                  onGammaGeoChange={setGammaGeo}
+                  onQFactorChange={setQFactor}
+                  onDutyChange={setDuty}
+                  onSagDepthChange={setSagDepth}
+                  simulationStatus={activeSimulation?.status || 'pending'}
+                  simulationResults={activeSimulation}
+                />
+              </div>
+            </div>
+
+            {/* Results Panel - Only when simulation exists */}
+            {activeSimulation && (
+              <ResultsPanel
+                simulation={activeSimulation}
+                onDownloadFile={handleDownloadFile}
+                onDownloadAll={handleDownloadAll}
+                tileArea={tileArea}
+                shipRadius={shipRadius}
+                onTileAreaChange={setTileArea}
+                onShipRadiusChange={setShipRadius}
+                gammaGeo={gammaGeo}
+                qFactor={qFactor}
+                duty={duty}
+                sagDepth={sagDepth}
+                temperature={temperature}
+                strokeAmplitude={strokeAmplitude}
+                burstTime={burstTime}
+                cycleTime={cycleTime}
+                xiPoints={xiPoints}
+                // Physics parameter callbacks
+                onGammaGeoChange={setGammaGeo}
+                onQFactorChange={setQFactor}
+                onDutyChange={setDuty}
+                onSagDepthChange={setSagDepth}
+                onGapChange={(value) => {}} // Gap distance control (placeholder)
+                // Constraint configuration props
+                massTolPct={massTolPct}
+                maxPower={maxPower}
+                maxZeta={maxZeta}
+                minGamma={minGamma}
+                onMassTolPctChange={setMassTolPct}
+                onMaxPowerChange={setMaxPower}
+                onMaxZetaChange={setMaxZeta}
+                onMinGammaChange={setMinGamma}
+              />
+            )}
           </div>
         </div>
       </div>
