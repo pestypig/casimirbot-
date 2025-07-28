@@ -171,13 +171,13 @@ export function viability(
   // Special case: Needle Hull configuration should always be viable
   const is_needle_hull = Math.abs(tile_cm2 - 25) < 1 && Math.abs(ship_m - 5.0) < 0.1;
   
-  // Create viable regions by making constraints much more permissive for exploration
-  const mass_range_ok = m_exotic >= 10 && m_exotic <= 50000; // Very broad mass range for exploration
+  // Use actual constraint configuration for proper viability assessment
+  const mass_in_range = m_exotic >= MIN_MASS && m_exotic <= MAX_MASS;
   const power_limit_ok = P_avg <= constraintConfig.maxPower * 1e6;
   const quantum_ok = zeta <= constraintConfig.maxZeta;
   
   const checks = {
-    mass_ok: is_needle_hull || mass_range_ok,      // Much broader mass window
+    mass_ok: mass_in_range,                        // Use actual ±5% mass tolerance
     power_ok: power_limit_ok,                      // Configurable power limit  
     quantum_safe: quantum_ok,                      // Configurable quantum safety
     gamma_ok: gamma_geo >= constraintConfig.minGamma,  // Configurable minimum gamma
