@@ -38,13 +38,44 @@ const CONST = {
   G: 6.674e-11,      // Gravitational constant (m³/kg⋅s²)
 };
 
+// Needle Hull ellipsoid dimensions (full-scale)
+const NEEDLE_HULL = {
+  A: 503.5,  // Semi-major axis (m)
+  B: 132,    // Semi-intermediate axis (m) 
+  C: 86.5,   // Semi-minor axis (m)
+};
+
+// Approximate ellipsoid surface area using Knud Thomsen's formula
+function approximateEllipsoidArea(a: number, b: number, c: number): number {
+  const p = 1.6075; // Thomsen's approximation parameter
+  const ap = Math.pow(a, p);
+  const bp = Math.pow(b, p);
+  const cp = Math.pow(c, p);
+  return 4 * Math.PI * Math.pow((ap * bp + ap * cp + bp * cp) / 3, 1/p);
+}
+
 function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
   // Convert units
   const A_tile = A_tile_cm2 * 1e-4;  // cm² to m²
   const R_ship = R_ship_m;
   
-  // Calculate number of tiles on spherical hull
-  const A_hull = 4 * Math.PI * R_ship**2;  // Hull surface area (m²)
+  // Calculate hull surface area using ellipsoid or sphere
+  let A_hull: number;
+  
+  if (R_ship_m <= 10) {
+    // Small test hulls: use spherical approximation
+    A_hull = 4 * Math.PI * R_ship_m * R_ship_m;
+  } else {
+    // Large hulls: use ellipsoid scaling
+    // Interpret slider as scale factor relative to nominal C=86.5m
+    const scale = R_ship_m / NEEDLE_HULL.C;
+    A_hull = approximateEllipsoidArea(
+      NEEDLE_HULL.A * scale,
+      NEEDLE_HULL.B * scale, 
+      NEEDLE_HULL.C * scale
+    );
+  }
+  
   const N_tiles = A_hull / A_tile;  // Total tile count
   
   // Fixed research targets (same for all configurations)
@@ -73,7 +104,8 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   
   // Time-scale separation (geometry-dependent)
   const T_m = 1 / (15e9);  // Mechanical period (15 GHz)
-  const T_LC = 2 * R_ship / CONST.C_LIGHT;  // Light crossing time
+  const effective_radius = Math.sqrt(A_hull / (4 * Math.PI));  // Equivalent sphere radius
+  const T_LC = 2 * effective_radius / CONST.C_LIGHT;  // Light crossing time
   const TS_ratio = T_m / T_LC;
   
   // Geometric feasibility - tile area must be reasonable for bowl geometry
@@ -158,9 +190,9 @@ interface InteractiveHeatMapProps {
 }
 
 function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
-  // Build the viability grid
+  // Build the viability grid  
   const gridData = useMemo(() => 
-    buildViabilityGrid([1, 100], [1, 30], 30), 
+    buildViabilityGrid([1, 100], [1, 100], 30), 
     []
   );
   
@@ -281,8 +313,9 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
       </div>
       
       <div className="mt-4 text-sm text-muted-foreground">
-        <p><strong>Needle Hull Grid:</strong> 1-100 cm² tile area (25 cm² = 5×5 cm tiles) × 1-30 m ship radius</p>
-        <p className="mt-1"><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;100 MW • Quantum ζ &lt;1.0 • TS ratio &lt;1.0 • γ ≥20</p>
+        <p><strong>Design Space:</strong> 1-100 cm² tiles × 1-100 m radius (≤10m = sphere, &gt;10m = ellipsoid scale)</p>
+        <p className="mt-1"><strong>Full Needle Hull:</strong> 503.5×132×86.5 m ellipsoid ≈ 5.6×10⁵ m² surface area</p>
+        <p className="mt-1"><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;1MW/tile • Quantum ζ &lt;1.0 • TS ratio &lt;1.0</p>
       </div>
     </div>
   );
@@ -363,15 +396,24 @@ export default function PhaseDiagram({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Ship Radius: {shipRadius.toFixed(1)} m</label>
+                    <label className="text-sm font-medium">
+                      Ship Radius: {shipRadius.toFixed(1)} m
+                      {shipRadius <= 10 ? ' (sphere)' : ' (ellipsoid scale)'}
+                    </label>
                     <Slider
                       value={[shipRadius]}
                       onValueChange={([value]) => onShipRadiusChange?.(value)}
                       min={1}
-                      max={50}
+                      max={100}
                       step={0.5}
                       className="mt-2"
                     />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {shipRadius <= 10 
+                        ? `Spherical test hull: ${(4 * Math.PI * shipRadius * shipRadius).toFixed(0)} m² surface`
+                        : `Needle Hull scale: ${(shipRadius / 86.5).toFixed(2)}× nominal size`
+                      }
+                    </div>
                   </div>
                 </div>
               </div>

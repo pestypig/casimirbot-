@@ -254,6 +254,14 @@ The current scientific foundation provides the authentic physics core that can b
   - **Lifted State Management**: Moved tileArea and shipRadius state from local component to Home component level
   - **Connected Needle Hull Preset**: "Apply Needle Hull Preset" button now updates both simulation parameters and phase diagram values
   - **Props Threading**: Updated component hierarchy (Home → ParameterPanel → NeedleHullPreset and Home → ResultsPanel → PhaseDiagram)
-  - **Research Values**: Preset correctly sets tile area to 2500 cm² and ship radius to 5.0 m as specified in research papers
+  - **Research Values**: Preset correctly sets tile area to 25 cm² and ship radius to 5.0 m as specified in research papers
   - **Real-time Synchronization**: Phase diagram sliders move in real-time when preset is applied, maintaining visual consistency
   - **Zero LSP Errors**: All TypeScript interfaces and prop threading implemented without compilation errors
+- **Interactive Phase Diagram Heat-Map Implementation (July 28, 2025)**: Completed full interactive viability visualization
+  - **Custom SVG Heat-Map**: Built interactive grid visualization using custom SVG rendering (avoided Plotly build issues)
+  - **Corrected Tile Area Range**: Fixed slider range from 1-100 cm² (was 100-5000 cm²) to match 5×5 cm Needle Hull tiles
+  - **Accurate Default Values**: Set default tile area to 25 cm² (5 cm × 5 cm tiles) as specified in research papers
+  - **Real-time Yellow Marker**: Yellow dot shows current design position and moves as sliders are adjusted
+  - **Viability Grid Calculation**: 30×30 grid showing teal (viable) vs red (failed) regions based on authentic physics
+  - **Research-Accurate Constraints**: Heat-map validates mass (1000-2000 kg), power (<100 MW), quantum safety (ζ<1.0), time-scale separation (<1.0), and geometric amplification (γ≥20)
+  - **Physics Context**: Currently uses spherical approximation N_tiles ≃ 4πR²/A_tile for 5m test hull, ready for ellipsoid upgrade to full Needle Hull dimensions (A=503.5m, B=132m, C=86.5m)
