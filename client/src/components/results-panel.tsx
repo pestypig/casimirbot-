@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp } from "lucide-react";
+import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp, Zap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { DynamicDashboard } from "@/components/dynamic-dashboard";
 import { DesignLedger } from "./design-ledger";
 import { VisualProofCharts } from "./visual-proof-charts";
 import { VerificationTab } from "./verification-tab";
+import { EnergyPipeline } from "./energy-pipeline";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -81,10 +82,14 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
     <Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="border-b border-border">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="results" className="flex items-center gap-2">
               <ChartBar className="h-4 w-4" />
               Results
+            </TabsTrigger>
+            <TabsTrigger value="energy-pipeline" className="flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Energy Pipeline
             </TabsTrigger>
             <TabsTrigger value="visual-proofs" className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -402,6 +407,19 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             massTargetCheck: results?.totalExoticMass ? Math.abs(results.totalExoticMass - 1400) <= 70 : false,
             powerTargetCheck: results?.powerDraw ? Math.abs(results.powerDraw - 83e6) <= 8.3e6 : false
           }} />
+        </TabsContent>
+
+        <TabsContent value="energy-pipeline" className="p-6">
+          {/* Energy Pipeline - Complete T_μν → Metric Calculations */}
+          {simulation.status === 'completed' && results ? (
+            <EnergyPipeline results={results} />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Energy pipeline calculations will appear here</p>
+              <p className="text-sm">Complete a simulation to see the complete T_μν → metric equations</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="visual-proofs" className="p-6">

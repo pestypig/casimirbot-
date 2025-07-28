@@ -189,6 +189,56 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   const massPerTileReadout = targetMassPerTile; // 7.14×10⁻⁷ kg per tile (corrected)
   const massTotalLatticeReadout = totalExoticMass; // 1.4×10³ kg for full lattice (corrected)
 
+  // Complete Energy Pipeline Implementation (following theory checklist)
+  const c = 299_792_458; // m/s - speed of light
+  const f_m = 15e9; // Hz - 15 GHz modulation frequency
+  const ω = 2 * Math.PI * f_m; // angular frequency [rad/s]
+  
+  // Hull geometry parameters for scaling calculations
+  const R_hull = 20e-6; // m - 20 μm hull radius from needle hull paper
+  const tileRadius = 20e-6; // m - assume 20 μm tile radius for calculations
+  const A_tile = Math.PI * Math.pow(tileRadius, 2); // m² - single tile area
+  const A_hull = Math.PI * Math.pow(25e-3, 2); // m² - full 25mm disk area from paper
+  const N_tiles = A_hull / A_tile; // Number of tiles in full lattice
+  
+  // 1) Q-factor amplification
+  const U_static = staticEnergy; // per-cavity static Casimir energy [J]
+  const U_Q = cavityQ * U_static; // U_Q = Q·U_static [J]
+  
+  // 2) Geometric amplification (Van den Broeck)
+  const γ_geo = Math.pow(25, 1/3); // Geometric blueshift factor ≈ 2.92 (cube root of 25)
+  const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q [J]
+  
+  // 3) Fractional stroke / duty cycle
+  const t_burst = params.burstLengthUs * 1e-6; // s - convert μs to s
+  const t_cycle = params.cycleLengthUs * 1e-6; // s - convert μs to s
+  const d = t_burst / t_cycle; // d = t_burst / t_cycle [dimensionless]
+  
+  // 4) Stored energy per cycle
+  const U_cycle = U_geo * d; // ⟨E⟩_cycle = U_geo·d [J]
+  
+  // 5) Power loss per cavity
+  // P_loss = U_geo / (Q/ω) = U_geo·ω / Q [W]
+  const P_loss = U_geo * ω / cavityQ;
+  
+  // 6) Time-scale separation check
+  // τ_pulse = t_burst, T_LC = 2·R_hull / c (round-trip light time)
+  const τ_pulse = t_burst; // s
+  const T_LC = 2 * R_hull / c; // s - light crossing time
+  const TS_ratio = τ_pulse / T_LC; // dimensionless - should be ≪1
+  
+  // 7) Per-tile negative energy
+  const E_tile = U_cycle; // E_tile = U_geo·d [J]
+  
+  // 8) Total exotic energy & mass
+  const E_total = E_tile * N_tiles; // J - total exotic energy
+  const m_exotic = Math.abs(E_total) / (c * c); // kg - via E=mc²
+  
+  // Additional calculations for verification
+  const powerPerTileComputed = P_loss; // W per tile
+  const powerTotalComputed = P_loss * N_tiles; // W total lattice
+  const massPerTileComputed = Math.abs(E_tile) / (c * c); // kg per tile
+  
   return {
     strokePeriodPs,
     dutyFactor,
@@ -206,7 +256,29 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
     exoticMassPerTile: massPerTileReadout,
     exoticMassTotalLattice: massTotalLatticeReadout,
     isaacsonLimit,
-    greenWaldCompliance
+    greenWaldCompliance,
+    
+    // Complete Energy Pipeline Values (theory checklist)
+    energyPipeline: {
+      U_static, // Static Casimir energy per cavity [J]
+      U_Q,      // Q-amplified energy [J]
+      U_geo,    // Geometrically amplified energy [J]
+      U_cycle,  // Stored energy per cycle [J]
+      P_loss,   // Power loss per cavity [W]
+      TS_ratio, // Time-scale separation ratio [dimensionless]
+      E_tile,   // Per-tile negative energy [J]
+      E_total,  // Total exotic energy [J]
+      m_exotic, // Exotic mass via E=mc² [kg]
+      γ_geo,    // Geometric blueshift factor
+      ω,        // Angular frequency [rad/s]
+      d,        // Duty cycle [dimensionless]
+      N_tiles,  // Number of tiles in full lattice
+      τ_pulse,  // Pulse duration [s]
+      T_LC,     // Light crossing time [s]
+      powerPerTileComputed,  // P_loss per tile [W]
+      powerTotalComputed,    // Total lattice power [W]
+      massPerTileComputed    // Mass per tile from E=mc² [kg]
+    }
   };
 }
 
