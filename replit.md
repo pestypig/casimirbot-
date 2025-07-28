@@ -330,3 +330,8 @@ The current scientific foundation provides the authentic physics core that can b
       - Exotic mass and power scale ∝ N_tiles, causing ~100× increase that exceeds ±5% mass tolerance and 83 MW power budget
       - Viability can be restored by: larger tile areas (2500+ cm²), reduced duty cycles, lower Q factors, or relaxed constraints
       - Test script confirms authentic physics calculations are working exactly as expected from research specifications
+    - **Fixed Exotic Mass Budget Implementation**: Corrected physics to match Needle Hull Mk 1 research specification
+      - **Constant Mass Target**: Implemented fixed 1.4×10³ kg exotic mass budget regardless of hull size per research papers
+      - **Auto-Duty Adjustment**: Duty cycle now auto-scales as d_eff,new = d_eff,baseline × (N_baseline / N_tiles) to maintain fixed mass
+      - **Power Stability**: Average power maintains ~83 MW target across all hull sizes due to duty auto-scaling
+      - **Authentic Research Behavior**: Matches paper specification "The ∑ T⁰₀ budget shall remain bounded at 1.4×10³ kg for all hull scalings"
