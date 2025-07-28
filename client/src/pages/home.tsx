@@ -20,6 +20,32 @@ export default function Home() {
   // Shared phase diagram state
   const [tileArea, setTileArea] = useState(25); // cm² (default: 5 cm × 5 cm = 25 cm²)
   const [shipRadius, setShipRadius] = useState(5.0); // m
+  
+  // Dynamic simulation parameters for real-time phase diagram updates
+  const [gammaGeo, setGammaGeo] = useState(25);
+  const [qFactor, setQFactor] = useState(1e9);
+  const [duty, setDuty] = useState(0.01);
+  const [sagDepth, setSagDepth] = useState(16);
+  const [temperature, setTemperature] = useState(20);
+  const [strokeAmplitude, setStrokeAmplitude] = useState(50);
+  const [burstTime, setBurstTime] = useState(10);
+  const [cycleTime, setCycleTime] = useState(1000);
+  const [xiPoints, setXiPoints] = useState(5000);
+  
+  // Apply Needle Hull Preset - sets all parameters to paper defaults
+  const applyNeedleHullPreset = () => {
+    setTileArea(25);      // cm²
+    setShipRadius(5.0);   // m
+    setGammaGeo(25);
+    setQFactor(1e9);
+    setDuty(0.01);
+    setSagDepth(16);
+    setTemperature(20);
+    setStrokeAmplitude(50);
+    setBurstTime(10);
+    setCycleTime(1000);
+    setXiPoints(5000);
+  };
 
   // Query for simulation data
   const { data: simulation, isLoading } = useQuery<SimulationResult>({
@@ -241,6 +267,29 @@ export default function Home() {
               isLoading={isSimulationRunning}
               onTileAreaChange={setTileArea}
               onShipRadiusChange={setShipRadius}
+              onApplyPreset={applyNeedleHullPreset}
+              parameterValues={{
+                gammaGeo,
+                qFactor,
+                duty,
+                sagDepth,
+                temperature,
+                strokeAmplitude,
+                burstTime,
+                cycleTime,
+                xiPoints
+              }}
+              onParameterChange={{
+                setGammaGeo,
+                setQFactor,
+                setDuty,
+                setSagDepth,
+                setTemperature,
+                setStrokeAmplitude,
+                setBurstTime,
+                setCycleTime,
+                setXiPoints
+              }}
             />
           </div>
 
@@ -264,6 +313,15 @@ export default function Home() {
               shipRadius={shipRadius}
               onTileAreaChange={setTileArea}
               onShipRadiusChange={setShipRadius}
+              gammaGeo={gammaGeo}
+              qFactor={qFactor}
+              duty={duty}
+              sagDepth={sagDepth}
+              temperature={temperature}
+              strokeAmplitude={strokeAmplitude}
+              burstTime={burstTime}
+              cycleTime={cycleTime}
+              xiPoints={xiPoints}
             />
           </div>
         </div>

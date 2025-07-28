@@ -21,6 +21,32 @@ interface ParameterPanelProps {
   // Phase diagram state
   onTileAreaChange?: (value: number) => void;
   onShipRadiusChange?: (value: number) => void;
+  // Apply preset callback
+  onApplyPreset?: () => void;
+  // Dynamic parameter values for preset application
+  parameterValues?: {
+    gammaGeo: number;
+    qFactor: number;
+    duty: number;
+    sagDepth: number;
+    temperature: number;
+    strokeAmplitude: number;
+    burstTime: number;
+    cycleTime: number;
+    xiPoints: number;
+  };
+  // Dynamic parameter setters for preset application
+  onParameterChange?: {
+    setGammaGeo: (value: number) => void;
+    setQFactor: (value: number) => void;
+    setDuty: (value: number) => void;
+    setSagDepth: (value: number) => void;
+    setTemperature: (value: number) => void;
+    setStrokeAmplitude: (value: number) => void;
+    setBurstTime: (value: number) => void;
+    setCycleTime: (value: number) => void;
+    setXiPoints: (value: number) => void;
+  };
 }
 
 export default function ParameterPanel({ 
@@ -28,7 +54,10 @@ export default function ParameterPanel({
   onGenerateOnly, 
   isLoading, 
   onTileAreaChange, 
-  onShipRadiusChange 
+  onShipRadiusChange,
+  onApplyPreset,
+  parameterValues,
+  onParameterChange
 }: ParameterPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -216,6 +245,7 @@ export default function ParameterPanel({
               form={form} 
               onTileAreaChange={onTileAreaChange}
               onShipRadiusChange={onShipRadiusChange}
+              onApplyPreset={onApplyPreset}
             />
 
             {/* Dynamic Module Controls */}

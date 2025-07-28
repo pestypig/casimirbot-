@@ -13,6 +13,16 @@ interface PhaseDiagramProps {
   onTileAreaChange?: (value: number) => void;
   onShipRadiusChange?: (value: number) => void;
   currentSimulation?: SimulationResult | null;
+  // Dynamic simulation parameters for real-time viability updates
+  gammaGeo?: number;
+  qFactor?: number;
+  duty?: number;
+  sagDepth?: number;
+  temperature?: number;
+  strokeAmplitude?: number;
+  burstTime?: number;
+  cycleTime?: number;
+  xiPoints?: number;
 }
 
 // Needle Hull ellipsoid dimensions (full-scale)
@@ -35,14 +45,26 @@ function approximateEllipsoidArea(a: number, b: number, c: number): number {
 interface InteractiveHeatMapProps {
   currentTileArea: number;
   currentShipRadius: number;
+  // Dynamic parameters for real-time viability updates
+  viabilityParams?: {
+    gammaGeo?: number;
+    qFactor?: number;
+    duty?: number;
+    sagDepth?: number;
+    temperature?: number;
+    strokeAmplitude?: number;
+    burstTime?: number;
+    cycleTime?: number;
+    xiPoints?: number;
+  };
 }
 
-function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
+function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParams }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
   // Build the viability grid using central viability function
-  // FIXED: Grid now rebuilds whenever current parameters change!
+  // DYNAMIC: Grid rebuilds whenever ANY parameter changes (tile, ship, OR simulation params)!
   React.useEffect(() => {
     const loadGrid = async () => {
       setIsLoading(true);
@@ -61,17 +83,17 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
           R_range[0] + (R_range[1] - R_range[0]) * i / (resolution - 1)
         );
         
-        // Grid calculations using central viability function
+        // Grid calculations using central viability function with dynamic parameters
         const Z = R_vals.map((R: number) => 
           A_vals.map((A: number) => {
-            const result = viability(A, R); // Single source of truth!
+            const result = viability(A, R, viabilityParams); // Single source of truth with dynamic params!
             return result.ok ? 1 : 0;
           })
         );
         
         const hoverText = R_vals.map((R: number) => 
           A_vals.map((A: number) => {
-            const result = viability(A, R); // Same function everywhere!
+            const result = viability(A, R, viabilityParams); // Same function everywhere with dynamic params!
             const status = result.ok ? "✅ Viable" : `❌ ${result.fail_reason}`;
             return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
                    `Mass: ${result.m_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
@@ -79,8 +101,8 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
           })
         );
         
-        // Test the current point specifically
-        const currentResult = viability(currentTileArea, currentShipRadius);
+        // Test the current point specifically with dynamic parameters
+        const currentResult = viability(currentTileArea, currentShipRadius, viabilityParams);
         console.log(`📍 Current point (${currentTileArea}, ${currentShipRadius}):`, 
                    currentResult.ok ? '✅ VIABLE' : `❌ ${currentResult.fail_reason}`,
                    `Mass: ${currentResult.m_exotic.toFixed(0)} kg, Power: ${(currentResult.P_avg/1e6).toFixed(1)} MW`);
@@ -94,7 +116,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
       }
     };
     loadGrid();
-  }, [currentTileArea, currentShipRadius]); // REBUILD when current parameters change!
+  }, [currentTileArea, currentShipRadius, viabilityParams]); // REBUILD when ANY parameter changes!
   
   if (!gridData || isLoading) {
     return (
@@ -194,7 +216,16 @@ export default function PhaseDiagram({
   shipRadius, 
   onTileAreaChange, 
   onShipRadiusChange,
-  currentSimulation 
+  currentSimulation,
+  gammaGeo,
+  qFactor,
+  duty,
+  sagDepth,
+  temperature,
+  strokeAmplitude,
+  burstTime,
+  cycleTime,
+  xiPoints
 }: PhaseDiagramProps) {
   
   // Live diagnostics using central viability function - perfect consistency!
@@ -339,6 +370,17 @@ export default function PhaseDiagram({
               <InteractiveHeatMap 
                 currentTileArea={tileArea}
                 currentShipRadius={shipRadius}
+                viabilityParams={{
+                  gammaGeo,
+                  qFactor,
+                  duty,
+                  sagDepth,
+                  temperature,
+                  strokeAmplitude,
+                  burstTime,
+                  cycleTime,
+                  xiPoints
+                }}
               />
             </div>
             

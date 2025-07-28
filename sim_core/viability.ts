@@ -42,7 +42,37 @@ const CONST = {
  * Core viability calculation function
  * Replicates exact Energy Pipeline mathematics for consistency
  */
-export function viability(tile_cm2: number, ship_m: number): ViabilityMeta {
+export function viability(
+  tile_cm2: number, 
+  ship_m: number,
+  params?: {
+    gammaGeo?: number;
+    qFactor?: number;
+    duty?: number;
+    sagDepth?: number;
+    temperature?: number;
+    strokeAmplitude?: number;
+    burstTime?: number;
+    cycleTime?: number;
+    xiPoints?: number;
+  }
+): ViabilityMeta {
+  // Default parameters (Needle Hull configuration)
+  const defaults = {
+    gammaGeo: 25,
+    qFactor: 1e9,
+    duty: 0.01,
+    sagDepth: 16,
+    temperature: 20,
+    strokeAmplitude: 50,
+    burstTime: 10,
+    cycleTime: 1000,
+    xiPoints: 5000
+  };
+  
+  // Merge with provided parameters
+  const config = { ...defaults, ...params };
+  
   // Geometry calculations
   const A_tile = tile_cm2 * 1e-4;  // cm² to m²
   const A_hull = 4 * Math.PI * ship_m * ship_m; // Spherical approximation
@@ -54,20 +84,20 @@ export function viability(tile_cm2: number, ship_m: number): ViabilityMeta {
   const U_static_per_tile = REFERENCE_STATIC_PER_TILE * (A_tile / 0.0025); // Scale by tile area
   const U_static_total = U_static_per_tile * N_tiles;
   
-  // Step 2: Geometric amplification (γ³ boost)
+  // Step 2: Geometric amplification (γ³ boost) - using dynamic gammaGeo
   const hull_effective_radius = Math.sqrt(A_hull / (4 * Math.PI));
-  const gamma_geo = Math.max(5.0, CONST.GAMMA_GEO * Math.pow(hull_effective_radius / 5.0, 0.3));
+  const gamma_geo = Math.max(5.0, config.gammaGeo * Math.pow(hull_effective_radius / 5.0, 0.3));
   const U_geo_raw = U_static_total * Math.pow(gamma_geo, 3);
   
-  // Step 3: Q-factor enhancement
-  const U_Q = U_geo_raw * CONST.Q_FACTOR;
+  // Step 3: Q-factor enhancement - using dynamic qFactor
+  const U_Q = U_geo_raw * config.qFactor;
   
-  // Step 4: Duty cycle averaging
-  const U_cycle = U_Q * CONST.DUTY_EFF;
+  // Step 4: Duty cycle averaging - using dynamic duty
+  const U_cycle = U_Q * config.duty;
   
-  // Step 5: Power loss calculation
+  // Step 5: Power loss calculation - using dynamic parameters
   const omega = 15e9 * 2 * Math.PI; // 15 GHz modulation frequency
-  const P_loss = Math.abs(U_geo_raw * omega / CONST.Q_FACTOR);
+  const P_loss = Math.abs(U_geo_raw * omega / config.qFactor);
   
   // Step 6: Time-scale separation
   const TS_ratio = 0.20; // Typical from research papers
@@ -85,8 +115,8 @@ export function viability(tile_cm2: number, ship_m: number): ViabilityMeta {
     m_exotic = 1400; // Exact research target
   }
   
-  // Average power calculation
-  const P_avg = P_loss * CONST.DUTY_EFF;
+  // Average power calculation - using dynamic duty
+  const P_avg = P_loss * config.duty;
   const powerPerTile = P_avg / N_tiles;
   
   // Quantum safety assessment

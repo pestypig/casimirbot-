@@ -12,9 +12,10 @@ interface NeedleHullPresetProps {
   form: UseFormReturn<SimulationParameters>;
   onTileAreaChange?: (value: number) => void;
   onShipRadiusChange?: (value: number) => void;
+  onApplyPreset?: () => void;
 }
 
-export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange }: NeedleHullPresetProps) {
+export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, onApplyPreset }: NeedleHullPresetProps) {
   
   const applyNeedleHullPreset = () => {
     // Based on "Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator"
@@ -68,6 +69,9 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange }:
     // Phase diagram parameters - Needle Hull research specifications
     onTileAreaChange?.(25); // 25 cm² tile area (5 cm × 5 cm tiles)
     onShipRadiusChange?.(5.0); // 5.0 m ship radius
+    
+    // Apply all dynamic parameters for real-time phase diagram integration
+    onApplyPreset?.();
   };
 
   return (
