@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle } from "lucide-react";
+import { Download, ChartBar, Folder, Terminal, FileCode, Box, FileText, CheckCircle, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import ChartVisualization from "@/components/chart-visualization";
 import { DynamicDashboard } from "@/components/dynamic-dashboard";
 import { DesignLedger } from "./design-ledger";
+import { VisualProofCharts } from "./visual-proof-charts";
 import { SimulationResult } from "@shared/schema";
 
 interface ResultsPanelProps {
@@ -60,10 +61,14 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
     <Card>
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <div className="border-b border-border">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="results" className="flex items-center gap-2">
               <ChartBar className="h-4 w-4" />
               Results
+            </TabsTrigger>
+            <TabsTrigger value="visual-proofs" className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Visual Proofs
             </TabsTrigger>
             <TabsTrigger value="files" className="flex items-center gap-2">
               <Folder className="h-4 w-4" />
@@ -217,6 +222,45 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             massTargetCheck: results?.totalExoticMass ? Math.abs(results.totalExoticMass - 1400) <= 70 : false,
             powerTargetCheck: results?.averagePower ? Math.abs(results.averagePower - 83e6) <= 8.3e6 : false
           }} />
+        </TabsContent>
+
+        <TabsContent value="visual-proofs" className="p-6">
+          {/* Visual Proof Charts - only show if simulation is completed */}
+          {simulation.status === 'completed' && results ? (
+            <VisualProofCharts 
+              results={{
+                totalEnergy: results.totalEnergy,
+                geometricBlueshiftFactor: simulation.parameters.geometry === 'bowl' && simulation.parameters.sagDepth ? 
+                  Math.round(simulation.parameters.gap / (simulation.parameters.gap - simulation.parameters.sagDepth * 1e-6)) : 25,
+                qEnhancementFactor: simulation.parameters.dynamicConfig?.cavityQ || 1e9,
+                totalExoticMass: results.totalExoticMass,
+                powerDraw: results.averagePower,
+                quantumInequalityMargin: results.quantumInequalityMargin,
+                dutyFactor: simulation.parameters.dynamicConfig ? 
+                  (simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000) : 0.01,
+                effectiveDuty: simulation.parameters.dynamicConfig ? 
+                  ((simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) / 
+                  (simulation.parameters.dynamicConfig.sectorCount || 400) : 2.5e-5,
+                baselineEnergyDensity: results.energyPerArea,
+                amplifiedEnergyDensity: results.energyPerArea ? results.energyPerArea * (results.totalExoticMass || 1) : undefined
+              }}
+              targets={{
+                gammaGeo: 25,
+                cavityQ: 1e9,
+                dutyFactor: 0.01,
+                effectiveDuty: 2.5e-5,
+                exoticMassTarget: 1.4e3,
+                powerTarget: 83e6,
+                zetaSafeLimit: 1.0
+              }}
+            />
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">
+              <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Visual proof charts will appear here</p>
+              <p className="text-sm">Complete a simulation to see visual analysis</p>
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="files" className="p-6">
