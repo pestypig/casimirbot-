@@ -23,6 +23,15 @@ interface PhaseDiagramProps {
   burstTime?: number;
   cycleTime?: number;
   xiPoints?: number;
+  // Constraint configuration props (following attached files specification)
+  massTolPct?: number;
+  maxPower?: number;
+  maxZeta?: number;
+  minGamma?: number;
+  onMassTolPctChange?: (value: number) => void;
+  onMaxPowerChange?: (value: number) => void;
+  onMaxZetaChange?: (value: number) => void;
+  onMinGammaChange?: (value: number) => void;
 }
 
 // Needle Hull ellipsoid dimensions (full-scale)
@@ -58,9 +67,17 @@ interface InteractiveHeatMapProps {
     xiPoints?: number;
     massTol?: number;
   };
+  // Constraint configuration
+  constraintConfig?: {
+    massNominal: number;
+    massTolPct: number;
+    maxPower: number;
+    maxZeta: number;
+    minGamma: number;
+  };
 }
 
-function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParams }: InteractiveHeatMapProps) {
+function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParams, constraintConfig }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -88,7 +105,16 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         // Grid calculations using central viability function with dynamic parameters
         const Z = R_vals.map((R: number) => 
           A_vals.map((A: number) => {
-            const result = viability(A, R, viabilityParams); // Single source of truth with dynamic params!
+            // Use provided constraint configuration or defaults
+            const currentConstraintConfig = constraintConfig || {
+              massNominal: 1400,
+              massTolPct: 25,
+              maxPower: 500,
+              maxZeta: 1.0,
+              minGamma: 5
+            };
+            
+            const result = viability(A, R, viabilityParams, currentConstraintConfig); // Single source of truth with dynamic params!
             // Debug logging for strategic points  
             const isSpecialPoint = (A === 25 && R === 5) || 
                 (Math.abs(A - A_vals[Math.floor(A_vals.length/2)]) < 0.1 && Math.abs(R - R_vals[Math.floor(R_vals.length/2)]) < 0.1) ||
@@ -103,7 +129,16 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         
         const hoverText = R_vals.map((R: number) => 
           A_vals.map((A: number) => {
-            const result = viability(A, R, viabilityParams); // Same function everywhere with dynamic params!
+            // Use provided constraint configuration or defaults
+            const currentConstraintConfig = constraintConfig || {
+              massNominal: 1400,
+              massTolPct: 25,
+              maxPower: 500,
+              maxZeta: 1.0,
+              minGamma: 5
+            };
+            
+            const result = viability(A, R, viabilityParams, currentConstraintConfig); // Same function everywhere with dynamic params!
             const status = result.ok ? "✅ Viable" : `❌ ${result.fail_reason}`;
             return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
                    `Mass: ${result.m_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
@@ -112,7 +147,16 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         );
         
         // Test the current point specifically with dynamic parameters
-        const currentResult = viability(currentTileArea, currentShipRadius, viabilityParams);
+        // Use provided constraint configuration or defaults
+        const currentConstraintConfig = constraintConfig || {
+          massNominal: 1400,
+          massTolPct: 25,
+          maxPower: 500,
+          maxZeta: 1.0,
+          minGamma: 5
+        };
+        
+        const currentResult = viability(currentTileArea, currentShipRadius, viabilityParams, currentConstraintConfig);
         console.log(`📍 Current point (${currentTileArea}, ${currentShipRadius}):`, 
                    currentResult.ok ? '✅ VIABLE' : `❌ ${currentResult.fail_reason}`,
                    `Mass: ${currentResult.m_exotic.toFixed(0)} kg, Power: ${(currentResult.P_avg/1e6).toFixed(1)} MW`);
@@ -131,7 +175,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
       }
     };
     loadGrid();
-  }, [currentTileArea, currentShipRadius, viabilityParams]); // REBUILD when ANY parameter changes!
+  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig]); // REBUILD when ANY parameter changes!
   
   if (!gridData || isLoading) {
     return (
@@ -232,17 +276,26 @@ export default function PhaseDiagram({
   onTileAreaChange, 
   onShipRadiusChange,
   currentSimulation,
-  gammaGeo,
-  qFactor,
-  duty,
-  sagDepth,
-  temperature,
-  strokeAmplitude,
-  burstTime,
-  cycleTime,
-  xiPoints
+  gammaGeo = 25,
+  qFactor = 1e9,
+  duty = 0.01,
+  sagDepth = 16,
+  temperature = 20,
+  strokeAmplitude = 50,
+  burstTime = 10,
+  cycleTime = 1000,
+  xiPoints = 5000,
+  // Constraint configuration props with defaults
+  massTolPct = 25,
+  maxPower = 500,
+  maxZeta = 1.0,
+  minGamma = 5,
+  onMassTolPctChange,
+  onMaxPowerChange,
+  onMaxZetaChange,
+  onMinGammaChange
 }: PhaseDiagramProps) {
-  const [massTol, setMassTol] = useState(0.10); // 10% mass tolerance default
+  // Use constraint props instead of local state
   
   // Live diagnostics using central viability function - perfect consistency!
   const liveDiagnostics = useMemo(() => {
@@ -275,6 +328,15 @@ export default function PhaseDiagram({
     }
     
     // Fallback to central viability function with ALL dynamic parameters - same math everywhere!
+    // Create constraint configuration using UI sliders
+    const constraintConfig = {
+      massNominal: 1400,
+      massTolPct: massTolPct,
+      maxPower: maxPower,
+      maxZeta: maxZeta,
+      minGamma: minGamma
+    };
+    
     return viability(tileArea, shipRadius, {
       gammaGeo,
       qFactor,
@@ -285,9 +347,9 @@ export default function PhaseDiagram({
       burstTime,
       cycleTime,
       xiPoints,
-      massTol
-    });
-  }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints, massTol]);
+      massTol: massTolPct / 100  // Convert percentage to fraction
+    }, constraintConfig);
+  }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints, massTolPct]);
 
   // Ellipsoid scaling calculation
   const getScaledSurfaceArea = (radius: number): number => {
@@ -312,8 +374,17 @@ export default function PhaseDiagram({
   };
 
   const runTestPoints = () => {
-    const test1 = viability(100, 30);  // Should fail
-    const test2 = viability(2500, 5);  // Should pass
+    // Test with default constraints
+    const defaultConstraints = {
+      massNominal: 1400,
+      massTolPct: 25,
+      maxPower: 500,
+      maxZeta: 1.0,
+      minGamma: 5
+    };
+    
+    const test1 = viability(100, 30, {}, defaultConstraints);  // Should fail
+    const test2 = viability(2500, 5, {}, defaultConstraints);  // Should pass
     
     const test1Result = !test1.ok ? "✅ PASS" : "❌ FAIL";
     const test2Result = test2.ok ? "✅ PASS" : "❌ FAIL";
@@ -376,18 +447,54 @@ export default function PhaseDiagram({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Mass Tolerance: ±{(massTol * 100).toFixed(0)}%</label>
+                    <label className="text-sm font-medium">Mass Tolerance: ±{massTolPct}%</label>
                     <Slider
-                      value={[massTol * 100]}
-                      onValueChange={([value]) => setMassTol(value / 100)}
+                      value={[massTolPct]}
+                      onValueChange={([value]) => onMassTolPctChange?.(value)}
                       min={5}
                       max={50}
                       step={1}
                       className="mt-2"
                     />
                     <div className="text-xs text-muted-foreground mt-1">
-                      Range: {(1400 * (1 - massTol)).toFixed(0)}-{(1400 * (1 + massTol)).toFixed(0)} kg
+                      Range: {(1400 * (1 - massTolPct/100)).toFixed(0)}-{(1400 * (1 + massTolPct/100)).toFixed(0)} kg
                     </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Max Power: {maxPower} MW</label>
+                    <Slider
+                      value={[maxPower]}
+                      onValueChange={([value]) => onMaxPowerChange?.(value)}
+                      min={50}
+                      max={1000}
+                      step={10}
+                      className="mt-2"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Max ζ: {maxZeta.toFixed(1)}</label>
+                    <Slider
+                      value={[maxZeta]}
+                      onValueChange={([value]) => onMaxZetaChange?.(value)}
+                      min={0.1}
+                      max={5.0}
+                      step={0.1}
+                      className="mt-2"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Min γ: {minGamma}</label>
+                    <Slider
+                      value={[minGamma]}
+                      onValueChange={([value]) => onMinGammaChange?.(value)}
+                      min={1}
+                      max={50}
+                      step={1}
+                      className="mt-2"
+                    />
                   </div>
                 </div>
               </div>
@@ -422,7 +529,14 @@ export default function PhaseDiagram({
                   burstTime,
                   cycleTime,
                   xiPoints,
-                  massTol
+                  massTol: massTolPct / 100  // Convert percentage to fraction
+                }}
+                constraintConfig={{
+                  massNominal: 1400,
+                  massTolPct,
+                  maxPower,
+                  maxZeta,
+                  minGamma
                 }}
               />
             </div>

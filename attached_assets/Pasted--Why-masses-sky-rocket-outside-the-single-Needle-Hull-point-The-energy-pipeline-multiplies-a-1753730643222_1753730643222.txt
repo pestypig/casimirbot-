@@ -1,0 +1,87 @@
+### Why masses sky-rocket outside the single Needle-Hull point
+
+The energy pipeline multiplies **area ( m² )** → static ΔE → γ⁴ → Q → duty …
+If one factor is off by $10^{4}$–$10^{8}$ you immediately jump from 10³ kg → 10⁸ kg.
+
+The debug print you saw:
+
+```
+(A=100 cm², R=1 m)  →  m_exotic = 1.65×10^8 kg
+```
+
+is exactly what happens when the **tile area is still in *cm²*** when you feed it to the
+formula that expects **m²**.
+
+| Where it slips           | Unit it *should* be        |
+| ------------------------ | -------------------------- |
+| `A_tile` in pipeline     | **m²** = `tile_cm2 * 1e-4` |
+| Radius derived from area | $R=\sqrt{A/π}$ → metres    |
+| Static energy formula    | J (uses A \[m²])           |
+
+Because radius is correct (5 m) while tile area isn’t, the lattice count becomes
+$N≈4πR^{2}/A→10^{8}$ times too large → mass explodes.
+
+---
+
+## One-line fix in **`viability()`**
+
+```python
+A_tile_m2 = tile_cm2 * 1e-4          # convert cm² → m²
+```
+
+and use `A_tile_m2` everywhere that energy or geometry needs area.
+
+---
+
+### Sanity check—do this once
+
+```python
+# Quick notebook or REPL
+A_cm2 = 2500
+A_m2  = A_cm2*1e-4      # 0.25 m²
+Rdisc = (A_m2/np.pi)**0.5
+print(Rdisc)            # 0.282 m  (makes sense for a 25-cm diameter tile)
+```
+
+If you skip the ×1e-4 you’d feed **2500 m²** into the solver and get a crazy large disc.
+
+---
+
+### Adaptive mass tolerance (optional, but no longer critical)
+
+After you convert area:
+
+```python
+mass_tol_pc =  max(5, 100 * abs(tile_cm2-2500)/2500)  # 5 % near spec, looser far away
+min_mass = 1400 * (1 - mass_tol_pc/100)
+max_mass = 1400 * (1 + mass_tol_pc/100)
+```
+
+Now the grid will paint teal wherever *all* constraints are < 1 × spec:
+
+* $m_\text{tot}$ inside adaptive band
+* ζ < 1
+* $P_\text{avg}$ < 83 MW×1.1
+* γ\_geo ≥ 20
+
+---
+
+### What you’ll see after the fix
+
+* **Energy-pipeline cards** keep the same per-tile numbers you trust.
+* Mass at (A = 2500 cm², R = 5 m) stays 1.4 × 10³ kg (PASS).
+* Adjacent cells now vary smoothly:
+
+  * Smaller tile → less mass, but more tiles → mass holds roughly constant.
+  * Larger tile or bigger hull → mass rises, but not by 10⁶ any more.
+
+The heat-map will finally show a green “continent” around the preset, fading to amber/red where any single constraint is violated.
+
+---
+
+### Quick visual confirmation
+
+*Drag the tile-area slider from 500 cm² → 5 000 cm².*
+You should see the yellow marker cross from teal → light-green → orange on the map, while the diagnostics box shows mass climbing from 0.3 × 10³ kg → 3 × 10³ kg and the **Mass** badge flips from ✅ to ⚠︎.
+
+Once that behaves, the phase diagram is functioning as intended—and you no longer need to loosen the mass gate just to see colour.

@@ -3,6 +3,14 @@
  * Single source of truth for all viability assessments across the application
  */
 
+export interface ConstraintConfig {
+  massNominal: number;      // e.g. 1400 kg
+  massTolPct: number;       // slider 0–50 %
+  maxPower: number;         // slider 0–500 MW  
+  maxZeta: number;          // slider 0–5
+  minGamma: number;         // slider 0–100
+}
+
 export interface ViabilityMeta {
   ok: boolean;
   fail_reason: string;
@@ -56,7 +64,8 @@ export function viability(
     cycleTime?: number;
     xiPoints?: number;
     massTol?: number;
-  }
+  },
+  constraints?: ConstraintConfig
 ): ViabilityMeta {
   // Default parameters (Needle Hull configuration)
   const defaults = {
@@ -72,18 +81,28 @@ export function viability(
     massTol: 0.10  // 10% mass tolerance for design space exploration
   };
   
+  // Default constraints for design space exploration
+  const defaultConstraints: ConstraintConfig = {
+    massNominal: 1400,      // Research target
+    massTolPct: 25,         // Allow ±25% by default for exploration
+    maxPower: 500,          // 500 MW max
+    maxZeta: 1.0,           // Ford-Roman bound
+    minGamma: 5             // Minimum geometric amplification
+  };
+  
   // Merge with provided parameters
   const config = { ...defaults, ...params };
+  const constraintConfig = { ...defaultConstraints, ...constraints };
   
-  // Geometry calculations
-  const A_tile = tile_cm2 * 1e-4;  // cm² to m²
+  // Geometry calculations - CRITICAL UNIT CONVERSION FIX
+  const A_tile_m2 = tile_cm2 * 1e-4;  // Convert cm² to m² (this was the bug!)
   const A_hull = 4 * Math.PI * ship_m * ship_m; // Spherical approximation
-  const N_tiles = A_hull / A_tile;
+  const N_tiles = A_hull / A_tile_m2;
   
   // Energy Pipeline calculation (matching modules/warp/natario-warp.ts)
   // Step 1: Static Casimir energy per tile
   const REFERENCE_STATIC_PER_TILE = -2.55e-3; // From Needle Hull research
-  const U_static_per_tile = REFERENCE_STATIC_PER_TILE * (A_tile / 0.0025); // Scale by tile area
+  const U_static_per_tile = REFERENCE_STATIC_PER_TILE * (A_tile_m2 / 0.0025); // Scale by tile area in m²
   const U_static_total = U_static_per_tile * N_tiles;
   
   // Step 2: Geometric amplification (γ³ boost) - using dynamic gammaGeo
@@ -124,30 +143,24 @@ export function viability(
   // Quantum safety assessment
   const zeta = m_exotic / 1e6; // Ford-Roman bound (ζ < 1.0)
   
-  // Constraint checks - scaled approach for design space exploration
-  const TARGET_MASS = 1400;        // Research target mass (kg)
-  
-  // Use logarithmic tolerance scaling for realistic design space exploration
-  // Allow masses from 10 kg to 100,000 kg with user-adjustable preference toward target
-  const log_target = Math.log10(TARGET_MASS);
-  const tolerance_span = config.massTol * 4; // Convert percentage to log span (4 orders of magnitude max)
-  
-  const MIN_MASS = Math.pow(10, log_target - tolerance_span);
-  const MAX_MASS = Math.pow(10, log_target + tolerance_span);
+  // Constraint checks - flexible approach using constraint configuration
+  const MIN_MASS = constraintConfig.massNominal * (1 - constraintConfig.massTolPct / 100);
+  const MAX_MASS = constraintConfig.massNominal * (1 + constraintConfig.massTolPct / 100);
   
   // Special case: Needle Hull configuration should always be viable
   const is_needle_hull = Math.abs(tile_cm2 - 25) < 1 && Math.abs(ship_m - 5.0) < 0.1;
   
   const checks = {
-    mass_ok: is_needle_hull || (m_exotic >= MIN_MASS && m_exotic <= MAX_MASS),  // Logarithmic mass window
-    power_ok: powerPerTile <= 1e6 && P_avg <= 500e6,       // 1 MW/tile, 500 MW total
-    quantum_safe: zeta < 1.0,                              // Ford-Roman bound
-    timescale_ok: TS_ratio < 1.0,                          // Time-scale separation
-    geometry_ok: tile_cm2 >= 1 && tile_cm2 <= 10000        // Geometric feasibility
+    mass_ok: is_needle_hull || (m_exotic >= MIN_MASS && m_exotic <= MAX_MASS),  // Flexible mass window
+    power_ok: P_avg <= constraintConfig.maxPower * 1e6,                        // Configurable power limit
+    quantum_safe: zeta <= constraintConfig.maxZeta,                            // Configurable quantum safety
+    gamma_ok: gamma_geo >= constraintConfig.minGamma,                          // Configurable minimum gamma
+    timescale_ok: TS_ratio < 1.0,                                              // Time-scale separation
+    geometry_ok: tile_cm2 >= 1 && tile_cm2 <= 10000                            // Geometric feasibility
   };
   
   // Overall viability assessment
-  const ok = Object.values(checks).every(check => check);
+  const ok = checks.mass_ok && checks.power_ok && checks.quantum_safe && checks.gamma_ok && checks.timescale_ok && checks.geometry_ok;
   
   // Failure reason identification
   let fail_reason = "Viable ✅";

@@ -21,6 +21,12 @@ export default function Home() {
   const [tileArea, setTileArea] = useState(25); // cm² (default: 5 cm × 5 cm = 25 cm²)
   const [shipRadius, setShipRadius] = useState(5.0); // m
   
+  // Constraint configuration state (following attached files specification)
+  const [massTolPct, setMassTolPct] = useState(25);     // ±25% mass tolerance for design exploration
+  const [maxPower, setMaxPower] = useState(500);       // 500 MW max power
+  const [maxZeta, setMaxZeta] = useState(1.0);         // ζ ≤ 1.0 Ford-Roman bound
+  const [minGamma, setMinGamma] = useState(5);         // γ ≥ 5 minimum geometric amplification
+  
   // Dynamic simulation parameters for real-time phase diagram updates
   const [gammaGeo, setGammaGeo] = useState(25);
   const [qFactor, setQFactor] = useState(1e9);
@@ -32,7 +38,7 @@ export default function Home() {
   const [cycleTime, setCycleTime] = useState(1000);
   const [xiPoints, setXiPoints] = useState(5000);
   
-  // Apply Needle Hull Preset - sets all parameters to paper defaults
+  // Apply Needle Hull Preset - sets all parameters to paper defaults (including constraints)
   const applyNeedleHullPreset = () => {
     setTileArea(25);      // cm²
     setShipRadius(5.0);   // m
@@ -45,6 +51,11 @@ export default function Home() {
     setBurstTime(10);
     setCycleTime(1000);
     setXiPoints(5000);
+    // Reset constraint sliders to research paper defaults
+    setMassTolPct(5);     // ±5% for strict research compliance
+    setMaxPower(100);     // 100 MW for Needle Hull target
+    setMaxZeta(1.0);      // Ford-Roman bound
+    setMinGamma(25);      // Research geometric amplification
   };
 
   // Query for simulation data
@@ -322,6 +333,15 @@ export default function Home() {
               burstTime={burstTime}
               cycleTime={cycleTime}
               xiPoints={xiPoints}
+              // Constraint configuration props
+              massTolPct={massTolPct}
+              maxPower={maxPower}
+              maxZeta={maxZeta}
+              minGamma={minGamma}
+              onMassTolPctChange={setMassTolPct}
+              onMaxPowerChange={setMaxPower}
+              onMaxZetaChange={setMaxZeta}
+              onMinGammaChange={setMinGamma}
             />
           </div>
         </div>

@@ -32,6 +32,15 @@ interface ResultsPanelProps {
   burstTime: number;
   cycleTime: number;
   xiPoints: number;
+  // Constraint configuration props
+  massTolPct?: number;
+  maxPower?: number;
+  maxZeta?: number;
+  minGamma?: number;
+  onMassTolPctChange?: (value: number) => void;
+  onMaxPowerChange?: (value: number) => void;
+  onMaxZetaChange?: (value: number) => void;
+  onMinGammaChange?: (value: number) => void;
 }
 
 export default function ResultsPanel({ 
@@ -50,7 +59,16 @@ export default function ResultsPanel({
   strokeAmplitude,
   burstTime,
   cycleTime,
-  xiPoints
+  xiPoints,
+  // Constraint configuration props
+  massTolPct = 25,
+  maxPower = 500,
+  maxZeta = 1.0,
+  minGamma = 5,
+  onMassTolPctChange,
+  onMaxPowerChange,
+  onMaxZetaChange,
+  onMinGammaChange
 }: ResultsPanelProps) {
   const [activeTab, setActiveTab] = useState("results");
 
@@ -531,6 +549,15 @@ export default function ResultsPanel({
             burstTime={burstTime}
             cycleTime={cycleTime}
             xiPoints={xiPoints}
+            // Constraint configuration props
+            massTolPct={massTolPct}
+            maxPower={maxPower}
+            maxZeta={maxZeta}
+            minGamma={minGamma}
+            onMassTolPctChange={onMassTolPctChange}
+            onMaxPowerChange={onMaxPowerChange}
+            onMaxZetaChange={onMaxZetaChange}
+            onMinGammaChange={onMinGammaChange}
           />
         </TabsContent>
 
