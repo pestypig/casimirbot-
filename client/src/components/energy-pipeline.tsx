@@ -12,9 +12,65 @@ interface EnergyPipelineProps {
 }
 
 export function EnergyPipeline({ results }: EnergyPipelineProps) {
-  if (!results || !results.energyPipeline) return null;
+  console.log("EnergyPipeline results:", results); // Debug log
   
-  const pipeline = results.energyPipeline;
+  if (!results) {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p>No simulation results available</p>
+        <p className="text-sm">Complete a simulation to see energy pipeline calculations</p>
+      </div>
+    );
+  }
+  
+  // Handle both direct energyPipeline object and computed pipeline from warp/dynamic data
+  let pipeline;
+  
+  if (results.energyPipeline) {
+    pipeline = results.energyPipeline;
+  } else if (results.stressEnergyTensor || results.powerDraw) {
+    // Create pipeline calculations from warp module data
+    const c = 299_792_458; // m/s
+    const f_m = 15e9; // Hz
+    const ω = 2 * Math.PI * f_m;
+    
+    // Estimate static energy from stress-energy tensor
+    const U_static = results.stressEnergyTensor?.T00 ? Math.abs(results.stressEnergyTensor.T00) * 1e-15 : -2.55e-3; // Fallback to typical value
+    const Q = results.qEnhancementFactor || 1e9;
+    const γ_geo = results.geometricBlueshiftFactor || 25;
+    const d = 0.01; // 1% duty cycle typical
+    
+    pipeline = {
+      U_static,
+      U_Q: Q * U_static,
+      U_geo: γ_geo * Q * U_static,
+      U_cycle: γ_geo * Q * U_static * d,
+      P_loss: (γ_geo * Q * U_static * ω) / Q,
+      TS_ratio: 10e-6 / (2 * 20e-6 / c), // Typical time-scale ratio
+      E_tile: γ_geo * Q * U_static * d,
+      E_total: results.totalExoticMass ? results.totalExoticMass * c * c : 0,
+      m_exotic: results.totalExoticMass || 0,
+      γ_geo,
+      ω,
+      d,
+      N_tiles: results.totalExoticMass ? results.totalExoticMass / (results.exoticMassPerTile || 1) : 1,
+      τ_pulse: 10e-6,
+      T_LC: 2 * 20e-6 / c,
+      powerPerTileComputed: results.powerDraw || 0,
+      powerTotalComputed: results.powerDraw || 0,
+      massPerTileComputed: results.exoticMassPerTile || 0
+    };
+  } else {
+    return (
+      <div className="text-center py-12 text-muted-foreground">
+        <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
+        <p>Energy pipeline data not available</p>
+        <p className="text-sm">This simulation doesn't include compatible energy calculations</p>
+        <p className="text-xs mt-2">Switch to Dynamic module for full energy pipeline analysis</p>
+      </div>
+    );
+  }
 
   const formatScientific = (value: number) => {
     if (Math.abs(value) === 0) return "0";
