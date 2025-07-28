@@ -59,111 +59,10 @@ function approximateEllipsoidArea(a: number, b: number, c: number): number {
   return 4 * Math.PI * Math.pow((ap * bp + ap * cp + bp * cp) / 3, 1/p);
 }
 
-async function calculateViabilityUsingSimulation(A_tile_cm2: number, R_ship_m: number): Promise<ViabilityResult> {
-  try {
-    // Create simulation parameters that match the schema structure
-    const simulationParams = {
-      geometry: 'bowl' as const,
-      gap: 1, // 1 nm gap
-      radius: 25000, // 25 mm radius
-      sagDepth: 16, // 16 nm sag depth
-      temperature: 20, // 20 K
-      moduleType: 'warp' as const, // Use warp module for Energy Pipeline
-      dynamicConfig: {
-        modulationFreqGHz: 15,
-        strokeAmplitudePm: 50,
-        burstLengthUs: 10,
-        cycleLengthUs: 1000,
-        cavityQ: 1e9,
-        sectorCount: 400,
-        sectorDuty: 2.5e-5,
-        pulseFrequencyGHz: 15,
-        lightCrossingTimeNs: 100,
-        shiftAmplitude: 50e-12,
-        expansionTolerance: 1e-12,
-        warpFieldType: 'natario' as const
-      },
-      advanced: {
-        xiMin: 0.001,
-        maxXiPoints: 5000,
-        intervals: 50,
-        absTol: 0,
-        relTol: 1e-12
-      }
-    };
-
-    // Call the actual simulation API endpoint
-    const response = await fetch('/api/simulations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(simulationParams)
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to create simulation');
-    }
-    
-    const simulation = await response.json();
-    
-    // Start the simulation
-    const startResponse = await fetch(`/api/simulations/${simulation.id}/start`, {
-      method: 'POST'
-    });
-    
-    if (!startResponse.ok) {
-      throw new Error('Failed to start simulation');
-    }
-    
-    // Wait for results (simplified for phase diagram)
-    let attempts = 0;
-    let results = null;
-    
-    while (attempts < 10 && !results) {
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
-      
-      const statusResponse = await fetch(`/api/simulations/${simulation.id}`);
-      const status = await statusResponse.json();
-      
-      if (status.status === 'completed' && status.results) {
-        results = status.results;
-        break;
-      }
-      attempts++;
-    }
-    
-    if (!results) {
-      // Fallback to shorthand calculation
-      return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
-    }
-    
-    // Extract values from actual Energy Pipeline results
-    const M_exotic = results.totalExoticMass || 1400;
-    const P_avg = results.powerDraw || 83e6;
-    const gamma_geo = results.geometricBlueshiftFactor || 25;
-    const zeta_actual = results.quantumInequalityMargin || 0.0014;
-    
-    // Calculate derived values using Energy Pipeline results
-    const A_tile = A_tile_cm2 * 1e-4;  // cm² to m²
-    const N_tiles = Math.PI * Math.pow(R_ship_m, 2) / A_tile; // Approximate tile count
-    const powerPerTile = P_avg / N_tiles;
-    
-    // Use simulation energy pipeline values
-    const U_static_total = -2.55e-3; // From simulation logs
-    const U_geo_raw = -3.99e-1;
-    const U_Q = -3.99e8;
-    const U_cycle = -3.99e6;
-    const P_loss = 6.01e9;
-    const TS_ratio = 0.20;
-
-    return createViabilityResult(A_tile_cm2, R_ship_m, M_exotic, P_avg, gamma_geo, 
-                               powerPerTile, zeta_actual, TS_ratio, N_tiles, U_static_total, 
-                               U_geo_raw, U_Q, U_cycle, P_loss);
-                               
-  } catch (error) {
-    console.warn('Simulation failed, using shorthand calculation:', error);
-    return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
-  }
-}
+// REMOVED: calculateViabilityUsingSimulation function was causing performance issues 
+// by creating hundreds of simulations. The phase diagram now only uses shorthand 
+// calculations for the heat-map grid. Live diagnostics use Energy Pipeline results 
+// when available from currentSimulation prop.
 
 function calculateViabilityShorthand(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
   // Fallback shorthand calculation (original method)
@@ -266,10 +165,7 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
 }
 
-// Async wrapper for full simulation integration
-async function calculateViabilityAsync(A_tile_cm2: number, R_ship_m: number): Promise<ViabilityResult> {
-  return await calculateViabilityUsingSimulation(A_tile_cm2, R_ship_m);
-}
+// REMOVED: Async wrapper was referencing deleted function
 
 async function buildViabilityGrid(A_range: [number, number], R_range: [number, number], resolution: number = 30, useFullSimulation: boolean = false) {
   const A_vals = Array.from({length: resolution}, (_, i) => 
@@ -291,20 +187,13 @@ async function buildViabilityGrid(A_range: [number, number], R_range: [number, n
       
       for (let j = 0; j < A_vals.length; j++) {
         const A = A_vals[j];
-        try {
-          const result = await calculateViabilityUsingSimulation(A, R);
-          row.push(result.viable ? 1 : 0);
-          const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
-          hoverRow.push(`Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
-                       `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
-                       `ζ: ${result.zeta.toFixed(3)}`);
-        } catch (error) {
-          // Fallback to shorthand on error
-          const result = calculateViabilityShorthand(A, R);
-          row.push(result.viable ? 1 : 0);
-          hoverRow.push(`Tile: ${A.toFixed(0)} cm² (shorthand)<br>Radius: ${R.toFixed(1)} m<br>` +
-                       `Error: Simulation failed`);
-        }
+        // Use shorthand calculation instead of full simulation
+        const result = calculateViabilityShorthand(A, R);
+        row.push(result.viable ? 1 : 0);
+        const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
+        hoverRow.push(`Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+                     `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
+                     `ζ: ${result.zeta.toFixed(3)}`);
       }
       Z.push(row);
       hoverText.push(hoverRow);
