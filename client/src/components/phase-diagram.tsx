@@ -294,6 +294,12 @@ export default function PhaseDiagram({
   burstTime = 10,
   cycleTime = 1000,
   xiPoints = 5000,
+  // Physics parameter callbacks
+  onGammaGeoChange,
+  onQFactorChange,
+  onDutyChange,
+  onSagDepthChange,
+  onGapChange,
   // Constraint configuration props with exact Needle Hull defaults
   massTolPct = 5,
   maxPower = 100,
