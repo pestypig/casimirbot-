@@ -258,9 +258,19 @@ export default function PhaseDiagram({
       };
     }
     
-    // Fallback to central viability function - same math everywhere!
-    return viability(tileArea, shipRadius);
-  }, [tileArea, shipRadius, currentSimulation]);
+    // Fallback to central viability function with ALL dynamic parameters - same math everywhere!
+    return viability(tileArea, shipRadius, {
+      gammaGeo,
+      qFactor,
+      duty,
+      sagDepth,
+      temperature,
+      strokeAmplitude,
+      burstTime,
+      cycleTime,
+      xiPoints
+    });
+  }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints]);
 
   // Ellipsoid scaling calculation
   const getScaledSurfaceArea = (radius: number): number => {
