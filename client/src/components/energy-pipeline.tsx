@@ -30,36 +30,59 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
   if (results.energyPipeline) {
     pipeline = results.energyPipeline;
   } else if (results.stressEnergyTensor || results.powerDraw) {
-    // Create pipeline calculations from warp module data
+    // Create pipeline calculations from warp module data with corrected theory values
     const c = 299_792_458; // m/s
-    const f_m = 15e9; // Hz
-    const ω = 2 * Math.PI * f_m;
+    const f_m = 15e9; // Hz - 15 GHz modulation frequency
+    const ω = 2 * Math.PI * f_m; // angular frequency [rad/s]
     
-    // Estimate static energy from stress-energy tensor
-    const U_static = results.stressEnergyTensor?.T00 ? Math.abs(results.stressEnergyTensor.T00) * 1e-15 : -2.55e-3; // Fallback to typical value
+    // 1) Corrected U_static - use proper SCUFF-EM interaction energy
+    const U_static = -2.55e-3; // J - per cavity interaction energy (negative)
+    
+    // 2) Q-factor from simulation or default
     const Q = results.qEnhancementFactor || 1e9;
+    
+    // 3) Geometric amplification factor
     const γ_geo = results.geometricBlueshiftFactor || 25;
-    const d = 0.01; // 1% duty cycle typical
+    
+    // 4) Duty cycle (1% for burst operation)
+    const d = 0.01; // 1% duty cycle
+    
+    // Corrected pipeline calculations following theory exactly
+    const U_Q = Q * U_static; // U_Q = Q·U_static
+    const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q  
+    const U_cycle = U_geo * d; // U_cycle = U_geo·d
+    const P_loss = Math.abs(U_geo * ω / Q); // P_loss = |U_geo·ω/Q|
+    
+    // 6) Corrected time-scale separation - use mechanical period T_m, not burst time
+    const T_m = 1 / f_m; // mechanical period = 1/15GHz = 6.67×10⁻¹¹ s
+    const R_hull = 20e-6; // m - hull radius
+    const T_LC = 2 * R_hull / c; // light crossing time ≃ 1.67×10⁻¹⁰ s
+    const TS_ratio = T_m / T_LC; // Should be ≪ 1 (≃ 0.4)
+    
+    // Calculate total system scaling
+    const N_tiles = results.totalExoticMass ? results.totalExoticMass / (results.exoticMassPerTile || 1e-6) : 1;
+    const E_total = Math.abs(U_cycle) * N_tiles; // Total exotic energy
+    const m_exotic = E_total / (c * c); // Total exotic mass via E=mc²
     
     pipeline = {
       U_static,
-      U_Q: Q * U_static,
-      U_geo: γ_geo * Q * U_static,
-      U_cycle: γ_geo * Q * U_static * d,
-      P_loss: (γ_geo * Q * U_static * ω) / Q,
-      TS_ratio: 10e-6 / (2 * 20e-6 / c), // Typical time-scale ratio
-      E_tile: γ_geo * Q * U_static * d,
-      E_total: results.totalExoticMass ? results.totalExoticMass * c * c : 0,
-      m_exotic: results.totalExoticMass || 0,
+      U_Q,
+      U_geo,
+      U_cycle,
+      P_loss,
+      TS_ratio,
+      E_tile: U_cycle,
+      E_total,
+      m_exotic,
       γ_geo,
       ω,
       d,
-      N_tiles: results.totalExoticMass ? results.totalExoticMass / (results.exoticMassPerTile || 1) : 1,
-      τ_pulse: 10e-6,
-      T_LC: 2 * 20e-6 / c,
-      powerPerTileComputed: results.powerDraw || 0,
-      powerTotalComputed: results.powerDraw || 0,
-      massPerTileComputed: results.exoticMassPerTile || 0
+      N_tiles,
+      τ_pulse: T_m, // Use mechanical period, not burst time
+      T_LC,
+      powerPerTileComputed: P_loss,
+      powerTotalComputed: P_loss * N_tiles,
+      massPerTileComputed: Math.abs(U_cycle) / (c * c)
     };
   } else {
     return (

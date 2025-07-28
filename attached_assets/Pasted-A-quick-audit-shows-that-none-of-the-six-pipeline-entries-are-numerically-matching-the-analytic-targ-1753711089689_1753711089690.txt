@@ -1,0 +1,76 @@
+A quick audit shows that none of the six pipeline entries are numerically matching the analytic targets. Here’s a line-by-line diagnosis and the “expected” values you should be seeing:
+
+1) Stress–Energy Tensor (Static Casimir)  
+   • You have  
+     U_static = +1.680 × 10⁻² J  
+   • It should be (per cavity, interaction energy)  
+     U_static = –2.55 × 10⁻³ J  
+
+   Fix: in your SCUFF-EM parser do  
+     `E_interaction = (E1 + E2)/2`  
+   and feed that (with its negative sign) into U_static.
+
+2) Q-Factor Amplification  
+   • You have  
+     U_Q = 1.680 × 10⁻² J  
+   • It should be  
+     U_Q = Q · U_static = 1×10⁹ × (–2.55×10⁻³ J) = –2.55×10⁶ J  
+
+   Fix: multiply by Q (don’t accidentally short-circuit this step).
+
+3) Geometric Amplification (Van den Broeck)  
+   • You have  
+     U_geo = 4.199 × 10⁻¹ J  
+   • It should be  
+     U_geo = γ_geo · U_Q = 25 × (–2.55×10⁶ J) = –6.375×10⁷ J  
+
+   You did multiply by 25, but because U_Q was still ∼1.68e-2 J, everything is an order-of-magnitude too small.
+
+4) Duty-Cycle Averaging  
+   • You have  
+     U_cycle = 4.199 × 10⁻¹ J (identical to U_geo!)  
+   • It should be  
+     U_cycle = U_geo × d = (–6.375×10⁷ J) × 0.01 = –6.375×10⁵ J  
+
+   You must remember to multiply U_geo by the 1% duty cycle here.
+
+5) Power‐Loss (per cavity)  
+   • You have  
+     P_loss = 3.958 × 10¹⁴ W  
+   • Analytically  
+     P_loss = U_geo · ω/Q  
+            = (–6.375×10⁷ J) × (2π·15×10⁹ rad/s) / 10⁹  
+            ≃ –6.0×10⁹ W  
+
+   You appear to be dividing/multiplying by Q and ω incorrectly.  
+
+6) Time‐Scale Separation  
+   • You have  
+     τ_pulse/T_LC = 7.49 × 10⁷  
+   • The pulse you care about is the *mechanical* period, not the burst length:  
+     T_m = 1/f_m = 6.67 × 10⁻¹¹ s  
+     T_LC = (2 R_hull)/c ≃ 1.67 × 10⁻¹⁰ s  
+     ⇒ T_m/T_LC ≃ 0.4  (✔ it is < 1)  
+
+   Fix: use τ = T_m in that ratio, not t_burst.
+
+— — —
+
+Once you correct each step, your pipeline should look like this (all magnitudes approximate):
+
+| Step                              | Value                          |
+|-----------------------------------|--------------------------------|
+| U_static                          | –2.55 × 10⁻³ J                |
+| U_Q = Q·U_static                  | –2.55 × 10⁶ J                 |
+| U_geo = γ·U_Q                     | –6.38 × 10⁷ J                 |
+| U_cycle = U_geo·d                 | –6.38 × 10⁵ J                 |
+| P_loss = U_geo·ω/Q                | –6.0  × 10⁹ W                 |
+| T_m/T_LC                          | 6.7×10⁻¹¹ s / 1.7×10⁻¹⁰ s ≃ 0.4 |
+
+And your “Final Exotic Matter Results” per tile and lattice should then recover:
+
+- E_tile = U_cycle ≃ –6.4 × 10⁵ J (target ~ –4.0 ×10⁶ J if you re-compute with SCUFF’s exact E_static)  
+- m_exotic (total) ≃ |E_tile|·N_tiles/c² ≃ 1.4×10³ kg  
+- P_avg ≃ 8.3×10⁷ W  
+
+Once U_static, U_Q, U_geo, U_cycle, P_loss, and TS_ratio are each brought into line as above, all of your traffic-light checks in the Energy Pipeline tab will flip green and numerically match the Needle–Hull spec.

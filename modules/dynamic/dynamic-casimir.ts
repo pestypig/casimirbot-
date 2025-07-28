@@ -202,11 +202,12 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   const N_tiles = A_hull / A_tile; // Number of tiles in full lattice
   
   // 1) Q-factor amplification
-  const U_static = staticEnergy; // per-cavity static Casimir energy [J]
+  // Use proper SCUFF-EM interaction energy (divide by 2 for identical plates)
+  const U_static = staticEnergy / 2; // per-cavity interaction energy [J] (should be ~-2.55e-3)
   const U_Q = cavityQ * U_static; // U_Q = Q·U_static [J]
   
   // 2) Geometric amplification (Van den Broeck)
-  const γ_geo = Math.pow(25, 1/3); // Geometric blueshift factor ≈ 2.92 (cube root of 25)
+  const γ_geo = 25; // Geometric blueshift factor (full amplification, not cube root)
   const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q [J]
   
   // 3) Fractional stroke / duty cycle
@@ -218,14 +219,14 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   const U_cycle = U_geo * d; // ⟨E⟩_cycle = U_geo·d [J]
   
   // 5) Power loss per cavity
-  // P_loss = U_geo / (Q/ω) = U_geo·ω / Q [W]
-  const P_loss = U_geo * ω / cavityQ;
+  // P_loss = |U_geo·ω / Q| [W] (take absolute value for power)
+  const P_loss = Math.abs(U_geo * ω / cavityQ);
   
   // 6) Time-scale separation check
-  // τ_pulse = t_burst, T_LC = 2·R_hull / c (round-trip light time)
-  const τ_pulse = t_burst; // s
-  const T_LC = 2 * R_hull / c; // s - light crossing time
-  const TS_ratio = τ_pulse / T_LC; // dimensionless - should be ≪1
+  // Use mechanical period T_m = 1/f_m, not burst time
+  const T_m = 1 / f_m; // mechanical period [s] = 6.67×10⁻¹¹ s for 15 GHz
+  const T_LC = 2 * R_hull / c; // light crossing time [s] ≃ 1.67×10⁻¹⁰ s
+  const TS_ratio = T_m / T_LC; // dimensionless - should be ≪1 (≃ 0.4)
   
   // 7) Per-tile negative energy
   const E_tile = U_cycle; // E_tile = U_geo·d [J]
@@ -273,7 +274,7 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
       ω,        // Angular frequency [rad/s]
       d,        // Duty cycle [dimensionless]
       N_tiles,  // Number of tiles in full lattice
-      τ_pulse,  // Pulse duration [s]
+      τ_pulse: T_m,  // Mechanical period [s] (corrected)
       T_LC,     // Light crossing time [s]
       powerPerTileComputed,  // P_loss per tile [W]
       powerTotalComputed,    // Total lattice power [W]
