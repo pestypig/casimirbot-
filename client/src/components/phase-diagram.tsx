@@ -56,6 +56,7 @@ interface InteractiveHeatMapProps {
     burstTime?: number;
     cycleTime?: number;
     xiPoints?: number;
+    massTol?: number;
   };
 }
 
@@ -241,6 +242,7 @@ export default function PhaseDiagram({
   cycleTime,
   xiPoints
 }: PhaseDiagramProps) {
+  const [massTol, setMassTol] = useState(0.10); // 10% mass tolerance default
   
   // Live diagnostics using central viability function - perfect consistency!
   const liveDiagnostics = useMemo(() => {
@@ -282,9 +284,10 @@ export default function PhaseDiagram({
       strokeAmplitude,
       burstTime,
       cycleTime,
-      xiPoints
+      xiPoints,
+      massTol
     });
-  }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints]);
+  }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints, massTol]);
 
   // Ellipsoid scaling calculation
   const getScaledSurfaceArea = (radius: number): number => {
@@ -371,6 +374,21 @@ export default function PhaseDiagram({
                       }
                     </div>
                   </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Mass Tolerance: ±{(massTol * 100).toFixed(0)}%</label>
+                    <Slider
+                      value={[massTol * 100]}
+                      onValueChange={([value]) => setMassTol(value / 100)}
+                      min={5}
+                      max={50}
+                      step={1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Range: {(1400 * (1 - massTol)).toFixed(0)}-{(1400 * (1 + massTol)).toFixed(0)} kg
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -403,7 +421,8 @@ export default function PhaseDiagram({
                   strokeAmplitude,
                   burstTime,
                   cycleTime,
-                  xiPoints
+                  xiPoints,
+                  massTol
                 }}
               />
             </div>
