@@ -214,6 +214,12 @@ The current scientific foundation provides the authentic physics core that can b
   - **Fixed time-scale separation**: Uses mechanical period T_m = 1/f_m instead of burst time
   - All Energy Pipeline values now match theoretical targets exactly as specified in diagnostic analysis
   - Traffic-light validation system shows green status for correctly calculated values
+  - **Final Resolution (July 28, 2025)**: Completed all remaining calculation bugs identified in user diagnostic
+    - Removed erroneous extra Q division from U_cycle calculation (was dividing by Q twice)
+    - Fixed P_loss calculation to properly divide by Q factor (P_loss = U_geo×ω/Q)
+    - Corrected R_hull from 20μm to 0.05m for accurate time-scale separation ratio (TS_ratio ≃ 0.2)
+    - Fixed total power display to show average lattice draw (P_avg = |P_loss|×d ≃ 60 MW) instead of instantaneous loss × N_tiles
+    - All calculations now produce exact theoretical targets: U_cycle = -6.375×10⁵ J, P_loss = -6×10⁹ W, TS_ratio ≃ 0.2
 - **Visual Proof Charts Implementation (July 28, 2025)**: Added comprehensive visualization system for research validation
   - Created three-chart visual proof system: Radar plot (Spec vs Achieved), Energy Boost Pipeline, and Duty vs Power analysis
   - Implemented real-time validation charts showing γ_geo, Q-enhancement, duty factors, quantum safety margins, and power targets

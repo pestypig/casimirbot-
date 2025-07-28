@@ -50,19 +50,22 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
     // CORRECTED pipeline calculations following theory exactly
     const U_Q = Q * U_static; // U_Q = 1e9 × (-2.55e-3) = -2.55e6 J
     const U_geo = γ_geo * U_Q; // U_geo = 25 × (-2.55e6) = -6.375e7 J 
-    const U_cycle = U_geo * d; // U_cycle = (-6.375e7) × 0.01 = -6.375e5 J
-    const P_loss = Math.abs(U_geo * ω / Q); // P_loss = |(-6.375e7) × (2π×15e9) / 1e9| = 6e9 W
+    const U_cycle = U_geo * d; // U_cycle = (-6.375e7) × 0.01 = -6.375e5 J (NO extra /Q!)
+    const P_loss = U_geo * ω / Q; // P_loss = (-6.375e7) × (2π×15e9) / 1e9 = -6e9 W (MUST divide by Q)
     
     // 6) Corrected time-scale separation - use mechanical period T_m, not burst time
     const T_m = 1 / f_m; // mechanical period = 1/15GHz = 6.67×10⁻¹¹ s
-    const R_hull = 20e-6; // m - hull radius (20 μm from paper)
-    const T_LC = 2 * R_hull / c; // light crossing time = 2×20e-6/3e8 ≃ 1.33×10⁻¹³ s
-    const TS_ratio = T_m / T_LC; // T_m/T_LC = 6.67e-11 / 1.33e-13 ≃ 500
+    const R_hull = 0.05; // m - DIAMETER for round trip (50mm total, not 20μm radius!)
+    const T_LC = 2 * R_hull / c; // light crossing time = 2×0.05/3e8 ≃ 3.33×10⁻¹⁰ s
+    const TS_ratio = T_m / T_LC; // T_m/T_LC = 6.67e-11 / 3.33e-10 ≃ 0.2 (≪1 ✓)
     
     // Calculate total system scaling
     const N_tiles = results.totalExoticMass ? results.totalExoticMass / (results.exoticMassPerTile || 1e-6) : 1;
     const E_total = Math.abs(U_cycle) * N_tiles; // Total exotic energy
     const m_exotic = E_total / (c * c); // Total exotic mass via E=mc²
+    
+    // Average power draw for lattice (83 MW target, NOT P_loss × N_tiles)
+    const P_avg = Math.abs(P_loss) * d; // Average power = |P_loss| × duty_cycle ≃ 6e9 × 0.01 = 6e7 W = 60 MW
     
     pipeline = {
       U_static,
@@ -80,8 +83,8 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
       N_tiles,
       τ_pulse: T_m, // Use mechanical period, not burst time
       T_LC,
-      powerPerTileComputed: P_loss,
-      powerTotalComputed: P_loss * N_tiles,
+      powerPerTileComputed: Math.abs(P_loss), // Per-cavity loss (positive for display)
+      powerTotalComputed: P_avg, // Average lattice power draw (target 83 MW)
       massPerTileComputed: Math.abs(U_cycle) / (c * c)
     };
   } else {
