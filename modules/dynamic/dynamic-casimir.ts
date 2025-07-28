@@ -51,6 +51,28 @@ export interface DynamicCasimirResult {
   averagePowerTotalLattice: number; // Full lattice power (83 MW)
   exoticMassPerTile: number;       // Mass per tile (1.5 kg target)
   exoticMassTotalLattice: number;  // Total exotic mass
+  
+  // Complete Energy Pipeline (T_μν → metric calculations)
+  energyPipeline?: {
+    U_static: number;             // Static Casimir energy per cavity [J]
+    U_Q: number;                  // Q-amplified energy [J]
+    U_geo: number;                // Geometrically amplified energy [J]
+    U_cycle: number;              // Stored energy per cycle [J]
+    P_loss: number;               // Power loss per cavity [W]
+    TS_ratio: number;             // Time-scale separation ratio
+    E_tile: number;               // Per-tile negative energy [J]
+    E_total: number;              // Total exotic energy [J]
+    m_exotic: number;             // Exotic mass via E=mc² [kg]
+    γ_geo: number;                // Geometric blueshift factor
+    ω: number;                    // Angular frequency [rad/s]
+    d: number;                    // Duty cycle [dimensionless]
+    N_tiles: number;              // Number of tiles in full lattice
+    τ_pulse: number;              // Mechanical period [s]
+    T_LC: number;                 // Light crossing time [s]
+    powerPerTileComputed: number; // P_loss per tile [W]
+    powerTotalComputed: number;   // Total lattice power [W]
+    massPerTileComputed: number;  // Mass per tile from E=mc² [kg]
+  };
 }
 
 /**
@@ -225,7 +247,7 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   // 6) Time-scale separation check
   // Use mechanical period T_m = 1/f_m, not burst time
   const T_m = 1 / f_m; // mechanical period [s] = 6.67×10⁻¹¹ s for 15 GHz
-  const T_LC = 2 * R_hull / c; // light crossing time [s] ≃ 1.67×10⁻¹⁰ s
+  const T_LC = 2 * R_hull / c; // light crossing time [s] ≃ 1.33×10⁻¹³ s (corrected)
   const TS_ratio = T_m / T_LC; // dimensionless - should be ≪1 (≃ 0.4)
   
   // 7) Per-tile negative energy

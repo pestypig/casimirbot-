@@ -48,16 +48,16 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
     const d = 0.01; // 1% duty cycle
     
     // Corrected pipeline calculations following theory exactly
-    const U_Q = Q * U_static; // U_Q = Q·U_static
-    const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q  
-    const U_cycle = U_geo * d; // U_cycle = U_geo·d
-    const P_loss = Math.abs(U_geo * ω / Q); // P_loss = |U_geo·ω/Q|
+    const U_Q = Q * U_static; // U_Q = Q·U_static = 1e9 × (-2.55e-3) = -2.55e6 J
+    const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q = 25 × (-2.55e6) = -6.375e7 J 
+    const U_cycle = U_geo * d; // U_cycle = U_geo·d = (-6.375e7) × 0.01 = -6.375e5 J
+    const P_loss = Math.abs(U_geo * ω / Q); // P_loss = |U_geo·ω/Q| = |(-6.375e7) × (2π×15e9) / 1e9| = 6e9 W
     
     // 6) Corrected time-scale separation - use mechanical period T_m, not burst time
     const T_m = 1 / f_m; // mechanical period = 1/15GHz = 6.67×10⁻¹¹ s
-    const R_hull = 20e-6; // m - hull radius
-    const T_LC = 2 * R_hull / c; // light crossing time ≃ 1.67×10⁻¹⁰ s
-    const TS_ratio = T_m / T_LC; // Should be ≪ 1 (≃ 0.4)
+    const R_hull = 20e-6; // m - hull radius (20 μm from paper)
+    const T_LC = 2 * R_hull / c; // light crossing time = 2×20e-6/3e8 ≃ 1.33×10⁻¹³ s
+    const TS_ratio = T_m / T_LC; // Should be ≪ 1, actual ≃ 6.67e-11/1.33e-13 ≃ 500 (corrected)
     
     // Calculate total system scaling
     const N_tiles = results.totalExoticMass ? results.totalExoticMass / (results.exoticMassPerTile || 1e-6) : 1;
