@@ -160,7 +160,7 @@ interface InteractiveHeatMapProps {
 function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
   // Build the viability grid
   const gridData = useMemo(() => 
-    buildViabilityGrid([100, 5000], [1, 30], 30), 
+    buildViabilityGrid([1, 100], [1, 30], 30), 
     []
   );
   
@@ -281,8 +281,8 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
       </div>
       
       <div className="mt-4 text-sm text-muted-foreground">
-        <p><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;100 MW • Quantum ζ &lt;1.0 • TS ratio &lt;1.0 • γ ≥20</p>
-        <p className="mt-1">Hover over grid cells to see detailed diagnostics for each design point.</p>
+        <p><strong>Needle Hull Grid:</strong> 1-100 cm² tile area (25 cm² = 5×5 cm tiles) × 1-30 m ship radius</p>
+        <p className="mt-1"><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;100 MW • Quantum ζ &lt;1.0 • TS ratio &lt;1.0 • γ ≥20</p>
       </div>
     </div>
   );
@@ -355,9 +355,9 @@ export default function PhaseDiagram({
                     <Slider
                       value={[tileArea]}
                       onValueChange={([value]) => onTileAreaChange?.(value)}
-                      min={50}
-                      max={5000}
-                      step={50}
+                      min={1}
+                      max={100}
+                      step={1}
                       className="mt-2"
                     />
                   </div>
@@ -426,14 +426,8 @@ export default function PhaseDiagram({
               />
               
               <div className="mt-4 text-sm text-muted-foreground">
-                <p><strong>Constraints checked:</strong></p>
-                <ul className="list-disc list-inside mt-2 space-y-1">
-                  <li>Exotic mass: 1000-2000 kg range</li>
-                  <li>Power consumption: &lt; 100 MW</li>
-                  <li>Quantum safety: ζ &lt; 1.0</li>
-                  <li>Time-scale separation: &lt; 1.0</li>
-                  <li>Geometric amplification: γ ≥ 20</li>
-                </ul>
+                <p><strong>Needle Hull Design Space:</strong> 1-100 cm² tiles × 1-30 m radius</p>
+                <p className="mt-1"><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;100 MW • Quantum ζ &lt;1.0 • TS ratio &lt;1.0 • γ ≥20</p>
               </div>
             </div>
           </div>

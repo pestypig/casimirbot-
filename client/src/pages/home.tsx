@@ -18,7 +18,7 @@ export default function Home() {
   const [currentStep, setCurrentStep] = useState<string>("");
   
   // Shared phase diagram state
-  const [tileArea, setTileArea] = useState(2500); // cm²
+  const [tileArea, setTileArea] = useState(25); // cm² (default: 5 cm × 5 cm = 25 cm²)
   const [shipRadius, setShipRadius] = useState(5.0); // m
 
   // Query for simulation data

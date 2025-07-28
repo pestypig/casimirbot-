@@ -66,7 +66,7 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange }:
     });
     
     // Phase diagram parameters - Needle Hull research specifications
-    onTileAreaChange?.(2500); // 2500 cm² tile area
+    onTileAreaChange?.(25); // 25 cm² tile area (5 cm × 5 cm tiles)
     onShipRadiusChange?.(5.0); // 5.0 m ship radius
   };
 
