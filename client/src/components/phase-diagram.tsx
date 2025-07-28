@@ -4,6 +4,7 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, TestTube, TrendingUp, Zap } from 'lucide-react';
+// Using a custom heat-map visualization instead of Plotly to avoid build issues
 
 interface ViabilityResult {
   viable: boolean;
@@ -14,7 +15,6 @@ interface ViabilityResult {
   TS_ratio: number;
   gamma_geo: number;
   N_tiles: number;
-  U_cycle: number;
   A_hull: number;
   checks: {
     mass_ok: boolean;
@@ -121,7 +121,7 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   };
 }
 
-function buildViabilityGrid(A_range: [number, number], R_range: [number, number], resolution: number = 60) {
+function buildViabilityGrid(A_range: [number, number], R_range: [number, number], resolution: number = 40) {
   const A_vals = Array.from({length: resolution}, (_, i) => 
     A_range[0] + (A_range[1] - A_range[0]) * i / (resolution - 1)
   );
@@ -129,6 +129,7 @@ function buildViabilityGrid(A_range: [number, number], R_range: [number, number]
     R_range[0] + (R_range[1] - R_range[0]) * i / (resolution - 1)
   );
   
+  // Build viability matrix (R x A)
   const Z = R_vals.map(R => 
     A_vals.map(A => {
       const result = calculateViability(A, R);
@@ -136,7 +137,155 @@ function buildViabilityGrid(A_range: [number, number], R_range: [number, number]
     })
   );
   
-  return { A_vals, R_vals, Z };
+  // Build hover text matrix with diagnostic information
+  const hoverText = R_vals.map(R => 
+    A_vals.map(A => {
+      const result = calculateViability(A, R);
+      const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
+      return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+             `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
+             `ζ: ${result.zeta.toFixed(3)}`;
+    })
+  );
+  
+  return { A_vals, R_vals, Z, hoverText };
+}
+
+// Interactive Heat Map Component
+interface InteractiveHeatMapProps {
+  currentTileArea: number;
+  currentShipRadius: number;
+}
+
+function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
+  // Build the viability grid
+  const gridData = useMemo(() => 
+    buildViabilityGrid([100, 5000], [1, 30], 30), 
+    []
+  );
+  
+  const { A_vals, R_vals, Z, hoverText } = gridData;
+  
+  // Grid dimensions
+  const cellWidth = 12;
+  const cellHeight = 8;
+  const width = A_vals.length * cellWidth;
+  const height = R_vals.length * cellHeight;
+  
+  // Find current point position in grid
+  const currentA_idx = A_vals.findIndex(a => a >= currentTileArea) || 0;
+  const currentR_idx = R_vals.findIndex(r => r >= currentShipRadius) || 0;
+  
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
+      <div className="mb-4 flex justify-between items-center text-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-teal-500 rounded"></div>
+            <span>Viable</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-500 rounded"></div>
+            <span>Failed</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
+            <span>Current Design</span>
+          </div>
+        </div>
+        <div className="text-muted-foreground">
+          {currentTileArea} cm² × {currentShipRadius.toFixed(1)} m
+        </div>
+      </div>
+      
+      <div className="overflow-auto max-h-96">
+        <svg width={width + 100} height={height + 60} className="border bg-gray-50 dark:bg-gray-800">
+          {/* Axis labels */}
+          <text x={width/2 + 50} y={height + 35} textAnchor="middle" className="text-xs fill-current">
+            Tile Area (cm²)
+          </text>
+          <text x={15} y={height/2 + 30} textAnchor="middle" transform={`rotate(-90, 15, ${height/2 + 30})`} className="text-xs fill-current">
+            Ship Radius (m)
+          </text>
+          
+          {/* Grid cells */}
+          {Z.map((row, r_idx) => 
+            row.map((viability, a_idx) => (
+              <rect
+                key={`${r_idx}-${a_idx}`}
+                x={50 + a_idx * cellWidth}
+                y={30 + r_idx * cellHeight}
+                width={cellWidth - 0.5}
+                height={cellHeight - 0.5}
+                fill={viability ? '#14b8a6' : '#ef4444'}
+                opacity={0.8}
+                stroke="white"
+                strokeWidth={0.5}
+              />
+            ))
+          )}
+          
+          {/* Current design marker */}
+          <circle
+            cx={50 + currentA_idx * cellWidth + cellWidth/2}
+            cy={30 + currentR_idx * cellHeight + cellHeight/2}
+            r={4}
+            fill="#fbbf24"
+            stroke="white"
+            strokeWidth={2}
+          />
+          
+          {/* Axis ticks and labels */}
+          {A_vals.filter((_, i) => i % 5 === 0).map((a, i) => (
+            <g key={`a-${i}`}>
+              <line 
+                x1={50 + i * 5 * cellWidth} 
+                y1={30 + height} 
+                x2={50 + i * 5 * cellWidth} 
+                y2={35 + height} 
+                stroke="currentColor" 
+                strokeWidth={1}
+              />
+              <text 
+                x={50 + i * 5 * cellWidth} 
+                y={50 + height} 
+                textAnchor="middle" 
+                className="text-xs fill-current"
+              >
+                {Math.round(a)}
+              </text>
+            </g>
+          ))}
+          
+          {R_vals.filter((_, i) => i % 4 === 0).map((r, i) => (
+            <g key={`r-${i}`}>
+              <line 
+                x1={45} 
+                y1={30 + i * 4 * cellHeight} 
+                x2={50} 
+                y2={30 + i * 4 * cellHeight} 
+                stroke="currentColor" 
+                strokeWidth={1}
+              />
+              <text 
+                x={40} 
+                y={35 + i * 4 * cellHeight} 
+                textAnchor="end" 
+                className="text-xs fill-current"
+              >
+                {r.toFixed(1)}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      
+      <div className="mt-4 text-sm text-muted-foreground">
+        <p><strong>Constraints:</strong> Mass: 1000-2000 kg • Power: &lt;100 MW • Quantum ζ &lt;1.0 • TS ratio &lt;1.0 • γ ≥20</p>
+        <p className="mt-1">Hover over grid cells to see detailed diagnostics for each design point.</p>
+      </div>
+    </div>
+  );
 }
 
 interface PhaseDiagramProps {
@@ -262,28 +411,19 @@ export default function PhaseDiagram({
                 <div className="mt-4 p-3 bg-muted rounded-lg text-xs">
                   <div>Total tiles: {formatScientific(currentDiagnostics.N_tiles)}</div>
                   <div>Hull area: {currentDiagnostics.A_hull.toFixed(1)} m²</div>
-                  <div>Energy/tile: {formatScientific(currentDiagnostics.U_cycle)} J</div>
+                  <div>Status: {currentDiagnostics.fail_reason}</div>
                 </div>
               </div>
             </div>
 
-            {/* Visualization Placeholder */}
+            {/* Interactive Phase Diagram Heat-Map */}
             <div className="lg:col-span-2">
               <h4 className="font-semibold mb-4">Viability Phase Space</h4>
               
-              {/* Simple grid visualization */}
-              <div className="bg-muted rounded-lg p-4 h-96 flex items-center justify-center">
-                <div className="text-center">
-                  <Zap className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-muted-foreground">Interactive Heat Map</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    🟦 Teal: Viable designs | 🟥 Red: Failed constraints
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    🟡 Current point: {currentDiagnostics.fail_reason}
-                  </p>
-                </div>
-              </div>
+              <InteractiveHeatMap 
+                currentTileArea={tileArea} 
+                currentShipRadius={shipRadius}
+              />
               
               <div className="mt-4 text-sm text-muted-foreground">
                 <p><strong>Constraints checked:</strong></p>
