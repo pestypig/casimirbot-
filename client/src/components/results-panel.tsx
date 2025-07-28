@@ -108,40 +108,108 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             isVisible={simulation.parameters.moduleType === 'dynamic'} 
           />
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Energy Results */}
-            <div>
-              <h3 className="text-base font-semibold mb-4">Casimir Energy</h3>
-              <div className="space-y-4">
-                <div className="bg-muted rounded-lg p-4">
-                  <div className="text-2xl font-mono font-semibold">
-                    {results?.totalEnergy ? formatScientificNotation(results.totalEnergy) : "—"}
+          {/* Warp Module Results */}
+          {simulation.parameters.moduleType === 'warp' && results && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Warp Bubble Results */}
+              <div>
+                <h3 className="text-base font-semibold mb-4">Warp Bubble Analysis</h3>
+                <div className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results.geometricBlueshiftFactor?.toFixed(1) || "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">γ_geo (Geometric Amplification)</div>
                   </div>
-                  <div className="text-sm text-muted-foreground">Joules (Total Energy)</div>
-                </div>
 
-                <div className="bg-muted rounded-lg p-4">
-                  <div className="text-2xl font-mono font-semibold">
-                    {results?.energyPerArea ? formatScientificNotation(results.energyPerArea) : "—"}
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results.totalExoticMass ? formatScientificNotation(results.totalExoticMass) : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">kg (Total Exotic Mass)</div>
                   </div>
-                  <div className="text-sm text-muted-foreground">J/m² (Energy per unit area)</div>
-                </div>
 
-                <div className="bg-muted rounded-lg p-4">
-                  <div className="text-2xl font-mono font-semibold">
-                    {results?.force ? formatScientificNotation(results.force) : "—"}
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results.powerDraw ? formatScientificNotation(results.powerDraw) : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">W (Power Draw)</div>
                   </div>
-                  <div className="text-sm text-muted-foreground">N (Casimir Force)</div>
+                </div>
+              </div>
+
+              {/* Warp Field Status */}
+              <div>
+                <h3 className="text-base font-semibold mb-4">Warp Field Status</h3>
+                <div className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-lg font-semibold">
+                      <Badge variant={results.isZeroExpansion ? "default" : "destructive"}>
+                        {results.isZeroExpansion ? "✓ Zero Expansion" : "✗ Non-Zero Expansion"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">Natário Field Geometry</div>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-lg font-semibold">
+                      <Badge variant={results.quantumSafetyStatus === 'safe' ? "default" : "destructive"}>
+                        {results.quantumSafetyStatus === 'safe' ? "✓ Quantum Safe" : "⚠ Quantum Violation"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">Ford-Roman Limit Compliance</div>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-lg font-semibold">
+                      <Badge variant={results.validationSummary?.overallStatus === 'optimal' ? "default" : "secondary"}>
+                        {results.validationSummary?.overallStatus === 'optimal' ? "✓ Optimal" : results.validationSummary?.overallStatus || "Unknown"}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">Overall System Status</div>
+                  </div>
                 </div>
               </div>
             </div>
+          )}
+          
+          {/* Standard Casimir Results (for static/dynamic modules) */}
+          {simulation.parameters.moduleType !== 'warp' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Energy Results */}
+              <div>
+                <h3 className="text-base font-semibold mb-4">Casimir Energy</h3>
+                <div className="space-y-4">
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results?.totalEnergy ? formatScientificNotation(results.totalEnergy) : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Joules (Total Energy)</div>
+                  </div>
 
-            {/* Visualization */}
-            <div>
-              <h3 className="text-base font-semibold mb-4">Energy vs. Gap Distance</h3>
-              <ChartVisualization simulation={simulation} />
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results?.energyPerArea ? formatScientificNotation(results.energyPerArea) : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">J/m² (Energy per unit area)</div>
+                  </div>
+
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="text-2xl font-mono font-semibold">
+                      {results?.force ? formatScientificNotation(results.force) : "—"}
+                    </div>
+                    <div className="text-sm text-muted-foreground">N (Casimir Force)</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Visualization */}
+              <div>
+                <h3 className="text-base font-semibold mb-4">Energy vs. Gap Distance</h3>
+                <ChartVisualization simulation={simulation} />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Analysis Summary */}
           {results && (
