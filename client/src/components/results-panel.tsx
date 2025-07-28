@@ -216,75 +216,147 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             <div className="mt-8">
               <h3 className="text-base font-semibold mb-4">Analysis Summary</h3>
               <div className="bg-muted rounded-lg p-4">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <div className="text-muted-foreground">Convergence</div>
-                    <div className="font-medium">
-                      <Badge variant={results.convergence === "Achieved" ? "default" : "destructive"}>
-                        {results.convergence || "Unknown"}
-                      </Badge>
+                {simulation.parameters.moduleType === 'warp' ? (
+                  /* Warp Module Analysis Summary */
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="text-muted-foreground">Overall Status</div>
+                      <div className="font-medium">
+                        <Badge variant={results.validationSummary?.overallStatus === "optimal" ? "default" : "destructive"}>
+                          {results.validationSummary?.overallStatus || "Unknown"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Amplification Factor</div>
+                      <div className="font-medium">{results.geometricBlueshiftFactor?.toFixed(1) || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Computation Time</div>
+                      <div className="font-medium">{results.calculationTime ? `${results.calculationTime}s` : "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Quantum Safety</div>
+                      <div className="font-medium">
+                        <Badge variant={results.quantumSafetyStatus === "safe" ? "default" : "destructive"}>
+                          {results.quantumSafetyStatus || "Unknown"}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-muted-foreground">Xi Points</div>
-                    <div className="font-medium">{results.xiPoints?.toLocaleString() || "—"}</div>
+                ) : (
+                  /* Standard Casimir Analysis Summary */
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <div className="text-muted-foreground">Convergence</div>
+                      <div className="font-medium">
+                        <Badge variant={results.convergence === "Achieved" ? "default" : "destructive"}>
+                          {results.convergence || "Unknown"}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Xi Points</div>
+                      <div className="font-medium">{results.xiPoints?.toLocaleString() || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Computation Time</div>
+                      <div className="font-medium">{results.computeTime || "—"}</div>
+                    </div>
+                    <div>
+                      <div className="text-muted-foreground">Error Estimate</div>
+                      <div className="font-medium">{results.errorEstimate || "—"}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-muted-foreground">Computation Time</div>
-                    <div className="font-medium">{results.computeTime || "—"}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Error Estimate</div>
-                    <div className="font-medium">{results.errorEstimate || "—"}</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Quality Assurance Checks */}
               <div className="mt-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
                 <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-3">Quality Assurance</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-amber-700 dark:text-amber-200">Xi Points Adequacy:</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      results.xiPoints && simulation?.parameters.gap && 
-                      results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000)
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-                    }`}>
-                      {results.xiPoints && simulation?.parameters.gap && 
-                       results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000) ? '✓ PASS' : '✗ FAIL'}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-amber-700 dark:text-amber-200">Error ≤ 5%:</span>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      results.errorEstimate && results.errorEstimate.includes('%') &&
-                      parseFloat(results.errorEstimate.replace('%', '')) <= 5.0
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-                    }`}>
-                      {results.errorEstimate && results.errorEstimate.includes('%') &&
-                       parseFloat(results.errorEstimate.replace('%', '')) <= 5.0 ? '✓ PASS' : '✗ FAIL'}
-                    </span>
-                  </div>
-                  
-                  {/* Quantum Safety for Dynamic simulations */}
-                  {simulation?.parameters.moduleType === 'dynamic' && results.quantumSafetyStatus && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-amber-700 dark:text-amber-200">Quantum Safety:</span>
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        results.quantumSafetyStatus === 'safe'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                          : results.quantumSafetyStatus === 'warning'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-                      }`}>
-                        {results.quantumSafetyStatus === 'safe' ? '✓ SAFE' : 
-                         results.quantumSafetyStatus === 'warning' ? '⚠ WARN' : '✗ VIOLATION'}
-                      </span>
-                    </div>
+                  {simulation.parameters.moduleType === 'warp' ? (
+                    /* Warp Module Quality Checks */
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-700 dark:text-amber-200">Power Target:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          results.isPowerCompliant
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                        }`}>
+                          {results.isPowerCompliant ? '✓ PASS' : '✗ FAIL'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-700 dark:text-amber-200">Quantum Safety:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          results.isQuantumSafe
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                        }`}>
+                          {results.isQuantumSafe ? '✓ SAFE' : '✗ VIOLATION'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-700 dark:text-amber-200">Zero Expansion:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          results.isZeroExpansion
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                        }`}>
+                          {results.isZeroExpansion ? '✓ PASS' : '✗ FAIL'}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    /* Standard Casimir Quality Checks */
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-700 dark:text-amber-200">Xi Points Adequacy:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          results.xiPoints && simulation?.parameters.gap && 
+                          results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000)
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                        }`}>
+                          {results.xiPoints && simulation?.parameters.gap && 
+                           results.xiPoints >= (simulation.parameters.gap <= 1 ? 5000 : 3000) ? '✓ PASS' : '✗ FAIL'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <span className="text-amber-700 dark:text-amber-200">Error ≤ 5%:</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          results.errorEstimate && results.errorEstimate.includes('%') &&
+                          parseFloat(results.errorEstimate.replace('%', '')) <= 5.0
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                        }`}>
+                          {results.errorEstimate && results.errorEstimate.includes('%') &&
+                           parseFloat(results.errorEstimate.replace('%', '')) <= 5.0 ? '✓ PASS' : '✗ FAIL'}
+                        </span>
+                      </div>
+                      
+                      {/* Quantum Safety for Dynamic simulations */}
+                      {simulation?.parameters.moduleType === 'dynamic' && results.quantumSafetyStatus && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-amber-700 dark:text-amber-200">Quantum Safety:</span>
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            results.quantumSafetyStatus === 'safe'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                              : results.quantumSafetyStatus === 'warning'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                          }`}>
+                            {results.quantumSafetyStatus === 'safe' ? '✓ SAFE' : 
+                             results.quantumSafetyStatus === 'warning' ? '⚠ WARN' : '✗ VIOLATION'}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
