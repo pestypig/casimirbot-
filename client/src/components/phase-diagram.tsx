@@ -75,9 +75,10 @@ interface InteractiveHeatMapProps {
     maxZeta: number;
     minGamma: number;
   };
+  currentSimulation?: any;
 }
 
-function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParams, constraintConfig }: InteractiveHeatMapProps) {
+function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -88,6 +89,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
       setIsLoading(true);
       console.log(`🔄 Rebuilding phase diagram grid for: ${currentTileArea} cm², ${currentShipRadius} m`);
       console.log(`🔧 Viability params:`, viabilityParams);
+      console.log(`🏁 Simulation status: ${currentSimulation?.status}, Using ${currentSimulation?.status === 'completed' ? 'Energy Pipeline' : 'shorthand'} calculations`);
       
       try {
         // Use central viability function for all calculations - single source of truth!
@@ -175,7 +177,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
       }
     };
     loadGrid();
-  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig]); // REBUILD when ANY parameter changes!
+  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation?.status]); // REBUILD when parameters change OR simulation completes!
   
   if (!gridData || isLoading) {
     return (
@@ -538,6 +540,7 @@ export default function PhaseDiagram({
                   maxZeta,
                   minGamma
                 }}
+                currentSimulation={currentSimulation}
               />
             </div>
             
