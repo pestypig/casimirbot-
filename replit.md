@@ -206,6 +206,14 @@ The current scientific foundation provides the authentic physics core that can b
   - Enhanced γ_geo calculation using proper E_bowl/E_flat energy ratio method for ≈25 amplification
   - Added LED traffic-light validation system with green/amber/red status for mass, power, and quantum safety targets
   - Design ledger now shows accurate target compliance with proper scaling factors from research methodology
+- **Energy Pipeline Calculation Fixes (July 28, 2025)**: Resolved all mathematical errors in T_μν → metric calculations
+  - **Fixed Q-factor multiplication**: U_Q now correctly calculated as Q×U_static = 1×10⁹ × (-2.55×10⁻³) = -2.55×10⁶ J
+  - **Fixed geometric amplification**: U_geo = γ_geo×U_Q = 25 × (-2.55×10⁶) = -6.375×10⁷ J
+  - **Fixed duty cycle averaging**: U_cycle = U_geo×d = (-6.375×10⁷) × 0.01 = -6.375×10⁵ J
+  - **Fixed power loss formula**: P_loss = |U_geo×ω/Q| = 6.008×10⁹ W (correctly includes Q division)
+  - **Fixed time-scale separation**: Uses mechanical period T_m = 1/f_m instead of burst time
+  - All Energy Pipeline values now match theoretical targets exactly as specified in diagnostic analysis
+  - Traffic-light validation system shows green status for correctly calculated values
 - **Visual Proof Charts Implementation (July 28, 2025)**: Added comprehensive visualization system for research validation
   - Created three-chart visual proof system: Radar plot (Spec vs Achieved), Energy Boost Pipeline, and Duty vs Power analysis
   - Implemented real-time validation charts showing γ_geo, Q-enhancement, duty factors, quantum safety margins, and power targets
