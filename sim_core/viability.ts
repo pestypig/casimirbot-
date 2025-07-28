@@ -78,7 +78,7 @@ export function viability(tile_cm2: number, ship_m: number): ViabilityMeta {
   const baseline_mass = 1400; // Research target mass (kg)
   
   // Calculate mass from true energy pipeline (no artificial caps)
-  m_exotic = baseline_mass * energy_scale;
+  let m_exotic = baseline_mass * energy_scale;
   
   // For Needle Hull preset, ensure exact research value
   if (Math.abs(tile_cm2 - 25) < 1 && Math.abs(ship_m - 5.0) < 0.1) {
