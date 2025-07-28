@@ -23,9 +23,9 @@ export default function Home() {
   
   // Constraint configuration state (following attached files specification)
   const [massTolPct, setMassTolPct] = useState(25);     // ±25% mass tolerance for design exploration
-  const [maxPower, setMaxPower] = useState(500);       // 500 MW max power
-  const [maxZeta, setMaxZeta] = useState(1.0);         // ζ ≤ 1.0 Ford-Roman bound
-  const [minGamma, setMinGamma] = useState(5);         // γ ≥ 5 minimum geometric amplification
+  const [maxPower, setMaxPower] = useState(1000);      // 1000 MW max power for broader exploration
+  const [maxZeta, setMaxZeta] = useState(5.0);         // ζ ≤ 5.0 more permissive for exploration
+  const [minGamma, setMinGamma] = useState(1);         // γ ≥ 1 minimum geometric amplification
   
   // Dynamic simulation parameters for real-time phase diagram updates
   const [gammaGeo, setGammaGeo] = useState(25);

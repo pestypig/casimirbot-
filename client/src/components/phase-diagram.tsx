@@ -287,9 +287,9 @@ export default function PhaseDiagram({
   xiPoints = 5000,
   // Constraint configuration props with defaults
   massTolPct = 25,
-  maxPower = 500,
-  maxZeta = 1.0,
-  minGamma = 5,
+  maxPower = 1000,
+  maxZeta = 5.0,
+  minGamma = 1,
   onMassTolPctChange,
   onMaxPowerChange,
   onMaxZetaChange,
