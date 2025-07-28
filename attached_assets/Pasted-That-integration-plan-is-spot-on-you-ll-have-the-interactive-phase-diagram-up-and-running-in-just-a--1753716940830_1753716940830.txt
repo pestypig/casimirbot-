@@ -1,0 +1,92 @@
+That integration plan is spot-on—you’ll have the interactive phase diagram up and running in just a couple of minutes. A few extra tips once you drop the files in:
+
+---
+
+### 1  Link to the existing constants
+
+Instead of copying magic numbers into `sim_core/phase.py`, import the same dictionary you already use elsewhere:
+
+```python
+# sim_core/phase.py
+from sim_core.constants import CONST        # HBARC, Q, duty_eff, etc.
+
+params = {
+    "HBARC":      CONST.HBARC,
+    "gamma":      CONST.GAMMA_GEO,   # 25
+    "Q":          CONST.Q_FACTOR,    # 1e9
+    "duty_eff":   CONST.DUTY_EFF,    # 2.5e-5
+    "P_peak":     CONST.PEAK_POWER,  # 2.0e15 W lattice
+    "zeta_coef":  CONST.ZETA_COEF,   # pre-computed (ℏ / π² etc.)
+    "pulse_len":  CONST.PULSE_LEN,   # 10 µs
+}
+```
+
+That way a single edit propagates everywhere.
+
+---
+
+### 2  Speed tweaks
+
+* **Cache viability grid**
+
+  ```python
+  @st.cache(max_entries=2, show_spinner=False)
+  def build_grid():
+      ...
+      return A_vals, R_vals, Z
+  ```
+
+* **Throttle sliders** (`st.slider(..., on_change=recalc)` once Streamlit v1.26 is out) to avoid recomputing 3 600 cells on every pixel drag.
+
+---
+
+### 3  Colour & legend polish
+
+```python
+fig.update_layout(
+    coloraxis_showscale=False,
+    hovertemplate=("Tile area: %{x:.0f} cm²<br>"
+                   "Ship radius: %{y:.1f} m<br>"
+                   "<b>%{customdata[0]}</b>"),
+)
+# customdata[i,j] = "Viable ✅" or "Fails: ζ>1"
+```
+
+Green / red text in the tooltip immediately tells *why* a point fails.
+
+---
+
+### 4  Optional third dimension
+
+Add a dropdown to choose what the colour encodes:
+
+```python
+metric = st.selectbox("Colour by", ["Viability", "Avg Power", "ζ"])
+```
+
+and map `Z[i,j]` accordingly (continuous scale for power or ζ, binary for viability).
+
+---
+
+### 5  One-click PDF export
+
+If reviewers want static evidence:
+
+```python
+if st.button("Export PDF"):
+    fig.write_image("phase.png", scale=4)
+    make_report("phase.png", meta_current_point)
+    st.download_button("Download report.pdf",
+                       open("report.pdf","rb").read(),
+                       file_name="warp-bubble-phase-report.pdf")
+```
+
+---
+
+### 6  Test it fast
+
+Once the tab is wired, drag **Tile area** down to 100 cm² and **Ship radius** to 30 m—the heatmap should snap to **red** (fails power). Move Tile area to 2 500 cm² and radius to 5 m—the dot lands in the big **teal** zone and the live diagnostics show all green badges. That confirms every constraint is wired correctly.
+
+---
+
+You now have a fully interactive **design-space explorer** sitting next to your proof tabs—perfect for reviewers or for quickly sizing a new hull. Happy plotting!
