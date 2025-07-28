@@ -110,10 +110,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 15,      // ±15% tolerance for viable zones
-              maxPower: 100,       // 100 MW for broader viability around 83 MW target
-              maxZeta: 1.5,        // Reasonable zeta limit
-              minGamma: 20         // Higher gamma requirement for viable zones
+              massTolPct: 30,      // ±30% tolerance for broader viable zones
+              maxPower: 200,       // 200 MW for broader viability
+              maxZeta: 2.5,        // More permissive zeta limit
+              minGamma: 10         // Lower gamma requirement
             };
             
             const result = viability(A, R, viabilityParams, currentConstraintConfig); // Single source of truth with dynamic params!
@@ -134,10 +134,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 15,      // ±15% tolerance for viable zones
-              maxPower: 100,       // 100 MW for broader viability around 83 MW target
-              maxZeta: 1.5,        // Reasonable zeta limit
-              minGamma: 20         // Higher gamma requirement for viable zones
+              massTolPct: 30,      // ±30% tolerance for broader viable zones
+              maxPower: 200,       // 200 MW for broader viability
+              maxZeta: 2.5,        // More permissive zeta limit
+              minGamma: 10         // Lower gamma requirement
             };
             
             const result = viability(A, R, viabilityParams, currentConstraintConfig); // Same function everywhere with dynamic params!
@@ -152,10 +152,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         // Use provided constraint configuration or defaults
         const currentConstraintConfig = constraintConfig || {
           massNominal: 1400,
-          massTolPct: 15,      // ±15% tolerance for viable zones
-          maxPower: 100,       // 100 MW for broader viability around 83 MW target
-          maxZeta: 1.5,        // Reasonable zeta limit
-          minGamma: 20         // Higher gamma requirement for viable zones
+          massTolPct: 30,      // ±30% tolerance for broader viable zones
+          maxPower: 200,       // 200 MW for broader viability
+          maxZeta: 2.5,        // More permissive zeta limit
+          minGamma: 10         // Lower gamma requirement
         };
         
         const currentResult = viability(currentTileArea, currentShipRadius, viabilityParams, currentConstraintConfig);
@@ -574,7 +574,7 @@ export default function PhaseDiagram({
                   </div>
                   <div className="flex justify-between">
                     <span>Tile Count:</span>
-                    <span className="font-mono">{formatScientific(liveDiagnostics.N_tiles, 2)}</span>
+                    <span className="font-mono">{formatScientific(liveDiagnostics.N_tiles || 0, 2)}</span>
                   </div>
                 </div>
                 
