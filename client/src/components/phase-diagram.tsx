@@ -17,7 +17,7 @@ interface ViabilityResult {
   TS_ratio: number;
   gamma_geo: number;
   U_static_total: number;
-  U_geo: number;
+  U_geo_raw: number;
   U_Q: number;
   U_cycle: number;
   P_loss: number;
@@ -237,7 +237,6 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
     TS_ratio,
     gamma_geo,
     U_static_total,
-    U_geo_raw,
     U_Q,
     U_cycle,
     P_loss,
@@ -247,12 +246,17 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
 
 // Main calculation function for phase diagram
 function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
-  // Use shorthand method for immediate results in phase diagram
-  // The full simulation integration is available for more precise calculations
+  // Note: This is now synchronous wrapper for UI compatibility
+  // For full simulation accuracy, use calculateViabilityUsingSimulation() 
   return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
 }
 
-function buildViabilityGrid(A_range: [number, number], R_range: [number, number], resolution: number = 40) {
+// Async wrapper for full simulation integration
+async function calculateViabilityAsync(A_tile_cm2: number, R_ship_m: number): Promise<ViabilityResult> {
+  return await calculateViabilityUsingSimulation(A_tile_cm2, R_ship_m);
+}
+
+async function buildViabilityGrid(A_range: [number, number], R_range: [number, number], resolution: number = 30, useFullSimulation: boolean = false) {
   const A_vals = Array.from({length: resolution}, (_, i) => 
     A_range[0] + (A_range[1] - A_range[0]) * i / (resolution - 1)
   );
@@ -260,26 +264,59 @@ function buildViabilityGrid(A_range: [number, number], R_range: [number, number]
     R_range[0] + (R_range[1] - R_range[0]) * i / (resolution - 1)
   );
   
-  // Build viability matrix (R x A)
-  const Z = R_vals.map(R => 
-    A_vals.map(A => {
-      const result = calculateViability(A, R);
-      return result.viable ? 1 : 0;
-    })
-  );
-  
-  // Build hover text matrix with diagnostic information
-  const hoverText = R_vals.map(R => 
-    A_vals.map(A => {
-      const result = calculateViability(A, R);
-      const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
-      return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
-             `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
-             `ζ: ${result.zeta.toFixed(3)}`;
-    })
-  );
-  
-  return { A_vals, R_vals, Z, hoverText };
+  if (useFullSimulation) {
+    // Use full simulation engine (slower but accurate)
+    const Z: number[][] = [];
+    const hoverText: string[][] = [];
+    
+    for (let i = 0; i < R_vals.length; i++) {
+      const R = R_vals[i];
+      const row: number[] = [];
+      const hoverRow: string[] = [];
+      
+      for (let j = 0; j < A_vals.length; j++) {
+        const A = A_vals[j];
+        try {
+          const result = await calculateViabilityUsingSimulation(A, R);
+          row.push(result.viable ? 1 : 0);
+          const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
+          hoverRow.push(`Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+                       `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
+                       `ζ: ${result.zeta.toFixed(3)}`);
+        } catch (error) {
+          // Fallback to shorthand on error
+          const result = calculateViabilityShorthand(A, R);
+          row.push(result.viable ? 1 : 0);
+          hoverRow.push(`Tile: ${A.toFixed(0)} cm² (shorthand)<br>Radius: ${R.toFixed(1)} m<br>` +
+                       `Error: Simulation failed`);
+        }
+      }
+      Z.push(row);
+      hoverText.push(hoverRow);
+    }
+    
+    return { A_vals, R_vals, Z, hoverText };
+  } else {
+    // Use shorthand method (faster)
+    const Z = R_vals.map(R => 
+      A_vals.map(A => {
+        const result = calculateViability(A, R);
+        return result.viable ? 1 : 0;
+      })
+    );
+    
+    const hoverText = R_vals.map(R => 
+      A_vals.map(A => {
+        const result = calculateViability(A, R);
+        const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
+        return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+               `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
+               `ζ: ${result.zeta.toFixed(3)}`;
+      })
+    );
+    
+    return { A_vals, R_vals, Z, hoverText };
+  }
 }
 
 // Interactive Heat Map Component
@@ -289,11 +326,40 @@ interface InteractiveHeatMapProps {
 }
 
 function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
-  // Build the viability grid  
-  const gridData = useMemo(() => 
-    buildViabilityGrid([1, 100], [1, 100], 30), 
-    []
-  );
+  const [gridData, setGridData] = useState<any>(null);
+  const [useFullSimulation, setUseFullSimulation] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // Build the viability grid
+  React.useEffect(() => {
+    const loadGrid = async () => {
+      setIsLoading(true);
+      try {
+        const data = await buildViabilityGrid([1, 100], [1, 100], 30, useFullSimulation);
+        setGridData(data);
+      } catch (error) {
+        console.error('Grid calculation failed:', error);
+        const fallbackData = await buildViabilityGrid([1, 100], [1, 100], 30, false);
+        setGridData(fallbackData);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadGrid();
+  }, [useFullSimulation]);
+  
+  if (!gridData || isLoading) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 h-96 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-b-2 border-teal-500 rounded-full mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            {useFullSimulation ? 'Running full simulation calculations...' : 'Calculating phase diagram...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
   
   const { A_vals, R_vals, Z, hoverText } = gridData;
   
@@ -304,28 +370,44 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
   const height = R_vals.length * cellHeight;
   
   // Find current point position in grid
-  const currentA_idx = A_vals.findIndex(a => a >= currentTileArea) || 0;
-  const currentR_idx = R_vals.findIndex(r => r >= currentShipRadius) || 0;
+  const currentA_idx = A_vals.findIndex((a: number) => a >= currentTileArea) || 0;
+  const currentR_idx = R_vals.findIndex((r: number) => r >= currentShipRadius) || 0;
   
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-      <div className="mb-4 flex justify-between items-center text-sm">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-teal-500 rounded"></div>
-            <span>Viable</span>
+      <div className="mb-4 space-y-2">
+        <div className="flex justify-between items-center text-sm">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-teal-500 rounded"></div>
+              <span>Viable</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-red-500 rounded"></div>
+              <span>Failed</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
+              <span>Current Design</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded"></div>
-            <span>Failed</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-400 rounded-full"></div>
-            <span>Current Design</span>
+          <div className="text-muted-foreground">
+            {currentTileArea} cm² × {currentShipRadius.toFixed(1)} m
           </div>
         </div>
-        <div className="text-muted-foreground">
-          {currentTileArea} cm² × {currentShipRadius.toFixed(1)} m
+        
+        <div className="flex justify-between items-center">
+          <Button
+            variant={useFullSimulation ? "default" : "outline"}
+            size="sm"
+            onClick={() => setUseFullSimulation(!useFullSimulation)}
+            className="text-xs"
+          >
+            {useFullSimulation ? "Full Simulation Mode" : "Fast Calculation Mode"}
+          </Button>
+          <div className="text-xs text-muted-foreground">
+            {useFullSimulation ? "Exact constraint matching" : "Approximate results"}
+          </div>
         </div>
       </div>
       
@@ -340,8 +422,8 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
           </text>
           
           {/* Grid cells */}
-          {Z.map((row, r_idx) => 
-            row.map((viability, a_idx) => (
+          {Z.map((row: number[], r_idx: number) => 
+            row.map((viability: number, a_idx: number) => (
               <rect
                 key={`${r_idx}-${a_idx}`}
                 x={50 + a_idx * cellWidth}
@@ -367,7 +449,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
           />
           
           {/* Axis ticks and labels */}
-          {A_vals.filter((_, i) => i % 5 === 0).map((a, i) => (
+          {A_vals.filter((_: number, i: number) => i % 5 === 0).map((a: number, i: number) => (
             <g key={`a-${i}`}>
               <line 
                 x1={50 + i * 5 * cellWidth} 
@@ -388,7 +470,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
             </g>
           ))}
           
-          {R_vals.filter((_, i) => i % 4 === 0).map((r, i) => (
+          {R_vals.filter((_: number, i: number) => i % 4 === 0).map((r: number, i: number) => (
             <g key={`r-${i}`}>
               <line 
                 x1={45} 
