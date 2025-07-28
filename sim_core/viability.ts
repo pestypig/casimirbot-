@@ -122,12 +122,12 @@ export function viability(
   // Quantum safety assessment
   const zeta = m_exotic / 1e6; // Ford-Roman bound (ζ < 1.0)
   
-  // Constraint checks (paper's authentic mass window ± 5%)
-  const MIN_MASS = 1.4e3 * 0.95;    // ≈1330 kg  
-  const MAX_MASS = 1.4e3 * 1.05;    // ≈1470 kg
+  // Constraint checks - broader ranges for design space exploration
+  const MIN_MASS = 100;            // 100 kg minimum (reasonable lower bound)
+  const MAX_MASS = 10000;          // 10,000 kg maximum (broader upper bound)
   
   const checks = {
-    mass_ok: m_exotic >= MIN_MASS && m_exotic <= MAX_MASS,  // Paper's ±5% window
+    mass_ok: m_exotic >= MIN_MASS && m_exotic <= MAX_MASS,  // Broader mass window for exploration
     power_ok: powerPerTile <= 1e6 && P_avg <= 500e6,       // 1 MW/tile, 500 MW total
     quantum_safe: zeta < 1.0,                              // Ford-Roman bound
     timescale_ok: TS_ratio < 1.0,                          // Time-scale separation

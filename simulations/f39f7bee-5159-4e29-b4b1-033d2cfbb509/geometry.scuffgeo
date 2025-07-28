@@ -1,0 +1,11 @@
+# Bowl and piston geometry
+OBJECT Bowl
+    MESHFILE bowl.msh
+    MATERIAL custom
+ENDOBJECT
+
+OBJECT Piston
+    MESHFILE piston.msh
+    MATERIAL custom
+    DISPLACED 0 0 0.001
+ENDOBJECT

@@ -69,6 +69,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
     const loadGrid = async () => {
       setIsLoading(true);
       console.log(`🔄 Rebuilding phase diagram grid for: ${currentTileArea} cm², ${currentShipRadius} m`);
+      console.log(`🔧 Viability params:`, viabilityParams);
       
       try {
         // Use central viability function for all calculations - single source of truth!
@@ -87,6 +88,14 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         const Z = R_vals.map((R: number) => 
           A_vals.map((A: number) => {
             const result = viability(A, R, viabilityParams); // Single source of truth with dynamic params!
+            // Debug logging for strategic points  
+            const isSpecialPoint = (A === 25 && R === 5) || 
+                (Math.abs(A - A_vals[Math.floor(A_vals.length/2)]) < 0.1 && Math.abs(R - R_vals[Math.floor(R_vals.length/2)]) < 0.1) ||
+                (A === A_vals[0] && R === R_vals[0]);
+            if (isSpecialPoint) {
+              console.log(`🔍 Grid point (${A.toFixed(1)}, ${R.toFixed(1)}): ${result.ok ? 'VIABLE' : result.fail_reason}, Mass: ${result.m_exotic.toFixed(0)} kg, Power: ${(result.P_avg/1e6).toFixed(1)} MW`);
+              console.log(`   -> Constraints: mass_ok=${result.checks?.mass_ok}, power_ok=${result.checks?.power_ok}, quantum_safe=${result.checks?.quantum_safe}`);
+            }
             return result.ok ? 1 : 0;
           })
         );
@@ -106,6 +115,11 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         console.log(`📍 Current point (${currentTileArea}, ${currentShipRadius}):`, 
                    currentResult.ok ? '✅ VIABLE' : `❌ ${currentResult.fail_reason}`,
                    `Mass: ${currentResult.m_exotic.toFixed(0)} kg, Power: ${(currentResult.P_avg/1e6).toFixed(1)} MW`);
+        
+        // Count viable vs non-viable points for debugging
+        const totalPoints = Z.flat().length;
+        const viablePoints = Z.flat().filter(z => z === 1).length;
+        console.log(`🎯 Grid summary: ${viablePoints}/${totalPoints} viable points (${(viablePoints/totalPoints*100).toFixed(1)}%)`);
         
         setGridData({ A_vals, R_vals, Z, hoverText });
       } catch (error) {
