@@ -463,10 +463,13 @@ export default function PhaseDiagram({
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium">Geometry Amplifier γ_geo: {gammaGeo}</label>
+                    <label className="text-sm font-medium">Geometry Amplifier γ_geo: {gammaGeo || 25}</label>
                     <Slider
-                      value={[gammaGeo]}
-                      onValueChange={([value]) => onGammaGeoChange?.(value)}
+                      value={[gammaGeo || 25]}
+                      onValueChange={([value]) => {
+                        console.log('γ_geo slider changed:', value);
+                        onGammaGeoChange?.(value);
+                      }}
                       min={1}
                       max={100}
                       step={1}
@@ -478,10 +481,14 @@ export default function PhaseDiagram({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Q-Factor: {formatScientific(qFactor, 1)}</label>
+                    <label className="text-sm font-medium">Q-Factor: {formatScientific(qFactor || 1e9, 1)}</label>
                     <Slider
-                      value={[Math.log10(qFactor)]}
-                      onValueChange={([value]) => onQFactorChange?.(Math.pow(10, value))}
+                      value={[Math.log10(qFactor || 1e9)]}
+                      onValueChange={([value]) => {
+                        const newQFactor = Math.pow(10, value);
+                        console.log('Q-Factor slider changed:', value, '→', newQFactor);
+                        onQFactorChange?.(newQFactor);
+                      }}
                       min={6}
                       max={10}
                       step={0.1}
@@ -493,10 +500,14 @@ export default function PhaseDiagram({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Burst Duty: {(duty * 100).toFixed(1)}%</label>
+                    <label className="text-sm font-medium">Burst Duty: {((duty || 0.01) * 100).toFixed(1)}%</label>
                     <Slider
-                      value={[duty * 100]}
-                      onValueChange={([value]) => onDutyChange?.(value / 100)}
+                      value={[(duty || 0.01) * 100]}
+                      onValueChange={([value]) => {
+                        const newDuty = value / 100;
+                        console.log('Duty slider changed:', value, '% →', newDuty);
+                        onDutyChange?.(newDuty);
+                      }}
                       min={0.1}
                       max={10}
                       step={0.1}
@@ -508,25 +519,33 @@ export default function PhaseDiagram({
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Gap Distance: {(1).toFixed(1)} nm</label>
+                    <label className="text-sm font-medium">Gap Distance: {(1.0).toFixed(1)} nm</label>
                     <Slider
-                      value={[1]}
-                      onValueChange={([value]) => onGapChange?.(value)}
+                      value={[1.0]}
+                      onValueChange={([value]) => {
+                        console.log('Gap distance slider changed:', value);
+                        // Note: Gap distance is currently fixed at 1nm in the simulation
+                        // This slider is a placeholder for future gap distance control
+                      }}
                       min={0.5}
                       max={2.0}
                       step={0.1}
                       className="mt-2"
+                      disabled
                     />
                     <div className="text-xs text-muted-foreground mt-1">
-                      Casimir gap - tiny changes dramatically reshape viability
+                      Casimir gap - currently fixed at 1nm (future enhancement)
                     </div>
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium">Sag Depth: {sagDepth} nm</label>
+                    <label className="text-sm font-medium">Sag Depth: {sagDepth || 16} nm</label>
                     <Slider
-                      value={[sagDepth]}
-                      onValueChange={([value]) => onSagDepthChange?.(value)}
+                      value={[sagDepth || 16]}
+                      onValueChange={([value]) => {
+                        console.log('Sag depth slider changed:', value);
+                        onSagDepthChange?.(value);
+                      }}
                       min={0}
                       max={50}
                       step={1}
