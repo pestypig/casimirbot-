@@ -285,11 +285,11 @@ export default function PhaseDiagram({
   burstTime = 10,
   cycleTime = 1000,
   xiPoints = 5000,
-  // Constraint configuration props with defaults
-  massTolPct = 25,
-  maxPower = 150,
-  maxZeta = 5.0,
-  minGamma = 1,
+  // Constraint configuration props with exact Needle Hull defaults
+  massTolPct = 5,
+  maxPower = 100,
+  maxZeta = 1.0,
+  minGamma = 25,
   onMassTolPctChange,
   onMaxPowerChange,
   onMaxZetaChange,

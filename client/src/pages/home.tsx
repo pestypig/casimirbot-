@@ -21,11 +21,11 @@ export default function Home() {
   const [tileArea, setTileArea] = useState(25); // cm² (default: 5 cm × 5 cm = 25 cm²)
   const [shipRadius, setShipRadius] = useState(5.0); // m
   
-  // Constraint configuration state (following attached files specification)
-  const [massTolPct, setMassTolPct] = useState(25);     // ±25% mass tolerance for design exploration
-  const [maxPower, setMaxPower] = useState(150);       // 150 MW max power to show 80 MW as green viable region
-  const [maxZeta, setMaxZeta] = useState(5.0);         // ζ ≤ 5.0 more permissive for exploration
-  const [minGamma, setMinGamma] = useState(1);         // γ ≥ 1 minimum geometric amplification
+  // Constraint configuration state (exact Needle Hull defaults)
+  const [massTolPct, setMassTolPct] = useState(5);      // ±5% mass tolerance (1340-1470 kg range)
+  const [maxPower, setMaxPower] = useState(100);       // 100 MW max power (headroom above 83 MW target)
+  const [maxZeta, setMaxZeta] = useState(1.0);         // ζ ≤ 1.0 Ford-Roman bound
+  const [minGamma, setMinGamma] = useState(25);        // γ ≥ 25 geometric amplification
   
   // Dynamic simulation parameters for real-time phase diagram updates
   const [gammaGeo, setGammaGeo] = useState(25);
