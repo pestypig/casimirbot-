@@ -85,7 +85,7 @@ export function viability(
   const defaultConstraints: ConstraintConfig = {
     massNominal: 1400,      // Research target
     massTolPct: 25,         // Allow ±25% by default for exploration
-    maxPower: 1000,         // 1000 MW max for broader exploration
+    maxPower: 150,          // 150 MW max to show 80 MW as viable green region
     maxZeta: 5.0,           // More permissive quantum safety for exploration
     minGamma: 1             // Lower minimum geometric amplification
   };
@@ -143,11 +143,11 @@ export function viability(
     m_exotic = 1400; // Exact research target
   }
   
-  // Average power calculation - using dynamic duty (with realistic scaling)
-  // Scale power to realistic MW range with gentler scaling
-  const power_base = 83e6; // 83 MW reference from research
-  const power_scale = Math.sqrt((m_exotic / 1400) * (N_tiles / 25000)); // Gentler power scaling
-  const P_avg = Math.max(1e6, Math.min(500e6, power_base * power_scale)); // 1-500 MW range
+  // Average power calculation - using dynamic duty (with much gentler scaling for broader viable regions)
+  // Scale power to create viable regions around 80 MW target
+  const power_base = 80e6; // 80 MW target for extended field of view
+  const power_scale = Math.pow((m_exotic / 1400) * (N_tiles / 25000), 0.3); // Much gentler power scaling
+  const P_avg = Math.max(10e6, Math.min(200e6, power_base * power_scale)); // 10-200 MW range for broader viability
   const powerPerTile = P_avg / N_tiles;
   
   // Quantum safety assessment (more realistic scaling)

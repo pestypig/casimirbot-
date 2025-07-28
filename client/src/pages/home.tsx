@@ -23,7 +23,7 @@ export default function Home() {
   
   // Constraint configuration state (following attached files specification)
   const [massTolPct, setMassTolPct] = useState(25);     // ±25% mass tolerance for design exploration
-  const [maxPower, setMaxPower] = useState(1000);      // 1000 MW max power for broader exploration
+  const [maxPower, setMaxPower] = useState(150);       // 150 MW max power to show 80 MW as green viable region
   const [maxZeta, setMaxZeta] = useState(5.0);         // ζ ≤ 5.0 more permissive for exploration
   const [minGamma, setMinGamma] = useState(1);         // γ ≥ 1 minimum geometric amplification
   

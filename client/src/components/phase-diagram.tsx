@@ -287,7 +287,7 @@ export default function PhaseDiagram({
   xiPoints = 5000,
   // Constraint configuration props with defaults
   massTolPct = 25,
-  maxPower = 1000,
+  maxPower = 150,
   maxZeta = 5.0,
   minGamma = 1,
   onMassTolPctChange,
@@ -467,7 +467,7 @@ export default function PhaseDiagram({
                       value={[maxPower]}
                       onValueChange={([value]) => onMaxPowerChange?.(value)}
                       min={50}
-                      max={1000}
+                      max={300}
                       step={10}
                       className="mt-2"
                     />
