@@ -9,13 +9,18 @@ import { Download, TestTube, TrendingUp, Zap } from 'lucide-react';
 interface ViabilityResult {
   viable: boolean;
   fail_reason: string;
+  N_tiles: number;
+  powerPerTile: number;
   M_exotic: number;
   P_avg: number;
   zeta: number;
   TS_ratio: number;
   gamma_geo: number;
-  N_tiles: number;
-  A_hull: number;
+  U_static_total: number;
+  U_geo: number;
+  U_Q: number;
+  U_cycle: number;
+  P_loss: number;
   checks: {
     mass_ok: boolean;
     power_ok: boolean;
@@ -84,29 +89,36 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   
   const N_tiles = A_hull / A_tile;  // Total tile count
   
-  // Fixed research targets (same for all configurations)
-  const TARGET_MASS = 1.4e3;  // kg - research target
-  const TARGET_POWER = 83e6;  // W - 83 MW research target
+  // Dynamic energy pipeline calculations based on actual physics
+  // Base static Casimir energy (scales with tile area)
+  const U_static_per_tile = -CONST.HBARC * A_tile / Math.pow(1e-9, 3); // a = 1nm gap
+  const U_static_total = U_static_per_tile * N_tiles;
   
-  // The simulation produces fixed targets, so phase diagram validates feasibility
-  const M_exotic = TARGET_MASS;  // Fixed target from research
-  const P_avg = TARGET_POWER;    // Fixed target from research
+  // Geometric amplification (γ_geo scales with effective radius)
+  const hull_effective_radius = Math.sqrt(A_hull / (4 * Math.PI));
+  const gamma_geo = Math.max(1.0, CONST.GAMMA_GEO * Math.sqrt(hull_effective_radius / 5.0)); // Scale from 5m reference
   
-  // Geometric amplification factor (from research)
-  const gamma_geo = CONST.GAMMA_GEO;  // γ_geo ≈ 25 from papers
+  // Apply full energy pipeline: Static → Geometry → Q → Duty
+  const U_geo = U_static_total * Math.pow(gamma_geo, 3);
+  const U_Q = U_geo * CONST.Q_FACTOR;
+  const U_cycle = U_Q * CONST.DUTY_EFF;
+  
+  // Calculate actual exotic mass from energy
+  const M_exotic = Math.abs(U_cycle / Math.pow(CONST.C_LIGHT, 2)); // E = mc²
+  
+  // Calculate actual power draw
+  const P_loss = Math.abs(U_geo * 15e9 / CONST.Q_FACTOR); // ω = 15 GHz, P = Uω/Q
+  const P_avg = P_loss * CONST.DUTY_EFF; // Time-averaged power
   
   // Power density check - can this configuration deliver target power?
   const powerPerTile = P_avg / N_tiles;  // W per tile
   const maxPowerPerTile = 1e6;  // 1 MW per tile limit (engineering constraint)
   const power_feasible = powerPerTile <= maxPowerPerTile;
   
-  // Quantum inequality check using Ford-Roman bound (matching actual simulation)
+  // Quantum inequality check using Ford-Roman bound
   const FORD_ROMAN_LIMIT = 1e6; // kg - quantum inequality upper bound from papers
-  
-  // The simulation shows that mass margin dominates: quantumInequalityMargin = 0.0014 = 1400/1e6
-  // This matches the Ford-Roman bound calculation where mass constraint is the limiting factor
   const massMargin = M_exotic / FORD_ROMAN_LIMIT;
-  const zeta = massMargin;  // Mass margin dominates in research configuration
+  const zeta = massMargin;  // Quantum safety parameter
   
   // Time-scale separation (geometry-dependent)
   const T_m = 1 / (15e9);  // Mechanical period (15 GHz)
@@ -119,10 +131,13 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   const maxTileArea = 10000; // cm² - maximum practical size
   const geometry_feasible = A_tile_cm2 >= minTileArea && A_tile_cm2 <= maxTileArea;
   
-  // Viability checks based on research feasibility
+  // Viability checks based on physics constraints
+  const mass_feasible = M_exotic >= 1000 && M_exotic <= 5000; // Reasonable mass range (kg)
+  const power_budget = P_avg <= 500e6; // 500 MW maximum power budget
+  
   const checks = {
-    mass_ok: true,                      // Fixed target always achievable if other constraints met
-    power_ok: power_feasible,           // Power per tile must be reasonable
+    mass_ok: mass_feasible,             // Exotic mass in reasonable range
+    power_ok: power_feasible && power_budget, // Power per tile and total power feasible
     quantum_safe: zeta < 1.0,           // Quantum inequality satisfied
     timescale_ok: TS_ratio < 1.0,       // Proper time-scale separation
     geometry_ok: geometry_feasible      // Tile area must be in feasible range
@@ -134,8 +149,14 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   // Failure reason (first constraint that fails)
   let fail_reason = "Viable ✅";
   if (!viable) {
-    if (!checks.power_ok) {
-      fail_reason = `Power: ${(powerPerTile/1e3).toFixed(0)} kW/tile`;
+    if (!checks.mass_ok) {
+      fail_reason = `Mass: ${(M_exotic/1000).toFixed(1)}k kg`;
+    } else if (!checks.power_ok) {
+      if (!power_feasible) {
+        fail_reason = `Power: ${(powerPerTile/1e3).toFixed(0)} kW/tile`;
+      } else {
+        fail_reason = `Power: ${(P_avg/1e6).toFixed(0)} MW total`;
+      }
     } else if (!checks.quantum_safe) {
       fail_reason = `ζ = ${zeta.toFixed(2)} > 1`;
     } else if (!checks.timescale_ok) {
@@ -148,13 +169,18 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   return {
     viable,
     fail_reason,
+    N_tiles,
+    powerPerTile,
     M_exotic,
     P_avg,
     zeta,
     TS_ratio,
     gamma_geo,
-    N_tiles,
-    A_hull,
+    U_static_total,
+    U_geo,
+    U_Q,
+    U_cycle,
+    P_loss,
     checks
   };
 }
@@ -458,7 +484,7 @@ export default function PhaseDiagram({
                 
                 <div className="mt-4 p-3 bg-muted rounded-lg text-xs">
                   <div>Total tiles: {formatScientific(currentDiagnostics.N_tiles)}</div>
-                  <div>Hull area: {currentDiagnostics.A_hull.toFixed(1)} m²</div>
+                  <div>γ_geo: {currentDiagnostics.gamma_geo.toFixed(1)}</div>
                   <div>Status: {currentDiagnostics.fail_reason}</div>
                 </div>
               </div>
