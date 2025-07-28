@@ -333,6 +333,12 @@ export default function Home() {
               burstTime={burstTime}
               cycleTime={cycleTime}
               xiPoints={xiPoints}
+              // Physics parameter callbacks
+              onGammaGeoChange={setGammaGeo}
+              onQFactorChange={setQFactor}
+              onDutyChange={setDuty}
+              onSagDepthChange={setSagDepth}
+              onGapChange={(value) => {}} // Gap distance control (placeholder)
               // Constraint configuration props
               massTolPct={massTolPct}
               maxPower={maxPower}

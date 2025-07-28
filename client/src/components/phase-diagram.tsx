@@ -23,6 +23,13 @@ interface PhaseDiagramProps {
   burstTime?: number;
   cycleTime?: number;
   xiPoints?: number;
+  // Physics parameter callbacks
+  onGammaGeoChange?: (value: number) => void;
+  onQFactorChange?: (value: number) => void;
+  onDutyChange?: (value: number) => void;
+  onSagDepthChange?: (value: number) => void;
+  onGapChange?: (value: number) => void;
+  
   // Constraint configuration props (following attached files specification)
   massTolPct?: number;
   maxPower?: number;
@@ -447,7 +454,96 @@ export default function PhaseDiagram({
                       }
                     </div>
                   </div>
+                </div>
+              </div>
+              
+              {/* Natário Physics Parameters */}
+              <div>
+                <h4 className="font-semibold mb-4">Natário Physics Levers</h4>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Geometry Amplifier γ_geo: {gammaGeo}</label>
+                    <Slider
+                      value={[gammaGeo]}
+                      onValueChange={([value]) => onGammaGeoChange?.(value)}
+                      min={1}
+                      max={100}
+                      step={1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Higher γ expands viable region, lower γ shrinks it
+                    </div>
+                  </div>
                   
+                  <div>
+                    <label className="text-sm font-medium">Q-Factor: {formatScientific(qFactor, 1)}</label>
+                    <Slider
+                      value={[Math.log10(qFactor)]}
+                      onValueChange={([value]) => onQFactorChange?.(Math.pow(10, value))}
+                      min={6}
+                      max={10}
+                      step={0.1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Cavity resonance quality factor - higher Q pushes sliver outward
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Burst Duty: {(duty * 100).toFixed(1)}%</label>
+                    <Slider
+                      value={[duty * 100]}
+                      onValueChange={([value]) => onDutyChange?.(value / 100)}
+                      min={0.1}
+                      max={10}
+                      step={0.1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Local duty cycle - lower duty expands viability
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Gap Distance: {(1).toFixed(1)} nm</label>
+                    <Slider
+                      value={[1]}
+                      onValueChange={([value]) => onGapChange?.(value)}
+                      min={0.5}
+                      max={2.0}
+                      step={0.1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Casimir gap - tiny changes dramatically reshape viability
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Sag Depth: {sagDepth} nm</label>
+                    <Slider
+                      value={[sagDepth]}
+                      onValueChange={([value]) => onSagDepthChange?.(value)}
+                      min={0}
+                      max={50}
+                      step={1}
+                      className="mt-2"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Bowl curvature depth - affects γ_geo amplification
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Constraint Parameters */}
+              <div>
+                <h4 className="font-semibold mb-4">Constraint Tolerances</h4>
+                
+                <div className="space-y-4">
                   <div>
                     <label className="text-sm font-medium">Mass Tolerance: ±{massTolPct}%</label>
                     <Slider
@@ -473,6 +569,9 @@ export default function PhaseDiagram({
                       step={10}
                       className="mt-2"
                     />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Power budget limit - higher stretches green zone outward
+                    </div>
                   </div>
                   
                   <div>
@@ -480,11 +579,14 @@ export default function PhaseDiagram({
                     <Slider
                       value={[maxZeta]}
                       onValueChange={([value]) => onMaxZetaChange?.(value)}
-                      min={0.1}
-                      max={5.0}
+                      min={0.5}
+                      max={2.0}
                       step={0.1}
                       className="mt-2"
                     />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Quantum inequality safety margin - shows where QI is the limiter
+                    </div>
                   </div>
                   
                   <div>
@@ -497,6 +599,9 @@ export default function PhaseDiagram({
                       step={1}
                       className="mt-2"
                     />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Minimum geometry amplification requirement
+                    </div>
                   </div>
                 </div>
               </div>

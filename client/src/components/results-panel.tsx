@@ -32,6 +32,12 @@ interface ResultsPanelProps {
   burstTime: number;
   cycleTime: number;
   xiPoints: number;
+  // Physics parameter callbacks
+  onGammaGeoChange?: (value: number) => void;
+  onQFactorChange?: (value: number) => void;
+  onDutyChange?: (value: number) => void;
+  onSagDepthChange?: (value: number) => void;
+  onGapChange?: (value: number) => void;
   // Constraint configuration props
   massTolPct?: number;
   maxPower?: number;
@@ -60,6 +66,12 @@ export default function ResultsPanel({
   burstTime,
   cycleTime,
   xiPoints,
+  // Physics parameter callbacks
+  onGammaGeoChange,
+  onQFactorChange,
+  onDutyChange,
+  onSagDepthChange,
+  onGapChange,
   // Constraint configuration props
   massTolPct = 25,
   maxPower = 500,
@@ -549,6 +561,12 @@ export default function ResultsPanel({
             burstTime={burstTime}
             cycleTime={cycleTime}
             xiPoints={xiPoints}
+            // Physics parameter callbacks
+            onGammaGeoChange={onGammaGeoChange}
+            onQFactorChange={onQFactorChange}
+            onDutyChange={onDutyChange}
+            onSagDepthChange={onSagDepthChange}
+            onGapChange={onGapChange}
             // Constraint configuration props
             massTolPct={massTolPct}
             maxPower={maxPower}
