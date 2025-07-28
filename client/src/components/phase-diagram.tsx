@@ -46,6 +46,8 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
   React.useEffect(() => {
     const loadGrid = async () => {
       setIsLoading(true);
+      console.log(`🔄 Rebuilding phase diagram grid for: ${currentTileArea} cm², ${currentShipRadius} m`);
+      
       try {
         // Use central viability function for all calculations - single source of truth!
         const A_range: [number, number] = [1, 100]; // 1-100 cm²
@@ -76,6 +78,12 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
                    `ζ: ${result.zeta.toFixed(3)}`;
           })
         );
+        
+        // Test the current point specifically
+        const currentResult = viability(currentTileArea, currentShipRadius);
+        console.log(`📍 Current point (${currentTileArea}, ${currentShipRadius}):`, 
+                   currentResult.ok ? '✅ VIABLE' : `❌ ${currentResult.fail_reason}`,
+                   `Mass: ${currentResult.m_exotic.toFixed(0)} kg, Power: ${(currentResult.P_avg/1e6).toFixed(1)} MW`);
         
         setGridData({ A_vals, R_vals, Z, hoverText });
       } catch (error) {
