@@ -250,3 +250,10 @@ The current scientific foundation provides the authentic physics core that can b
   - **Integration Strategy**: Link to existing constants, cache viability grid, throttle sliders, polish colors/legends
   - **Export Capabilities**: One-click PDF export for static evidence and reviewer documentation
   - **Testing Protocol**: Specific test points (100 cm² at 30m = red fail, 2500 cm² at 5m = green viable) for validation
+- **Phase Diagram Shared State Integration (July 28, 2025)**: Successfully implemented shared state management for phase diagram sliders
+  - **Lifted State Management**: Moved tileArea and shipRadius state from local component to Home component level
+  - **Connected Needle Hull Preset**: "Apply Needle Hull Preset" button now updates both simulation parameters and phase diagram values
+  - **Props Threading**: Updated component hierarchy (Home → ParameterPanel → NeedleHullPreset and Home → ResultsPanel → PhaseDiagram)
+  - **Research Values**: Preset correctly sets tile area to 2500 cm² and ship radius to 5.0 m as specified in research papers
+  - **Real-time Synchronization**: Phase diagram sliders move in real-time when preset is applied, maintaining visual consistency
+  - **Zero LSP Errors**: All TypeScript interfaces and prop threading implemented without compilation errors
