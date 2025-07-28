@@ -110,10 +110,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 20,      // ±20% tolerance for viable zones
-              maxPower: 100,       // 100 MW for broader viability
-              maxZeta: 2.0,        // More permissive zeta
-              minGamma: 5
+              massTolPct: 15,      // ±15% tolerance for viable zones
+              maxPower: 100,       // 100 MW for broader viability around 83 MW target
+              maxZeta: 1.5,        // Reasonable zeta limit
+              minGamma: 20         // Higher gamma requirement for viable zones
             };
             
             const result = viability(A, R, viabilityParams, currentConstraintConfig); // Single source of truth with dynamic params!
@@ -134,10 +134,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 20,      // ±20% tolerance for viable zones
-              maxPower: 100,       // 100 MW for broader viability
-              maxZeta: 2.0,        // More permissive zeta
-              minGamma: 5
+              massTolPct: 15,      // ±15% tolerance for viable zones
+              maxPower: 100,       // 100 MW for broader viability around 83 MW target
+              maxZeta: 1.5,        // Reasonable zeta limit
+              minGamma: 20         // Higher gamma requirement for viable zones
             };
             
             const result = viability(A, R, viabilityParams, currentConstraintConfig); // Same function everywhere with dynamic params!
@@ -152,10 +152,10 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         // Use provided constraint configuration or defaults
         const currentConstraintConfig = constraintConfig || {
           massNominal: 1400,
-          massTolPct: 20,      // ±20% tolerance for viable zones
-          maxPower: 100,       // 100 MW for broader viability
-          maxZeta: 2.0,        // More permissive zeta
-          minGamma: 5
+          massTolPct: 15,      // ±15% tolerance for viable zones
+          maxPower: 100,       // 100 MW for broader viability around 83 MW target
+          maxZeta: 1.5,        // Reasonable zeta limit
+          minGamma: 20         // Higher gamma requirement for viable zones
         };
         
         const currentResult = viability(currentTileArea, currentShipRadius, viabilityParams, currentConstraintConfig);
