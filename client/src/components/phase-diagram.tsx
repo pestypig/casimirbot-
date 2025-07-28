@@ -61,27 +61,42 @@ function approximateEllipsoidArea(a: number, b: number, c: number): number {
 
 async function calculateViabilityUsingSimulation(A_tile_cm2: number, R_ship_m: number): Promise<ViabilityResult> {
   try {
-    // Create simulation parameters that match the design space values
+    // Create simulation parameters that match the schema structure
     const simulationParams = {
       geometry: 'bowl' as const,
-      gap: 1, // 1 nm gap (standard)
-      radius: 25000, // 25 mm radius (standard)
-      sagDepth: 16, // 16 nm sag depth (research config)
-      temperature: 20, // 20 K (superconducting)
-      numXiPoints: 5000,
-      tolerance: 1e-12,
-      // Dynamic parameters
-      burstDuration: 10, // μs
-      cycleDuration: 1000, // μs  
-      strokeAmplitude: 50, // pm
-      qFactor: 1e9
+      gap: 1, // 1 nm gap
+      radius: 25000, // 25 mm radius
+      sagDepth: 16, // 16 nm sag depth
+      temperature: 20, // 20 K
+      moduleType: 'warp' as const, // Use warp module for Energy Pipeline
+      dynamicConfig: {
+        modulationFreqGHz: 15,
+        strokeAmplitudePm: 50,
+        burstLengthUs: 10,
+        cycleLengthUs: 1000,
+        cavityQ: 1e9,
+        sectorCount: 400,
+        sectorDuty: 2.5e-5,
+        pulseFrequencyGHz: 15,
+        lightCrossingTimeNs: 100,
+        shiftAmplitude: 50e-12,
+        expansionTolerance: 1e-12,
+        warpFieldType: 'natario' as const
+      },
+      advanced: {
+        xiMin: 0.001,
+        maxXiPoints: 5000,
+        intervals: 50,
+        absTol: 0,
+        relTol: 1e-12
+      }
     };
 
     // Call the actual simulation API endpoint
     const response = await fetch('/api/simulations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parameters: simulationParams })
+      body: JSON.stringify(simulationParams)
     });
     
     if (!response.ok) {
@@ -121,16 +136,16 @@ async function calculateViabilityUsingSimulation(A_tile_cm2: number, R_ship_m: n
       return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
     }
     
-    // Extract values from actual simulation results
+    // Extract values from actual Energy Pipeline results
     const M_exotic = results.totalExoticMass || 1400;
     const P_avg = results.powerDraw || 83e6;
     const gamma_geo = results.geometricBlueshiftFactor || 25;
+    const zeta_actual = results.quantumInequalityMargin || 0.0014;
     
-    // Calculate derived values
+    // Calculate derived values using Energy Pipeline results
     const A_tile = A_tile_cm2 * 1e-4;  // cm² to m²
     const N_tiles = Math.PI * Math.pow(R_ship_m, 2) / A_tile; // Approximate tile count
     const powerPerTile = P_avg / N_tiles;
-    const zeta = results.quantumInequalityMargin || 0.0014;
     
     // Use simulation energy pipeline values
     const U_static_total = -2.55e-3; // From simulation logs
@@ -141,7 +156,7 @@ async function calculateViabilityUsingSimulation(A_tile_cm2: number, R_ship_m: n
     const TS_ratio = 0.20;
 
     return createViabilityResult(A_tile_cm2, R_ship_m, M_exotic, P_avg, gamma_geo, 
-                               powerPerTile, zeta, TS_ratio, N_tiles, U_static_total, 
+                               powerPerTile, zeta_actual, TS_ratio, N_tiles, U_static_total, 
                                U_geo_raw, U_Q, U_cycle, P_loss);
                                
   } catch (error) {
