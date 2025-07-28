@@ -405,19 +405,19 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
             <VisualProofCharts 
               results={{
                 totalEnergy: results.totalEnergy,
-                geometricBlueshiftFactor: simulation.parameters.geometry === 'bowl' && simulation.parameters.sagDepth ? 
-                  calculateGeometricBlueshift(simulation.parameters.radius, simulation.parameters.sagDepth, simulation.parameters.gap) : 25,
-                qEnhancementFactor: simulation.parameters.dynamicConfig?.cavityQ || 1e9,
+                // Use actual simulation results instead of recalculating
+                geometricBlueshiftFactor: results.geometricBlueshiftFactor || 25,
+                qEnhancementFactor: results.qEnhancementFactor || (simulation.parameters.dynamicConfig?.cavityQ || 1e9),
                 totalExoticMass: results.totalExoticMass,
-                powerDraw: results.averagePower,
+                powerDraw: results.powerDraw, // Use actual power result (83 MW)
                 quantumInequalityMargin: results.quantumInequalityMargin,
                 dutyFactor: simulation.parameters.dynamicConfig ? 
                   (simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000) : 0.01,
                 effectiveDuty: simulation.parameters.dynamicConfig ? 
                   ((simulation.parameters.dynamicConfig.burstLengthUs || 10) / (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) / 
                   (simulation.parameters.dynamicConfig.sectorCount || 400) : 2.5e-5,
-                baselineEnergyDensity: results.energyPerArea,
-                amplifiedEnergyDensity: results.energyPerArea ? results.energyPerArea * (results.totalExoticMass || 1) : undefined
+                baselineEnergyDensity: results.baselineEnergyDensity,
+                amplifiedEnergyDensity: results.amplifiedEnergyDensity
               }}
               targets={{
                 gammaGeo: 25,
