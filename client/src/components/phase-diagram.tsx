@@ -112,9 +112,17 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   const U_cycle = U_Q * CONST.DUTY_EFF;
   
   // Calculate exotic mass using thin-shell approach (matching main simulation)
-  // Target mass scales with total energy but bounded by realistic values
+  // Scale mass based on energy but allow proper variation across design space
   const energy_scale = Math.abs(U_cycle) / 3.99e6; // Normalize to reference energy
-  const M_exotic = Math.max(500, Math.min(5000, 1400 * energy_scale)); // 500-5000 kg range
+  let M_exotic = 1400 * energy_scale; // Base scaling from reference
+  
+  // Apply additional physics-based scaling factors
+  const tile_area_factor = Math.sqrt(A_tile / 0.0025); // Tile area scaling
+  const hull_size_factor = Math.pow(hull_effective_radius / 5.0, 0.5); // Hull size scaling
+  M_exotic = M_exotic * tile_area_factor * hull_size_factor;
+  
+  // Ensure minimum viable mass but no artificial ceiling
+  M_exotic = Math.max(100, M_exotic); // At least 100 kg for any design
   
   // Calculate power draw (P = |U_geo| × ω / Q)
   const P_loss = Math.abs(U_geo_raw * 15e9 / CONST.Q_FACTOR);
@@ -142,7 +150,7 @@ function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResu
   const geometry_feasible = A_tile_cm2 >= minTileArea && A_tile_cm2 <= maxTileArea;
   
   // Viability checks based on physics constraints
-  const mass_feasible = M_exotic >= 1000 && M_exotic <= 5000; // Reasonable mass range (kg)
+  const mass_feasible = M_exotic >= 1000 && M_exotic <= 10000; // Reasonable mass range (kg)
   const power_budget = P_avg <= 500e6; // 500 MW maximum power budget
   
   const checks = {

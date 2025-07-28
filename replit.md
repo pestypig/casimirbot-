@@ -266,3 +266,9 @@ The current scientific foundation provides the authentic physics core that can b
   - **Dynamic Labels**: Shows "sphere" vs "ellipsoid scale" mode with real-time surface area calculations
   - **Corrected Constraints**: Heat-map validates power density (<1MW/tile), quantum safety (ζ<1.0), time-scale separation (<1.0)
   - **Full Needle Hull Support**: At 86.5m slider position generates ~5.6×10⁵ m² surface area matching research specifications
+  - **Fixed Dynamic Energy Pipeline (July 28, 2025 - Final)**: Resolved exotic mass calculation issues in phase diagram
+    - **Removed Artificial Mass Ceiling**: Eliminated 5000 kg cap that was preventing proper scaling across design space
+    - **Physics-Based Mass Scaling**: Added tile area and hull size factors for realistic mass variation
+    - **Multi-Factor Energy Pipeline**: Mass now scales with energy (U_cycle), tile area, and hull geometry simultaneously
+    - **Extended Viable Range**: Updated constraints to 1000-10000 kg mass range for broader design exploration
+    - **True Design Space Explorer**: Phase diagram now provides genuine variable exotic mass and power calculations
