@@ -69,7 +69,7 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
     // Geometry-Amplified Dynamic Casimir Effect parameters for warp bubble configuration
     form.setValue("geometry", "bowl");
     form.setValue("gap", 1.0); // 1 nm vacuum gap (design parameter)
-    form.setValue("radius", 20000); // 40 μm diameter = 20 μm radius as per paper
+    form.setValue("radius", 25000); // 25 mm radius (50 mm diameter) as per paper spec
     form.setValue("sagDepth", 16); // 16 nm sag depth as specified in paper
     form.setValue("material", "PEC"); // Nb₃Sn superconducting mirrors
     form.setValue("temperature", 20); // 20 K operating temperature
@@ -79,7 +79,14 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
       strokeAmplitudePm: 50, // ±50 pm piston stroke amplitude
       burstLengthUs: 10, // 10 μs burst duration
       cycleLengthUs: 1000, // 1 ms cycle (1 kHz strobe frequency, S=400 sectors)
-      cavityQ: 1e9 // Q ≈ 10⁹ superconducting RF quality factor
+      cavityQ: 1e9, // Q ≈ 10⁹ superconducting RF quality factor
+      sectorCount: 400,
+      sectorDuty: 2.5e-5,
+      pulseFrequencyGHz: 15,
+      lightCrossingTimeNs: 100,
+      shiftAmplitude: 1e-6,
+      expansionTolerance: 1e-12,
+      warpFieldType: "natario" as const
     });
     form.setValue("advanced", {
       xiMin: 0.001,

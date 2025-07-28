@@ -20,7 +20,7 @@ export function NeedleHullPreset({ form }: NeedleHullPresetProps) {
     
     // Core geometry: 40 μm concave pocket
     form.setValue("geometry", "bowl");
-    form.setValue("radius", 20); // 20 μm radius for 40 μm diameter pocket
+    form.setValue("radius", 25000); // 25 mm radius (50 mm diameter) as per paper spec
     form.setValue("sagDepth", 16); // 16 nm sag depth for γ_geo ≈ 25
     form.setValue("gap", 1); // 1 nm vacuum gap
     
