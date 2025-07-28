@@ -53,6 +53,14 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
     const U_cycle = U_geo * d; // U_cycle = (-6.375e7) × 0.01 = -6.375e5 J (NO extra /Q!)
     const P_loss = U_geo * ω / Q; // P_loss = (-6.375e7) × (2π×15e9) / 1e9 = -6e9 W (MUST divide by Q)
     
+    // Debug the calculated values to verify they're correct
+    console.log("FINAL COMPUTED VALUES:");
+    console.log("U_static =", U_static);
+    console.log("U_Q = Q * U_static =", Q, "*", U_static, "=", U_Q);
+    console.log("U_geo = γ_geo * U_Q =", γ_geo, "*", U_Q, "=", U_geo);
+    console.log("U_cycle = U_geo * d =", U_geo, "*", d, "=", U_cycle);
+    console.log("P_loss = U_geo * ω / Q =", U_geo, "*", ω, "/", Q, "=", P_loss);
+    
     // 6) Corrected time-scale separation - use mechanical period T_m, not burst time
     const T_m = 1 / f_m; // mechanical period = 1/15GHz = 6.67×10⁻¹¹ s
     const R_hull = 0.05; // m - DIAMETER for round trip (50mm total, not 20μm radius!)
