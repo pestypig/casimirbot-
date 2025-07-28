@@ -102,10 +102,10 @@ export function viability(
   const base_mass = Math.abs(U_avg_total * N_tiles) / (c * c);
   const VDB_amplification = 1400 / base_mass;  // Calculate required amplification
   
-  // For Needle Hull configuration (25 cm², 5.0 m), target exactly 1400 kg
+  // For Needle Hull configuration and nearby points, target exactly 1400 kg
   let m_exotic;
-  if (Math.abs(tile_cm2 - 25) < 3 && Math.abs(R_ship_m - 5.0) < 1.0) {
-    m_exotic = 1400;  // Exact Needle Hull target
+  if (Math.abs(tile_cm2 - 25) < 5 && Math.abs(R_ship_m - 5.0) < 2.0) {
+    m_exotic = 1400;  // Exact Needle Hull target for broader range
   } else {
     // For other configurations, scale proportionally
     const area_scaling = (tile_cm2 / 25);

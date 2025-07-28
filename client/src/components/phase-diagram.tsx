@@ -95,7 +95,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         // Use central viability function for all calculations - single source of truth!
         const A_range: [number, number] = [1, 100]; // 1-100 cm²
         const R_range: [number, number] = [1, 100]; // 1-100 m
-        const resolution = 20; // 20x20 grid for performance
+        const resolution = 25; // 25x25 grid for better resolution
         
         const A_vals = Array.from({length: resolution}, (_, i) => 
           A_range[0] + (A_range[1] - A_range[0]) * i / (resolution - 1)
@@ -209,7 +209,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
           {R_vals.map((R: number, i: number) => 
             A_vals.map((A: number, j: number) => {
               const viable = Z[i][j] === 1;
-              const isCurrentPoint = Math.abs(A - currentTileArea) < 2 && Math.abs(R - currentShipRadius) < 2;
+              const isCurrentPoint = Math.abs(A - currentTileArea) < 3 && Math.abs(R - currentShipRadius) < 3;
               
               return (
                 <g key={`${i}-${j}`}>
