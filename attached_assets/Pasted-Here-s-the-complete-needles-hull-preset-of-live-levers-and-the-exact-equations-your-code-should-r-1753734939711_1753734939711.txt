@@ -1,0 +1,96 @@
+Here’s the complete “needles‐hull” preset of live levers, and the exact equations your code should run on every parameter change to rebuild both the heat‐map grid and the live diagnostics.
+
+––––––––––––––––––––––––––––––––––––––––  
+1) Starting (default) dynamic parameters  
+––––––––––––––––––––––––––––––––––––––––  
+• Tile area:  
+  Aₜᵢₗₑ = 25 cm²   (5 cm × 5 cm)  
+• Ship inner‐hull radius:  
+  Rₛₕᵢₚ = 5.0 m  
+• Gap distance (a):  
+  a = 1 nm  
+• Sag depth (bowl curvature):  
+  t = 16 nm  
+• Geometry blue‐shift factor:  
+  γ_geo = 25  
+• Q‐factor (dynamic Casimir gain):  
+  Q = 1×10⁹  
+• Local burst duty cycle:  
+  d = t_burst/t_cycle = 10 µs / 1 ms = 0.01  
+• Sector strobing count:  
+  S = 400  →  d_eff = d/S = 2.5×10⁻⁵  
+• Tile count:  
+  N_tiles = 1.96×10⁹  
+• Raw lattice power (if all tiles on):  
+  P_raw = 2×10¹⁵ W  
+• Mass tolerance (± % around 1.4×10³ kg):  
+  massTolPct = 5 %  
+• Max allowed average power:  
+  maxPower = 83 MW  
+• Max allowed ζ:  
+  maxZeta = 1.0  
+• Min allowed γ_geo:  
+  minGamma = 25  
+
+––––––––––––––––––––––––––––––––––––––––  
+2) Equational pipeline (exact code‐proof)  
+––––––––––––––––––––––––––––––––––––––––  
+
+1.  **Static Casimir interaction energy per tile**  
+    $$E_{\rm static} = -\frac{\pi^2\,\hbar c\,A_{\rm tile}}{720\,a^3}\;\times\;\frac12$$  
+
+2.  **Geometry amplification (Van‐den‐Broeck)**  
+    $$U_{\rm geo} = \gamma_{\rm geo}^3 \;E_{\rm static}$$  
+
+3.  **Q‐factor boost**  
+    $$U_{Q} = Q\;\times\;U_{\rm geo}$$  
+
+4.  **Duty‐cycle averaging (per burst)**  
+    $$U_{\rm cycle} = d\;\times\;U_{Q}$$  
+
+5.  **Sector‐strobing mitigation (ship‐wide duty)**  
+    $$U_{\rm avg\,total} = \frac{d}{S}\;\times\;U_{Q} \;=\; d_{\rm eff}\,U_Q$$  
+
+6.  **Total exotic mass**  
+    $$m_{\rm exotic} = \frac{\bigl|\,U_{\rm avg\,total}\,\times\,N_{\rm tiles}\bigr|}{c^2}$$  
+
+7.  **Average drive power**  
+    $$P_{\rm avg} = P_{\rm raw}\;\times\;d$$  
+
+8.  **Quantum‐inequality margin** ζ (Ford–Roman check)  
+    Use your existing formula, e.g.  
+    $$\zeta = f\Bigl(\tfrac{U_{\rm avg\,total}}{A_{\rm tile}},\,\tau_{\rm pulse},\,\dots\Bigr)$$  
+
+9.  **Time‐scale separation**  
+    $$\tau_{\rm pulse}/\tau_{\rm LC} 
+      = \frac{d\,t_{\rm cycle}}{2\,R_{\rm ship}/c} 
+      = \frac{t_{\rm burst}}{2R_{\rm ship}/c}$$  
+
+––––––––––––––––––––––––––––––––––––––––  
+3) Constraint gates  
+––––––––––––––––––––––––––––––––––––––––  
+
+Given the above, your single `viability()` should do:
+
+```ts
+const minM   = massNominal*(1 - massTolPct/100);
+const maxM   = massNominal*(1 + massTolPct/100);
+const massOK = (m_exotic >= minM && m_exotic <= maxM);
+const powerOK= (P_avg <= maxPower*1e6);
+const zetaOK = (zeta   <= maxZeta);
+const gammaOK= (gamma_geo >= minGamma);
+
+const ok = massOK && powerOK && zetaOK && gammaOK;
+```
+
+Return `{ ok, m_exotic, P_avg, zeta, TS_ratio, /*…*/ }`.
+
+––––––––––––––––––––––––––––––––––––––––  
+4) Wiring to UI  
+––––––––––––––––––––––––––––––––––––––––  
+
+- **Apply Needle‐Hull Preset** sets **all** state levers to the defaults above.  
+- **PhaseDiagram** component’s `useEffect` rebuilds the entire grid whenever **any** of these values change (tileArea, shipRadius, γ_geo, Q, d, d_eff, S, massTolPct, maxPower, maxZeta, minGamma).  
+- **Live Diagnostics** panel calls the same `viability(tileArea, shipRadius, pipelineParams, constraintConfig)` and displays its `m_exotic`, `P_avg`, `ζ`, `TS_ratio` in lock‐step.
+
+With that in place, your heat‐map will always paint a **teal “viable” band** exactly where the ledger says “all checks pass,” and it will smoothly recalculate as the user drags any lever.

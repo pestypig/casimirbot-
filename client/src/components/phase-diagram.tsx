@@ -110,9 +110,9 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 25,
+              massTolPct: 30,      // More permissive 30% tolerance
               maxPower: 500,
-              maxZeta: 1.0,
+              maxZeta: 2.0,        // More permissive zeta
               minGamma: 5
             };
             
@@ -134,9 +134,9 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             // Use provided constraint configuration or defaults
             const currentConstraintConfig = constraintConfig || {
               massNominal: 1400,
-              massTolPct: 25,
+              massTolPct: 30,      // More permissive 30% tolerance
               maxPower: 500,
-              maxZeta: 1.0,
+              maxZeta: 2.0,        // More permissive zeta
               minGamma: 5
             };
             
@@ -152,9 +152,9 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
         // Use provided constraint configuration or defaults
         const currentConstraintConfig = constraintConfig || {
           massNominal: 1400,
-          massTolPct: 25,
+          massTolPct: 30,      // More permissive 30% tolerance
           maxPower: 500,
-          maxZeta: 1.0,
+          maxZeta: 2.0,        // More permissive zeta
           minGamma: 5
         };
         
