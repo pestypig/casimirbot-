@@ -272,3 +272,9 @@ The current scientific foundation provides the authentic physics core that can b
     - **Multi-Factor Energy Pipeline**: Mass now scales with energy (U_cycle), tile area, and hull geometry simultaneously
     - **Extended Viable Range**: Updated constraints to 1000-10000 kg mass range for broader design exploration
     - **True Design Space Explorer**: Phase diagram now provides genuine variable exotic mass and power calculations
+  - **Mandatory Energy Pipeline Integration (July 28, 2025)**: Removed toggle button and made phase diagram use only authentic calculation method
+    - **Pure Energy Pipeline Mode**: Phase diagram now exclusively uses Static → Geometry → Q → Duty sequence
+    - **Chronological Order Required**: Eliminated shorthand approximations as they cannot maintain proper physics sequence
+    - **Authentic Constraint Matching**: All phase diagram results now computed using same engine as main simulation
+    - **No Fallback Mode**: Phase diagram requires full Energy Pipeline calculation for scientific accuracy
+    - **Performance Optimization**: Reduced grid resolution to 20x20 for faster authentic calculations while maintaining precision

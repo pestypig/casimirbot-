@@ -237,6 +237,7 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
     TS_ratio,
     gamma_geo,
     U_static_total,
+    U_geo_raw: U_geo_raw,
     U_Q,
     U_cycle,
     P_loss,
@@ -244,10 +245,10 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
   };
 }
 
-// Main calculation function for phase diagram
+// Main calculation function for phase diagram - now requires Energy Pipeline
 function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
-  // Note: This is now synchronous wrapper for UI compatibility
-  // For full simulation accuracy, use calculateViabilityUsingSimulation() 
+  // Phase diagram requires authentic Energy Pipeline calculation
+  // This synchronous wrapper is only for backwards compatibility
   return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
 }
 
@@ -327,26 +328,26 @@ interface InteractiveHeatMapProps {
 
 function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
-  const [useFullSimulation, setUseFullSimulation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Build the viability grid
+  // Build the viability grid using full Energy Pipeline calculation
   React.useEffect(() => {
     const loadGrid = async () => {
       setIsLoading(true);
       try {
-        const data = await buildViabilityGrid([1, 100], [1, 100], 30, useFullSimulation);
+        // Always use full simulation mode for authentic Energy Pipeline results
+        const data = await buildViabilityGrid([1, 100], [1, 100], 20, true);
         setGridData(data);
       } catch (error) {
-        console.error('Grid calculation failed:', error);
-        const fallbackData = await buildViabilityGrid([1, 100], [1, 100], 30, false);
-        setGridData(fallbackData);
+        console.error('Energy Pipeline calculation failed:', error);
+        // No fallback - phase diagram requires authentic calculation
+        setGridData(null);
       } finally {
         setIsLoading(false);
       }
     };
     loadGrid();
-  }, [useFullSimulation]);
+  }, []);
   
   if (!gridData || isLoading) {
     return (
@@ -354,8 +355,22 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-b-2 border-teal-500 rounded-full mx-auto mb-4"></div>
           <p className="text-muted-foreground">
-            {useFullSimulation ? 'Running full simulation calculations...' : 'Calculating phase diagram...'}
+            Running Energy Pipeline calculations...
           </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Computing Static → Geometry → Q → Duty sequence for each grid point
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!gridData) {
+    return (
+      <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 h-96 flex items-center justify-center">
+        <div className="text-center text-red-600">
+          <p>Energy Pipeline calculation failed</p>
+          <p className="text-xs mt-2">Phase diagram requires authentic simulation data</p>
         </div>
       </div>
     );
@@ -397,16 +412,11 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius }: InteractiveH
         </div>
         
         <div className="flex justify-between items-center">
-          <Button
-            variant={useFullSimulation ? "default" : "outline"}
-            size="sm"
-            onClick={() => setUseFullSimulation(!useFullSimulation)}
-            className="text-xs"
-          >
-            {useFullSimulation ? "Full Simulation Mode" : "Fast Calculation Mode"}
-          </Button>
+          <div className="text-xs font-medium text-teal-600">
+            Energy Pipeline Mode
+          </div>
           <div className="text-xs text-muted-foreground">
-            {useFullSimulation ? "Exact constraint matching" : "Approximate results"}
+            Static → Geometry → Q → Duty sequence
           </div>
         </div>
       </div>
