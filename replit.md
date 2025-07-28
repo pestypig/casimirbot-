@@ -278,3 +278,9 @@ The current scientific foundation provides the authentic physics core that can b
     - **Authentic Constraint Matching**: All phase diagram results now computed using same engine as main simulation
     - **No Fallback Mode**: Phase diagram requires full Energy Pipeline calculation for scientific accuracy
     - **Performance Optimization**: Reduced grid resolution to 20x20 for faster authentic calculations while maintaining precision
+  - **Live Diagnostics Energy Pipeline Integration (July 28, 2025)**: Connected live diagnostics to use Energy Pipeline results
+    - **Dual Calculation System**: Heat-map grid uses shorthand for performance, live diagnostics use Energy Pipeline when available
+    - **Authentic Values Display**: Live diagnostics show actual simulation results (exotic mass, power, quantum safety) from completed Energy Pipeline calculations
+    - **Performance Optimized**: Grid calculations now use only shorthand method to prevent hundreds of API calls
+    - **Smart Fallback**: Live diagnostics fall back to shorthand calculation only when no Energy Pipeline results are available
+    - **Consistent Integration**: Both components now share the same calculation foundation while maintaining optimal performance

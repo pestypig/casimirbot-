@@ -260,10 +260,9 @@ function createViabilityResult(A_tile_cm2: number, R_ship_m: number, M_exotic: n
   };
 }
 
-// Main calculation function for phase diagram - now requires Energy Pipeline
+// Main calculation function for phase diagram - always uses shorthand for performance
 function calculateViability(A_tile_cm2: number, R_ship_m: number): ViabilityResult {
-  // Phase diagram requires authentic Energy Pipeline calculation
-  // This synchronous wrapper is only for backwards compatibility
+  // Use shorthand method for all grid calculations to avoid performance issues
   return calculateViabilityShorthand(A_tile_cm2, R_ship_m);
 }
 
@@ -602,10 +601,40 @@ export default function PhaseDiagram({
     return calculateViability(tileArea, shipRadius);
   }, [tileArea, shipRadius, currentSimulation]);
 
-  // Build viability grid (cached)
-  const viabilityGrid = useMemo(() => 
-    buildViabilityGrid([50, 5000], [1, 50], 40), []
-  );
+  // Build viability grid (cached) - always use shorthand for performance
+  const viabilityGrid = useMemo(() => {
+    // Use shorthand method (no API calls) for performance
+    const A_range: [number, number] = [1, 100]; // 1-100 cm²
+    const R_range: [number, number] = [1, 100]; // 1-100 m
+    const resolution = 20; // 20x20 grid
+    
+    const A_vals = Array.from({length: resolution}, (_, i) => 
+      A_range[0] + (A_range[1] - A_range[0]) * i / (resolution - 1)
+    );
+    const R_vals = Array.from({length: resolution}, (_, i) => 
+      R_range[0] + (R_range[1] - R_range[0]) * i / (resolution - 1)
+    );
+    
+    // Use only shorthand calculations - no API calls
+    const Z = R_vals.map(R => 
+      A_vals.map(A => {
+        const result = calculateViabilityShorthand(A, R);
+        return result.viable ? 1 : 0;
+      })
+    );
+    
+    const hoverText = R_vals.map(R => 
+      A_vals.map(A => {
+        const result = calculateViabilityShorthand(A, R);
+        const status = result.viable ? "✅ Viable" : `❌ ${result.fail_reason}`;
+        return `Tile: ${A.toFixed(0)} cm²<br>Radius: ${R.toFixed(1)} m<br>${status}<br>` +
+               `Mass: ${result.M_exotic.toFixed(0)} kg<br>Power: ${(result.P_avg/1e6).toFixed(1)} MW<br>` +
+               `ζ: ${result.zeta.toFixed(3)}`;
+      })
+    );
+    
+    return { A_vals, R_vals, Z, hoverText };
+  }, []); // No dependencies - compute once
 
   const formatScientific = (value: number, decimals: number = 2) => {
     if (value === 0) return "0";
