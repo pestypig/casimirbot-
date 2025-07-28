@@ -468,7 +468,9 @@ export default function PhaseDiagram({
                       value={[gammaGeo || 25]}
                       onValueChange={([value]) => {
                         console.log('γ_geo slider changed:', value);
-                        onGammaGeoChange?.(value);
+                        if (onGammaGeoChange) {
+                          onGammaGeoChange(value);
+                        }
                       }}
                       min={1}
                       max={100}
@@ -487,7 +489,9 @@ export default function PhaseDiagram({
                       onValueChange={([value]) => {
                         const newQFactor = Math.pow(10, value);
                         console.log('Q-Factor slider changed:', value, '→', newQFactor);
-                        onQFactorChange?.(newQFactor);
+                        if (onQFactorChange) {
+                          onQFactorChange(newQFactor);
+                        }
                       }}
                       min={6}
                       max={10}
@@ -506,7 +510,9 @@ export default function PhaseDiagram({
                       onValueChange={([value]) => {
                         const newDuty = value / 100;
                         console.log('Duty slider changed:', value, '% →', newDuty);
-                        onDutyChange?.(newDuty);
+                        if (onDutyChange) {
+                          onDutyChange(newDuty);
+                        }
                       }}
                       min={0.1}
                       max={10}
@@ -544,7 +550,9 @@ export default function PhaseDiagram({
                       value={[sagDepth || 16]}
                       onValueChange={([value]) => {
                         console.log('Sag depth slider changed:', value);
-                        onSagDepthChange?.(value);
+                        if (onSagDepthChange) {
+                          onSagDepthChange(value);
+                        }
                       }}
                       min={0}
                       max={50}
