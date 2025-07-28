@@ -17,9 +17,22 @@ interface ResultsPanelProps {
   simulation: SimulationResult | null;
   onDownloadFile: (fileId: string) => void;
   onDownloadAll: () => void;
+  // Phase diagram state
+  tileArea: number;
+  shipRadius: number;
+  onTileAreaChange: (value: number) => void;
+  onShipRadiusChange: (value: number) => void;
 }
 
-export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll }: ResultsPanelProps) {
+export default function ResultsPanel({ 
+  simulation, 
+  onDownloadFile, 
+  onDownloadAll,
+  tileArea,
+  shipRadius,
+  onTileAreaChange,
+  onShipRadiusChange
+}: ResultsPanelProps) {
   const [activeTab, setActiveTab] = useState("results");
 
   if (!simulation) {
@@ -484,7 +497,12 @@ export default function ResultsPanel({ simulation, onDownloadFile, onDownloadAll
 
         <TabsContent value="phase-diagram" className="p-6">
           {/* Phase Diagram - Design Space Exploration */}
-          <PhaseDiagram />
+          <PhaseDiagram 
+            tileArea={tileArea}
+            shipRadius={shipRadius}
+            onTileAreaChange={onTileAreaChange}
+            onShipRadiusChange={onShipRadiusChange}
+          />
         </TabsContent>
 
         <TabsContent value="files" className="p-6">

@@ -16,6 +16,10 @@ export default function Home() {
   const [currentSimulation, setCurrentSimulation] = useState<SimulationResult | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [currentStep, setCurrentStep] = useState<string>("");
+  
+  // Shared phase diagram state
+  const [tileArea, setTileArea] = useState(2500); // cm²
+  const [shipRadius, setShipRadius] = useState(5.0); // m
 
   // Query for simulation data
   const { data: simulation, isLoading } = useQuery<SimulationResult>({
@@ -235,6 +239,8 @@ export default function Home() {
               onSubmit={handleCreateAndRunSimulation}
               onGenerateOnly={handleGenerateOnly}
               isLoading={isSimulationRunning}
+              onTileAreaChange={setTileArea}
+              onShipRadiusChange={setShipRadius}
             />
           </div>
 
@@ -254,6 +260,10 @@ export default function Home() {
               simulation={activeSimulation}
               onDownloadFile={handleDownloadFile}
               onDownloadAll={handleDownloadAll}
+              tileArea={tileArea}
+              shipRadius={shipRadius}
+              onTileAreaChange={setTileArea}
+              onShipRadiusChange={setShipRadius}
             />
           </div>
         </div>

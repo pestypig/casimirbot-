@@ -18,9 +18,18 @@ interface ParameterPanelProps {
   onSubmit: (parameters: SimulationParameters) => void;
   onGenerateOnly: (parameters: SimulationParameters) => void;
   isLoading: boolean;
+  // Phase diagram state
+  onTileAreaChange?: (value: number) => void;
+  onShipRadiusChange?: (value: number) => void;
 }
 
-export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: ParameterPanelProps) {
+export default function ParameterPanel({ 
+  onSubmit, 
+  onGenerateOnly, 
+  isLoading, 
+  onTileAreaChange, 
+  onShipRadiusChange 
+}: ParameterPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<SimulationParameters>({
@@ -203,7 +212,11 @@ export default function ParameterPanel({ onSubmit, onGenerateOnly, isLoading }: 
             />
 
             {/* Needle Hull Preset Button */}
-            <NeedleHullPreset form={form} />
+            <NeedleHullPreset 
+              form={form} 
+              onTileAreaChange={onTileAreaChange}
+              onShipRadiusChange={onShipRadiusChange}
+            />
 
             {/* Dynamic Module Controls */}
             <DynamicControls form={form} isVisible={form.watch("moduleType") === "dynamic"} />

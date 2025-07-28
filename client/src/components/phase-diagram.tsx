@@ -142,9 +142,19 @@ function buildViabilityGrid(A_range: [number, number], R_range: [number, number]
   return { A_vals, R_vals, Z };
 }
 
-export default function PhaseDiagram() {
-  const [tileArea, setTileArea] = useState(2500);
-  const [shipRadius, setShipRadius] = useState(5.0);
+interface PhaseDiagramProps {
+  tileArea?: number;
+  shipRadius?: number;
+  onTileAreaChange?: (value: number) => void;
+  onShipRadiusChange?: (value: number) => void;
+}
+
+export default function PhaseDiagram({ 
+  tileArea = 2500, 
+  shipRadius = 5.0, 
+  onTileAreaChange, 
+  onShipRadiusChange 
+}: PhaseDiagramProps) {
 
   // Calculate current point diagnostics
   const currentDiagnostics = useMemo(() => 
@@ -198,7 +208,7 @@ export default function PhaseDiagram() {
                     <label className="text-sm font-medium">Tile Area: {tileArea} cm²</label>
                     <Slider
                       value={[tileArea]}
-                      onValueChange={([value]) => setTileArea(value)}
+                      onValueChange={([value]) => onTileAreaChange?.(value)}
                       min={50}
                       max={5000}
                       step={50}
@@ -210,7 +220,7 @@ export default function PhaseDiagram() {
                     <label className="text-sm font-medium">Ship Radius: {shipRadius.toFixed(1)} m</label>
                     <Slider
                       value={[shipRadius]}
-                      onValueChange={([value]) => setShipRadius(value)}
+                      onValueChange={([value]) => onShipRadiusChange?.(value)}
                       min={1}
                       max={50}
                       step={0.5}
