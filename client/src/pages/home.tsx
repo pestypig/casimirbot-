@@ -31,7 +31,7 @@ export default function Home() {
   // Dynamic simulation parameters - Needle Hull Mk 1 defaults
   const [gammaGeo, setGammaGeo] = useState(26);        // γ_geo = 26 (Needle Hull research value)
   const [qFactor, setQFactor] = useState(1.6e6);       // Q = 1.6 × 10⁶ (Needle Hull research value)
-  const [duty, setDuty] = useState(0.01);              // 1.0% burst duty cycle
+  const [duty, setDuty] = useState(0.002);             // 0.2% burst duty cycle
   const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
   const [strokeAmplitude, setStrokeAmplitude] = useState(50);
@@ -45,7 +45,7 @@ export default function Home() {
     setShipRadius(82.0);  // m (Needle Hull: 82.0 m ellipsoid scale)
     setGammaGeo(26);      // γ_geo = 26 (research value)
     setQFactor(1.6e6);    // Q = 1.6 × 10⁶ (research value)
-    setDuty(0.01);        // 1.0% burst duty cycle
+    setDuty(0.002);       // 0.2% burst duty cycle
     setSagDepth(16);      // 16 nm sag depth for Ω profiling
     setTemperature(20);
     setStrokeAmplitude(50);
