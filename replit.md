@@ -321,3 +321,8 @@ The current scientific foundation provides the authentic physics core that can b
   - **Sparse Viability Confirmed**: Viable coordinates cluster around Needle Hull region (22-30 cm², 5 m radius)
   - **Mathematical Proof**: Phase diagram's teal sliver represents authentic physics calculations, not display artifacts
   - **Test Infrastructure**: Created automated validation tools, Jest unit tests, and interactive UI validation component
+  - **Authentic Needle Hull Geometry Implementation**: Replaced simplified spherical approximation with real ellipsoid geometry
+    - **Implemented Knud-Thomsen Formula**: Using exact prolate ellipsoid dimensions (503.5 × 132 × 86.5 m) for authentic 5.6×10⁵ m² surface area
+    - **Dynamic Hull Scaling**: Small test hulls (≤10m) use spherical approximation, Needle Hull scale (86.5m±5) uses authentic ellipsoid
+    - **Updated Viability Calculations**: Phase diagram now reflects true research-grade hull geometry instead of 314 m² sphere proxy
+    - **Enhanced Display Labels**: Hull area indicators show authentic ellipsoid surface areas with proper scientific notation

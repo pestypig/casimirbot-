@@ -366,18 +366,39 @@ export default function PhaseDiagram({
     }, constraintConfig);
   }, [tileArea, shipRadius, currentSimulation, gammaGeo, qFactor, duty, sagDepth, temperature, strokeAmplitude, burstTime, cycleTime, xiPoints, massTolPct]);
 
-  // Ellipsoid scaling calculation
+  // Authentic Needle Hull geometry calculation using Knud-Thomsen formula
   const getScaledSurfaceArea = (radius: number): number => {
+    // Real Needle Hull dimensions: prolate ellipsoid 503.5 × 132 × 86.5 m
+    const NEEDLE_HULL_REAL = {
+      A: 503.5,  // Semi-major axis (m)
+      B: 132,    // Semi-intermediate axis (m) 
+      C: 86.5    // Semi-minor axis (m)
+    };
+    
     if (radius <= 10) {
-      // Spherical approximation for test hulls
+      // Small test hulls use spherical approximation for exploration
       return 4 * Math.PI * radius * radius;
+    } else if (Math.abs(radius - 86.5) < 5) {
+      // Needle Hull scale: use authentic ellipsoid area ~5.6×10⁵ m²
+      const a = NEEDLE_HULL_REAL.A;
+      const b = NEEDLE_HULL_REAL.B;
+      const c = NEEDLE_HULL_REAL.C;
+      const p = 1.6075;
+      return 4 * Math.PI * Math.pow(
+        (Math.pow(a*b, p) + Math.pow(a*c, p) + Math.pow(b*c, p)) / 3,
+        1/p
+      );
     } else {
-      // Ellipsoid scaling relative to Needle Hull
-      const scale = radius / 86.5; // Scale relative to Needle Hull semi-minor axis
-      const scaled_A = NEEDLE_HULL.A * scale;
-      const scaled_B = NEEDLE_HULL.B * scale;
-      const scaled_C = NEEDLE_HULL.C * scale;
-      return approximateEllipsoidArea(scaled_A, scaled_B, scaled_C);
+      // Scaled ellipsoid relative to Needle Hull
+      const scale = radius / 86.5;
+      const scaled_A = NEEDLE_HULL_REAL.A * scale;
+      const scaled_B = NEEDLE_HULL_REAL.B * scale;
+      const scaled_C = NEEDLE_HULL_REAL.C * scale;
+      const p = 1.6075;
+      return 4 * Math.PI * Math.pow(
+        (Math.pow(scaled_A*scaled_B, p) + Math.pow(scaled_A*scaled_C, p) + Math.pow(scaled_B*scaled_C, p)) / 3,
+        1/p
+      );
     }
   };
 
@@ -456,7 +477,9 @@ export default function PhaseDiagram({
                     <div className="text-xs text-muted-foreground mt-1">
                       {shipRadius <= 10 
                         ? `Spherical test hull: ${(4 * Math.PI * shipRadius * shipRadius).toFixed(0)} m² surface`
-                        : `Needle Hull scale: ${(shipRadius / 86.5).toFixed(2)}× nominal size`
+                        : Math.abs(shipRadius - 86.5) < 5
+                          ? `Needle Hull ellipsoid: ${(getScaledSurfaceArea(shipRadius)/1e5).toFixed(1)}×10⁵ m² surface`
+                          : `Scaled ellipsoid: ${(getScaledSurfaceArea(shipRadius)/1e3).toFixed(1)}k m² surface`
                       }
                     </div>
                   </div>
