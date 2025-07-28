@@ -18,9 +18,9 @@ export default function Home() {
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [currentStep, setCurrentStep] = useState<string>("");
   
-  // Shared phase diagram state
-  const [tileArea, setTileArea] = useState(25); // cm² (default: 5 cm × 5 cm = 25 cm²)
-  const [shipRadius, setShipRadius] = useState(5.0); // m
+  // Shared phase diagram state - Needle Hull Mk 1 defaults
+  const [tileArea, setTileArea] = useState(5); // cm² (Needle Hull: 5 cm²)
+  const [shipRadius, setShipRadius] = useState(82.0); // m (Needle Hull: 82.0 m ellipsoid scale)
   
   // Constraint configuration state (exact Needle Hull defaults)
   const [massTolPct, setMassTolPct] = useState(5);      // ±5% mass tolerance (1340-1470 kg range)
@@ -28,25 +28,25 @@ export default function Home() {
   const [maxZeta, setMaxZeta] = useState(1.0);         // ζ ≤ 1.0 Ford-Roman bound
   const [minGamma, setMinGamma] = useState(25);        // γ ≥ 25 geometric amplification
   
-  // Dynamic simulation parameters for real-time phase diagram updates
-  const [gammaGeo, setGammaGeo] = useState(25);
-  const [qFactor, setQFactor] = useState(1e9);
-  const [duty, setDuty] = useState(0.01);
-  const [sagDepth, setSagDepth] = useState(16);
+  // Dynamic simulation parameters - Needle Hull Mk 1 defaults
+  const [gammaGeo, setGammaGeo] = useState(26);        // γ_geo = 26 (Needle Hull research value)
+  const [qFactor, setQFactor] = useState(1.6e6);       // Q = 1.6 × 10⁶ (Needle Hull research value)
+  const [duty, setDuty] = useState(0.01);              // 1.0% burst duty cycle
+  const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
   const [strokeAmplitude, setStrokeAmplitude] = useState(50);
   const [burstTime, setBurstTime] = useState(10);
   const [cycleTime, setCycleTime] = useState(1000);
   const [xiPoints, setXiPoints] = useState(5000);
   
-  // Apply Needle Hull Preset - sets all parameters to paper defaults (including constraints)
+  // Apply Needle Hull Preset - sets all parameters to exact research paper defaults
   const applyNeedleHullPreset = () => {
-    setTileArea(25);      // cm²
-    setShipRadius(5.0);   // m
-    setGammaGeo(25);
-    setQFactor(1e9);
-    setDuty(0.01);
-    setSagDepth(16);
+    setTileArea(5);       // cm² (Needle Hull: 5 cm²)
+    setShipRadius(82.0);  // m (Needle Hull: 82.0 m ellipsoid scale)
+    setGammaGeo(26);      // γ_geo = 26 (research value)
+    setQFactor(1.6e6);    // Q = 1.6 × 10⁶ (research value)
+    setDuty(0.01);        // 1.0% burst duty cycle
+    setSagDepth(16);      // 16 nm sag depth for Ω profiling
     setTemperature(20);
     setStrokeAmplitude(50);
     setBurstTime(10);

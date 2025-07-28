@@ -347,3 +347,8 @@ The current scientific foundation provides the authentic physics core that can b
         - Users can explore viable regions interactively without waiting for simulation results
         - Live diagnostics work immediately, showing constraint compliance and failure reasons in real-time
         - Maintains authentic Needle Hull Mk 1 physics with fixed mass budget and engineering constraints
+        - **Updated Default Parameters (July 28, 2025)**: Set phase diagram defaults to exact Needle Hull Mk 1 research values
+          - Tile Area: 5 cm² (instead of 25 cm²), Ship Radius: 82.0 m (instead of 5.0 m)
+          - γ_geo: 26, Q-factor: 1.6×10⁶, Burst Duty: 1.0%, Sag Depth: 16 nm
+          - Phase diagram now starts in the viable region highlighted by research papers
+          - All constraint sliders maintain research-grade defaults (±5% mass tolerance, 100 MW power, ζ ≤ 1.0, γ ≥ 25)
