@@ -42,10 +42,10 @@ export function LiveEnergyPipeline({
   const R_ship = shipRadius; // already in m
   
   // Use baseline research configuration for power calculations (not scaled hull)
-  const A_tile_baseline = 25e-4; // 25 cm² baseline from research papers
+  const A_tile_baseline = 50e-4; // 50 cm² = 50e-4 m² baseline from research papers (to get ~62,832 tiles)
   const R_baseline = 5.0; // 5 m baseline radius
   const A_hull_baseline = 4 * pi * R_baseline * R_baseline; // ~314 m² spherical
-  const N_tiles = A_hull_baseline / A_tile_baseline; // ~62,832 tiles (research baseline)
+  const N_tiles = A_hull_baseline / A_tile_baseline; // 314.2 m² ÷ 50e-4 m² = 62,840 tiles (research baseline)
   
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
   const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (FIXED: 720 not 240)
@@ -115,6 +115,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_baseline=${A_tile_baseline*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
+  console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
