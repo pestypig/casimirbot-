@@ -18,6 +18,11 @@ interface LiveEnergyPipelineProps {
   
   // Show calculations in real-time
   isRunning?: boolean;
+  
+  // Mode selection and callbacks
+  selectedMode?: string;
+  onModeChange?: (mode: string) => void;
+  onParameterUpdate?: (params: { duty: number; qFactor?: number; gammaGeo?: number }) => void;
 }
 
 // Operational mode configurations
@@ -75,11 +80,11 @@ export function LiveEnergyPipeline({
   shipRadius,
   gapDistance = 1.0,
   sectorCount = 400,
-  isRunning = false
+  isRunning = false,
+  selectedMode = "hover",
+  onModeChange,
+  onParameterUpdate
 }: LiveEnergyPipelineProps) {
-  
-  // Mode selector state
-  const [selectedMode, setSelectedMode] = useState<string>("hover");
   
   // Constants from physics
   const h_bar = 1.055e-34; // J⋅s
@@ -192,6 +197,22 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
+  // Handle mode changes and notify parent
+  const handleModeChange = (newMode: string) => {
+    const mode = modes[newMode];
+    if (onModeChange) {
+      onModeChange(newMode);
+    }
+    if (onParameterUpdate) {
+      onParameterUpdate({ 
+        duty: mode.duty,
+        // Also update phase diagram parameters based on mode
+        qFactor: qFactor, // Keep existing Q factor
+        gammaGeo: gammaGeo // Keep existing gamma
+      });
+    }
+  };
+  
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
     if (Math.abs(value) === 0) return "0";
@@ -224,7 +245,7 @@ export function LiveEnergyPipeline({
             <Settings className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Operational Mode:</span>
           </div>
-          <Select value={selectedMode} onValueChange={setSelectedMode}>
+          <Select value={selectedMode} onValueChange={handleModeChange}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>

@@ -22,6 +22,32 @@ export default function Home() {
   const [duty, setDuty] = useState(0.002);             // 0.2% burst duty cycle
   const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
+  
+  // Operational mode state - default to hover mode
+  const [selectedMode, setSelectedMode] = useState("hover");
+  
+  // Function to determine best matching mode based on current parameters
+  const findBestMatchingMode = (currentDuty: number): string => {
+    const modes = {
+      hover: { duty: 0.14, threshold: 0.02 },
+      cruise: { duty: 0.005, threshold: 0.002 },
+      emergency: { duty: 0.50, threshold: 0.1 },
+      standby: { duty: 0.0, threshold: 0.001 }
+    };
+    
+    let bestMatch = "hover";
+    let minDifference = Infinity;
+    
+    for (const [mode, config] of Object.entries(modes)) {
+      const difference = Math.abs(currentDuty - config.duty);
+      if (difference < minDifference && difference <= config.threshold) {
+        minDifference = difference;
+        bestMatch = mode;
+      }
+    }
+    
+    return bestMatch;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,6 +97,13 @@ export default function Home() {
                 gapDistance={1.0}
                 sectorCount={400}
                 isRunning={false}
+                selectedMode={selectedMode}
+                onModeChange={setSelectedMode}
+                onParameterUpdate={({ duty: newDuty, qFactor: newQFactor, gammaGeo: newGammaGeo }) => {
+                  if (newDuty !== undefined) setDuty(newDuty);
+                  if (newQFactor !== undefined) setQFactor(newQFactor);  
+                  if (newGammaGeo !== undefined) setGammaGeo(newGammaGeo);
+                }}
               />
             </div>
           </div>
@@ -100,7 +133,14 @@ export default function Home() {
                 qFactor={qFactor}
                 onQFactorChange={setQFactor}
                 duty={duty}
-                onDutyChange={setDuty}
+                onDutyChange={(newDuty) => {
+                  setDuty(newDuty);
+                  // Auto-update operational mode when duty cycle changes from phase diagram
+                  const matchingMode = findBestMatchingMode(newDuty);
+                  if (matchingMode !== selectedMode) {
+                    setSelectedMode(matchingMode);
+                  }
+                }}
                 sagDepth={sagDepth}
                 onSagDepthChange={setSagDepth}
                 temperature={temperature}
