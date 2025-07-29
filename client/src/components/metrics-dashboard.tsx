@@ -30,16 +30,53 @@ interface MetricConstraints {
 
 export default function MetricsDashboard({ viabilityParams }: MetricsDashboardProps) {
   const [metrics, setMetrics] = useState<ComputedMetrics | null>(null);
-  const [constraints, setConstraints] = useState<MetricConstraints>({
-    P_max: 1000,        // 1000 MW max raw power
-    f_min: 0.001,       // 0.1% minimum throttling
-    P_avg_max: 200,     // 200 MW max average power
-    U_min: 1e-12,       // Minimum energy magnitude
-    TS_min: 0.01,       // Minimum time-scale (universal)
-    zeta_max: 1.0,      // Ford-Roman bound
-    M_target: 1405,     // Target mass (kg)
-    M_tolerance: 5      // ±5% tolerance
-  });
+  // Mode-aware constraint calculation for dynamic safe zones
+  const getModeAwareConstraints = (selectedMode: string): MetricConstraints => {
+    const baseConstraints = {
+      P_max: 1000,        // 1000 MW max raw power (universal)
+      f_min: 0.001,       // 0.1% minimum throttling
+      U_min: 1e-12,       // Minimum energy magnitude
+      TS_min: 100,        // Universal time-scale threshold (TS_ratio ≥ 100)
+      M_target: 1405,     // Target mass (kg) - fixed for all active modes
+      M_tolerance: 5      // ±5% tolerance
+    };
+    
+    // Mode-specific constraints based on authentic calculated values
+    switch (selectedMode) {
+      case 'hover':
+        return {
+          ...baseConstraints,
+          P_avg_max: 120,   // 83.3 MW + headroom
+          zeta_max: 0.05    // ζ=0.032 + safety margin
+        };
+      case 'cruise': 
+        return {
+          ...baseConstraints,
+          P_avg_max: 20,    // 7.4 MW + headroom  
+          zeta_max: 1.0     // ζ=0.89 + margin (Ford-Roman limit)
+        };
+      case 'emergency':
+        return {
+          ...baseConstraints,
+          P_avg_max: 400,   // 297.5 MW + headroom
+          zeta_max: 0.02    // ζ=0.009 + safety margin
+        };
+      case 'standby':
+        return {
+          ...baseConstraints,
+          P_avg_max: 10,    // 0 MW + minimal headroom
+          zeta_max: 10.0    // Relaxed when system off
+        };
+      default:
+        return {
+          ...baseConstraints,
+          P_avg_max: 200,   // Default moderate limit
+          zeta_max: 1.0     // Ford-Roman bound
+        };
+    }
+  };
+
+  const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints("hover"));
 
   // Compute authentic metrics using Live Energy Pipeline calculations that update with mode changes
   const computeMetrics = React.useCallback((params: any): ComputedMetrics => {
@@ -128,51 +165,66 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     };
   }, [viabilityParams]);
 
-  // Update metrics when parameters change
+  // Update metrics and constraints when parameters change
   useEffect(() => {
     const newMetrics = computeMetrics(viabilityParams);
     setMetrics(newMetrics);
     
-    // Update constraints based on mode
-    if (viabilityParams?.maxPower) {
-      setConstraints(prev => ({
-        ...prev,
-        P_avg_max: viabilityParams.maxPower,
-        zeta_max: viabilityParams.maxZeta || 1.0,
-        M_tolerance: viabilityParams.massTolerance || 5
-      }));
-    }
+    // Update constraints based on operational mode for dynamic safe zones
+    const selectedMode = viabilityParams?.selectedMode || "hover";
+    const modeConstraints = getModeAwareConstraints(selectedMode);
+    setConstraints(modeConstraints);
+    
+    console.log(`🎯 Mode-Aware Constraints for ${selectedMode}:`, {
+      P_avg_max: modeConstraints.P_avg_max,
+      zeta_max: modeConstraints.zeta_max,
+      current_metrics: newMetrics
+    });
   }, [viabilityParams, computeMetrics]);
 
-  // Prepare radar chart data
+  // Prepare radar chart data with mode-aware safe zones
   const getRadarData = () => {
     if (!metrics) return null;
 
+    // Current mode for debug logging
+    const selectedMode = viabilityParams?.selectedMode || "hover";
+
+    // Normalize current values against mode-specific constraints
     const normalizedData = [
-      Math.min(metrics.P_avg / constraints.P_avg_max, 2), // Cap at 2 for visualization
-      Math.min(metrics.f_throttle / 0.5, 2), // Normalized to 50% max duty
-      Math.min(Math.abs(metrics.M_exotic - constraints.M_target) / (constraints.M_target * constraints.M_tolerance / 100), 2),
-      Math.min(metrics.zeta / constraints.zeta_max, 2),
-      Math.min(constraints.TS_min / metrics.TS_ratio, 2), // Inverted (want high TS_ratio)
-      Math.min(metrics.P_raw / constraints.P_max, 2),
-      Math.min(metrics.U_cycle / 1e6, 2) // Normalized energy
+      Math.min(metrics.P_avg / constraints.P_avg_max, 2), // Average Power vs mode limit
+      Math.min(metrics.f_throttle / 0.5, 2), // Duty Cycle (normalized to 50% max)
+      Math.min(Math.abs(metrics.M_exotic - constraints.M_target) / (constraints.M_target * constraints.M_tolerance / 100), 2), // Mass Error
+      Math.min(metrics.zeta / constraints.zeta_max, 2), // Quantum Safety vs mode limit
+      Math.min(constraints.TS_min / Math.max(metrics.TS_ratio, 0.01), 2), // Time-Scale (inverted, want high TS_ratio)
+      Math.min(metrics.P_raw / constraints.P_max, 2), // Raw Power vs universal limit
+      Math.min(metrics.U_cycle / 1e6, 2) // Energy magnitude (normalized)
     ];
+
+    // Mode-aware safe zone boundary (green zone shows what's acceptable for current mode)
+    const safeZoneBoundary = [1, 1, 1, 1, 1, 1, 1]; // All values should be ≤ 1.0 to be "safe"
+
+    console.log(`🎯 Radar Chart Data for ${selectedMode} mode:`, {
+      P_avg: `${metrics.P_avg.toFixed(1)} MW (limit: ${constraints.P_avg_max} MW, normalized: ${normalizedData[0].toFixed(2)})`,
+      zeta: `${metrics.zeta.toFixed(3)} (limit: ${constraints.zeta_max}, normalized: ${normalizedData[3].toFixed(2)})`,
+      duty: `${metrics.f_throttle.toFixed(3)} (normalized: ${normalizedData[1].toFixed(2)})`,
+      mass: `${metrics.M_exotic.toFixed(0)} kg (target: ${constraints.M_target} kg, normalized: ${normalizedData[2].toFixed(2)})`
+    });
 
     return [{
       type: 'scatterpolar',
       r: normalizedData,
       theta: ['Avg Power', 'Duty Cycle', 'Mass Error', 'Quantum ζ', 'Time-Scale', 'Raw Power', 'Energy'],
       fill: 'toself',
-      name: 'Current Values',
-      line: { color: '#3b82f6' },
+      name: `${selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1)} Mode Values`,
+      line: { color: '#3b82f6', width: 2 },
       fillcolor: 'rgba(59, 130, 246, 0.1)'
     }, {
       type: 'scatterpolar',
-      r: [1, 1, 1, 1, 1, 1, 1], // Constraint boundary
+      r: safeZoneBoundary,
       theta: ['Avg Power', 'Duty Cycle', 'Mass Error', 'Quantum ζ', 'Time-Scale', 'Raw Power', 'Energy'],
       fill: 'toself',
-      name: 'Safe Zone',
-      line: { color: '#22c55e', dash: 'dash' },
+      name: `${selectedMode.charAt(0).toUpperCase() + selectedMode.slice(1)} Safe Zone`,
+      line: { color: '#22c55e', dash: 'dash', width: 2 },
       fillcolor: 'rgba(34, 197, 94, 0.1)'
     }];
   };
