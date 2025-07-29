@@ -77,6 +77,24 @@ function InteractiveHeatMap({
   const initialMode = selectedMode || "hover";
   const initialPreset = modePresets[initialMode as keyof typeof modePresets] || modePresets.hover;
   
+  // Helper to get mode-specific constraint defaults
+  const getModeConstraintDefaults = (mode: string) => {
+    switch (mode) {
+      case 'hover':
+        return { maxPower: 120, massTolerance: 5, maxZeta: 0.1, minTimescale: 0.001 };
+      case 'cruise':
+        return { maxPower: 20, massTolerance: 10, maxZeta: 1.5, minTimescale: 0.01 };
+      case 'emergency':
+        return { maxPower: 400, massTolerance: 15, maxZeta: 0.05, minTimescale: 0.0001 };
+      case 'standby':
+        return { maxPower: 10, massTolerance: 50, maxZeta: 10.0, minTimescale: 0.1 };
+      default:
+        return { maxPower: 120, massTolerance: 5, maxZeta: 1.0, minTimescale: 0.01 };
+    }
+  };
+
+  const initialConstraints = getModeConstraintDefaults(initialMode);
+
   // Local parameter state for sliders - initialized with correct mode preset
   const [localParams, setLocalParams] = useState({
     selectedMode: initialMode,
@@ -84,10 +102,10 @@ function InteractiveHeatMap({
     qFactor: viabilityParams?.qFactor || initialPreset.cavityQ,
     duty: viabilityParams?.duty || initialPreset.duty,
     sagDepth: viabilityParams?.sagDepth || 16,
-    maxPower: 120, // MW (hover mode default)
-    massTolerance: 5, // % (tight Needle Hull tolerance)
-    maxZeta: 1.0,
-    minTimescale: 0.01
+    maxPower: viabilityParams?.maxPower || initialConstraints.maxPower,
+    massTolerance: viabilityParams?.massTolerance || initialConstraints.massTolerance,
+    maxZeta: viabilityParams?.maxZeta || initialConstraints.maxZeta,
+    minTimescale: viabilityParams?.minTimescale || initialConstraints.minTimescale
   });
   
   // Get current mode configuration (use passed selectedMode instead of local state)
