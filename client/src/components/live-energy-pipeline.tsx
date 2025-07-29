@@ -48,10 +48,10 @@ export function LiveEnergyPipeline({
   const N_tiles = A_hull_baseline / A_tile_baseline; // 314.2 m² ÷ 50e-4 m² = 62,840 tiles (research baseline)
   
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
-  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (FIXED: 720 not 240)
+  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (CORRECT: 720)
   
   // Step 2: Static Casimir Energy per Tile  
-  const V_cavity = A_tile_baseline * a; // Use baseline 25 cm² for consistent energy calculation
+  const V_cavity = A_tile * a; // Use current slider tile area (5 cm²)
   const U_static = u_casimir * V_cavity; // J per tile (should be ~-6.5×10⁻⁵ J)
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
@@ -71,29 +71,29 @@ export function LiveEnergyPipeline({
   const P_loss_raw = Math.abs(U_geo * omega / qFactor); // W per tile (raw, unthrottled)
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
-  const Q_idle = 1e6; // Q during idle periods (Q-spoiling) - FIXED: hard-coded
-  const Q_spoiling_factor = Q_idle / Q_on; // FIXED: Q_idle/Q_on ratio (~10^-3)
+  const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
+  const Q_on_needle = 1e9; // Needle Hull design Q_on ≈ 10^9 (not slider value)
+  const Q_spoiling_factor = Q_idle / Q_on_needle; // Q_idle/Q_on ≈ 10^-3
   const duty_factor = d; // User duty from slider
   const S = sectorCount; // User sector count (default 400)
   const sector_strobing_factor = 1 / S; // 1/S strobing factor
   const combined_throttle = duty_factor * Q_spoiling_factor * sector_strobing_factor; // Total mitigation
   
   // Step 8: Realistic Average Power (83 MW target)
-  const P_avg_per_tile = P_loss_raw * combined_throttle; // W per tile (throttled)
-  const P_raw = P_loss_raw * N_tiles; // Raw hull power in W
-  const P_avg = P_raw * combined_throttle; // Throttled power in W
-  const P_total_realistic = P_avg / 1e6; // FIXED: Convert W to MW properly
+  const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
+  const P_avg_W = P_raw_W * combined_throttle; // Throttled power in W
+  const P_total_realistic = P_avg_W / 1e6; // Convert W to MW
   
   // Debug logging
   console.log("🔧 Power Calculation Debug:");
   console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
   console.log(`  N_tiles: ${N_tiles}`);
-  console.log(`  P_raw (total): ${P_raw} W`);
+  console.log(`  P_raw (total): ${P_raw_W} W`);
   console.log(`  duty_factor: ${duty_factor}`);
-  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_on=${Q_on})`);
+  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_on_needle=${Q_on_needle})`);
   console.log(`  sector_strobing_factor: ${sector_strobing_factor}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
-  console.log(`  P_avg (throttled): ${P_avg} W`);
+  console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
   // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
@@ -103,7 +103,7 @@ export function LiveEnergyPipeline({
   const TS_ratio = tau_LC / T_m; // Should be ≫ 1
   
   // Step 10: Total Exotic Mass (Equation 5 from PDF)  
-  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // FIXED: kg per tile (c^2 not c)
+  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
