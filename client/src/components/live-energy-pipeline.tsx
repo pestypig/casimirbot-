@@ -64,7 +64,7 @@ export function LiveEnergyPipeline({
   
   // Step 5: Duty Cycle Averaging (Equation 3 from PDF)
   const d = duty; // User parameter (fraction)
-  const U_cycle = U_Q * d; // J per tile
+  const U_cycle = U_Q * d; // J per tile (duty cycle on fully boosted energy: γ³×Q×U_static)
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
