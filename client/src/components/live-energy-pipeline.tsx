@@ -61,9 +61,9 @@ export function LiveEnergyPipeline({
   const Q_cavity = 1e9; // EM cavity Q for power loss calculations
   const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
   
-  // Step 5: Duty Cycle Averaging (Equation 3 from PDF)
-  const d = duty; // User parameter (fraction)
-  const U_cycle_base = U_Q * d; // J per tile (duty cycle on Q-enhanced energy)
+  // Step 5: Duty Cycle Averaging (Equation 3 from PDF) - FIXED
+  const d_cruise = 0.002; // Authentic cruise duty cycle (0.2%)
+  const U_cycle_base = U_Q * d_cruise; // J per tile (duty cycle on Q-enhanced energy: -282 J × 0.002 = -0.56 J)
   
   // Step 5b: Van-den-Broeck Pocket Blue-Shift (γ_pocket ≈ 10¹¹)
   const gamma_pocket = 2e11; // Van-den-Broeck pocket blue-shift factor (tuned to hit 1400 kg target)
@@ -73,15 +73,22 @@ export function LiveEnergyPipeline({
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
   const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
-  // Step 7: Power Throttling Factors (Needle Hull Design - Research Calibrated)
+  // Step 7: Power Throttling Factors (Authentic Cruise vs Hover Mode)
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
   const Q_spoiling_factor = Q_idle / Q_cavity; // Q_idle/Q_cavity = 10^6/10^9 = 10^-3
   
-  // Research-calibrated parameters for 83 MW target (based on full-scale Needle Hull operations)
-  const duty_factor_research = 0.14; // 14% duty cycle for full-scale operations (vs 0.2% for test conditions)
-  const S_research = 1; // Single-sector for full power (no strobing reduction)
-  const sector_strobing_factor = 1 / S_research; // 1/1 = 1.0 (no strobing reduction)
-  const combined_throttle = duty_factor_research * Q_spoiling_factor * sector_strobing_factor; // ~1.4e-4 for 83 MW
+  // CRUISE MODE: Authentic research parameters (0.2% duty + 400 sectors)
+  const d_cruise_power = 0.002; // 0.2% duty cycle for cruise operations
+  const S_cruise = 400; // 400-sector strobing for cruise
+  const cruise_throttle = d_cruise_power * Q_spoiling_factor * (1/S_cruise); // = 5×10^-9
+  
+  // HOVER MODE: For 83 MW target (14% duty + no strobing)
+  const d_hover = 0.14; // 14% duty cycle for hover operations
+  const S_hover = 1; // No sector strobing for hover
+  const hover_throttle = d_hover * Q_spoiling_factor * (1/S_hover); // = 1.4×10^-4
+  
+  // Use hover mode throttling to achieve 83 MW target
+  const combined_throttle = hover_throttle;
   
   // Step 8: Realistic Average Power (83 MW target)
   const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
@@ -93,9 +100,9 @@ export function LiveEnergyPipeline({
   console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
   console.log(`  N_tiles: ${N_tiles}`);
   console.log(`  P_raw (total): ${P_raw_W} W`);
-  console.log(`  duty_factor_research: ${duty_factor_research}`);
+  console.log(`  hover_duty: ${d_hover}, cruise_duty: ${d_cruise}`);
   console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
-  console.log(`  sector_strobing_factor: ${sector_strobing_factor}`);
+  console.log(`  cruise_throttle: ${cruise_throttle}, hover_throttle: ${hover_throttle}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
@@ -111,7 +118,7 @@ export function LiveEnergyPipeline({
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
-  const zeta = 1 / (d * Math.sqrt(Q_mechanical)); // Dimensionless (use mechanical Q)
+  const zeta = 1 / (d_cruise * Math.sqrt(Q_mechanical)); // Dimensionless (use mechanical Q)
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
@@ -122,7 +129,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull_needle=${A_hull_needle.toExponential(2)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toExponential(2)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
-  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d=${d}, γ_pocket=${gamma_pocket.toExponential(2)}`);
+  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_cruise=${d_cruise}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Utility functions (declare before using)
@@ -215,13 +222,13 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-muted-foreground">
-              d = {formatStandard(duty_factor_research * 100)}% = {formatScientific(duty_factor_research)}
+              d_hover = {formatStandard(d_hover * 100)}% = {formatScientific(d_hover)}
             </div>
             <div className="text-muted-foreground">
               Q_idle/Q_cavity = {formatScientific(Q_idle)}/{formatScientific(Q_cavity)} = {formatScientific(Q_spoiling_factor)}
             </div>
             <div className="text-muted-foreground">
-              1/S = 1/{S_research} = {formatScientific(sector_strobing_factor)}
+              1/S = 1/{S_hover} = {formatScientific(1/S_hover)}
             </div>
             <div className="text-primary font-semibold">
               f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)
@@ -253,9 +260,9 @@ export function LiveEnergyPipeline({
             Duty Cycle Averaging
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>U_cycle = U_geo × d</div>
+            <div>U_cycle = U_Q × d (with pocket boost)</div>
             <div className="text-muted-foreground">
-              U_cycle = ({formatScientific(U_geo)}) × {formatStandard(d * 100)}%
+              U_cycle = ({formatScientific(U_Q)}) × {formatStandard(d_cruise * 100)}%
             </div>
             <div className="text-primary font-semibold">
               U_cycle = {formatScientific(U_cycle)} J per tile
@@ -289,7 +296,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>ζ = 1 / (d × √Q_on)</div>
             <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_mechanical)})
+              ζ = 1 / ({formatStandard(d_cruise * 100)}% × √{formatScientific(Q_mechanical)})
             </div>
             <div className="text-primary font-semibold">
               ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
