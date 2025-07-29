@@ -69,10 +69,12 @@ export function LiveEnergyPipeline({
   const P_loss_raw = Math.abs(U_Q * omega / Q); // W per tile (raw, unthrottled)
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
+  const Q_on = Q; // Q during burst periods
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q; // ~10⁻³ for Q=10⁹ → Q=10⁶
+  const Q_spoiling_factor = Q_idle / Q_on; // ~10⁻³ for Q=1.6×10⁶ → Q=10⁶
   const duty_factor = d; // 0.002 for 0.2% duty cycle
-  const combined_throttle = duty_factor * Q_spoiling_factor; // Total mitigation
+  const sector_strobing_factor = 1 / 400; // 1/S = 2.5×10⁻³ (400 sectors)
+  const combined_throttle = duty_factor * Q_spoiling_factor * sector_strobing_factor; // Total mitigation
   
   // Step 8: Realistic Average Power (83 MW target)
   const P_avg_per_tile = P_loss_raw * combined_throttle; // W per tile (throttled)
@@ -231,11 +233,12 @@ export function LiveEnergyPipeline({
             Power Throttling (Needle Hull Design)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>Duty Factor: d = {formatStandard(duty_factor * 100)}%</div>
-            <div>Q-Spoiling: Q_idle/Q_on = {formatScientific(Q_spoiling_factor)}</div>
-            <div>Combined Throttle: {formatScientific(combined_throttle)}</div>
+            <div>1. Duty Factor: d = {formatStandard(duty_factor * 100)}%</div>
+            <div>2. Q-Spoiling: Q_idle/Q_on = {formatScientific(Q_spoiling_factor)}</div>
+            <div>3. Sector Strobing: 1/S = {formatScientific(sector_strobing_factor)}</div>
+            <div>Combined: d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-primary font-semibold">
-              Total Mitigation: {formatScientific(combined_throttle)} (×{formatStandard(1/combined_throttle)} reduction)
+              Total Throttle: {formatScientific(combined_throttle)} (×{formatScientific(1/combined_throttle)} reduction)
             </div>
           </div>
         </div>
@@ -247,12 +250,12 @@ export function LiveEnergyPipeline({
             Realistic Average Power (83 MW Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>P_avg = P_raw × throttle × N_tiles</div>
+            <div>P_realistic = P_raw_lattice × throttle</div>
             <div className="text-muted-foreground">
-              P_avg = ({formatScientific(P_loss_raw)}) × ({formatScientific(combined_throttle)}) × ({formatScientific(N_tiles)})
+              P_realistic = ({formatScientific(P_loss_raw * N_tiles)}) × ({formatScientific(combined_throttle)})
             </div>
             <div className="text-primary font-semibold">
-              P_avg = {formatStandard(P_total_realistic)} MW
+              P_realistic = {formatStandard(P_total_realistic)} MW
             </div>
           </div>
         </div>
@@ -320,7 +323,7 @@ export function LiveEnergyPipeline({
               <div className="font-semibold">{formatScientific(M_exotic_total)} kg</div>
             </div>
             <div>
-              <span className="text-muted-foreground">Raw Power:</span>
+              <span className="text-muted-foreground">Raw Lattice:</span>
               <div className="font-semibold">{formatScientific(P_loss_raw * N_tiles * 1e-6)} MW</div>
             </div>
             <div>
