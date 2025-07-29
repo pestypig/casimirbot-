@@ -29,10 +29,12 @@ function InteractiveHeatMap({
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Operational mode configurations (matches Live Energy Pipeline exactly)
-  const modes = {
+  // Mode presets with all parameters properly synchronized
+  const modePresets = {
     hover: {
       name: "Hover",
+      cavityQ: 1e9,        // 1.0×10⁹ (Cavity Q for power loss)
+      mechQ: 5e4,          // 5.0×10⁴ (Mechanical Q for energy boost - fixed)
       duty: 0.14,          // 14% duty (station-hold)
       sectors: 1,          // No strobing
       qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
@@ -41,6 +43,8 @@ function InteractiveHeatMap({
     },
     cruise: {
       name: "Cruise", 
+      cavityQ: 1.6e6,      // 1.6×10⁶ (Lower for stability)
+      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
       duty: 0.005,         // 0.5% duty (Ford-Roman compliant)
       sectors: 400,        // 400-sector strobing (1/S = 1/400)
       qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
@@ -49,6 +53,8 @@ function InteractiveHeatMap({
     },
     emergency: {
       name: "Emergency",
+      cavityQ: 1e9,        // 1.0×10⁹
+      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
       duty: 0.50,          // 50% duty (fast-burn)
       sectors: 1,          // No strobing
       qSpoiling: 1,        // No Q-spoiling
@@ -57,6 +63,8 @@ function InteractiveHeatMap({
     },
     standby: {
       name: "Standby",
+      cavityQ: 1e9,        // 1.0×10⁹ (Irrelevant when duty=0)
+      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
       duty: 0.0,           // 0% duty (bubble collapsed)
       sectors: 1,          // Irrelevant
       qSpoiling: 1,        // Irrelevant
@@ -65,12 +73,16 @@ function InteractiveHeatMap({
     }
   };
 
-  // Local parameter state for sliders
+  // Get initial mode preset
+  const initialMode = selectedMode || "hover";
+  const initialPreset = modePresets[initialMode as keyof typeof modePresets] || modePresets.hover;
+  
+  // Local parameter state for sliders - initialized with correct mode preset
   const [localParams, setLocalParams] = useState({
-    selectedMode: selectedMode,
+    selectedMode: initialMode,
     gammaGeo: viabilityParams?.gammaGeo || 26,
-    qFactor: viabilityParams?.qFactor || 1.6e6,
-    duty: viabilityParams?.duty || 0.14,
+    qFactor: viabilityParams?.qFactor || initialPreset.cavityQ,
+    duty: viabilityParams?.duty || initialPreset.duty,
     sagDepth: viabilityParams?.sagDepth || 16,
     maxPower: 120, // MW (hover mode default)
     massTolerance: 5, // % (tight Needle Hull tolerance)
@@ -79,7 +91,7 @@ function InteractiveHeatMap({
   });
   
   // Get current mode configuration (use passed selectedMode instead of local state)
-  const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
+  const currentMode = modePresets[selectedMode as keyof typeof modePresets] || modePresets.hover;
 
   // Format Q-Factor for better readability
   const formatQFactor = (qFactor: number) => {
@@ -92,17 +104,46 @@ function InteractiveHeatMap({
     }
   };
   
+  // Helper to apply a mode preset to all parameters
+  const applyModePreset = (mode: string) => {
+    const preset = modePresets[mode as keyof typeof modePresets];
+    if (!preset) return;
+    
+    const newParams = {
+      ...localParams,
+      selectedMode: mode,
+      qFactor: preset.cavityQ,
+      duty: preset.duty
+    };
+    
+    setLocalParams(newParams);
+    
+    // Update parent component with new parameters
+    if (onParameterChange) {
+      onParameterChange(newParams);
+    }
+    
+    console.log(`🎯 Applied ${mode} mode preset: Q=${preset.cavityQ}, duty=${preset.duty}`);
+  };
+
+  // React to mode changes from parent component
+  React.useEffect(() => {
+    if (selectedMode && selectedMode !== localParams.selectedMode) {
+      applyModePreset(selectedMode);
+    }
+  }, [selectedMode]);
+
   // Get mode-specific parameter values for double-click functionality
   const getModeSpecificValue = (parameter: string, mode: string) => {
-    const modeConfig = modes[mode as keyof typeof modes];
+    const modeConfig = modePresets[mode as keyof typeof modePresets];
     if (!modeConfig) return null;
     
     switch (parameter) {
       case 'gammaGeo':
         return 26; // Standard research value for all modes
       case 'qFactor':
-        // Cavity Q: Hover/Emergency use 1e9, Cruise uses 1.6e6 for stability
-        return mode === 'cruise' ? 1.6e6 : 1e9;
+        // Use the mode's cavity Q directly from preset
+        return modeConfig.cavityQ;
       case 'duty':
         return modeConfig.duty;
       case 'sagDepth':
@@ -256,7 +297,7 @@ function InteractiveHeatMap({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(modes).map(([key, mode]) => (
+                {Object.entries(modePresets).map(([key, mode]) => (
                   <SelectItem key={key} value={key}>
                     {mode.name} - {mode.description}
                   </SelectItem>
@@ -303,12 +344,12 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({selectedMode === 'cruise' ? '1.6×10⁶' : '1.0×10⁹'})
+                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode.cavityQ)})
                 </p>
               </div>
               
               <div className="bg-muted/30 rounded p-2">
-                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(50000)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
+                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
                 </p>
