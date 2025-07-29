@@ -50,8 +50,9 @@ export function LiveEnergyPipeline({
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
   const u_casimir = -(pi * pi * h_bar * c) / (240 * Math.pow(a, 4)); // J/m³
   
-  // Step 2: Static Casimir Energy per Tile
-  const U_static = u_casimir * A_tile * a; // J per tile
+  // Step 2: Static Casimir Energy per Tile  
+  const V_cavity = A_tile * a; // Volume per tile cavity (m³)
+  const U_static = u_casimir * V_cavity; // J per tile (should be ~-6.5×10⁻⁵ J)
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
   const gamma_geo = gammaGeo; // User parameter (26 for Needle Hull)
@@ -89,10 +90,13 @@ export function LiveEnergyPipeline({
   console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
   console.log(`  N_tiles: ${N_tiles}`);
   console.log(`  P_raw (total): ${P_raw} W`);
+  console.log(`  duty_factor: ${duty_factor}`);
+  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_on=${Q_on})`);
+  console.log(`  sector_strobing_factor: ${sector_strobing_factor}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
-  
+  console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
   // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
   const T_m = 1 / f_m; // s (mechanical period)
@@ -107,6 +111,7 @@ export function LiveEnergyPipeline({
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
   const zeta = 1 / (d * Math.sqrt(Q_on)); // Dimensionless
   
+  // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
     if (Math.abs(value) === 0) return "0";
     const exp = Math.floor(Math.log10(Math.abs(value)));
