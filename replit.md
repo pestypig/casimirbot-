@@ -401,3 +401,9 @@ The current scientific foundation provides the authentic physics core that can b
   - **Research-Grade Parameters**: All modes use authentic Needle Hull Mk 1 physics with proper throttling factors
   - **Visual Status Indicators**: Green/red checkmarks for Ford-Roman compliance, highlighted current mode selection
   - **Complete Energy Pipeline Integration**: Mode parameters flow through all 8 calculation steps with proper unit conversion
+- **UI Reorganization for Clarity (July 29, 2025)**: Restructured interface into focused page layout
+  - **Home Page**: Clean front page displaying only Live Energy Pipeline and Interactive Phase Diagram
+  - **Simulation Configuration Page**: Separated Simulation Parameters, Status, and Bowl Geometry visualization
+  - **Navigation Header**: Added clear navigation buttons between Home and Simulation Config pages
+  - **Focused User Experience**: Users can now explore real-time calculations on main page, then configure detailed simulations separately
+  - **Maintained State Synchronization**: Phase diagram and energy pipeline continue to share parameter state across pages
