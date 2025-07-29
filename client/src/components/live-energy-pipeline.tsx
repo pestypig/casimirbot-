@@ -111,7 +111,7 @@ export function LiveEnergyPipeline({
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
-  console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile_baseline = ${A_tile_baseline.toExponential(3)} m², a = ${a.toExponential(3)} m`);
+  console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile = ${A_tile.toExponential(3)} m², a = ${a.toExponential(3)} m`);
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_baseline=${A_tile_baseline*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
@@ -210,7 +210,7 @@ export function LiveEnergyPipeline({
               d = {formatStandard(duty_factor * 100)}% = {formatScientific(duty_factor)}
             </div>
             <div className="text-muted-foreground">
-              Q_idle/Q_on = {formatScientific(Q_idle)}/{formatScientific(Q_on)} = {formatScientific(Q_spoiling_factor)}
+              Q_idle/Q_on = {formatScientific(Q_idle)}/{formatScientific(Q_on_needle)} = {formatScientific(Q_spoiling_factor)}
             </div>
             <div className="text-muted-foreground">
               1/S = 1/{S} = {formatScientific(sector_strobing_factor)}
