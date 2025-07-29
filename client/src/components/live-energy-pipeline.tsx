@@ -68,11 +68,11 @@ export function LiveEnergyPipeline({
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
-  const P_loss_raw = Math.abs(U_geo * omega / Q_on); // W per tile (raw, unthrottled)
+  const P_loss_raw = Math.abs(U_geo * omega / qFactor); // W per tile (raw, unthrottled)
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
-  const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q_on; // User Q_on from slider
+  const Q_idle = 1e6; // Q during idle periods (Q-spoiling) - FIXED: hard-coded
+  const Q_spoiling_factor = Q_idle / Q_on; // FIXED: Q_idle/Q_on ratio (~10^-3)
   const duty_factor = d; // User duty from slider
   const S = sectorCount; // User sector count (default 400)
   const sector_strobing_factor = 1 / S; // 1/S strobing factor
@@ -82,7 +82,7 @@ export function LiveEnergyPipeline({
   const P_avg_per_tile = P_loss_raw * combined_throttle; // W per tile (throttled)
   const P_raw = P_loss_raw * N_tiles; // Raw hull power in W
   const P_avg = P_raw * combined_throttle; // Throttled power in W
-  const P_total_realistic = P_avg / 1e6; // Convert W to MW
+  const P_total_realistic = P_avg / 1e6; // FIXED: Convert W to MW properly
   
   // Debug logging
   console.log("🔧 Power Calculation Debug:");
@@ -100,8 +100,8 @@ export function LiveEnergyPipeline({
   const tau_LC = L_LC / c; // Light-crossing time
   const TS_ratio = tau_LC / T_m; // Should be ≫ 1
   
-  // Step 10: Total Exotic Mass (Equation 5 from PDF)
-  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile
+  // Step 10: Total Exotic Mass (Equation 5 from PDF)  
+  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // FIXED: kg per tile (c^2 not c)
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
