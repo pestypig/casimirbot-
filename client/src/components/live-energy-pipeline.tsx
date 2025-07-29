@@ -577,7 +577,7 @@ export function LiveEnergyPipeline({
                       <td className="text-center p-2 text-xs">
                         {key === "hover" && "Station-hold"}
                         {key === "cruise" && "Mass-budgeting"}
-                        {key === "emergency" && "Fast-burn"}
+                        {key === "emergency" && "High-Intensity Warp Pulse"}
                         {key === "standby" && "System-off"}
                       </td>
                     </tr>
