@@ -81,6 +81,35 @@ function InteractiveHeatMap({
   // Get current mode configuration (use passed selectedMode instead of local state)
   const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
   
+  // Get mode-specific parameter values for double-click functionality
+  const getModeSpecificValue = (parameter: string, mode: string) => {
+    const modeConfig = modes[mode as keyof typeof modes];
+    if (!modeConfig) return null;
+    
+    switch (parameter) {
+      case 'gammaGeo':
+        return 26; // Standard research value for all modes
+      case 'qFactor':
+        // Hover/Emergency use Q_cavity = 1e9, Cruise uses lower for stability
+        return mode === 'cruise' ? 1.6e6 : 1e9;
+      case 'duty':
+        return modeConfig.duty;
+      case 'sagDepth':
+        return 16; // Standard Needle Hull research value
+      default:
+        return null;
+    }
+  };
+  
+  // Handle double-click to apply mode-specific values
+  const handleSliderDoubleClick = (parameter: string) => {
+    const modeValue = getModeSpecificValue(parameter, selectedMode);
+    if (modeValue !== null) {
+      updateParameter(parameter, modeValue);
+      console.log(`🎯 Applied ${selectedMode} mode value for ${parameter}: ${modeValue}`);
+    }
+  };
+  
   // Update parent when local parameters change
   const updateParameter = (key: string, value: number | string) => {
     const newParams = { ...localParams, [key]: value };
@@ -219,60 +248,74 @@ function InteractiveHeatMap({
             {/* Geometric Amplification */}
             <div className="space-y-2">
               <Label>γ_geo: {localParams.gammaGeo}</Label>
-              <Slider
-                value={[localParams.gammaGeo]}
-                onValueChange={([value]) => updateParameter('gammaGeo', value)}
-                min={1}
-                max={100}
-                step={1}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">Geometric amplification factor</p>
+              <div onDoubleClick={() => handleSliderDoubleClick('gammaGeo')}>
+                <Slider
+                  value={[localParams.gammaGeo]}
+                  onValueChange={([value]) => updateParameter('gammaGeo', value)}
+                  min={1}
+                  max={100}
+                  step={1}
+                  className="w-full cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Geometric amplification factor • Double-click to apply {selectedMode} mode value (26)
+              </p>
             </div>
             
             {/* Q-Factor */}
             <div className="space-y-2">
               <Label>Q-Factor: {(localParams.qFactor / 1e6).toFixed(1)}×10⁶</Label>
-              <Slider
-                value={[Math.log10(localParams.qFactor)]}
-                onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
-                min={6}
-                max={10}
-                step={0.1}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">Cavity quality factor</p>
+              <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
+                <Slider
+                  value={[Math.log10(localParams.qFactor)]}
+                  onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
+                  min={6}
+                  max={10}
+                  step={0.1}
+                  className="w-full cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cavity quality factor • Double-click to apply {selectedMode} mode value ({selectedMode === 'cruise' ? '1.6×10⁶' : '1.0×10⁹'})
+              </p>
             </div>
             
             {/* Duty Cycle - Mode-controlled but still adjustable */}
             <div className="space-y-2">
               <Label>Duty Cycle: {(currentMode.duty * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
-              <Slider
-                value={[currentMode.duty * 100]}
-                onValueChange={([value]) => updateParameter('duty', value / 100)}
-                min={0.1}
-                max={50}
-                step={0.1}
-                className="w-full"
-                disabled={localParams.selectedMode !== 'custom'}
-              />
+              <div onDoubleClick={() => handleSliderDoubleClick('duty')}>
+                <Slider
+                  value={[currentMode.duty * 100]}
+                  onValueChange={([value]) => updateParameter('duty', value / 100)}
+                  min={0.1}
+                  max={50}
+                  step={0.1}
+                  className="w-full cursor-pointer"
+                  disabled={localParams.selectedMode !== 'custom'}
+                />
+              </div>
               <p className="text-xs text-muted-foreground">
-                Set by operational mode ({currentMode.name})
+                Set by operational mode ({currentMode.name}) • Double-click to reset to mode default ({(currentMode.duty * 100).toFixed(1)}%)
               </p>
             </div>
             
             {/* Sag Depth */}
             <div className="space-y-2">
               <Label>Sag Depth: {localParams.sagDepth} nm</Label>
-              <Slider
-                value={[localParams.sagDepth]}
-                onValueChange={([value]) => updateParameter('sagDepth', value)}
-                min={0}
-                max={50}
-                step={1}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">Bowl curvature depth</p>
+              <div onDoubleClick={() => handleSliderDoubleClick('sagDepth')}>
+                <Slider
+                  value={[localParams.sagDepth]}
+                  onValueChange={([value]) => updateParameter('sagDepth', value)}
+                  min={0}
+                  max={50}
+                  step={1}
+                  className="w-full cursor-pointer"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Bowl curvature depth • Double-click to apply research value (16 nm)
+              </p>
             </div>
           </div>
           
