@@ -96,7 +96,6 @@ export function LiveEnergyPipeline({
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
-  console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
   // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
   const T_m = 1 / f_m; // s (mechanical period)
@@ -110,6 +109,12 @@ export function LiveEnergyPipeline({
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
   const zeta = 1 / (d * Math.sqrt(Q_on)); // Dimensionless
+  
+  // Debug logging (after all calculations complete)
+  console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
+  console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile_baseline = ${A_tile_baseline.toExponential(3)} m², a = ${a.toExponential(3)} m`);
+  console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
+  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
