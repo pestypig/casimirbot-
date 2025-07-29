@@ -1,6 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calculator, Zap, Atom } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calculator, Zap, Atom, Settings } from "lucide-react";
+import { useState } from "react";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -18,6 +20,51 @@ interface LiveEnergyPipelineProps {
   isRunning?: boolean;
 }
 
+// Operational mode configurations
+type OperationalMode = {
+  name: string;
+  duty: number;        // Duty cycle fraction
+  sectors: number;     // Strobing sectors (1 = no strobing)
+  qSpoiling: number;   // Q_idle/Q_cavity ratio
+  pocketGamma: number; // Van-den-Broeck pocket amplification
+  description: string;
+};
+
+const modes: Record<string, OperationalMode> = {
+  hover: {
+    name: "Hover",
+    duty: 0.14,          // 14% duty
+    sectors: 1,          // No strobing
+    qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
+    pocketGamma: 0.8e11, // Reduced for Ford-Roman compliance
+    description: "High-power hover operations (83 MW target)"
+  },
+  cruise: {
+    name: "Cruise", 
+    duty: 0.005,         // 0.5% duty (Ford-Roman compliant)
+    sectors: 400,        // 400-sector strobing
+    qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 10^-3)
+    pocketGamma: 0.8e11, // Same pocket amplification
+    description: "Efficient cruise mode (Ford-Roman compliant)"
+  },
+  emergency: {
+    name: "Emergency",
+    duty: 0.50,          // 50% duty
+    sectors: 1,          // No strobing
+    qSpoiling: 1,        // No Q-spoiling
+    pocketGamma: 0.8e11, // Same pocket amplification
+    description: "Emergency burn mode (high power output)"
+  },
+  standby: {
+    name: "Standby",
+    duty: 0.0,           // 0% duty
+    sectors: 1,          // Irrelevant
+    qSpoiling: 1,        // Irrelevant
+    pocketGamma: 0.8e11, // Same pocket amplification
+    description: "Zero power standby mode"
+  }
+};
+
 export function LiveEnergyPipeline({
   gammaGeo,
   qFactor,
@@ -30,6 +77,9 @@ export function LiveEnergyPipeline({
   sectorCount = 400,
   isRunning = false
 }: LiveEnergyPipelineProps) {
+  
+  // Mode selector state
+  const [selectedMode, setSelectedMode] = useState<string>("hover");
   
   // Constants from physics
   const h_bar = 1.055e-34; // J⋅s
@@ -61,35 +111,32 @@ export function LiveEnergyPipeline({
   const Q_cavity = 1e9; // EM cavity Q for power loss calculations
   const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
   
-  // Step 5: Duty Cycle Averaging (Equation 3 from PDF) - FIXED for Ford-Roman compliance
-  const d_cruise = 0.005; // Ford-Roman compliant cruise duty cycle (0.5% for ζ < 1)
-  const U_cycle_base = U_Q * d_cruise; // J per tile (duty cycle on Q-enhanced energy: -282 J × 0.005 = -1.41 J)
+  // Get current mode parameters
+  const currentMode = modes[selectedMode];
   
-  // Step 5b: Van-den-Broeck Pocket Blue-Shift (γ_pocket adjusted for Ford-Roman compliance)
-  const gamma_pocket = 0.8e11; // Van-den-Broeck pocket blue-shift factor (reduced to compensate for 0.5% duty)
+  // Step 5: Duty Cycle Averaging (Dynamic based on selected mode)
+  const d_mode = currentMode.duty; // Duty cycle for selected mode
+  const U_cycle_base = U_Q * d_mode; // J per tile (duty cycle on Q-enhanced energy)
+  
+  // Step 5b: Van-den-Broeck Pocket Blue-Shift (from mode configuration)
+  const gamma_pocket = currentMode.pocketGamma; // Van-den-Broeck pocket amplification
   const U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
   const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
-  // Step 7: Power Throttling Factors (Authentic Cruise vs Hover Mode)
-  const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q_cavity; // Q_idle/Q_cavity = 10^6/10^9 = 10^-3
+  // Step 7: Dynamic Power Throttling (Based on selected mode)
+  const Q_idle = currentMode.qSpoiling * Q_cavity; // Dynamic Q-spoiling based on mode
+  const Q_spoiling_factor = currentMode.qSpoiling; // Direct Q-spoiling ratio
   
-  // CRUISE MODE: Ford-Roman compliant parameters (0.5% duty + 400 sectors)
-  const d_cruise_power = 0.005; // 0.5% duty cycle for cruise operations (Ford-Roman: ζ < 1)
-  const S_cruise = 400; // 400-sector strobing for cruise
-  const cruise_throttle = d_cruise_power * Q_spoiling_factor * (1/S_cruise); // = 1.25×10^-8
+  // Apply mode-specific throttling factors
+  const d_power = currentMode.duty; // Power duty cycle for selected mode
+  const S_mode = currentMode.sectors; // Sector strobing for selected mode
+  const mode_throttle = d_power * Q_spoiling_factor * (1/S_mode); // Combined throttle factor
   
-  // HOVER MODE: For 83 MW target (14% duty + no strobing + no Q-spoiling)
-  const d_hover = 0.14; // 14% duty cycle for hover operations
-  const S_hover = 1; // No sector strobing for hover
-  const Q_spoiling_hover = 1; // No Q-spoiling in hover mode (Q_idle/Q_on = 1)
-  const hover_throttle = d_hover * Q_spoiling_hover * (1/S_hover); // = 0.14
-  
-  // Use hover mode throttling to achieve 83 MW target
-  const combined_throttle = hover_throttle;
+  // Use selected mode throttling
+  const combined_throttle = mode_throttle;
   
   // Step 8: Realistic Average Power (83 MW target)
   const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
@@ -97,13 +144,13 @@ export function LiveEnergyPipeline({
   const P_total_realistic = P_avg_W / 1e6; // Convert W to MW
   
   // Debug logging
-  console.log("🔧 Power Calculation Debug:");
+  console.log(`🔧 Power Calculation Debug (${currentMode.name} Mode):`);
   console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
   console.log(`  N_tiles: ${N_tiles}`);
   console.log(`  P_raw (total): ${P_raw_W} W`);
-  console.log(`  hover_duty: ${d_hover}, cruise_duty: ${d_cruise}`);
+  console.log(`  mode_duty: ${currentMode.duty}, sectors: ${currentMode.sectors}`);
   console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
-  console.log(`  cruise_throttle: ${cruise_throttle}, hover_throttle: ${hover_throttle} (no Q-spoiling in hover)`);
+  console.log(`  mode_throttle: ${mode_throttle}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
@@ -118,8 +165,8 @@ export function LiveEnergyPipeline({
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
-  // Step 11: Quantum Inequality Margin (Equation 3 from PDF) - now Ford-Roman compliant
-  const zeta = 1 / (d_cruise * Math.sqrt(Q_mechanical)); // Dimensionless (ζ < 1 with d=0.5%)
+  // Step 11: Quantum Inequality Margin (Dynamic based on mode)
+  const zeta = currentMode.duty > 0 ? 1 / (currentMode.duty * Math.sqrt(Q_mechanical)) : Infinity; // ζ (Ford-Roman bound)
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
@@ -130,7 +177,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull_needle=${A_hull_needle.toExponential(2)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toExponential(2)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
-  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_cruise=${d_cruise}, γ_pocket=${gamma_pocket.toExponential(2)}`);
+  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Utility functions (declare before using)
@@ -151,15 +198,39 @@ export function LiveEnergyPipeline({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Calculator className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Live Energy Pipeline: Hover Mode</CardTitle>
+            <CardTitle className="text-lg">Live Energy Pipeline: {currentMode.name} Mode</CardTitle>
           </div>
           <Badge variant={isRunning ? "default" : "secondary"} className="flex items-center space-x-1">
             <Zap className="h-3 w-3" />
             <span>{isRunning ? "Running" : "Real-time"}</span>
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Needle Hull Mk 1 hover: 83 MW target + Ford-Roman compliant (zeta &lt; 1.0 with d_cruise = 0.5%)
+        
+        {/* Mode Selector */}
+        <div className="flex items-center gap-4 mt-3">
+          <div className="flex items-center gap-2">
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Operational Mode:</span>
+          </div>
+          <Select value={selectedMode} onValueChange={setSelectedMode}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select mode" />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(modes).map(([key, mode]) => (
+                <SelectItem key={key} value={key}>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{mode.name}</span>
+                    <span className="text-xs text-muted-foreground">{mode.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        
+        <p className="text-sm text-muted-foreground mt-2">
+          {currentMode.description} (Ford-Roman compliant: zeta &lt; 1.0)
         </p>
       </CardHeader>
       
@@ -223,13 +294,13 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-muted-foreground">
-              d_hover = {formatStandard(d_hover * 100)}% = {formatScientific(d_hover)}
+              d_{currentMode.name.toLowerCase()} = {formatStandard(currentMode.duty * 100)}% = {formatScientific(currentMode.duty)}
             </div>
             <div className="text-muted-foreground">
-              Q_idle/Q_cavity = 1 (no spoiling in hover mode)
+              Q_idle/Q_cavity = {currentMode.qSpoiling} ({currentMode.qSpoiling === 1 ? "no spoiling" : "Q-spoiling"})
             </div>
             <div className="text-muted-foreground">
-              1/S = 1/{S_hover} = {formatScientific(1/S_hover)}
+              1/S = 1/{currentMode.sectors} = {formatScientific(1/currentMode.sectors)}
             </div>
             <div className="text-primary font-semibold">
               f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)
@@ -263,7 +334,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>U_cycle = U_Q × d (with pocket boost)</div>
             <div className="text-muted-foreground">
-              U_cycle = ({formatScientific(U_Q)}) × {formatStandard(d_cruise * 100)}%
+              U_cycle = ({formatScientific(U_Q)}) × {formatStandard(currentMode.duty * 100)}%
             </div>
             <div className="text-primary font-semibold">
               U_cycle = {formatScientific(U_cycle)} J per tile
@@ -297,7 +368,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>ζ = 1 / (d × √Q_on)</div>
             <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(d_cruise * 100)}% × √{formatScientific(Q_mechanical)})
+              ζ = 1 / ({formatStandard(currentMode.duty * 100)}% × √{formatScientific(Q_mechanical)})
             </div>
             <div className="text-primary font-semibold">
               ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
@@ -352,6 +423,83 @@ export function LiveEnergyPipeline({
             <div>
               <span className="text-muted-foreground">Time-Scale:</span>
               <div className="font-semibold">{formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}</div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mode Comparison Table */}
+        <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg p-4 border border-primary/20">
+          <h4 className="font-semibold text-sm mb-3 flex items-center text-primary">
+            <Settings className="h-4 w-4 mr-2" />
+            Operational Mode Comparison
+          </h4>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border border-border rounded-md">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="text-left p-2 border-r border-border font-medium">Mode</th>
+                  <th className="text-center p-2 border-r border-border font-medium">Duty (%)</th>
+                  <th className="text-center p-2 border-r border-border font-medium">Sectors</th>
+                  <th className="text-center p-2 border-r border-border font-medium">Q-Spoiling</th>
+                  <th className="text-center p-2 border-r border-border font-medium">P_avg (MW)</th>
+                  <th className="text-center p-2 border-r border-border font-medium">M_exotic (kg)</th>
+                  <th className="text-center p-2 border-r border-border font-medium">ζ</th>
+                  <th className="text-center p-2 font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(modes).map(([key, mode]) => {
+                  // Calculate values for each mode
+                  const U_cycle_mode = U_Q * mode.duty * mode.pocketGamma;
+                  const M_exotic_mode = Math.abs(U_cycle_mode) * N_tiles / (c * c);
+                  const throttle_mode = mode.duty * mode.qSpoiling * (1/mode.sectors);
+                  const P_avg_mode = (P_loss_raw * N_tiles * throttle_mode) / 1e6;
+                  const zeta_mode = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : Infinity;
+                  const isCurrentMode = key === selectedMode;
+                  
+                  return (
+                    <tr key={key} className={isCurrentMode ? "bg-primary/10" : "hover:bg-muted/30"}>
+                      <td className={`p-2 border-r border-border ${isCurrentMode ? "font-semibold text-primary" : ""}`}>
+                        {mode.name}
+                      </td>
+                      <td className="text-center p-2 border-r border-border font-mono">
+                        {formatStandard(mode.duty * 100, 1)}
+                      </td>
+                      <td className="text-center p-2 border-r border-border font-mono">
+                        {mode.sectors === 1 ? "1" : `1/${mode.sectors}`}
+                      </td>
+                      <td className="text-center p-2 border-r border-border font-mono">
+                        {mode.qSpoiling === 1 ? "1" : formatScientific(mode.qSpoiling, 0)}
+                      </td>
+                      <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
+                        {formatStandard(P_avg_mode, 1)}
+                      </td>
+                      <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
+                        {formatScientific(M_exotic_mode, 0)}
+                      </td>
+                      <td className={`text-center p-2 border-r border-border font-mono ${zeta_mode < 1.0 ? "text-green-600" : "text-red-600"}`}>
+                        {mode.duty === 0 ? "—" : formatStandard(zeta_mode, 2)}
+                      </td>
+                      <td className="text-center p-2">
+                        {mode.duty === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          <span className={zeta_mode < 1.0 ? "text-green-600" : "text-red-600"}>
+                            {zeta_mode < 1.0 ? "✓" : "✗"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4">
+              <span>✓ Ford-Roman compliant (ζ &lt; 1.0)</span>
+              <span>✗ Quantum inequality violation</span>
+              <span className="font-semibold text-primary">Highlighted: Current mode</span>
             </div>
           </div>
         </div>
