@@ -369,3 +369,11 @@ The current scientific foundation provides the authentic physics core that can b
       - Q-spoiling throttle: ~0.625 (Q_idle/Q_on = 10⁶/1.6×10⁶)
       - Sector strobing throttle: 0.0025 (1/400 sectors)
       - Combined throttle: ~3×10⁻⁶ achieving proper ~10-100 MW realistic power from ~10¹⁵ W raw lattice load
+    - **Restructured Live Energy Pipeline (July 29, 2025)**: Reorganized display for immediate inspection of calculation components
+      - Foundation section: Shows cycle-averaged cavity energy build-up (u_Casimir → U_static → U_Q → U_geo)
+      - Step 1: Raw per-tile loss power P_raw,tile = U_geo × ω / Q_on
+      - Step 2: Raw hull power P_raw = P_raw,tile × N_tiles
+      - Step 3: Combined throttling factor f_throttle = d × (Q_idle/Q_on) × (1/S)
+      - Step 4: Realistic average power P_avg = P_raw × f_throttle
+      - Color-coded sections: Foundation (blue), Final Result (green), Exotic Mass (orange)
+      - Enables immediate inspection of each calculation component for debugging and verification

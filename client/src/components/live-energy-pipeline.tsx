@@ -124,219 +124,166 @@ export function LiveEnergyPipeline({
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Step 1: Static Casimir Energy Density */}
+        {/* Foundation: Cycle-Averaged Cavity Energy */}
+        <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">∞</span>
+            Foundation: Cycle-Averaged Cavity Energy
+          </h4>
+          <div className="font-mono text-xs space-y-1">
+            <div>u_Casimir = -π²ℏc/(720a⁴) = {formatScientific(u_casimir)} J/m³</div>
+            <div>U_static = u_Casimir × A_tile = {formatScientific(U_static)} J</div>
+            <div>U_Q = Q_on × U_static = {formatScientific(Q_on)} × {formatScientific(U_static)} = {formatScientific(Q_on * U_static)} J</div>
+            <div className="text-blue-700 dark:text-blue-300 font-semibold">
+              U_geo = γ × U_Q = {formatStandard(gamma_geo)} × {formatScientific(Q_on * U_static)} = {formatScientific(U_geo)} J
+            </div>
+          </div>
+        </div>
+
+        {/* Step 1: Raw Per-Tile Loss Power */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
-            Static Casimir Energy Density
+            Raw Per-Tile Loss Power
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>u = -π²ℏc / (240a⁴)</div>
+            <div>P_raw,tile = U_geo × ω / Q_on</div>
             <div className="text-muted-foreground">
-              u = -π²({formatScientific(h_bar)})({formatScientific(c)}) / (240×({formatScientific(a)})⁴)
+              P_raw,tile = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_on)})
             </div>
             <div className="text-primary font-semibold">
-              u = {formatScientific(u_casimir)} J/m³
+              P_raw,tile = {formatScientific(P_loss_raw)} W per tile
             </div>
           </div>
         </div>
 
-        {/* Step 2: Static Energy per Tile */}
+        {/* Step 2: Raw Hull Power */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
-            Static Energy per Tile
+            Raw Hull Power
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>U_static = u × A_tile × a</div>
+            <div>P_raw = P_raw,tile × N_tiles</div>
             <div className="text-muted-foreground">
-              U_static = ({formatScientific(u_casimir)}) × ({formatScientific(A_tile)}) × ({formatScientific(a)})
+              P_raw = ({formatScientific(P_loss_raw)}) × ({formatScientific(N_tiles)})
             </div>
             <div className="text-primary font-semibold">
-              U_static = {formatScientific(U_static)} J
+              P_raw = {formatScientific(P_loss_raw * N_tiles)} W = {formatScientific(P_loss_raw * N_tiles * 1e-6)} MW
             </div>
           </div>
         </div>
 
-        {/* Step 3: Combined Amplification (Needle Hull Formula) */}
+        {/* Step 3: Combined Throttling Factor */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">3</span>
-            Combined Amplification (Needle Hull)
+            Combined Throttling Factor
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>U_geo = γ × Q_on × U_static</div>
+            <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-muted-foreground">
-              U_geo = ({formatStandard(gamma_geo)}) × ({formatScientific(Q_on)}) × ({formatScientific(U_static)})
+              d = {formatStandard(duty_factor * 100)}% = {formatScientific(duty_factor)}
             </div>
-            <div className="text-primary font-semibold">
-              U_geo = {formatScientific(U_geo)} J
-            </div>
-          </div>
-        </div>
-
-        {/* Step 4: Energy Per Tile */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
-            Enhanced Energy Per Tile
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>U_enhanced = U_geo</div>
             <div className="text-muted-foreground">
-              Using Needle Hull amplification formula
+              Q_idle/Q_on = {formatScientific(Q_idle)}/{formatScientific(Q_on)} = {formatScientific(Q_spoiling_factor)}
             </div>
-            <div className="text-primary font-semibold">
-              U_enhanced = {formatScientific(U_Q)} J per tile
-            </div>
-          </div>
-        </div>
-
-        {/* Step 5: Duty Cycle Averaging */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">5</span>
-            Duty Cycle Averaging
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>U_cycle = U_Q × d</div>
             <div className="text-muted-foreground">
-              U_cycle = ({formatScientific(U_Q)}) × {formatStandard(d * 100)}%
+              1/S = 1/400 = {formatScientific(sector_strobing_factor)}
             </div>
             <div className="text-primary font-semibold">
-              U_cycle = {formatScientific(U_cycle)} J
+              f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)
             </div>
           </div>
         </div>
 
-        {/* Step 6: Raw Power Loss */}
-        <div className="bg-muted/50 rounded-lg p-4">
+        {/* Step 4: Realistic Average Power */}
+        <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
-            Raw Power Loss (Unthrottled)
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>P_raw = |U_geo| × ω / Q_on</div>
-            <div className="text-muted-foreground">
-              P_raw = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_on)})
-            </div>
-            <div className="text-primary font-semibold">
-              P_raw = {formatScientific(P_loss_raw)} W per tile
-            </div>
-          </div>
-        </div>
-
-        {/* Step 7: Power Throttling Factors */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
-            Power Throttling (Needle Hull Design)
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>1. Duty Factor: d = {formatStandard(duty_factor * 100)}%</div>
-            <div>2. Q-Spoiling: Q_idle/Q_on = {formatScientific(Q_spoiling_factor)}</div>
-            <div>3. Sector Strobing: 1/S = {formatScientific(sector_strobing_factor)}</div>
-            <div>Combined: d × (Q_idle/Q_on) × (1/S)</div>
-            <div className="text-primary font-semibold">
-              Total Throttle: {formatScientific(combined_throttle)} (×{formatScientific(1/combined_throttle)} reduction)
-            </div>
-          </div>
-        </div>
-
-        {/* Step 8: Realistic Average Power */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
+            <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
             Realistic Average Power (83 MW Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>P_realistic = P_raw_lattice × throttle</div>
+            <div>P_avg = P_raw × f_throttle</div>
             <div className="text-muted-foreground">
-              P_realistic = ({formatScientific(P_loss_raw * N_tiles)}) × ({formatScientific(combined_throttle)})
+              P_avg = ({formatScientific(P_loss_raw * N_tiles)}) × ({formatScientific(combined_throttle)})
             </div>
-            <div className="text-primary font-semibold">
-              P_realistic = {formatStandard(P_total_realistic)} MW
+            <div className="text-green-700 dark:text-green-300 font-semibold text-lg">
+              P_avg = {formatStandard(P_total_realistic)} MW
             </div>
           </div>
         </div>
 
-        {/* Step 9: Time-Scale Separation */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">9</span>
-            Time-Scale Separation
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>TS_ratio = τ_LC / T_m</div>
-            <div className="text-muted-foreground">
-              TS_ratio = ({formatScientific(tau_LC)}) / ({formatScientific(T_m)})
+        {/* Additional Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Time-Scale Separation */}
+          <div className="bg-muted/50 rounded-lg p-4">
+            <h4 className="font-semibold text-sm mb-2 flex items-center">
+              <span className="bg-secondary text-secondary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">T</span>
+              Time-Scale Separation
+            </h4>
+            <div className="font-mono text-sm space-y-1">
+              <div>TS_ratio = τ_LC / T_m</div>
+              <div className="text-primary font-semibold">
+                {formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}
+              </div>
             </div>
-            <div className="text-primary font-semibold">
-              TS_ratio = {formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}
+          </div>
+
+          {/* Quantum Safety */}
+          <div className="bg-muted/50 rounded-lg p-4">
+            <h4 className="font-semibold text-sm mb-2 flex items-center">
+              <span className="bg-secondary text-secondary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">ζ</span>
+              Quantum Safety
+            </h4>
+            <div className="font-mono text-sm space-y-1">
+              <div>ζ = 1 / (d × √Q_on)</div>
+              <div className="text-primary font-semibold">
+                {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Step 10: Total Exotic Mass */}
-        <div className="bg-muted/50 rounded-lg p-4">
+        {/* Total Exotic Mass */}
+        <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">10</span>
-            Total Exotic Mass
+            <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">M</span>
+            Total Exotic Mass (1400 kg Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
             <div>M_exotic = N_tiles × |U_cycle| / c²</div>
             <div className="text-muted-foreground">
               M_exotic = ({formatScientific(N_tiles)}) × ({formatScientific(Math.abs(U_cycle))}) / ({formatScientific(c*c)})
             </div>
-            <div className="text-primary font-semibold">
+            <div className="text-orange-700 dark:text-orange-300 font-semibold text-lg">
               M_exotic = {formatScientific(M_exotic_total)} kg
             </div>
           </div>
         </div>
 
-        {/* Step 11: Quantum Safety */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">11</span>
-            Quantum Inequality Margin
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>ζ = 1 / (d × √Q_on)</div>
-            <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_on)})
-            </div>
-            <div className="text-primary font-semibold">
-              ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
-            </div>
-          </div>
-        </div>
-
-        {/* Summary */}
+        {/* Key Results Summary */}
         <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
           <h4 className="font-semibold text-sm mb-2 flex items-center text-primary">
             <Atom className="h-4 w-4 mr-2" />
-            Pipeline Summary
+            Key Results Summary
           </h4>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-muted-foreground">Exotic Mass:</span>
-              <div className="font-semibold">{formatScientific(M_exotic_total)} kg</div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Raw Lattice:</span>
+              <span className="text-muted-foreground">Raw Hull Power:</span>
               <div className="font-semibold">{formatScientific(P_loss_raw * N_tiles * 1e-6)} MW</div>
             </div>
             <div>
+              <span className="text-muted-foreground">Throttle Factor:</span>
+              <div className="font-semibold">{formatScientific(combined_throttle)}</div>
+            </div>
+            <div>
               <span className="text-muted-foreground">Realistic Power:</span>
-              <div className="font-semibold">{formatStandard(P_total_realistic)} MW</div>
+              <div className="font-semibold text-green-600 dark:text-green-400">{formatStandard(P_total_realistic)} MW</div>
             </div>
             <div>
-              <span className="text-muted-foreground">Quantum Safety:</span>
-              <div className="font-semibold">ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}</div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Time-Scale:</span>
-              <div className="font-semibold">{formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}</div>
+              <span className="text-muted-foreground">Exotic Mass:</span>
+              <div className="font-semibold text-orange-600 dark:text-orange-400">{formatScientific(M_exotic_total)} kg</div>
             </div>
           </div>
         </div>
