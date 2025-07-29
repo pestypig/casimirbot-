@@ -117,8 +117,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     console.log(`🔧 Energy Check: U_geo = ${U_geo.toExponential(3)} J (should be ~-5.636e-3 J)`);
     
     // Match Live Energy Pipeline calculation exactly
-    const Q_mechanical = 5e4; // Fixed mechanical Q
-    const Q_cavity = qFactor; // Use SLIDER Q-factor as cavity Q
+    const Q_mechanical = 5e4; // Fixed mechanical Q  
+    const Q_cavity = 1e9; // Fixed cavity Q (NOT slider qFactor!)
     const U_Q = Q_mechanical * U_geo; // Q-enhancement step
     const U_cycle_base = U_Q * duty; // Use SLIDER duty
     
@@ -127,12 +127,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const gamma_pocket = duty > 0 ? M_target * (C * C) / (Math.abs(U_cycle_base) * N_tiles) : 0;
     const U_cycle = U_cycle_base * gamma_pocket;
     
-    // Step 2: Raw power per tile (match Live Energy Pipeline exactly)
+    // Step 2: Power calculation (match Live Energy Pipeline exactly)
     const P_loss_raw = Math.abs(U_geo) * omega / Q_cavity; // W per tile
-    const P_raw = (P_loss_raw * N_tiles) / 1e6; // MW
+    const P_raw_total = P_loss_raw * N_tiles / 1e6; // MW (match Live Energy Pipeline)
+    const P_raw = P_raw_total; // Already in MW
     
-    // Step 4: Throttle factor - need mode-specific values
-    // Get mode-specific parameters
+    // Step 4: Throttle calculation (match Live Energy Pipeline exactly)  
+    // Live Energy Pipeline uses: mode_throttle = mode.duty / mode.sectors * mode.qSpoiling
     const modeConfigs = {
       hover: { sectors: 1, qSpoiling: 1.0 },
       cruise: { sectors: 400, qSpoiling: 0.001 }, 
@@ -142,7 +143,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     
     const currentModeConfig = modeConfigs[selectedMode as keyof typeof modeConfigs] || modeConfigs.hover;
     const mode_throttle = duty / currentModeConfig.sectors * currentModeConfig.qSpoiling; // Uses SLIDER duty with mode params!
-    const P_avg = P_raw * mode_throttle; // MW
+    const P_avg = P_raw_total * mode_throttle; // MW (both values in MW)
     
     // Step 7: Time-scale ratio (constant)
     const tau_LC = shipRadius / C;
