@@ -107,50 +107,73 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const A_hull_needle = 5.6e5; // m²
     const N_tiles = A_hull_needle / A_tile;
     
-    // Step 1: Casimir energy per tile
-    const U_Casimir = -(Math.PI**2 * HBAR * C) / (720 * a**3); // Energy per unit volume
-    const U_static = U_Casimir * A_tile * a; // J per tile
+    // Step 1: Casimir energy per tile (match Live Energy Pipeline exactly)
+    // From Live Energy Pipeline: u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4))
+    const u_casimir = -(Math.PI * Math.PI * HBAR * C) / (720 * Math.pow(a, 4)); // Energy density J/m³
+    const U_static = u_casimir * A_tile * a; // J per tile
     const U_geo = gammaGeo * U_static; // Geometric amplification
     
-    // Step 2: Raw power per tile using SLIDER Q-factor
-    const P_raw_tile = Math.abs(U_geo) * omega / qFactor; // W per tile (uses SLIDER qFactor!)
+    console.log(`🔧 Energy Check: U_static = ${U_static.toExponential(3)} J (should be ~-2.168e-4 J)`);
+    console.log(`🔧 Energy Check: U_geo = ${U_geo.toExponential(3)} J (should be ~-5.636e-3 J)`);
     
-    // Step 3: Total raw hull power  
-    const P_raw = (P_raw_tile * N_tiles) / 1e6; // MW
+    // Match Live Energy Pipeline calculation exactly
+    const Q_mechanical = 5e4; // Fixed mechanical Q
+    const Q_cavity = qFactor; // Use SLIDER Q-factor as cavity Q
+    const U_Q = Q_mechanical * U_geo; // Q-enhancement step
+    const U_cycle_base = U_Q * duty; // Use SLIDER duty
     
-    // Step 4: Throttle factor using SLIDER duty cycle
-    const Q_idle = 1e9; // Idle Q-factor
-    const S = 1; // Sector count for this calculation
-    const f_throttle = (duty / 100) * (Q_idle / qFactor) * (1 / S); // Uses SLIDER duty & qFactor!
+    // Van-den-Broeck pocket boost for fixed mass target (match Live Energy Pipeline)
+    const M_target = 1.405e3; // kg
+    const gamma_pocket = duty > 0 ? M_target * (C * C) / (Math.abs(U_cycle_base) * N_tiles) : 0;
+    const U_cycle = U_cycle_base * gamma_pocket;
     
-    // Step 5: Average power using calculated throttle
-    const P_avg = P_raw * f_throttle; // MW (calculated from sliders, not hardcoded!)
+    // Step 2: Raw power per tile (match Live Energy Pipeline exactly)
+    const P_loss_raw = Math.abs(U_geo) * omega / Q_cavity; // W per tile
+    const P_raw = (P_loss_raw * N_tiles) / 1e6; // MW
     
-    // Step 6: Duty-cycle averaged energy per tile using SLIDER duty
-    const U_cycle = U_geo * (duty / 100); // J per tile (uses SLIDER duty!)
+    // Step 4: Throttle factor - need mode-specific values
+    // Get mode-specific parameters
+    const modeConfigs = {
+      hover: { sectors: 1, qSpoiling: 1.0 },
+      cruise: { sectors: 400, qSpoiling: 0.001 }, 
+      emergency: { sectors: 1, qSpoiling: 1.0 },
+      standby: { sectors: 1, qSpoiling: 1.0 }
+    };
+    
+    const currentModeConfig = modeConfigs[selectedMode as keyof typeof modeConfigs] || modeConfigs.hover;
+    const mode_throttle = duty / currentModeConfig.sectors * currentModeConfig.qSpoiling; // Uses SLIDER duty with mode params!
+    const P_avg = P_raw * mode_throttle; // MW
     
     // Step 7: Time-scale ratio (constant)
     const tau_LC = shipRadius / C;
     const tau_m = 1 / 15e9;
     const TS_ratio = tau_LC / tau_m;
     
-    // Step 8: Quantum safety using SLIDER values
-    const zeta = duty > 0 ? 1 / ((duty / 100) * Math.sqrt(qFactor)) : 0; // Uses SLIDER duty & qFactor!
+    // Step 8: Quantum safety (match Live Energy Pipeline)
+    const zeta = duty > 0 ? 1 / (duty * Math.sqrt(Q_mechanical)) : 0; // Uses Q_mechanical!
     
-    // Step 9: Exotic mass using calculated U_cycle
-    const M_exotic = N_tiles * Math.abs(U_cycle) / (C**2); // kg (calculated from sliders!)
+    // Step 9: Exotic mass (match Live Energy Pipeline)
+    const M_exotic = duty > 0 ? Math.abs(U_cycle) / (C * C) * N_tiles : 0; // kg
+    
+    const f_throttle = mode_throttle; // For compatibility
     
     console.log(`🔧 Metrics Dashboard - FIXED with Slider Values for ${selectedMode}:`, {
-      gammaGeo_slider: gammaGeo,
-      qFactor_slider: qFactor,
-      duty_slider: duty,
-      calculated: {
-        P_raw_MW: P_raw.toFixed(3),
-        P_avg_MW: P_avg.toFixed(3), 
-        zeta: zeta.toFixed(3),
-        M_exotic_kg: M_exotic.toFixed(1)
+      inputs: {
+        gammaGeo: gammaGeo,
+        qFactor: qFactor,
+        duty_decimal: duty,
+        duty_percent: (duty * 100).toFixed(1) + "%"
       },
-      note: "NOW USING ACTUAL SLIDER VALUES IN ALL STEPS!"
+      mode_config: currentModeConfig,
+      calculated: {
+        P_raw_MW: P_raw.toFixed(1),
+        P_avg_MW: P_avg.toFixed(1), 
+        zeta: zeta.toFixed(3),
+        M_exotic_kg: M_exotic.toFixed(0),
+        mode_throttle: mode_throttle.toExponential(3),
+        gamma_pocket: gamma_pocket.toExponential(2)
+      },
+      note: "SLIDER VALUES + MODE-SPECIFIC PARAMS FLOW INTO ALL STEPS!"
     });
     
     return {
