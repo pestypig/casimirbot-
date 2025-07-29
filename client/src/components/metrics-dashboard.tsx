@@ -227,7 +227,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       Math.min(metrics.f_throttle / 0.5, 2), // Duty Cycle (normalized to 50% max)  
       Math.min(Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100), 2), // Mass Error
       Math.min(metrics.zeta / currentConstraints.zeta_max, 2), // Quantum Safety vs mode limit
-      Math.min(currentConstraints.TS_min / Math.max(metrics.TS_ratio, 0.01), 2), // Time-Scale (inverted, want high TS_ratio)
+      Math.min(metrics.TS_ratio / currentConstraints.TS_min, 2), // Time-Scale (want high TS_ratio ≫ TS_min)
       Math.min(metrics.P_raw / 1000, 2), // Raw Power (fixed scale for visual separation)
       Math.min(metrics.U_cycle / 1e12, 2) // Energy magnitude (larger denominator for visual separation)
     ];
@@ -238,7 +238,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       duty: `${(metrics.f_throttle*100).toFixed(1)}% → ${normalizedData[1].toFixed(2)}`,
       mass_error: `${Math.abs(metrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg → ${normalizedData[2].toFixed(2)}`,
       zeta: `${metrics.zeta.toFixed(3)} → ${normalizedData[3].toFixed(2)} (limit: ${currentConstraints.zeta_max})`,
-      visual_check: `Hover should be ~[0.7,0.3,0.0,0.6], Emergency should be ~[0.7,1.0,0.0,0.5]`
+      TS_ratio: `${metrics.TS_ratio.toFixed(1)} → ${normalizedData[4].toFixed(2)} (min: ${currentConstraints.TS_min})`,
+      visual_check: `TS_ratio=${metrics.TS_ratio.toFixed(0)} ≫ 100 → homogenized GR regime ✓`
     });
 
     // Mode-aware safe zone boundary (green zone shows what's acceptable for current mode)
@@ -249,7 +250,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         power: `${metrics.P_avg.toFixed(1)}MW/${currentConstraints.P_avg_max}MW = ${normalizedData[0].toFixed(2)}`,
         duty: `${(metrics.f_throttle*100).toFixed(1)}%/50% = ${normalizedData[1].toFixed(2)}`,  
         mass: `${Math.abs(metrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg error = ${normalizedData[2].toFixed(2)}`,
-        quantum: `${metrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`
+        quantum: `${metrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`,
+        timescale: `${metrics.TS_ratio.toFixed(1)}/${currentConstraints.TS_min} = ${(metrics.TS_ratio/currentConstraints.TS_min).toFixed(2)}`
       }
     });
 
@@ -401,7 +403,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TS_ratio:</span>
-                      <span className="font-semibold">{metrics.TS_ratio.toFixed(0)} ≫ 100</span>
+                      <span className="font-semibold">{metrics.TS_ratio.toFixed(1)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_raw:</span>
@@ -431,19 +433,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                       <span>{constraints.zeta_max}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">TS_threshold:</span>
-                      <span>≥ 100 (homogenized GR)</span>
+                      <span className="text-muted-foreground">TS_min:</span>
+                      <span>{constraints.TS_min}</span>
                     </div>
                   </div>
                 </div>
                 
-                {/* Mode-Independence Note */}
-                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 rounded p-2 border-l-2 border-blue-400">
-                  <strong>Mode-Independent TS_ratio:</strong> {metrics.TS_ratio.toFixed(0)} ≫ 100<br />
-                  <span className="text-[10px]">
-                    Hull geometry (82m) + RF frequency (15 GHz) → homogenized GR regime for ALL operational modes
-                  </span>
-                </div>
+
               </div>
             )}
           </div>
