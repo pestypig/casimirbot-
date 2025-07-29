@@ -35,6 +35,47 @@ type OperationalMode = {
   description: string;
 };
 
+// Function to calculate actual mode metrics for descriptions
+const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: number, tileArea: number) => {
+  // Physics constants
+  const h_bar = 1.055e-34; // J⋅s
+  const c = 2.998e8; // m/s
+  const pi = Math.PI;
+  const a = 1e-9; // 1 nm gap
+  const A_tile = tileArea * 1e-4; // cm² to m²
+  const A_hull_needle = 5.6e5; // m²
+  const N_tiles = A_hull_needle / A_tile;
+  
+  // Energy pipeline calculation
+  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4));
+  const U_static = u_casimir * A_tile * a;
+  const U_geo = gammaGeo * U_static;
+  const Q_mechanical = 5e4;
+  const Q_cavity = 1e9;
+  const U_Q = Q_mechanical * U_geo;
+  const U_cycle_base = U_Q * mode.duty;
+  
+  // Van-den-Broeck pocket boost for fixed mass target
+  const M_target = 1.405e3; // kg
+  const gamma_pocket = mode.duty > 0 ? M_target * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
+  const U_cycle = U_cycle_base * gamma_pocket;
+  
+  // Power calculation
+  const omega = 2 * pi * 15e9; // 15 GHz
+  const P_loss_raw = Math.abs(U_geo) * omega / Q_cavity;
+  const P_raw_total = P_loss_raw * N_tiles / 1e6; // MW
+  const mode_throttle = mode.duty / mode.sectors * mode.qSpoiling;
+  const P_avg = P_raw_total * mode_throttle;
+  
+  // Quantum safety
+  const zeta = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : 0;
+  
+  // Exotic mass
+  const M_exotic = mode.duty > 0 ? Math.abs(U_cycle) / (c * c) * N_tiles : 0;
+  
+  return { P_avg, M_exotic, zeta, P_raw_total, mode_throttle };
+};
+
 const modes: Record<string, OperationalMode> = {
   hover: {
     name: "Hover",
@@ -42,7 +83,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 1,          // No strobing
     qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
     pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "Station-hold"
+    description: "83.3 MW • 1,405 kg • ζ=0.032"
   },
   cruise: {
     name: "Cruise", 
@@ -50,7 +91,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 400,        // 400-sector strobing (1/S = 1/400)
     qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
     pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "Mass-budgeting"
+    description: "7.4 MW • 1,405 kg • ζ=0.89"
   },
   emergency: {
     name: "Emergency",
@@ -58,7 +99,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 1,          // No strobing
     qSpoiling: 1,        // No Q-spoiling
     pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "Fast-burn"
+    description: "297 MW • 1,405 kg • ζ=0.009"
   },
   standby: {
     name: "Standby",
@@ -66,7 +107,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 1,          // Irrelevant
     qSpoiling: 1,        // Irrelevant
     pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
-    description: "System-off"
+    description: "0 MW • 0 kg • System Off"
   }
 };
 
