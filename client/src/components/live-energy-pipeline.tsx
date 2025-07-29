@@ -81,16 +81,9 @@ export function LiveEnergyPipeline({
   
   // Step 8: Realistic Average Power (83 MW target)
   const P_avg_per_tile = P_loss_raw * combined_throttle; // W per tile (throttled)
-  
-  // Fixed exotic mass budget approach (Needle Hull Mk 1 spec)
-  const M_target = 1.4e3; // kg (fixed target from research papers)
-  const M_per_tile_baseline = Math.abs(U_cycle) / (c * c); // kg per tile at current settings
-  const N_baseline = 6.28e4; // Baseline tile count from research (25 cm², 5m radius)
-  const auto_duty_factor = (M_target / N_baseline) / M_per_tile_baseline; // Auto-scale duty to maintain fixed mass
-  
-  // Realistic power using auto-scaled duty (maintains ~83 MW regardless of hull size)
-  const P_realistic_corrected = P_loss_raw * auto_duty_factor; // W per tile (corrected)
-  const P_total_realistic = (P_realistic_corrected * Math.min(N_tiles, N_baseline)) / 1e6; // Convert W to MW
+  const P_raw = P_loss_raw * N_tiles; // Raw hull power in W
+  const P_avg = P_raw * combined_throttle; // Throttled power in W
+  const P_total_realistic = P_avg / 1e6; // Convert W to MW
   
   // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
