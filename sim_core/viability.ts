@@ -74,26 +74,21 @@ export function viability(
   const a = pipe.gap;              // 1e-9 m (1 nm)
   const E_static = -(Math.PI**2 * pipe.HBARC * A_tile) / (720 * a**3) / 2;
 
-  // 2) Geometry amplification (Van-den-Broeck)
-  //    U_geo = γ_geo³ × E_static
-  const U_geo = Math.pow(pipe.gamma_geo, 3) * E_static;
+  // 2) Geometry amplification (Linear scaling like Live Energy Pipeline)
+  //    U_geo = γ_geo × E_static (NOT γ³ - matches Live Energy Pipeline)
+  const U_geo = pipe.gamma_geo * E_static;
 
-  // 3) Q-factor boost
-  //    U_Q = Q × U_geo
-  const U_Q = pipe.Q * U_geo;
+  // 3) Q-factor boost (Use mechanical Q like Live Energy Pipeline)
+  //    U_Q = Q_mechanical × U_geo (NOT Q_cavity)
+  const Q_mechanical = 5e4; // Same as Live Energy Pipeline
+  const U_Q = Q_mechanical * U_geo;
 
-  // 4) Duty-cycle averaging (per burst)
-  //    U_cycle = d × U_Q
-  const U_cycle = pipe.duty * U_Q;
+  // 4) Duty-cycle averaging (per burst) - matches Live Energy Pipeline
+  //    U_cycle_base = d × U_Q (before Van-den-Broeck pocket boost)
+  const U_cycle_base = pipe.duty * U_Q;
 
-  // 5) Sector-strobing mitigation (ship-wide duty)
-  //    U_avg_total = (d/S) × U_Q = d_eff × U_Q
-  const S = 400;  // Sector strobing count
-  const d_eff = pipe.duty / S;  // d_eff = 2.5×10⁻⁵
-  const U_avg_total = d_eff * U_Q;
-
-  // 6) Total exotic mass using authentic Needle Hull ellipsoid geometry
-  //    Calculate N_tiles from ship geometry: N_tiles = A_hull / A_tile
+  // Move N_tiles calculation before using it
+  // 5a) Hull surface area calculation (moved up for use in Van-den-Broeck calculation)
   let A_hull: number;
   
   if (R_ship_m <= 10) {
@@ -101,86 +96,109 @@ export function viability(
     A_hull = 4 * Math.PI * R_ship_m * R_ship_m;
   } else if (Math.abs(R_ship_m - 86.5) < 5) {
     // Authentic Needle Hull: prolate ellipsoid 503.5 × 132 × 86.5 m using Knud-Thomsen formula
-    const a = 503.5, b = 132, c = 86.5;
+    const a_ellip = 503.5, b_ellip = 132, c_ellip = 86.5;
     const p = 1.6075;
     A_hull = 4 * Math.PI * Math.pow(
-      (Math.pow(a*b, p) + Math.pow(a*c, p) + Math.pow(b*c, p)) / 3,
+      (Math.pow(a_ellip*b_ellip, p) + Math.pow(a_ellip*c_ellip, p) + Math.pow(b_ellip*c_ellip, p)) / 3,
       1/p
     ); // ≈ 5.6×10⁵ m²
   } else {
     // Scaled ellipsoid relative to Needle Hull
     const scale = R_ship_m / 86.5;
-    const a = 503.5 * scale, b = 132 * scale, c = 86.5 * scale;
+    const a_ellip = 503.5 * scale, b_ellip = 132 * scale, c_ellip = 86.5 * scale;
     const p = 1.6075;
     A_hull = 4 * Math.PI * Math.pow(
-      (Math.pow(a*b, p) + Math.pow(a*c, p) + Math.pow(b*c, p)) / 3,
+      (Math.pow(a_ellip*b_ellip, p) + Math.pow(a_ellip*c_ellip, p) + Math.pow(b_ellip*c_ellip, p)) / 3,
       1/p
     );
   }
   
   const N_tiles = A_hull / A_tile;
   
-  // NEEDLE HULL MK 1 PHYSICS: Fixed exotic mass budget of 1.4×10³ kg
-  // Papers specify: "The ∑ T⁰₀ budget shall remain bounded at 1.4 × 10³ kg for all hull scalings"
-  // Duty cycle auto-adjusts to maintain constant exotic mass regardless of hull size
+  // 5b) Van-den-Broeck Pocket Blue-Shift (calibrated for fixed exotic mass like Live Energy Pipeline)
+  const M_target = 1.405e3; // kg target exotic mass for active modes  
+  let gamma_pocket: number;
+  let U_cycle: number;
   
-  const MASS_TARGET = 1400;  // kg - absolute budget from research papers
-  
-  // Auto-adjust duty cycle to maintain fixed exotic mass (authentic Needle Hull behavior)
-  const N_baseline = 1.96e9;  // Baseline tile count for 5m hull from research
-  const duty_baseline = pipe.duty_eff || (pipe.duty / 400);  // 25 ppm nominal
-  
-  // Scale duty down as hull grows: d_eff,new = d_eff,baseline × (N_baseline / N_tiles)
-  const duty_auto_raw = duty_baseline * (N_baseline / N_tiles);
-  
-  // Apply minimum duty cycle constraint (engineering/physical limit)
-  // TODO: Make this configurable via constraints parameter
-  const DUTY_MIN = 2.5e-6;  // 2.5 ppm floor - minimum implementable duty cycle
-  const duty_auto = Math.max(duty_auto_raw, DUTY_MIN);
-  
-  // Fixed exotic mass per research specification
-  const m_exotic = MASS_TARGET;
+  if (pipe.duty === 0) {
+    // Standby mode: zero exotic mass
+    gamma_pocket = 0;
+    U_cycle = 0;
+  } else {
+    // Active modes: calculate gamma_pocket to achieve fixed 1.405 × 10³ kg
+    const target_energy_per_tile = (M_target * c * c) / N_tiles; // J per tile for target mass
+    gamma_pocket = target_energy_per_tile / Math.abs(U_cycle_base); // Van-den-Broeck amplification needed
+    U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
+  }
 
-  // 7) Average drive power with constrained auto-adjusted duty cycle
-  const P_raw_base = 2e15;  // 2×10¹⁵ W for full Needle Hull
-  const P_raw = P_raw_base * (N_tiles / N_baseline);  // Scale with actual tile count
-  const P_avg = P_raw * pipe.duty;  // Use original duty for power calculation
+  // 6) Power Loss Calculation (matches Live Energy Pipeline exactly)
+  const omega = 2 * Math.PI * 15e9; // 15 GHz modulation frequency
+  const Q_cavity = 1e9; // EM cavity Q for power loss calculations
+  const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
-  // Apply constrained auto-adjusted duty cycle for electrical draw
-  const P_electrical = P_avg * duty_auto;  // Now includes duty floor constraint
+  // 7) Total Exotic Mass (matches Live Energy Pipeline)
+  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile
+  const m_exotic = M_exotic_per_tile * N_tiles; // kg total
+
+  // 8) Realistic Average Power (matches Live Energy Pipeline mode-based throttling)
+  // Simulate mode parameters based on duty cycle
+  let mode_duty = pipe.duty;
+  let sectors = 1;
+  let qSpoiling = 1;
   
-  // 7b) System-level conversion - power may exceed target if duty floor is hit
-  const eta_system = 0.00166;  // Fixed system efficiency from research
-  const P_final = P_electrical * eta_system;  // May exceed 83 MW when duty floor constrains scaling
+  // Match Live Energy Pipeline mode detection
+  if (Math.abs(pipe.duty - 0.14) < 0.02) {
+    // Hover mode
+    mode_duty = 0.14;
+    sectors = 1;
+    qSpoiling = 1;
+  } else if (Math.abs(pipe.duty - 0.005) < 0.002) {
+    // Cruise mode
+    mode_duty = 0.005;
+    sectors = 400;
+    qSpoiling = 0.001;
+  } else if (Math.abs(pipe.duty - 0.50) < 0.1) {
+    // Emergency mode
+    mode_duty = 0.50;
+    sectors = 1;
+    qSpoiling = 1;
+  } else if (pipe.duty === 0) {
+    // Standby mode
+    mode_duty = 0.0;
+    sectors = 1;
+    qSpoiling = 1;
+  }
+  
+  // Apply mode-specific throttling factors (matches Live Energy Pipeline exactly)
+  const mode_throttle = mode_duty * qSpoiling * (1/sectors); // Combined throttle factor
+  const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
+  const P_avg_W = P_raw_W * mode_throttle; // Throttled power in W
+  const P_avg = P_avg_W; // Power in W for constraint checking
 
-  // 8) Quantum-inequality margin ζ - depends on actual duty cycle
-  //    Lower duty cycles reduce quantum safety margin
-  const zeta_base = computeZeta(pipe, U_avg_total, A_tile);
-  const zeta = zeta_base * (duty_auto / duty_baseline);  // Scale with actual duty used
+  // 8) Quantum-inequality margin ζ (simplified like Live Energy Pipeline) 
+  const zeta = mode_duty > 0 ? 1 / (mode_duty * Math.sqrt(Q_mechanical)) : Infinity;
 
-  // 9) Time-scale separation
-  //    τ_pulse/τ_LC = (d × t_cycle)/(2 × R_ship/c) = t_burst/(2 × R_ship/c)
-  const t_cycle = 1e-3;  // 1 ms cycle time
-  const t_burst = pipe.duty * t_cycle;  // 10 μs burst time
-  const TS_ratio = t_burst / (2 * R_ship_m / c);
+  // 9) Time-scale separation (matches Live Energy Pipeline)
+  const f_m = 15e9; // Hz (mechanical frequency)
+  const T_m = 1 / f_m; // s (mechanical period)
+  const L_LC = R_ship_m; // Light-crossing distance
+  const tau_LC = L_LC / c; // Light-crossing time
+  const TS_ratio = tau_LC / T_m; // Should be ≫ 1
 
-  // CONSTRAINT GATES with meaningful trade-offs restored
-  const massOK = Math.abs(m_exotic - MASS_TARGET) <= (cons.massTolPct/100) * MASS_TARGET;
-  const powerOK = P_final <= cons.maxPower * 1e6;  // May fail when duty floor prevents scaling
-  const zetaOK  = zeta <= cons.maxZeta;  // May fail when very low duty reduces quantum safety
+  // CONSTRAINT GATES (simplified to match Live Energy Pipeline)
+  const massOK = Math.abs(m_exotic - M_target) <= (cons.massTolPct/100) * M_target;
+  const powerOK = P_avg <= cons.maxPower * 1e6;  // Power constraint in W
+  const zetaOK  = zeta <= cons.maxZeta;  // Quantum safety
   const gammaOK = pipe.gamma_geo >= cons.minGamma;
-  const dutyOK  = duty_auto >= DUTY_MIN;  // Fails when required duty drops below engineering limit
 
-  const ok = massOK && powerOK && zetaOK && gammaOK && dutyOK;
+  const ok = massOK && powerOK && zetaOK && gammaOK;
 
   let fail_reason = "Viable ✅";
   if (!ok) {
     if (!massOK) {
       fail_reason = `Mass: ${(m_exotic/1000).toFixed(1)}k kg`;
-    } else if (!dutyOK) {
-      fail_reason = `Duty too low: ${(duty_auto_raw*1e6).toFixed(1)} ppm`;
     } else if (!powerOK) {
-      fail_reason = `Power: ${(P_final/1e6).toFixed(0)} MW`;
+      fail_reason = `Power: ${(P_avg/1e6).toFixed(0)} MW`;
     } else if (!zetaOK) {
       fail_reason = `ζ = ${zeta.toFixed(2)}`;
     } else if (!gammaOK) {
@@ -192,7 +210,7 @@ export function viability(
     ok,
     fail_reason,
     m_exotic,
-    P_avg: P_final,
+    P_avg,
     zeta,
     U_flat: E_static,
     U_geo,
@@ -200,19 +218,17 @@ export function viability(
     U_cycle,
     TS_ratio,
     gamma_geo: pipe.gamma_geo,
-    powerPerTile: P_final / N_tiles,
+    powerPerTile: P_loss_raw,  // W per tile
     N_tiles,
     U_static_total: E_static * N_tiles,
     U_geo_raw: U_geo,
-    P_loss: P_final / N_tiles,
-    duty_auto_ppm: (duty_auto * 1e6).toFixed(1), // Auto-adjusted duty in ppm for diagnostics
+    P_loss: P_loss_raw * N_tiles,
     checks: {
       mass_ok: massOK,
       power_ok: powerOK,
       quantum_safe: zetaOK,
       gamma_ok: gammaOK,
-      duty_ok: dutyOK,
-      timescale_ok: true,
+      timescale_ok: TS_ratio > 1.0,
       geometry_ok: true
     }
   };
