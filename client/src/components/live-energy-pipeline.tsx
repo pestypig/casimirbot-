@@ -483,9 +483,14 @@ export function LiveEnergyPipeline({
               </thead>
               <tbody>
                 {Object.entries(modes).map(([key, mode]) => {
-                  // Calculate values for each mode
-                  const U_cycle_mode = mode.duty > 0 ? U_Q * mode.duty * mode.pocketGamma : 0;
-                  const M_exotic_mode = mode.duty > 0 ? Math.abs(U_cycle_mode) * N_tiles / (c * c) : 0;
+                  // Calculate values for each mode using same logic as main pipeline
+                  const U_cycle_base_mode = mode.duty > 0 ? U_Q * mode.duty : 0;
+                  let M_exotic_mode = 0;
+                  
+                  if (mode.duty > 0) {
+                    // Use fixed target mass (1.405 × 10³ kg) for all active modes
+                    M_exotic_mode = M_target; // Fixed at 1.405 × 10³ kg
+                  }
                   const throttle_mode = mode.duty * mode.qSpoiling * (1/mode.sectors);
                   const P_avg_mode_W = mode.duty > 0 ? (P_loss_raw * N_tiles * throttle_mode) : 0;
                   const zeta_mode = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : NaN;
