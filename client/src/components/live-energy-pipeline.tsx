@@ -41,11 +41,11 @@ const modes: Record<string, OperationalMode> = {
   },
   cruise: {
     name: "Cruise", 
-    duty: 0.005,         // 0.5% duty (Ford-Roman compliant)
+    duty: 0.002,         // 0.2% duty (mass-budgeting mode)
     sectors: 400,        // 400-sector strobing
     qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 10^-3)
     pocketGamma: 0.8e11, // Same pocket amplification
-    description: "Efficient cruise mode (Ford-Roman compliant)"
+    description: "Mass-budgeting cruise mode"
   },
   emergency: {
     name: "Emergency",
@@ -53,7 +53,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 1,          // No strobing
     qSpoiling: 1,        // No Q-spoiling
     pocketGamma: 0.8e11, // Same pocket amplification
-    description: "Emergency burn mode (high power output)"
+    description: "Fast-burn emergency mode"
   },
   standby: {
     name: "Standby",
@@ -61,7 +61,7 @@ const modes: Record<string, OperationalMode> = {
     sectors: 1,          // Irrelevant
     qSpoiling: 1,        // Irrelevant
     pocketGamma: 0.8e11, // Same pocket amplification
-    description: "Zero power standby mode"
+    description: "Idle/off mode"
   }
 };
 
@@ -230,7 +230,7 @@ export function LiveEnergyPipeline({
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
-          {currentMode.description} (Ford-Roman compliant: zeta &lt; 1.0)
+          {currentMode.description}
         </p>
       </CardHeader>
       
@@ -438,56 +438,66 @@ export function LiveEnergyPipeline({
               <thead>
                 <tr className="bg-muted/50">
                   <th className="text-left p-2 border-r border-border font-medium">Mode</th>
-                  <th className="text-center p-2 border-r border-border font-medium">Duty (%)</th>
-                  <th className="text-center p-2 border-r border-border font-medium">Sectors</th>
-                  <th className="text-center p-2 border-r border-border font-medium">Q-Spoiling</th>
-                  <th className="text-center p-2 border-r border-border font-medium">P_avg (MW)</th>
+                  <th className="text-center p-2 border-r border-border font-medium">d</th>
+                  <th className="text-center p-2 border-r border-border font-medium">1/S</th>
+                  <th className="text-center p-2 border-r border-border font-medium">Q_idle/Q_on</th>
+                  <th className="text-center p-2 border-r border-border font-medium">P_avg</th>
                   <th className="text-center p-2 border-r border-border font-medium">M_exotic (kg)</th>
                   <th className="text-center p-2 border-r border-border font-medium">ζ</th>
-                  <th className="text-center p-2 font-medium">Status</th>
+                  <th className="text-center p-2 border-r border-border font-medium">TS</th>
+                  <th className="text-center p-2 font-medium">Notes</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(modes).map(([key, mode]) => {
                   // Calculate values for each mode
-                  const U_cycle_mode = U_Q * mode.duty * mode.pocketGamma;
-                  const M_exotic_mode = Math.abs(U_cycle_mode) * N_tiles / (c * c);
+                  const U_cycle_mode = mode.duty > 0 ? U_Q * mode.duty * mode.pocketGamma : 0;
+                  const M_exotic_mode = mode.duty > 0 ? Math.abs(U_cycle_mode) * N_tiles / (c * c) : 0;
                   const throttle_mode = mode.duty * mode.qSpoiling * (1/mode.sectors);
-                  const P_avg_mode = (P_loss_raw * N_tiles * throttle_mode) / 1e6;
-                  const zeta_mode = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : Infinity;
+                  const P_avg_mode_W = mode.duty > 0 ? (P_loss_raw * N_tiles * throttle_mode) : 0;
+                  const zeta_mode = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : NaN;
                   const isCurrentMode = key === selectedMode;
+                  const isStandby = mode.duty === 0;
+                  
+                  // Format power with appropriate units
+                  const formatPower = (powerW: number) => {
+                    if (powerW === 0) return "0.00";
+                    if (powerW < 1000) return `${powerW.toFixed(3)} W`;
+                    if (powerW < 1e6) return `${(powerW/1000).toFixed(3)} kW`;
+                    return `${(powerW/1e6).toFixed(1)} MW`;
+                  };
                   
                   return (
-                    <tr key={key} className={isCurrentMode ? "bg-primary/10" : "hover:bg-muted/30"}>
+                    <tr key={key} className={`${isCurrentMode ? "bg-primary/10" : "hover:bg-muted/30"} ${isStandby ? "opacity-50" : ""}`}>
                       <td className={`p-2 border-r border-border ${isCurrentMode ? "font-semibold text-primary" : ""}`}>
                         {mode.name}
                       </td>
                       <td className="text-center p-2 border-r border-border font-mono">
-                        {formatStandard(mode.duty * 100, 1)}
+                        {formatStandard(mode.duty * 100, 1)}%
                       </td>
                       <td className="text-center p-2 border-r border-border font-mono">
-                        {mode.sectors === 1 ? "1" : `1/${mode.sectors}`}
+                        {isStandby ? "—" : (mode.sectors === 1 ? "1" : `1/${mode.sectors}`)}
                       </td>
                       <td className="text-center p-2 border-r border-border font-mono">
-                        {mode.qSpoiling === 1 ? "1" : formatScientific(mode.qSpoiling, 0)}
+                        {isStandby ? "—" : (mode.qSpoiling === 1 ? "1" : "10⁻³")}
                       </td>
                       <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
-                        {formatStandard(P_avg_mode, 1)}
+                        {formatPower(P_avg_mode_W)}
                       </td>
                       <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
-                        {formatScientific(M_exotic_mode, 0)}
+                        {isStandby ? "0" : formatScientific(M_exotic_mode, 0)}
                       </td>
-                      <td className={`text-center p-2 border-r border-border font-mono ${zeta_mode < 1.0 ? "text-green-600" : "text-red-600"}`}>
-                        {mode.duty === 0 ? "—" : formatStandard(zeta_mode, 2)}
+                      <td className={`text-center p-2 border-r border-border font-mono ${isStandby ? "" : (zeta_mode < 1.0 ? "text-green-600" : "text-red-600")}`}>
+                        {isStandby ? "—" : formatStandard(zeta_mode, 2)}
                       </td>
-                      <td className="text-center p-2">
-                        {mode.duty === 0 ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <span className={zeta_mode < 1.0 ? "text-green-600" : "text-red-600"}>
-                            {zeta_mode < 1.0 ? "✓" : "✗"}
-                          </span>
-                        )}
+                      <td className="text-center p-2 border-r border-border font-mono">
+                        {isStandby ? "—" : formatStandard(TS_ratio, 0)}
+                      </td>
+                      <td className="text-center p-2 text-xs">
+                        {key === "hover" && "Cruise-holding"}
+                        {key === "cruise" && "Mass-budgeting"}
+                        {key === "emergency" && "Fast-burn"}
+                        {key === "standby" && "Idle/off"}
                       </td>
                     </tr>
                   );
@@ -495,10 +505,11 @@ export function LiveEnergyPipeline({
               </tbody>
             </table>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">
+          <div className="mt-2 text-xs text-muted-foreground space-y-1">
+            <div>P_avg for Cruise is kilowatts, not megawatts, because throttle is far lower than in hover.</div>
             <div className="flex items-center gap-4">
-              <span>✓ Ford-Roman compliant (ζ &lt; 1.0)</span>
-              <span>✗ Quantum inequality violation</span>
+              <span>ζ &lt; 1.0: Ford-Roman compliant</span>
+              <span>ζ &gt; 1.0: Quantum inequality violation</span>
               <span className="font-semibold text-primary">Highlighted: Current mode</span>
             </div>
           </div>
