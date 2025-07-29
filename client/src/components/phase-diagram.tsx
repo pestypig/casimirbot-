@@ -517,25 +517,29 @@ export default function PhaseDiagram({
     // Always use Live Energy Pipeline calculation logic for consistency
     // This replicates the exact same calculations as in LiveEnergyPipeline component
     
-    // Constants (same as Live Energy Pipeline)
-    const c = 299_792_458; // m/s
-    const pi = Math.PI;
+    // Constants (EXACT match with Live Energy Pipeline)
+    const h_bar = 1.055e-34; // J⋅s - EXACT match with Live Energy Pipeline
+    const c = 2.998e8; // m/s - EXACT match with Live Energy Pipeline  
+    const pi = Math.PI; // Use Math.PI like Live Energy Pipeline
     const A_tile = tileArea * 1e-4; // cm² → m²
     const a = 1e-9; // 1 nm gap distance
-    const HBARC = 1.054571817e-34 * c; // ℏc constant
     
     // Hull surface area calculation (matches Live Energy Pipeline)
     const A_hull_needle = 5.6e5; // m² - Needle Hull surface area
     const N_tiles = A_hull_needle / A_tile; // Use fixed Needle Hull area
     
-    // Energy Pipeline Steps (exact replica of LiveEnergyPipeline)
-    // Step 1: Static Casimir Energy per tile
-    const V_cavity = A_tile * a; // m³ cavity volume
-    const u_casimir = -(pi * pi * HBARC) / (240 * a * a * a); // Energy density J/m³
-    const U_static = u_casimir * V_cavity / 2; // J per tile (SCUFF-EM factor)
+    // Energy Pipeline Steps (EXACT replica of LiveEnergyPipeline)
+    // Step 1: Static Casimir Energy Density (EXACT match - note: 720 and a⁴!)
+    const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (EXACT: 720 and a⁴)
     
-    // Step 2: Geometric Amplification 
-    const U_geo = gammaGeo * U_static; // Linear scaling (NOT γ³)
+    // Step 2: Static Casimir Energy per Tile (EXACT match - no division by 2!)
+    const V_cavity = A_tile * a; // Use current slider tile area
+    const U_static = u_casimir * V_cavity; // J per tile (EXACT: no /2 factor)
+    
+    // Live Diagnostics now uses identical physics formula as Live Energy Pipeline
+    
+    // Step 2: Geometric Amplification (EXACT match with Live Energy Pipeline)
+    const U_geo = gammaGeo * U_static; // Linear scaling (NOT γ³) - matches Live Energy Pipeline
     
     // Step 3: Q-Factor Enhancement
     const Q_mechanical = 5e4; // Mechanical/parametric resonator Q
@@ -584,21 +588,7 @@ export default function PhaseDiagram({
     const P_raw_W = P_loss_raw * N_tiles;
     const P_avg_W = P_raw_W * mode_throttle;
     
-    // Debug logging to match Live Energy Pipeline
-    console.log(`🔧 Live Diagnostics Power Debug:`, {
-      P_loss_raw: P_loss_raw,
-      N_tiles: N_tiles,
-      P_raw_W: P_raw_W,
-      mode_duty: mode_duty,
-      qSpoiling: qSpoiling,
-      sectors: sectors,
-      mode_throttle: mode_throttle,
-      P_avg_W: P_avg_W,
-      P_avg_MW: P_avg_W / 1e6,
-      U_geo: U_geo,
-      omega: omega,
-      Q_cavity: Q_cavity
-    });
+    // Power calculation now perfectly matches Live Energy Pipeline
     
     // Step 7: Total Exotic Mass and Quantum Safety (exact Live Energy Pipeline formula)
     const M_exotic_per_tile = Math.abs(U_cycle) / (c * c);
