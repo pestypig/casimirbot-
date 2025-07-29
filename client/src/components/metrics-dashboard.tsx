@@ -106,10 +106,11 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const modes = {
       hover: { duty: 0.14, sectors: 1, qSpoiling: 1, pocketGamma: 2.86e9 },
       cruise: { duty: 0.005, sectors: 400, qSpoiling: 0.001, pocketGamma: 8.0e10 },
-      emergency: { duty: 0.50, sectors: 1, qSpoiling: 1, pocketGamma: 8.0e9 },
+      emergency: { duty: 0.50, sectors: 1, qSpoiling: 1, pocketGamma: 8.0e8 },
       standby: { duty: 0.0, sectors: 1, qSpoiling: 1, pocketGamma: 0 }
     };
-    
+
+    // Get mode-specific parameters to match Live Energy Pipeline exactly
     const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
     
     // Convert units  
@@ -132,12 +133,24 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const gamma_pocket = currentMode.duty > 0 ? M_target * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
     const U_cycle = U_cycle_base * gamma_pocket;
     
-    // Power calculation (authentic)
+    // Power calculation (authentic - matches Live Energy Pipeline exactly)
     const omega = 2 * pi * 15e9;
     const P_loss_per_tile = Math.abs(U_geo) * omega / Q_cavity;
     const P_raw = (P_loss_per_tile * N_tiles) / 1e6; // MW
-    const mode_throttle = currentMode.duty / currentMode.sectors * currentMode.qSpoiling;
-    const P_avg = P_raw * mode_throttle;
+    
+    // Mode-specific throttling calculation (exactly as Live Energy Pipeline)
+    const sector_factor = 1.0 / currentMode.sectors;
+    const combined_throttle = currentMode.duty * currentMode.qSpoiling * sector_factor;
+    const P_avg = P_raw * combined_throttle;
+    
+    console.log(`🔍 Metrics Debug for ${selectedMode}:`, {
+      P_raw_MW: P_raw.toFixed(1),
+      mode_duty: currentMode.duty,
+      sectors: currentMode.sectors,
+      qSpoiling: currentMode.qSpoiling,
+      combined_throttle: combined_throttle.toFixed(6),
+      P_avg_MW: P_avg.toFixed(1)
+    });
     
     // Authentic metrics
     const f_throttle = currentMode.duty; // Mode-specific duty
