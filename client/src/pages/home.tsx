@@ -19,7 +19,7 @@ export default function Home() {
   // Dynamic simulation parameters - Needle Hull Mk 1 defaults
   const [gammaGeo, setGammaGeo] = useState(26);        // γ_geo = 26 (Needle Hull research value)
   const [qFactor, setQFactor] = useState(1.6e6);       // Q = 1.6 × 10⁶ (Needle Hull research value)
-  const [duty, setDuty] = useState(0.002);             // 0.2% burst duty cycle
+  const [duty, setDuty] = useState(0.14);              // 14% burst duty cycle (HOVER MODE default)
   const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
   

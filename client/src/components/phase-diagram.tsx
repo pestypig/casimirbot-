@@ -584,9 +584,10 @@ export default function PhaseDiagram({
     const P_raw_W = P_loss_raw * N_tiles;
     const P_avg_W = P_raw_W * mode_throttle;
     
-    // Step 7: Total Exotic Mass and Quantum Safety
+    // Step 7: Total Exotic Mass and Quantum Safety (exact Live Energy Pipeline formula)
     const M_exotic_per_tile = Math.abs(U_cycle) / (c * c);
     const m_exotic = M_exotic_per_tile * N_tiles;
+    // ζ = 1 / (d × √Q_on) - EXACT Live Energy Pipeline formula
     const zeta = mode_duty > 0 ? 1 / (mode_duty * Math.sqrt(Q_mechanical)) : Infinity;
     
     // Constraint checking (same logic as viability function)
