@@ -145,10 +145,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const mode_throttle = duty / currentModeConfig.sectors * currentModeConfig.qSpoiling; // Uses SLIDER duty with mode params!
     const P_avg = P_raw_total * mode_throttle; // MW (both values in MW)
     
-    // Step 7: Time-scale ratio (constant)
-    const tau_LC = shipRadius / C;
-    const tau_m = 1 / 15e9;
-    const TS_ratio = tau_LC / tau_m;
+    // Step 7: Time-scale ratio (MODE-INDEPENDENT - hull geometry + RF frequency)
+    // Needle Hull characteristic length determines light-crossing time (independent of duty/Q)
+    const L_hull = 82.0; // 82 m Needle Hull characteristic length (from research papers)
+    const tau_LC = L_hull / C; // Light-crossing time through hull
+    const f_RF = 15e9; // 15 GHz RF modulation frequency (fixed)
+    const tau_pulse = 1 / f_RF; // RF pulse period (~7×10⁻¹¹ s)
+    const TS_ratio = tau_LC / tau_pulse; // ~4100+ (mode-independent!)
     
     // Step 8: Quantum safety (match Live Energy Pipeline)
     const zeta = duty > 0 ? 1 / (duty * Math.sqrt(Q_mechanical)) : 0; // Uses Q_mechanical!
@@ -171,12 +174,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         P_avg_MW: P_avg >= 1 ? P_avg.toFixed(3) : `${(P_avg * 1e6).toFixed(1)}W`,  // Smart units: MW or W
         P_avg_scientific: P_avg.toExponential(3),
         P_avg_watts: (P_avg * 1e6).toFixed(1), // Always show W value for debugging
+        TS_ratio: TS_ratio.toFixed(1) + " (MODE-INDEPENDENT: hull=82m, RF=15GHz)",
         zeta: zeta.toFixed(3),
         M_exotic_kg: M_exotic.toFixed(0),
         mode_throttle: mode_throttle.toExponential(3),
         gamma_pocket: gamma_pocket.toExponential(2)
       },
-      note: "SLIDER VALUES + MODE-SPECIFIC PARAMS FLOW INTO ALL STEPS!"
+      note: "TS_ratio ≫ 100 ensures homogenized GR regime for ALL modes!"
     });
     
     return {
@@ -397,7 +401,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TS_ratio:</span>
-                      <span className="font-semibold">{metrics.TS_ratio.toFixed(1)}</span>
+                      <span className="font-semibold">{metrics.TS_ratio.toFixed(0)} ≫ 100</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_raw:</span>
@@ -427,10 +431,18 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                       <span>{constraints.zeta_max}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">TS_min:</span>
-                      <span>100 (universal)</span>
+                      <span className="text-muted-foreground">TS_threshold:</span>
+                      <span>≥ 100 (homogenized GR)</span>
                     </div>
                   </div>
+                </div>
+                
+                {/* Mode-Independence Note */}
+                <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 rounded p-2 border-l-2 border-blue-400">
+                  <strong>Mode-Independent TS_ratio:</strong> {metrics.TS_ratio.toFixed(0)} ≫ 100<br />
+                  <span className="text-[10px]">
+                    Hull geometry (82m) + RF frequency (15 GHz) → homogenized GR regime for ALL operational modes
+                  </span>
                 </div>
               </div>
             )}
