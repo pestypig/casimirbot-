@@ -337,18 +337,39 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
               <div className="w-80 bg-muted/30 rounded-lg p-4 space-y-4">
                 <h4 className="font-semibold text-sm mb-3">Vector Transparency</h4>
                 
-                {/* Normalized Vector */}
+                {/* Normalized Vector - Blue vs Green */}
                 <div>
-                  <h5 className="text-xs font-medium text-muted-foreground mb-2">NORMALIZED RADAR VECTOR</h5>
-                  <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
-                    {radarData[0].r?.map((value, index) => (
-                      <div key={index} className="flex justify-between">
-                        <span className="text-muted-foreground">{radarData[0].theta?.[index]}:</span>
-                        <span className={value > 1.0 ? "text-red-600 font-semibold" : "text-green-600"}>
-                          {typeof value === 'number' ? value.toFixed(2) : 'N/A'}
-                        </span>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">NORMALIZED RADAR VECTORS</h5>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Blue Dataset (Actual Values) */}
+                    <div>
+                      <h6 className="text-xs font-medium text-blue-600 mb-1">Blue: Current Mode</h6>
+                      <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
+                        {radarData[0].r?.map((value, index) => (
+                          <div key={index} className="flex justify-between">
+                            <span className="text-muted-foreground text-[10px]">{radarData[0].theta?.[index]?.substring(0,8)}:</span>
+                            <span className={value > 1.0 ? "text-red-600 font-semibold" : "text-blue-600 font-semibold"}>
+                              {typeof value === 'number' ? value.toFixed(2) : 'N/A'}
+                            </span>
+                          </div>
+                        )) || []}
                       </div>
-                    )) || []}
+                    </div>
+                    
+                    {/* Green Dataset (Safe Zone) */}
+                    <div>
+                      <h6 className="text-xs font-medium text-green-600 mb-1">Green: Safe Zone</h6>
+                      <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
+                        {radarData[1].r?.map((value, index) => (
+                          <div key={index} className="flex justify-between">
+                            <span className="text-muted-foreground text-[10px]">{radarData[1].theta?.[index]?.substring(0,8)}:</span>
+                            <span className="text-green-600 font-semibold">
+                              {typeof value === 'number' ? value.toFixed(2) : 'N/A'}
+                            </span>
+                          </div>
+                        )) || []}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
