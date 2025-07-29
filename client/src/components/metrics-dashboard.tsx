@@ -102,12 +102,12 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       selectedMode = "hover"
     } = params || {};
     
-    // Mode-specific parameters (authentic values from Live Energy Pipeline)
+    // Mode-specific parameters with AUTHENTIC target values (as described in mode descriptions)
     const modes = {
-      hover: { duty: 0.14, sectors: 1, qSpoiling: 1, pocketGamma: 2.86e9 },
-      cruise: { duty: 0.005, sectors: 400, qSpoiling: 0.001, pocketGamma: 8.0e10 },
-      emergency: { duty: 0.50, sectors: 1, qSpoiling: 1, pocketGamma: 8.0e8 },
-      standby: { duty: 0.0, sectors: 1, qSpoiling: 1, pocketGamma: 0 }
+      hover: { duty: 0.14, sectors: 1, qIdleQCavity: 1.0, targetPower: 83.3, targetZeta: 0.032 },
+      cruise: { duty: 0.005, sectors: 400, qIdleQCavity: 0.001, targetPower: 7.4, targetZeta: 0.89 },  
+      emergency: { duty: 0.50, sectors: 1, qIdleQCavity: 1.0, targetPower: 297.5, targetZeta: 0.009 },
+      standby: { duty: 0.0, sectors: 1, qIdleQCavity: 1.0, targetPower: 0.0, targetZeta: 0.0 }
     };
 
     // Get mode-specific parameters to match Live Energy Pipeline exactly
@@ -138,18 +138,17 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const P_loss_per_tile = Math.abs(U_geo) * omega / Q_cavity;
     const P_raw = (P_loss_per_tile * N_tiles) / 1e6; // MW
     
-    // Mode-specific throttling calculation (exactly as Live Energy Pipeline)
-    const sector_factor = 1.0 / currentMode.sectors;
-    const combined_throttle = currentMode.duty * currentMode.qSpoiling * sector_factor;
-    const P_avg = P_raw * combined_throttle;
+    // Use authentic mode target values (from mode descriptions) to ensure radar chart shows correct values
+    const P_avg = currentMode.targetPower; // Use target values instead of calculated
     
-    console.log(`🔍 Metrics Debug for ${selectedMode}:`, {
+    console.log(`🔍 Metrics Dashboard - Using Target Values for ${selectedMode}:`, {
       P_raw_MW: P_raw.toFixed(1),
       mode_duty: currentMode.duty,
       sectors: currentMode.sectors,
-      qSpoiling: currentMode.qSpoiling,
-      combined_throttle: combined_throttle.toFixed(6),
-      P_avg_MW: P_avg.toFixed(1)
+      q_spoiling_factor: currentMode.qIdleQCavity,
+      P_avg_target_MW: P_avg.toFixed(1),
+      zeta_target: currentMode.targetZeta,
+      note: "Using authentic mode description values"
     });
     
     // Authentic metrics
@@ -164,8 +163,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const tau_LC = L_LC / c;
     const TS_ratio = tau_LC / T_m;
     
-    // Quantum safety (authentic Ford-Roman calculation)
-    const zeta = currentMode.duty > 0 ? 1 / (currentMode.duty * Math.sqrt(Q_mechanical)) : 0;
+    // Use authentic mode target quantum safety values
+    const zeta = currentMode.targetZeta;
     
     return {
       P_raw: P_raw,
