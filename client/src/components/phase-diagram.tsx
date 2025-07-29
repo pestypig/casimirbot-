@@ -543,7 +543,11 @@ function InteractiveHeatMap({
           </p>
         </CardHeader>
         <CardContent>
-          <MetricsDashboard viabilityParams={viabilityParams} />
+          <MetricsDashboard viabilityParams={{
+            ...viabilityParams,
+            selectedMode: selectedMode,
+            duty: localParams.duty
+          }} />
         </CardContent>
       </Card>
     </div>
