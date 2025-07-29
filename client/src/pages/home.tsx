@@ -39,10 +39,12 @@ export default function Home() {
                 Simulation Config
               </Button>
             </Link>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Book className="w-4 h-4" />
-              Documentation
-            </Button>
+            <Link href="/documentation">
+              <Button variant="outline" className="flex items-center gap-2">
+                <Book className="w-4 h-4" />
+                Documentation
+              </Button>
+            </Link>
             <Button variant="outline" className="flex items-center gap-2">
               <History className="w-4 h-4" />
               History

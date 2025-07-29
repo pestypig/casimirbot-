@@ -6,6 +6,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Serve PDF files from attached_assets folder
+app.use('/attached_assets', express.static('attached_assets'));
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
