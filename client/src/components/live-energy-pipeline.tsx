@@ -51,7 +51,7 @@ export function LiveEnergyPipeline({
   const u_casimir = -(pi * pi * h_bar * c) / (240 * Math.pow(a, 4)); // J/m³
   
   // Step 2: Static Casimir Energy per Tile  
-  const V_cavity = A_tile * a; // Volume per tile cavity (m³)
+  const V_cavity = A_tile_baseline * a; // Use baseline 25 cm² for consistent energy calculation
   const U_static = u_casimir * V_cavity; // J per tile (should be ~-6.5×10⁻⁵ J)
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
