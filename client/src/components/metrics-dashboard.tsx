@@ -221,16 +221,37 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     // Get fresh constraints directly for this mode (avoid stale state)
     const currentConstraints = getModeAwareConstraints(selectedMode);
 
-    // Normalize current values against mode-specific constraints (fixed for proper visual separation)
-    const normalizedData = [
-      Math.min(metrics.P_avg / currentConstraints.P_avg_max, 2), // Average Power vs mode limit
-      Math.min(metrics.f_throttle / 0.5, 2), // Duty Cycle (normalized to 50% max)  
-      Math.min(Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100), 2), // Mass Error
-      Math.min(metrics.zeta / currentConstraints.zeta_max, 2), // Quantum Safety vs mode limit
-      metrics.TS_ratio / currentConstraints.TS_min, // Time-Scale (want high TS_ratio ≫ TS_min, no cap needed)
-      Math.min(metrics.P_raw / 1000, 2), // Raw Power (fixed scale for visual separation)
-      Math.min(metrics.U_cycle / 1e12, 2) // Energy magnitude (larger denominator for visual separation)
+    // Define constraint types for proper normalization (all values should be ≤ 1 when safe)
+    const rawValues = {
+      P_avg: metrics.P_avg,
+      duty: metrics.f_throttle,
+      mass_error: Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100),
+      zeta: metrics.zeta,
+      TS_ratio: metrics.TS_ratio,
+      P_raw: metrics.P_raw,
+      U_cycle: Math.abs(metrics.U_cycle)
+    };
+
+    const constraints = [
+      { value: rawValues.P_avg, limit: currentConstraints.P_avg_max, type: 'max' }, // Average Power
+      { value: rawValues.duty, limit: 0.5, type: 'max' }, // Duty Cycle (50% max)
+      { value: rawValues.mass_error, limit: 1.0, type: 'max' }, // Mass Error (already normalized)
+      { value: rawValues.zeta, limit: currentConstraints.zeta_max, type: 'max' }, // Quantum Safety
+      { value: rawValues.TS_ratio, limit: currentConstraints.TS_min, type: 'min' }, // Time-Scale (MINIMUM requirement)
+      { value: rawValues.P_raw, limit: 1000, type: 'max' }, // Raw Power
+      { value: rawValues.U_cycle, limit: 1e12, type: 'max' } // Energy magnitude
     ];
+
+    // Normalize each constraint properly based on type
+    const normalizedData = constraints.map(({ value, limit, type }) => {
+      if (type === 'max') {
+        // Safe if value ≤ limit, normalize as value/limit
+        return Math.min(value / limit, 2);
+      } else {
+        // type === 'min', safe if value ≥ limit, normalize as limit/value  
+        return Math.min(limit / Math.max(value, 0.01), 1); // Prevent division by zero
+      }
+    });
 
     // Debug: Log actual vs normalized values for verification
     console.log(`🎯 Radar Normalization Debug for ${selectedMode}:`, {
@@ -251,7 +272,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         duty: `${(metrics.f_throttle*100).toFixed(1)}%/50% = ${normalizedData[1].toFixed(2)}`,  
         mass: `${Math.abs(metrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg error = ${normalizedData[2].toFixed(2)}`,
         quantum: `${metrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`,
-        timescale: `${metrics.TS_ratio.toFixed(1)}/${currentConstraints.TS_min} = ${(metrics.TS_ratio/currentConstraints.TS_min).toFixed(2)}`
+        timescale: `${currentConstraints.TS_min}/${metrics.TS_ratio.toFixed(1)} = ${normalizedData[4].toFixed(2)} (min constraint: inverted)`
       }
     });
 
