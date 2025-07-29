@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import MetricsDashboard from './metrics-dashboard';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -529,79 +530,16 @@ function InteractiveHeatMap({
         </CardContent>
       </Card>
       
-      {/* Heat-map Visualization */}
+      {/* Metrics Dashboard */}
       <Card className="bg-white dark:bg-gray-900">
         <CardHeader>
-          <CardTitle className="text-lg">Interactive Phase Diagram</CardTitle>
+          <CardTitle className="text-lg">Real-Time Metrics Dashboard</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Realistic viability boundaries based on mass, power, quantum safety, and time-scale constraints
+            Live constraint monitoring with radar chart visualization - all metrics update as parameters change
           </p>
         </CardHeader>
         <CardContent>
-        
-        <svg width="450" height="350" className="border rounded">
-          {/* Grid cells */}
-          {R_vals.map((R: number, i: number) => 
-            A_vals.map((A: number, j: number) => {
-              const viable = Z[i][j] === 1;
-              const isCurrentPoint = Math.abs(A - currentTileArea) < 3 && Math.abs(R - currentShipRadius) < 3;
-              
-              return (
-                <g key={`${i}-${j}`}>
-                  <rect
-                    x={j * cellWidth + 50}
-                    y={(R_vals.length - 1 - i) * cellHeight + 25}
-                    width={cellWidth}
-                    height={cellHeight}
-                    fill={viable ? "#10b981" : "#ef4444"}
-                    opacity={isCurrentPoint ? 1.0 : 0.7}
-                    stroke={isCurrentPoint ? "#1f2937" : "none"}
-                    strokeWidth={isCurrentPoint ? 2 : 0}
-                  />
-                  {isCurrentPoint && (
-                    <circle
-                      cx={j * cellWidth + 50 + cellWidth/2}
-                      cy={(R_vals.length - 1 - i) * cellHeight + 25 + cellHeight/2}
-                      r="4"
-                      fill="white"
-                      stroke="#1f2937"
-                      strokeWidth="2"
-                    />
-                  )}
-                </g>
-              );
-            })
-          )}
-          
-          {/* Axes */}
-          <text x="225" y="345" textAnchor="middle" className="text-xs fill-current">
-            Tile Area (cm²)
-          </text>
-          <text x="15" y="175" textAnchor="middle" className="text-xs fill-current" transform="rotate(-90, 15, 175)">
-            Ship Radius (m)
-          </text>
-          
-          {/* Axis labels */}
-          <text x="50" y="345" className="text-xs fill-current">1</text>
-          <text x="430" y="345" className="text-xs fill-current">100</text>
-          <text x="35" y="325" className="text-xs fill-current">1</text>
-          <text x="35" y="30" className="text-xs fill-current">100</text>
-        </svg>
-        
-        <div className="flex items-center gap-4 mt-4">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded"></div>
-            <span className="text-sm">Viable (passes all constraints)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded"></div>
-            <span className="text-sm">Failed (violates constraints)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-white border-2 border-gray-800 rounded-full"></div>
-            <span className="text-sm">Current Parameters</span>
-          </div>
-        </div>
+          <MetricsDashboard viabilityParams={viabilityParams} />
         </CardContent>
       </Card>
     </div>
