@@ -45,10 +45,10 @@ export function LiveEnergyPipeline({
   const A_tile_baseline = 25e-4; // 25 cm² baseline from research papers
   const R_baseline = 5.0; // 5 m baseline radius
   const A_hull_baseline = 4 * pi * R_baseline * R_baseline; // ~314 m² spherical
-  const N_tiles = A_hull_baseline / A_tile_baseline; // ~6.28×10⁴ tiles (research baseline)
+  const N_tiles = A_hull_baseline / A_tile_baseline; // ~62,832 tiles (research baseline)
   
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
-  const u_casimir = -(pi * pi * h_bar * c) / (240 * Math.pow(a, 4)); // J/m³
+  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (FIXED: 720 not 240)
   
   // Step 2: Static Casimir Energy per Tile  
   const V_cavity = A_tile_baseline * a; // Use baseline 25 cm² for consistent energy calculation
@@ -56,12 +56,11 @@ export function LiveEnergyPipeline({
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
   const gamma_geo = gammaGeo; // User parameter (26 for Needle Hull)
-  const U_geo_raw = Math.pow(gamma_geo, 3) * U_static; // γ³ scaling
+  const U_geo = Math.pow(gamma_geo, 3) * U_static; // γ³ scaling
   
   // Step 4: Q-Enhancement (Equation 3 from PDF)
   const Q_on = qFactor; // User parameter (1.6×10⁶ for Needle Hull)
-  const U_geo = gamma_geo * Q_on * U_static; // Correct Needle Hull formula: γ × Q_on × U_static
-  const U_Q = U_geo; // This is the enhanced energy per tile
+  const U_Q = Q_on * U_geo; // Q-enhanced energy per tile
   
   // Step 5: Duty Cycle Averaging (Equation 3 from PDF)
   const d = duty; // User parameter (fraction)
@@ -115,6 +114,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile_baseline = ${A_tile_baseline.toExponential(3)} m², a = ${a.toExponential(3)} m`);
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
+  console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_baseline=${A_tile_baseline*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
