@@ -41,12 +41,11 @@ export function LiveEnergyPipeline({
   const A_tile = tileArea * 1e-4; // cm² to m²
   const R_ship = shipRadius; // already in m
   
-  // Calculate hull surface area (ellipsoid for large hulls, sphere for small)
-  const A_hull = R_ship > 10 
-    ? 5.6e5 // Needle Hull ellipsoid surface area
-    : 4 * pi * R_ship * R_ship; // Spherical approximation
-  
-  const N_tiles = A_hull / A_tile;
+  // Use baseline research configuration for power calculations (not scaled hull)
+  const A_tile_baseline = 25e-4; // 25 cm² baseline from research papers
+  const R_baseline = 5.0; // 5 m baseline radius
+  const A_hull_baseline = 4 * pi * R_baseline * R_baseline; // ~314 m² spherical
+  const N_tiles = A_hull_baseline / A_tile_baseline; // ~6.28×10⁴ tiles (research baseline)
   
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
   const u_casimir = -(pi * pi * h_bar * c) / (240 * Math.pow(a, 4)); // J/m³
