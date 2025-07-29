@@ -214,41 +214,61 @@ export function LiveEnergyPipeline({
           </div>
         </div>
 
-        {/* Additional Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Time-Scale Separation */}
-          <div className="bg-muted/50 rounded-lg p-4">
-            <h4 className="font-semibold text-sm mb-2 flex items-center">
-              <span className="bg-secondary text-secondary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">T</span>
-              Time-Scale Separation
-            </h4>
-            <div className="font-mono text-sm space-y-1">
-              <div>TS_ratio = τ_LC / T_m</div>
-              <div className="text-primary font-semibold">
-                {formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}
-              </div>
+        {/* Step 5: Duty Cycle Averaging */}
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">5</span>
+            Duty Cycle Averaging
+          </h4>
+          <div className="font-mono text-sm space-y-1">
+            <div>U_cycle = U_geo × d</div>
+            <div className="text-muted-foreground">
+              U_cycle = ({formatScientific(U_geo)}) × {formatStandard(d * 100)}%
             </div>
-          </div>
-
-          {/* Quantum Safety */}
-          <div className="bg-muted/50 rounded-lg p-4">
-            <h4 className="font-semibold text-sm mb-2 flex items-center">
-              <span className="bg-secondary text-secondary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">ζ</span>
-              Quantum Safety
-            </h4>
-            <div className="font-mono text-sm space-y-1">
-              <div>ζ = 1 / (d × √Q_on)</div>
-              <div className="text-primary font-semibold">
-                {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
-              </div>
+            <div className="text-primary font-semibold">
+              U_cycle = {formatScientific(U_cycle)} J per tile
             </div>
           </div>
         </div>
 
-        {/* Total Exotic Mass */}
+        {/* Step 6: Time-Scale Separation */}
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
+            Time-Scale Separation
+          </h4>
+          <div className="font-mono text-sm space-y-1">
+            <div>TS_ratio = τ_LC / T_m</div>
+            <div className="text-muted-foreground">
+              τ_LC = {formatScientific(tau_LC)} s, T_m = {formatScientific(T_m)} s
+            </div>
+            <div className="text-primary font-semibold">
+              TS_ratio = {formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}
+            </div>
+          </div>
+        </div>
+
+        {/* Step 7: Quantum Safety */}
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
+            Quantum Inequality Margin
+          </h4>
+          <div className="font-mono text-sm space-y-1">
+            <div>ζ = 1 / (d × √Q_on)</div>
+            <div className="text-muted-foreground">
+              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_on)})
+            </div>
+            <div className="text-primary font-semibold">
+              ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
+            </div>
+          </div>
+        </div>
+
+        {/* Step 8: Total Exotic Mass */}
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">M</span>
+            <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
             Total Exotic Mass (1400 kg Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
@@ -284,6 +304,14 @@ export function LiveEnergyPipeline({
             <div>
               <span className="text-muted-foreground">Exotic Mass:</span>
               <div className="font-semibold text-orange-600 dark:text-orange-400">{formatScientific(M_exotic_total)} kg</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Quantum Safety:</span>
+              <div className="font-semibold">ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Time-Scale:</span>
+              <div className="font-semibold">{formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}</div>
             </div>
           </div>
         </div>
