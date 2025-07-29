@@ -12,6 +12,7 @@ interface LiveEnergyPipelineProps {
   tileArea: number; // cm²
   shipRadius: number; // m
   gapDistance?: number; // nm, default 1.0
+  sectorCount?: number; // Number of sectors for strobing (default 400)
   
   // Show calculations in real-time
   isRunning?: boolean;
@@ -26,6 +27,7 @@ export function LiveEnergyPipeline({
   tileArea,
   shipRadius,
   gapDistance = 1.0,
+  sectorCount = 400,
   isRunning = false
 }: LiveEnergyPipelineProps) {
   
@@ -71,9 +73,10 @@ export function LiveEnergyPipeline({
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q_on; // For Q_on=1.6×10⁶ → ~0.625
-  const duty_factor = d; // 0.002 for 0.2% duty cycle
-  const sector_strobing_factor = 1 / 400; // 1/S = 2.5×10⁻³ (400 sectors)
+  const Q_spoiling_factor = Q_idle / Q_on; // User Q_on from slider
+  const duty_factor = d; // User duty from slider
+  const S = sectorCount; // User sector count (default 400)
+  const sector_strobing_factor = 1 / S; // 1/S strobing factor
   const combined_throttle = duty_factor * Q_spoiling_factor * sector_strobing_factor; // Total mitigation
   
   // Step 8: Realistic Average Power (83 MW target)
@@ -189,7 +192,7 @@ export function LiveEnergyPipeline({
               Q_idle/Q_on = {formatScientific(Q_idle)}/{formatScientific(Q_on)} = {formatScientific(Q_spoiling_factor)}
             </div>
             <div className="text-muted-foreground">
-              1/S = 1/400 = {formatScientific(sector_strobing_factor)}
+              1/S = 1/{S} = {formatScientific(sector_strobing_factor)}
             </div>
             <div className="text-primary font-semibold">
               f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)

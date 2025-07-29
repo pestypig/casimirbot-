@@ -327,6 +327,7 @@ export default function Home() {
               tileArea={tileArea}
               shipRadius={shipRadius}
               gapDistance={1.0}
+              sectorCount={400}
               isRunning={isSimulationRunning}
             />
 
