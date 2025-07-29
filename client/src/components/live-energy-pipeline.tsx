@@ -191,7 +191,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Scale Analysis: U_Q/260 = ${(Math.abs(U_Q)/260).toExponential(3)}× too large`);
   console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile = ${A_tile.toExponential(3)} m², a = ${a.toExponential(3)} m`);
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
-  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
+  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: 1.405×10³ kg)`);
   console.log(`🔍 N_tiles calculation: A_hull_needle=${A_hull_needle.toExponential(2)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toExponential(2)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
@@ -413,7 +413,7 @@ export function LiveEnergyPipeline({
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
-            Total Exotic Mass (1400 kg Target)
+            Total Exotic Mass (1.405 × 10³ kg Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
             <div>M_exotic = N_tiles × |U_cycle| / c²</div>
