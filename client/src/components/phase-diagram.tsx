@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -6,6 +10,7 @@ interface InteractiveHeatMapProps {
   viabilityParams: any;
   constraintConfig?: any;
   currentSimulation?: any;
+  onParameterChange?: (newParams: any) => void;
 }
 
 function InteractiveHeatMap({ 
@@ -13,10 +18,35 @@ function InteractiveHeatMap({
   currentShipRadius, 
   viabilityParams, 
   constraintConfig, 
-  currentSimulation 
+  currentSimulation,
+  onParameterChange 
 }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Local parameter state for sliders
+  const [localParams, setLocalParams] = useState({
+    gammaGeo: viabilityParams?.gammaGeo || 26,
+    qFactor: viabilityParams?.qFactor || 1.6e6,
+    duty: viabilityParams?.duty || 0.14,
+    sagDepth: viabilityParams?.sagDepth || 16,
+    maxPower: 500, // MW
+    massTolerance: 30, // %
+    maxZeta: 2.0,
+    minTimescale: 0.01
+  });
+  
+  // Update parent when local parameters change
+  const updateParameter = (key: string, value: number) => {
+    const newParams = { ...localParams, [key]: value };
+    setLocalParams(newParams);
+    if (onParameterChange) {
+      onParameterChange({
+        ...viabilityParams,
+        [key]: value
+      });
+    }
+  };
   
   React.useEffect(() => {
     const loadGrid = async () => {
@@ -25,9 +55,13 @@ function InteractiveHeatMap({
       console.log(`🔧 Mode: ${viabilityParams?.duty === 0.14 ? 'Hover' : viabilityParams?.duty === 0.005 ? 'Cruise' : 'Custom'}`);
       
       try {
-        // Use the recipe-based viability grid computation
+        // Use the recipe-based viability grid computation with current constraints
         const { computeViabilityGrid } = await import('./viability-grid');
-        const gridResult = computeViabilityGrid(viabilityParams, 25);
+        const enhancedParams = {
+          ...viabilityParams,
+          ...localParams // Include local constraint parameters
+        };
+        const gridResult = computeViabilityGrid(enhancedParams, 25);
         const { A_vals, R_vals, Z } = gridResult;
         
         console.log(`🎯 Recipe Results: ${gridResult.viableCount}/${gridResult.totalCount} viable points (${(gridResult.viableCount/gridResult.totalCount*100).toFixed(1)}%)`);
@@ -52,7 +86,7 @@ function InteractiveHeatMap({
     };
     
     loadGrid();
-  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation?.status]);
+  }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation?.status, localParams]);
   
   if (!gridData || isLoading) {
     return (
@@ -73,12 +107,146 @@ function InteractiveHeatMap({
   const cellHeight = 300 / R_vals.length;
   
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg border">
-      <div className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Interactive Phase Diagram</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Realistic viability boundaries based on mass, power, quantum safety, and time-scale constraints
-        </p>
+    <div className="space-y-4">
+      {/* Physics Parameter Controls */}
+      <Card className="bg-white dark:bg-gray-900">
+        <CardHeader>
+          <CardTitle className="text-lg">Physics Parameters</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Geometric Amplification */}
+            <div className="space-y-2">
+              <Label>γ_geo: {localParams.gammaGeo}</Label>
+              <Slider
+                value={[localParams.gammaGeo]}
+                onValueChange={([value]) => updateParameter('gammaGeo', value)}
+                min={1}
+                max={100}
+                step={1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">Geometric amplification factor</p>
+            </div>
+            
+            {/* Q-Factor */}
+            <div className="space-y-2">
+              <Label>Q-Factor: {(localParams.qFactor / 1e6).toFixed(1)}×10⁶</Label>
+              <Slider
+                value={[Math.log10(localParams.qFactor)]}
+                onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
+                min={6}
+                max={10}
+                step={0.1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">Cavity quality factor</p>
+            </div>
+            
+            {/* Duty Cycle */}
+            <div className="space-y-2">
+              <Label>Duty Cycle: {(localParams.duty * 100).toFixed(1)}%</Label>
+              <Slider
+                value={[localParams.duty * 100]}
+                onValueChange={([value]) => updateParameter('duty', value / 100)}
+                min={0.1}
+                max={50}
+                step={0.1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">Operational duty cycle</p>
+            </div>
+            
+            {/* Sag Depth */}
+            <div className="space-y-2">
+              <Label>Sag Depth: {localParams.sagDepth} nm</Label>
+              <Slider
+                value={[localParams.sagDepth]}
+                onValueChange={([value]) => updateParameter('sagDepth', value)}
+                min={0}
+                max={50}
+                step={1}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">Bowl curvature depth</p>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          {/* Constraint Controls */}
+          <div>
+            <h4 className="font-medium mb-4">Viability Constraints</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Max Power */}
+              <div className="space-y-2">
+                <Label>Max Power: {localParams.maxPower} MW</Label>
+                <Slider
+                  value={[localParams.maxPower]}
+                  onValueChange={([value]) => updateParameter('maxPower', value)}
+                  min={50}
+                  max={2000}
+                  step={10}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">Maximum allowable power</p>
+              </div>
+              
+              {/* Mass Tolerance */}
+              <div className="space-y-2">
+                <Label>Mass Tolerance: ±{localParams.massTolerance}%</Label>
+                <Slider
+                  value={[localParams.massTolerance]}
+                  onValueChange={([value]) => updateParameter('massTolerance', value)}
+                  min={5}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">Exotic mass target tolerance</p>
+              </div>
+              
+              {/* Quantum Safety */}
+              <div className="space-y-2">
+                <Label>Max ζ: {localParams.maxZeta.toFixed(1)}</Label>
+                <Slider
+                  value={[localParams.maxZeta]}
+                  onValueChange={([value]) => updateParameter('maxZeta', value)}
+                  min={0.5}
+                  max={5.0}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">Quantum inequality limit</p>
+              </div>
+              
+              {/* Time-scale Separation */}
+              <div className="space-y-2">
+                <Label>Min Time-scale: {localParams.minTimescale.toFixed(3)}</Label>
+                <Slider
+                  value={[Math.log10(localParams.minTimescale)]}
+                  onValueChange={([value]) => updateParameter('minTimescale', Math.pow(10, value))}
+                  min={-4}
+                  max={-1}
+                  step={0.1}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">Minimum time-scale separation</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {/* Heat-map Visualization */}
+      <Card className="bg-white dark:bg-gray-900">
+        <CardHeader>
+          <CardTitle className="text-lg">Interactive Phase Diagram</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Realistic viability boundaries based on mass, power, quantum safety, and time-scale constraints
+          </p>
+        </CardHeader>
+        <CardContent>
         
         <svg width="450" height="350" className="border rounded">
           {/* Grid cells */}
@@ -143,7 +311,8 @@ function InteractiveHeatMap({
             <span className="text-sm">Current Parameters</span>
           </div>
         </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -159,7 +328,7 @@ export default function PhaseDiagram(props: any) {
           This heat-map uses the exact 8-step pipeline from your recipe file to evaluate each point:
           hull surface area → tile count → energy pipeline → mass calculation → power analysis → 
           time-scale validation → quantum safety → constraint checking. 
-          <strong>No more unrealistic 100% viable zones!</strong>
+          <strong>Adjust the physics parameters above to see how viability boundaries change in real-time!</strong>
         </p>
       </div>
     </div>

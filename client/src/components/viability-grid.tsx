@@ -18,13 +18,19 @@ export function computeViabilityGrid(
   const c = 2.998e8; // m/s
   const a = 1e-9; // 1 nm gap distance
   
-  // Mode-specific parameters
+  // Mode-specific parameters from sliders
   const gamma_geo = viabilityParams?.gammaGeo || 26;
   const Q_mech = 5e4; // Mechanical Q
-  const Q_cavity = 1e9; // Cavity Q
+  const Q_cavity = viabilityParams?.qFactor || 1e9; // Use slider Q-factor
   const d_cruise = viabilityParams?.duty || 0.14; // Mode duty cycle
   const f_drive = 15e9; // 15 GHz drive frequency
   const omega = 2 * pi * f_drive;
+  
+  // Constraint parameters from sliders
+  const maxPower_MW = viabilityParams?.maxPower || 500; // MW
+  const massTolerance_pct = viabilityParams?.massTolerance || 30; // %
+  const maxZeta = viabilityParams?.maxZeta || 2.0;
+  const minTimescale = viabilityParams?.minTimescale || 0.01;
   
   // Combined throttle factors (mode-specific)
   let Q_idle = Q_cavity;
@@ -92,12 +98,13 @@ export function computeViabilityGrid(
         const TS_ratio = tau_LC / tau_pulse;
         const zeta = d_cruise > 0 ? 1 / (d_cruise * Math.sqrt(Q_mech)) : Infinity;
         
-        // Recipe Step 11: Viability test with REALISTIC constraints
-        const M_min = 500; // 500 kg minimum exotic mass
-        const M_max = 5000; // 5000 kg maximum exotic mass  
-        const P_max = 1000; // 1000 MW maximum power
-        const TS_min = 0.001; // Minimum time-scale separation
-        const zeta_max = 3.0; // Maximum quantum inequality parameter
+        // Recipe Step 11: Viability test with USER-CONFIGURABLE constraints
+        const M_target = 1405; // kg target mass from Needle Hull
+        const M_min = M_target * (1 - massTolerance_pct/100); // User-configurable mass tolerance
+        const M_max = M_target * (1 + massTolerance_pct/100); 
+        const P_max = maxPower_MW; // User-configurable max power (MW)
+        const TS_min = minTimescale; // User-configurable minimum time-scale separation
+        const zeta_max = maxZeta; // User-configurable quantum inequality parameter
         
         const ok = (
           M_exotic >= M_min && M_exotic <= M_max &&    // mass gate
