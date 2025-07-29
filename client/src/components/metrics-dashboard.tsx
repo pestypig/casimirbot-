@@ -188,26 +188,29 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
     // Current mode for debug logging
     const selectedMode = viabilityParams?.selectedMode || "hover";
+    
+    // Get fresh constraints directly for this mode (avoid stale state)
+    const currentConstraints = getModeAwareConstraints(selectedMode);
 
     // Normalize current values against mode-specific constraints
     const normalizedData = [
-      Math.min(metrics.P_avg / constraints.P_avg_max, 2), // Average Power vs mode limit
+      Math.min(metrics.P_avg / currentConstraints.P_avg_max, 2), // Average Power vs mode limit
       Math.min(metrics.f_throttle / 0.5, 2), // Duty Cycle (normalized to 50% max)
-      Math.min(Math.abs(metrics.M_exotic - constraints.M_target) / (constraints.M_target * constraints.M_tolerance / 100), 2), // Mass Error
-      Math.min(metrics.zeta / constraints.zeta_max, 2), // Quantum Safety vs mode limit
-      Math.min(constraints.TS_min / Math.max(metrics.TS_ratio, 0.01), 2), // Time-Scale (inverted, want high TS_ratio)
-      Math.min(metrics.P_raw / constraints.P_max, 2), // Raw Power vs universal limit
+      Math.min(Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100), 2), // Mass Error
+      Math.min(metrics.zeta / currentConstraints.zeta_max, 2), // Quantum Safety vs mode limit
+      Math.min(currentConstraints.TS_min / Math.max(metrics.TS_ratio, 0.01), 2), // Time-Scale (inverted, want high TS_ratio)
+      Math.min(metrics.P_raw / currentConstraints.P_max, 2), // Raw Power vs universal limit
       Math.min(metrics.U_cycle / 1e6, 2) // Energy magnitude (normalized)
     ];
 
     // Mode-aware safe zone boundary (green zone shows what's acceptable for current mode)
     const safeZoneBoundary = [1, 1, 1, 1, 1, 1, 1]; // All values should be ≤ 1.0 to be "safe"
 
-    console.log(`🎯 Radar Chart Data for ${selectedMode} mode:`, {
-      P_avg: `${metrics.P_avg.toFixed(1)} MW (limit: ${constraints.P_avg_max} MW, normalized: ${normalizedData[0].toFixed(2)})`,
-      zeta: `${metrics.zeta.toFixed(3)} (limit: ${constraints.zeta_max}, normalized: ${normalizedData[3].toFixed(2)})`,
+    console.log(`🎯 Radar Chart Data for ${selectedMode} mode (FIXED):`, {
+      P_avg: `${metrics.P_avg.toFixed(1)} MW (limit: ${currentConstraints.P_avg_max} MW, normalized: ${normalizedData[0].toFixed(2)})`,
+      zeta: `${metrics.zeta.toFixed(3)} (limit: ${currentConstraints.zeta_max}, normalized: ${normalizedData[3].toFixed(2)})`,
       duty: `${metrics.f_throttle.toFixed(3)} (normalized: ${normalizedData[1].toFixed(2)})`,
-      mass: `${metrics.M_exotic.toFixed(0)} kg (target: ${constraints.M_target} kg, normalized: ${normalizedData[2].toFixed(2)})`
+      mass: `${metrics.M_exotic.toFixed(0)} kg (target: ${currentConstraints.M_target} kg, normalized: ${normalizedData[2].toFixed(2)})`
     });
 
     return [{
