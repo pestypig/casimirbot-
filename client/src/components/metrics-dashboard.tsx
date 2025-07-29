@@ -168,8 +168,9 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       mode_config: currentModeConfig,
       calculated: {
         P_raw_MW: P_raw.toFixed(1),
-        P_avg_MW: P_avg.toFixed(3),  // Higher precision to show mW range
+        P_avg_MW: P_avg >= 1 ? P_avg.toFixed(3) : `${(P_avg * 1e6).toFixed(1)}W`,  // Smart units: MW or W
         P_avg_scientific: P_avg.toExponential(3),
+        P_avg_watts: (P_avg * 1e6).toFixed(1), // Always show W value for debugging
         zeta: zeta.toFixed(3),
         M_exotic_kg: M_exotic.toFixed(0),
         mode_throttle: mode_throttle.toExponential(3),
@@ -338,9 +339,18 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Power Draw</p>
-                <p className="text-2xl font-bold">{metrics.P_avg.toFixed(3)} MW</p>
+                {/* Smart unit display: MW for ≥1 MW, W for <1 MW */}
+                {metrics.P_avg >= 1 ? (
+                  <p className="text-2xl font-bold">{metrics.P_avg.toFixed(1)} MW</p>
+                ) : (
+                  <p className="text-2xl font-bold">{(metrics.P_avg * 1e6).toFixed(1)} W</p>
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Peak: {metrics.P_raw.toFixed(1)} MW • Avg: {metrics.P_avg.toFixed(3)} MW
+                  Peak: {metrics.P_raw.toFixed(1)} MW • Avg: {
+                    metrics.P_avg >= 1 
+                      ? `${metrics.P_avg.toFixed(3)} MW`
+                      : `${(metrics.P_avg * 1e6).toFixed(1)} W`
+                  }
                 </p>
               </div>
               <Badge variant={getStatus(metrics.P_avg, constraints.P_avg_max) === 'pass' ? 'default' : 'destructive'}>
