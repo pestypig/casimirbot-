@@ -3,7 +3,7 @@ import React from 'react';
 // Exact implementation of the 8-step pipeline recipe from user's attached file
 export function computeViabilityGrid(
   viabilityParams: any,
-  resolution: number = 30
+  resolution: number = 25
 ): { A_vals: number[], R_vals: number[], Z: number[][], viableCount: number, totalCount: number } {
   
   // Recipe Step 1: Build grid (fix array generation)
@@ -30,10 +30,17 @@ export function computeViabilityGrid(
   const Q_mech = 5e4; // Mechanical Q (fixed)
   const Q_cavity = viabilityParams?.qFactor || 1e9; // Use slider Q-factor
   
+  // Constraint parameters from sliders - MUST BE DECLARED FIRST
+  const M_target = 1405; // kg (exact Needle Hull target) - MUST BE DECLARED FIRST
+  const maxPower_MW = viabilityParams?.maxPower || 120; // MW (hover mode default)
+  const massTolerance_pct = viabilityParams?.massTolerance || 5; // % (back to realistic tolerance)
+  const maxZeta = viabilityParams?.maxZeta || 1.0; // Back to strict quantum safety
+  const minTimescale = viabilityParams?.minTimescale || 0.01; // Back to strict timescale
+  
   // CRITICAL FIX #1: Single global γ_pocket (2×10¹¹) for all modes - Needle Hull Mk 1 constant
   const gamma_pocket = 2e11; // Van-den-Broeck pocket amplification (constant for all modes)
   
-  console.log(`🔧 Single Inequality Method: γ_pocket=${gamma_pocket.toExponential(3)}, M_target=${M_target} kg`);
+  console.log(`🔧 Fast Single Inequality: γ_pocket=${gamma_pocket.toExponential(3)}, M_target=${M_target} kg, resolution=${resolution}×${resolution}`);
   
   // Mode configuration (passed from phase diagram)
   const modeConfig = viabilityParams?.modeConfig || {
@@ -42,16 +49,6 @@ export function computeViabilityGrid(
     qSpoiling: 1,
     pocketGamma: gamma_pocket // Use global constant
   };
-  
-  // Constraint parameters from sliders
-  const M_target = 1405; // kg (exact Needle Hull target) - MUST BE DECLARED FIRST
-  const maxPower_MW = viabilityParams?.maxPower || 120; // MW (hover mode default)
-  const massTolerance_pct = viabilityParams?.massTolerance || 95; // % (VERY BROAD tolerance for testing)
-  const maxZeta = viabilityParams?.maxZeta || 10.0; // Relaxed quantum safety for testing
-  const minTimescale = viabilityParams?.minTimescale || 0.001; // Relaxed timescale for testing
-  
-  console.log(`🔧 Constraint Debug: massTolerance=${massTolerance_pct}%, M_target=${M_target} kg, maxPower=${maxPower_MW} MW`);
-  console.log(`🎉 BREAKTHROUGH: Single inequality method generating viable regions!`);
   
   let viableCount = 0;
   let totalCount = 0;
@@ -72,10 +69,9 @@ export function computeViabilityGrid(
         const cruise_duty = 0.005; // Always use cruise duty for mass calculation
         const M_max = M_target * (1 + massTolerance_pct/100); // Maximum allowed exotic mass
         
-        // Compute U_cycle per tile (depends on A_tile)
-        const V_cavity = A_tile * a; // Cavity volume
-        const U_static = u_casimir * V_cavity / 2; // SCUFF-EM divide by 2 convention
-        const U_cycle = Q_mech * (gamma_geo * U_static) * cruise_duty * gamma_pocket; // Complete energy pipeline
+        // Compute U_cycle per tile (depends on A_tile) - simplified for speed
+        const U_static = u_casimir * A_tile * a / 2; // SCUFF-EM divide by 2 convention
+        const U_cycle = Q_mech * gamma_geo * U_static * cruise_duty * gamma_pocket; // Complete energy pipeline
         
         // Single inequality viability check: 4πR² ≤ A_tile * (M_max * c²) / U_cycle
         const K = (M_max * c_squared) / (4 * pi * Math.abs(U_cycle)); // Coefficient
@@ -96,23 +92,16 @@ export function computeViabilityGrid(
           
           const ok = powerGate && quantumGate && timescaleGate;
           
-          // Debug logging for first few cells
-          if (i < 3 && j < 3) {
+          // Debug logging for first cell only (reduce console spam)
+          if (i === 0 && j === 0) {
             const M_exotic = Math.abs(U_cycle * N_tiles) / c_squared;
-            console.log(`🔍 Cell [${i},${j}] Single Inequality: A_tile=${A_tile.toFixed(6)} m², r_ship=${r_ship.toFixed(1)} m`);
-            console.log(`  K=${K.toExponential(3)}, R²=${(r_ship*r_ship).toFixed(1)}, K*A_tile=${(K*A_tile).toExponential(3)}`);
-            console.log(`  Mass condition: ${viabilityCondition}, M_exotic=${M_exotic.toFixed(2)} kg`);
-            console.log(`  Power: ${P_avg_MW.toFixed(2)} MW ≤ ${maxPower_MW}, ζ=${zeta.toFixed(3)} ≤ ${maxZeta}`);
-            console.log(`  FINAL VIABLE=${ok}`);
+            console.log(`🔍 Single Inequality Debug: K=${K.toExponential(3)}, Mass=${M_exotic.toFixed(2)} kg, Power=${P_avg_MW.toFixed(2)} MW`);
           }
           
           if (ok) viableCount++;
           Z_row.push(ok ? 1 : 0);
         } else {
-          // Mass constraint failed - no need to check other constraints
-          if (i < 3 && j < 3) {
-            console.log(`🔍 Cell [${i},${j}] Mass Failed: R²=${(r_ship*r_ship).toFixed(1)} > K*A_tile=${(K*A_tile).toExponential(3)}`);
-          }
+          // Mass constraint failed - no debug logging for performance
           Z_row.push(0);
         }
         
