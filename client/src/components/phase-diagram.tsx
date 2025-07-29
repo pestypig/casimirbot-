@@ -101,7 +101,7 @@ function InteractiveHeatMap({
       case 'gammaGeo':
         return 26; // Standard research value for all modes
       case 'qFactor':
-        // Hover/Emergency use Q_cavity = 1e9, Cruise uses lower for stability
+        // Cavity Q: Hover/Emergency use 1e9, Cruise uses 1.6e6 for stability
         return mode === 'cruise' ? 1.6e6 : 1e9;
       case 'duty':
         return modeConfig.duty;
@@ -288,22 +288,31 @@ function InteractiveHeatMap({
               </p>
             </div>
             
-            {/* Q-Factor */}
-            <div className="space-y-2">
-              <Label>Q-Factor: {formatQFactor(localParams.qFactor)}</Label>
-              <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
-                <Slider
-                  value={[Math.log10(localParams.qFactor)]}
-                  onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
-                  min={6}
-                  max={10}
-                  step={0.1}
-                  className="w-full cursor-pointer"
-                />
+            {/* Q-Factors (Two Types) */}
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label>Cavity Q-Factor: {formatQFactor(localParams.qFactor)} <span className="text-xs text-blue-600">(User Control)</span></Label>
+                <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
+                  <Slider
+                    value={[Math.log10(localParams.qFactor)]}
+                    onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
+                    min={6}
+                    max={10}
+                    step={0.1}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({selectedMode === 'cruise' ? '1.6×10⁶' : '1.0×10⁹'})
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Cavity quality factor • Double-click to apply {selectedMode} mode value ({selectedMode === 'cruise' ? '1.6×10⁶' : '1.0×10⁹'})
-              </p>
+              
+              <div className="bg-muted/30 rounded p-2">
+                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(50000)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
+                </p>
+              </div>
             </div>
             
             {/* Duty Cycle - Mode-controlled but still adjustable */}
