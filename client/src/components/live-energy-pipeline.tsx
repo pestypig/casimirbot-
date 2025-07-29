@@ -58,8 +58,9 @@ export function LiveEnergyPipeline({
   const U_geo = gamma_geo * U_static; // γ¹ scaling (NOT γ³)
   
   // Step 4: Q-Enhancement (Equation 3 from PDF)
-  const Q_on_needle = 1e9; // Needle Hull design Q_on ≈ 10^9 (high-Q cavity)
-  const U_Q = Q_on_needle * U_geo; // Q-enhanced energy per tile
+  const Q_mechanical = 5e4; // Mechanical/parametric resonator Q (~10^4-10^5)
+  const Q_cavity = 1e9; // EM cavity Q for power loss calculations
+  const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
   
   // Step 5: Duty Cycle Averaging (Equation 3 from PDF)
   const d = duty; // User parameter (fraction)
@@ -67,11 +68,11 @@ export function LiveEnergyPipeline({
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
-  const P_loss_raw = Math.abs(U_geo * omega / Q_on_needle); // W per tile (raw, unthrottled)
+  const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q_on_needle; // Q_idle/Q_on = 10^6/10^9 = 10^-3
+  const Q_spoiling_factor = Q_idle / Q_cavity; // Q_idle/Q_cavity = 10^6/10^9 = 10^-3
   const duty_factor = d; // User duty from slider
   const S = sectorCount; // User sector count (default 400)
   const sector_strobing_factor = 1 / S; // 1/S strobing factor
@@ -88,7 +89,7 @@ export function LiveEnergyPipeline({
   console.log(`  N_tiles: ${N_tiles}`);
   console.log(`  P_raw (total): ${P_raw_W} W`);
   console.log(`  duty_factor: ${duty_factor}`);
-  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_on_needle=${Q_on_needle})`);
+  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
   console.log(`  sector_strobing_factor: ${sector_strobing_factor}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
@@ -105,7 +106,7 @@ export function LiveEnergyPipeline({
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
-  const zeta = 1 / (d * Math.sqrt(Q_on_needle)); // Dimensionless
+  const zeta = 1 / (d * Math.sqrt(Q_mechanical)); // Dimensionless (use mechanical Q)
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
@@ -116,7 +117,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
-  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_on_needle=${Q_on_needle}, d=${d}`);
+  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d=${d}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Utility functions (declare before using)
@@ -159,7 +160,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-xs space-y-1">
             <div>u_Casimir = -π²ℏc/(720a⁴) = {formatScientific(u_casimir)} J/m³</div>
             <div>U_static = u_Casimir × A_tile = {formatScientific(U_static)} J</div>
-            <div>U_Q = Q_on × U_static = {formatScientific(Q_on_needle)} × {formatScientific(U_static)} = {formatScientific(Q_on_needle * U_static)} J</div>
+            <div>U_Q = Q_mech × U_geo = {formatScientific(Q_mechanical)} × {formatScientific(U_geo)} = {formatScientific(U_Q)} J</div>
             <div className="text-blue-700 dark:text-blue-300 font-semibold">
               U_geo = γ × U_static = {formatStandard(gamma_geo)} × {formatScientific(U_static)} = {formatScientific(U_geo)} J
             </div>
@@ -175,7 +176,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>P_raw,tile = U_geo × ω / Q_on</div>
             <div className="text-muted-foreground">
-              P_raw,tile = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_on_needle)})
+              P_raw,tile = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_cavity)})
             </div>
             <div className="text-primary font-semibold">
               P_raw,tile = {formatScientific(P_loss_raw)} W per tile
@@ -212,7 +213,7 @@ export function LiveEnergyPipeline({
               d = {formatStandard(duty_factor * 100)}% = {formatScientific(duty_factor)}
             </div>
             <div className="text-muted-foreground">
-              Q_idle/Q_on = {formatScientific(Q_idle)}/{formatScientific(Q_on_needle)} = {formatScientific(Q_spoiling_factor)}
+              Q_idle/Q_cavity = {formatScientific(Q_idle)}/{formatScientific(Q_cavity)} = {formatScientific(Q_spoiling_factor)}
             </div>
             <div className="text-muted-foreground">
               1/S = 1/{S} = {formatScientific(sector_strobing_factor)}
@@ -283,7 +284,7 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>ζ = 1 / (d × √Q_on)</div>
             <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_on_needle)})
+              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_mechanical)})
             </div>
             <div className="text-primary font-semibold">
               ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
