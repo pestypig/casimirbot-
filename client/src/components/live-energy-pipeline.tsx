@@ -61,12 +61,12 @@ export function LiveEnergyPipeline({
   const Q_cavity = 1e9; // EM cavity Q for power loss calculations
   const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
   
-  // Step 5: Duty Cycle Averaging (Equation 3 from PDF) - FIXED
-  const d_cruise = 0.002; // Authentic cruise duty cycle (0.2%)
-  const U_cycle_base = U_Q * d_cruise; // J per tile (duty cycle on Q-enhanced energy: -282 J × 0.002 = -0.56 J)
+  // Step 5: Duty Cycle Averaging (Equation 3 from PDF) - FIXED for Ford-Roman compliance
+  const d_cruise = 0.005; // Ford-Roman compliant cruise duty cycle (0.5% for ζ < 1)
+  const U_cycle_base = U_Q * d_cruise; // J per tile (duty cycle on Q-enhanced energy: -282 J × 0.005 = -1.41 J)
   
-  // Step 5b: Van-den-Broeck Pocket Blue-Shift (γ_pocket ≈ 10¹¹)
-  const gamma_pocket = 2e11; // Van-den-Broeck pocket blue-shift factor (tuned to hit 1400 kg target)
+  // Step 5b: Van-den-Broeck Pocket Blue-Shift (γ_pocket adjusted for Ford-Roman compliance)
+  const gamma_pocket = 0.8e11; // Van-den-Broeck pocket blue-shift factor (reduced to compensate for 0.5% duty)
   const U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
@@ -77,10 +77,10 @@ export function LiveEnergyPipeline({
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
   const Q_spoiling_factor = Q_idle / Q_cavity; // Q_idle/Q_cavity = 10^6/10^9 = 10^-3
   
-  // CRUISE MODE: Authentic research parameters (0.2% duty + 400 sectors)
-  const d_cruise_power = 0.002; // 0.2% duty cycle for cruise operations
+  // CRUISE MODE: Ford-Roman compliant parameters (0.5% duty + 400 sectors)
+  const d_cruise_power = 0.005; // 0.5% duty cycle for cruise operations (Ford-Roman: ζ < 1)
   const S_cruise = 400; // 400-sector strobing for cruise
-  const cruise_throttle = d_cruise_power * Q_spoiling_factor * (1/S_cruise); // = 5×10^-9
+  const cruise_throttle = d_cruise_power * Q_spoiling_factor * (1/S_cruise); // = 1.25×10^-8
   
   // HOVER MODE: For 83 MW target (14% duty + no strobing + no Q-spoiling)
   const d_hover = 0.14; // 14% duty cycle for hover operations
@@ -118,8 +118,8 @@ export function LiveEnergyPipeline({
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
-  // Step 11: Quantum Inequality Margin (Equation 3 from PDF) - needs d ≳ 0.4% or lower Q_mech
-  const zeta = 1 / (d_cruise * Math.sqrt(Q_mechanical)); // Dimensionless (use mechanical Q)
+  // Step 11: Quantum Inequality Margin (Equation 3 from PDF) - now Ford-Roman compliant
+  const zeta = 1 / (d_cruise * Math.sqrt(Q_mechanical)); // Dimensionless (ζ < 1 with d=0.5%)
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
@@ -159,7 +159,7 @@ export function LiveEnergyPipeline({
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Needle Hull Mk 1 hover operations: 14% duty, no Q-spoiling, no strobing → 83 MW target
+          Needle Hull Mk 1 hover: 83 MW target + Ford-Roman compliant (zeta &lt; 1.0 with d_cruise = 0.5%)
         </p>
       </CardHeader>
       
