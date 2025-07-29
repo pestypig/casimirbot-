@@ -584,6 +584,22 @@ export default function PhaseDiagram({
     const P_raw_W = P_loss_raw * N_tiles;
     const P_avg_W = P_raw_W * mode_throttle;
     
+    // Debug logging to match Live Energy Pipeline
+    console.log(`🔧 Live Diagnostics Power Debug:`, {
+      P_loss_raw: P_loss_raw,
+      N_tiles: N_tiles,
+      P_raw_W: P_raw_W,
+      mode_duty: mode_duty,
+      qSpoiling: qSpoiling,
+      sectors: sectors,
+      mode_throttle: mode_throttle,
+      P_avg_W: P_avg_W,
+      P_avg_MW: P_avg_W / 1e6,
+      U_geo: U_geo,
+      omega: omega,
+      Q_cavity: Q_cavity
+    });
+    
     // Step 7: Total Exotic Mass and Quantum Safety (exact Live Energy Pipeline formula)
     const M_exotic_per_tile = Math.abs(U_cycle) / (c * c);
     const m_exotic = M_exotic_per_tile * N_tiles;
