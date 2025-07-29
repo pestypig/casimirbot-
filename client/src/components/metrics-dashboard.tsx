@@ -78,7 +78,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
   const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints("hover"));
 
-  // Compute authentic metrics using Live Energy Pipeline calculations that update with mode changes
+  // Compute authentic metrics using slider-driven parameters in ALL steps (FIXED)
   const computeMetrics = React.useCallback((params: any): ComputedMetrics => {
     if (!params) return {
       P_raw: 0, f_throttle: 0, P_avg: 0, U_cycle: 0, 
@@ -86,32 +86,20 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     };
 
     // Physics constants
-    const h_bar = 1.055e-34;
-    const c = 2.998e8;
-    const pi = Math.PI;
+    const HBAR = 1.055e-34; // J⋅s
+    const C = 2.998e8; // m/s
+    const omega = 2 * Math.PI * 15e9; // 15 GHz modulation
     
-    // Extract parameters with mode-aware defaults
+    // Extract SLIDER-DRIVEN parameters (these must flow into every calculation step)
     const { 
       gammaGeo = 26, 
-      qFactor = 1e6, 
-      duty = 0.14, 
+      qFactor = 1e6,        // ← SLIDER VALUE: Cavity Q-factor (Q_on)
+      duty = 0.14,          // ← SLIDER VALUE: Duty cycle percentage  
       tileArea = 5, 
       shipRadius = 5,
       gapDistance = 1.0,
-      temperature = 20,
       selectedMode = "hover"
     } = params || {};
-    
-    // Mode-specific parameters with AUTHENTIC target values (as described in mode descriptions)
-    const modes = {
-      hover: { duty: 0.14, sectors: 1, qIdleQCavity: 1.0, targetPower: 83.3, targetZeta: 0.032 },
-      cruise: { duty: 0.005, sectors: 400, qIdleQCavity: 0.001, targetPower: 7.4, targetZeta: 0.89 },  
-      emergency: { duty: 0.50, sectors: 1, qIdleQCavity: 1.0, targetPower: 297.5, targetZeta: 0.009 },
-      standby: { duty: 0.0, sectors: 1, qIdleQCavity: 1.0, targetPower: 0.0, targetZeta: 0.0 }
-    };
-
-    // Get mode-specific parameters to match Live Energy Pipeline exactly
-    const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
     
     // Convert units  
     const a = gapDistance * 1e-9; // nm to m
@@ -119,52 +107,51 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const A_hull_needle = 5.6e5; // m²
     const N_tiles = A_hull_needle / A_tile;
     
-    // Authentic energy pipeline calculation (matches Live Energy Pipeline exactly)
-    const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4));
-    const U_static = u_casimir * A_tile * a;
-    const U_geo = gammaGeo * U_static;
-    const Q_mechanical = 5e4;
-    const Q_cavity = 1e9; // Fixed cavity Q
-    const U_Q = Q_mechanical * U_geo;
-    const U_cycle_base = U_Q * currentMode.duty;
+    // Step 1: Casimir energy per tile
+    const U_Casimir = -(Math.PI**2 * HBAR * C) / (720 * a**3); // Energy per unit volume
+    const U_static = U_Casimir * A_tile * a; // J per tile
+    const U_geo = gammaGeo * U_static; // Geometric amplification
     
-    // Van-den-Broeck pocket boost for fixed mass target (1.405×10³ kg)
-    const M_target = 1.405e3;
-    const gamma_pocket = currentMode.duty > 0 ? M_target * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
-    const U_cycle = U_cycle_base * gamma_pocket;
+    // Step 2: Raw power per tile using SLIDER Q-factor
+    const P_raw_tile = Math.abs(U_geo) * omega / qFactor; // W per tile (uses SLIDER qFactor!)
     
-    // Power calculation (authentic - matches Live Energy Pipeline exactly)
-    const omega = 2 * pi * 15e9;
-    const P_loss_per_tile = Math.abs(U_geo) * omega / Q_cavity;
-    const P_raw = (P_loss_per_tile * N_tiles) / 1e6; // MW
+    // Step 3: Total raw hull power  
+    const P_raw = (P_raw_tile * N_tiles) / 1e6; // MW
     
-    // Use authentic mode target values (from mode descriptions) to ensure radar chart shows correct values
-    const P_avg = currentMode.targetPower; // Use target values instead of calculated
+    // Step 4: Throttle factor using SLIDER duty cycle
+    const Q_idle = 1e9; // Idle Q-factor
+    const S = 1; // Sector count for this calculation
+    const f_throttle = (duty / 100) * (Q_idle / qFactor) * (1 / S); // Uses SLIDER duty & qFactor!
     
-    console.log(`🔍 Metrics Dashboard - Using Target Values for ${selectedMode}:`, {
-      P_raw_MW: P_raw.toFixed(1),
-      mode_duty: currentMode.duty,
-      sectors: currentMode.sectors,
-      q_spoiling_factor: currentMode.qIdleQCavity,
-      P_avg_target_MW: P_avg.toFixed(1),
-      zeta_target: currentMode.targetZeta,
-      note: "Using authentic mode description values"
+    // Step 5: Average power using calculated throttle
+    const P_avg = P_raw * f_throttle; // MW (calculated from sliders, not hardcoded!)
+    
+    // Step 6: Duty-cycle averaged energy per tile using SLIDER duty
+    const U_cycle = U_geo * (duty / 100); // J per tile (uses SLIDER duty!)
+    
+    // Step 7: Time-scale ratio (constant)
+    const tau_LC = shipRadius / C;
+    const tau_m = 1 / 15e9;
+    const TS_ratio = tau_LC / tau_m;
+    
+    // Step 8: Quantum safety using SLIDER values
+    const zeta = duty > 0 ? 1 / ((duty / 100) * Math.sqrt(qFactor)) : 0; // Uses SLIDER duty & qFactor!
+    
+    // Step 9: Exotic mass using calculated U_cycle
+    const M_exotic = N_tiles * Math.abs(U_cycle) / (C**2); // kg (calculated from sliders!)
+    
+    console.log(`🔧 Metrics Dashboard - FIXED with Slider Values for ${selectedMode}:`, {
+      gammaGeo_slider: gammaGeo,
+      qFactor_slider: qFactor,
+      duty_slider: duty,
+      calculated: {
+        P_raw_MW: P_raw.toFixed(3),
+        P_avg_MW: P_avg.toFixed(3), 
+        zeta: zeta.toFixed(3),
+        M_exotic_kg: M_exotic.toFixed(1)
+      },
+      note: "NOW USING ACTUAL SLIDER VALUES IN ALL STEPS!"
     });
-    
-    // Authentic metrics
-    const f_throttle = currentMode.duty; // Mode-specific duty
-    const M_exotic = currentMode.duty > 0 ? Math.abs(U_cycle) / (c * c) * N_tiles : 0; // Fixed 1405 kg for active modes
-    
-    // Time-scale separation (authentic calculation)
-    const R_ship = shipRadius;
-    const f_m = 15e9;
-    const T_m = 1 / f_m;
-    const L_LC = R_ship;
-    const tau_LC = L_LC / c;
-    const TS_ratio = tau_LC / T_m;
-    
-    // Use authentic mode target quantum safety values
-    const zeta = currentMode.targetZeta;
     
     return {
       P_raw: P_raw,
