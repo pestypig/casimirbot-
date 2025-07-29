@@ -446,3 +446,11 @@ The current scientific foundation provides the authentic physics core that can b
   - **Perfect Synchronization**: Both components now show identical power values (83.3 MW vs 83.29 MW)
   - **Verification Complete**: U_static = -2.168e-4 J, U_geo = -5.636e-3 J, P_loss_raw = 0.531 W per tile - all values perfectly matched
   - **System Integrity**: Live Diagnostics and Live Energy Pipeline now use 100% identical physics calculations
+- **Metrics Dashboard Mode Synchronization Fix (July 29, 2025)**: Successfully resolved critical dashboard update bug
+  - **Issue Fixed**: Metrics dashboard was showing static values and not updating when switching operational modes (Hover/Cruise/Emergency/Standby)
+  - **Root Cause**: computeMetrics function had empty dependency array preventing recalculation when mode changed
+  - **Solution**: Updated computeMetrics to depend on viabilityParams and integrated authentic Live Energy Pipeline calculations
+  - **Mode-Aware Calculations**: Dashboard now uses same physics as Live Energy Pipeline with Van-den-Broeck pocket boost for fixed 1,405 kg mass
+  - **Real-Time Updates**: Radar chart and all metrics now update instantly when switching between operational modes
+  - **Authentic Values**: Mode descriptions show calculated values: Hover (83.3 MW • 1,405 kg • ζ=0.032), Cruise (7.4 MW • 1,405 kg • ζ=0.89)
+  - **UI Cleanup**: Removed explanatory "Recipe-Based Viability" text section for cleaner interface

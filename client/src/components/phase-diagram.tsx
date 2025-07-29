@@ -559,15 +559,7 @@ export default function PhaseDiagram(props: any) {
     <div className="space-y-4">
       <InteractiveHeatMap {...props} />
       
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Recipe-Based Viability</h4>
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          This heat-map uses the exact 8-step pipeline from your recipe file to evaluate each point:
-          hull surface area → tile count → energy pipeline → mass calculation → power analysis → 
-          time-scale validation → quantum safety → constraint checking. 
-          <strong>Adjust the physics parameters above to see how viability boundaries change in real-time!</strong>
-        </p>
-      </div>
+
     </div>
   );
 }
