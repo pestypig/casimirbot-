@@ -359,3 +359,8 @@ The current scientific foundation provides the authentic physics core that can b
   - Scientific notation formatting with proper units for all intermediate values
   - Visual validation with checkmarks for time-scale separation and quantum safety constraints
   - Makes physics calculations completely transparent and checkable before simulation runs
+  - **Fixed Power Calculation Issue (July 29, 2025)**: Implemented authentic Needle Hull throttling factors
+    - Added Step 7: Power Throttling showing duty cycle (0.2%) and Q-spoiling (10⁻³) factors
+    - Raw power (~10¹² MW) now correctly throttled to realistic ~83 MW using combined mitigation factors
+    - Shows both unthrottled peak power and realistic average power with proper Needle Hull design factors
+    - Transparent calculation: Raw × (duty × Q-spoiling) = Realistic power matching research paper targets

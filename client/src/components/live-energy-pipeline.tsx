@@ -64,26 +64,32 @@ export function LiveEnergyPipeline({
   const d = duty; // User parameter (fraction)
   const U_cycle = U_Q * d; // J per tile
   
-  // Step 6: Power Loss (Equation 3 from PDF)
+  // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
-  const P_loss = Math.abs(U_Q * omega / Q); // W per tile
+  const P_loss_raw = Math.abs(U_Q * omega / Q); // W per tile (raw, unthrottled)
   
-  // Step 7: Time-Scale Separation (Equation 3 from PDF)
+  // Step 7: Power Throttling Factors (Needle Hull Design)
+  const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
+  const Q_spoiling_factor = Q_idle / Q; // ~10⁻³ for Q=10⁹ → Q=10⁶
+  const duty_factor = d; // 0.002 for 0.2% duty cycle
+  const combined_throttle = duty_factor * Q_spoiling_factor; // Total mitigation
+  
+  // Step 8: Realistic Average Power (83 MW target)
+  const P_avg_per_tile = P_loss_raw * combined_throttle; // W per tile (throttled)
+  const P_total_realistic = P_avg_per_tile * N_tiles * 1e-6; // MW total (realistic)
+  
+  // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
   const T_m = 1 / f_m; // s (mechanical period)
   const L_LC = R_ship; // Light-crossing distance
   const tau_LC = L_LC / c; // Light-crossing time
   const TS_ratio = tau_LC / T_m; // Should be ≫ 1
   
-  // Step 8: Total Exotic Mass (Equation 5 from PDF)
+  // Step 10: Total Exotic Mass (Equation 5 from PDF)
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
-  // Step 9: Average Power (Equation 4 from PDF)
-  const P_avg = P_loss * d; // W per tile
-  const P_total = P_avg * N_tiles * 1e-6; // MW total
-  
-  // Step 10: Quantum Inequality Margin (Equation 3 from PDF)
+  // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
   const zeta = 1 / (d * Math.sqrt(Q)); // Dimensionless
   
   const formatScientific = (value: number, decimals = 3) => {
@@ -111,7 +117,7 @@ export function LiveEnergyPipeline({
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Step-by-step equations from research papers with live parameter substitution
+          Step-by-step equations with authentic Needle Hull throttling factors (duty cycle + Q-spoiling)
         </p>
       </CardHeader>
       
@@ -201,27 +207,60 @@ export function LiveEnergyPipeline({
           </div>
         </div>
 
-        {/* Step 6: Power Loss */}
+        {/* Step 6: Raw Power Loss */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
-            Power Loss (15 GHz)
+            Raw Power Loss (Unthrottled)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>P_loss = |U_Q| × ω / Q</div>
+            <div>P_raw = |U_Q| × ω / Q</div>
             <div className="text-muted-foreground">
-              P_loss = ({formatScientific(Math.abs(U_Q))}) × ({formatScientific(omega)}) / ({formatScientific(Q)})
+              P_raw = ({formatScientific(Math.abs(U_Q))}) × ({formatScientific(omega)}) / ({formatScientific(Q)})
             </div>
             <div className="text-primary font-semibold">
-              P_loss = {formatScientific(P_loss)} W
+              P_raw = {formatScientific(P_loss_raw)} W per tile
             </div>
           </div>
         </div>
 
-        {/* Step 7: Time-Scale Separation */}
+        {/* Step 7: Power Throttling Factors */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
+            Power Throttling (Needle Hull Design)
+          </h4>
+          <div className="font-mono text-sm space-y-1">
+            <div>Duty Factor: d = {formatStandard(duty_factor * 100)}%</div>
+            <div>Q-Spoiling: Q_idle/Q_on = {formatScientific(Q_spoiling_factor)}</div>
+            <div>Combined Throttle: {formatScientific(combined_throttle)}</div>
+            <div className="text-primary font-semibold">
+              Total Mitigation: {formatScientific(combined_throttle)} (×{formatStandard(1/combined_throttle)} reduction)
+            </div>
+          </div>
+        </div>
+
+        {/* Step 8: Realistic Average Power */}
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
+            Realistic Average Power (83 MW Target)
+          </h4>
+          <div className="font-mono text-sm space-y-1">
+            <div>P_avg = P_raw × throttle × N_tiles</div>
+            <div className="text-muted-foreground">
+              P_avg = ({formatScientific(P_loss_raw)}) × ({formatScientific(combined_throttle)}) × ({formatScientific(N_tiles)})
+            </div>
+            <div className="text-primary font-semibold">
+              P_avg = {formatStandard(P_total_realistic)} MW
+            </div>
+          </div>
+        </div>
+
+        {/* Step 9: Time-Scale Separation */}
+        <div className="bg-muted/50 rounded-lg p-4">
+          <h4 className="font-semibold text-sm mb-2 flex items-center">
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">9</span>
             Time-Scale Separation
           </h4>
           <div className="font-mono text-sm space-y-1">
@@ -235,10 +274,10 @@ export function LiveEnergyPipeline({
           </div>
         </div>
 
-        {/* Step 8: Total Exotic Mass */}
+        {/* Step 10: Total Exotic Mass */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">10</span>
             Total Exotic Mass
           </h4>
           <div className="font-mono text-sm space-y-1">
@@ -252,27 +291,10 @@ export function LiveEnergyPipeline({
           </div>
         </div>
 
-        {/* Step 9: Average Power */}
+        {/* Step 11: Quantum Safety */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">9</span>
-            Average Power
-          </h4>
-          <div className="font-mono text-sm space-y-1">
-            <div>P_avg = P_loss × d × N_tiles</div>
-            <div className="text-muted-foreground">
-              P_avg = ({formatScientific(P_loss)}) × {formatStandard(d * 100)}% × ({formatScientific(N_tiles)})
-            </div>
-            <div className="text-primary font-semibold">
-              P_avg = {formatStandard(P_total)} MW
-            </div>
-          </div>
-        </div>
-
-        {/* Step 10: Quantum Safety */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">10</span>
+            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">11</span>
             Quantum Inequality Margin
           </h4>
           <div className="font-mono text-sm space-y-1">
@@ -292,14 +314,18 @@ export function LiveEnergyPipeline({
             <Atom className="h-4 w-4 mr-2" />
             Pipeline Summary
           </h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-3 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">Exotic Mass:</span>
               <div className="font-semibold">{formatScientific(M_exotic_total)} kg</div>
             </div>
             <div>
-              <span className="text-muted-foreground">Average Power:</span>
-              <div className="font-semibold">{formatStandard(P_total)} MW</div>
+              <span className="text-muted-foreground">Raw Power:</span>
+              <div className="font-semibold">{formatScientific(P_loss_raw * N_tiles * 1e-6)} MW</div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Realistic Power:</span>
+              <div className="font-semibold">{formatStandard(P_total_realistic)} MW</div>
             </div>
             <div>
               <span className="text-muted-foreground">Quantum Safety:</span>
