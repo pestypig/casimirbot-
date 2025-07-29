@@ -105,8 +105,22 @@ function InteractiveHeatMap({
   const handleSliderDoubleClick = (parameter: string) => {
     const modeValue = getModeSpecificValue(parameter, selectedMode);
     if (modeValue !== null) {
-      updateParameter(parameter, modeValue);
-      console.log(`🎯 Applied ${selectedMode} mode value for ${parameter}: ${modeValue}`);
+      console.log(`🎯 Double-click detected for ${parameter}, applying ${selectedMode} mode value: ${modeValue}`);
+      
+      // Force immediate local state update
+      setLocalParams(prev => {
+        const updated = { ...prev, [parameter]: modeValue };
+        console.log(`🔄 Local state updated: ${parameter} = ${modeValue}`);
+        return updated;
+      });
+      
+      // Trigger parent update after a brief delay to ensure state is synchronized
+      setTimeout(() => {
+        updateParameter(parameter, modeValue);
+        console.log(`📤 Parent update triggered for ${parameter}: ${modeValue}`);
+      }, 10);
+    } else {
+      console.log(`❌ No mode value found for parameter: ${parameter} in mode: ${selectedMode}`);
     }
   };
   
@@ -283,16 +297,16 @@ function InteractiveHeatMap({
             
             {/* Duty Cycle - Mode-controlled but still adjustable */}
             <div className="space-y-2">
-              <Label>Duty Cycle: {(currentMode.duty * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
+              <Label>Duty Cycle: {(localParams.duty * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
               <div onDoubleClick={() => handleSliderDoubleClick('duty')}>
                 <Slider
-                  value={[currentMode.duty * 100]}
+                  value={[localParams.duty * 100]}
                   onValueChange={([value]) => updateParameter('duty', value / 100)}
                   min={0.1}
                   max={50}
                   step={0.1}
                   className="w-full cursor-pointer"
-                  disabled={localParams.selectedMode !== 'custom'}
+                  disabled={false} // Enable for double-click functionality
                 />
               </div>
               <p className="text-xs text-muted-foreground">
