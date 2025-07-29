@@ -3,6 +3,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -24,22 +25,83 @@ function InteractiveHeatMap({
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Operational mode configurations (matches Live Energy Pipeline exactly)
+  const modes = {
+    hover: {
+      name: "Hover",
+      duty: 0.14,          // 14% duty (station-hold)
+      sectors: 1,          // No strobing
+      qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
+      pocketGamma: 2.86e9, // Van-den-Broeck pocket amplification
+      description: "Station-hold → 83.3 MW"
+    },
+    cruise: {
+      name: "Cruise", 
+      duty: 0.005,         // 0.5% duty (Ford-Roman compliant)
+      sectors: 400,        // 400-sector strobing (1/S = 1/400)
+      qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
+      pocketGamma: 8.0e10, // Van-den-Broeck pocket amplification
+      description: "Mass-budgeting → ~7.4 MW"
+    },
+    emergency: {
+      name: "Emergency",
+      duty: 0.50,          // 50% duty (fast-burn)
+      sectors: 1,          // No strobing
+      qSpoiling: 1,        // No Q-spoiling
+      pocketGamma: 8.0e9,  // Van-den-Broeck pocket amplification
+      description: "Fast-burn → 297 MW"
+    },
+    standby: {
+      name: "Standby",
+      duty: 0.0,           // 0% duty (bubble collapsed)
+      sectors: 1,          // Irrelevant
+      qSpoiling: 1,        // Irrelevant
+      pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
+      description: "System-off → 0 MW"
+    }
+  };
+
   // Local parameter state for sliders
   const [localParams, setLocalParams] = useState({
+    selectedMode: "hover",
     gammaGeo: viabilityParams?.gammaGeo || 26,
     qFactor: viabilityParams?.qFactor || 1.6e6,
     duty: viabilityParams?.duty || 0.14,
     sagDepth: viabilityParams?.sagDepth || 16,
-    maxPower: 500, // MW
-    massTolerance: 30, // %
-    maxZeta: 2.0,
+    maxPower: 120, // MW (hover mode default)
+    massTolerance: 5, // % (tight Needle Hull tolerance)
+    maxZeta: 1.0,
     minTimescale: 0.01
   });
   
+  // Get current mode configuration
+  const currentMode = modes[localParams.selectedMode as keyof typeof modes] || modes.hover;
+  
   // Update parent when local parameters change
-  const updateParameter = (key: string, value: number) => {
+  const updateParameter = (key: string, value: number | string) => {
     const newParams = { ...localParams, [key]: value };
     setLocalParams(newParams);
+    
+    // If mode changed, update duty and other mode-specific parameters
+    if (key === 'selectedMode' && typeof value === 'string') {
+      const mode = modes[value as keyof typeof modes];
+      if (mode) {
+        newParams.duty = mode.duty;
+        // Update constraint defaults based on mode
+        switch(value) {
+          case "hover":
+            newParams.maxPower = 120; newParams.maxZeta = 0.1; break;
+          case "cruise":
+            newParams.maxPower = 20; newParams.maxZeta = 1.5; break;
+          case "emergency":
+            newParams.maxPower = 400; newParams.maxZeta = 0.05; break;
+          case "standby":
+            newParams.maxPower = 10; newParams.maxZeta = 10; break;
+        }
+        setLocalParams(newParams);
+      }
+    }
+    
     if (onParameterChange) {
       onParameterChange({
         ...viabilityParams,
@@ -55,11 +117,19 @@ function InteractiveHeatMap({
       console.log(`🔧 Mode: ${viabilityParams?.duty === 0.14 ? 'Hover' : viabilityParams?.duty === 0.005 ? 'Cruise' : 'Custom'}`);
       
       try {
-        // Use the recipe-based viability grid computation with current constraints
+        // Use the recipe-based viability grid computation with mode-aware parameters
         const { computeViabilityGrid } = await import('./viability-grid');
         const enhancedParams = {
           ...viabilityParams,
-          ...localParams // Include local constraint parameters
+          ...localParams, // Include local constraint parameters
+          // Include current mode configuration for exact Live Energy Pipeline matching
+          currentMode: currentMode,
+          modeConfig: {
+            duty: currentMode.duty,
+            sectors: currentMode.sectors,
+            qSpoiling: currentMode.qSpoiling,
+            pocketGamma: currentMode.pocketGamma
+          }
         };
         const gridResult = computeViabilityGrid(enhancedParams, 25);
         const { A_vals, R_vals, Z } = gridResult;
@@ -114,6 +184,30 @@ function InteractiveHeatMap({
           <CardTitle className="text-lg">Physics Parameters</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Operational Mode Selector */}
+          <div className="space-y-2">
+            <Label>Operational Mode</Label>
+            <Select 
+              value={localParams.selectedMode} 
+              onValueChange={(value) => updateParameter('selectedMode', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(modes).map(([key, mode]) => (
+                  <SelectItem key={key} value={key}>
+                    {mode.name} - {mode.description}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Current: {currentMode.duty * 100}% duty, {currentMode.sectors === 1 ? 'no' : `${currentMode.sectors}-sector`} strobing, 
+              {currentMode.qSpoiling === 1 ? 'no' : `${(currentMode.qSpoiling * 1000).toFixed(0)}×10⁻³`} Q-spoiling
+            </p>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Geometric Amplification */}
             <div className="space-y-2">
@@ -143,18 +237,21 @@ function InteractiveHeatMap({
               <p className="text-xs text-muted-foreground">Cavity quality factor</p>
             </div>
             
-            {/* Duty Cycle */}
+            {/* Duty Cycle - Mode-controlled but still adjustable */}
             <div className="space-y-2">
-              <Label>Duty Cycle: {(localParams.duty * 100).toFixed(1)}%</Label>
+              <Label>Duty Cycle: {(currentMode.duty * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
               <Slider
-                value={[localParams.duty * 100]}
+                value={[currentMode.duty * 100]}
                 onValueChange={([value]) => updateParameter('duty', value / 100)}
                 min={0.1}
                 max={50}
                 step={0.1}
                 className="w-full"
+                disabled={localParams.selectedMode !== 'custom'}
               />
-              <p className="text-xs text-muted-foreground">Operational duty cycle</p>
+              <p className="text-xs text-muted-foreground">
+                {localParams.selectedMode === 'custom' ? 'Custom duty cycle' : 'Set by operational mode'}
+              </p>
             </div>
             
             {/* Sag Depth */}

@@ -18,35 +18,27 @@ export function computeViabilityGrid(
   const c = 2.998e8; // m/s
   const a = 1e-9; // 1 nm gap distance
   
-  // Mode-specific parameters from sliders
+  // Mode-specific parameters from sliders (exact Live Energy Pipeline matching)
   const gamma_geo = viabilityParams?.gammaGeo || 26;
-  const Q_mech = 5e4; // Mechanical Q
+  const Q_mech = 5e4; // Mechanical Q (fixed)
   const Q_cavity = viabilityParams?.qFactor || 1e9; // Use slider Q-factor
-  const d_cruise = viabilityParams?.duty || 0.14; // Mode duty cycle
   const f_drive = 15e9; // 15 GHz drive frequency
   const omega = 2 * pi * f_drive;
   
+  // Mode configuration (passed from phase diagram)
+  const modeConfig = viabilityParams?.modeConfig || {
+    duty: 0.14,
+    sectors: 1,
+    qSpoiling: 1,
+    pocketGamma: 2.86e9
+  };
+  
   // Constraint parameters from sliders
-  const maxPower_MW = viabilityParams?.maxPower || 500; // MW
-  const massTolerance_pct = viabilityParams?.massTolerance || 30; // %
-  const maxZeta = viabilityParams?.maxZeta || 2.0;
+  const maxPower_MW = viabilityParams?.maxPower || 120; // MW (hover mode default)
+  const massTolerance_pct = viabilityParams?.massTolerance || 5; // % (tight Needle Hull tolerance)
+  const maxZeta = viabilityParams?.maxZeta || 1.0;
   const minTimescale = viabilityParams?.minTimescale || 0.01;
   
-  // Combined throttle factors (mode-specific)
-  let Q_idle = Q_cavity;
-  let S_sectors = 1;
-  
-  if (Math.abs(d_cruise - 0.14) < 0.02) {
-    // Hover mode: no additional throttling
-    Q_idle = Q_cavity; S_sectors = 1;
-  } else if (Math.abs(d_cruise - 0.005) < 0.002) {
-    // Cruise mode: Q-spoiling + sector strobing  
-    Q_idle = Q_cavity * 0.001; S_sectors = 400;
-  } else if (Math.abs(d_cruise - 0.50) < 0.1) {
-    // Emergency mode: no additional throttling
-    Q_idle = Q_cavity; S_sectors = 1;
-  }
-
   let viableCount = 0;
   let totalCount = 0;
 
@@ -71,35 +63,42 @@ export function computeViabilityGrid(
         // Recipe Step 4: Number of tiles
         const N_tiles = A_hull / A_tile;
         
-        // Recipe Step 5: Pipeline constants
+        // Recipe Step 5: Energy pipeline (exact Live Energy Pipeline match)
         const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4));
-        const U_static = u_casimir * A_tile * a;
-        const U_geo = gamma_geo * U_static;
-        const U_Q = Q_mech * U_geo;
-        const U_cycle = U_Q * d_cruise; // Simplified for grid computation
+        const V_cavity = A_tile * a; // Cavity volume
+        const U_static = u_casimir * V_cavity / 2; // SCUFF-EM divide by 2 convention
+        const U_geo = gamma_geo * U_static; // Geometric amplification
+        const U_Q = Q_mech * U_geo; // Q-enhanced energy
         
-        // Recipe Step 6: Exotic mass
+        // Recipe Step 6: Van-den-Broeck pocket for fixed exotic mass (cruise duty for mass budgeting)
+        const M_target = 1405; // kg (exact Needle Hull target)
+        const cruise_duty = 0.005; // Always use cruise duty for mass calculation per paper
+        const U_cycle_base = U_Q * cruise_duty;
+        const gamma_pocket = modeConfig.pocketGamma;
+        const U_cycle = U_cycle_base * gamma_pocket; // Final cycle energy with pocket boost
+        
+        // Recipe Step 7: Exotic mass calculation 
         const M_exotic = N_tiles * Math.abs(U_cycle) / (c * c);
         
-        // Recipe Step 7: Raw per-tile loss & raw hull power
+        // Recipe Step 8: Raw per-tile loss & raw hull power
         const P_raw_tile = Math.abs(U_geo) * omega / Q_cavity;
         const P_raw = P_raw_tile * N_tiles;
         
-        // Recipe Step 8: Combined throttle
-        const f_throttle = d_cruise * (Q_idle / Q_cavity) * (1 / S_sectors);
+        // Recipe Step 9: Mode-specific throttling (exact Live Energy Pipeline match)
+        const Q_idle = Q_cavity * modeConfig.qSpoiling; // Q-spoiling factor
+        const f_throttle = modeConfig.duty * (Q_idle / Q_cavity) * (1 / modeConfig.sectors);
         
-        // Recipe Step 9: Realistic average power
+        // Recipe Step 10: Realistic average power
         const P_avg_W = P_raw * f_throttle;
         const P_avg_MW = P_avg_W / 1e6;
         
-        // Recipe Step 10: Time-scale & quantum margin
+        // Recipe Step 11: Time-scale & quantum margin
         const tau_LC = r / c;
         const tau_pulse = 1 / f_drive;
         const TS_ratio = tau_LC / tau_pulse;
-        const zeta = d_cruise > 0 ? 1 / (d_cruise * Math.sqrt(Q_mech)) : Infinity;
+        const zeta = modeConfig.duty > 0 ? 1 / (modeConfig.duty * Math.sqrt(Q_mech)) : Infinity;
         
-        // Recipe Step 11: Viability test with USER-CONFIGURABLE constraints
-        const M_target = 1405; // kg target mass from Needle Hull
+        // Recipe Step 12: Viability test with USER-CONFIGURABLE constraints
         const M_min = M_target * (1 - massTolerance_pct/100); // User-configurable mass tolerance
         const M_max = M_target * (1 + massTolerance_pct/100); 
         const P_max = maxPower_MW; // User-configurable max power (MW)
