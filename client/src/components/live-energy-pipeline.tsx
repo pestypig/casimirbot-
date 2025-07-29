@@ -85,6 +85,15 @@ export function LiveEnergyPipeline({
   const P_avg = P_raw * combined_throttle; // Throttled power in W
   const P_total_realistic = P_avg / 1e6; // Convert W to MW
   
+  // Debug logging
+  console.log("🔧 Power Calculation Debug:");
+  console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
+  console.log(`  N_tiles: ${N_tiles}`);
+  console.log(`  P_raw (total): ${P_raw} W`);
+  console.log(`  combined_throttle: ${combined_throttle}`);
+  console.log(`  P_avg (throttled): ${P_avg} W`);
+  console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
+  
   // Step 9: Time-Scale Separation (Equation 3 from PDF)
   const f_m = 15e9; // Hz (mechanical frequency)
   const T_m = 1 / f_m; // s (mechanical period)
