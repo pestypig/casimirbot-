@@ -80,6 +80,17 @@ function InteractiveHeatMap({
   
   // Get current mode configuration (use passed selectedMode instead of local state)
   const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
+
+  // Format Q-Factor for better readability
+  const formatQFactor = (qFactor: number) => {
+    if (qFactor >= 1e9) {
+      return `${(qFactor / 1e9).toFixed(1)}×10⁹`;
+    } else if (qFactor >= 1e6) {
+      return `${(qFactor / 1e6).toFixed(1)}×10⁶`;
+    } else {
+      return qFactor.toExponential(1);
+    }
+  };
   
   // Get mode-specific parameter values for double-click functionality
   const getModeSpecificValue = (parameter: string, mode: string) => {
@@ -279,7 +290,7 @@ function InteractiveHeatMap({
             
             {/* Q-Factor */}
             <div className="space-y-2">
-              <Label>Q-Factor: {(localParams.qFactor / 1e6).toFixed(1)}×10⁶</Label>
+              <Label>Q-Factor: {formatQFactor(localParams.qFactor)}</Label>
               <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
                 <Slider
                   value={[Math.log10(localParams.qFactor)]}
