@@ -82,10 +82,11 @@ export function LiveEnergyPipeline({
   const S_cruise = 400; // 400-sector strobing for cruise
   const cruise_throttle = d_cruise_power * Q_spoiling_factor * (1/S_cruise); // = 5×10^-9
   
-  // HOVER MODE: For 83 MW target (14% duty + no strobing)
+  // HOVER MODE: For 83 MW target (14% duty + no strobing + no Q-spoiling)
   const d_hover = 0.14; // 14% duty cycle for hover operations
   const S_hover = 1; // No sector strobing for hover
-  const hover_throttle = d_hover * Q_spoiling_factor * (1/S_hover); // = 1.4×10^-4
+  const Q_spoiling_hover = 1; // No Q-spoiling in hover mode (Q_idle/Q_on = 1)
+  const hover_throttle = d_hover * Q_spoiling_hover * (1/S_hover); // = 0.14
   
   // Use hover mode throttling to achieve 83 MW target
   const combined_throttle = hover_throttle;
@@ -102,7 +103,7 @@ export function LiveEnergyPipeline({
   console.log(`  P_raw (total): ${P_raw_W} W`);
   console.log(`  hover_duty: ${d_hover}, cruise_duty: ${d_cruise}`);
   console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
-  console.log(`  cruise_throttle: ${cruise_throttle}, hover_throttle: ${hover_throttle}`);
+  console.log(`  cruise_throttle: ${cruise_throttle}, hover_throttle: ${hover_throttle} (no Q-spoiling in hover)`);
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
@@ -117,7 +118,7 @@ export function LiveEnergyPipeline({
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
-  // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
+  // Step 11: Quantum Inequality Margin (Equation 3 from PDF) - needs d ≳ 0.4% or lower Q_mech
   const zeta = 1 / (d_cruise * Math.sqrt(Q_mechanical)); // Dimensionless (use mechanical Q)
   
   // Debug logging (after all calculations complete)
@@ -225,7 +226,7 @@ export function LiveEnergyPipeline({
               d_hover = {formatStandard(d_hover * 100)}% = {formatScientific(d_hover)}
             </div>
             <div className="text-muted-foreground">
-              Q_idle/Q_cavity = {formatScientific(Q_idle)}/{formatScientific(Q_cavity)} = {formatScientific(Q_spoiling_factor)}
+              Q_idle/Q_cavity = 1 (no spoiling in hover mode)
             </div>
             <div className="text-muted-foreground">
               1/S = 1/{S_hover} = {formatScientific(1/S_hover)}
