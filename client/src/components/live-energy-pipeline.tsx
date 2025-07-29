@@ -41,11 +41,10 @@ export function LiveEnergyPipeline({
   const A_tile = tileArea * 1e-4; // cm² to m²
   const R_ship = shipRadius; // already in m
   
-  // Use baseline research configuration for power calculations (not scaled hull)
-  const A_tile_baseline = 50e-4; // 50 cm² = 50e-4 m² baseline from research papers (to get ~62,832 tiles)
+  // Use actual slider tile area for N_tiles calculation (authentic scaling)
   const R_baseline = 5.0; // 5 m baseline radius
   const A_hull_baseline = 4 * pi * R_baseline * R_baseline; // ~314 m² spherical
-  const N_tiles = A_hull_baseline / A_tile_baseline; // 314.2 m² ÷ 50e-4 m² = 62,840 tiles (research baseline)
+  const N_tiles = A_hull_baseline / A_tile; // Use actual slider A_tile (5 cm² = 5e-4 m²) for ~628,320 tiles
   
   // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
   const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (CORRECT: 720)
@@ -56,7 +55,7 @@ export function LiveEnergyPipeline({
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
   const gamma_geo = gammaGeo; // User parameter (26 for Needle Hull)
-  const U_geo = Math.pow(gamma_geo, 3) * U_static; // γ³ scaling
+  const U_geo = gamma_geo * U_static; // γ¹ scaling (NOT γ³)
   
   // Step 4: Q-Enhancement (Equation 3 from PDF)
   const Q_on_needle = 1e9; // Needle Hull design Q_on ≈ 10^9 (high-Q cavity)
@@ -110,12 +109,14 @@ export function LiveEnergyPipeline({
   
   // Debug logging (after all calculations complete)
   console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
+  console.log(`🔍 Expected vs Actual: Target U_Q ≃ 260 J, Actual U_Q = ${U_Q.toExponential(3)} J`);
+  console.log(`🔍 Scale Analysis: U_Q/260 = ${(Math.abs(U_Q)/260).toExponential(3)}× too large`);
   console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile = ${A_tile.toExponential(3)} m², a = ${a.toExponential(3)} m`);
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
-  console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_baseline=${A_tile_baseline*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
+  console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
-  console.log(`🔍 Energy sequence check: γ³=${Math.pow(gamma_geo, 3)}, Q_on_needle=${Q_on_needle}, d=${d}`);
+  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_on_needle=${Q_on_needle}, d=${d}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Utility functions (declare before using)
@@ -160,7 +161,7 @@ export function LiveEnergyPipeline({
             <div>U_static = u_Casimir × A_tile = {formatScientific(U_static)} J</div>
             <div>U_Q = Q_on × U_static = {formatScientific(Q_on_needle)} × {formatScientific(U_static)} = {formatScientific(Q_on_needle * U_static)} J</div>
             <div className="text-blue-700 dark:text-blue-300 font-semibold">
-              U_geo = γ × U_Q = {formatStandard(gamma_geo)} × {formatScientific(Q_on_needle * U_static)} = {formatScientific(U_geo)} J
+              U_geo = γ × U_static = {formatStandard(gamma_geo)} × {formatScientific(U_static)} = {formatScientific(U_geo)} J
             </div>
           </div>
         </div>
