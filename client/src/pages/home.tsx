@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Atom, Settings, Book, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,33 @@ export default function Home() {
     
     return bestMatch;
   };
+
+  // Mode-aware constraint calculation
+  const getModeAwareConstraints = (mode: string) => {
+    switch(mode) {
+      case "hover":     // 14% duty → ~83 MW
+        return { maxPower: 120, maxZeta: 0.1, massTolPct: 5 };
+      case "cruise":    // 0.5% duty → ~0.007 MW  
+        return { maxPower: 20, maxZeta: 1.5, massTolPct: 5 };
+      case "emergency": // 50% duty → ~297 MW
+        return { maxPower: 400, maxZeta: 0.05, massTolPct: 5 };
+      case "standby":   // 0% duty → 0 MW
+        return { maxPower: 10, maxZeta: 10, massTolPct: 5 };
+      default:
+        return { maxPower: 100, maxZeta: 1.0, massTolPct: 5 };
+    }
+  };
+
+  // Get current mode constraints
+  const currentConstraints = getModeAwareConstraints(selectedMode);
+  
+  // Auto-update constraints when mode changes
+  useEffect(() => {
+    const newConstraints = getModeAwareConstraints(selectedMode);
+    setMaxPower(newConstraints.maxPower);
+    setMaxZeta(newConstraints.maxZeta);
+    setMassTolPct(newConstraints.massTolPct);
+  }, [selectedMode]);
 
   return (
     <div className="min-h-screen bg-background">
