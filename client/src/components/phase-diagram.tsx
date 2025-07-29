@@ -186,7 +186,7 @@ function InteractiveHeatMap({
       if (onModeChange) {
         onModeChange(value); // Notify parent component
       }
-      const mode = modes[value as keyof typeof modes];
+      const mode = modePresets[value as keyof typeof modePresets];
       if (mode) {
         newParams.duty = mode.duty;
         // Update constraint defaults based on mode
