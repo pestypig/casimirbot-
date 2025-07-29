@@ -84,29 +84,27 @@ export default function Home() {
               </h2>
               <PhaseDiagram
                 tileArea={tileArea}
-                setTileArea={setTileArea}
+                onTileAreaChange={setTileArea}
                 shipRadius={shipRadius}
-                setShipRadius={setShipRadius}
+                onShipRadiusChange={setShipRadius}
                 massTolPct={massTolPct}
-                setMassTolPct={setMassTolPct}
+                onMassTolPctChange={setMassTolPct}
                 maxPower={maxPower}
-                setMaxPower={setMaxPower}
+                onMaxPowerChange={setMaxPower}
                 maxZeta={maxZeta}
-                setMaxZeta={setMaxZeta}
+                onMaxZetaChange={setMaxZeta}
                 minGamma={minGamma}
-                setMinGamma={setMinGamma}
+                onMinGammaChange={setMinGamma}
                 gammaGeo={gammaGeo}
-                setGammaGeo={setGammaGeo}
+                onGammaGeoChange={setGammaGeo}
                 qFactor={qFactor}
-                setQFactor={setQFactor}
+                onQFactorChange={setQFactor}
                 duty={duty}
-                setDuty={setDuty}
+                onDutyChange={setDuty}
                 sagDepth={sagDepth}
-                setSagDepth={setSagDepth}
+                onSagDepthChange={setSagDepth}
                 temperature={temperature}
-                setTemperature={setTemperature}
-                simulationStatus={undefined}
-                results={null}
+                currentSimulation={null}
               />
             </div>
           </div>
