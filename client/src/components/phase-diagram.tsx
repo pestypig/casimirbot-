@@ -148,6 +148,42 @@ function InteractiveHeatMap({
         return modeConfig.duty;
       case 'sagDepth':
         return 16; // Standard Needle Hull research value
+      case 'maxPower':
+        // Mode-specific power constraints
+        switch (mode) {
+          case 'hover': return 120;
+          case 'cruise': return 20;
+          case 'emergency': return 400;
+          case 'standby': return 10;
+          default: return 120;
+        }
+      case 'massTolerance':
+        // Mode-specific mass tolerance
+        switch (mode) {
+          case 'hover': return 5; // Tight control for station-keeping
+          case 'cruise': return 10; // Moderate tolerance for efficiency
+          case 'emergency': return 15; // Relaxed for high power
+          case 'standby': return 50; // Very relaxed (system off)
+          default: return 5;
+        }
+      case 'maxZeta':
+        // Mode-specific quantum safety limits
+        switch (mode) {
+          case 'hover': return 0.1; // Very strict for station-keeping
+          case 'cruise': return 1.5; // Relaxed for Ford-Roman compliance
+          case 'emergency': return 0.05; // Extremely strict for high power  
+          case 'standby': return 10.0; // Very relaxed (system off)
+          default: return 1.0;
+        }
+      case 'minTimescale':
+        // Mode-specific time-scale separation requirements
+        switch (mode) {
+          case 'hover': return 0.001; // Strict separation for stability
+          case 'cruise': return 0.01; // Moderate separation
+          case 'emergency': return 0.0001; // Very strict for high power
+          case 'standby': return 0.1; // Relaxed (system off)
+          default: return 0.01;
+        }
       default:
         return null;
     }
@@ -403,57 +439,73 @@ function InteractiveHeatMap({
               {/* Max Power */}
               <div className="space-y-2">
                 <Label>Max Power: {localParams.maxPower} MW</Label>
-                <Slider
-                  value={[localParams.maxPower]}
-                  onValueChange={([value]) => updateParameter('maxPower', value)}
-                  min={50}
-                  max={2000}
-                  step={10}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">Maximum allowable power</p>
+                <div onDoubleClick={() => handleSliderDoubleClick('maxPower')}>
+                  <Slider
+                    value={[localParams.maxPower]}
+                    onValueChange={([value]) => updateParameter('maxPower', value)}
+                    min={50}
+                    max={2000}
+                    step={10}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Maximum allowable power • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxPower', selectedMode)} MW)
+                </p>
               </div>
               
               {/* Mass Tolerance */}
               <div className="space-y-2">
                 <Label>Mass Tolerance: ±{localParams.massTolerance}%</Label>
-                <Slider
-                  value={[localParams.massTolerance]}
-                  onValueChange={([value]) => updateParameter('massTolerance', value)}
-                  min={5}
-                  max={100}
-                  step={5}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">Exotic mass target tolerance</p>
+                <div onDoubleClick={() => handleSliderDoubleClick('massTolerance')}>
+                  <Slider
+                    value={[localParams.massTolerance]}
+                    onValueChange={([value]) => updateParameter('massTolerance', value)}
+                    min={5}
+                    max={100}
+                    step={5}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Exotic mass target tolerance • Double-click to apply {selectedMode} mode value (±{getModeSpecificValue('massTolerance', selectedMode)}%)
+                </p>
               </div>
               
               {/* Quantum Safety */}
               <div className="space-y-2">
                 <Label>Max ζ: {localParams.maxZeta.toFixed(1)}</Label>
-                <Slider
-                  value={[localParams.maxZeta]}
-                  onValueChange={([value]) => updateParameter('maxZeta', value)}
-                  min={0.5}
-                  max={5.0}
-                  step={0.1}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">Quantum inequality limit</p>
+                <div onDoubleClick={() => handleSliderDoubleClick('maxZeta')}>
+                  <Slider
+                    value={[localParams.maxZeta]}
+                    onValueChange={([value]) => updateParameter('maxZeta', value)}
+                    min={0.05}
+                    max={15.0}
+                    step={0.05}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Quantum inequality limit • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxZeta', selectedMode)?.toFixed(2)})
+                </p>
               </div>
               
               {/* Time-scale Separation */}
               <div className="space-y-2">
                 <Label>Min Time-scale: {localParams.minTimescale.toFixed(3)}</Label>
-                <Slider
-                  value={[Math.log10(localParams.minTimescale)]}
-                  onValueChange={([value]) => updateParameter('minTimescale', Math.pow(10, value))}
-                  min={-4}
-                  max={-1}
-                  step={0.1}
-                  className="w-full"
-                />
-                <p className="text-xs text-muted-foreground">Minimum time-scale separation</p>
+                <div onDoubleClick={() => handleSliderDoubleClick('minTimescale')}>
+                  <Slider
+                    value={[Math.log10(localParams.minTimescale)]}
+                    onValueChange={([value]) => updateParameter('minTimescale', Math.pow(10, value))}
+                    min={-4}
+                    max={-1}
+                    step={0.1}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Minimum time-scale separation • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('minTimescale', selectedMode)?.toFixed(3)})
+                </p>
               </div>
             </div>
           </div>
