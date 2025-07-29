@@ -116,6 +116,8 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: ~1400 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull=${A_hull_baseline.toFixed(1)} m², A_tile_baseline=${A_tile_baseline*1e4} cm², N_tiles=${N_tiles.toFixed(0)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
+  console.log(`🔍 Energy sequence check: γ³=${Math.pow(gamma_geo, 3)}, Q_on=${Q_on}, d=${d}`);
+  console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
