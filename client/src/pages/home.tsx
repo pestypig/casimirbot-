@@ -369,7 +369,6 @@ export default function Home() {
                   onQFactorChange={setQFactor}
                   onDutyChange={setDuty}
                   onSagDepthChange={setSagDepth}
-                  simulationStatus={activeSimulation?.status || 'pending'}
                   simulationResults={activeSimulation}
                 />
               </div>
