@@ -194,8 +194,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     });
   }, [viabilityParams, computeMetrics]);
 
-  // Prepare radar chart data with mode-aware safe zones
-  const getRadarData = () => {
+  // Memoize radar chart data with mode-aware safe zones
+  const radarData = React.useMemo(() => {
     if (!metrics) return null;
 
     // Current mode for debug logging
@@ -242,7 +242,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       line: { color: '#22c55e', dash: 'dash', width: 2 },
       fillcolor: 'rgba(34, 197, 94, 0.1)'
     }];
-  };
+  }, [metrics, viabilityParams?.selectedMode, constraints]);
 
   const radarLayout = {
     polar: {
@@ -284,9 +284,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         </CardHeader>
         <CardContent>
           <div className="w-full">
-            {metrics && (
+            {metrics && radarData && (
               <Plot
-                data={getRadarData() || []}
+                key={`radar-${viabilityParams?.selectedMode || 'hover'}-${Date.now()}`}
+                data={radarData}
                 layout={radarLayout}
                 config={{ responsive: true }}
                 style={{ width: '100%', height: '400px' }}
