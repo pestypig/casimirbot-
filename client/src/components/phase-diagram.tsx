@@ -79,17 +79,21 @@ function InteractiveHeatMap({
   
   // Helper to get mode-specific constraint defaults
   const getModeConstraintDefaults = (mode: string) => {
+    // NOTE: minTimescale is UNIVERSAL homogenization threshold (TS_ratio ≥ 10)
+    // NOT mode-specific - all modes must clear same τ_pulse ≪ τ_LC bar
+    const universalMinTimescale = 0.01; // TS_ratio = 100 for conservative safety margin
+    
     switch (mode) {
       case 'hover':
-        return { maxPower: 120, massTolerance: 5, maxZeta: 0.1, minTimescale: 0.001 };
+        return { maxPower: 120, massTolerance: 5, maxZeta: 0.1, minTimescale: universalMinTimescale };
       case 'cruise':
-        return { maxPower: 20, massTolerance: 10, maxZeta: 1.5, minTimescale: 0.01 };
+        return { maxPower: 20, massTolerance: 10, maxZeta: 1.5, minTimescale: universalMinTimescale };
       case 'emergency':
-        return { maxPower: 400, massTolerance: 15, maxZeta: 0.05, minTimescale: 0.0001 };
+        return { maxPower: 400, massTolerance: 15, maxZeta: 0.05, minTimescale: universalMinTimescale };
       case 'standby':
-        return { maxPower: 10, massTolerance: 50, maxZeta: 10.0, minTimescale: 0.1 };
+        return { maxPower: 10, massTolerance: 50, maxZeta: 10.0, minTimescale: universalMinTimescale };
       default:
-        return { maxPower: 120, massTolerance: 5, maxZeta: 1.0, minTimescale: 0.01 };
+        return { maxPower: 120, massTolerance: 5, maxZeta: 1.0, minTimescale: universalMinTimescale };
     }
   };
 
@@ -194,14 +198,9 @@ function InteractiveHeatMap({
           default: return 1.0;
         }
       case 'minTimescale':
-        // Mode-specific time-scale separation requirements
-        switch (mode) {
-          case 'hover': return 0.001; // Strict separation for stability
-          case 'cruise': return 0.01; // Moderate separation
-          case 'emergency': return 0.0001; // Very strict for high power
-          case 'standby': return 0.1; // Relaxed (system off)
-          default: return 0.01;
-        }
+        // UNIVERSAL homogenization threshold: TS_ratio = τ_LC/τ_pulse ≥ 100
+        // Same for ALL modes - ensures τ_pulse ≪ τ_LC across all operational envelopes
+        return 0.01; // Conservative TS_ratio = 100 safety margin
       default:
         return null;
     }
@@ -522,7 +521,7 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Minimum time-scale separation • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('minTimescale', selectedMode)?.toFixed(3)})
+                  Universal homogenization threshold (TS_ratio ≥ 100) • Double-click to apply research value (0.010)
                 </p>
               </div>
             </div>
