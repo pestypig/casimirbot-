@@ -129,7 +129,7 @@ function InteractiveHeatMap({ currentTileArea, currentShipRadius, viabilityParam
             const V_cavity = A_tile * a;
             const u_casimir = -(pi * pi * HBARC) / (240 * a * a * a);
             const U_static = u_casimir * V_cavity / 2;
-            const U_geo = viabilityParams.gammaGeo * U_static;
+            const U_geo = (viabilityParams?.gammaGeo || 26) * U_static;
             const Q_mechanical = 5e4;
             const Q_cavity = 1e9;
             const U_Q = Q_mechanical * U_geo;
