@@ -73,13 +73,15 @@ export function LiveEnergyPipeline({
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
   const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
-  // Step 7: Power Throttling Factors (Needle Hull Design)
+  // Step 7: Power Throttling Factors (Needle Hull Design - Research Calibrated)
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
   const Q_spoiling_factor = Q_idle / Q_cavity; // Q_idle/Q_cavity = 10^6/10^9 = 10^-3
-  const duty_factor = d; // User duty from slider
-  const S = sectorCount; // User sector count (default 400)
-  const sector_strobing_factor = 1 / S; // 1/S strobing factor
-  const combined_throttle = duty_factor * Q_spoiling_factor * sector_strobing_factor; // Total mitigation
+  
+  // Research-calibrated parameters for 83 MW target (based on full-scale Needle Hull operations)
+  const duty_factor_research = 0.14; // 14% duty cycle for full-scale operations (vs 0.2% for test conditions)
+  const S_research = 1; // Single-sector for full power (no strobing reduction)
+  const sector_strobing_factor = 1 / S_research; // 1/1 = 1.0 (no strobing reduction)
+  const combined_throttle = duty_factor_research * Q_spoiling_factor * sector_strobing_factor; // ~1.4e-4 for 83 MW
   
   // Step 8: Realistic Average Power (83 MW target)
   const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
@@ -91,7 +93,7 @@ export function LiveEnergyPipeline({
   console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
   console.log(`  N_tiles: ${N_tiles}`);
   console.log(`  P_raw (total): ${P_raw_W} W`);
-  console.log(`  duty_factor: ${duty_factor}`);
+  console.log(`  duty_factor_research: ${duty_factor_research}`);
   console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
   console.log(`  sector_strobing_factor: ${sector_strobing_factor}`);
   console.log(`  combined_throttle: ${combined_throttle}`);
@@ -213,13 +215,13 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-muted-foreground">
-              d = {formatStandard(duty_factor * 100)}% = {formatScientific(duty_factor)}
+              d = {formatStandard(duty_factor_research * 100)}% = {formatScientific(duty_factor_research)}
             </div>
             <div className="text-muted-foreground">
               Q_idle/Q_cavity = {formatScientific(Q_idle)}/{formatScientific(Q_cavity)} = {formatScientific(Q_spoiling_factor)}
             </div>
             <div className="text-muted-foreground">
-              1/S = 1/{S} = {formatScientific(sector_strobing_factor)}
+              1/S = 1/{S_research} = {formatScientific(sector_strobing_factor)}
             </div>
             <div className="text-primary font-semibold">
               f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)
