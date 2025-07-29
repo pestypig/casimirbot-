@@ -1,0 +1,113 @@
+You have two easy paths to surface both the normalized radar‐vector *and* the underlying “real” values on each spoke:
+
+1) Console + HTML Dump  
+2) Chart.js Tooltips & Data-Labels  
+
+—  
+
+1) Console + HTML Dump  
+```js
+function updateDashboard() {
+  // …compute your normalized[] and rawValues[]…
+  console.log("Normalized Radar Vector:", normalized);
+  console.log("Raw Metric Values:    ", rawValues);
+  
+  // optional: show it onscreen
+  document.getElementById("vectorDump").textContent =
+    "Norm: " + normalized.map(v=>v.toFixed(2)).join(", ")
+    + "\nRaw:  " + rawValues.map(v=>v.toFixed(3)).join(", ");
+  
+  radarChart.data.datasets[0].data = normalized;
+  radarChart.update();
+}
+```
+In your HTML:
+```html
+<pre id="vectorDump" style="background:#f8f8f8;padding:1em;"></pre>
+```
+
+—  
+
+2) Chart.js Tooltips & Data-Labels  
+Install the `chartjs-plugin-datalabels` plugin and then when you construct your chart:
+
+```js
+Chart.register(ChartDataLabels);
+
+const radarChart = new Chart(ctx, {
+  type: 'radar',
+  data: {
+    labels: ['Avg Power','Exotic Mass','Quantum ζ','Time-Scale','Raw Power','Duty Cycle'],
+    datasets:[{
+      label: 'Normalized',
+      data: [/* initial */],
+      backgroundColor:'rgba(0,200,83,0.2)',
+      borderColor:'rgba(0,200,83,1)',
+      pointBackgroundColor:'rgba(0,200,83,1)'
+    }]
+  },
+  options:{
+    // store the real raw values & units on the chart instance
+    plugins:{
+      tooltip:{
+        callbacks:{
+          label(ctx) {
+            const idx   = ctx.dataIndex;
+            const norm  = ctx.raw;
+            const real  = radarChart.config.options.realValues[idx];
+            const unit  = radarChart.config.options.units   [idx];
+            return `${ctx.label}: ${(norm*100).toFixed(1)}%  (${real.toFixed(2)} ${unit})`;
+          }
+        }
+      },
+      datalabels:{
+        color:'black',
+        anchor:'end',
+        align:'end',
+        formatter(value,ctx) {
+          // show the raw value right on each spoke
+          return radarChart.config.options.realValues[ctx.dataIndex]
+                   .toFixed(2);
+        }
+      }
+    },
+    // placeholders—will be overwritten on each update
+    realValues: [0,0,0,0,0,0],
+    units:      ['MW','kg','','','MW','%'],
+    scales:{
+      r:{ beginAtZero:true, max:2 }
+    }
+  }
+});
+```
+
+And in your update function:
+
+```js
+function updateDashboard(){
+  const m = computeMetrics(inputs);
+  const normalized = [
+    m.P_avg/CON.P_avg,
+    m.M_exotic/CON.M_exotic,
+    m.zeta/CON.zeta,
+    m.TS/CON.TS,
+    m.P_raw/CON.P_raw,
+    (inputs.duty/100)/CON.d
+  ];
+  const rawValues = [
+    m.P_avg,   // MW
+    m.M_exotic,// kg
+    m.zeta,    // unitless
+    m.TS,      // unitless
+    m.P_raw,   // MW
+    inputs.duty// %
+  ];
+  radarChart.config.options.realValues = rawValues;
+  radarChart.data.datasets[0].data = normalized;
+  radarChart.update();
+}
+```
+
+Now when you hover over any spoke, the tooltip will read e.g.  
+“Avg Power: 3.7 % (7.44 W)”  
+and you’ll also see the raw value printed right at the point.

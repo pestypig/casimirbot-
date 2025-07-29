@@ -314,20 +314,105 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
           </p>
         </CardHeader>
         <CardContent>
-          <div className="w-full">
+          <div className="flex gap-6">
+            {/* Radar Chart */}
+            <div className="flex-1">
+              {metrics && radarData && (
+                <Plot
+                  key={`radar-${renderKey}-${viabilityParams?.selectedMode || 'hover'}`}
+                  data={radarData}
+                  layout={radarLayout}
+                  config={{ responsive: true, displayModeBar: false }}
+                  style={{ width: '100%', height: '400px' }}
+                  useResizeHandler={true}
+                  revision={renderKey}
+                />
+              )}
+              {!metrics && <div>Loading metrics...</div>}
+              {!radarData && metrics && <div>Generating chart...</div>}
+            </div>
+            
+            {/* Values Transparency Panel */}
             {metrics && radarData && (
-              <Plot
-                key={`radar-${renderKey}-${viabilityParams?.selectedMode || 'hover'}`}
-                data={radarData}
-                layout={radarLayout}
-                config={{ responsive: true, displayModeBar: false }}
-                style={{ width: '100%', height: '400px' }}
-                useResizeHandler={true}
-                revision={renderKey}
-              />
+              <div className="w-80 bg-muted/30 rounded-lg p-4 space-y-4">
+                <h4 className="font-semibold text-sm mb-3">Vector Transparency</h4>
+                
+                {/* Normalized Vector */}
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">NORMALIZED RADAR VECTOR</h5>
+                  <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
+                    {radarData[0].r?.map((value, index) => (
+                      <div key={index} className="flex justify-between">
+                        <span className="text-muted-foreground">{radarData[0].theta?.[index]}:</span>
+                        <span className={value > 1.0 ? "text-red-600 font-semibold" : "text-green-600"}>
+                          {typeof value === 'number' ? value.toFixed(2) : 'N/A'}
+                        </span>
+                      </div>
+                    )) || []}
+                  </div>
+                </div>
+                
+                {/* Raw Values */}
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">RAW METRIC VALUES</h5>
+                  <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">P_avg:</span>
+                      <span className="font-semibold">
+                        {metrics.P_avg >= 1 ? `${metrics.P_avg.toFixed(1)} MW` : `${(metrics.P_avg * 1e6).toFixed(1)} W`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Duty:</span>
+                      <span className="font-semibold">{(metrics.f_throttle * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">M_exotic:</span>
+                      <span className="font-semibold">{metrics.M_exotic.toFixed(0)} kg</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ζ:</span>
+                      <span className="font-semibold">{metrics.zeta.toFixed(3)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">TS_ratio:</span>
+                      <span className="font-semibold">{metrics.TS_ratio.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">P_raw:</span>
+                      <span className="font-semibold">{metrics.P_raw.toFixed(1)} MW</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">γ_geo:</span>
+                      <span className="font-semibold">{viabilityParams?.gammaGeo || 26}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Constraint Limits */}
+                <div>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">CONSTRAINT LIMITS</h5>
+                  <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">P_max:</span>
+                      <span>{constraints.P_avg_max} MW</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">M_target:</span>
+                      <span>{constraints.M_target} ±{constraints.M_tolerance}% kg</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">ζ_max:</span>
+                      <span>{constraints.zeta_max}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">TS_min:</span>
+                      <span>100 (universal)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
-            {!metrics && <div>Loading metrics...</div>}
-            {!radarData && metrics && <div>Generating chart...</div>}
           </div>
         </CardContent>
       </Card>
