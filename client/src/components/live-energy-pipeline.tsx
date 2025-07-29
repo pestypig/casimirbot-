@@ -486,7 +486,12 @@ export function LiveEnergyPipeline({
             </div>
             <div>
               <span className="text-muted-foreground">Realistic Power:</span>
-              <div className="font-semibold text-green-600 dark:text-green-400">{formatStandard(P_total_realistic)} MW</div>
+              <div className="font-semibold text-green-600 dark:text-green-400">
+                {P_total_realistic >= 1 
+                  ? `${formatStandard(P_total_realistic)} MW`
+                  : `${formatStandard(P_total_realistic * 1e6)} W`
+                }
+              </div>
             </div>
             <div>
               <span className="text-muted-foreground">Exotic Mass:</span>
