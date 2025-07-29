@@ -244,6 +244,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     }];
   }, [metrics, viabilityParams?.selectedMode, constraints]);
 
+  // Force re-render when mode changes
+  const [renderKey, setRenderKey] = React.useState(0);
+  React.useEffect(() => {
+    console.log(`🔄 Mode changed to: ${viabilityParams?.selectedMode}, forcing chart re-render`);
+    setRenderKey(prev => prev + 1);
+  }, [viabilityParams?.selectedMode]);
+
   const radarLayout = {
     polar: {
       radialaxis: {
@@ -286,13 +293,17 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
           <div className="w-full">
             {metrics && radarData && (
               <Plot
-                key={`radar-${viabilityParams?.selectedMode || 'hover'}-${Date.now()}`}
+                key={`radar-${renderKey}-${viabilityParams?.selectedMode || 'hover'}`}
                 data={radarData}
                 layout={radarLayout}
-                config={{ responsive: true }}
+                config={{ responsive: true, displayModeBar: false }}
                 style={{ width: '100%', height: '400px' }}
+                useResizeHandler={true}
+                revision={renderKey}
               />
             )}
+            {!metrics && <div>Loading metrics...</div>}
+            {!radarData && metrics && <div>Generating chart...</div>}
           </div>
         </CardContent>
       </Card>
