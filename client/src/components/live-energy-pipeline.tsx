@@ -391,10 +391,12 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>P_avg = P_raw × f_throttle</div>
             <div className="text-muted-foreground">
-              P_avg = ({formatScientific(P_loss_raw * N_tiles)}) × ({formatScientific(combined_throttle)})
+              P_avg = ({formatScientific(P_loss_raw * N_tiles)} W) × ({formatScientific(combined_throttle)})
             </div>
             <div className="text-green-700 dark:text-green-300 font-semibold text-lg">
-              P_avg = {formatStandard(P_total_realistic)} MW
+              P_avg = {P_total_realistic >= 1 
+                ? `${formatStandard(P_total_realistic)} MW`
+                : `${formatStandard(P_total_realistic * 1e6)} W`}
             </div>
           </div>
         </div>
