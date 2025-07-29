@@ -352,3 +352,10 @@ The current scientific foundation provides the authentic physics core that can b
           - γ_geo: 26, Q-factor: 1.6×10⁶, Burst Duty: 0.2%, Sag Depth: 16 nm
           - Phase diagram now starts in the viable region highlighted by research papers
           - All constraint sliders maintain research-grade defaults (±5% mass tolerance, 100 MW power, ζ ≤ 1.0, γ ≥ 25)
+- **Live Energy Pipeline Implementation (July 29, 2025)**: Added transparent step-by-step equation display with real-time parameter substitution
+  - Created comprehensive 10-step energy pipeline showing equations from research papers
+  - Real-time parameter substitution: users see slider values populate equations instantly
+  - Step-by-step calculation from Static Casimir → Geometric Amplification → Q-Enhancement → Duty Cycling → Power/Mass
+  - Scientific notation formatting with proper units for all intermediate values
+  - Visual validation with checkmarks for time-scale separation and quantum safety constraints
+  - Makes physics calculations completely transparent and checkable before simulation runs

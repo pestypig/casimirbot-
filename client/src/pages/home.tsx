@@ -8,6 +8,7 @@ import SimulationStatus from "@/components/simulation-status";
 import ResultsPanel from "@/components/results-panel";
 import { MeshVisualization } from "@/components/mesh-visualization";
 import PhaseDiagram from "@/components/phase-diagram";
+import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
 import { createSimulation, startSimulation, generateScuffgeo, downloadFile, downloadAllFiles, createWebSocketConnection } from "@/lib/simulation-api";
 import { SimulationParameters, SimulationResult } from "@shared/schema";
 
@@ -315,6 +316,19 @@ export default function Home() {
 
             {/* Mesh Visualization */}
             <MeshVisualization />
+
+            {/* Live Energy Pipeline - Real-time Equation Display */}
+            <LiveEnergyPipeline
+              gammaGeo={gammaGeo}
+              qFactor={qFactor}
+              duty={duty}
+              sagDepth={sagDepth}
+              temperature={temperature}
+              tileArea={tileArea}
+              shipRadius={shipRadius}
+              gapDistance={1.0}
+              isRunning={isSimulationRunning}
+            />
 
             {/* Interactive Phase Diagram - Always Visible */}
             <div className="bg-card rounded-lg border border-border">
