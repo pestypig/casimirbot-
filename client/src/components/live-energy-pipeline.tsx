@@ -53,12 +53,13 @@ export function LiveEnergyPipeline({
   const U_static = u_casimir * A_tile * a; // J per tile
   
   // Step 3: Geometric Amplification (Equation 3 from PDF)
-  const gamma_geo = gammaGeo; // User parameter
+  const gamma_geo = gammaGeo; // User parameter (26 for Needle Hull)
   const U_geo_raw = Math.pow(gamma_geo, 3) * U_static; // γ³ scaling
   
   // Step 4: Q-Enhancement (Equation 3 from PDF)
-  const Q = qFactor; // User parameter
-  const U_Q = Q * U_geo_raw; // J per tile
+  const Q_on = qFactor; // User parameter (1.6×10⁶ for Needle Hull)
+  const U_geo = gamma_geo * Q_on * U_static; // Correct Needle Hull formula: γ × Q_on × U_static
+  const U_Q = U_geo; // This is the enhanced energy per tile
   
   // Step 5: Duty Cycle Averaging (Equation 3 from PDF)
   const d = duty; // User parameter (fraction)
@@ -66,12 +67,11 @@ export function LiveEnergyPipeline({
   
   // Step 6: Raw Power Loss (Equation 3 from PDF)
   const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
-  const P_loss_raw = Math.abs(U_Q * omega / Q); // W per tile (raw, unthrottled)
+  const P_loss_raw = Math.abs(U_geo * omega / Q_on); // W per tile (raw, unthrottled)
   
   // Step 7: Power Throttling Factors (Needle Hull Design)
-  const Q_on = Q; // Q during burst periods
   const Q_idle = 1e6; // Q during idle periods (Q-spoiling)
-  const Q_spoiling_factor = Q_idle / Q_on; // ~10⁻³ for Q=1.6×10⁶ → Q=10⁶
+  const Q_spoiling_factor = Q_idle / Q_on; // For Q_on=1.6×10⁶ → ~0.625
   const duty_factor = d; // 0.002 for 0.2% duty cycle
   const sector_strobing_factor = 1 / 400; // 1/S = 2.5×10⁻³ (400 sectors)
   const combined_throttle = duty_factor * Q_spoiling_factor * sector_strobing_factor; // Total mitigation
@@ -92,7 +92,7 @@ export function LiveEnergyPipeline({
   const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
   
   // Step 11: Quantum Inequality Margin (Equation 3 from PDF)
-  const zeta = 1 / (d * Math.sqrt(Q)); // Dimensionless
+  const zeta = 1 / (d * Math.sqrt(Q_on)); // Dimensionless
   
   const formatScientific = (value: number, decimals = 3) => {
     if (Math.abs(value) === 0) return "0";
@@ -158,36 +158,36 @@ export function LiveEnergyPipeline({
           </div>
         </div>
 
-        {/* Step 3: Geometric Amplification */}
+        {/* Step 3: Combined Amplification (Needle Hull Formula) */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">3</span>
-            Geometric Amplification (γ³ scaling)
+            Combined Amplification (Needle Hull)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>U_geo = γ³ × U_static</div>
+            <div>U_geo = γ × Q_on × U_static</div>
             <div className="text-muted-foreground">
-              U_geo = ({formatStandard(gamma_geo)})³ × ({formatScientific(U_static)})
+              U_geo = ({formatStandard(gamma_geo)}) × ({formatScientific(Q_on)}) × ({formatScientific(U_static)})
             </div>
             <div className="text-primary font-semibold">
-              U_geo = {formatScientific(U_geo_raw)} J
+              U_geo = {formatScientific(U_geo)} J
             </div>
           </div>
         </div>
 
-        {/* Step 4: Q-Enhancement */}
+        {/* Step 4: Energy Per Tile */}
         <div className="bg-muted/50 rounded-lg p-4">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
-            Q-Factor Enhancement
+            Enhanced Energy Per Tile
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>U_Q = Q × U_geo</div>
+            <div>U_enhanced = U_geo</div>
             <div className="text-muted-foreground">
-              U_Q = ({formatScientific(Q)}) × ({formatScientific(U_geo_raw)})
+              Using Needle Hull amplification formula
             </div>
             <div className="text-primary font-semibold">
-              U_Q = {formatScientific(U_Q)} J
+              U_enhanced = {formatScientific(U_Q)} J per tile
             </div>
           </div>
         </div>
@@ -216,9 +216,9 @@ export function LiveEnergyPipeline({
             Raw Power Loss (Unthrottled)
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>P_raw = |U_Q| × ω / Q</div>
+            <div>P_raw = |U_geo| × ω / Q_on</div>
             <div className="text-muted-foreground">
-              P_raw = ({formatScientific(Math.abs(U_Q))}) × ({formatScientific(omega)}) / ({formatScientific(Q)})
+              P_raw = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_on)})
             </div>
             <div className="text-primary font-semibold">
               P_raw = {formatScientific(P_loss_raw)} W per tile
@@ -301,9 +301,9 @@ export function LiveEnergyPipeline({
             Quantum Inequality Margin
           </h4>
           <div className="font-mono text-sm space-y-1">
-            <div>ζ = 1 / (d × √Q)</div>
+            <div>ζ = 1 / (d × √Q_on)</div>
             <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q)})
+              ζ = 1 / ({formatStandard(d * 100)}% × √{formatScientific(Q_on)})
             </div>
             <div className="text-primary font-semibold">
               ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
