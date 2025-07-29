@@ -227,7 +227,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       Math.min(metrics.f_throttle / 0.5, 2), // Duty Cycle (normalized to 50% max)  
       Math.min(Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100), 2), // Mass Error
       Math.min(metrics.zeta / currentConstraints.zeta_max, 2), // Quantum Safety vs mode limit
-      Math.min(metrics.TS_ratio / currentConstraints.TS_min, 2), // Time-Scale (want high TS_ratio ≫ TS_min)
+      metrics.TS_ratio / currentConstraints.TS_min, // Time-Scale (want high TS_ratio ≫ TS_min, no cap needed)
       Math.min(metrics.P_raw / 1000, 2), // Raw Power (fixed scale for visual separation)
       Math.min(metrics.U_cycle / 1e12, 2) // Energy magnitude (larger denominator for visual separation)
     ];
