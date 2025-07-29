@@ -160,7 +160,7 @@ export default function Home() {
                 qFactor={qFactor}
                 onQFactorChange={setQFactor}
                 duty={duty}
-                onDutyChange={(newDuty) => {
+                onDutyChange={(newDuty: number) => {
                   setDuty(newDuty);
                   // Auto-update operational mode when duty cycle changes from phase diagram
                   const matchingMode = findBestMatchingMode(newDuty);
@@ -172,6 +172,22 @@ export default function Home() {
                 onSagDepthChange={setSagDepth}
                 temperature={temperature}
                 currentSimulation={null}
+                // Add mode synchronization
+                selectedMode={selectedMode}
+                onModeChange={(newMode: string) => {
+                  setSelectedMode(newMode);
+                  // Update other parameters when mode changes from phase diagram
+                  const modes = {
+                    hover: { duty: 0.14 },
+                    cruise: { duty: 0.005 },
+                    emergency: { duty: 0.50 },
+                    standby: { duty: 0.0 }
+                  };
+                  const modeConfig = modes[newMode as keyof typeof modes];
+                  if (modeConfig) {
+                    setDuty(modeConfig.duty);
+                  }
+                }}
               />
             </div>
           </div>

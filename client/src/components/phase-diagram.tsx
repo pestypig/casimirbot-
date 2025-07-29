@@ -12,6 +12,8 @@ interface InteractiveHeatMapProps {
   constraintConfig?: any;
   currentSimulation?: any;
   onParameterChange?: (newParams: any) => void;
+  selectedMode?: string;
+  onModeChange?: (mode: string) => void;
 }
 
 function InteractiveHeatMap({ 
@@ -20,7 +22,9 @@ function InteractiveHeatMap({
   viabilityParams, 
   constraintConfig, 
   currentSimulation,
-  onParameterChange 
+  onParameterChange,
+  selectedMode = "hover",
+  onModeChange
 }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -63,7 +67,7 @@ function InteractiveHeatMap({
 
   // Local parameter state for sliders
   const [localParams, setLocalParams] = useState({
-    selectedMode: "hover",
+    selectedMode: selectedMode,
     gammaGeo: viabilityParams?.gammaGeo || 26,
     qFactor: viabilityParams?.qFactor || 1.6e6,
     duty: viabilityParams?.duty || 0.14,
@@ -74,8 +78,8 @@ function InteractiveHeatMap({
     minTimescale: 0.01
   });
   
-  // Get current mode configuration
-  const currentMode = modes[localParams.selectedMode as keyof typeof modes] || modes.hover;
+  // Get current mode configuration (use passed selectedMode instead of local state)
+  const currentMode = modes[selectedMode as keyof typeof modes] || modes.hover;
   
   // Update parent when local parameters change
   const updateParameter = (key: string, value: number | string) => {
@@ -84,6 +88,9 @@ function InteractiveHeatMap({
     
     // If mode changed, update duty and other mode-specific parameters
     if (key === 'selectedMode' && typeof value === 'string') {
+      if (onModeChange) {
+        onModeChange(value); // Notify parent component
+      }
       const mode = modes[value as keyof typeof modes];
       if (mode) {
         newParams.duty = mode.duty;
@@ -188,7 +195,7 @@ function InteractiveHeatMap({
           <div className="space-y-2">
             <Label>Operational Mode</Label>
             <Select 
-              value={localParams.selectedMode} 
+              value={selectedMode} 
               onValueChange={(value) => updateParameter('selectedMode', value)}
             >
               <SelectTrigger>
@@ -250,7 +257,7 @@ function InteractiveHeatMap({
                 disabled={localParams.selectedMode !== 'custom'}
               />
               <p className="text-xs text-muted-foreground">
-                {localParams.selectedMode === 'custom' ? 'Custom duty cycle' : 'Set by operational mode'}
+                Set by operational mode ({currentMode.name})
               </p>
             </div>
             
