@@ -151,7 +151,7 @@ export function LiveEnergyPipeline({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Calculator className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Live Energy Pipeline</CardTitle>
+            <CardTitle className="text-lg">Live Energy Pipeline: Hover Mode</CardTitle>
           </div>
           <Badge variant={isRunning ? "default" : "secondary"} className="flex items-center space-x-1">
             <Zap className="h-3 w-3" />
@@ -159,7 +159,7 @@ export function LiveEnergyPipeline({
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          Step-by-step equations with authentic Needle Hull throttling factors (duty cycle + Q-spoiling)
+          Needle Hull Mk 1 hover operations: 14% duty, no Q-spoiling, no strobing → 83 MW target
         </p>
       </CardHeader>
       
