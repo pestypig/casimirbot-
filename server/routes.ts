@@ -280,10 +280,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api', targetValidationRoutes);
 
   // HELIX-CORE routes
-  const { handleHelixCommand, getTileStatus, getSystemMetrics } = await import('./helix-core.js');
+  const { 
+    handleHelixCommand, 
+    getTileStatus, 
+    getSystemMetrics,
+    getPipelineState,
+    updatePipelineParams,
+    switchOperationalMode
+  } = await import('./helix-core.js');
+  
   app.post("/api/helix/command", handleHelixCommand);
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
   app.get("/api/helix/metrics", getSystemMetrics);
+  app.get("/api/helix/pipeline", getPipelineState);
+  app.post("/api/helix/pipeline/update", updatePipelineParams);
+  app.post("/api/helix/pipeline/mode", switchOperationalMode);
 
   return httpServer;
 }

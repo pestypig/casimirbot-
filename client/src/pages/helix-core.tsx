@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -85,6 +86,10 @@ export default function HelixCore() {
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Use centralized energy pipeline
+  const { data: pipelineState } = useEnergyPipeline();
+  const switchMode = useSwitchMode();
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -447,6 +452,35 @@ export default function HelixCore() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Operational Mode Selector */}
+                  <div className="space-y-2">
+                    <Label className="text-slate-200">Operational Mode</Label>
+                    <Select 
+                      value={pipelineState?.currentMode || 'hover'}
+                      onValueChange={(mode) => {
+                        switchMode.mutate(mode as any);
+                        setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
+                      }}
+                    >
+                      <SelectTrigger className="bg-slate-950 border-slate-700">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(MODE_CONFIGS).map(([mode, config]) => (
+                          <SelectItem key={mode} value={mode}>
+                            <div className="flex items-center gap-2">
+                              <span className={config.color}>{config.name}</span>
+                              <span className="text-xs text-slate-500">({config.powerTarget} MW)</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {pipelineState && (
+                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Active Tiles</p>
@@ -454,20 +488,33 @@ export default function HelixCore() {
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Energy Output</p>
-                      <p className="text-lg font-mono text-yellow-400">{systemMetrics?.energyOutput || 83.3} MW</p>
+                      <p className="text-lg font-mono text-yellow-400">{pipelineState?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Exotic Mass</p>
-                      <p className="text-lg font-mono text-purple-400">{systemMetrics?.exoticMass || 1405} kg</p>
+                      <p className="text-lg font-mono text-purple-400">{pipelineState?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">System Status</p>
-                      <p className="text-lg font-mono text-green-400">{systemMetrics?.overallStatus || 'NOMINAL'}</p>
+                      <p className="text-lg font-mono text-green-400">{pipelineState?.overallStatus || systemMetrics?.overallStatus || 'NOMINAL'}</p>
                     </div>
                   </div>
+
+                  {/* Show current pipeline parameters */}
+                  {pipelineState && (
+                    <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
+                      <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
+                      <div className="grid grid-cols-2 gap-1 text-slate-300">
+                        <div>Duty: {(pipelineState.dutyCycle * 100).toFixed(1)}%</div>
+                        <div>Sectors: {pipelineState.sectorStrobing}</div>
+                        <div>Q-Spoil: {pipelineState.qSpoilingFactor.toFixed(3)}</div>
+                        <div>γ_VdB: {pipelineState.gammaVanDenBroeck.toExponential(1)}</div>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="space-y-2">
                     <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
@@ -556,9 +603,9 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Ford-Roman Inequality</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">ζ = {systemMetrics?.fordRoman.value.toFixed(3) || '0.032'}</span>
-                      <Badge className={`${systemMetrics?.fordRoman.status === 'PASS' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {systemMetrics?.fordRoman.status || 'PASS'}
+                      <span className="font-mono text-sm">ζ = {pipelineState?.zeta?.toFixed(3) || systemMetrics?.fordRoman.value.toFixed(3) || '0.032'}</span>
+                      <Badge className={`${(pipelineState?.fordRomanCompliance || systemMetrics?.fordRoman.status === 'PASS') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {pipelineState?.fordRomanCompliance ? 'PASS' : systemMetrics?.fordRoman.status || 'PASS'}
                       </Badge>
                     </div>
                   </div>
@@ -567,8 +614,8 @@ export default function HelixCore() {
                     <span className="text-sm">Natário Zero-Expansion</span>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">∇·ξ = {systemMetrics?.natario.value || 0}</span>
-                      <Badge className={`${systemMetrics?.natario.status === 'VALID' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {systemMetrics?.natario.status || 'VALID'}
+                      <Badge className={`${(pipelineState?.natarioConstraint || systemMetrics?.natario.status === 'VALID') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {pipelineState?.natarioConstraint ? 'VALID' : systemMetrics?.natario.status || 'VALID'}
                       </Badge>
                     </div>
                   </div>
@@ -576,19 +623,38 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Curvature Threshold</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">R {'<'} {systemMetrics?.curvatureMax.toExponential(0) || '1e-21'}</span>
-                      <Badge className="bg-yellow-500/20 text-yellow-400">WARN</Badge>
+                      <span className="font-mono text-sm">R {'<'} {(pipelineState && Math.abs(pipelineState.U_cycle) / (3e8 * 3e8))?.toExponential(0) || systemMetrics?.curvatureMax.toExponential(0) || '1e-21'}</span>
+                      <Badge className={`${pipelineState?.curvatureLimit ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                        {pipelineState?.curvatureLimit ? 'SAFE' : 'WARN'}
+                      </Badge>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Time-Scale Separation</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">TS = {systemMetrics?.timeScaleRatio.toFixed(1) || '4102.7'}</span>
-                      <Badge className="bg-green-500/20 text-green-400">SAFE</Badge>
+                      <span className="font-mono text-sm">TS = {pipelineState?.TS_ratio?.toFixed(1) || systemMetrics?.timeScaleRatio.toFixed(1) || '4102.7'}</span>
+                      <Badge className={`${(pipelineState && pipelineState.TS_ratio < 1) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                        {(pipelineState && pipelineState.TS_ratio < 1) ? 'SAFE' : 'CHECK'}
+                      </Badge>
                     </div>
                   </div>
                 </div>
+
+                {/* Show pipeline calculation details */}
+                {pipelineState && (
+                  <div className="mt-4 p-3 bg-slate-950 rounded-lg">
+                    <p className="text-xs text-slate-400 mb-2">Energy Pipeline Values:</p>
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
+                      <div>U_static: {pipelineState.U_static.toExponential(2)} J</div>
+                      <div>U_geo: {pipelineState.U_geo.toExponential(2)} J</div>
+                      <div>U_Q: {pipelineState.U_Q.toExponential(2)} J</div>
+                      <div>U_cycle: {pipelineState.U_cycle.toExponential(2)} J</div>
+                      <div>P_loss: {pipelineState.P_loss_raw.toFixed(3)} W/tile</div>
+                      <div>N_tiles: {pipelineState.N_tiles.toExponential(2)}</div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -623,18 +689,26 @@ export default function HelixCore() {
                   
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="p-2 bg-slate-950 rounded text-center">
-                      <p className="text-xs text-slate-400">Burst</p>
-                      <p className="font-mono text-slate-100">10 μs</p>
-                    </div>
-                    <div className="p-2 bg-slate-950 rounded text-center">
-                      <p className="text-xs text-slate-400">Cycle</p>
-                      <p className="font-mono text-slate-100">1 ms</p>
+                      <p className="text-xs text-slate-400">Duty Cycle</p>
+                      <p className="font-mono text-slate-100">{pipelineState ? (pipelineState.dutyCycle * 100).toFixed(1) : '14'}%</p>
                     </div>
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Sectors</p>
-                      <p className="font-mono text-slate-100">400</p>
+                      <p className="font-mono text-slate-100">{pipelineState?.sectorStrobing || 1}</p>
+                    </div>
+                    <div className="p-2 bg-slate-950 rounded text-center">
+                      <p className="text-xs text-slate-400">Frequency</p>
+                      <p className="font-mono text-slate-100">{pipelineState?.modulationFreq_GHz || 15} GHz</p>
                     </div>
                   </div>
+                  
+                  {/* Show current mode configuration */}
+                  {pipelineState && (
+                    <div className="mt-3 p-3 bg-slate-950 rounded-lg">
+                      <p className="text-xs text-slate-400 mb-1">Current Mode: {MODE_CONFIGS[pipelineState.currentMode]?.name}</p>
+                      <p className="text-xs text-slate-300">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

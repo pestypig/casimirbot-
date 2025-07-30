@@ -1,6 +1,16 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import fetch from "node-fetch";
+import { 
+  initializePipelineState, 
+  calculateEnergyPipeline, 
+  switchMode,
+  updateParameters,
+  getGlobalPipelineState,
+  setGlobalPipelineState,
+  MODE_CONFIGS,
+  type EnergyPipelineState 
+} from "./energy-pipeline.js";
 
 // Schema for ChatGPT function calls
 const pulseSectorSchema = z.object({
@@ -433,24 +443,82 @@ export function getTileStatus(req: Request, res: Response) {
   res.json(tileData);
 }
 
+// Initialize the global pipeline state
+const pipelineState = calculateEnergyPipeline(initializePipelineState());
+setGlobalPipelineState(pipelineState);
+
 // System metrics endpoint
 export function getSystemMetrics(req: Request, res: Response) {
+  const state = getGlobalPipelineState();
   res.json({
-    activeTiles: 312,
-    totalTiles: 400,
-    energyOutput: 83.3, // MW
-    exoticMass: 1405, // kg
+    activeTiles: Math.floor(state.N_tiles * 0.78),
+    totalTiles: Math.floor(state.N_tiles),
+    energyOutput: state.P_avg, // MW
+    exoticMass: Math.round(state.M_exotic), // kg
     fordRoman: {
-      value: 0.032,
+      value: state.zeta,
       limit: 1.0,
-      status: "PASS"
+      status: state.fordRomanCompliance ? "PASS" : "FAIL"
     },
     natario: {
       value: 0,
       status: "VALID"
     },
-    curvatureMax: 1e-21,
-    timeScaleRatio: 4102.7,
-    overallStatus: "NOMINAL"
+    curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
+    timeScaleRatio: state.TS_ratio,
+    overallStatus: state.overallStatus
   });
+}
+
+// Get full pipeline state
+export function getPipelineState(req: Request, res: Response) {
+  const state = getGlobalPipelineState();
+  res.json(state);
+}
+
+// Update pipeline parameters
+export function updatePipelineParams(req: Request, res: Response) {
+  try {
+    const params = req.body;
+    const currentState = getGlobalPipelineState();
+    const newState = updateParameters(currentState, params);
+    setGlobalPipelineState(newState);
+    res.json(newState);
+  } catch (error) {
+    res.status(400).json({ 
+      error: "Failed to update parameters",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+// Switch operational mode
+export function switchOperationalMode(req: Request, res: Response) {
+  try {
+    const { mode } = req.body;
+    if (!['hover', 'cruise', 'emergency', 'standby'].includes(mode)) {
+      return res.status(400).json({ error: "Invalid mode" });
+    }
+    
+    const currentState = getGlobalPipelineState();
+    const newState = switchMode(currentState, mode as EnergyPipelineState['currentMode']);
+    setGlobalPipelineState(newState);
+    
+    res.json({
+      success: true,
+      mode,
+      state: newState,
+      config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS]
+    });
+  } catch (error) {
+    res.status(400).json({ 
+      error: "Failed to switch mode",
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+// Get HELIX metrics (alias for compatibility)
+export function getHelixMetrics(req: Request, res: Response) {
+  return getSystemMetrics(req, res);
 }
