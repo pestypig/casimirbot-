@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scuffemService } from "./services/scuffem";
@@ -240,6 +241,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Add target validation routes
   app.use('/api', targetValidationRoutes);
+
+  // Papers API - JSON endpoint for research documentation
+  app.get("/api/papers", (req, res) => {
+    const papers = [
+      {
+        id: 'needle-hull-mk1',
+        title: 'Needle Hull Mark 1: 83 MW Casimir Stress Geometry',
+        filename: '83 MW Needle Hull Mark 1 update_1753733381119.pdf',
+        url: '/documents/83 MW Needle Hull Mark 1 update_1753733381119.pdf',
+        year: 2025,
+        category: 'Warp Bubble Physics',
+        description: 'Comprehensive analysis of the Needle Hull Mk 1 configuration, targeting 1.405×10³ kg exotic mass generation with 83 MW power requirements for theoretical warp bubble applications.',
+        version: '2025.1',
+        keywords: ['casimir effect', 'warp bubble', 'exotic mass', 'needle hull']
+      },
+      {
+        id: 'geometry-amplified-casimir',
+        title: 'Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator',
+        filename: 'Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator_1753733560411.pdf',
+        url: '/documents/Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator_1753733560411.pdf',
+        year: 2025,
+        category: 'Dynamic Casimir Effects',
+        description: 'Investigation of geometric amplification factors in concave cavity geometries, achieving γ ≈ 25× blue-shift enhancement for dynamic boundary modulation.',
+        version: '2025.1',
+        keywords: ['dynamic casimir', 'geometric amplification', 'concave resonator', 'blue-shift']
+      },
+      {
+        id: 'time-sliced-strobing',
+        title: 'Time-Sliced Sector Strobing Functions as a GR-Valid Proxy',
+        filename: 'time-sliced sector strobing functions as a GR-valid proxy_1753733389106.pdf',
+        url: '/documents/time-sliced sector strobing functions as a GR-valid proxy_1753733389106.pdf',
+        year: 2025,
+        category: 'General Relativity',
+        description: 'Theoretical framework for sector strobing techniques ensuring General Relativistic validity through time-scale separation and Ford-Roman compliance.',
+        version: '2025.1',
+        keywords: ['general relativity', 'sector strobing', 'ford-roman', 'time-scale separation']
+      },
+      {
+        id: 'bubble-metrics-checklist',
+        title: 'CheckList of Bubble Metric Analysis',
+        filename: 'CheckList of Bubble Metric_1753798567838.pdf',
+        url: '/documents/CheckList of Bubble Metric_1753798567838.pdf',
+        year: 2025,
+        category: 'Methodology',
+        description: 'Comprehensive verification checklist for warp bubble metric calculations, including quantum inequality bounds and stress-energy tensor validation.',
+        version: '2025.1',
+        keywords: ['warp bubble', 'metrics', 'verification', 'quantum inequality']
+      }
+    ];
+
+    res.json({
+      count: papers.length,
+      papers: papers,
+      updated: new Date().toISOString(),
+      api_version: "1.0"
+    });
+  });
+
+  // Serve PDF documents from attached_assets  
+  app.use('/documents', (req, res, next) => {
+    // Set proper headers for PDF files
+    if (req.path.endsWith('.pdf')) {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+    }
+    next();
+  }, express.static('attached_assets'));
 
   return httpServer;
 }
