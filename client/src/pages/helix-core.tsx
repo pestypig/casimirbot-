@@ -83,6 +83,7 @@ export default function HelixCore() {
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
+  const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Fetch system metrics
@@ -160,7 +161,7 @@ export default function HelixCore() {
   };
   
   // Handle tile click
-  const handleTileClick = (sectorId: string) => {
+  const handleTileClick = async (sectorId: string) => {
     setSelectedSector(sectorId);
     const sector = TILE_SECTORS.find(s => s.id === sectorId);
     if (sector) {
@@ -168,6 +169,52 @@ export default function HelixCore() {
         `[TILE] Selected ${sectorId}`,
         `[DATA] Q-Factor: ${sector.qFactor.toExponential(2)}, Temp: ${sector.temperature.toFixed(1)}K`
       ]);
+      
+      // In manual mode, pulse the sector
+      if (activeMode === "manual") {
+        setIsProcessing(true);
+        try {
+          const command = `Pulse sector ${sectorId} with 1 nm gap`;
+          const userMessage: ChatMessage = {
+            role: 'user',
+            content: command,
+            timestamp: new Date()
+          };
+          setChatMessages(prev => [...prev, userMessage]);
+          
+          const response = await apiRequest('POST', '/api/helix/command', {
+            messages: chatMessages.concat({ role: 'user', content: command })
+          });
+          
+          const responseData = await response.json();
+          const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: responseData.message.content,
+            timestamp: new Date()
+          };
+          
+          if (responseData.functionResult) {
+            assistantMessage.functionCall = {
+              name: responseData.message.function_call.name,
+              result: responseData.functionResult
+            };
+            setMainframeLog(prev => [...prev, 
+              `[MANUAL] ${sectorId} pulsed: Energy=${responseData.functionResult.energy?.toExponential(2)} J`
+            ]);
+            refetchMetrics();
+          }
+          
+          setChatMessages(prev => [...prev, assistantMessage]);
+        } catch (error) {
+          toast({
+            title: "Manual Pulse Error",
+            description: error instanceof Error ? error.message : "Failed to pulse sector",
+            variant: "destructive"
+          });
+        } finally {
+          setIsProcessing(false);
+        }
+      }
     }
   };
 
@@ -204,7 +251,51 @@ export default function HelixCore() {
           <div className="flex gap-2">
             <Button 
               variant={activeMode === "auto" ? "default" : "outline"}
-              onClick={() => setActiveMode("auto")}
+              onClick={async () => {
+                setActiveMode("auto");
+                setIsProcessing(true);
+                try {
+                  const command = "Execute auto-duty pulse sequence across all 400 sectors";
+                  const userMessage: ChatMessage = {
+                    role: 'user',
+                    content: command,
+                    timestamp: new Date()
+                  };
+                  setChatMessages(prev => [...prev, userMessage]);
+                  
+                  const response = await apiRequest('POST', '/api/helix/command', {
+                    messages: chatMessages.concat({ role: 'user', content: command })
+                  });
+                  
+                  const responseData = await response.json();
+                  const assistantMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: responseData.message.content,
+                    timestamp: new Date()
+                  };
+                  
+                  if (responseData.functionResult) {
+                    assistantMessage.functionCall = {
+                      name: responseData.message.function_call.name,
+                      result: responseData.functionResult
+                    };
+                    setMainframeLog(prev => [...prev, 
+                      `[AUTO-DUTY] ${responseData.functionResult.log || 'Sequence initiated'}`
+                    ]);
+                    refetchMetrics();
+                  }
+                  
+                  setChatMessages(prev => [...prev, assistantMessage]);
+                } catch (error) {
+                  toast({
+                    title: "Auto-Duty Error",
+                    description: error instanceof Error ? error.message : "Failed to execute",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
               className="flex items-center gap-2"
             >
               <Brain className="w-4 h-4" />
@@ -220,7 +311,50 @@ export default function HelixCore() {
             </Button>
             <Button 
               variant={activeMode === "diagnostics" ? "default" : "outline"}
-              onClick={() => setActiveMode("diagnostics")}
+              onClick={async () => {
+                setActiveMode("diagnostics");
+                setIsProcessing(true);
+                try {
+                  const command = "Run comprehensive diagnostics scan on all tile sectors";
+                  const userMessage: ChatMessage = {
+                    role: 'user',
+                    content: command,
+                    timestamp: new Date()
+                  };
+                  setChatMessages(prev => [...prev, userMessage]);
+                  
+                  const response = await apiRequest('POST', '/api/helix/command', {
+                    messages: chatMessages.concat({ role: 'user', content: command })
+                  });
+                  
+                  const responseData = await response.json();
+                  const assistantMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: responseData.message.content,
+                    timestamp: new Date()
+                  };
+                  
+                  if (responseData.functionResult) {
+                    assistantMessage.functionCall = {
+                      name: responseData.message.function_call.name,
+                      result: responseData.functionResult
+                    };
+                    setMainframeLog(prev => [...prev, 
+                      `[DIAGNOSTICS] System Health: ${responseData.functionResult.systemHealth}`
+                    ]);
+                  }
+                  
+                  setChatMessages(prev => [...prev, assistantMessage]);
+                } catch (error) {
+                  toast({
+                    title: "Diagnostics Error",
+                    description: error instanceof Error ? error.message : "Failed to run scan",
+                    variant: "destructive"
+                  });
+                } finally {
+                  setIsProcessing(false);
+                }
+              }}
               className="flex items-center gap-2"
             >
               <Gauge className="w-4 h-4" />
@@ -228,7 +362,13 @@ export default function HelixCore() {
             </Button>
             <Button 
               variant={activeMode === "theory" ? "default" : "outline"}
-              onClick={() => setActiveMode("theory")}
+              onClick={() => {
+                setActiveMode("theory");
+                // Theory playback would load PDFs - placeholder for now
+                setMainframeLog(prev => [...prev, 
+                  "[THEORY] Loading Needle Hull Mark 1 documentation..."
+                ]);
+              }}
               className="flex items-center gap-2"
             >
               <Atom className="w-4 h-4" />
@@ -253,15 +393,22 @@ export default function HelixCore() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {activeMode === "manual" && (
+                  <div className="mb-2 text-center text-sm text-cyan-400">
+                    Click any tile to pulse it manually
+                  </div>
+                )}
                 <div className="grid grid-cols-10 gap-1 p-4 bg-slate-950 rounded-lg">
                   {TILE_SECTORS.slice(0, 100).map(sector => (
                     <div
                       key={sector.id}
                       onClick={() => handleTileClick(sector.id)}
                       className={`
-                        w-3 h-3 rounded-sm cursor-pointer transition-all
+                        w-3 h-3 rounded-sm transition-all
+                        ${activeMode === "manual" ? "cursor-pointer hover:scale-110" : "cursor-default"}
                         ${sector.strobing ? 'animate-pulse' : ''}
                         ${selectedSector === sector.id ? 'ring-2 ring-cyan-400' : ''}
+                        ${isProcessing && selectedSector === sector.id ? 'animate-pulse' : ''}
                         ${sector.active 
                           ? sector.errorRate > 0.03 
                             ? 'bg-red-500' 
@@ -328,14 +475,62 @@ export default function HelixCore() {
                       <Input 
                         id="modulation"
                         type="number" 
-                        defaultValue="15"
+                        value={modulationFrequency}
+                        onChange={(e) => setModulationFrequency(Number(e.target.value))}
                         className="bg-slate-950 border-slate-700 text-slate-100"
                       />
                       <span className="flex items-center text-sm text-slate-400">GHz</span>
                     </div>
                   </div>
 
-                  <Button className="w-full bg-gradient-to-r from-cyan-600 to-blue-600">
+                  <Button 
+                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600"
+                    onClick={async () => {
+                      setIsProcessing(true);
+                      try {
+                        const command = `Simulate a full pulse cycle at ${modulationFrequency} GHz`;
+                        const userMessage: ChatMessage = {
+                          role: 'user',
+                          content: command,
+                          timestamp: new Date()
+                        };
+                        setChatMessages(prev => [...prev, userMessage]);
+                        
+                        const response = await apiRequest('POST', '/api/helix/command', {
+                          messages: chatMessages.concat({ role: 'user', content: command })
+                        });
+                        
+                        const responseData = await response.json();
+                        const assistantMessage: ChatMessage = {
+                          role: 'assistant',
+                          content: responseData.message.content,
+                          timestamp: new Date()
+                        };
+                        
+                        if (responseData.functionResult) {
+                          assistantMessage.functionCall = {
+                            name: responseData.message.function_call.name,
+                            result: responseData.functionResult
+                          };
+                          setMainframeLog(prev => [...prev, 
+                            `[PULSE] ${responseData.functionResult.log || 'Cycle complete'}`
+                          ]);
+                          refetchMetrics();
+                        }
+                        
+                        setChatMessages(prev => [...prev, assistantMessage]);
+                      } catch (error) {
+                        toast({
+                          title: "Pulse Sequence Error",
+                          description: error instanceof Error ? error.message : "Failed to execute",
+                          variant: "destructive"
+                        });
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    disabled={isProcessing}
+                  >
                     Execute Pulse Sequence
                   </Button>
                 </div>

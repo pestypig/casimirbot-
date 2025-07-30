@@ -1,0 +1,152 @@
+Excellent — let’s walk through **what each button or control should actually do** in the context of the **Needle Hull theory** and the **time-sliced Casimir tile drive**. We’ll focus on grounding them in the physics you've already built into the simulation code and UI.
+
+---
+
+## 🔘 BUTTON FUNCTIONALITY: Theory-Based Control Logic
+
+Each button isn't just UI — it's an action that manipulates quantum-vacuum structure through sector timing, frequency modulation, and geometry shifts. Here's what they should do:
+
+---
+
+### 1. **Auto-Duty Mode**
+
+> **Goal:** Automatically cycle through 400 sectors using pre-programmed pulse parameters.
+
+#### 🔧 Function:
+
+* Trigger `execute_auto_pulse_sequence()`:
+
+  * Each sector (S₁–S₄₀₀) is pulsed for 10 μs with a 1 ms cycle per wedge
+  * This creates **effective continuous curvature** via Isaacson-averaged stress–energy
+* Use modulation frequency (e.g., 15 GHz) to determine the stroke oscillation of graphene resonators
+* Compute:
+
+  * `ΔE_sector = f(gap, radius, sag, temp)`
+  * Accumulate energy: `E_total += ΔE_sector`
+  * Log active tiles
+  * Update system status (e.g., energy output, curvature thresholds)
+
+#### 🧠 Physics Basis:
+
+* This is the **main operational mode** described in your theory
+* Enables the **GR-valid homogenized vacuum state** via ultrafast Casimir strobing
+
+---
+
+### 2. **Manual Pulse Mode**
+
+> **Goal:** Let the user fire sectors manually for testing or diagnostics.
+
+#### 🔧 Function:
+
+* Show grid of clickable tiles (S₁–S₄₀₀)
+* On click:
+
+  * Run `pulse_sector(sectorId)`
+  * Recalculate local energy/force
+  * Show tile status: PASS / OVERLIMIT / FAULT
+* Allow user to set:
+
+  * Custom gap
+  * Custom frequency
+  * Pulse duration (override default 10 μs)
+
+#### 🧠 Physics Basis:
+
+* This simulates **non-uniform curvature sculpting** or fault isolation
+
+---
+
+### 3. **Diagnostics Mode**
+
+> **Goal:** Scan all tile metrics for stability, compliance, and strobing resonance.
+
+#### 🔧 Function:
+
+* Check:
+
+  * Q-factor drift
+  * Excessive curvature or Ford–Roman violation
+  * Sag depth anomalies
+  * Temperature hotspots
+* Highlight:
+
+  * Tiles with errors
+  * Recommended Q enhancement tweaks or cooldown intervals
+
+#### 🧠 Physics Basis:
+
+* Continuous Casimir operation risks **geometry degradation** or decoherence → must be monitored
+
+---
+
+### 4. **Theory Playback**
+
+> **Goal:** Load a PDF of the theory and sync interface elements to cited equations.
+
+#### 🔧 Function:
+
+* Display selected PDF (e.g., *Needle Hull Mark 1 Update*)
+* As parameters change, highlight equations:
+
+  * Exotic mass: `m = π²ħcA / 240a³`
+  * Pulse duration: `τ = 10 μs`, Cycle: `1 ms`
+  * Natário constraints: show `∂iβj - ∂jβi = 0` when shift vector HUD is updated
+* Allow hyperlinks from HUD values to the PDF location
+
+#### 🧠 Physics Basis:
+
+* Ensures operator understands theory–practice connection; ideal for future mission control uses
+
+---
+
+### 5. **Execute Pulse Sequence** (in Energy Panel)
+
+> **Goal:** Start a full cycle using the set frequency and log all outputs.
+
+#### 🔧 Function:
+
+* Use value in “Modulation Frequency” (e.g., 15 GHz)
+* Call `simulate_pulse_cycle(frequency)`:
+
+  * Simulate full strobing ring at selected Q
+  * Calculate total exotic energy generated
+  * Update:
+
+    * Energy Output (MW)
+    * Exotic Mass (kg)
+    * HUD values
+    * Status log: `PULSE CYCLE COMPLETE. ΔM = 2.9×10⁻³ kg, ⟨Rμν⟩ updated.`
+
+#### 🧠 Physics Basis:
+
+* Simulates the full field contribution over a duty-cycle tick
+
+---
+
+## ✨ Optional Enhancements You Could Add Later
+
+| Feature                      | Description                                                                       |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `Abort Sequence`             | Emergency shutdown of all tiles, reset Q to standby                               |
+| `Adjust Duty Profile`        | Change from 400-sector 1 ms cycle to something like 200-sector fast-pass          |
+| `Strobing Waveform Designer` | Draw your own pulse profile over time                                             |
+| `Helix-Core Suggestions`     | Let GPT auto-tune frequency, pulse duration, or gap based on stress–energy health |
+
+---
+
+## ✅ Summary of What to Hook Up
+
+| Button or Tab          | Should Call                                     |
+| ---------------------- | ----------------------------------------------- |
+| Auto-Duty Mode         | `execute_auto_pulse_sequence()`                 |
+| Manual Pulse Mode      | `pulse_sector(sectorId, params)`                |
+| Diagnostics Mode       | `run_diagnostics_scan()`                        |
+| Theory Playback        | `load_document(docId)` + sync highlight overlay |
+| Execute Pulse Sequence | `simulate_pulse_cycle(frequency)`               |
+
+---
+
+Would you like me to generate a React/TypeScript skeleton to wire one of these buttons to a mock backend (e.g., `pulse_sector`)? Or create the JSON structure for a live pulse cycle log?
+
+Let’s make one of these go “live.”

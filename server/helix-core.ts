@@ -53,6 +53,37 @@ const AVAILABLE_FUNCTIONS = [
     }
   },
   {
+    name: "execute_auto_pulse_sequence",
+    description: "Execute automated pulse sequence across all 400 sectors",
+    parameters: {
+      type: "object",
+      properties: {
+        frequency_GHz: { type: "number", description: "Modulation frequency in GHz", default: 15 },
+        duration_us: { type: "number", description: "Pulse duration in microseconds", default: 10 },
+        cycle_ms: { type: "number", description: "Cycle time in milliseconds", default: 1 }
+      }
+    }
+  },
+  {
+    name: "run_diagnostics_scan",
+    description: "Run comprehensive diagnostics on all tile sectors",
+    parameters: {
+      type: "object", 
+      properties: {}
+    }
+  },
+  {
+    name: "simulate_pulse_cycle",
+    description: "Simulate a full strobing cycle at specified frequency",
+    parameters: {
+      type: "object",
+      properties: {
+        frequency_GHz: { type: "number", description: "Modulation frequency in GHz" }
+      },
+      required: ["frequency_GHz"]
+    }
+  },
+  {
     name: "load_document",
     description: "Overlay a ship theory document for review",
     parameters: {
@@ -110,6 +141,150 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
     powerLoss: powerLoss,
     curvatureContribution: result.totalEnergy / (3e8 * 3e8), // Rough approximation
     status: "PULSED"
+  };
+}
+
+// Execute automated pulse sequence across all sectors
+async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration_us?: number; cycle_ms?: number }) {
+  const frequency = (args.frequency_GHz || 15) * 1e9; // Convert GHz to Hz
+  const duration = (args.duration_us || 10) * 1e-6; // Convert μs to seconds
+  const cycle = (args.cycle_ms || 1) * 1e-3; // Convert ms to seconds
+  
+  const totalSectors = 400;
+  const pulsedSectors: any[] = [];
+  let totalEnergy = 0;
+  let totalPower = 0;
+  
+  // Simulate pulsing each sector
+  for (let i = 1; i <= totalSectors; i++) {
+    const sectorResult = await executePulseSector({
+      sectorId: `S${i}`,
+      gap_nm: 1.0, // Standard 1nm gap
+      radius_mm: 25, // Standard 25mm radius
+      temperature_K: 20 // Standard 20K
+    });
+    
+    pulsedSectors.push({
+      id: sectorResult.sectorId,
+      energy: sectorResult.energy,
+      status: sectorResult.status
+    });
+    
+    totalEnergy += sectorResult.energy;
+    totalPower += sectorResult.powerLoss;
+  }
+  
+  // Calculate exotic mass contribution
+  const c = 3e8; // Speed of light
+  const exoticMass = Math.abs(totalEnergy) / (c * c);
+  
+  return {
+    mode: "AUTO_DUTY",
+    sectorsCompleted: totalSectors,
+    totalEnergy: totalEnergy,
+    averagePower: totalPower * (duration / cycle), // Apply duty cycle
+    exoticMassGenerated: exoticMass,
+    frequency: frequency,
+    dutyCycle: (duration / cycle) * 100,
+    status: "SEQUENCE_COMPLETE",
+    log: `Pulsed all ${totalSectors} sectors at ${frequency/1e9} GHz. Generated ${exoticMass.toExponential(2)} kg exotic mass.`
+  };
+}
+
+// Run diagnostics scan on all sectors
+async function runDiagnosticsScan() {
+  const sectors = [];
+  const issues = [];
+  
+  // Check each sector
+  for (let i = 1; i <= 400; i++) {
+    const qFactor = 5e4 + Math.random() * 1e5;
+    const errorRate = Math.random() * 0.05;
+    const temperature = 20 + Math.random() * 5;
+    const curvature = Math.random() * 1e-15;
+    
+    // Check for issues
+    const sectorIssues = [];
+    if (qFactor < 1e5) sectorIssues.push("LOW_Q");
+    if (errorRate > 0.03) sectorIssues.push("HIGH_ERROR");
+    if (temperature > 23) sectorIssues.push("TEMP_WARNING");
+    if (curvature > 5e-16) sectorIssues.push("CURVATURE_LIMIT");
+    
+    const sector = {
+      id: `S${i}`,
+      qFactor,
+      errorRate,
+      temperature,
+      curvature,
+      status: sectorIssues.length > 0 ? "FAULT" : "OK",
+      issues: sectorIssues
+    };
+    
+    sectors.push(sector);
+    if (sectorIssues.length > 0) {
+      issues.push({
+        sectorId: `S${i}`,
+        issues: sectorIssues
+      });
+    }
+  }
+  
+  return {
+    mode: "DIAGNOSTICS",
+    totalSectors: 400,
+    healthySectors: 400 - issues.length,
+    faultySectors: issues.length,
+    systemHealth: ((400 - issues.length) / 400 * 100).toFixed(1) + "%",
+    criticalIssues: issues.filter(i => i.issues.includes("CURVATURE_LIMIT")),
+    warnings: issues.filter(i => !i.issues.includes("CURVATURE_LIMIT")),
+    recommendations: [
+      issues.length > 20 ? "Consider thermal cycling to reset Q-factors" : null,
+      issues.some(i => i.issues.includes("TEMP_WARNING")) ? "Increase coolant flow to affected sectors" : null
+    ].filter(Boolean)
+  };
+}
+
+// Simulate a full pulse cycle
+async function simulatePulseCycle(args: { frequency_GHz: number }) {
+  const frequency = args.frequency_GHz * 1e9; // Convert to Hz
+  const omega = 2 * Math.PI * frequency;
+  
+  // Simulate full cycle using Needle Hull parameters
+  const { calculateCasimirEnergy } = await import('../modules/sim_core/static-casimir.js');
+  
+  const cycleResult = await calculateCasimirEnergy({
+    geometry: 'parallel_plate',
+    gap: 1.0, // 1nm gap
+    radius: 25000, // 25mm in μm
+    temperature: -253.15, // 20K in °C
+    sagDepth: 0
+  } as any);
+  
+  // Apply Needle Hull amplifications
+  const gammaGeo = 26;
+  const qMechanical = 5e4;
+  const qCavity = 1e9;
+  const dutyFactor = 0.14; // Hover mode
+  
+  const energyAmplified = cycleResult.totalEnergy * Math.pow(gammaGeo, 3) * qMechanical;
+  const powerOutput = Math.abs(energyAmplified * omega / qCavity) * dutyFactor;
+  const exoticMass = Math.abs(energyAmplified) / (3e8 * 3e8) * 1.12e9; // Full hull
+  
+  return {
+    mode: "PULSE_CYCLE",
+    frequency: frequency,
+    energyPerTile: cycleResult.totalEnergy,
+    amplifiedEnergy: energyAmplified,
+    powerOutput: powerOutput / 1e6, // Convert to MW
+    exoticMassTotal: exoticMass,
+    metrics: {
+      fordRoman: 0.032,
+      natario: 0,
+      curvature: energyAmplified / (3e8 * 3e8),
+      timeScale: 4102.7
+    },
+    status: "CYCLE_COMPLETE",
+    log: `PULSE CYCLE COMPLETE. ΔM = ${exoticMass.toExponential(3)} kg, ⟨Rμν⟩ updated.`
   };
 }
 
@@ -197,6 +372,15 @@ export async function handleHelixCommand(req: Request, res: Response) {
       switch (functionName) {
         case "pulse_sector":
           functionResult = await executePulseSector(functionArgs);
+          break;
+        case "execute_auto_pulse_sequence":
+          functionResult = await executeAutoPulseSequence(functionArgs);
+          break;
+        case "run_diagnostics_scan":
+          functionResult = await runDiagnosticsScan();
+          break;
+        case "simulate_pulse_cycle":
+          functionResult = await simulatePulseCycle(functionArgs);
           break;
         case "check_metric_violation":
           functionResult = checkMetricViolation(functionArgs.metricType);
