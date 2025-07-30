@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
+import HelixCore from "@/pages/helix-core";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -14,6 +15,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
+      <Route path="/helix-core" component={HelixCore} />
       <Route component={NotFound} />
     </Switch>
   );
