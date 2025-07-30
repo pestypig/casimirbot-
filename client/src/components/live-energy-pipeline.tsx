@@ -345,7 +345,7 @@ export function LiveEnergyPipeline({
             />
             <span className="text-sm text-muted-foreground">kg</span>
             <span className="text-xs text-muted-foreground ml-2">
-              (γ_pocket = {formatScientific(gamma_pocket)} - realistic range)
+              (γ_pocket = {formatScientific(gamma_pocket)} - paper spec: 2.86×10⁵)
             </span>
           </div>
         </div>
