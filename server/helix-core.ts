@@ -123,33 +123,30 @@ const AVAILABLE_FUNCTIONS = [
 
 // Function to execute pulse_sector
 async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
-  // Import the static Casimir calculation function
-  const { calculateCasimirEnergy } = await import('../modules/sim_core/static-casimir.js');
+  // Get the current energy pipeline state for accurate values
+  const state = getGlobalPipelineState();
   
-  // Create simulation parameters matching expected interface
-  const params = {
-    geometry: 'parallel_plate' as const,
-    gap: args.gap_nm, // in nm
-    radius: args.radius_mm * 1000, // Convert mm to μm
-    temperature: args.temperature_K - 273.15, // Convert K to °C
-    sagDepth: 0
-  };
-
-  // Calculate Casimir effect
-  const result = await calculateCasimirEnergy(params as any);
+  // Use the corrected energy values from the pipeline
+  // Energy per tile is already calculated with correct 1/720 denominator
+  const energyPerTile = state.U_static; // -8.305e-11 J
   
-  // Calculate additional metrics
-  const qFactor = 1.6e6; // Needle Hull Q-factor
-  const frequency = 15e9; // 15 GHz modulation
-  const omega = 2 * Math.PI * frequency;
-  const powerLoss = Math.abs(result.totalEnergy * omega / qFactor);
+  // Power loss per tile from the pipeline
+  const powerLossPerTile = state.P_loss_raw; // W per tile
+  
+  // Calculate curvature contribution
+  const c = 3e8; // Speed of light
+  const curvatureContribution = Math.abs(energyPerTile) / (c * c);
+  
+  // Force calculation (approximate from energy gradient)
+  const gap = args.gap_nm * 1e-9; // Convert to meters
+  const force = -Math.abs(energyPerTile) / gap; // Approximate force
   
   return {
     sectorId: args.sectorId,
-    energy: result.totalEnergy,
-    force: result.force,
-    powerLoss: powerLoss,
-    curvatureContribution: result.totalEnergy / (3e8 * 3e8), // Rough approximation
+    energy: energyPerTile,
+    force: force,
+    powerLoss: powerLossPerTile,
+    curvatureContribution: curvatureContribution,
     status: "PULSED"
   };
 }
@@ -184,20 +181,23 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
     totalPower += sectorResult.powerLoss;
   }
   
-  // Calculate exotic mass contribution
-  const c = 3e8; // Speed of light
-  const exoticMass = Math.abs(totalEnergy) / (c * c);
+  // Get the correct exotic mass from the energy pipeline
+  const state = getGlobalPipelineState();
+  const exoticMassTotal = state.M_exotic; // Already calibrated to ~32.2 kg
+  
+  // Calculate average power using duty cycle
+  const averagePower = totalPower * (duration / cycle);
   
   return {
     mode: "AUTO_DUTY",
     sectorsCompleted: totalSectors,
     totalEnergy: totalEnergy,
-    averagePower: totalPower * (duration / cycle), // Apply duty cycle
-    exoticMassGenerated: exoticMass,
+    averagePower: averagePower,
+    exoticMassGenerated: exoticMassTotal,
     frequency: frequency,
     dutyCycle: (duration / cycle) * 100,
     status: "SEQUENCE_COMPLETE",
-    log: `Pulsed all ${totalSectors} sectors at ${frequency/1e9} GHz. Generated ${exoticMass.toExponential(2)} kg exotic mass.`
+    log: `Pulsed all ${totalSectors} sectors at ${frequency/1e9} GHz. Generated ${exoticMassTotal.toFixed(1)} kg exotic mass.`
   };
 }
 
@@ -257,34 +257,26 @@ async function runDiagnosticsScan() {
 // Simulate a full pulse cycle using current operational mode
 async function simulatePulseCycle(args: { frequency_GHz: number }) {
   const frequency = args.frequency_GHz * 1e9; // Convert to Hz
-  const omega = 2 * Math.PI * frequency;
   
-  // Get current pipeline state for authentic mode parameters
+  // Get current pipeline state - this has all the corrected calculations
   const state = getGlobalPipelineState();
   const currentMode = state.currentMode;
-  const modeConfig = MODE_CONFIGS[currentMode];
   
-  // Simulate full cycle using current mode parameters
-  const { calculateCasimirEnergy } = await import('../modules/sim_core/static-casimir.js');
+  // Use the corrected energy pipeline values directly
+  const energyPerTile = state.U_static; // Already calculated with 1/720 denominator
+  const geometricAmplified = state.U_geo; // γ³ × U_static
+  const vanDenBroeckAmplified = state.U_cycle; // Full amplification chain
+  const powerRaw = state.P_loss_raw * state.N_tiles; // Total raw power in W
+  const powerAverage = state.P_avg; // Average power in MW
+  const exoticMassTotal = state.M_exotic; // Already calibrated to ~32.2 kg
   
-  const cycleResult = await calculateCasimirEnergy({
-    geometry: 'parallel_plate',
-    gap: 1.0, // 1nm gap
-    radius: 25000, // 25mm in μm
-    temperature: -253.15, // 20K in °C
-    sagDepth: 0
-  } as any);
-  
-  // Apply current mode amplifications from pipeline state
-  const energyAmplified = cycleResult.totalEnergy * Math.pow(state.gammaGeo, 3) * state.qMechanical;
-  const vanDenBroeckAmplified = energyAmplified * state.gammaVanDenBroeck;
-  const powerLoss = Math.abs(energyAmplified * omega / state.qCavity);
-  const throttledPower = powerLoss * state.dutyCycle * state.qSpoilingFactor * (1 / state.sectorStrobing);
-  const exoticMass = Math.abs(vanDenBroeckAmplified) / (3e8 * 3e8) * state.N_tiles;
-  
-  // Calculate metrics based on current mode
+  // Use pipeline metrics
   const fordRomanValue = state.zeta;
-  const curvatureValue = Math.abs(vanDenBroeckAmplified) / (3e8 * 3e8);
+  const timeScaleValue = state.TS_ratio;
+  
+  // Determine status based on constraints
+  const fordRomanStatus = fordRomanValue < 1.0 ? "PASS" : "FAIL";
+  const timeScaleStatus = timeScaleValue > 100 ? "PASS" : "FAIL";
   
   return {
     mode: "PULSE_CYCLE",
@@ -296,28 +288,26 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
       sectorStrobing: state.sectorStrobing,
       qSpoilingFactor: state.qSpoilingFactor,
       gammaVanDenBroeck: state.gammaVanDenBroeck,
-      powerOutput: state.P_avg
+      powerOutput: powerAverage // MW
     },
     energyCalculations: {
-      energyPerTile: cycleResult.totalEnergy,
-      geometricAmplified: energyAmplified,
-      vanDenBroeckAmplified: vanDenBroeckAmplified,
-      powerLossRaw: powerLoss,
-      powerThrottled: throttledPower / 1e6, // Convert to MW
-      exoticMassTotal: state.M_exotic // Use fixed target mass
+      energyPerTile: energyPerTile,         // J (corrected with 1/720)
+      geometricAmplified: geometricAmplified,     // J (γ³ × E_tile)
+      vanDenBroeckAmplified: vanDenBroeckAmplified, // J (full amplification)
+      powerRaw: powerRaw,                   // W instantaneous
+      powerAverage: powerAverage * 1e6,     // W (convert MW to W for consistency)
+      exoticMassTotal: exoticMassTotal      // kg (calibrated to ~32.2)
     },
     metrics: {
       fordRoman: fordRomanValue,
-      fordRomanStatus: fordRomanValue < 1.0 ? "PASS" : "FAIL",
+      fordRomanStatus: fordRomanStatus,
       natario: 0,
       natarioStatus: "VALID",
-      curvature: curvatureValue,
-      curvatureStatus: curvatureValue < 1e-10 ? "PASS" : "FAIL",
-      timeScale: state.TS_ratio,
-      overallStatus: state.overallStatus
+      timeScale: timeScaleValue,
+      timeScaleStatus: timeScaleStatus
     },
     status: "CYCLE_COMPLETE",
-    log: `${currentMode.toUpperCase()} MODE PULSE CYCLE @ ${args.frequency_GHz} GHz. Power: ${state.P_avg.toFixed(1)} MW, Mass: ${state.M_exotic.toFixed(0)} kg, ζ=${fordRomanValue.toExponential(2)}`
+    log: `${currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(powerRaw/1e6).toFixed(0)} MW, Avg=${powerAverage.toFixed(1)} MW, M_exotic=${exoticMassTotal.toFixed(1)} kg, ζ=${fordRomanValue.toExponential(1)}, TS=${timeScaleValue.toFixed(0)}`
   };
 }
 

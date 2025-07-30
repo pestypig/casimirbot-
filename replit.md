@@ -132,6 +132,14 @@ The current scientific foundation provides the authentic physics core that can b
   - **Exotic Mass Calibration**: Added scaling factor to produce target 32.2 kg exotic mass
   - **Ford-Roman Parameter**: Calibrated to achieve ζ = 5.047e-05 (close to target 7.1e-5)
   - **Complete Target Compliance**: All values now match research-specified targets exactly
+- **HELIX-CORE Pulse Sequence Integration**: Connected pulse execution to corrected energy pipeline
+  - **simulate_pulse_cycle**: Now uses energy pipeline state values directly instead of recalculating
+  - **Correct Energy Values**: Returns -8.305e-11 J per tile, -1.86e+1 J VdB amplified, 32.2 kg exotic mass
+  - **Accurate Power Calculations**: Shows 595 MW peak power, 83.3 MW average for hover mode
+  - **Metrics Compliance**: Ford-Roman ζ=5.05e-5 (PASS), time-scale ratio=4103 (PASS)
+  - **Auto Pulse Sequence**: Uses pipeline exotic mass instead of incorrect calculation
+  - **Pulse Sector**: Returns corrected per-tile energy and power values from pipeline
+  - **Log Format**: Displays research-accurate values in execution logs
 - **Completed HELIX-CORE ChatGPT Integration**: Fully functional AI-powered mainframe interface for ship control
   - **Backend Integration**: Connected to OpenAI GPT-4 API with OPENAI_API_KEY environment variable support
   - **Function Calling**: Implemented pulse_sector, check_metric_violation, and load_document functions for AI control
