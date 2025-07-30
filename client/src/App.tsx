@@ -14,12 +14,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documents" component={Documents} />
-      <Route path="/documentation">
-        {() => { 
-          window.location.replace('/documents'); 
-          return null; 
-        }}
-      </Route>
+      <Route path="/documentation" component={Documents} />
       <Route component={NotFound} />
     </Switch>
   );

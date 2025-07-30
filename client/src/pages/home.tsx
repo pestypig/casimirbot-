@@ -94,8 +94,8 @@ export default function Home() {
             </Link>
             <Link href="/documents">
               <Button variant="outline" className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                Research Papers
+                <Book className="w-4 h-4" />
+                Documentation
               </Button>
             </Link>
             <Button variant="outline" className="flex items-center gap-2">
