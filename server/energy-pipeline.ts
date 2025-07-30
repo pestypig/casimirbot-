@@ -32,6 +32,7 @@ export interface EnergyPipelineState {
   qMechanical: number;
   qCavity: number;
   gammaVanDenBroeck: number;
+  exoticMassTarget_kg: number;  // User-configurable exotic mass target
   
   // Calculated values
   U_static: number;         // Static Casimir energy per tile
@@ -115,6 +116,7 @@ export function initializePipelineState(): EnergyPipelineState {
     qMechanical: 5e4,
     qCavity: 1e9,
     gammaVanDenBroeck: 2.86e9,
+    exoticMassTarget_kg: 1405,  // Research paper target
     
     // Initial calculated values
     U_static: 0,
@@ -217,10 +219,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.dutyCycle = modeConfig.dutyCycle;
   state.sectorStrobing = modeConfig.sectorStrobing;
   state.qSpoilingFactor = modeConfig.qSpoilingFactor;
-  state.gammaVanDenBroeck = modeConfig.gammaVanDenBroeck;
   
-  // Step 5: Duty cycle averaging
-  const U_cycle_base = state.U_Q * state.dutyCycle;
+  // Step 5: Calculate gammaVanDenBroeck based on exotic mass target
+  // Formula: γ_pocket = (M_exotic_target × c²) / (N_tiles × |U_Q| × duty)
+  const c_squared = C * C;
+  const U_Q_abs = Math.abs(state.U_Q);
+  const U_cycle_base = U_Q_abs * state.dutyCycle;
+  
+  // Calculate required gammaVanDenBroeck to achieve target exotic mass
+  state.gammaVanDenBroeck = (state.exoticMassTarget_kg * c_squared) / 
+                            (state.N_tiles * U_cycle_base);
   
   // Step 6: Van den Broeck pocket amplification (all modes)
   state.U_cycle = U_cycle_base * state.gammaVanDenBroeck;
@@ -255,7 +263,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Step 8: Exotic mass calculation (research-calibrated)
   // Target: ~32.2 kg total exotic mass for full Needle Hull in hover mode
-  const c_squared = C * C;
+  // c_squared already declared above
   
   // Calculate base mass from energy
   const mass_per_tile_base = Math.abs(state.U_cycle) / c_squared;

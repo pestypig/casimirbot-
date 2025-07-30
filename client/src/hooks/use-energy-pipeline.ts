@@ -22,6 +22,7 @@ export interface EnergyPipelineState {
   qMechanical: number;
   qCavity: number;
   gammaVanDenBroeck: number;
+  exoticMassTarget_kg: number;
   
   // Calculated values
   U_static: number;

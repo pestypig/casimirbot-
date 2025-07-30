@@ -4,8 +4,12 @@ import { Atom, Settings, Book, History, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
+import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
 
 export default function Home() {
+  // Hook for updating backend pipeline
+  const updatePipeline = useUpdatePipeline();
+  
   // Shared phase diagram state - Needle Hull Mk 1 defaults
   const [tileArea, setTileArea] = useState(5); // cm² (Needle Hull: 5 cm²)
   const [shipRadius, setShipRadius] = useState(82.0); // m (Needle Hull: 82.0 m ellipsoid scale)
@@ -22,6 +26,7 @@ export default function Home() {
   const [duty, setDuty] = useState(0.14);              // 14% burst duty cycle (HOVER MODE default)
   const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
+  const [exoticMassTarget, setExoticMassTarget] = useState(1405);  // Default to research paper target
   
   // Operational mode state - default to hover mode
   const [selectedMode, setSelectedMode] = useState("hover");
@@ -129,13 +134,23 @@ export default function Home() {
                 shipRadius={shipRadius}
                 gapDistance={1.0}
                 sectorCount={400}
+                exoticMassTarget={exoticMassTarget}
                 isRunning={false}
                 selectedMode={selectedMode}
                 onModeChange={setSelectedMode}
-                onParameterUpdate={({ duty: newDuty, qFactor: newQFactor, gammaGeo: newGammaGeo }) => {
+                onParameterUpdate={({ duty: newDuty, qFactor: newQFactor, gammaGeo: newGammaGeo, exoticMassTarget: newExoticMassTarget }) => {
                   if (newDuty !== undefined) setDuty(newDuty);
                   if (newQFactor !== undefined) setQFactor(newQFactor);  
                   if (newGammaGeo !== undefined) setGammaGeo(newGammaGeo);
+                  if (newExoticMassTarget !== undefined) setExoticMassTarget(newExoticMassTarget);
+                  
+                  // Update backend pipeline with new parameters
+                  updatePipeline.mutate({
+                    dutyCycle: newDuty || duty,
+                    qMechanical: newQFactor || qFactor,
+                    gammaGeo: newGammaGeo || gammaGeo,
+                    exoticMassTarget_kg: newExoticMassTarget || exoticMassTarget
+                  });
                 }}
               />
             </div>

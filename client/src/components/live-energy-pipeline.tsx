@@ -15,6 +15,7 @@ interface LiveEnergyPipelineProps {
   shipRadius: number; // m
   gapDistance?: number; // nm, default 1.0
   sectorCount?: number; // Number of sectors for strobing (default 400)
+  exoticMassTarget?: number; // kg, user-configurable exotic mass target
   
   // Show calculations in real-time
   isRunning?: boolean;
@@ -22,7 +23,7 @@ interface LiveEnergyPipelineProps {
   // Mode selection and callbacks
   selectedMode?: string;
   onModeChange?: (mode: string) => void;
-  onParameterUpdate?: (params: { duty: number; qFactor?: number; gammaGeo?: number }) => void;
+  onParameterUpdate?: (params: { duty: number; qFactor?: number; gammaGeo?: number; exoticMassTarget?: number }) => void;
 }
 
 // Operational mode configurations
@@ -36,7 +37,7 @@ type OperationalMode = {
 };
 
 // Function to calculate actual mode metrics for descriptions
-const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: number, tileArea: number) => {
+const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: number, tileArea: number, exoticMassTarget: number = 32.21) => {
   // Physics constants
   const h_bar = 1.055e-34; // J⋅s
   const c = 2.998e8; // m/s
@@ -55,9 +56,8 @@ const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: 
   const U_Q = Q_mechanical * U_geo;
   const U_cycle_base = U_Q * mode.duty;
   
-  // Van-den-Broeck pocket boost for fixed mass target
-  const M_target = 32.21; // kg (calibrated to match research specifications)
-  const gamma_pocket = mode.duty > 0 ? M_target * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
+  // Van-den-Broeck pocket boost for configurable mass target
+  const gamma_pocket = mode.duty > 0 ? exoticMassTarget * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
   const U_cycle = U_cycle_base * gamma_pocket;
   
   // Power calculation
@@ -76,39 +76,51 @@ const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: 
   return { P_avg, M_exotic, zeta, P_raw_total, mode_throttle };
 };
 
-const modes: Record<string, OperationalMode> = {
-  hover: {
-    name: "Hover",
-    duty: 0.14,          // 14% duty (station-hold)
-    sectors: 1,          // No strobing
-    qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
-    pocketGamma: 6.57e7, // Fixed exotic mass: ~32.21 kg
-    description: "83.3 MW • 32 kg • ζ=0.032"
-  },
-  cruise: {
-    name: "Cruise", 
-    duty: 0.005,         // 0.5% duty (Ford-Roman compliant: ζ = 1.00)
-    sectors: 400,        // 400-sector strobing (1/S = 1/400)
-    qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
-    pocketGamma: 5.1e4,  // Fixed exotic mass: ~32.21 kg
-    description: "7.4 MW • 32 kg • ζ=0.89"
-  },
-  emergency: {
-    name: "Emergency",
-    duty: 0.50,          // 50% duty (fast-burn)
-    sectors: 1,          // No strobing
-    qSpoiling: 1,        // No Q-spoiling
-    pocketGamma: 6.57e7, // Fixed exotic mass: ~32.21 kg
-    description: "297 MW • 32 kg • ζ=0.009"
-  },
-  standby: {
-    name: "Standby",
-    duty: 0.0,           // 0% duty (bubble collapsed)
-    sectors: 1,          // Irrelevant
-    qSpoiling: 1,        // Irrelevant
-    pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
-    description: "0 MW • 0 kg • System Off"
-  }
+const getModesWithDynamicDescriptions = (gammaGeo: number, qFactor: number, tileArea: number, exoticMassTarget: number) => {
+  const modes: Record<string, OperationalMode> = {
+    hover: {
+      name: "Hover",
+      duty: 0.14,          // 14% duty (station-hold)
+      sectors: 1,          // No strobing
+      qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
+      pocketGamma: 0,      // Will be calculated dynamically
+      description: ""      // Will be calculated
+    },
+    cruise: {
+      name: "Cruise", 
+      duty: 0.005,         // 0.5% duty (Ford-Roman compliant: ζ = 1.00)
+      sectors: 400,        // 400-sector strobing (1/S = 1/400)
+      qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
+      pocketGamma: 0,      // Will be calculated dynamically
+      description: ""      // Will be calculated
+    },
+    emergency: {
+      name: "Emergency",
+      duty: 0.50,          // 50% duty (fast-burn)
+      sectors: 1,          // No strobing
+      qSpoiling: 1,        // No Q-spoiling
+      pocketGamma: 0,      // Will be calculated dynamically
+      description: ""      // Will be calculated
+    },
+    standby: {
+      name: "Standby",
+      duty: 0.0,           // 0% duty (bubble collapsed)
+      sectors: 1,          // Irrelevant
+      qSpoiling: 1,        // Irrelevant
+      pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
+      description: "0 MW • 0 kg • System Off"
+    }
+  };
+  
+  // Calculate descriptions for each mode
+  Object.entries(modes).forEach(([key, mode]) => {
+    if (key !== 'standby') {
+      const metrics = calculateModeMetrics(mode, gammaGeo, qFactor, tileArea, exoticMassTarget);
+      mode.description = `${metrics.P_avg.toFixed(1)} MW • ${metrics.M_exotic.toFixed(0)} kg • ζ=${metrics.zeta.toFixed(3)}`;
+    }
+  });
+  
+  return modes;
 };
 
 export function LiveEnergyPipeline({
@@ -121,6 +133,7 @@ export function LiveEnergyPipeline({
   shipRadius,
   gapDistance = 1.0,
   sectorCount = 400,
+  exoticMassTarget = 1405,
   isRunning = false,
   selectedMode = "hover",
   onModeChange,
@@ -157,6 +170,9 @@ export function LiveEnergyPipeline({
   const Q_cavity = 1e9; // EM cavity Q for power loss calculations
   const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
   
+  // Get modes with dynamically calculated descriptions
+  const modes = getModesWithDynamicDescriptions(gammaGeo, qFactor, tileArea, exoticMassTarget);
+  
   // Get current mode parameters
   const currentMode = modes[selectedMode];
   
@@ -164,8 +180,7 @@ export function LiveEnergyPipeline({
   const d_mode = currentMode.duty; // Duty cycle for selected mode
   const U_cycle_base = U_Q * d_mode; // J per tile (duty cycle on Q-enhanced energy)
   
-  // Step 5b: Van-den-Broeck Pocket Blue-Shift (calibrated for fixed exotic mass)
-  const M_target = 32.21; // kg target exotic mass for active modes (calibrated to match research specifications)
+  // Step 5b: Van-den-Broeck Pocket Blue-Shift (calibrated for user-configurable exotic mass)
   let gamma_pocket: number;
   let U_cycle: number;
   
@@ -174,8 +189,8 @@ export function LiveEnergyPipeline({
     gamma_pocket = 0;
     U_cycle = 0;
   } else {
-    // Active modes: calculate gamma_pocket to achieve fixed 1.405 × 10³ kg
-    const target_energy_per_tile = (M_target * c * c) / N_tiles; // J per tile for target mass
+    // Active modes: calculate gamma_pocket to achieve user-configured exotic mass target
+    const target_energy_per_tile = (exoticMassTarget * c * c) / N_tiles; // J per tile for target mass
     gamma_pocket = target_energy_per_tile / Math.abs(U_cycle_base); // Van-den-Broeck amplification needed
     U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
   }
@@ -301,6 +316,38 @@ export function LiveEnergyPipeline({
               ))}
             </SelectContent>
           </Select>
+        </div>
+        
+        {/* Exotic Mass Target Control */}
+        <div className="flex items-center gap-4 mt-3">
+          <div className="flex items-center gap-2">
+            <Atom className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Exotic Mass Target:</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <input 
+              type="number" 
+              value={exoticMassTarget}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value > 0) {
+                  onParameterUpdate?.({ 
+                    duty: currentMode.duty, 
+                    qFactor, 
+                    gammaGeo,
+                    exoticMassTarget: value 
+                  });
+                }
+              }}
+              className="w-20 px-2 py-1 text-sm border rounded"
+              min="1"
+              max="10000"
+            />
+            <span className="text-sm text-muted-foreground">kg</span>
+            <span className="text-xs text-muted-foreground ml-2">
+              (γ_pocket = {formatScientific(gamma_pocket)})
+            </span>
+          </div>
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
@@ -456,7 +503,7 @@ export function LiveEnergyPipeline({
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
           <h4 className="font-semibold text-sm mb-2 flex items-center">
             <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
-            Total Exotic Mass (1.405 × 10³ kg Target)
+            Total Exotic Mass ({formatScientific(exoticMassTarget)} kg Target)
           </h4>
           <div className="font-mono text-sm space-y-1">
             <div>M_exotic = N_tiles × |U_cycle| / c²</div>
@@ -536,8 +583,10 @@ export function LiveEnergyPipeline({
                   let M_exotic_mode = 0;
                   
                   if (mode.duty > 0) {
-                    // Use fixed target mass (1.405 × 10³ kg) for all active modes
-                    M_exotic_mode = M_target; // Fixed at 1.405 × 10³ kg
+                    // Calculate exotic mass for this mode using the current exotic mass target
+                    const gamma_pocket_mode = exoticMassTarget * (c * c) / (Math.abs(U_cycle_base_mode) * N_tiles);
+                    const U_cycle_mode = U_cycle_base_mode * gamma_pocket_mode;
+                    M_exotic_mode = Math.abs(U_cycle_mode) / (c * c) * N_tiles;
                   }
                   const throttle_mode = mode.duty * mode.qSpoiling * (1/mode.sectors);
                   const P_avg_mode_W = mode.duty > 0 ? (P_loss_raw * N_tiles * throttle_mode) : 0;
