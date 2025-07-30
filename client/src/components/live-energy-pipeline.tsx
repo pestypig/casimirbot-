@@ -56,7 +56,7 @@ const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: 
   const U_cycle_base = U_Q * mode.duty;
   
   // Van-den-Broeck pocket boost for fixed mass target
-  const M_target = 1.405e3; // kg
+  const M_target = 32.21; // kg (calibrated to match research specifications)
   const gamma_pocket = mode.duty > 0 ? M_target * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
   const U_cycle = U_cycle_base * gamma_pocket;
   
@@ -82,24 +82,24 @@ const modes: Record<string, OperationalMode> = {
     duty: 0.14,          // 14% duty (station-hold)
     sectors: 1,          // No strobing
     qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
-    pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "83.3 MW • 1,405 kg • ζ=0.032"
+    pocketGamma: 6.57e7, // Fixed exotic mass: ~32.21 kg
+    description: "83.3 MW • 32 kg • ζ=0.032"
   },
   cruise: {
     name: "Cruise", 
     duty: 0.005,         // 0.5% duty (Ford-Roman compliant: ζ = 1.00)
     sectors: 400,        // 400-sector strobing (1/S = 1/400)
     qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
-    pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "7.4 MW • 1,405 kg • ζ=0.89"
+    pocketGamma: 5.1e4,  // Fixed exotic mass: ~32.21 kg
+    description: "7.4 MW • 32 kg • ζ=0.89"
   },
   emergency: {
     name: "Emergency",
     duty: 0.50,          // 50% duty (fast-burn)
     sectors: 1,          // No strobing
     qSpoiling: 1,        // No Q-spoiling
-    pocketGamma: 0.8e11, // Fixed exotic mass: 1.405 × 10³ kg
-    description: "297 MW • 1,405 kg • ζ=0.009"
+    pocketGamma: 6.57e7, // Fixed exotic mass: ~32.21 kg
+    description: "297 MW • 32 kg • ζ=0.009"
   },
   standby: {
     name: "Standby",
@@ -165,7 +165,7 @@ export function LiveEnergyPipeline({
   const U_cycle_base = U_Q * d_mode; // J per tile (duty cycle on Q-enhanced energy)
   
   // Step 5b: Van-den-Broeck Pocket Blue-Shift (calibrated for fixed exotic mass)
-  const M_target = 1.405e3; // kg target exotic mass for active modes
+  const M_target = 32.21; // kg target exotic mass for active modes (calibrated to match research specifications)
   let gamma_pocket: number;
   let U_cycle: number;
   
@@ -232,7 +232,7 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Scale Analysis: U_Q/260 = ${(Math.abs(U_Q)/260).toExponential(3)}× too large`);
   console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile = ${A_tile.toExponential(3)} m², a = ${a.toExponential(3)} m`);
   console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
-  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: 1.405×10³ kg)`);
+  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: 32.21 kg)`);
   console.log(`🔍 N_tiles calculation: A_hull_needle=${A_hull_needle.toExponential(2)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toExponential(2)}`);
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
@@ -592,7 +592,7 @@ export function LiveEnergyPipeline({
             </table>
           </div>
           <div className="mt-2 text-xs text-muted-foreground space-y-1">
-            <div>Exotic mass held fixed at 1.405 × 10³ kg by adjusting Van-den-Broeck pocket amplification for active modes.</div>
+            <div>Exotic mass held fixed at 32.21 kg by adjusting Van-den-Broeck pocket amplification for active modes.</div>
             <div>P_avg for Cruise is watts (7.4 W) due to 400-sector strobing and Q-spoiling throttling.</div>
             <div className="flex items-center gap-4">
               <span>✓ Ford-Roman compliant (ζ ≤ 1.0)</span>

@@ -78,14 +78,14 @@ export function useSwitchMode() {
   });
 }
 
-// Mode configurations for UI display
+// Mode configurations for UI display (synchronized with backend)
 export const MODE_CONFIGS = {
   hover: {
     name: "Hover Mode",
     dutyCycle: 0.14,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 2.86e9,
+    gammaVanDenBroeck: 6.57e7,  // Calibrated to achieve ~32.21 kg exotic mass
     description: "High-power hover mode for station-keeping",
     powerTarget: 83.3,
     color: "text-cyan-400"
@@ -95,7 +95,7 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.005,
     sectorStrobing: 400,
     qSpoilingFactor: 0.625,
-    gammaVanDenBroeck: 8e10,
+    gammaVanDenBroeck: 5.1e4,  // Scaled for cruise mode
     description: "Low-power cruise mode for sustained travel",
     powerTarget: 7.4,
     color: "text-green-400"
@@ -105,7 +105,7 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.50,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 1e8,
+    gammaVanDenBroeck: 6.57e7,  // Same as hover
     description: "Maximum power emergency mode",
     powerTarget: 297,
     color: "text-red-400"
