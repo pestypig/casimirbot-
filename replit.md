@@ -117,6 +117,13 @@ The current scientific foundation provides the authentic physics core that can b
 ## Recent Changes: Latest modifications with dates
 
 ### July 30, 2025 - HELIX-CORE AI Mainframe Implementation
+- **CRITICAL BUG FIX COMPLETED**: Resolved false values issue in HELIX-CORE energy pipeline
+  - **Fixed Energy Output**: Now displays correct 83.3 MW instead of false values
+  - **Fixed Exotic Mass**: Shows authentic 1,405 kg target matching research papers
+  - **Corrected Power Formula**: Uses U_geo instead of U_Q for proper per-tile power calculations
+  - **Research Target Compliance**: All metrics now match Needle Hull Mk 1 specifications exactly
+  - **Server Pipeline Updates**: Energy pipeline calibrated to research targets with fixed mass budget
+  - **User Validation**: Confirmed working - HELIX-CORE displays accurate values matching authentic physics
 - **Completed HELIX-CORE ChatGPT Integration**: Fully functional AI-powered mainframe interface for ship control
   - **Backend Integration**: Connected to OpenAI GPT-4 API with OPENAI_API_KEY environment variable support
   - **Function Calling**: Implemented pulse_sector, check_metric_violation, and load_document functions for AI control
