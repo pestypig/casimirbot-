@@ -345,13 +345,13 @@ export function LiveEnergyPipeline({
             />
             <span className="text-sm text-muted-foreground">kg</span>
             <span className="text-xs text-muted-foreground ml-2">
-              (γ_pocket = {formatScientific(gamma_pocket)})
+              (γ_pocket = {formatScientific(gamma_pocket)} - realistic range)
             </span>
           </div>
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
-          {currentMode.description}
+          {currentMode.description.replace('1,405', exoticMassTarget.toString())}
         </p>
       </CardHeader>
       

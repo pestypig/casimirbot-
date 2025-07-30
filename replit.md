@@ -116,6 +116,17 @@ The current scientific foundation provides the authentic physics core that can b
 
 ## Recent Changes: Latest modifications with dates
 
+### July 30, 2025 - Configurable Exotic Mass Target Implementation
+- **Successfully Implemented Configurable Exotic Mass Target System**: Added user-controllable exotic mass slider (1-10000 kg range)
+  - **Realistic Van den Broeck Amplification**: Changed from idealized γ_pocket=2.86×10⁹ to realistic 6.57×10⁷ baseline
+  - **Physics-Based Scaling**: Mass target controls realistic amplification factors rather than theoretical values
+  - **Dynamic Mode Descriptions**: Mode descriptions update in real-time to show selected exotic mass target
+  - **Backend API Integration**: Frontend connected to backend energy pipeline for parameter updates
+  - **Research-Calibrated Baseline**: Uses 1,405 kg as baseline matching research paper specifications
+  - **Mass Scaling Factor**: Applies proportional scaling to realistic γ_pocket rather than recalculating from idealized formulas
+  - **UI Enhancement**: Added exotic mass input field with live γ_pocket display in realistic range
+  - **Fixed M_target Error**: Resolved undefined variable error in mode comparison table calculations
+
 ### July 30, 2025 - HELIX-CORE AI Mainframe Implementation
 - **CRITICAL BUG FIX COMPLETED**: Resolved false values issue in HELIX-CORE energy pipeline
   - **Fixed Energy Output**: Now displays correct 83.3 MW instead of false values
