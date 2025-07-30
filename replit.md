@@ -432,6 +432,13 @@ The current scientific foundation provides the authentic physics core that can b
   - **Tutorial System**: Quick start guide and advanced feature explanations for new users
   - **Static File Serving**: Server configured to serve PDF files directly from attached_assets folder
   - **Tabbed Interface**: Clean organization with dedicated tabs for different documentation categories
+  - **JSON API for Research Papers (July 30, 2025)**: Added machine-readable research papers API
+    - **Endpoint**: GET /api/papers returns JSON array of all research documents
+    - **AI/Bot Integration**: Enables automated ingestion of research papers with metadata
+    - **Paper Metadata**: Each entry includes title, URL, year, and description
+    - **Direct PDF Access**: URLs provide direct access to full research papers via HTTP
+    - **RESTful Design**: Standard HTTP API following REST conventions for external integration
+    - **Testing Verified**: All 4 research papers accessible with proper Content-Type headers (application/pdf)
 - **Mode-Aware Constraint Synchronization (July 29, 2025)**: Successfully implemented dynamic constraint system for operational modes
   - **Perfect Constraint Matching**: Phase Diagram automatically updates power limits based on operational mode selection
   - **Emergency Mode Validation**: Max Power constraint auto-adjusts to 400 MW when Emergency mode shows 297.48 MW power draw

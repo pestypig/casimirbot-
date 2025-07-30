@@ -238,6 +238,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Research Papers API for AI/bot integration
+  app.get("/api/papers", (req, res) => {
+    try {
+      const papers = [
+        {
+          title: "83 MW Needle Hull Mark 1",
+          url: "/attached_assets/83 MW Needle Hull Mark 1 update_1753733381119.pdf",
+          year: 2025,
+          description: "Comprehensive analysis of the Needle Hull Mark 1 warp bubble design with exotic mass calculations and power requirements"
+        },
+        {
+          title: "Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator",
+          url: "/attached_assets/Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator_1753733560411.pdf", 
+          year: 2025,
+          description: "Research on geometric amplification factors in concave cavity designs for enhanced Casimir effect generation"
+        },
+        {
+          title: "Time-Sliced Sector Strobing Functions as a GR-Valid Proxy",
+          url: "/attached_assets/time-sliced sector strobing functions as a GR-valid proxy_1753733389106.pdf",
+          year: 2025,
+          description: "Analysis of sector strobing techniques for time-scale separation in general relativity applications"
+        },
+        {
+          title: "CheckList of Bubble Metric",
+          url: "/attached_assets/CheckList of Bubble Metric_1753798567838.pdf",
+          year: 2025,
+          description: "Quality assurance checklist for warp bubble metric calculations and validation procedures"
+        }
+      ];
+
+      res.json(papers);
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to retrieve research papers"
+      });
+    }
+  });
+
   // Add target validation routes
   app.use('/api', targetValidationRoutes);
 
