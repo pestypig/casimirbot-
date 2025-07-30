@@ -116,6 +116,18 @@ The current scientific foundation provides the authentic physics core that can b
 
 ## Recent Changes: Latest modifications with dates
 
+### July 30, 2025 - Deployment Readiness Implementation
+- **Complete Deployment Setup**: Configured for casimirbot.com production deployment
+  - **Health Endpoints**: Added `/health` endpoint returning service status for deployment verification
+  - **Documents Listing**: Added `/documents/` endpoint providing structured research paper catalog for crawlers
+  - **API Papers Endpoint**: Existing `/api/papers` provides JSON array for automated bot integration
+  - **Production Build**: Client builds to `dist/public/` with proper static serving configuration
+  - **Express Static Middleware**: Serves PDF files from `attached_assets/` for direct document access
+  - **Deployment Command**: Uses `npm run build && npm start` for production deployment
+  - **Port Configuration**: Correctly configured on port 5000 with 0.0.0.0 binding for Replit hosting
+  - **Environment Variables**: Ready for DATABASE_URL and other production secrets
+  - **HTTPS Ready**: All endpoints tested and working for secure domain deployment
+
 ### July 30, 2025 - Paper-Accurate γ_pocket Implementation
 - **CRITICAL PHYSICS CORRECTION**: Fixed γ_pocket from 2.86×10⁹ to paper-specified 2.86×10⁵ value
   - **Energy Pipeline Fix**: Updated energy pipeline to use γ_pocket = 2.86×10⁵ for exact 1,405 kg target

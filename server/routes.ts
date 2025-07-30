@@ -276,6 +276,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Health check endpoint for deployment verification
+  app.get("/health", (req, res) => {
+    res.json({ 
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0",
+      service: "Casimir Effect Research Platform"
+    });
+  });
+
+  // Documents listing endpoint for crawlers
+  app.get("/documents/", (req, res) => {
+    try {
+      const documents = [
+        {
+          title: "83 MW Needle Hull Mark 1 Update",
+          url: "/attached_assets/83 MW Needle Hull Mark 1 update_1753733381119.pdf",
+          type: "Research Paper",
+          description: "Needle Hull warp bubble design specifications"
+        },
+        {
+          title: "Geometry-Amplified Dynamic Casimir Effect",
+          url: "/attached_assets/Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator_1753733560411.pdf",
+          type: "Research Paper", 
+          description: "Concave cavity Casimir amplification research"
+        },
+        {
+          title: "Time-Sliced Sector Strobing Functions",
+          url: "/attached_assets/time-sliced sector strobing functions as a GR-valid proxy_1753733389106.pdf",
+          type: "Research Paper",
+          description: "GR-compliant sector strobing methodology"
+        },
+        {
+          title: "Bubble Metric Checklist",
+          url: "/attached_assets/CheckList of Bubble Metric_1753798567838.pdf",
+          type: "Reference Document",
+          description: "Warp bubble validation checklist"
+        }
+      ];
+
+      res.json({
+        message: "Available research documents",
+        count: documents.length,
+        documents: documents
+      });
+    } catch (error) {
+      res.status(500).json({
+        message: error instanceof Error ? error.message : "Failed to list documents"
+      });
+    }
+  });
+
   // Add target validation routes
   app.use('/api', targetValidationRoutes);
 
