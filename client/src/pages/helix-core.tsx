@@ -173,7 +173,7 @@ export default function HelixCore() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100">
-      <div className="container mx-auto p-4">
+      <div className="container mx-auto p-4 text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
