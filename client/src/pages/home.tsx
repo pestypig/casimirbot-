@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
-import { Atom, Settings, Book, History, FileText } from "lucide-react";
+import { Atom, Settings, Book, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
@@ -92,7 +92,7 @@ export default function Home() {
                 Simulation Config
               </Button>
             </Link>
-            <Link href="/documents">
+            <Link href="/documentation">
               <Button variant="outline" className="flex items-center gap-2">
                 <Book className="w-4 h-4" />
                 Documentation
