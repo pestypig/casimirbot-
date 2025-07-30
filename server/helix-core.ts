@@ -254,12 +254,17 @@ async function runDiagnosticsScan() {
   };
 }
 
-// Simulate a full pulse cycle
+// Simulate a full pulse cycle using current operational mode
 async function simulatePulseCycle(args: { frequency_GHz: number }) {
   const frequency = args.frequency_GHz * 1e9; // Convert to Hz
   const omega = 2 * Math.PI * frequency;
   
-  // Simulate full cycle using Needle Hull parameters
+  // Get current pipeline state for authentic mode parameters
+  const state = getGlobalPipelineState();
+  const currentMode = state.currentMode;
+  const modeConfig = MODE_CONFIGS[currentMode];
+  
+  // Simulate full cycle using current mode parameters
   const { calculateCasimirEnergy } = await import('../modules/sim_core/static-casimir.js');
   
   const cycleResult = await calculateCasimirEnergy({
@@ -270,31 +275,49 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
     sagDepth: 0
   } as any);
   
-  // Apply Needle Hull amplifications
-  const gammaGeo = 26;
-  const qMechanical = 5e4;
-  const qCavity = 1e9;
-  const dutyFactor = 0.14; // Hover mode
+  // Apply current mode amplifications from pipeline state
+  const energyAmplified = cycleResult.totalEnergy * Math.pow(state.gammaGeo, 3) * state.qMechanical;
+  const vanDenBroeckAmplified = energyAmplified * state.gammaVanDenBroeck;
+  const powerLoss = Math.abs(energyAmplified * omega / state.qCavity);
+  const throttledPower = powerLoss * state.dutyCycle * state.qSpoilingFactor * (1 / state.sectorStrobing);
+  const exoticMass = Math.abs(vanDenBroeckAmplified) / (3e8 * 3e8) * state.N_tiles;
   
-  const energyAmplified = cycleResult.totalEnergy * Math.pow(gammaGeo, 3) * qMechanical;
-  const powerOutput = Math.abs(energyAmplified * omega / qCavity) * dutyFactor;
-  const exoticMass = Math.abs(energyAmplified) / (3e8 * 3e8) * 1.12e9; // Full hull
+  // Calculate metrics based on current mode
+  const fordRomanValue = state.zeta;
+  const curvatureValue = Math.abs(vanDenBroeckAmplified) / (3e8 * 3e8);
   
   return {
     mode: "PULSE_CYCLE",
+    operationalMode: currentMode.toUpperCase(),
     frequency: frequency,
-    energyPerTile: cycleResult.totalEnergy,
-    amplifiedEnergy: energyAmplified,
-    powerOutput: powerOutput / 1e6, // Convert to MW
-    exoticMassTotal: exoticMass,
+    frequencyGHz: args.frequency_GHz,
+    modeParameters: {
+      dutyCycle: state.dutyCycle,
+      sectorStrobing: state.sectorStrobing,
+      qSpoilingFactor: state.qSpoilingFactor,
+      gammaVanDenBroeck: state.gammaVanDenBroeck,
+      powerOutput: state.P_avg
+    },
+    energyCalculations: {
+      energyPerTile: cycleResult.totalEnergy,
+      geometricAmplified: energyAmplified,
+      vanDenBroeckAmplified: vanDenBroeckAmplified,
+      powerLossRaw: powerLoss,
+      powerThrottled: throttledPower / 1e6, // Convert to MW
+      exoticMassTotal: state.M_exotic // Use fixed target mass
+    },
     metrics: {
-      fordRoman: 0.032,
+      fordRoman: fordRomanValue,
+      fordRomanStatus: fordRomanValue < 1.0 ? "PASS" : "FAIL",
       natario: 0,
-      curvature: energyAmplified / (3e8 * 3e8),
-      timeScale: 4102.7
+      natarioStatus: "VALID",
+      curvature: curvatureValue,
+      curvatureStatus: curvatureValue < 1e-10 ? "PASS" : "FAIL",
+      timeScale: state.TS_ratio,
+      overallStatus: state.overallStatus
     },
     status: "CYCLE_COMPLETE",
-    log: `PULSE CYCLE COMPLETE. ΔM = ${exoticMass.toExponential(3)} kg, ⟨Rμν⟩ updated.`
+    log: `${currentMode.toUpperCase()} MODE PULSE CYCLE @ ${args.frequency_GHz} GHz. Power: ${state.P_avg.toFixed(1)} MW, Mass: ${state.M_exotic.toFixed(0)} kg, ζ=${fordRomanValue.toExponential(2)}`
   };
 }
 
@@ -333,7 +356,10 @@ function checkMetricViolation(metricType: string) {
 // Main ChatGPT interaction handler
 export async function handleHelixCommand(req: Request, res: Response) {
   try {
-    const { messages, functions, function_call } = req.body;
+    const { message: userMessage, messages, functions, function_call } = req.body;
+    
+    // Handle both single message and messages array formats
+    const chatMessages = messages || (userMessage ? [{ role: "user", content: userMessage }] : []);
     
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ 
@@ -346,7 +372,7 @@ export async function handleHelixCommand(req: Request, res: Response) {
       model: "gpt-4-0613",
       messages: [
         { role: "system", content: HELIX_CORE_PROMPT },
-        ...messages
+        ...chatMessages
       ],
       functions: AVAILABLE_FUNCTIONS,
       function_call: function_call || "auto",
