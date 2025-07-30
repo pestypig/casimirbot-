@@ -323,13 +323,13 @@ export default function HelixCore() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="modulation">Modulation Frequency</Label>
+                    <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
                     <div className="flex gap-2">
                       <Input 
                         id="modulation"
                         type="number" 
                         defaultValue="15"
-                        className="bg-slate-950 border-slate-700"
+                        className="bg-slate-950 border-slate-700 text-slate-100"
                       />
                       <span className="flex items-center text-sm text-slate-400">GHz</span>
                     </div>
@@ -429,15 +429,15 @@ export default function HelixCore() {
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Burst</p>
-                      <p className="font-mono">10 μs</p>
+                      <p className="font-mono text-slate-100">10 μs</p>
                     </div>
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Cycle</p>
-                      <p className="font-mono">1 ms</p>
+                      <p className="font-mono text-slate-100">1 ms</p>
                     </div>
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Sectors</p>
-                      <p className="font-mono">400</p>
+                      <p className="font-mono text-slate-100">400</p>
                     </div>
                   </div>
                 </div>
@@ -507,7 +507,7 @@ export default function HelixCore() {
                         onChange={(e) => setCommandInput(e.target.value)}
                         onKeyPress={(e) => e.key === 'Enter' && sendCommand()}
                         placeholder="Ask HELIX-CORE..."
-                        className="bg-slate-950 border-slate-700"
+                        className="bg-slate-950 border-slate-700 text-slate-100"
                         disabled={isProcessing}
                       />
                       <Button 
@@ -556,22 +556,22 @@ export default function HelixCore() {
                 <div className="space-y-3">
                   <div className="p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-1">Cavity Gap</p>
-                    <p className="font-mono text-lg">1.000 nm</p>
+                    <p className="font-mono text-lg text-slate-100">1.000 nm</p>
                   </div>
                   
                   <div className="p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-1">Surface Roughness</p>
-                    <p className="font-mono text-lg">0.05 nm RMS</p>
+                    <p className="font-mono text-lg text-slate-100">0.05 nm RMS</p>
                   </div>
                   
                   <div className="p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-1">Q Enhancement</p>
-                    <p className="font-mono text-lg">1.6×10⁶</p>
+                    <p className="font-mono text-lg text-slate-100">1.6×10⁶</p>
                   </div>
 
                   <div className="p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-1">Vibrational Mode</p>
-                    <p className="font-mono text-lg">15.0 GHz</p>
+                    <p className="font-mono text-lg text-slate-100">15.0 GHz</p>
                   </div>
                 </div>
               </CardContent>
