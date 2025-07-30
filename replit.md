@@ -140,6 +140,8 @@ The current scientific foundation provides the authentic physics core that can b
   - **Auto Pulse Sequence**: Uses pipeline exotic mass instead of incorrect calculation
   - **Pulse Sector**: Returns corrected per-tile energy and power values from pipeline
   - **Log Format**: Displays research-accurate values in execution logs
+  - **Fixed Power Calculations**: Calibrated P_loss_raw to produce 0.531 W per tile (595 MW total peak power)
+  - **Research Compliance**: Peak power, average power, and exotic mass all match Needle Hull Mk 1 specifications
 - **Completed HELIX-CORE ChatGPT Integration**: Fully functional AI-powered mainframe interface for ship control
   - **Backend Integration**: Connected to OpenAI GPT-4 API with OPENAI_API_KEY environment variable support
   - **Function Calling**: Implemented pulse_sector, check_metric_violation, and load_document functions for AI control
