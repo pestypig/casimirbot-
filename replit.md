@@ -116,6 +116,20 @@ The current scientific foundation provides the authentic physics core that can b
 
 ## Recent Changes: Latest modifications with dates
 
+### July 30, 2025 - HELIX-CORE AI Mainframe Implementation
+- **Completed HELIX-CORE ChatGPT Integration**: Fully functional AI-powered mainframe interface for ship control
+  - **Backend Integration**: Connected to OpenAI GPT-4 API with OPENAI_API_KEY environment variable support
+  - **Function Calling**: Implemented pulse_sector, check_metric_violation, and load_document functions for AI control
+  - **Interactive UI**: Seven operational zones including tile grid, energy panel, compliance HUD, and AI chat interface
+  - **Real-Time Metrics**: Connected to live system metrics API showing active tiles, energy output, exotic mass generation
+  - **Chat Interface**: Sophisticated ChatGPT-powered conversation system replacing basic log terminal
+  - **Tile Grid Interaction**: Interactive 10×10 tile sector display with click-to-select functionality
+  - **System Logs**: Dual-view system with AI chat and technical logs for debugging
+  - **API Endpoints**: Full /api/helix/* endpoint suite for mainframe functionality
+  - **Navigation Integration**: HELIX-CORE accessible from main navigation with CPU icon
+  - **TypeScript Fixes**: Resolved all TypeScript errors for proper API communication
+  - **User Validation**: OpenAI API key configured and ready for testing
+
 ### July 29, 2025 - Metrics Dashboard Implementation
 - **Successfully Implemented Real-Time Metrics Dashboard**: Replaced 2D phase diagram with comprehensive visualization approach
   - **Radar Chart Visualization**: Shows all 7 key metrics (P_raw, f_throttle, P_avg, U_cycle, TS_ratio, ζ, M_exotic) on single normalized chart

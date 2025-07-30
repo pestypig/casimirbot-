@@ -113,36 +113,35 @@ export default function HelixCore() {
     setIsProcessing(true);
     
     try {
-      const response = await apiRequest('/api/helix/command', {
-        method: 'POST',
-        body: JSON.stringify({
-          messages: chatMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          })).concat({ role: 'user', content: commandInput })
-        })
+      const response = await apiRequest('POST', '/api/helix/command', {
+        messages: chatMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })).concat({ role: 'user', content: commandInput })
       });
+      
+      const responseData = await response.json();
       
       const assistantMessage: ChatMessage = {
         role: 'assistant',
-        content: response.message.content,
+        content: responseData.message.content,
         timestamp: new Date()
       };
       
-      if (response.functionResult) {
+      if (responseData.functionResult) {
         assistantMessage.functionCall = {
-          name: response.message.function_call.name,
-          result: response.functionResult
+          name: responseData.message.function_call.name,
+          result: responseData.functionResult
         };
         
         // Log function calls
         setMainframeLog(prev => [...prev, 
-          `[FUNCTION] ${response.message.function_call.name}(${JSON.stringify(JSON.parse(response.message.function_call.arguments))})`,
-          `[RESULT] ${JSON.stringify(response.functionResult)}`
+          `[FUNCTION] ${responseData.message.function_call.name}(${JSON.stringify(JSON.parse(responseData.message.function_call.arguments))})`,
+          `[RESULT] ${JSON.stringify(responseData.functionResult)}`
         ]);
         
         // Refresh metrics if a pulse was executed
-        if (response.message.function_call.name === 'pulse_sector') {
+        if (responseData.message.function_call.name === 'pulse_sector') {
           refetchMetrics();
         }
       }

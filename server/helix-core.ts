@@ -115,7 +115,7 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
 
 // Function to check metric violations
 function checkMetricViolation(metricType: string) {
-  const metrics = {
+  const metrics: Record<string, { value: number; limit: number; status: string; equation: string }> = {
     "ford-roman": {
       value: 0.032,
       limit: 1.0,
