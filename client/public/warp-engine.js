@@ -1,7 +1,7 @@
 //====================================================================
-//  Natário Warp‑Bubble Visualiser (optimized WebGL – cross-browser compatible)
+//  Natário Warp‑Bubble Visualiser (optimized with enhanced physics visualization)
 //  ------------------------------------------------------------------
-//  Integrates seamlessly with React dashboard for real-time physics visualization
+//  Real-time WebGL visualization with authentic parameter mapping
 //====================================================================
 
 class WarpEngine {
@@ -11,9 +11,10 @@ class WarpEngine {
         if (!this.gl) throw new Error("WebGL not supported");
 
         // Enable derivatives extension for WebGL1 compatibility
-        this.hasDerivatives = !!this.gl.getExtension("OES_standard_derivatives");
-        if (!this.hasDerivatives && !this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0")) {
+        this.hasDerivatives = true;
+        if (!this.gl.getExtension("OES_standard_derivatives")) {
             console.warn("OES_standard_derivatives extension not available – grid lines disabled for WebGL1");
+            this.hasDerivatives = false;
         }
 
         // Default Natário parameters (Hover mode defaults)
@@ -38,7 +39,7 @@ class WarpEngine {
     }
 
     //----------------------------------------------------------------
-    //  Optimized shader compilation with WebGL1/2 compatibility
+    //  Enhanced shader compilation with visual physics mapping
     //----------------------------------------------------------------
     _compileShaders() {
         const isWebGL2 = this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0");
@@ -59,90 +60,121 @@ class WarpEngine {
             "    gl_Position = vec4(a_position, 0.0, 1.0);\n" +
             "}";
 
-        let fs = "";
-        if (isWebGL2) {
-            fs = "#version 300 es\n" +
-                "precision highp float;\n" +
-                "in vec2 v_uv;\n" +
-                "out vec4 frag;\n" +
-                "\n" +
-                "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-                "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
-                "\n" +
-                "// Natário β‑field with authentic physics\n" +
-                "vec3 betaField(vec3 x) {\n" +
-                "    float R = u_sagDepth_nm * 1e-9;  // nm → m conversion\n" +
-                "    float r = length(x);\n" +
-                "    if (r < 1e-9) return vec3(0.0);\n" +
-                "    \n" +
-                "    float beta0 = u_dutyCycle * u_g_y;\n" +
-                "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
-                "    return beta0 * prof * (x / r);\n" +
-                "}\n" +
-                "\n" +
-                "// Enhanced color mapping with physics-based intensity\n" +
-                "vec3 warpColor(float b) {\n" +
-                "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
-                "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
-                "}\n" +
-                "\n" +
-                "void main() {\n" +
-                "    vec2 center = v_uv - 0.5;\n" +
-                "    vec3 pos = vec3(center * 2.0e-8, 0.0);  // 20nm field of view\n" +
-                "    \n" +
-                "    float bmag = length(betaField(pos));\n" +
-                "    // Dynamic ripple effect scaled by duty cycle\n" +
-                "    bmag += sin(u_time * 2.0 + length(center) * 20.0) * 0.1 * u_dutyCycle;\n" +
-                "    \n" +
-                "    vec3 color = warpColor(bmag);\n" +
-                "    \n" +
-                "    // Grid overlay with WebGL2 derivatives\n" +
-                "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
-                "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
-                "    color = mix(color, vec3(0.5), gridLine * 0.2);\n" +
-                "    \n" +
-                "    frag = vec4(color, 1.0);\n" +
-                "}";
-        } else {
-            fs = (this.hasDerivatives ? "#extension GL_OES_standard_derivatives : enable\n" : "") +
-                "precision highp float;\n" +
-                "varying vec2 v_uv;\n" +
-                "\n" +
-                "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-                "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
-                "\n" +
-                "vec3 betaField(vec3 x) {\n" +
-                "    float R = u_sagDepth_nm * 1e-9;\n" +
-                "    float r = length(x);\n" +
-                "    if (r < 1e-9) return vec3(0.0);\n" +
-                "    \n" +
-                "    float beta0 = u_dutyCycle * u_g_y;\n" +
-                "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
-                "    return beta0 * prof * (x / r);\n" +
-                "}\n" +
-                "\n" +
-                "vec3 warpColor(float b) {\n" +
-                "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
-                "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
-                "}\n" +
-                "\n" +
-                "void main() {\n" +
-                "    vec2 center = v_uv - 0.5;\n" +
-                "    vec3 pos = vec3(center * 2.0e-8, 0.0);\n" +
-                "    \n" +
-                "    float bmag = length(betaField(pos));\n" +
-                "    bmag += sin(u_time * 2.0 + length(center) * 20.0) * 0.1 * u_dutyCycle;\n" +
-                "    \n" +
-                "    vec3 color = warpColor(bmag);\n" +
-                "    \n" +
-                (this.hasDerivatives ? 
-                "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
-                "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
-                "    color = mix(color, vec3(0.5), gridLine * 0.2);\n" : "") +
-                "    \n" +
-                "    gl_FragColor = vec4(color, 1.0);\n" +
-                "}";
-        }
+        const fs = isWebGL2 ?
+            "#version 300 es\n" +
+            "precision highp float;\n" +
+            "in vec2 v_uv;\n" +
+            "out vec4 frag;\n" +
+            "\n" +
+            "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
+            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
+            "\n" +
+            "// Natário β‑field with authentic physics\n" +
+            "vec3 betaField(vec3 x) {\n" +
+            "    float R = u_sagDepth_nm * 1e-9;  // nm → m conversion\n" +
+            "    float r = length(x);\n" +
+            "    if (r < 1e-9) return vec3(0.0);\n" +
+            "    \n" +
+            "    float beta0 = u_dutyCycle * u_g_y;  // Physics cheat-sheet: DutyCycle × γ_geo\n" +
+            "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
+            "    return beta0 * prof * (x / r);\n" +
+            "}\n" +
+            "\n" +
+            "// Enhanced color mapping with physics-based intensity\n" +
+            "vec3 warpColor(float b) {\n" +
+            "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
+            "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
+            "}\n" +
+            "\n" +
+            "void main() {\n" +
+            "    vec2 center = v_uv - 0.5;\n" +
+            "    vec3 pos = vec3(center * 2.0e-8, 0.0);  // 20nm field of view\n" +
+            "    \n" +
+            "    float bmag = length(betaField(pos));\n" +
+            "    \n" +
+            "    // Enhanced ripple: Power controls speed, Duty controls amplitude\n" +
+            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0;\n" +
+            "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
+            "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
+            "    \n" +
+            "    vec3 color = warpColor(bmag);\n" +
+            "    \n" +
+            "    // Q-Factor driven halo/bloom effect\n" +
+            "    float halo = smoothstep(8.0, 10.0, log(u_cavityQ) / log(10.0));\n" +
+            "    color += halo * vec3(1.0, 0.8, 0.3) * 0.4;\n" +
+            "    \n" +
+            "    // Exotic Mass shock ring visualization\n" +
+            "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1.0e-8;\n" +
+            "    float distFromCenter = length(pos);\n" +
+            "    float shock = step(shockRadius, distFromCenter) * \n" +
+            "                 (1.0 - step(shockRadius * 1.3, distFromCenter));\n" +
+            "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.25 * shock);\n" +
+            "    \n" +
+            (this.hasDerivatives ?
+            "    // Grid overlay with derivatives\n" +
+            "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
+            "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
+            "    color = mix(color, vec3(0.5), gridLine * 0.15);\n"
+            :
+            "    // Grid disabled for WebGL1 compatibility\n") +
+            "    \n" +
+            "    frag = vec4(color, 1.0);\n" +
+            "}"
+            :
+            (this.hasDerivatives ? "#extension GL_OES_standard_derivatives : enable\n" : "") +
+            "precision highp float;\n" +
+            "varying vec2 v_uv;\n" +
+            "\n" +
+            "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
+            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
+            "\n" +
+            "vec3 betaField(vec3 x) {\n" +
+            "    float R = u_sagDepth_nm * 1e-9;\n" +
+            "    float r = length(x);\n" +
+            "    if (r < 1e-9) return vec3(0.0);\n" +
+            "    \n" +
+            "    float beta0 = u_dutyCycle * u_g_y;\n" +
+            "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
+            "    return beta0 * prof * (x / r);\n" +
+            "}\n" +
+            "\n" +
+            "vec3 warpColor(float b) {\n" +
+            "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
+            "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
+            "}\n" +
+            "\n" +
+            "void main() {\n" +
+            "    vec2 center = v_uv - 0.5;\n" +
+            "    vec3 pos = vec3(center * 2.0e-8, 0.0);\n" +
+            "    \n" +
+            "    float bmag = length(betaField(pos));\n" +
+            "    \n" +
+            "    // Enhanced ripple effects\n" +
+            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0;\n" +
+            "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
+            "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
+            "    \n" +
+            "    vec3 color = warpColor(bmag);\n" +
+            "    \n" +
+            "    // Q-Factor halo\n" +
+            "    float halo = smoothstep(8.0, 10.0, log(u_cavityQ) / log(10.0));\n" +
+            "    color += halo * vec3(1.0, 0.8, 0.3) * 0.4;\n" +
+            "    \n" +
+            "    // Exotic Mass shock ring\n" +
+            "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1.0e-8;\n" +
+            "    float distFromCenter = length(pos);\n" +
+            "    float shock = step(shockRadius, distFromCenter) * \n" +
+            "                 (1.0 - step(shockRadius * 1.3, distFromCenter));\n" +
+            "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.25 * shock);\n" +
+            "    \n" +
+            (this.hasDerivatives ?
+            "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
+            "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
+            "    color = mix(color, vec3(0.5), gridLine * 0.15);\n"
+            : "") +
+            "    \n" +
+            "    gl_FragColor = vec4(color, 1.0);\n" +
+            "}";
 
         this.program = this._linkProgram(vs, fs);
     }
@@ -291,6 +323,6 @@ class WarpEngine {
 // Export for both ES modules and CommonJS
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
-} else if (typeof window !== 'undefined') {
+} else {
     window.WarpEngine = WarpEngine;
 }

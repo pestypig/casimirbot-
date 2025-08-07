@@ -89,12 +89,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   useEffect(() => {
     const handleResize = () => {
       if (engineRef.current && canvasRef.current) {
-        const rect = canvasRef.current.parentElement?.getBoundingClientRect();
-        if (rect) {
-          engineRef.current.resize(rect.width, rect.height);
+        // The optimized engine handles its own resizing automatically
+        // through the _resize() method bound to window resize events
+        if (engineRef.current._resize) {
+          engineRef.current._resize();
         }
       }
     };
+
+    // Manual resize trigger for component changes
+    if (isLoaded && engineRef.current) {
+      handleResize();
+    }
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -170,34 +176,46 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           )}
         </div>
         
-        <div className="mt-4 grid grid-cols-2 gap-4 text-xs">
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Duty Cycle:</span>
-              <span>{(parameters.dutyCycle * 100).toFixed(1)}%</span>
+        <div className="mt-4 space-y-3">
+          <div className="grid grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Duty Cycle:</span>
+                <span className="text-cyan-400">{(parameters.dutyCycle * 100).toFixed(1)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">γ Geometric:</span>
+                <span className="text-orange-400">{parameters.g_y.toFixed(1)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Q Factor:</span>
+                <span className="text-yellow-400">{parameters.cavityQ.toExponential(1)}</span>
+              </div>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">γ Geometric:</span>
-              <span>{parameters.g_y.toFixed(1)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Q Factor:</span>
-              <span>{parameters.cavityQ.toExponential(1)}</span>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Sag Depth:</span>
+                <span className="text-blue-400">{parameters.sagDepth_nm.toFixed(1)} nm</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Power:</span>
+                <span className="text-green-400">{parameters.powerAvg_MW.toFixed(1)} MW</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Exotic Mass:</span>
+                <span className="text-purple-400">{parameters.exoticMass_kg.toFixed(0)} kg</span>
+              </div>
             </div>
           </div>
-          <div className="space-y-1">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Sag Depth:</span>
-              <span>{parameters.sagDepth_nm.toFixed(1)} nm</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Power:</span>
-              <span>{parameters.powerAvg_MW.toFixed(1)} MW</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Exotic Mass:</span>
-              <span>{parameters.exoticMass_kg.toFixed(0)} kg</span>
-            </div>
+          
+          <div className="text-xs text-slate-400 space-y-1">
+            <div className="font-semibold text-slate-300">Visual Effects Guide:</div>
+            <div>• <span className="text-cyan-400">Duty Cycle</span>: Controls overall brightness & ripple depth</div>
+            <div>• <span className="text-orange-400">γ Geometric</span>: Adjusts color contrast & bubble sharpness</div>
+            <div>• <span className="text-blue-400">Sag Depth</span>: Bubble size (larger = wider disc)</div>
+            <div>• <span className="text-green-400">Power</span>: Ripple propagation speed</div>
+            <div>• <span className="text-yellow-400">Q Factor</span>: Golden halo intensity</div>
+            <div>• <span className="text-purple-400">Exotic Mass</span>: Outer shock ring visibility</div>
           </div>
         </div>
       </CardContent>
