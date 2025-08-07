@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["gmsh"]
+packages = ["gmsh", "emscripten"]
 
 [deployment]
 deploymentTarget = "autoscale"

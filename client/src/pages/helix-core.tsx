@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { WarpVisualizer } from "@/components/WarpVisualizer";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -24,7 +25,7 @@ const MAINFRAME_ZONES = {
   PHASE_DIAGRAM: "Phase Diagram AI",
   RESONANCE_SCHEDULER: "Resonance Scheduler",
   LOG_TERMINAL: "Log + Document Terminal",
-  LATTICE_INSPECTOR: "Graphene Lattice Inspector"
+  WARP_VISUALIZER: "Natário Warp Bubble"
 };
 
 // Mock tile sectors for demo
@@ -810,41 +811,18 @@ export default function HelixCore() {
               </CardContent>
             </Card>
 
-            {/* Graphene Lattice Inspector */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Atom className="w-5 h-5 text-teal-400" />
-                  {MAINFRAME_ZONES.LATTICE_INSPECTOR}
-                </CardTitle>
-                <CardDescription>
-                  Microscale geometry diagnostics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="p-3 bg-slate-950 rounded-lg">
-                    <p className="text-xs text-slate-400 mb-1">Cavity Gap</p>
-                    <p className="font-mono text-lg text-slate-100">1.000 nm</p>
-                  </div>
-                  
-                  <div className="p-3 bg-slate-950 rounded-lg">
-                    <p className="text-xs text-slate-400 mb-1">Surface Roughness</p>
-                    <p className="font-mono text-lg text-slate-100">0.05 nm RMS</p>
-                  </div>
-                  
-                  <div className="p-3 bg-slate-950 rounded-lg">
-                    <p className="text-xs text-slate-400 mb-1">Q Enhancement</p>
-                    <p className="font-mono text-lg text-slate-100">1.6×10⁶</p>
-                  </div>
-
-                  <div className="p-3 bg-slate-950 rounded-lg">
-                    <p className="text-xs text-slate-400 mb-1">Vibrational Mode</p>
-                    <p className="font-mono text-lg text-slate-100">15.0 GHz</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            {/* Natário Warp Bubble Visualizer */}
+            <WarpVisualizer
+              parameters={{
+                dutyCycle: pipelineState?.dutyCycle || 0.14,
+                g_y: pipelineState?.gammaGeo || 26,
+                cavityQ: pipelineState?.qFactor || 1e9,
+                sagDepth_nm: pipelineState?.sagDepth || 16,
+                tsRatio: pipelineState?.TS_ratio || 4102.74,
+                powerAvg_MW: pipelineState?.P_avg || 83.3,
+                exoticMass_kg: pipelineState?.M_exotic || 1405
+              }}
+            />
           </div>
         </div>
       </div>
