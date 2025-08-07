@@ -27,34 +27,55 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       if (!canvasRef.current) return;
 
       try {
-        // Load the WarpEngine script
-        const script = document.createElement('script');
-        script.src = '/warp-engine.js';
-        script.onload = () => {
-          if (window.WarpEngine) {
+        // Check if WarpEngine is already loaded to avoid duplicate declarations
+        if (window.WarpEngine) {
+          try {
             engineRef.current = new window.WarpEngine(canvasRef.current);
             setIsLoaded(true);
-            startAnimation();
+          } catch (error) {
+            console.error('Failed to initialize existing WarpEngine:', error);
+          }
+          return;
+        }
+
+        // Load the WarpEngine script dynamically
+        const script = document.createElement('script');
+        script.src = '/warp-engine.js?' + Date.now(); // Cache bust
+        script.onload = () => {
+          if (window.WarpEngine) {
+            try {
+              engineRef.current = new window.WarpEngine(canvasRef.current);
+              setIsLoaded(true);
+              // Engine now auto-starts its render loop
+            } catch (error) {
+              console.error('Failed to initialize WarpEngine:', error);
+              setIsLoaded(false);
+            }
           }
         };
         script.onerror = () => {
           console.error('Failed to load WarpEngine');
+          setIsLoaded(false);
         };
         document.head.appendChild(script);
 
         return () => {
-          document.head.removeChild(script);
+          if (document.head.contains(script)) {
+            document.head.removeChild(script);
+          }
         };
       } catch (error) {
         console.error('Failed to initialize WarpEngine:', error);
+        setIsLoaded(false);
       }
     };
 
     initializeEngine();
 
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
+      // Clean up engine resources
+      if (engineRef.current?.destroy) {
+        engineRef.current.destroy();
       }
     };
   }, []);
@@ -79,27 +100,19 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     return () => window.removeEventListener('resize', handleResize);
   }, [isLoaded]);
 
-  const startAnimation = () => {
-    if (!engineRef.current || !isRunning) return;
-
-    const animate = (time: number) => {
-      if (engineRef.current) {
-        engineRef.current.render(time);
-      }
-      if (isRunning) {
-        animationRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    animationRef.current = requestAnimationFrame(animate);
-  };
-
   const toggleAnimation = () => {
     setIsRunning(!isRunning);
-    if (!isRunning && engineRef.current) {
-      startAnimation();
-    } else if (animationRef.current) {
-      cancelAnimationFrame(animationRef.current);
+    if (engineRef.current) {
+      if (!isRunning) {
+        // Resume animation loop
+        engineRef.current._startRenderLoop();
+      } else {
+        // Pause animation loop
+        if (engineRef.current.animationId) {
+          cancelAnimationFrame(engineRef.current.animationId);
+          engineRef.current.animationId = null;
+        }
+      }
     }
   };
 
