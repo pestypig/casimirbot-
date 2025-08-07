@@ -1,0 +1,38 @@
+Below is a cheat-sheet that ties each **physics slider** to a concrete, visible change in the simplified WebGL visualiser you just dropped in.  Think of the picture on the canvas as nothing more than a heat-map of the local **shift vector β(x)**; every slider ultimately tweaks the size, shape, or pulse of that field.
+
+| Slider (uniform)                    | Where it lands in code                                                                           | What it does mathematically                                                                                                             | What you’ll *see*                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Duty Cycle** (`u_dutyCycle`)      | `beta0 = u_dutyCycle * u_g_y;`<br>*(fragment shader)*                                            | Linear scale on the peak β-amplitude. A higher duty cycle = a larger portion of each RF cycle spends “on-throttle,” so β’s crest grows. | **Overall brightness ↑** (orange hues creep outward), grid ripples get stronger, and the pulsating ripple (`sin(u_time*2.0 …) * 0.1 * u_dutyCycle`) becomes deeper. |
+| **γ Geometric** (`u_g_y`)           | Same line as above.                                                                              | Geometric amplification factor from the shell “periodic-tilt”—multiplies duty cycle to give `β₀`.                                       | **Contrast slider**: raising γ makes the colour gradient steeper; the dark-blue core quickly turns orange, making the bubble edge look sharper.                     |
+| **Q Factor** (`u_cavityQ`)          | *Not yet used in the demo shader,* but physically it controls stored resonant energy vs. losses. | In a richer renderer you’d feed Q into energy-density ρ(x) ∝ β² Q, which in turn shifts the effective exotic mass.                      | **Suggested hook-up:** map log₁₀(Q) to a subtle bloom/halo intensity, so ultra-high-Q modes glow more.                                                              |
+| **Sag Depth** (`u_sagDepth_nm`)     | `float R = u_sagDepth_nm * 1e-9;`                                                                | Sets the characteristic radius *R* in the Gaussian profile `prof = (r/R)·e^{-(r/R)²}`.                                                  | **Bubble size control**: larger sag depth → bigger R → β rolls off more slowly → the coloured disc widens. Small sag depth pinches the bubble into a tight dot.     |
+| **Power** (`u_powerAvg_MW`)         | Only stored for now. Physically P ∝ β₀² / Q.                                                     | Should modulate *how fast* the ripple propagates or how bright the field gets when Q is held fixed.                                     | **Easy visual dial-in:** scale the ripple amplitude with √P so a 4× power boost doubles ripple depth.                                                               |
+| **Exotic Mass** (`u_exoticMass_kg`) | Currently a passive uniform. In GR it’s the volume integral of negative ρ.                       | Raising M\_exotic lets the bubble push harder against surrounding spacetime.                                                            | **Visual cue idea:** draw a faint outer “bow shock” radius proportional to M\_exotic^{1/3}; bigger exotic mass pushes that ring outward.                            |
+
+### TL;DR flow
+
+```
+DutyCycle ─┐
+           │      beta0 = DutyCycle * γ_geo
+γ_geo  ────┘
+beta0, R(sagDepth)  ─► β(x) field  ─►  |β|  ─►  colour gradient ➜ what you see
+```
+
+*Everything else* (Q, Power, Exotic Mass) are energy bookkeeping knobs that can drive **secondary visuals**—glow, halo, shock-rings, temporal beats—once you’re ready to make the renderer a bit more physically expressive.
+
+---
+
+#### Quick implementation hint
+
+If you want to try those “suggested hooks” without rewriting the whole shader:
+
+```glsl
+// after computing vec3 col = warpColor(bmag);
+float halo = smoothstep(8.0, 10.0, log10(u_cavityQ));   // Q-driven bloom
+col += halo * vec3(1.0, 0.8, 0.3);                      // warm glow
+
+float shock = step( pow(u_exoticMass_kg, 0.333) * 1e-9, length(pos) );
+col = mix(col, vec3(0.9,0.9,1.0), 0.2 * shock);         // pale shock ring
+```
+
+Drop that snippet in, and now the slider moves *instantly* echo in the image.

@@ -45,6 +45,7 @@ Preferred communication style: Simple, everyday language.
 - **Multi-Dimensional Design Explorer**: Interactive phase diagram (heat-map) allowing real-time exploration of viable design regions based on adjustable physics parameters (e.g., geometric amplification, Q-factor, duty cycle, sag depth) and configurable constraint tolerances (power, mass, quantum safety). Supports ellipsoid geometry for larger hulls.
 - **Live Energy Pipeline**: Transparent, step-by-step display of physics equations with real-time parameter substitution, showing the calculation flow from static Casimir to power and mass generation.
 - **Operational Modes**: Comprehensive system for switching between predefined operational modes (e.g., Hover, Cruise, Emergency, Standby), each with specific physical parameters and real-time calculation updates.
+- **WebGL Warp Bubble Visualizer**: Real-time Natário shift vector β(x) visualization with authentic physics interpretation - duty cycle controls brightness, γ geometric amplification affects contrast, sag depth determines bubble size, Q-factor adds halo effects, power scales ripple intensity, and exotic mass creates shock rings. Cross-browser compatible with WebGL1/WebGL2 support.
 - **Documentation System**: Integrated access to research papers, physics guides, and API references.
 
 ## External Dependencies
