@@ -88,9 +88,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
   useEffect(() => {
     const handleResize = () => {
-      if (engineRef.current) {
-        // The engine handles its own resizing internally
-        engineRef.current._resize();
+      if (engineRef.current && canvasRef.current) {
+        const rect = canvasRef.current.parentElement?.getBoundingClientRect();
+        if (rect) {
+          engineRef.current.resize(rect.width, rect.height);
+        }
       }
     };
 

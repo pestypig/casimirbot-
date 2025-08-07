@@ -96,19 +96,6 @@ class WarpEngine {
                 "    \n" +
                 "    vec3 color = warpColor(bmag);\n" +
                 "    \n" +
-                "    // Q-factor driven halo effect\n" +
-                "    float halo = smoothstep(8.0, 10.0, log10(u_cavityQ));\n" +
-                "    color += halo * vec3(1.0, 0.8, 0.3) * 0.3;\n" +
-                "    \n" +
-                "    // Exotic mass shock ring\n" +
-                "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1e-8;\n" +
-                "    float shock = smoothstep(shockRadius - 1e-9, shockRadius, length(pos));\n" +
-                "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.1 * (1.0 - shock));\n" +
-                "    \n" +
-                "    // Power-driven ripple intensity\n" +
-                "    float powerScale = sqrt(u_powerAvg_MW / 83.3);\n" +
-                "    bmag += sin(u_time * 2.0 + length(center) * 20.0) * 0.1 * u_dutyCycle * powerScale;\n" +
-                "    \n" +
                 "    // Grid overlay with WebGL2 derivatives\n" +
                 "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
                 "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
@@ -147,19 +134,6 @@ class WarpEngine {
                 "    bmag += sin(u_time * 2.0 + length(center) * 20.0) * 0.1 * u_dutyCycle;\n" +
                 "    \n" +
                 "    vec3 color = warpColor(bmag);\n" +
-                "    \n" +
-                "    // Q-factor driven halo effect\n" +
-                "    float halo = smoothstep(8.0, 10.0, log10(u_cavityQ));\n" +
-                "    color += halo * vec3(1.0, 0.8, 0.3) * 0.3;\n" +
-                "    \n" +
-                "    // Exotic mass shock ring\n" +
-                "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1e-8;\n" +
-                "    float shock = smoothstep(shockRadius - 1e-9, shockRadius, length(pos));\n" +
-                "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.1 * (1.0 - shock));\n" +
-                "    \n" +
-                "    // Power-driven ripple intensity\n" +
-                "    float powerScale = sqrt(u_powerAvg_MW / 83.3);\n" +
-                "    bmag += sin(u_time * 2.0 + length(center) * 20.0) * 0.1 * u_dutyCycle * powerScale;\n" +
                 "    \n" +
                 (this.hasDerivatives ? 
                 "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
