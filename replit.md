@@ -46,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Live Energy Pipeline**: Transparent, step-by-step display of physics equations with real-time parameter substitution, showing the calculation flow from static Casimir to power and mass generation.
 - **Operational Modes**: Comprehensive system for switching between predefined operational modes (e.g., Hover, Cruise, Emergency, Standby), each with specific physical parameters and real-time calculation updates.
 - **Documentation System**: Integrated access to research papers, physics guides, and API references.
+- **3D Spacetime Curvature Visualization**: Real-time WebGL grid overlay showing authentic Natário warp bubble deformation effects, with physics-accurate parameter mapping responding to duty cycle, geometric amplification, and sag depth controls.
 
 ## External Dependencies
 
