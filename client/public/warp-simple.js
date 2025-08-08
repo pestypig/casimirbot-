@@ -248,12 +248,7 @@ class SimpleWarpEngine {
                     });
                 }
                 
-                // (ii) Correct Natário spatial metric: γᵢⱼ = δᵢⱼ (keep flat!)
-                // The β² term goes in the lapse function, not spatial metric
-                const stretchedY = clipY; // no artificial stretching
-                const stretchedZ = clipZ;
-                
-                // (iii) Authentic energy density: ρ = (|∇×β|² - |∇β|²)/(16π)
+                // (ii) Authentic energy density: ρ = (|∇×β|² - |∇β|²)/(16π)
                 // Simplified for radially symmetric β in +x direction
                 const dr_ds = (1 - 2*s*s) * Math.exp(-s*s); // d/ds[s*exp(-s²)]
                 const gradBeta = beta0 * dr_ds / R; // |∇β|
