@@ -234,40 +234,14 @@ class WarpEngine {
     _initGrid() {
         const gl = this.gl;
         
-        // Grid parameters from gravity_sim.cpp
-        const size = 40e-9;      // 40nm grid size to match visualization scale
-        const divisions = 30;    // 30x30 grid for performance
-        const step = size / divisions;
-        const half = size / 2;
-        const yPlane = -half * 0.3 + 3 * step;  // reference plane from C++
+        // Create grid using the exact recipe from gravity_sim.cpp
+        this.gridVertices = this._createGrid(40_000, 50);  // 40μm grid, 50 divisions
+        this.gridVertexCount = this.gridVertices.length / 3;
         
-        const vertices = [];
-        
-        // Generate horizontal lines (z-direction)
-        for (let z = 0; z <= divisions; z++) {
-            const zPos = -half + z * step;
-            for (let x = 0; x < divisions; x++) {
-                const x0 = -half + x * step;
-                const x1 = x0 + step;
-                vertices.push(x0, yPlane, zPos, x1, yPlane, zPos);
-            }
-        }
-        
-        // Generate vertical lines (x-direction)
-        for (let x = 0; x <= divisions; x++) {
-            const xPos = -half + x * step;
-            for (let z = 0; z < divisions; z++) {
-                const z0 = -half + z * step;
-                const z1 = z0 + step;
-                vertices.push(xPos, yPlane, z0, xPos, yPlane, z1);
-            }
-        }
-        
-        this.gridVertices = new Float32Array(vertices);
-        this.gridVertexCount = vertices.length / 3;
-        this.gridSize = size;
-        this.gridHalf = half;
-        this.gridY0 = yPlane;
+        // Store grid parameters for warping
+        this.gridSize = 40_000;
+        this.gridHalf = this.gridSize / 2;
+        this.gridY0 = -this.gridHalf * 0.3 + 3 * (this.gridSize / 50);  // exact yPlane from C++
         
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
@@ -277,6 +251,32 @@ class WarpEngine {
         
         // Compile grid shader program
         this._compileGridShaders();
+    }
+
+    // Exact implementation from the minimal recipe
+    _createGrid(size = 40_000, divisions = 50) {
+        const verts = [];
+        const step = size / divisions;
+        const half = size / 2;
+        const yPlane = -half * 0.3 + 3 * step;   // exactly the plane used in C++
+
+        for (let z = 0; z <= divisions; ++z) {
+            const zPos = -half + z * step;
+            for (let x = 0; x < divisions; ++x) {
+                const x0 = -half + x * step;
+                const x1 = x0 + step;
+                verts.push(x0, yPlane, zPos, x1, yPlane, zPos);      // x–lines
+            }
+        }
+        for (let x = 0; x <= divisions; ++x) {
+            const xPos = -half + x * step;
+            for (let z = 0; z < divisions; ++z) {
+                const z0 = -half + z * step;
+                const z1 = z0 + step;
+                verts.push(xPos, yPlane, z0, xPos, yPlane, z1);     // z–lines
+            }
+        }
+        return new Float32Array(verts);
     }
 
     _compileGridShaders() {
@@ -301,12 +301,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.7, 0.7, 0.9, 0.6);\n" +  // Semi-transparent blue-white grid
+            "    frag = vec4(0.5, 0.5, 0.5, 0.4);\n" +  // Low-alpha grey as suggested
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.7, 0.7, 0.9, 0.6);\n" +
+            "    gl_FragColor = vec4(0.5, 0.5, 0.5, 0.4);\n" +
             "}";
 
         this.gridProgram = this._linkProgram(gridVs, gridFs);
@@ -392,70 +392,54 @@ class WarpEngine {
         gl.disable(gl.BLEND);
     }
 
-    // Warp grid vertices based on Natário physics (from gravity_sim.cpp)
+    // Exact warpGridVertices implementation from the minimal recipe
     _updateGrid() {
-        const sagR = this.uniforms.sagDepth_nm * 1e-9;    // nm → m conversion
-        const beta0 = this.uniforms.dutyCycle * this.uniforms.g_y;  // β₀ amplitude
-        const vertices = this.gridVertices;
-        
-        for (let i = 0; i < vertices.length; i += 3) {
-            const x = vertices[i];
-            const z = vertices[i + 2];
-            
-            // Radial distance from bubble center
-            const r = Math.sqrt(x * x + z * z);
-            
-            // Natário β-field profile: (r/R) * exp(-(r/R)²)
-            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
-            const beta = beta0 * prof;
-            
-            // Map |β| to vertical displacement for spacetime curvature visualization
-            const dy = beta * sagR * 8000;  // Amplification factor for visibility
-            
-            vertices[i + 1] = this.gridY0 + dy;
-        }
+        this._warpGridVertices(this.gridVertices, this.gridHalf, this.gridY0, this.uniforms);
         
         // Upload warped vertices to GPU
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    // Direct implementation from the gravity sim recipe
+    _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
+        const G = 6.6743e-11, c = 2.99792458e8;
+        const sagR = bubbleParams.sagDepth_nm * 1e-9;          // nm → m
+        const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
+
+        for (let i = 0; i < vtx.length; i += 3) {
+            const x = vtx[i], z = vtx[i + 2];
+
+            // --- simple Natário–style shift vector approximation ---
+            const r = Math.hypot(x, z);           // radial distance in nm plane
+            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
+            const beta = beta0 * prof;              // |β| at this point
+
+            // map |β| to a vertical displacement just for visualisation
+            const dy = beta * sagR * 5;           // tuning factor '5' is artistic
+
+            vtx[i + 1] = y0 + dy;
+        }
     }
 
     _renderGrid() {
         const gl = this.gl;
         gl.useProgram(this.gridProgram);
         
-        // Create perspective projection matrix
-        const aspect = this.canvas.width / this.canvas.height;
-        const fov = Math.PI / 3;  // 60 degrees
-        const near = 1e-10;
-        const far = 1e-7;
-        
-        // Simple perspective matrix calculation
-        const f = 1 / Math.tan(fov / 2);
-        const projection = new Float32Array([
-            f/aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far+near)/(near-far), -1,
-            0, 0, (2*far*near)/(near-far), 0
-        ]);
-        
-        // Camera positioned to view the grid at an angle
-        const eyeZ = -this.gridSize * 1.5;
-        const eyeY = this.gridSize * 0.8;
-        
-        // View-projection matrix (simplified for this demo)
+        // Simplified orthographic projection to match the recipe approach
+        const scale = 2.0e-8 / this.gridSize;  // Match the 20nm field of view from main shader
         const mvp = new Float32Array([
-            1, 0, 0, 0,
-            0, 0.8, 0.6, 0,     // Slight rotation to show 3D effect
-            0, -0.6, 0.8, 0,
-            0, eyeY, eyeZ, 1
+            scale, 0, 0, 0,
+            0, 0, scale, 0,     // Isometric view: map Z to Y for top-down visualization
+            0, scale*0.5, 0, 0, // Slight Y offset to show curvature
+            0, 0, 0, 1
         ]);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Render grid lines
+        // Simple grid rendering as suggested in the recipe
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
