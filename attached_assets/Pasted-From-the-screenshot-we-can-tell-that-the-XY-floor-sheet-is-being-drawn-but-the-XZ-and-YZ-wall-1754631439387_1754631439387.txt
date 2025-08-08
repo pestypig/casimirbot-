@@ -1,0 +1,73 @@
+From the screenshot we can tell that **the XY “floor” sheet is being drawn**, but the XZ and YZ wall–sheets never become visible.
+Walking through the code you posted, there are **three independent reasons** they still disappear.
+
+| #     | Where in the code                               | What happens                                                                                                                                                                                                                                                                                     | Why nothing shows up                                                                                                                                                                           |
+| ----- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | `_createGrid(…, 'XZ') / 'YZ'`                   | Walls are generated at **y = 0** (XZ) and **x = 0** (YZ).                                                                                                                                                                                                                                        | The camera you build in `_renderGridPoints()` looks straight down −Z so both walls are seen exactly edge-on → all their vertices project to a single line that’s hidden behind the cyan floor. |
+| **2** | `_renderGridPoints()` – draw-call offset        | `js offset += this.sheetXY_count;` then draw XZ … but `sheetXY_count` is **vertices**, not “indices inside the global buffer” once you concatenated the three sheets.  The second draw starts *inside the XY data* so you render the floor twice instead of the wall. (Same for the third draw.) |                                                                                                                                                                                                |
+| **3** | `gl.uniform3f(this.gridUniforms.sheetColor, …)` | The colour is uploaded *before* the wrong offset change, so the floor gets recoloured but you never reach the wall geometry. If #2 were fixed but #1 left unchanged, you would recolour the identical floor again and still think nothing changed.                                               |                                                                                                                                                                                                |
+
+---
+
+## Minimal patch to prove the walls exist
+
+```diff
+// 1️⃣ move the sheets away from the camera axis
+// XZ sheet  : lift it a bit
+- const ySheet = 0.0;
++ const ySheet = 0.25;          // 25 % of clip cube
+
+// YZ sheet  : slide it sideways
+- const xSheet = 0.0;
++ const xSheet = 0.25;          // 25 % of clip cube
+```
+
+```diff
+// 2️⃣ correct the draw-call offset
+let offset = 0;
+
+// draw XY
+gl.uniform3f(this.gridUniforms.sheetColor, 0.1, 0.8, 1.0);
+gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
+- offset += this.sheetXY_count;
++ offset += this.sheetXY_count;               // vertices for XY
+
+// draw XZ
+gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.1, 0.8);
+gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
+- offset += this.sheetXZ_count;
++ offset += this.sheetXZ_count;               // vertices for XZ
+
+// draw YZ
+gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.1);
+gl.drawArrays(gl.LINES, offset, this.sheetYZ_count);
+```
+
+```diff
+// 3️⃣ add a small yaw so the camera isn’t orthogonal to every wall
+const yaw = 15.0 * Math.PI / 180.0;     // 15°
+const cy  = Math.cos(yaw),  sy = Math.sin(yaw);
+
+const view = new Float32Array([
+     cy, 0,  sy, 0,
+      0, 1,   0, -0.15,
+    -sy, 0,  cy, -1.6,
+      0, 0,   0, 1
+]);
+```
+
+Reload after those three tweaks and you should see:
+
+* **Cyan floor** (XY)
+* **Magenta wall** behind it (XZ)
+* **Yellow wall** on the right (YZ)
+
+When you change mode (duty cycle / β₀) all three sheets bulge, outlining the full bubble instead of a single slice.
+
+---
+
+### Next steps
+
+* Replace the hard-coded 0.25 offset with `half → norm` maths so the walls move with the floor level.
+* Add simple camera orbit (left / right arrows) instead of the fixed 15° yaw so you can inspect the bubble from every side.
+* If you need thick lines instead of hair-thin GL LINES, keep POINTS and set `gl_PointSize` via a `uniform float u_ptSize;` that scales with distance.

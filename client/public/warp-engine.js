@@ -348,7 +348,7 @@ class WarpEngine {
         }
         else if (plane === 'XZ') {
             // Side wall grid - vertical sheet, offset from camera axis for visibility
-            const ySheet = 0.2;  // Move away from camera axis (y=0)
+            const ySheet = 0.25;  // Move away from camera axis (25% of clip cube)
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let x = 0; x < divisions; ++x) {
@@ -368,7 +368,7 @@ class WarpEngine {
         }
         else if (plane === 'YZ') {
             // End wall grid - vertical sheet, offset from camera axis for visibility
-            const xSheet = 0.2;  // Move away from camera axis (x=0)
+            const xSheet = 0.25;  // Move away from camera axis (25% of clip cube)
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let y = 0; y < divisions; ++y) {
@@ -777,11 +777,15 @@ class WarpEngine {
                 0, 0, -0.2, 0
             ]);
             
+            // Add 15° yaw so camera isn't orthogonal to walls
+            const yaw = 15.0 * Math.PI / 180.0;     // 15°
+            const cy = Math.cos(yaw), sy = Math.sin(yaw);
+            
             const view = new Float32Array([
-                1, 0, 0, 0,
-                0, 1, 0, -0.1,   // slightly elevated camera
-                0, 0, 1, -1.2,   // closer camera position
-                0, 0, 0, 1
+                 cy, 0,  sy, 0,
+                  0, 1,   0, -0.15,   // slightly elevated camera
+                -sy, 0,  cy, -1.6,   // camera with yaw rotation
+                  0, 0,   0, 1
             ]);
             
             const mvp = this._multiplyMatrices(proj, view);
@@ -804,13 +808,13 @@ class WarpEngine {
             gl.uniform3f(this.gridUniforms.sheetColor, 0.1, 0.8, 1.0);
             gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
             console.log(`XY sheet drawn: offset=${offset}, count=${this.sheetXY_count}`);
-            offset += this.sheetXY_count;
+            offset += this.sheetXY_count;  // Move to start of XZ data
             
             // XZ Side wall - magenta  
             gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.1, 0.8);
             gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
             console.log(`XZ sheet drawn: offset=${offset}, count=${this.sheetXZ_count}`);
-            offset += this.sheetXZ_count;
+            offset += this.sheetXZ_count;  // Move to start of YZ data
             
             // YZ End wall - yellow
             gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.1);
