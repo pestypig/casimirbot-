@@ -153,30 +153,36 @@ class SimpleWarpEngine {
                 const clipY = (screenY - centerY) / normScale * 0.8;
                 const clipZ = 0; // 2D projection
                 
-                // (i) Apply β as translation in +x direction
-                const r_perp = Math.sqrt(clipY * clipY + clipZ * clipZ) * 20e-6; // convert to meters for physics
-                const prof = (r_perp / R) * Math.exp(-r_perp * r_perp / (R * R)); // Natário profile
-                const beta = beta0 * prof;
+                // (i) Authentic Natário β profile: β(r) = β₀ * (r/R) * exp(-r²/R²)
+                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * 20e-6; // total radius in meters
+                const s = r / R; // normalized radius
+                const beta_magnitude = beta0 * s * Math.exp(-s * s); // Natário canonical bell profile
+                const beta_x = beta_magnitude; // +x direction translation
+                const beta_y = 0;
+                const beta_z = 0;
                 
                 // Debug first vertex β calculation
                 if (i === 0 && j === 0) {
-                    console.log('β Debug:', { r_perp, R, prof, beta0, beta });
+                    console.log('β Debug:', { r, R, s, beta0, beta_magnitude });
                 }
                 
-                // Convert β (meters) to clip-space units properly
-                const halfSize = 20e-6; // 20 µm in meters
-                const metresPerClip = halfSize / 1.6; // 1.6 because grid spans ±0.8
-                const exaggerate = 150.0; // temporary visibility boost - remove once scale is right
-                const xShiftClip = (beta / metresPerClip) * exaggerate;
+                // Convert β (dimensionless) to clip-space units properly
+                const metresPerClip = 20e-6 / 1.6; // 20 µm field / 1.6 clip range
+                const exaggerate = 150.0; // temporary visibility boost
+                const xShiftClip = (beta_x / metresPerClip) * exaggerate;
                 
-                // (ii) Adjust transverse metric: γᵢⱼ = δᵢⱼ + βᵢβⱼ  
-                const stretch = Math.sqrt(1 + beta * beta); // metric correction
-                const stretchedY = clipY * stretch;
-                const stretchedZ = clipZ * stretch;
+                // (ii) Correct Natário spatial metric: γᵢⱼ = δᵢⱼ (keep flat!)
+                // The β² term goes in the lapse function, not spatial metric
+                const stretchedY = clipY; // no artificial stretching
+                const stretchedZ = clipZ;
                 
-                // (iii) Derive energy density from β
-                const laplacian = (2/R - 2*r_perp*r_perp/(R*R*R)) * beta0 * Math.exp(-r_perp*r_perp/(R*R));
-                const rho = -(beta * laplacian) / (8 * Math.PI * 6.674e-11); // J/m³
+                // (iii) Authentic energy density: ρ = (|∇×β|² - |∇β|²)/(16π)
+                // Simplified for radially symmetric β in +x direction
+                const dr_ds = (1 - 2*s*s) * Math.exp(-s*s); // d/ds[s*exp(-s²)]
+                const gradBeta = beta0 * dr_ds / R; // |∇β|
+                const gradBeta2 = gradBeta * gradBeta;
+                const curlBeta2 = 0; // curl of radial field is zero
+                const rho = (curlBeta2 - gradBeta2) / (16 * Math.PI); // authentic Natário energy density
                 
                 // Convert back to screen coordinates (no more 1e9 multiplication!)
                 const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
@@ -196,7 +202,7 @@ class SimpleWarpEngine {
                 
                 // Sanity check - log first vertex per frame
                 if (i === 0 && j === 0) {
-                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta.toExponential(2)} shiftClip≈${xShiftClip.toFixed(3)}`);
+                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta_magnitude.toExponential(2)} shiftClip≈${xShiftClip.toFixed(3)}`);
                 }
                 
                 if (j === 0) {
@@ -230,17 +236,15 @@ class SimpleWarpEngine {
                 const clipY = (screenY - centerY) / normScale * 0.8;
                 const clipZ = 0;
                 
-                const r_perp = Math.sqrt(clipY * clipY + clipZ * clipZ) * 20e-6; // convert to meters
-                const prof = (r_perp / R) * Math.exp(-r_perp * r_perp / (R * R));
-                const beta = beta0 * prof;
+                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * 20e-6; // total radius
+                const s = r / R;
+                const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                const halfSize = 20e-6; // 20 µm in meters
-                const metresPerClip = halfSize / 1.6;
+                const metresPerClip = 20e-6 / 1.6;
                 const exaggerate = 150.0; // temporary visibility boost
-                const xShiftClip = (beta / metresPerClip) * exaggerate;
+                const xShiftClip = (beta_magnitude / metresPerClip) * exaggerate;
                 
-                const stretch = Math.sqrt(1 + beta * beta);
-                const stretchedY = clipY * stretch;
+                const stretchedY = clipY; // keep spatial metric flat per Natário
                 
                 const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
                 const finalY = centerY + stretchedY * normScale / 0.8;
