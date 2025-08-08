@@ -6,39 +6,57 @@
 
 class WarpEngine {
     constructor(canvas) {
-        this.canvas = canvas;
-        this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-        if (!this.gl) throw new Error("WebGL not supported");
+        try {
+            console.log("WarpEngine: Starting initialization...");
+            this.canvas = canvas;
+            this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+            if (!this.gl) throw new Error("WebGL not supported");
 
-        // Enable derivatives extension for WebGL1 compatibility
-        this.hasDerivatives = true;
-        if (!this.gl.getExtension("OES_standard_derivatives")) {
-            console.warn("OES_standard_derivatives extension not available – grid lines disabled for WebGL1");
-            this.hasDerivatives = false;
+            // Enable derivatives extension for WebGL1 compatibility
+            this.hasDerivatives = true;
+            if (!this.gl.getExtension("OES_standard_derivatives")) {
+                console.warn("OES_standard_derivatives extension not available – grid lines disabled for WebGL1");
+                this.hasDerivatives = false;
+            }
+
+            // Default Natário parameters (Hover mode defaults)
+            this.uniforms = {
+                dutyCycle: 0.14,        // 14% duty cycle
+                g_y: 26.0,              // geometric amplification
+                cavityQ: 1e9,           // electromagnetic Q-factor
+                sagDepth_nm: 16.0,      // sag depth in nanometers
+                tsRatio: 4102.74,       // time-scale separation
+                powerAvg_MW: 83.3,      // average power (MW)
+                exoticMass_kg: 1405     // exotic mass (kg)
+            };
+
+            console.log("WarpEngine: Compiling shaders...");
+            this._compileShaders();
+            
+            console.log("WarpEngine: Initializing quad and grid...");
+            this._initQuad();
+            
+            console.log("WarpEngine: Caching uniform locations...");
+            this._cacheUniformLocations();
+            
+            console.log("WarpEngine: Resizing...");
+            this._resize();
+            
+            // Enable depth buffer for 3D grid rendering
+            this.gl.enable(this.gl.DEPTH_TEST);
+            
+            // Auto-resize and continuous rendering
+            window.addEventListener("resize", () => this._resize());
+            
+            console.log("WarpEngine: Starting render loop...");
+            this._startRenderLoop();
+            
+            console.log("WarpEngine: Initialization completed successfully!");
+        } catch (error) {
+            console.error("WarpEngine initialization failed:", error);
+            console.error("Error stack:", error.stack);
+            throw error;
         }
-
-        // Default Natário parameters (Hover mode defaults)
-        this.uniforms = {
-            dutyCycle: 0.14,        // 14% duty cycle
-            g_y: 26.0,              // geometric amplification
-            cavityQ: 1e9,           // electromagnetic Q-factor
-            sagDepth_nm: 16.0,      // sag depth in nanometers
-            tsRatio: 4102.74,       // time-scale separation
-            powerAvg_MW: 83.3,      // average power (MW)
-            exoticMass_kg: 1405     // exotic mass (kg)
-        };
-
-        this._compileShaders();
-        this._initQuad();
-        this._cacheUniformLocations();
-        this._resize();
-        
-        // Enable depth buffer for 3D grid rendering
-        this.gl.enable(this.gl.DEPTH_TEST);
-        
-        // Auto-resize and continuous rendering
-        window.addEventListener("resize", () => this._resize());
-        this._startRenderLoop();
     }
 
     //----------------------------------------------------------------
@@ -218,17 +236,28 @@ class WarpEngine {
     //  Optimized geometry setup
     //----------------------------------------------------------------
     _initQuad() {
-        const gl = this.gl;
-        const vbo = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            -1, -1,  1, -1,  -1, 1,  1, 1
-        ]), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        this.vbo = vbo;
-        
-        // Initialize 3D grid for spacetime curvature visualization
-        this._initGrid();
+        try {
+            const gl = this.gl;
+            const vbo = gl.createBuffer();
+            if (!vbo) throw new Error("Failed to create VBO");
+            
+            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                -1, -1,  1, -1,  -1, 1,  1, 1
+            ]), gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ARRAY_BUFFER, null);
+            this.vbo = vbo;
+            
+            console.log("Quad VBO created successfully");
+            
+            // Initialize 3D grid for spacetime curvature visualization
+            console.log("Initializing 3D grid...");
+            this._initGrid();
+            console.log("3D grid initialized successfully");
+        } catch (error) {
+            console.error("Failed to initialize quad:", error);
+            throw error;
+        }
     }
 
     _initGrid() {
