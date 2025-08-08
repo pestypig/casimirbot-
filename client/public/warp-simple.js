@@ -323,59 +323,6 @@ class SimpleWarpEngine {
         }
         
         ctx.globalAlpha = 1;
-        
-        // Real-time β calculations display at bottom
-        this.drawBetaCalculations(ctx, w, h, beta0, R, VIEW_DIAM);
-    }
-    
-    drawBetaCalculations(ctx, w, h, beta0, R, viewDiam) {
-        const startY = h - 140;
-        ctx.fillStyle = '#00FFFF';
-        ctx.font = '11px monospace';
-        
-        // Real-time β sampling at key points
-        const samplePoints = [
-            { name: 'Center', s: 0, r: 0 },
-            { name: 'R/2', s: 0.5, r: 0.5 * R },
-            { name: 'R', s: 1.0, r: R },
-            { name: 'Edge', s: viewDiam/(2*R), r: viewDiam/2 }
-        ];
-        
-        const samples = samplePoints.map(pt => {
-            const beta = beta0 * pt.s * Math.exp(-pt.s * pt.s);
-            return `${pt.name}(s=${pt.s.toFixed(2)}): β=${beta.toExponential(2)}`;
-        }).join('  |  ');
-        
-        // Physics equations display
-        const equations = [
-            `β(r) = β₀ × (r/R) × exp(-r²/R²)   [Natário 2002 Canonical Bell Profile]`,
-            `β₀ = duty × γ_geo = ${(this.params.dutyCycle || 0.14).toFixed(3)} × ${this.params.g_y || 26} = ${beta0.toFixed(3)}`,
-            `R = ${(R*1e9).toFixed(1)}nm   |   View = ${(viewDiam*1e9).toFixed(1)}nm (4× zoom)   |   s_max = ${(viewDiam/(2*R)).toFixed(2)}`,
-            `Live β Samples: ${samples}`,
-            `γᵢⱼ = δᵢⱼ (flat spatial metric)   |   ρ = (|∇×β|² - |∇β|²)/(16π)   [Authentic Energy Density]`,
-            `${this.debugDisableWarp ? '🔧 WARP DISABLED (Press W to enable)' : '🔥 WARP ENABLED (Press W to disable)'}`
-        ];
-        
-        equations.forEach((eq, i) => {
-            ctx.fillText(eq, 10, startY + i * 15);
-        });
-        
-        // Live parameter updates box
-        const paramBox = [
-            `Mode: ${this.params.currentMode || 'hover'}  |  Power: ${(this.params.powerAvg_MW || 83.3).toFixed(1)}MW`,
-            `Duty: ${((this.params.dutyCycle || 0.14) * 100).toFixed(1)}%  |  Q: ${(this.params.cavityQ || 1e9).toExponential(0)}`,
-            `Exotic Mass: ${this.params.exoticMass_kg || 1405}kg  |  Sag Depth: ${this.params.sagDepth_nm || 16}nm`
-        ];
-        
-        // Semi-transparent background for readability
-        ctx.fillStyle = 'rgba(0, 20, 40, 0.8)';
-        ctx.fillRect(w - 400, startY - 10, 390, 80);
-        
-        ctx.fillStyle = '#00FF88';
-        ctx.font = '10px monospace';
-        paramBox.forEach((param, i) => {
-            ctx.fillText(param, w - 395, startY + 5 + i * 15);
-        });
     }
     
     drawModeIndicator(ctx, effects) {

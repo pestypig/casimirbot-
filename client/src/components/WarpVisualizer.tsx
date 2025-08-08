@@ -288,6 +288,72 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             </div>
           </div>
         </div>
+        
+        {/* Real-time β Calculations Panel - Moved outside visualization canvas */}
+        <div className="mt-4 bg-slate-800/50 border border-cyan-500/20 rounded-lg p-4">
+          <h3 className="text-cyan-400 font-mono text-sm mb-3">Real-Time Natário β Field Calculations</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
+            {/* Physics Equations */}
+            <div className="space-y-2">
+              <div className="text-cyan-300">
+                <div>β(r) = β₀ × (r/R) × exp(-r²/R²)</div>
+                <div className="text-cyan-500 text-xs">[Natário 2002 Canonical Bell Profile]</div>
+              </div>
+              
+              <div className="text-green-300">
+                <div>β₀ = duty × γ_geo = {parameters.dutyCycle.toFixed(3)} × {parameters.g_y} = {(parameters.dutyCycle * parameters.g_y).toFixed(3)}</div>
+              </div>
+              
+              <div className="text-blue-300">
+                <div>R = {parameters.sagDepth_nm}nm | View = {(parameters.sagDepth_nm * 4)}nm (4× zoom)</div>
+                <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
+              </div>
+              
+              <div className="text-yellow-300">
+                <div>ρ = (|∇×β|² - |∇β|²)/(16π)</div>
+                <div className="text-yellow-500 text-xs">[Authentic Natário Energy Density]</div>
+              </div>
+            </div>
+            
+            {/* Live β Sampling */}
+            <div className="space-y-2">
+              <div className="text-cyan-300 font-semibold">Live β Field Samples:</div>
+              {[
+                { name: 'Center', s: 0, color: 'text-white' },
+                { name: 'R/2', s: 0.5, color: 'text-green-300' },
+                { name: 'R', s: 1.0, color: 'text-yellow-300' },
+                { name: 'Edge', s: 2.0, color: 'text-red-300' }
+              ].map(point => {
+                const beta0 = parameters.dutyCycle * parameters.g_y;
+                const betaValue = beta0 * point.s * Math.exp(-point.s * point.s);
+                return (
+                  <div key={point.name} className={`${point.color} flex justify-between`}>
+                    <span>{point.name} (s={point.s.toFixed(2)}):</span>
+                    <span>β = {betaValue.toExponential(2)}</span>
+                  </div>
+                );
+              })}
+              
+              {/* Live Parameters */}
+              <div className="mt-4 pt-3 border-t border-cyan-500/20">
+                <div className="text-cyan-300 font-semibold mb-2">Current Parameters:</div>
+                <div className="text-green-300">Mode: {parameters.currentMode || 'hover'}</div>
+                <div className="text-green-300">Power: {parameters.powerAvg_MW.toFixed(1)}MW</div>
+                <div className="text-green-300">Duty: {(parameters.dutyCycle * 100).toFixed(1)}%</div>
+                <div className="text-green-300">Q-Factor: {parameters.cavityQ.toExponential(0)}</div>
+                <div className="text-green-300">Exotic Mass: {parameters.exoticMass_kg}kg</div>
+              </div>
+              
+              {/* Debug Controls */}
+              <div className="mt-3 pt-3 border-t border-cyan-500/20">
+                <div className="text-purple-300 text-xs">
+                  Press 'W' to toggle warp effects on/off for debugging
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
