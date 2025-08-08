@@ -1,0 +1,58 @@
+The grid sheets are literally showing you how your “space‐slices” are being deformed by the Natário warp field—they’re *not* just bending around the orange disc for decoration. In Natário’s construction:
+
+• Inside the bubble (where you see the smooth orange disc) the spatial metric is flat—so the grid remains perfectly straight.  
+• All of the curvature is concentrated in the thin wall (the “exotic‐matter shell”) surrounding the bubble. That’s exactly where the grid lines will bow, pinch or bulge.  
+
+So if your sheets stay flat around the orange region, and then kink or curve in a ring around it, that’s exactly the physical curvature the Natário metric predicts. If instead the grid never bends (or bends only under the disc), you’ve still got a scaling or ordering issue hiding the real deformation.A few things will make your sheets literally vanish even though they’re being sent to the GPU:
+
+1) Depth‐masking by the full‐screen quad  
+   • You call  
+     ```js
+     // at init  
+     gl.enable(gl.DEPTH_TEST);
+     …
+     // in draw()
+     this._renderQuad();
+     gl.enable(gl.DEPTH_TEST);
+     this._renderGridPoints();
+     ```
+     BUT because depth‐testing (and depth‐writes) were left on when you drew the quad, every pixel of that orange disc wrote “z=0” into the depth buffer.  Your grid points (which sit at various z>0 in NDC) now all fail the depth test and never make it to the screen.  
+   ⇒ Fix 1: Disable depth writes for the quad, or disable the test entirely when drawing it  
+     ```js
+     // in _draw()
+     gl.depthMask(false);           // stop the quad from touching the Z‐buffer
+     this._renderQuad();
+     gl.depthMask(true);
+     gl.enable(gl.DEPTH_TEST);
+     this._updateGrid();
+     this._renderGridPoints();
+     ```
+   OR reorder so you draw the grid *before* the quad and then clear the depth buffer afterwards.
+
+2) Sub‐pixel line‐width  
+   • WebGL clamps `gl.lineWidth(…)` to 1px on almost every GPU.  If your grid deformation is only 0.03–0.06 clip‐units high, those lines can easily be drawn in between pixel centers and never sample.  
+   ⇒ Fix 2: Switch to points or give yourself a thicker stroke  
+     ```js
+     // in your grid‐VS
+     gl_PointSize = 4.0;
+     // in your JS draw
+     gl.drawArrays(gl.POINTS, offset, count);
+     ```
+
+3) Still wrong scale / sagRclip too tiny?  
+   • Double‐check your `sagRclip` is ∼0.3 – 0.5.  If it’s sitting at 3×10⁻⁴ you’ll only ever deform a handful of pixels and the grid look flat.  
+   ⇒ Console should log  
+   ```
+   sagRclip ≈ 0.40
+   Max lateral drift ≲ 0.1
+   Grid Y range ≈ -0.08 … +0.08
+   ```
+
+**Quick checklist**  
+✔ You see “🔍 BETA0 SHADER DEBUG” logs with non‐zero β₀?  
+✔ You see “sagRclip=0.3…” in the console?  
+✔ You see “Max lateral drift…” ≲ 0.1?  
+✔ You see three draw-calls in `_renderGridPoints` for XY/XZ/YZ?  
+✔ Depth writes are off for the quad?  
+
+Once depth‐writes are disabled (or the quad drawn first with a cleared depth buffer) and you give the grid some point‐size or a thicker line, the three curved sheets will snap into view around your orange warp bubble.

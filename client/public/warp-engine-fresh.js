@@ -439,14 +439,14 @@ class WarpEngine {
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 2.0;\n" +
+            "    gl_PointSize = 4.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 2.0;\n" +
+            "    gl_PointSize = 4.0;\n" +
             "}";
 
         const gridFs = isWebGL2 ?
@@ -554,6 +554,11 @@ class WarpEngine {
         
         // Enable depth testing for 3D grid overlay
         gl.enable(gl.DEPTH_TEST);
+        
+        // FIX 1: Stop the quad from killing Z-buffer
+        gl.depthMask(false);         // quad does NOT write Z
+        this._renderQuad();
+        gl.depthMask(true);          // restore for the sheets
         
         // Now render the grid with FIXED physics
         this._updateGrid();
@@ -721,7 +726,7 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.00001;             // REDUCED: tiny deformation for proper scaling
+            const push = beta * 0.000001;            // ULTRA-REDUCED: micro deformation for proper scaling
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
@@ -731,7 +736,7 @@ class WarpEngine {
             // FIXED: Use clamped linear scaling to keep within frustum
             const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * 0.00003 * powerScale * timeScale;   // REDUCED: tiny deformation for proper scaling
+            const dy = beta * 0.000003 * powerScale * timeScale;  // ULTRA-REDUCED: micro deformation for proper scaling
             vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         

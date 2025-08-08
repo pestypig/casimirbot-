@@ -1,0 +1,86 @@
+Below is a **single-pass “visibility patch”** that rolls the three things still hiding your sheets:
+
+| # | Symptom in console                                          | Root cause                                                     | 1-line fix                                                               |
+| - | ----------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1 | grid draw-calls fire but *nothing* appears                  | full-screen quad writes depth = 0, points fail the test        | turn depth-writes **off** while you draw the quad                        |
+| 2 | grid appears only as the faint magenta dots on the top edge | 1-px lines fall between pixel centres                          | switch to **POINTS** (or wide instanced strips) and raise `gl_PointSize` |
+| 3 | Max lateral drift still 80 k                                | nm → clip conversion used 0.4 instead of the global 0.8 factor | use the same `this.normClip` everywhere                                  |
+
+---
+
+## 1 · Stop the quad from killing Z-buffer
+
+```diff
+// WarpEngine._draw()
+- this._renderQuad();
+- gl.enable(gl.DEPTH_TEST);
++ gl.depthMask(false);         // << NEW — quad does NOT write Z
++ this._renderQuad();
++ gl.depthMask(true);          // << restore for the sheets
++ gl.enable(gl.DEPTH_TEST);
+```
+
+*(If you’d rather keep depth-writes, just render the grid first, then call
+`gl.clear(gl.DEPTH_BUFFER_BIT)` before the quad.)*
+
+---
+
+## 2 · Give the grid some pixels to hit
+
+### 2-a vertex shader for the sheets
+
+```glsl
+// gridVs  (both WebGL 1 & 2)
+...
+void main() {
+    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+    gl_PointSize = 4.0;            // <= was 1 px
+}
+```
+
+### 2-b JS draw-call
+
+```diff
+- gl.drawArrays(gl.LINES, offset, count);
++ gl.drawArrays(gl.POINTS, offset, count);  // fat points really show up
+```
+
+*(Leave the colour/energy-flag logic untouched.)*
+
+---
+
+## 3 · Use *one* nm→clip scale everywhere
+
+You already set `this.normClip = 0.8 / half` when the cage is built.
+Just consume it in `_warpGridVertices` instead of recomputing:
+
+```diff
+- const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;
+- const sagRclip        = bubbleRadius_nm / halfSize * 0.4;   // wrong 0.4!
++ const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;
++ const sagRclip        = bubbleRadius_nm * this.normClip;    // ≈ 0.32
+```
+
+*(That 0.4 was the old “keep it inside ±0.8” heuristic; the global
+`normClip` already does that.)*
+
+---
+
+### Quick re-run checklist
+
+```
+🔍 sagRclip         0.32
+🔍 Max lateral drift 0.07 – 0.09
+🔍 Grid Y range     -0.08 … +0.08
+XY sheet drawn      ✓ cyan
+XZ sheet drawn      ✓ magenta
+YZ sheet drawn      ✓ yellow
+```
+
+With depth-writes suppressed for the quad and 4-pixel points, the three
+orthogonal sheets curve neatly around (not *under*) the orange warp
+bubble, letting you see the thin Natário shell pinch -- exactly the
+behaviour you described.
+
+That’s all you need—no more hunting through 5 000-line diffs.
+Happy curvature hunting 🚀
