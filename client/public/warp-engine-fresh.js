@@ -526,43 +526,37 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        console.log(">> TOP OF DRAW - MASTER SWITCH TEST");
+        // Clear with dark blue background for contrast
+        gl.clearColor(0.05, 0.1, 0.15, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        // 1) Clear the color buffer only
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
-        // 2) Use the grid program
-        gl.useProgram(this.gridProgram);
-
-        // 3) Force a fat white point-cloud
+        // Upload all uniforms for the warp field shader
+        gl.useProgram(this.program);
+        gl.uniform1f(this.uLoc.time, time);
+        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
+        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
+        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
+        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
+        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);
+        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
+        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
+        
+        // Upload β₀ from amplifier chain
+        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
+        gl.uniform1f(this.uLoc.beta0, currentBeta0);
+        
+        // Render quad first 
+        this._renderQuad();
+        
+        // Clear ONLY the depth buffer so grid can render on top
+        gl.clear(gl.DEPTH_BUFFER_BIT);
+        
+        // Now render the grid with corrected projection
+        gl.enable(gl.DEPTH_TEST);
+        this._updateGrid();
+        this._renderGridPointsFixed();
+        
         gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
-
-        // 4) Identity MVP so points land at ±0.8 in NDC
-        const I = new Float32Array([
-            1,0,0,0,
-            0,1,0,0,
-            0,0,1,0,
-            0,0,0,1
-        ]);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, I);
-
-        // 5) Bind VBO & attribute
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.enableVertexAttribArray(this.gridUniforms.position);
-        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
-
-        // 6) Override sheetColor to white & energyFlag to 0
-        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
-        gl.uniform3f(this.gridUniforms.sheetColor, 1, 1, 1);
-
-        // 7) Draw as POINTS for maximum visibility
-        gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
-        console.log(`🔍 MASTER SWITCH: Drew ${this.gridVertexCount} white points with identity matrix`);
-
-        // 8) Cleanup
-        gl.disableVertexAttribArray(this.gridUniforms.position);
     }
 
     _renderQuad() {
@@ -580,53 +574,78 @@ class WarpEngine {
         gl.disableVertexAttribArray(this.uLoc.position);
     }
 
-    _renderGridPoints() {
+    _renderGridPointsFixed() {
         const gl = this.gl;
         
         gl.useProgram(this.gridProgram);
-        console.log("Using grid program for rendering...");
         
-        // CORRECTED: Pure perspective projection test (no view transform)
-        gl.disable(gl.DEPTH_TEST);
+        // Create correct perspective + view matrix
         const fov = Math.PI/4;
         const aspect = this.canvas.width / this.canvas.height;
         const near = 0.01, far = 10.0;
         const f = 1/Math.tan(fov/2);
 
-        // Correct projection matrix with proper sign conventions
+        // Corrected projection matrix
         const proj = new Float32Array([
             f/aspect, 0,        0,                             0,
             0,        f,        0,                             0,
             0,        0,   (far+near)/(near-far),  (2*far*near)/(near-far),
             0,        0,       -1,                             0
         ]);
-        
-        console.log("🔧 CORRECTED PROJECTION: Testing proper perspective matrix");
-        console.log(`🔍 M[2,2]=${(far+near)/(near-far)} (should be ≈-1.002)`);
-        console.log(`🔍 M[2,3]=${(2*far*near)/(near-far)} (should be ≈-0.020)`);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, proj);
+
+        // View matrix: camera at (0,0,2.5) looking at origin
+        const view = new Float32Array([
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, 2.5, 1
+        ]);
+
+        // Multiply projection * view matrices
+        const mvp = this._multiplyMatrices4x4(proj, view);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
         // Bind grid vertices
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        // Draw as LINES with white color for testing
-        gl.disable(gl.BLEND);
+        // Calculate vertex counts per sheet
+        const verticesPerSheet = Math.floor(this.gridVertexCount / 3);
         
-        console.log("Using LINES for visible grid rendering (better visibility than points)");
-        console.log(`🔍 CORRECTED PROJECTION TEST: Grid should be visible at ±0.8 in X/Y`);
+        console.log(`🎯 FINAL GRID: Drawing 3 colored sheets with corrected perspective+view`);
         
-        // Test with single white draw call to simplify debugging
-        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 1.0);  // White for testing
-        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);            // Normal matter
-        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
-        console.log(`🔍 PROJECTION TEST: Drew ${this.gridVertexCount} vertices as white lines`);
+        // Draw XY sheet (cyan floor)
+        gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 1.0);
+        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
+        gl.drawArrays(gl.LINES, 0, verticesPerSheet);
         
-        console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
-        console.log("3D spacetime grid rendered with authentic Natário warp bubble physics");
+        // Draw XZ sheet (magenta wall)
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 1.0);
+        gl.drawArrays(gl.LINES, verticesPerSheet, verticesPerSheet);
+        
+        // Draw YZ sheet (yellow wall)
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.0);
+        gl.drawArrays(gl.LINES, verticesPerSheet * 2, verticesPerSheet);
+        
+        console.log("✅ 3D spacetime grid rendered: Cyan XY + Magenta XZ + Yellow YZ sheets");
         
         gl.disableVertexAttribArray(this.gridUniforms.position);
+    }
+
+    // 4x4 matrix multiplication helper
+    _multiplyMatrices4x4(a, b) {
+        const result = new Float32Array(16);
+        for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                result[row * 4 + col] = 
+                    a[row * 4 + 0] * b[0 * 4 + col] +
+                    a[row * 4 + 1] * b[1 * 4 + col] +
+                    a[row * 4 + 2] * b[2 * 4 + col] +
+                    a[row * 4 + 3] * b[3 * 4 + col];
+            }
+        }
+        return result;
     }
 
     // Exact warpGridVertices implementation with FIXED Natário curvature
