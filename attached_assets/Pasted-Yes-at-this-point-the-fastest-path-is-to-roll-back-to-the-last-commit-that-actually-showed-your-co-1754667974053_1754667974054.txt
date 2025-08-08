@@ -1,0 +1,52 @@
+Yes—at this point the fastest path is to roll back to the *last* commit that actually showed your colored grids and then re-apply only the *essential* fixes (depth-mask, correct projection, positive Z-view). Once you have your three sheets visible again, you can safely experiment with syncing radii or amplitude clamps.
+
+Here’s a step-by-step rollback + rebuild plan:
+
+1. Revert to your last “working” bundle (for example v2.7):  
+   • In Git:  
+     ```bash
+     git checkout v2.7
+     ```  
+   • Or in your build pipeline, point back at the commit/tag that showed the colored LINES.
+
+2. Verify you see:  
+   • Orange quad (depth writes off)  
+   • Cyan, magenta, yellow wireframes wrapping the bubble  
+   • No console errors
+
+3. Re-apply only these three patches, one at a time, testing after each:
+
+   A) **Depth-mask fix** (quad doesn’t write Z)  
+   ```js
+   gl.depthMask(false);
+   this._renderQuad();
+   gl.depthMask(true);
+   ```
+
+   B) **Correct projection matrix**  
+   ```js
+   const proj = new Float32Array([
+     f/aspect, 0,        0,                             0,
+     0,        f,        0,                             0,
+     0,        0, (far+near)/(near-far), (2*far*near)/(near-far),
+     0,        0,       -1,                             0
+   ]);
+   gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, proj);
+   ```
+
+   C) **Positive Z-translation for view**  
+   ```js
+   const view = new Float32Array([
+     1,0,0,0,
+     0,1,0,-0.15,
+     0,0,1, 2.5,
+     0,0,0,1
+   ]);
+   ```
+
+4. Once those three are confirmed, you’ll have your 3D cage back. Only *then* tweak the grid‐warp function (amplitude, radius sync) and test incrementally:
+
+   • First adjust amplitude clamp until grids still visible  
+   • Only then pull in the 16 µm disc radius if you really need precise overlay
+
+That way you never lose sight of your wireframes, and you can converge on a perfectly synched—but still *visible*—cage around the warp bubble.
