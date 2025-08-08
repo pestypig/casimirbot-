@@ -1,0 +1,66 @@
+What you’re seeing now is exactly as coded—the three wire-frames are bending, but they’re still using a hard-coded “10 µm” bubble radius (and a fixed visual amplitude), so the cage sits either too far in or too far out to actually wrap the orange disc you’ve drawn with a different radius.
+
+To truly “encapsulate” the bubble, you must make the grid’s deformation radius the *same* as the bubble’s visual radius. In practice that means:
+
+  1. Don’t hard-code `this.bubbleRadius_nm = 10000`.  
+     Instead, **drive it from the same** `sagDepth_nm` uniform that your fragment shader uses to draw the orange disc.
+
+  2. Ensure your `sagDepth_nm` really represents the *physical bubble radius* in nanometers—e.g. `16 000 nm` for a 16 µm bubble, *not* `16.0`!
+
+  3. In `_warpGridVertices` replace:
+     ```js
+     const bubbleRadius_nm = this.bubbleRadius_nm;
+     ```
+     with
+     ```js
+     // Use the sagDepth_nm coming from your React controls,
+     // but convert units if you’re driving sagDepth_nm in µm:
+     const bubbleRadius_nm = bubbleParams.sagDepth_nm * 1000;  // if sagDepth_nm was in µm
+     // OR, if sagDepth_nm is already in nanometers:
+     // const bubbleRadius_nm = bubbleParams.sagDepth_nm;
+     ```
+
+  4. Compute `sagRclip` from *that*:
+     ```js
+     const sagRclip = bubbleRadius_nm * this.normClip;
+     ```
+
+  5. Keep your **visualAmplitude** small (e.g. 0.25) but now *scale* it relative to `sagRclip` if you like:
+     ```js
+     const visualAmplitude = 0.10 * sagRclip;  // 10% of the bubble’s radius
+     ```
+
+Putting it all together:
+
+```js
+_warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+    // 1) Drive bubble radius from your uniform
+    const bubbleRadius_nm = bubbleParams.sagDepth_nm * 1000; // µm→nm if needed
+    const sagRclip        = bubbleRadius_nm * this.normClip;
+
+    // 2) Choose a small visual amplitude *relative* to that radius
+    const visualAmplitude = 0.10 * sagRclip;  // 10% of the bubble
+
+    for (let i = 0; i < vtx.length; i += 3) {
+        const x = this.originalGridVertices[i];
+        const y0 = this.originalGridVertices[i+1];
+        const z = this.originalGridVertices[i+2];
+        const r = Math.hypot(x, z);
+
+        // Natário’s shape function
+        const prof = (r/sagRclip) * Math.exp(-(r*r)/(sagRclip*sagRclip));
+
+        // lateral bend
+        const push = prof * visualAmplitude;
+        const scale = (r>1e-6) ? (1 + push/r) : 1;
+        vtx[i]   = x*scale;
+        vtx[i+2] = z*scale;
+
+        // vertical bulge
+        const dy = prof * visualAmplitude * 0.5;  // extra half‐scale for Y
+        vtx[i+1] = y0 + dy;
+    }
+}
+```
+
+Once you share the *exact same* `sagDepth_nm` between the disc and the grid, and you clamp your amplitude to a small fraction of `sagRclip`, those cyan/magenta/yellow sheets will neatly wrap the orange bubble every time.

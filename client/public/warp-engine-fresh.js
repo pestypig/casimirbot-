@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: PERSPECTIVE-FIXED-v3.0 - CORRECTED VIEW MATRIX 🚨');
+            console.error('🚨 BUNDLE VERSION: SYNCHRONIZED-v3.1 - GRID MATCHES BUBBLE RADIUS 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -697,11 +697,11 @@ class WarpEngine {
         console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
-    // Authentic Natário spacetime curvature implementation with FIXED scaling
+    // Authentic Natário spacetime curvature implementation with SYNCHRONIZED scaling
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Use fixed bubble radius with proper normalization
-        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
-        const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
+        // 1) Drive bubble radius from the same sagDepth_nm uniform used by fragment shader
+        const bubbleRadius_nm = bubbleParams.sagDepth_nm || 16000;  // Use pipeline value or 16µm fallback
+        const sagRclip = bubbleRadius_nm * this.normClip;  // Now synchronized with orange disc
         
         // Use computed β₀ from amplifier chain
         const beta0 = bubbleParams.beta0;
@@ -721,7 +721,8 @@ class WarpEngine {
         console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
         console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
         console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
-        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
+        console.log(`  🔗 SYNCHRONIZED: Grid radius=${bubbleRadius_nm}nm matches fragment shader disc`);
+        console.log(`  🔧 VISUAL AMPLITUDE: ${(0.10 * sagRclip).toExponential(3)} (10% of bubble radius)`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -736,21 +737,20 @@ class WarpEngine {
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
-            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
-            const lateralK = 0.10 * sagRclip;       // max 10% of radius
-            const verticalK = 0.10 * sagRclip;      // max 10% of radius
+            // -------- SYNCHRONIZED AMPLITUDE: Scale deformation relative to actual bubble size --------
+            const visualAmplitude = 0.10 * sagRclip;  // 10% of the actual bubble radius
             
-            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
-            const push = beta * lateralK;           // use clamped coefficient
+            // -------- LATERAL DEFORMATION: Bend X and Z using Natário profile --------
+            const push = prof * visualAmplitude;
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
-            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
+            // -------- VERTICAL DEFORMATION: Y displacement using Natário profile --------
             const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
+            const dy = prof * visualAmplitude * 0.5 * powerScale * timeScale;  // half-scale for Y, synchronized
             vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
