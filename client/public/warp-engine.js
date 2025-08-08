@@ -257,7 +257,7 @@ class WarpEngine {
             
             // Initialize 3D grid for spacetime curvature visualization
             console.log("Initializing 3D grid...");
-            this._initGrid();
+            this._initGrids();
             console.log("3D grid initialized successfully");
         } catch (error) {
             console.error("Failed to initialize quad:", error);
@@ -265,30 +265,44 @@ class WarpEngine {
         }
     }
 
-    _initGrid() {
+    _initGrids() {
         const gl = this.gl;
         
-        // Create grid using the exact recipe from gravity_sim.cpp
-        this.gridVertices = this._createGrid(40_000, 50);  // 40μm grid, 50 divisions
+        console.log("Initializing 3D volumetric spacetime cage...");
+        
+        // Three orthogonal sheets for full 3D perception of warp bubble
+        const size_nm = 40000;  // 40 μm viewing volume
+        const divisions = 50;   // Grid resolution
+        
+        const sheetXY = this._createGrid(size_nm, divisions, 'XY');  // Floor (original)
+        const sheetXZ = this._createGrid(size_nm, divisions, 'XZ');  // Side wall  
+        const sheetYZ = this._createGrid(size_nm, divisions, 'YZ');  // End wall
+        
+        // Combine into single buffer for efficient rendering
+        this.gridVertices = new Float32Array([
+            ...sheetXY, ...sheetXZ, ...sheetYZ
+        ]);
         this.gridVertexCount = this.gridVertices.length / 3;
         
-        // CRITICAL FIX: Store original grid vertices for proper Y coordinate warping
+        // Store sheet boundaries for colored rendering
+        this.sheetXY_count = sheetXY.length / 3;
+        this.sheetXZ_count = sheetXZ.length / 3;  
+        this.sheetYZ_count = sheetYZ.length / 3;
+        
+        // Store original for reset operations
         this.originalGridVertices = new Float32Array(this.gridVertices);
-        console.log("Stored original grid vertices for proper Y warping");
         
         // Store grid parameters for warping
-        this.gridSize = 40_000;
+        this.gridSize = size_nm;
         this.gridHalf = this.gridSize / 2;
         
-        // CRITICAL FIX: Normalize Y coordinate to clip space like X and Z
-        const step = this.gridSize / 50;
+        // Y coordinate baseline (kept from original system)
+        const step = this.gridSize / divisions;
         const norm = 0.8 / this.gridHalf;
-        this.gridY0 = (-this.gridHalf * 0.3 + 3 * step) * norm;  // Apply same normalization as X/Z
+        this.gridY0 = (-this.gridHalf * 0.3 + 3 * step) * norm;
         
-        console.log(`Grid initialized: ${this.gridVertexCount} vertices, size=${this.gridSize}nm`);
-        console.log(`Grid Y0 normalized: ${this.gridY0} (was ~-3600 in raw nm)`);
-        console.log(`First few vertices:`, this.gridVertices.slice(0, 12));
-        console.log(`Last few vertices:`, this.gridVertices.slice(-12));
+        console.log(`3D Cage created: XY(${this.sheetXY_count}) + XZ(${this.sheetXZ_count}) + YZ(${this.sheetYZ_count}) = ${this.gridVertexCount} vertices`);
+        console.log(`Grid parameters: size=${this.gridSize}nm, Y0=${this.gridY0}`);
         
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
@@ -296,53 +310,80 @@ class WarpEngine {
         gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        // Compile grid shader program
+        // Compile grid shader program with multi-sheet support
         this._compileGridShaders();
     }
 
-    // Authentic spacetime grid from gravity_sim.cpp with proper normalization
-    _createGrid(size = 40_000, divisions = 50) {
+    // 3D volumetric grid generator - creates orthogonal sheets for full warp bubble visualization
+    _createGrid(size = 40_000, divisions = 50, plane = 'XY') {
         const verts = [];
         const step = size / divisions;
         const half = size / 2;
+        const norm = 0.8 / half;  // Normalize to clip space
         
-        // Create a slight height variation across the grid for proper 3D visualization
-        const yBase = -0.15;  // Base Y level
-        const yVariation = 0.05;  // Small height variation
+        console.log(`Generating ${plane} sheet with ${divisions}x${divisions} grid`);
         
-        // Normalize to [-0.8, 0.8] to keep grid visible within viewport
-        const norm = 0.8 / half;
-
-        for (let z = 0; z <= divisions; ++z) {
-            const zPos = (-half + z * step) * norm;
-            for (let x = 0; x < divisions; ++x) {
-                const x0 = (-half + x * step) * norm;
-                const x1 = (-half + (x + 1) * step) * norm;
-                
-                // Add slight Y variation for better 3D visibility
-                const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
-                const y1 = yBase + yVariation * Math.sin(x1 * 2) * Math.cos(zPos * 3);
-                
-                verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
+        if (plane === 'XY') {
+            // Floor grid - lines parallel to X and Y axes (original sheet)
+            for (let z = 0; z <= divisions; ++z) {
+                const zPos = (-half + z * step) * norm;
+                for (let x = 0; x < divisions; ++x) {
+                    const x0 = (-half + x * step) * norm;
+                    const x1 = (-half + (x + 1) * step) * norm;
+                    const yBase = -0.15 + 0.05 * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                    verts.push(x0, yBase, zPos, x1, yBase, zPos);  // X-lines
+                }
+            }
+            for (let x = 0; x <= divisions; ++x) {
+                const xPos = (-half + x * step) * norm;
+                for (let z = 0; z < divisions; ++z) {
+                    const z0 = (-half + z * step) * norm;
+                    const z1 = (-half + (z + 1) * step) * norm;
+                    const yBase = -0.15 + 0.05 * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                    verts.push(xPos, yBase, z0, xPos, yBase, z1);  // Z-lines
+                }
             }
         }
-        for (let x = 0; x <= divisions; ++x) {
-            const xPos = (-half + x * step) * norm;
-            for (let z = 0; z < divisions; ++z) {
-                const z0 = (-half + z * step) * norm;
-                const z1 = (-half + (z + 1) * step) * norm;
-                
-                // Add slight Y variation for better 3D visibility
-                const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
-                const y1 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z1 * 3);
-                
-                verts.push(xPos, y0, z0, xPos, y1, z1);     // z–lines with height variation
+        else if (plane === 'XZ') {
+            // Side wall grid - vertical sheet, lines parallel to X and Z axes
+            for (let z = 0; z <= divisions; ++z) {
+                const zPos = (-half + z * step) * norm;
+                for (let x = 0; x < divisions; ++x) {
+                    const x0 = (-half + x * step) * norm;
+                    const x1 = (-half + (x + 1) * step) * norm;
+                    verts.push(x0, 0.0, zPos, x1, 0.0, zPos);  // X-lines at y=0
+                }
+            }
+            for (let x = 0; x <= divisions; ++x) {
+                const xPos = (-half + x * step) * norm;
+                for (let z = 0; z < divisions; ++z) {
+                    const z0 = (-half + z * step) * norm;
+                    const z1 = (-half + (z + 1) * step) * norm;
+                    verts.push(xPos, 0.0, z0, xPos, 0.0, z1);  // Z-lines at y=0
+                }
+            }
+        }
+        else if (plane === 'YZ') {
+            // End wall grid - vertical sheet, lines parallel to Y and Z axes
+            for (let z = 0; z <= divisions; ++z) {
+                const zPos = (-half + z * step) * norm;
+                for (let y = 0; y < divisions; ++y) {
+                    const y0 = (-half * 0.3 + y * step) * norm;
+                    const y1 = (-half * 0.3 + (y + 1) * step) * norm;
+                    verts.push(0.0, y0, zPos, 0.0, y1, zPos);  // Y-lines at x=0
+                }
+            }
+            for (let y = 0; y <= divisions; ++y) {
+                const yPos = (-half * 0.3 + y * step) * norm;
+                for (let z = 0; z < divisions; ++z) {
+                    const z0 = (-half + z * step) * norm;
+                    const z1 = (-half + (z + 1) * step) * norm;
+                    verts.push(0.0, yPos, z0, 0.0, yPos, z1);  // Z-lines at x=0
+                }
             }
         }
         
-        console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
-        console.log(`Grid coordinate range: X=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
-        console.log(`Grid coordinate range: Z=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
+        console.log(`${plane} sheet: ${verts.length/6} lines generated`);
         return new Float32Array(verts);
     }
 
@@ -369,23 +410,25 @@ class WarpEngine {
             "#version 300 es\n" +
             "precision highp float;\n" +
             "uniform float u_energyFlag;\n" +  // WarpFactory energy condition flag
+            "uniform vec3 u_sheetColor;\n" +    // Different color per sheet
             "out vec4 frag;\n" +
             "void main() {\n" +
             "    // WarpFactory-inspired: Color-code energy condition violations\n" +
-            "    vec3 color = (u_energyFlag > 0.5) ? \n" +
+            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
             "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations (exotic matter)\n" +
-            "        vec3(0.1, 0.8, 1.0);   // Cyan for normal matter\n" +
-            "    frag = vec4(color, 1.0);\n" +
+            "        u_sheetColor;           // Sheet-specific color for normal matter\n" +
+            "    frag = vec4(baseColor, 0.7);\n" +  // Semi-transparent for 3D depth
             "}"
             :
             "precision highp float;\n" +
             "uniform float u_energyFlag;\n" +  // WarpFactory energy condition flag
+            "uniform vec3 u_sheetColor;\n" +    // Different color per sheet
             "void main() {\n" +
             "    // WarpFactory-inspired: Color-code energy condition violations\n" +
-            "    vec3 color = (u_energyFlag > 0.5) ? \n" +
+            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
             "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations (exotic matter)\n" +
-            "        vec3(0.1, 0.8, 1.0);   // Cyan for normal matter\n" +
-            "    gl_FragColor = vec4(color, 1.0);\n" +
+            "        u_sheetColor;           // Sheet-specific color for normal matter\n" +
+            "    gl_FragColor = vec4(baseColor, 0.7);\n" +  // Semi-transparent for 3D depth
             "}";
 
         console.log("Compiling grid shaders for POINTS rendering...");
@@ -404,7 +447,8 @@ class WarpEngine {
         this.gridUniforms = {
             mvpMatrix: gl.getUniformLocation(this.gridProgram, "u_mvpMatrix"),
             position: gl.getAttribLocation(this.gridProgram, "a_position"),
-            energyFlag: gl.getUniformLocation(this.gridProgram, "u_energyFlag")  // WarpFactory energy condition
+            energyFlag: gl.getUniformLocation(this.gridProgram, "u_energyFlag"),  // WarpFactory energy condition
+            sheetColor: gl.getUniformLocation(this.gridProgram, "u_sheetColor")   // Sheet-specific coloring
         };
         
         console.log("Grid shader compiled successfully!");
@@ -743,8 +787,28 @@ class WarpEngine {
             const energyFlag = this.uniforms.beta0 > 100000 ? 1.0 : 0.0;  // WEC violation threshold
             gl.uniform1f(this.gridUniforms.energyFlag, energyFlag);
             
-            // Use POINTS for thick visibility (lineWidth clamped to 1px on most browsers)
-            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+            // Enable blending for transparent overlapping sheets
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            
+            // Render each sheet with different colors for 3D perception
+            let offset = 0;
+            
+            // XY Floor sheet - cyan
+            gl.uniform3f(this.gridUniforms.sheetColor, 0.1, 0.8, 1.0);
+            gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
+            offset += this.sheetXY_count;
+            
+            // XZ Side wall - magenta  
+            gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.1, 0.8);
+            gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
+            offset += this.sheetXZ_count;
+            
+            // YZ End wall - yellow
+            gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.1);
+            gl.drawArrays(gl.LINES, offset, this.sheetYZ_count);
+            
+            gl.disable(gl.BLEND);
             
             console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
         } else {
