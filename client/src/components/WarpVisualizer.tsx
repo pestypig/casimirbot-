@@ -12,6 +12,11 @@ interface WarpVisualizerProps {
     tsRatio: number;
     powerAvg_MW: number;
     exoticMass_kg: number;
+    // Operational mode data
+    currentMode?: string;
+    sectorStrobing?: number;
+    qSpoilingFactor?: number;
+    gammaVanDenBroeck?: number;
   };
 }
 
@@ -38,9 +43,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the FIXED WarpEngine script with cache bypass
+        // Load the V2 WarpEngine script with operational mode integration
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=' + Date.now(); // Cache bypass with new file
+        script.src = '/warp-engine-v2.js?v=' + Date.now(); // Fresh operational mode integration
         console.log('Loading FIXED WarpEngine script from:', script.src);
         script.onload = () => {
           console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -89,13 +94,17 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
   useEffect(() => {
     if (engineRef.current && isLoaded) {
-      console.log('🔄 Updating spacetime curvature with live parameters:', {
+      console.log('🔄 Updating Natário warp bubble for operational mode:', {
+        mode: parameters.currentMode || 'hover',
         dutyCycle: parameters.dutyCycle,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         sagDepth_nm: parameters.sagDepth_nm,
         powerAvg_MW: parameters.powerAvg_MW,
-        exoticMass_kg: parameters.exoticMass_kg
+        exoticMass_kg: parameters.exoticMass_kg,
+        sectorStrobing: parameters.sectorStrobing,
+        qSpoilingFactor: parameters.qSpoilingFactor,
+        gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
       engineRef.current.updateUniforms(parameters);
     }
@@ -150,7 +159,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg">Natário Warp Bubble</CardTitle>
-            <CardDescription>Real-time spacetime curvature visualization</CardDescription>
+            <CardDescription>
+              {parameters.currentMode ? 
+                `${parameters.currentMode.toUpperCase()} Mode - Real-time spacetime curvature` : 
+                'Real-time spacetime curvature visualization'
+              }
+            </CardDescription>
           </div>
           <div className="flex gap-2">
             <Button
@@ -224,15 +238,19 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           </div>
           
           <div className="text-xs text-slate-400 space-y-1">
-            <div className="font-semibold text-slate-300">Visual Effects Guide:</div>
-            <div>• <span className="text-cyan-400">Duty Cycle</span>: Controls brightness, ripple depth & grid curvature</div>
-            <div>• <span className="text-orange-400">γ Geometric</span>: Adjusts contrast, sharpness & curvature amplitude</div>
-            <div>• <span className="text-blue-400">Sag Depth</span>: Bubble size & spacetime grid deformation scale</div>
-            <div>• <span className="text-green-400">Power</span>: Ripple propagation speed</div>
-            <div>• <span className="text-yellow-400">Q Factor</span>: Golden halo intensity</div>
-            <div>• <span className="text-purple-400">Exotic Mass</span>: Outer shock ring visibility</div>
+            <div className="font-semibold text-slate-300">Operational Mode Physics:</div>
+            <div className="mb-2 text-cyan-300">
+              <strong>{parameters.currentMode?.toUpperCase() || 'HOVER'} MODE</strong> - 
+              {parameters.currentMode === 'hover' && ' High-power station-keeping'}
+              {parameters.currentMode === 'cruise' && ' Low-power sustained travel'}
+              {parameters.currentMode === 'emergency' && ' Maximum power output'}
+              {parameters.currentMode === 'standby' && ' Minimal power conservation'}
+            </div>
+            <div>• <span className="text-orange-400">Sector Strobing</span>: {parameters.sectorStrobing || 1}× spatial coherence</div>
+            <div>• <span className="text-yellow-400">Q Spoiling</span>: {((parameters.qSpoilingFactor || 1) * 100).toFixed(0)}% cavity efficiency</div>
+            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {(parameters.gammaVanDenBroeck || 6.57e7).toExponential(1)} curvature amplifier</div>
             <div className="mt-2 text-slate-500">
-              <span className="font-semibold">3D Grid:</span> Live spacetime curvature visualization showing Natário field deformation
+              <span className="font-semibold">3D Grid:</span> Live Natário spacetime curvature with mode-specific deformation scaling
             </div>
           </div>
         </div>

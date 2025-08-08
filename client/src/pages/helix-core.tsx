@@ -816,11 +816,16 @@ export default function HelixCore() {
               parameters={{
                 dutyCycle: pipelineState?.dutyCycle || 0.14,
                 g_y: pipelineState?.gammaGeo || 26,
-                cavityQ: pipelineState?.qFactor || 1e9,
-                sagDepth_nm: pipelineState?.sagDepth || 16,
+                cavityQ: pipelineState?.qCavity || 1e9,
+                sagDepth_nm: pipelineState?.sag_nm || 16,
                 tsRatio: pipelineState?.TS_ratio || 4102.74,
                 powerAvg_MW: pipelineState?.P_avg || 83.3,
-                exoticMass_kg: pipelineState?.M_exotic || 1405
+                exoticMass_kg: pipelineState?.M_exotic || 1405,
+                // Operational mode parameters for authentic Natário computations
+                currentMode: pipelineState?.currentMode || 'hover',
+                sectorStrobing: pipelineState?.sectorStrobing || 1,
+                qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
+                gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7
               }}
             />
           </div>

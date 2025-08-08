@@ -178,11 +178,52 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
-        // Update internal parameters
+        // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
         
-        // Apply warp deformation to grid
+        // NEW: Map operational mode parameters to spacetime visualization
+        if (parameters.currentMode) {
+            const modeEffects = this._calculateModeEffects(parameters);
+            console.log('🎯 Operational Mode Effects:', {
+                mode: parameters.currentMode,
+                strobing: parameters.sectorStrobing,
+                qSpoiling: parameters.qSpoilingFactor, 
+                vanDenBroeck: parameters.gammaVanDenBroeck,
+                visualScale: modeEffects.visualScale,
+                curvatureAmplifier: modeEffects.curvatureAmplifier
+            });
+            
+            // Apply mode-specific physics scaling
+            this.currentParams.modeVisualScale = modeEffects.visualScale;
+            this.currentParams.modeCurvatureAmplifier = modeEffects.curvatureAmplifier;
+            this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
+        }
+        
+        // Apply warp deformation to grid with mode-specific enhancements
         this._updateGrid();
+    }
+    
+    _calculateModeEffects(params) {
+        const mode = params.currentMode || 'hover';
+        const strobing = params.sectorStrobing || 1;
+        const qSpoiling = params.qSpoilingFactor || 1;
+        const vanDenBroeck = params.gammaVanDenBroeck || 6.57e7;
+        
+        // Mode-specific visual scaling factors for authentic Natário physics
+        const modeConfigs = {
+            hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8 },
+            cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2 },
+            emergency: { baseScale: 2.0, curvatureBoost: 1.8, strobingViz: 1.0 },
+            standby: { baseScale: 0.1, curvatureBoost: 0.2, strobingViz: 0.05 }
+        };
+        
+        const config = modeConfigs[mode] || modeConfigs.hover;
+        
+        return {
+            visualScale: config.baseScale * Math.sqrt(qSpoiling),
+            curvatureAmplifier: config.curvatureBoost * (vanDenBroeck / 1e7) * 0.1, 
+            strobingFactor: config.strobingViz * (400 / Math.max(strobing, 1))
+        };
     }
 
     _updateGrid() {
@@ -235,20 +276,23 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.05;               // FIXED: Keep inside clip cube (-1 to +1)
+            // Apply operational mode scaling to lateral warp effects
+            const modeScale = this.currentParams?.modeVisualScale || 1.0;
+            const curvatureBoost = this.currentParams?.modeCurvatureAmplifier || 1.0;
+            const push = beta * 0.05 * modeScale * curvatureBoost;  // Mode-dependent deformation
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.05;                 // FIXED: Keep inside clip cube (-1 to +1)
+            const dy = beta * 0.05 * modeScale;     // Mode-scaled vertical deformation
             
-            // Optional: Add exotic mass-based depression (negative energy density effect)
-            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9);  // Toy ρ ≈ -β²Q (normalized)
-            const extraDip = rho * 0.002;           // Scale for subtle visibility
+            // Enhanced: Mode-dependent exotic mass effects
+            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9) * curvatureBoost;  // Enhanced with mode boost
+            const extraDip = rho * 0.002 * this.currentParams?.modeStrobingFactor || 0.002;  // Strobing-dependent
             
-            vtx[i + 1] = y_original + dy + extraDip;  // Y warped with curvature + mass depression
+            vtx[i + 1] = y_original + dy + extraDip;  // Y with full mode-dependent curvature
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
@@ -456,5 +500,5 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
     window.WarpEngine = WarpEngine;
-    console.log("WarpEngine class loaded and available on window - CACHE BYPASS VERSION", Date.now());
+    console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
 }
