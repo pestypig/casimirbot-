@@ -13,14 +13,14 @@ class WarpEngine {
             sagDepth_nm: 16,
             powerAvg_MW: 83.3,
             exoticMass_kg: 1405,
-            // NEW: Operational mode parameters
+            // Operational mode parameters
             currentMode: 'hover',
             sectorStrobing: 1,
             qSpoilingFactor: 1,
             gammaVanDenBroeck: 6.57e7
         };
         
-        console.log("🎯 WarpEngine initialized with operational mode support");
+        console.log("🎯 WarpEngine V3 initialized with operational mode support");
         this._init();
     }
 
@@ -32,9 +32,8 @@ class WarpEngine {
         }
         
         // Setup WebGL state with better visibility
-        gl.clearColor(0.05, 0.05, 0.1, 1.0); // Dark blue background for contrast
+        gl.clearColor(0.05, 0.05, 0.15, 1.0); // Dark blue background
         gl.enable(gl.DEPTH_TEST);
-        gl.lineWidth(2.0); // Thicker lines for visibility
         
         this._setupShaders();
         this._setupGrid();
@@ -53,13 +52,14 @@ class WarpEngine {
             
             void main() {
                 gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+                gl_PointSize = 3.0;
             }
         `;
         
         const fragmentShaderSource = `
             precision mediump float;
             void main() {
-                gl_FragColor = vec4(0.0, 1.0, 1.0, 1.0); // Bright cyan grid lines for visibility
+                gl_FragColor = vec4(0.0, 1.0, 1.0, 0.8); // Bright cyan grid lines
             }
         `;
         
@@ -73,11 +73,11 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
-        // Smooth transition support (inspired by GPT's lerp suggestion)
+        // Smooth transition support 
         const oldParams = { ...this.currentParams };
         this.currentParams = { ...this.currentParams, ...parameters };
         
-        // Enhanced mode mapping with smooth transitions for operational modes
+        // Enhanced mode mapping with transitions
         if (parameters.currentMode) {
             const modeEffects = this._calculateModeEffects(parameters);
             console.log('🎯 Mode Transition:', {
@@ -89,7 +89,7 @@ class WarpEngine {
                 curvatureAmplifier: modeEffects.curvatureAmplifier
             });
             
-            // Apply mode-specific physics scaling with smooth transitions
+            // Apply mode-specific physics scaling
             this.currentParams.modeVisualScale = modeEffects.visualScale;
             this.currentParams.modeCurvatureAmplifier = modeEffects.curvatureAmplifier;
             this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
@@ -106,7 +106,6 @@ class WarpEngine {
         const vanDenBroeck = params.gammaVanDenBroeck || 6.57e7;
         
         // Enhanced mode-specific visual scaling for authentic Natário physics
-        // (Inspired by GPT's mode mapping table)
         const modeConfigs = {
             hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8, description: 'gentle bulge, slow ripple' },
             cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2, description: 'field nearly flat, faint ripple' },
@@ -125,8 +124,8 @@ class WarpEngine {
 
     _setupGrid() {
         const gl = this.gl;
-        const size = 50;
-        const scale = 0.8;
+        const size = 25; // Smaller grid for better performance
+        const scale = 1.0; // Larger scale for visibility
         
         const vertices = [];
         const indices = [];
@@ -138,14 +137,14 @@ class WarpEngine {
             const pos = t * scale;
             
             // Horizontal lines
-            vertices.push(-scale, -0.144, pos);
-            vertices.push(scale, -0.144, pos);
+            vertices.push(-scale, 0.0, pos); // Start at Y=0 for visibility
+            vertices.push(scale, 0.0, pos);
             indices.push(vertexIndex, vertexIndex + 1);
             vertexIndex += 2;
             
             // Vertical lines  
-            vertices.push(pos, -0.144, -scale);
-            vertices.push(pos, -0.144, scale);
+            vertices.push(pos, 0.0, -scale);
+            vertices.push(pos, 0.0, scale);
             indices.push(vertexIndex, vertexIndex + 1);
             vertexIndex += 2;
         }
@@ -168,13 +167,11 @@ class WarpEngine {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
         
         console.log(`Spacetime grid: ${this.gridIndices.length / 2} lines, ${size}x${size} divisions`);
-        console.log(`Grid coordinate range: X=${-scale} to ${scale}`);
-        console.log(`Grid coordinate range: Z=${-scale} to ${scale}`);
+        console.log(`Grid coordinate range: X=${-scale} to ${scale}, Z=${-scale} to ${scale}, Y starts at 0`);
     }
 
     _updateGrid() {
         console.log("_updateGrid called");
-        console.log("Updating", this.gridVertices.length / 3, "grid vertices...");
         
         if (!this.originalGridVertices) {
             console.error("No original vertices stored!");
@@ -184,12 +181,8 @@ class WarpEngine {
         // Copy original vertices
         this.gridVertices.set(this.originalGridVertices);
         
-        // Apply warp field deformation
-        const vtx = this.gridVertices;
-        const halfSize = 20000; // Half grid size in original units
-        const originalY = -0.144; // Base Y coordinate
-        
-        this._warpGridVertices(vtx, halfSize, originalY, this.currentParams);
+        // Apply warp field deformation with better scaling
+        this._warpGridVertices(this.gridVertices, this.currentParams);
         
         // Upload updated vertices to GPU
         const gl = this.gl;
@@ -197,59 +190,41 @@ class WarpEngine {
         gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        console.log("Grid vertices updated and uploaded to GPU");
+        console.log(`Grid updated: ${this.gridVertices.length / 3} vertices`);
     }
 
-    // Authentic Natário spacetime curvature implementation
-    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
-        const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
-        const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
+    // Simplified and more visible Natário warp implementation
+    _warpGridVertices(vtx, bubbleParams) {
+        const modeScale = bubbleParams.modeVisualScale || 1.0;
+        const curvatureBoost = bubbleParams.modeCurvatureAmplifier || 1.0;
         
-        console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
+        // Scale factors for visible deformation
+        const warpStrength = bubbleParams.dutyCycle * bubbleParams.g_y * 0.02 * modeScale;
+        const bubbleSize = 0.5; // Radius in normalized coordinates
+        
+        console.log(`WARP: strength=${warpStrength.toFixed(4)}, mode=${modeScale.toFixed(2)}, boost=${curvatureBoost.toFixed(4)}`);
+
+        let minY = Number.POSITIVE_INFINITY;
+        let maxY = Number.NEGATIVE_INFINITY;
 
         for (let i = 0; i < vtx.length; i += 3) {
-            // Work directly in clip-space coordinates
             const x = vtx[i];
             const z = vtx[i + 2];
-            const r = Math.hypot(x, z);              // radius in clip-space
+            const r = Math.sqrt(x * x + z * z); // Distance from center
             
-            // Use original Y coordinate for each vertex, not a single constant
-            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
+            // Natário-style warp profile: Gaussian with exponential decay
+            const warpProfile = Math.exp(-(r * r) / (bubbleSize * bubbleSize));
+            const displacement = warpStrength * warpProfile * curvatureBoost;
             
-            // Natário warp bubble profile (now with correct units)
-            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-            const beta = beta0 * prof;              // |β| shift vector magnitude
-
-            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            // Apply operational mode scaling to lateral warp effects
-            const modeScale = this.currentParams?.modeVisualScale || 1.0;
-            const curvatureBoost = this.currentParams?.modeCurvatureAmplifier || 1.0;
-            const push = beta * 0.05 * modeScale * curvatureBoost;  // Mode-dependent deformation
-            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
-
-            vtx[i] = x * scale;                      // X warped laterally
-            vtx[i + 2] = z * scale;                  // Z warped laterally
+            // Apply vertical displacement
+            vtx[i + 1] = displacement;
             
-            // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.05 * modeScale;     // Mode-scaled vertical deformation
-            
-            // Enhanced: Mode-dependent exotic mass effects
-            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9) * curvatureBoost;  // Enhanced with mode boost
-            const extraDip = rho * 0.002 * (this.currentParams?.modeStrobingFactor || 0.002);  // Strobing-dependent
-            
-            vtx[i + 1] = y_original + dy + extraDip;  // Y with full mode-dependent curvature
+            // Track Y range for debugging
+            minY = Math.min(minY, vtx[i + 1]);
+            maxY = Math.max(maxY, vtx[i + 1]);
         }
         
-        // Log range for debugging
-        const yValues = [];
-        for (let i = 1; i < vtx.length; i += 3) {
-            yValues.push(vtx[i]);
-        }
-        const minY = Math.min(...yValues);
-        const maxY = Math.max(...yValues);
-        console.log(`Max lateral drift = ${Math.max(...vtx.filter((_, i) => i % 3 === 0)).toFixed(4)} (FIXED: should be < 0.2 to stay visible)`);
-        console.log(`Grid Y range after warp: ${minY.toFixed(3)} … ${maxY.toFixed(3)} (should show variation)`);
+        console.log(`Grid Y range after warp: ${minY.toFixed(4)} … ${maxY.toFixed(4)} (range: ${(maxY - minY).toFixed(4)})`);
     }
 
     _setupCamera() {
@@ -257,12 +232,13 @@ class WarpEngine {
         this.projMatrix = new Float32Array(16);
         this.viewMatrix = new Float32Array(16);
         
+        // Ensure proper aspect ratio
         const aspect = this.canvas.width / this.canvas.height;
-        this._perspective(this.projMatrix, Math.PI / 4, aspect, 0.1, 100.0);
+        this._perspective(this.projMatrix, Math.PI / 6, aspect, 0.1, 100.0);
         
         this._lookAt(this.viewMatrix,
-            [1.5, 0.8, 1.5],  // Closer camera position for better visibility
-            [0.0, -0.1, 0.0], // Look at center of grid
+            [2.0, 1.5, 2.0],  // Camera position - higher up to see deformation
+            [0.0, 0.0, 0.0],  // Look at center of grid
             [0.0, 1.0, 0.0]   // Up vector
         );
         
@@ -282,8 +258,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gridIbo);
         gl.drawElements(gl.LINES, this.gridIndices.length, gl.UNSIGNED_SHORT, 0);
         
-        console.log("Using grid program for rendering...");
-        console.log(`Rendered ${this.gridIndices.length} grid lines with 3D perspective - should now be visible!`);
+        console.log(`Rendered ${this.gridIndices.length} grid indices as lines`);
     }
 
     _startRenderLoop() {
@@ -300,12 +275,12 @@ class WarpEngine {
     _render() {
         const gl = this.gl;
         
-        // Clear the screen
+        // Clear with visible background
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        // Ensure proper canvas size
-        if (gl.canvas.clientWidth !== gl.canvas.width / window.devicePixelRatio ||
-            gl.canvas.clientHeight !== gl.canvas.height / window.devicePixelRatio) {
+        // Auto-resize if needed
+        if (this.canvas.clientWidth !== this.canvas.width || 
+            this.canvas.clientHeight !== this.canvas.height) {
             this._resize();
         }
         
@@ -316,11 +291,10 @@ class WarpEngine {
     _resize() {
         const canvas = this.canvas;
         const rect = canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2); // Limit pixel ratio for performance
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
+        canvas.width = rect.width;
+        canvas.height = rect.height;
         
-        console.log(`Canvas resized: ${canvas.width}x${canvas.height} (display: ${rect.width}x${rect.height})`);
+        console.log(`Canvas resized: ${canvas.width}x${canvas.height}`);
         
         this.gl.viewport(0, 0, canvas.width, canvas.height);
         this._setupCamera();
@@ -457,5 +431,5 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
     window.WarpEngine = WarpEngine;
-    console.log("🎯 WarpEngine V2 - OPERATIONAL MODE INTEGRATED", Date.now());
+    console.log("🎯 WarpEngine V3 - FIXED VISIBILITY & OPERATIONAL MODE INTEGRATED", Date.now());
 }

@@ -43,9 +43,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the V2 WarpEngine script with operational mode integration
+        // Load the V3 WarpEngine script with fixed visibility
         const script = document.createElement('script');
-        script.src = '/warp-engine-v2.js?v=' + Date.now(); // Fresh operational mode integration
+        script.src = '/warp-engine-v3.js?v=' + Date.now(); // Fixed visibility and operational mode
         console.log('Loading FIXED WarpEngine script from:', script.src);
         script.onload = () => {
           console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -202,7 +202,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="relative w-full h-64 bg-black rounded-lg overflow-hidden">
+        <div className="relative w-full h-64 bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
           <canvas
             ref={canvasRef}
             className="w-full h-full"
