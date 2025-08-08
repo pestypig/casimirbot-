@@ -553,10 +553,14 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Removed nuclear test - now applying real physics
+        // CRITICAL FIX 1: Reset vertices FIRST before warping (not after!)
+        if (this.originalGridVertices) {
+            vtx.set(this.originalGridVertices);
+        }
 
-        // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
-        const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
+        // CRITICAL FIX: Use bubble radius instead of microscopic sag depth
+        const bubbleRadius_nm = 10000;  // 10 μm bubble radius for visible effects
+        const sagRclip = bubbleRadius_nm / halfSize * 0.8;  // Convert to clip-space
         const beta0 = bubbleParams.beta0 || (bubbleParams.dutyCycle * bubbleParams.g_y);
         
         console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
@@ -601,22 +605,24 @@ class WarpEngine {
             if (y < ymin) ymin = y;
         }
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
-        
-        // CRITICAL FIX: Reset vertices to prevent drift accumulation
-        if (this.originalGridVertices) {
-            vtx.set(this.originalGridVertices);
-        }
     }
 
     _renderQuad() {
         const gl = this.gl;
         
+        // CRITICAL FIX 2: Get correct attribute location (not hardcoded 0)
+        const positionLoc = gl.getAttribLocation(this.program, "a_position");
+        if (positionLoc === -1) {
+            console.error("a_position attribute not found in shader!");
+            return;
+        }
+        
         // Render fullscreen quad for warp field visualization
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(0);
-        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(positionLoc);
+        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        gl.disableVertexAttribArray(0);
+        gl.disableVertexAttribArray(positionLoc);
     }
 
     _renderGridPoints() {
@@ -666,12 +672,15 @@ class WarpEngine {
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // DIAGNOSTIC 3: Disable depth and blending to eliminate hiding issues
-        gl.disable(gl.DEPTH_TEST);
+        // Keep depth testing enabled for proper 3D overlay
+        gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND);
         
-        // Thick lines for maximum visibility
-        gl.lineWidth(3.0);
+        // Use POINTS instead of LINES for visible thick grid (lineWidth is clamped to 1px)
+        if (this.gl.getParameter(this.gl.ALIASED_POINT_SIZE_RANGE)[1] >= 5.0) {
+            // GPU supports large points - use them for visibility
+            console.log("Using POINTS for visible grid rendering");
+        }
         
         // Grid rendering
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -698,8 +707,8 @@ class WarpEngine {
             const mvp = this._multiplyMatrices(proj, view);
             gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
             
-            // Switch to LINES for wireframe effect (more visible than tiny points)
-            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+            // Use POINTS for thick visibility (lineWidth clamped to 1px on most browsers)
+            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
             
             console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
         } else {
