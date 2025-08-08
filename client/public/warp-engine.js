@@ -477,11 +477,17 @@ class WarpEngine {
             if (i === 0) {  // run once per frame
                 console.log("*** NUCLEAR TEST: Grid nuked for visibility test ***");
                 for (let k = 0; k < vtx.length; k += 3) {
-                    vtx[k]     *= 1.4;         // stretch X
-                    vtx[k + 2] *= 1.4;         // stretch Z  
-                    vtx[k + 1] += 0.15;        // lift Y
+                    vtx[k]     *= 1.05;        // very mild stretch (was 1.4)
+                    vtx[k + 2] *= 1.05;        // very mild stretch (was 1.4)
+                    vtx[k + 1] += 0.05;        // small lift (was 0.15)
                 }
-                console.log("Grid stretched and lifted - should be VERY visible now");
+                
+                // Check coordinate ranges after transformation
+                const xRange = [Math.min(...vtx.filter((_,i)=>i%3===0)), Math.max(...vtx.filter((_,i)=>i%3===0))];
+                const zRange = [Math.min(...vtx.filter((_,i)=>i%3===2)), Math.max(...vtx.filter((_,i)=>i%3===2))];
+                console.log(`Post-warp X range: ${xRange[0].toFixed(2)} → ${xRange[1].toFixed(2)}`);
+                console.log(`Post-warp Z range: ${zRange[0].toFixed(2)} → ${zRange[1].toFixed(2)}`);
+                console.log("Grid gently stretched - should stay in clip cube");
                 return;
             }
         }
@@ -591,6 +597,17 @@ class WarpEngine {
         // DIAGNOSTIC 4: Test with POINTS to bypass line-width issues
         if (this.gridUniforms.position !== -1) {
             console.log(`Attempting to render ${this.gridVertexCount} RED POINTS...`);
+            
+            // TEMPORARY: Use identity MVP matrix to ensure visibility
+            const identityMVP = new Float32Array([
+                1,0,0,0,
+                0,1,0,0,
+                0,0,1,0,
+                0,0,0,1
+            ]);
+            gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identityMVP);
+            console.log("Using IDENTITY MVP matrix for visibility test");
+            
             const error1 = gl.getError();
             if (error1 !== gl.NO_ERROR) console.error("WebGL error before draw:", error1);
             
@@ -598,7 +615,7 @@ class WarpEngine {
             
             const error2 = gl.getError();
             if (error2 !== gl.NO_ERROR) console.error("WebGL error after draw:", error2);
-            console.log("Grid draw call completed - should see bright red dots");
+            console.log("Grid draw call completed - should see bright red dots with identity matrix");
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }

@@ -1,0 +1,90 @@
+### You *are* feeding vertices to WebGL—the MVP matrix (and the 1.4 “nuke” scale) is simply pushing every point **outside the clip cube**, so nothing reaches the rasteriser.
+
+Fix that and the red dots pop right up.
+
+---
+
+## 1 · Why the grid is off-screen
+
+| Step                  | Value                                                       | What happens                                          |   |                                                   |
+| --------------------- | ----------------------------------------------------------- | ----------------------------------------------------- | - | ------------------------------------------------- |
+| After the “nuke” test | X & Z grow from ±0.8 → ±1.12                                | Already outside the legal –1 … +1 clip range.         |   |                                                   |
+| View matrix           | `z' = z – 1.6`                                              | Shifts every vertex another −1.6, so z′ ≈ −2.7 … −0.5 |   |                                                   |
+| Projection            | Perspective divides by **–z′**, mapping Xclip ≈ **−2 … +2** | All                                                   | x | > 1 values are clipped before the fragment stage. |
+
+Result: *no fragments, no red.*
+
+---
+
+## 2 · Quick visibility win
+
+Make the MVP **identity** for one frame:
+
+```js
+// _renderGrid()  – temporarily override the matrix
+const mvp = new Float32Array([
+  1,0,0,0,
+  0,1,0,0,
+  0,0,1,0,
+  0,0,0,1
+]);
+gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+```
+
+Leave the draw mode as `POINTS`.
+Reload — you should now see a red carpet that covers (and probably overflows) the viewport. ✔︎
+
+---
+
+## 3 · Put the camera back, but fit the mesh
+
+1. **Remove** the 1.4 scale from the “nuke” block (or comment that whole test out).
+2. Keep the perspective matrix, leave the camera at `[0, 0.15, 1.6]`.
+   Those settings expect world-coords in roughly the **±1** cube.
+
+If you still want a dramatic bulge for debugging, scale by **1.1** at most; anything bigger escapes the frustum.
+
+```js
+// very mild stretch for eye-catching motion
+vtx[k]     *= 1.1;
+vtx[k + 2] *= 1.1;
+vtx[k + 1] += 0.05;
+```
+
+---
+
+## 4 · Confirm with a quick A/B printout
+
+```js
+console.log(
+  "post-warp X range",
+  Math.min(...vtx.filter((_,i)=>i%3===0)).toFixed(2),
+  "→",
+  Math.max(...vtx.filter((_,i)=>i%3===0)).toFixed(2)
+);
+```
+
+Ranges inside –1…+1 mean the points can reach the screen.
+
+---
+
+## 5 · Done debugging?  Switch back to `LINES`
+
+When the dots show up:
+
+```js
+// _renderGrid()
+gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+```
+
+and drop `gl_PointSize` from the vertex shader (or leave it—it’s ignored for lines).
+
+---
+
+### TL;DR
+
+* Identity MVP → dots visible → proves VBO + attribute path is fine.
+* Re-enable perspective only **after** your vertices sit in roughly ±1 clip units.
+* Remove (or tame) the 1.4 “nuke” scale.
+
+Do that, and your grid will finally bend over the colourful spacetime backdrop instead of vanishing into the numeric horizon. Let me know how it looks!
