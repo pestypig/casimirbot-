@@ -612,11 +612,11 @@ class WarpEngine {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         
-        // Upload the whole vertex array (works for all three sheets)
+        // Upload the whole vertex array (works for all three sheets) - CACHE BUSTER v2
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        console.log("Grid vertices updated and uploaded to GPU");
+        console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
     // Authentic Natário spacetime curvature implementation
