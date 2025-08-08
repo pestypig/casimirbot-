@@ -123,20 +123,23 @@ class SimpleWarpEngine {
     }
     
     drawWarpGrid(ctx, w, h, effects) {
-        const gridSize = 20;
+        const gridSize = 40; // higher resolution for smooth bubble contours
         const centerX = w / 2;
         const centerY = h / 2;
         
-        // Scientifically correct Natário parameters
+        // Proper scale matching: physical lengths to clip-space ruler
+        const CLIP_HALF = 0.8; // normalized clip coordinates
         const R = (this.params.sagDepth_nm || 16) * 1e-9; // bubble radius in meters
+        const VIEW_DIAM = 8 * R; // view 8× bubble diameter for proper context
+        const metresPerClip = VIEW_DIAM / (2 * CLIP_HALF); // consistent length scale
+        
         const duty = this.params.dutyCycle || 0.14;
         const gamma_geo = this.params.g_y || 26;
         const beta0 = duty * gamma_geo; // β₀ = duty × γ_geo
-        const direction = [1, 0, 0]; // +x direction warp bubble
-        const normScale = Math.min(w, h) / 4; // screen to physical scale
+        const normScale = Math.min(w, h) / 2; // screen scale for ±0.8 range
         
-        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, power=${this.params.powerAvg_MW}MW`);
-        console.log('Physics Debug:', { duty, gamma_geo, beta0, params: this.params });
+        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, VIEW=${VIEW_DIAM*1e9}nm`);
+        console.log('Scale Debug:', { R_nm: R*1e9, VIEW_nm: VIEW_DIAM*1e9, metresPerClip });
         
         // Draw grid with authentic Natário warp deformation
         for (let i = 0; i <= gridSize; i++) {
@@ -149,27 +152,29 @@ class SimpleWarpEngine {
                 const screenY = (i / gridSize) * h;
                 
                 // Convert screen to normalized clip coordinates (-0.8 to 0.8)
-                const clipX = (screenX - centerX) / normScale * 0.8;
-                const clipY = (screenY - centerY) / normScale * 0.8;
+                const clipX = (screenX - centerX) / normScale * CLIP_HALF;
+                const clipY = (screenY - centerY) / normScale * CLIP_HALF;
                 const clipZ = 0; // 2D projection
                 
-                // (i) Authentic Natário β profile: β(r) = β₀ * (r/R) * exp(-r²/R²)
-                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * 20e-6; // total radius in meters
+                // (i) Authentic Natário β profile with proper scaling
+                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
                 const s = r / R; // normalized radius
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // Natário canonical bell profile
-                const beta_x = beta_magnitude; // +x direction translation
-                const beta_y = 0;
-                const beta_z = 0;
                 
                 // Debug first vertex β calculation
                 if (i === 0 && j === 0) {
-                    console.log('β Debug:', { r, R, s, beta0, beta_magnitude });
+                    console.log('β Debug:', { r_nm: r*1e9, R_nm: R*1e9, s, beta0, beta_magnitude });
                 }
                 
-                // Convert β (dimensionless) to clip-space units properly
-                const metresPerClip = 20e-6 / 1.6; // 20 µm field / 1.6 clip range
-                const exaggerate = 150.0; // temporary visibility boost
-                const xShiftClip = (beta_x / metresPerClip) * exaggerate;
+                // Convert β displacement to clip space and use color coding for visibility
+                const xShiftPhysical = beta_magnitude; // β displacement in meters
+                const xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
+                
+                // Color-code the warp field strength for visibility
+                const warpIntensity = Math.abs(beta_magnitude * 1e6); // amplify for color mapping
+                const red = Math.min(1, warpIntensity * 2);
+                const green = Math.min(1, warpIntensity * 0.5);
+                const blue = 0.3 + Math.min(0.7, warpIntensity);
                 
                 // (ii) Correct Natário spatial metric: γᵢⱼ = δᵢⱼ (keep flat!)
                 // The β² term goes in the lapse function, not spatial metric
@@ -184,25 +189,20 @@ class SimpleWarpEngine {
                 const curlBeta2 = 0; // curl of radial field is zero
                 const rho = (curlBeta2 - gradBeta2) / (16 * Math.PI); // authentic Natário energy density
                 
-                // Convert back to screen coordinates (no more 1e9 multiplication!)
-                const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
-                const finalY = centerY + stretchedY * normScale / 0.8;
+                // Convert back to screen coordinates with proper scaling
+                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
+                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
                 
-                // Color based on energy density (exotic = magenta, normal = cyan)
-                const energyIntensity = Math.abs(rho) / 1e8; // normalize
-                const isExotic = rho < 0;
-                const red = isExotic ? Math.min(1, energyIntensity) : 0;
-                const green = isExotic ? 0.3 * Math.min(1, energyIntensity) : Math.min(1, energyIntensity);
-                const blue = Math.min(1, energyIntensity);
-                
-                ctx.strokeStyle = effects.color; // Keep mode color for primary effect
-                ctx.globalAlpha = 0.6 + 0.4 * Math.min(1, energyIntensity);
+                // Color-code based on β field strength and energy density
+                const rgbColor = `rgb(${Math.round(red*255)}, ${Math.round(green*255)}, ${Math.round(blue*255)})`;
+                ctx.strokeStyle = warpIntensity > 0.001 ? rgbColor : effects.color;
+                ctx.globalAlpha = 0.7 + 0.3 * Math.min(1, warpIntensity);
                 
                 lineVertices.push({ x: finalX, y: finalY, rho: rho });
                 
                 // Sanity check - log first vertex per frame
                 if (i === 0 && j === 0) {
-                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta_magnitude.toExponential(2)} shiftClip≈${xShiftClip.toFixed(3)}`);
+                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta_magnitude.toExponential(2)} shiftClip≈${xShiftClip.toExponential(3)}`);
                 }
                 
                 if (j === 0) {
@@ -232,22 +232,20 @@ class SimpleWarpEngine {
                 const screenX = (i / gridSize) * w;
                 const screenY = (j / gridSize) * h;
                 
-                const clipX = (screenX - centerX) / normScale * 0.8;
-                const clipY = (screenY - centerY) / normScale * 0.8;
+                const clipX = (screenX - centerX) / normScale * CLIP_HALF;
+                const clipY = (screenY - centerY) / normScale * CLIP_HALF;
                 const clipZ = 0;
                 
-                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * 20e-6; // total radius
+                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
                 const s = r / R;
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                const metresPerClip = 20e-6 / 1.6;
-                const exaggerate = 150.0; // temporary visibility boost
-                const xShiftClip = (beta_magnitude / metresPerClip) * exaggerate;
+                const xShiftClip = beta_magnitude / metresPerClip; // proper scaling without exaggeration
                 
                 const stretchedY = clipY; // keep spatial metric flat per Natário
                 
-                const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
-                const finalY = centerY + stretchedY * normScale / 0.8;
+                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
+                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
                 
                 ctx.strokeStyle = effects.color;
                 ctx.globalAlpha = 0.6;

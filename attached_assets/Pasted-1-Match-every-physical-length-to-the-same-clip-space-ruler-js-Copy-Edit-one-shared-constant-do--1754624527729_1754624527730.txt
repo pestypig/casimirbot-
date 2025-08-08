@@ -1,0 +1,70 @@
+1 Match every physical length to the same clip-space ruler
+js
+Copy
+Edit
+// one shared constant – do it ONCE, near constructor
+const CLIP_HALF   = 0.8;        // you normalise –0.8…+0.8
+const VIEW_DIAM   = 20e-6;      // 20 µm physical window
+const metresPerClip = VIEW_DIAM / (2*CLIP_HALF);   // ≈1.25×10-5 m
+Wherever you use a length L (m) or a radius R (m)
+js
+Copy
+Edit
+float Lclip = L / metresPerClip;   // metres → clip  
+Grid creation – when you push x,z into the vertex array, divide by metresPerClip instead of a hard-wired norm.
+β-profile in CPU OR GLSL – use the same Rclip.
+
+That guarantees every point the shader sees is ≤1 in magnitude, yet retains the real nanometre sag.
+
+2 Zoom the camera instead of scaling the physics
+A microscopic dent can fill the screen if you fly the camera in:
+
+js
+Copy
+Edit
+const eye     = [0.0, 0.0, 0.01];    // 10 mm in front of grid
+const centre  = [0.0, 0.0, 0.0];
+const up      = [0.0, 1.0, 0.0];
+
+// build a lookAt → view matrix (or use gl-matrix)
+Then set a small frustum:
+
+js
+Copy
+Edit
+const near = 0.001;   // 1 mm
+const far  = 0.05;    // 5 cm
+const fovY = 5 * Math.PI/180;  // 5°
+Because the grid never leaves the ±1 cube the depth range stays valid.
+
+3 Use colour (or line-thickness) to reveal sub-pixel vertical motion
+Even with the camera close, the vertical displacement at realistic sag depths is well below a screen pixel.
+Keep geometry untouched, but map the computed β or ρ into colour:
+
+glsl
+Copy
+Edit
+float warp  = beta * 1e6;            //   1e6 is only for COLOUR
+vec3  tint  = mix(vec3(0.2,0.2,0.5),
+                   vec3(0.9,0.3,0.2),
+                   clamp(warp, 0.0, 1.0));
+The grid still lies in physical positions; you just see the strength encoded as hue.
+
+4 Higher-resolution grid
+With sag ≈ 10-8 m and a 20 µm field of view, the bend extends over only a handful of your current 50×50 cells.
+Generate e.g. 256 × 256 to get smooth contours:
+
+js
+Copy
+Edit
+this.gridVertices = this._createGrid(40_000, 256);
+Memory cost: (256² × 12 bytes) ≈ 0.8 MB – fine for WebGL.
+
+Result
+No “exaggeration” constants – maths identical to the paper.
+
+Curvature is visible because the camera sits where the action is and the grid is fine enough.
+
+Colours trace β (or ρ) so you can compare operational‐mode sliders without distorting geometry.
+
+Try these four changes – if the grid still looks flat, print the max |β| each frame; if it’s <10-7 you just aren’t close enough yet.
