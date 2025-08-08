@@ -136,7 +136,7 @@ class SimpleWarpEngine {
     }
     
     drawWarpGrid(ctx, w, h, effects) {
-        const gridSize = 60; // ultra-high resolution for smooth Natário contours
+        const gridSize = 25; // optimized resolution for visible vertex displacement
         const centerX = w / 2;
         const centerY = h / 2;
         
@@ -193,28 +193,30 @@ class SimpleWarpEngine {
                     console.log('β Debug:', { r_nm: r*1e9, R_nm: R*1e9, s, beta0, beta_magnitude });
                 }
                 
-                // Convert β displacement to clip space with clamping for stability
+                // Scale the warp with debug exaggeration for visibility
+                const exaggeration = 8.0; // dial back later for physical accuracy
                 const xShiftPhysical = beta_magnitude; // β displacement in meters
-                let xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
+                let xShiftClip = (xShiftPhysical / metresPerClip) * exaggeration;
                 
                 // Clamp warp displacement to prevent vertices from leaving clip space
-                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip));
+                xShiftClip = Math.max(-0.2, Math.min(0.2, xShiftClip));
                 
-                // Debug logging once per frame
-                if (i === 0 && j === 0) {
-                    console.log('Warp Debug:', { 
-                        r_nm: r*1e9, 
-                        s: s.toFixed(3), 
-                        beta: beta_magnitude.toExponential(3),
-                        pushClip: xShiftClip.toFixed(6)
+                // Verify uniforms are updating (every ~2 seconds)
+                if (i === 0 && j === 0 && (Date.now() / 2000 | 0) % 2 === 0) {
+                    console.log('🎯 Uniform Check:', {
+                        'β₀': beta0.toFixed(3),
+                        'sag': this.params.sagDepth_nm || 16,
+                        'power': (this.params.powerAvg_MW || 83.3).toFixed(1),
+                        'mode': this.params.currentMode || 'hover',
+                        'yShift': yShiftClip.toFixed(6)
                     });
                 }
                 
-                // Color-code the warp field strength for visibility (exaggerated for visual feedback)
-                const warpIntensity = Math.abs(beta_magnitude * 1e7); // exaggerate ONLY for color, not geometry
-                const red = Math.min(1, warpIntensity * 2);
-                const green = Math.min(1, warpIntensity * 0.5);
-                const blue = 0.3 + Math.min(0.7, warpIntensity);
+                // Color-code the vertical displacement for height visualization
+                const yDisplacement = yShiftClip;
+                const red = Math.max(0.1, Math.min(1.0, 0.1 + Math.abs(yDisplacement) * 10.0)); // hot pink for crests
+                const green = 0.6; // constant middle value
+                const blue = Math.max(0.1, Math.min(1.0, 1.0 - red)); // deep blue for troughs
                 
                 // Log once per frame to verify parameter flow
                 if (i === 0 && j === 0) {
@@ -226,9 +228,9 @@ class SimpleWarpEngine {
                     });
                 }
                 
-                // (ii) Correct Natário spatial metric: γᵢⱼ = δᵢⱼ (keep flat!)
-                // The β² term goes in the lapse function, not spatial metric
-                const stretchedY = clipY; // no artificial stretching
+                // (ii) Add Y-displacement for 3D warp bubble visualization  
+                const yShiftClip = xShiftClip * 0.3; // vertical displacement proportional to β
+                const stretchedY = clipY + yShiftClip; // create visible height variation
                 const stretchedZ = clipZ;
                 
                 // (iii) Authentic energy density: ρ = (|∇×β|² - |∇β|²)/(16π)
@@ -239,15 +241,25 @@ class SimpleWarpEngine {
                 const curlBeta2 = 0; // curl of radial field is zero
                 const rho = (curlBeta2 - gradBeta2) / (16 * Math.PI); // authentic Natário energy density
                 
-                // Convert back to screen coordinates with proper scaling
-                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
-                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
+                // Apply 3D perspective transformation for better visualization
+                // Camera tilted at ~15 degrees to show Y-displacement as real height
+                const eye_y = 0.25; // raised camera position
+                const eye_z = 1.4;  // pulled back position
                 
-                // Use color-coded β field strength for visibility
+                // Simple perspective projection with camera tilt
+                const perspectiveX = clipX + xShiftClip;
+                const perspectiveY = (stretchedY - eye_y) / eye_z + eye_y; // perspective correction
+                const perspectiveZ = stretchedZ;
+                
+                // Convert to screen coordinates with perspective
+                const finalX = centerX + perspectiveX * normScale / CLIP_HALF;
+                const finalY = centerY + perspectiveY * normScale / CLIP_HALF;
+                
+                // Use color-coded height displacement for 3D visualization
                 const rgbColor = `rgb(${Math.round(red*255)}, ${Math.round(green*255)}, ${Math.round(blue*255)})`;
-                ctx.strokeStyle = warpIntensity > 0.0001 ? rgbColor : effects.color;
-                ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, warpIntensity);
-                ctx.lineWidth = 1 + Math.min(2, warpIntensity * 5); // vary line thickness with β strength
+                ctx.strokeStyle = Math.abs(yDisplacement) > 0.001 ? rgbColor : effects.color;
+                ctx.globalAlpha = 0.7 + 0.3 * Math.abs(yDisplacement) * 20;
+                ctx.lineWidth = 1 + Math.min(3, Math.abs(yDisplacement) * 30); // line thickness shows height
                 
                 lineVertices.push({ x: finalX, y: finalY, rho: rho });
                 
@@ -302,13 +314,23 @@ class SimpleWarpEngine {
                 const s = r / R;
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                let xShiftClip = beta_magnitude / metresPerClip; // proper scaling
-                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip)); // clamp for stability
+                // Apply same exaggeration as horizontal lines
+                const exaggeration = 8.0;
+                let xShiftClip = (beta_magnitude / metresPerClip) * exaggeration;
+                xShiftClip = Math.max(-0.2, Math.min(0.2, xShiftClip));
                 
-                const stretchedY = clipY; // keep spatial metric flat per Natário
+                // Add Y-displacement for 3D visualization
+                const yShiftClip = xShiftClip * 0.3;
+                const stretchedY = clipY + yShiftClip;
                 
-                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
-                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
+                // Apply same perspective transformation
+                const eye_y = 0.25;
+                const eye_z = 1.4;
+                const perspectiveX = clipX + xShiftClip;
+                const perspectiveY = (stretchedY - eye_y) / eye_z + eye_y;
+                
+                const finalX = centerX + perspectiveX * normScale / CLIP_HALF;
+                const finalY = centerY + perspectiveY * normScale / CLIP_HALF;
                 
                 ctx.strokeStyle = effects.color;
                 ctx.globalAlpha = 0.6;
