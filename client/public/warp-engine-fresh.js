@@ -602,7 +602,7 @@ class WarpEngine {
         // Translation: Move grid back and down to center it in view
         const translateX = 0.0;
         const translateY = 0.1;             // Slightly up
-        const translateZ = -2.5;            // Back from camera
+        const translateZ = 2.5;             // FIXED: Move world AWAY from camera
         
         // Scale: Make grid fit nicely in view (diagnostic showed coordinates ±0.8)
         const scale = 0.8;
@@ -629,6 +629,7 @@ class WarpEngine {
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
         console.log("Using LINES for visible grid rendering (better visibility than points)");
+        console.log(`🔍 DEPTH FIX: translateZ=${translateZ} pushes grid into negative eye-space for NDC z < 0`);
         
         // Calculate vertex counts per sheet
         const totalVertices = this.gridVertexCount;
