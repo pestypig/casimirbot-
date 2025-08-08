@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: MASTER-SWITCH-TEST-v2.7 - FINAL GRID DEBUG 🚨');
+            console.error('🚨 BUNDLE VERSION: FORCED-RED-DIAGNOSTIC-v2.8 - NO INTERFERENCE TEST 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -432,6 +432,7 @@ class WarpEngine {
 
     _compileGridShaders() {
         const isWebGL2 = this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0");
+        console.log("Grid shader using", isWebGL2 ? "WebGL2" : "WebGL1", "fragment branch");
         
         const gridVs = isWebGL2 ?
             "#version 300 es\n" +
@@ -452,19 +453,11 @@ class WarpEngine {
         const gridFs = isWebGL2 ?
             "#version 300 es\n" +
             "precision highp float;\n" +
-            "uniform float u_energyFlag;\n" +
-            "uniform vec3 u_sheetColor;\n" +
             "out vec4 frag;\n" +
-            "void main() {\n" +
-            "    frag = vec4(1.0, 0.0, 0.0, 1.0);  // FORCE SOLID RED for testing\n" +
-            "}"
+            "void main() { frag = vec4(1.0,0.0,0.0,1.0); }"
             :
             "precision highp float;\n" +
-            "uniform float u_energyFlag;\n" +
-            "uniform vec3 u_sheetColor;\n" +
-            "void main() {\n" +
-            "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);  // FORCE SOLID RED for testing\n" +
-            "}";
+            "void main() { gl_FragColor = vec4(1.0,0.0,0.0,1.0); }";
 
         console.log("Compiling grid shaders for POINTS rendering...");
         
@@ -534,37 +527,34 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        // Clear with dark blue background for contrast
-        gl.clearColor(0.05, 0.1, 0.15, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        console.log("🔴 FORCED RED DIAGNOSTIC - Draw grid FIRST, no interference");
         
-        // Upload all uniforms for the warp field shader
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.time, time);
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
+        // Clear color only
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
         
-        // Upload β₀ from amplifier chain
-        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.beta0, currentBeta0);
-        
-        // Render quad first WITHOUT writing to depth buffer
-        gl.depthMask(false);         // Stop writing Z to depth buffer
-        this._renderQuad();
-        gl.depthMask(true);          // Restore depth writes for grid
-        console.log("🎯 DEPTH BUFFER FIX: Orange quad rendered without depth writes - grid should now be visible!");
-        
-        // Now render the grid with depth testing enabled
-        gl.enable(gl.DEPTH_TEST);
-        this._updateGrid();
-        this._renderGridPointsFixed();
-        
+        // DIAGNOSTIC: Draw red grid FIRST with no interference
+        gl.useProgram(this.gridProgram);
         gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+
+        // Identity MVP matrix
+        const I = new Float32Array([1,0,0,0,  0,1,0,0,  0,0,1,0,  0,0,0,1]);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, I);
+
+        // Bind VBO & attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+
+        // Draw all lines as red
+        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+        console.log(`🔴 DIAGNOSTIC: Drew ${this.gridVertexCount} vertices as FORCED RED LINES`);
+
+        gl.disableVertexAttribArray(this.gridUniforms.position);
+        
+        // Skip all other rendering for now to isolate the grid issue
+        return;
     }
 
     _renderQuad() {
