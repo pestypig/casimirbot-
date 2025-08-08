@@ -1,0 +1,74 @@
+Below is a **triage checklist** that maps every message you pasted to a concrete fix, plus the one code tweak that will finally make the red grid appear.
+
+---
+
+## 1 · The single root-cause for “black screen”
+
+```
+Max lateral drift = 1.6000    ♦  sagRclip = 0.00064
+Grid Y range     = –0.200 … –0.100
+```
+
+*Your warp step blows the mesh  **±1.6 clip-units** sideways—well beyond the –1 … +1 frustum—so the entire grid is clipped.*
+Patch:
+
+```js
+// _warpGridVertices  ─ just after you compute beta
+const push  = beta * 0.05;        // instead of 0.3
+const dy    = beta * 0.05;        // instead of 0.5
+```
+
+Then print again:
+
+```
+Max lateral drift ≈ 0.15      (inside –1…+1) ✅
+Grid Y range      ≈ –0.10 … –0.02 ✅
+```
+
+Reload → red lines show up immediately.
+
+*(Keep the exaggeration knobs small until you finish camera tuning.)*
+
+---
+
+## 2 · Why each console warning is harmless
+
+| Message                                                  | Meaning                                                                         | Safe action                                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **invalid sandbox flag / un-recognised feature**         | Outdated `<iframe sandbox>` and `Permissions-Policy` tokens.                    | Delete `allow-downloads-without-user-activation`; trim the header to real features (`geolocation`, `fullscreen`). |
+| **401 on Microsoft Translator**                          | Site script calls Translator without a key.                                     | Remove the script or insert a valid key.                                                                          |
+| **task queue exceeded deadline**                         | Main thread busy (>50 ms frames) — React hydration plus your huge console logs. | Comment out the many `console.log` once debug is done.                                                            |
+| **CORS block to sp.replit.com**                          | Replit ping fails; unrelated to WebGL.                                          | Ignore.                                                                                                           |
+| **Datadog “failed ping” + ERR\_INSUFFICIENT\_RESOURCES** | Analytics beacon blocked by browser.                                            | Ignore or disable Datadog.                                                                                        |
+
+None of these hide the grid; they only clutter DevTools.
+
+---
+
+## 3 · One-line improvements after you see the mesh
+
+1. **Depth fight**: draw the grid on top once your colour pass works:
+
+```js
+gl.disable(gl.DEPTH_TEST);   // before gl.drawArrays for grid
+```
+
+2. **Fat lines on Windows**: Chrome clamps `gl.lineWidth` to 1 px; keep `POINTS` with `gl_PointSize = 4.0` for platform-independent thickness or switch to a screen-space thick-line shader later.
+
+3. **Remove the height wiggle** in `_createGrid()` once testing is over; the warp step will create real curvature.
+
+---
+
+### TL;DR to get it visible
+
+```diff
+// inside _warpGridVertices
+- const push = beta * 0.3;
+- const dy   = beta * 0.5;
++ const push = beta * 0.05;   // stay inside clip cube
++ const dy   = beta * 0.05;
+```
+
+Reload → red grid appears over the dark-blue background.
+
+Once you see it, you can slowly raise the multipliers (0.1…0.2) and re-enable depth & blending for the final look. Everything else in the console is just noise.

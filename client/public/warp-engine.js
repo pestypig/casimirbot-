@@ -556,14 +556,14 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.3;                // Increased lateral deformation
+            const push = beta * 0.05;               // Keep inside clip cube (-1 to +1)
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.5;                  // Increased deformation for visibility
+            const dy = beta * 0.05;                 // Keep inside clip cube (-1 to +1)
             vtx[i + 1] = y_original + dy;            // Y warped vertically from original position
         }
         
@@ -572,7 +572,7 @@ class WarpEngine {
         for (let i = 0; i < vtx.length; i += 3) {
             maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
         }
-        console.log("Max lateral drift =", maxDrift.toFixed(4), "(want 0.05-0.2)");
+        console.log("Max lateral drift =", maxDrift.toFixed(4), "(should be < 0.2 to stay visible)");
         
         // Visual smoke test - check Y range after warping
         let ymax = -1e9, ymin = 1e9;
