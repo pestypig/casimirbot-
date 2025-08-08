@@ -55,6 +55,8 @@ class WarpEngine {
         console.log(`Canvas dimensions: ${this.canvas.width}x${this.canvas.height}`);
         console.log(`WebGL context: ${this.gl ? 'OK' : 'FAILED'}`);
         console.log(`Grid vertices: ${this.gridVertexCount} points`);
+        console.log(`Grid VBO created: ${this.gridVbo ? 'YES' : 'NO'}`);
+        console.log(`Grid program created: ${this.gridProgram ? 'YES' : 'NO'}`);
         } catch (error) {
             console.error("WarpEngine initialization failed:", error);
             console.error("Error stack:", error.stack);
@@ -439,6 +441,8 @@ class WarpEngine {
         // Now render the full grid with proper physics
         this._updateGrid();
         this._renderGridPoints();
+        
+        gl.disable(gl.DEPTH_TEST);
     }
     
     _drawSimpleTest() {
@@ -492,13 +496,23 @@ class WarpEngine {
 
     // Exact warpGridVertices implementation from the minimal recipe
     _updateGrid() {
+        console.log("_updateGrid called");
+        
+        if (!this.gridVertices) {
+            console.warn("Grid vertices not initialized!");
+            return;
+        }
+        
+        console.log(`Updating ${this.gridVertices.length / 3} grid vertices...`);
         this._warpGridVertices(this.gridVertices, this.gridHalf, this.gridY0, this.uniforms);
         
         // Upload warped vertices to GPU
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);     // DIAGNOSTIC 2: Ensure proper unbinding
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        
+        console.log("Grid vertices updated and uploaded to GPU");
     }
 
     // Authentic Natário spacetime curvature implementation
@@ -705,4 +719,5 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
     window.WarpEngine = WarpEngine;
+    console.log("WarpEngine class loaded and available on window");
 }
