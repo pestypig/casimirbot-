@@ -545,15 +545,15 @@ class WarpEngine {
         const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
         gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
-        // Enable depth testing for 3D grid overlay
-        gl.enable(gl.DEPTH_TEST);
-        
-        // FIX 1: Stop the quad from killing Z-buffer
+        // Render quad first WITHOUT writing to depth buffer
         gl.depthMask(false);         // quad does NOT write Z
         this._renderQuad();
         gl.depthMask(true);          // restore for the sheets
         
-        // Now render the grid with FIXED physics and coordinate transformation
+        // Now enable depth testing for 3D grid overlay
+        gl.enable(gl.DEPTH_TEST);
+        
+        // Render the grid with FIXED physics and coordinate transformation
         this._updateGrid();
         this._renderGridPoints();
         
