@@ -243,6 +243,8 @@ class WarpEngine {
         this.gridHalf = this.gridSize / 2;
         this.gridY0 = -this.gridHalf * 0.3 + 3 * (this.gridSize / 50);  // exact yPlane from C++
         
+        console.log(`Grid initialized: ${this.gridVertexCount} vertices, size=${this.gridSize}nm`);
+        
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -301,12 +303,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.5, 0.5, 0.5, 0.4);\n" +  // Low-alpha grey as suggested
+            "    frag = vec4(0.8, 0.8, 1.0, 0.7);\n" +  // More visible light blue for debugging
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.5, 0.5, 0.5, 0.4);\n" +
+            "    gl_FragColor = vec4(0.8, 0.8, 1.0, 0.7);\n" +
             "}";
 
         this.gridProgram = this._linkProgram(gridVs, gridFs);
@@ -428,18 +430,25 @@ class WarpEngine {
         const gl = this.gl;
         gl.useProgram(this.gridProgram);
         
-        // Simplified orthographic projection to match the recipe approach
-        const scale = 2.0e-8 / this.gridSize;  // Match the 20nm field of view from main shader
+        // Debug: Check if we have valid grid data
+        if (!this.gridVbo || this.gridVertexCount === 0) {
+            console.warn("Grid VBO not initialized properly");
+            return;
+        }
+        
+        // Scale the 40μm grid to match the 20nm field of view from main shader
+        // 40μm = 40,000nm, so we need to scale by 20nm/40000nm = 0.0005
+        const scale = 0.0005;
         const mvp = new Float32Array([
             scale, 0, 0, 0,
-            0, 0, scale, 0,     // Isometric view: map Z to Y for top-down visualization
-            0, scale*0.5, 0, 0, // Slight Y offset to show curvature
+            0, scale, 0, 0,     // Keep normal X,Y mapping for now
+            0, 0, scale, 0,     // Z mapping 
             0, 0, 0, 1
         ]);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Simple grid rendering as suggested in the recipe
+        // Grid rendering with error checking
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
@@ -447,6 +456,7 @@ class WarpEngine {
         gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
         
         gl.disableVertexAttribArray(this.gridUniforms.position);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
     //----------------------------------------------------------------
