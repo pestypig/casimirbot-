@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: REVERTED-v3.2 - HARDCODED GRID SCALE RESTORED 🚨');
+            console.error('🚨 BUNDLE VERSION: CLEAN-v3.3 - BETA0 REFERENCES REMOVED 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -699,15 +699,11 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation - REVERTED to visible scale
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // REVERT to a hardcoded radius (e.g., 10,000 nm) that is proportional
-        // to the grid's 40,000 nm size. This makes the warp visible.
-        const bubbleRadius_nm = 10000; // 10 µm
+        // Hardcoded 10 µm radius for visibility
+        const bubbleRadius_nm = 10000;
         const sagRclip = bubbleRadius_nm * this.normClip;
+        const visualAmplitude = 0.25;  // Fixed 25% bulge
 
-        // REVERT to a fixed visual amplitude to control the deformation size.
-        const visualAmplitude = 0.25;
-
-        // Physics parameters for animation scaling
         const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
         const tsRatio = bubbleParams.tsRatio || 4100;
 
@@ -717,17 +713,16 @@ class WarpEngine {
             const z = this.originalGridVertices[i + 2];
             const r = Math.hypot(x, z);
 
-            // The Natário profile function gives the SHAPE of the warp.
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
 
-            // --- LATERAL DEFORMATION ---
+            // Lateral bend
             const push = prof * visualAmplitude;
-            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+            const scale = r > 1e-6 ? 1 + push / r : 1;
             vtx[i] = x * scale;
             vtx[i + 2] = z * scale;
 
-            // --- VERTICAL DEFORMATION ---
-            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / 2.0;
+            // Vertical bulge
+            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / 2;
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);
             const dy = prof * visualAmplitude * powerScale * timeScale;
             vtx[i + 1] = y_original + dy;
@@ -748,7 +743,7 @@ class WarpEngine {
         }
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
         
-        console.log(`✅ ENERGY PIPELINE CONNECTED: β₀=${(beta0/1e6).toFixed(1)}e+6, Power=${powerAvg_MW}MW → Visual Deformation`);
+        console.log(`✅ VISUAL GRID DEFORMATION: Power=${powerAvg_MW}MW, Scale=${visualAmplitude}`);
     }
 
     destroy() {
