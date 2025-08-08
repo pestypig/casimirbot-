@@ -620,16 +620,27 @@ class WarpEngine {
         gl.useProgram(this.gridProgram);
         console.log("Using grid program for rendering...");
         
-        // Upload MVP matrix
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvpMatrix);
+        // DIAGNOSTIC: Test with pure orthographic identity matrix to isolate transform issue
+        const ortho = new Float32Array([
+            2/2, 0,   0, 0,   // scale X to ±1
+            0,   2/2, 0, 0,   // scale Y to ±1
+            0,   0,  -1, 0,   // leave Z alone
+            0,   0,   0, 1
+        ]);
+        console.log("🔧 ORTHO TEST: Using identity orthographic matrix to bypass transform issues");
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, ortho);
         
         // Bind grid vertices
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
+        // Disable depth test for diagnostic
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+        
         console.log("Using LINES for visible grid rendering (better visibility than points)");
-        console.log(`🔍 DEPTH FIX: translateZ=${translateZ} pushes grid into negative eye-space for NDC z < 0`);
+        console.log(`🔍 ORTHO DIAGNOSTIC: Should show grid at ±0.8 in X/Y if VBO data is correct`);
         
         // Calculate vertex counts per sheet
         const totalVertices = this.gridVertexCount;
