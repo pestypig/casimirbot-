@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: 3D-GRID-CAGE-v3.1 - FULL XYZ SHEETS WITH VARIABLE COORDINATES 🚨');
+            console.error('🚨 BUNDLE VERSION: 3D-WIREFRAME-CAGE-v3.2 - ALL SHEETS PROPERLY POSITIONED 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -412,7 +412,7 @@ class WarpEngine {
         }
         else if (plane === 'YZ') {
             // YZ plane (side wall) - yellow
-            const xSheet = -0.4;  // -sagRclip offset - shift that vertical sheet to other side
+            const xSheet = 0.4;  // +sagRclip offset - shift that vertical sheet to right side of bubble
             for (let y = 0; y <= divisions; ++y) {
                 const yPos = (-half + y * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
