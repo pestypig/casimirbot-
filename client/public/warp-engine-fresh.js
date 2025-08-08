@@ -531,14 +531,14 @@ class WarpEngine {
         gl.disable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND);
         
-        // Set identity MVP matrix
-        const identity = new Float32Array([
-            1,0,0,0,
-            0,1,0,0,
-            0,0,1,0,
-            0,0,0,1
+        // Set simple orthographic matrix that moves grid into view
+        const ortho = new Float32Array([
+            0.5,0,0,0,      // Scale X down to fit better
+            0,0.5,0,0,      // Scale Y down to fit better  
+            0,0,0.5,0,      // Scale Z down
+            0,0,-0.5,1      // Translate Z back into view
         ]);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identity);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, ortho);
         
         // Update grid first (to ensure we have data)
         this._updateGrid();
