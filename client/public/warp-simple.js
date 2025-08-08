@@ -28,12 +28,22 @@ class SimpleWarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
-        this.params = { ...this.params, ...parameters };
+        // Extract additional physics parameters from parameters
+        this.params = { 
+            ...this.params, 
+            ...parameters,
+            // Ensure we have all physics parameters
+            sagDepth_nm: parameters.sagDepth_nm || this.params.sagDepth_nm || 16,
+            g_y: parameters.g_y || this.params.g_y || 26,
+            exoticMass_kg: parameters.exoticMass_kg || this.params.exoticMass_kg || 1405
+        };
         
         console.log('🎯 Mode Update:', {
             mode: this.params.currentMode,
             power: this.params.powerAvg_MW,
-            duty: this.params.dutyCycle
+            duty: this.params.dutyCycle,
+            beta0: (this.params.dutyCycle * this.params.g_y).toFixed(3),
+            sagDepth: this.params.sagDepth_nm + 'nm'
         });
     }
     
@@ -147,8 +157,9 @@ class SimpleWarpEngine {
                 
                 // Convert β (meters) to clip-space units properly
                 const halfSize = 20e-6; // 20 µm in meters
-                const metresPerClip = halfSize / 0.8; // meters per clip unit
-                const xShiftClip = beta / metresPerClip; // proper coordinate conversion
+                const metresPerClip = halfSize / 1.6; // 1.6 because grid spans ±0.8
+                const exaggerate = 150.0; // temporary visibility boost - remove once scale is right
+                const xShiftClip = (beta / metresPerClip) * exaggerate;
                 
                 // (ii) Adjust transverse metric: γᵢⱼ = δᵢⱼ + βᵢβⱼ  
                 const stretch = Math.sqrt(1 + beta * beta); // metric correction
@@ -216,8 +227,9 @@ class SimpleWarpEngine {
                 const beta = beta0 * prof;
                 
                 const halfSize = 20e-6; // 20 µm in meters
-                const metresPerClip = halfSize / 0.8;
-                const xShiftClip = beta / metresPerClip;
+                const metresPerClip = halfSize / 1.6;
+                const exaggerate = 150.0; // temporary visibility boost
+                const xShiftClip = (beta / metresPerClip) * exaggerate;
                 
                 const stretch = Math.sqrt(1 + beta * beta);
                 const stretchedY = clipY * stretch;

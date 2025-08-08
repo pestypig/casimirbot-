@@ -1,0 +1,93 @@
+### 1 — Why the grid is flat
+
+Right now every vertex is definitely being shifted, but by **microns-to-clip-space** the displacement is only a few **1 × 10-4 → 0.002 clip-units** – that is *much* smaller than a pixel on a full-HD canvas, so the grid looks perfectly flat.
+
+| parameter                          | hover                                     | cruise | emergency     |
+| ---------------------------------- | ----------------------------------------- | ------ | ------------- |
+| duty cycle \* γ<sub>geo</sub> = β₀ | 0.14 × 26 ≈ **3.6**                       | ≈ 0    | ≈ 13          |
+| sag depth R                        | 16 nm                                     | 16 nm  | 16 nm         |
+| β<sub>max</sub> R (metres)         | \~ 6 × 10-8 m                             | ≈ 0    | \~ 2 × 10-7 m |
+| β<sub>max</sub> in clip-space      | β<sub>max</sub>/metresPerClip ≈ **0.002** | 0      | **0.008**     |
+
+Even in emergency mode you are bending the grid by **< 1 %** of the viewport – below visibility.
+
+---
+
+### 2 — Quick visibility check (development only)
+
+Add a temporary **boost factor** so you can see the shape:
+
+```js
+const exagerate = 50.0;        //   <── remove once it looks right
+const xShiftClip = beta/metresPerClip * exagerate;
+const dy          = beta*0.05   * exagerate;
+```
+
+If the grid now arches you know the plumbing is correct and it’s only a scale issue.
+
+---
+
+### 3 — Hook the dashboard sliders / pipeline numbers
+
+```ts
+// inside React component that wraps WarpEngine ⬇
+useEffect(()=>{
+    const w = engineRef.current;
+    if(!w) return;
+
+    const el = document.querySelector('#live-energy-panel');
+    const getNum = id => parseFloat(el.querySelector(id).textContent);
+
+    const pump = () => {
+        w.updateUniforms({
+            dutyCycle    : getNum('#duty')   / 100,   // 14 % → 0.14
+            g_y          : getNum('#gamma'),
+            sagDepth_nm  : getNum('#sag'),
+            powerAvg_MW  : getNum('#pavg'),
+            exoticMass_kg: getNum('#mass')
+        });
+        requestAnimationFrame(pump);
+    };
+    pump();
+},[]);
+```
+
+*Grab the values straight off the DOM every frame (or on slider `input`) and the warp will follow the “Energy Pipeline”.*
+
+---
+
+### 4 — Physically meaningful scale
+
+To keep the picture inside clip-space and still visible, a good rule is
+
+```
+max(|β|) / metresPerClip ≈ 0.3 … 0.6
+```
+
+For your 20 µm field-of-view:
+
+```js
+metresPerClip = 20e-6 / 1.6   ≈ 1.25e-5 m   // 1.6 because grid spans ±0.8
+```
+
+So if you want the rim of the bubble to reach ≈ 0.4 clip-units you need
+
+```
+βmax ≈ 0.4 * 1.25e-5 m  ≈ 5 µm  (β ~ 5×10-6 m)
+```
+
+Increase **γ<sub>geo</sub>**, **duty cycle**, or **sag depth** until
+`βmax` sits in that range; then remove the exaggeration factor.
+
+---
+
+### 5 — Little checklist
+
+* ✔ **console** shows `shiftClip≈0.35` in emergency mode → good
+  (anything > 1 hides vertices again)
+* ✔ remove `gl.disable(DEPTHTEST)` once the grid stays in view, so the warp field can occlude correctly.
+* ✔ switch back from `LINES` → `LINE_STRIP` or `POINTS` if you prefer smoother arcs.
+
+---
+
+When the boosts are gone and the physical parameters alone give you a clearly curved mesh, the visualiser is driven by the **same numbers** that power the Energy-Pipeline cards – i.e. a correct Natário-style bubble.

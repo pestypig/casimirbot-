@@ -1,4 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+
+// Extend Window interface for SimpleWarpEngine
+declare global {
+  interface Window {
+    SimpleWarpEngine: any;
+  }
+}
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
