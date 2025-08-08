@@ -93,7 +93,7 @@ class WarpEngine {
             "out vec4 frag;\n" +
             "\n" +
             "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
+            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time, u_beta0;\n" +
             "\n" +
             "// Natário β‑field with authentic physics\n" +
             "vec3 betaField(vec3 x) {\n" +
@@ -101,7 +101,7 @@ class WarpEngine {
             "    float r = length(x);\n" +
             "    if (r < 1e-9) return vec3(0.0);\n" +
             "    \n" +
-            "    float beta0 = u_dutyCycle * u_g_y;  // Physics cheat-sheet: DutyCycle × γ_geo\n" +
+            "    float beta0 = u_beta0;  // Use directly injected β₀ from amplifier chain\n" +
             "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
             "    return beta0 * prof * (x / r);\n" +
             "}\n" +
@@ -152,14 +152,14 @@ class WarpEngine {
             "varying vec2 v_uv;\n" +
             "\n" +
             "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;\n" +
+            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time, u_beta0;\n" +
             "\n" +
             "vec3 betaField(vec3 x) {\n" +
             "    float R = u_sagDepth_nm * 1e-9;\n" +
             "    float r = length(x);\n" +
             "    if (r < 1e-9) return vec3(0.0);\n" +
             "    \n" +
-            "    float beta0 = u_dutyCycle * u_g_y;\n" +
+            "    float beta0 = u_beta0;  // Use directly injected β₀ from amplifier chain\n" +
             "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
             "    return beta0 * prof * (x / r);\n" +
             "}\n" +
@@ -422,7 +422,8 @@ class WarpEngine {
             tsRatio: gl.getUniformLocation(this.program, "u_tsRatio"),
             powerAvg_MW: gl.getUniformLocation(this.program, "u_powerAvg_MW"),
             exoticMass_kg: gl.getUniformLocation(this.program, "u_exoticMass_kg"),
-            time: gl.getUniformLocation(this.program, "u_time")
+            time: gl.getUniformLocation(this.program, "u_time"),
+            beta0: gl.getUniformLocation(this.program, "u_beta0")
         };
     }
 
@@ -452,7 +453,25 @@ class WarpEngine {
         gl.clearColor(0.05, 0.1, 0.15, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        // Enable depth testing for 3D grid
+        // CRITICAL FIX: Upload time uniform to enable animation
+        gl.useProgram(this.program);
+        gl.uniform1f(this.uLoc.time, time);
+        
+        // Upload all uniforms for the warp field shader
+        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
+        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
+        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
+        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
+        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
+        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
+        
+        // CRITICAL FIX: Upload directly injected β₀ from amplifier chain
+        gl.uniform1f(this.uLoc.beta0, this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y));
+        
+        // Render main warp field visualization first
+        this._renderQuad();
+        
+        // Enable depth testing for 3D grid overlay
         gl.enable(gl.DEPTH_TEST);
         
         // Now render the full grid with proper physics
@@ -538,7 +557,7 @@ class WarpEngine {
 
         // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
         const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
-        const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
+        const beta0 = bubbleParams.beta0 || (bubbleParams.dutyCycle * bubbleParams.g_y);
         
         console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
 
@@ -582,6 +601,22 @@ class WarpEngine {
             if (y < ymin) ymin = y;
         }
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
+        
+        // CRITICAL FIX: Reset vertices to prevent drift accumulation
+        if (this.originalGridVertices) {
+            vtx.set(this.originalGridVertices);
+        }
+    }
+
+    _renderQuad() {
+        const gl = this.gl;
+        
+        // Render fullscreen quad for warp field visualization
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.disableVertexAttribArray(0);
     }
 
     _renderGridPoints() {
