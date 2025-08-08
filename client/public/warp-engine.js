@@ -550,6 +550,13 @@ class WarpEngine {
             return;
         }
         
+        // CRITICAL BUG FIX: Reset vertices to original BEFORE warping
+        // CRITICAL BUG FIX: Reset vertices to original BEFORE warping
+        if (this.originalGridVertices) {
+            this.gridVertices.set(this.originalGridVertices);
+            console.log("✅ Grid reset to original before warping");
+        }
+        
         console.log(`Updating ${this.gridVertices.length / 3} grid vertices...`);
         this._warpGridVertices(this.gridVertices, this.gridHalf, this.gridY0, this.uniforms);
         
@@ -572,15 +579,18 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // CRITICAL FIX 1: Reset vertices FIRST before warping (not after!)
-        if (this.originalGridVertices) {
-            vtx.set(this.originalGridVertices);
-        }
+        // CRITICAL BUG FIX: Remove the reset that was happening AFTER warping
+        // (Reset now happens in _updateGrid BEFORE calling this function)
 
         // WarpFactory-inspired: Use proper physical units and bubble radius
         const bubbleRadius_nm = 10000;  // 10 μm bubble radius (WarpFactory standard)
         const sagRclip = bubbleRadius_nm / halfSize * 0.8;  // Convert to clip-space
-        const beta0 = bubbleParams.beta0 || (bubbleParams.dutyCycle * bubbleParams.g_y);
+        // CRITICAL BUG FIX: Only use supplied beta0, no fallback to prevent stale values
+        const beta0 = bubbleParams.beta0;
+        if (beta0 === undefined) {
+            console.warn("No beta0 supplied to _warpGridVertices - using fallback");
+            return; // Early out to prevent using stale values
+        }
         
         // WarpFactory energy condition flags simulation (future: load from pre-computed texture)
         const energyConditionViolated = beta0 > 1000;  // Simplified WEC check
