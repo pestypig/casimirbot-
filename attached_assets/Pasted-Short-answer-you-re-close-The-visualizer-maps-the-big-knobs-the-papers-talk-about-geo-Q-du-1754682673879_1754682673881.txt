@@ -1,0 +1,31 @@
+Short answer: you’re close. The visualizer maps the big knobs the papers talk about (β, γ_geo, Q, duty, strobing) into something you can see, but a few key links are only symbolic right now—so the demo “looks right” without yet behaving like the theory.
+
+Does it support the theory?
+	•	Geometry/Q/γ knobs exist but don’t drive β yet. The papers make β (and thus curvature) scale with the concave-pocket blue-shift γ_geo and the burst-Q during the 10 µs pump, with duty cycling folded in later as a time-average. Your code sets g_y, cavityQ, and dutyCycle, but currentBeta0 = dutyCycle * g_y ignores Q and γ_geo entirely—so the picture doesn’t brighten/dim the way the tile physics predicts.  ￼  ￼
+	•	Sector strobing is a claim of the design, but not visualized. The theory relies on 400-sector strobing at 1 kHz (10 µs bursts) and uses the cycle-average stress–energy as the GR-valid proxy. You’ve got tsRatio but no wedge scheduler or +β/–β cancellation mask in the UI yet.  ￼  ￼
+	•	Natário “tilt” (artificial-g) isn’t exposed. The tilt is a tiny linear β-gradient across the cabin (≲0.1 g baseline; up to ~0.5 g if you burn the margin). There’s no betaGradient in the field yet, so you can’t demo that whisper of down.  ￼  ￼
+	•	Shape: you render a spherical profile. The Needle Hull spec uses a signed-distance coordinate across a prolate shell, and the shift field is a “top-hat” that falls to zero inside a ~0.5 m wall—great excuse to swap in an ellipsoidal SDF.  ￼  ￼
+
+Quick wins for the bubble UI (minimal code changes)
+	1.	Make β depend on γ_geo, Q, and stroke.
+Add uniforms: u_gammaGeo, u_Qburst, u_deltaAOverA (≈ 50 pm / 1 nm ≈ 0.05). Compute an instantaneous β and an average display β:
+beta0_inst = A * u_gammaGeo * u_Qburst * u_deltaAOverA;
+beta0_avg = beta0_inst * sqrt(u_dutyCycle / float(u_sectorCount));
+Use beta0_inst for “flash view”, beta0_avg for “GR-average view.” (Matches: γ_geo×Q↑ during bursts; duty/strobing only enters the average.)  ￼  ￼
+	2.	Show sector strobing.
+Add u_sectorCount (default 400), u_phaseSplit (0..1 for +β vs –β), and a ring HUD: color the wall by wedge index; step an active wedge every frame; optionally render dual masks for +90°/–90° to show HOVER (β_net≈0) vs CRUISE (β_net>0). Tool-tip the derived d_eff = d/S.  ￼
+	3.	Expose “tilt” as a β-gradient.
+Add u_betaGradient (vec3). In the shader: beta += dot(u_betaGradient, position_world); and draw a cabin arrow to indicate “down.” That directly demonstrates the 0.1 g whisper without blowing QI.  ￼
+	4.	Use an ellipsoidal SDF for the wall.
+Replace r = length(p)/length(x,y,z) with r = sdEllipsoid(p, axes), then drive your “top-hat”/Gaussian-wall profile by this r. That aligns with the “signed-distance ρ(χ)” and the 0.5 m wall picture in the spec.  ￼  ￼
+	5.	Two overlays:
+
+	•	WEC/NEC heatmap: approximate with a color by |∇β| (or β·∇²β proxy) so the wall “lights up” where exotic stress–energy sits.
+	•	QI margin gauge (ζ): little HUD bar that dims when you crank tilt or overlap sectors; it reinforces the “average, not flicker” story.  ￼
+
+	6.	“Instantaneous vs Averaged” toggle.
+Side-by-side thumbnails or a key to flip between burst-frame (γ_geo×Q↑) and cycle-average (d/S applied). This makes the strobing→homogenization claim tangible.  ￼
+	7.	Needle-hull aspect & wall thickness sliders.
+Sliders for ellipsoid axes and “wall thickness” (visual shell). Show the 3 orthogonal sheets already in your grid, but let the user scrub the slice depth.
+
+If you want, I can hand you a tiny patch that adds gammaGeo/Q/deltaAOverA/sectorCount/betaGradient uniforms and wires HOVER/CRUISE/TILT modes into your existing programs. It’ll keep your render loop and buffers intact—just smarter math feeding β.
