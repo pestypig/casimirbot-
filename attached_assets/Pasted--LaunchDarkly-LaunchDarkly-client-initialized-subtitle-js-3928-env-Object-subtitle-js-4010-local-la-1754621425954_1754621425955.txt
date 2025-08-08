@@ -1,0 +1,259 @@
+[LaunchDarkly] LaunchDarkly client initialized
+subtitle.js:3928 env Object
+subtitle.js:4010 local lang en
+subtitle.js:7642 auth:init isAuth undefined
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+ ## inline22 : js.stripe.com default
+subtitle.js:4013 ## useLocalInfo Object uuid
+subtitle.js:4013 ## 2useLocalInfo Object
+ ## inline22 : www.googletagmanager.com default
+ ## inline22 : td.doubleclick.net default
+38Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'battery'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+CasimirBot:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ ## inline22 : js.stripe.com default
+ ## inline22 : m.stripe.network default
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 119ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 60ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 72ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 25ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 51ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 63ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 70ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+subtitle.js:7741 Getted userconfig from local Object
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+_app-2be6b9d2c923db0f.js:13 Measure loop restarted more than 5 times
+(anonymous) @ _app-2be6b9d2c923db0f.js:13
+measure @ 275e5802-f81d32497f69aad8.js:1
+(anonymous) @ 275e5802-f81d32497f69aad8.js:1
+n @ _app-2be6b9d2c923db0f.js:13Understand this warning
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+2_app-2be6b9d2c923db0f.js:13 Measure loop restarted more than 5 times
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+ ## inline22 : www.google.com default
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+CasimirBot:1 Access to fetch at 'https://sp.replit.com/v1/t' from origin 'https://replit.com' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
+sp.replit.com/v1/t:1 
+            
+            
+           Failed to load resource: net::ERR_FAILEDUnderstand this error
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+stallwart.build.js:1 stallwart: failed ping 1
+logs.browser-intake-us5-datadoghq.com/api/v2/logs?ddsource=browser&ddtags=sdk_version%3A4.46.0%2Capi%3Afetch%2Cenv%3Aproduction%2Cservice%3Awebsite%2Cversion%3A83c1754a&dd-api-key=pub31a5047a3a4692afb84a423db984dc57&dd-evp-origin-version=4.46.0&dd-evp-origin=browser&dd-request-id=36cb138f-e405-4a6b-9564-0bce28542d93:1 
+            
+            
+           Failed to load resource: net::ERR_INSUFFICIENT_RESOURCESUnderstand this error
+stallwart.build.js:1 stallwart: failed ping 1
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'battery'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'layout-animations'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'navigation-override'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'oversized-images'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Unrecognized feature: 'unsized-media'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+f81f34a0-aa78-45c3-917a-d07b54de71c7-00-2z5pis4t63h9s.riker.replit.dev/__replco/workspace_iframe.html?initialPath=%2F&id=%3Ar3vf%3A:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+Console.js:61 3D spacetime grid rendered with authentic Natário warp bubble physics
+Console.js:61 _updateGrid called
+Console.js:61 Updating 10200 grid vertices...
+Console.js:61 WARP DEBUG: originalY=-0.14400000000000002 (should be original grid Y), halfSize=20000, sagRclip=0.00064
+Console.js:61 Max lateral drift = 1.6000 (should be < 0.2 to stay visible)
+Console.js:61 Grid Y range after warp: -0.200 … -0.100 (should show variation)
+Console.js:61 Grid vertices updated and uploaded to GPU
+Console.js:61 Using grid program for rendering...
+Console.js:61 Rendered 10200 grid lines with 3D perspective - should now be visible!
+Console.js:61 3D spacetime grid rendered with authentic Natário warp bubble physics

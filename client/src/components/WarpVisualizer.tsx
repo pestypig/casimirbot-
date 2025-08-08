@@ -38,10 +38,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the WarpEngine script dynamically with aggressive cache busting
+        // Load the FIXED WarpEngine script with cache bypass
         const script = document.createElement('script');
-        script.src = '/warp-engine.js?' + Date.now() + Math.random(); // Cache bust
-        console.log('Loading WarpEngine script from:', script.src);
+        script.src = '/warp-engine-fixed.js?' + Date.now(); // Cache bypass with new file
+        console.log('Loading FIXED WarpEngine script from:', script.src);
         script.onload = () => {
           console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
           if (window.WarpEngine) {
