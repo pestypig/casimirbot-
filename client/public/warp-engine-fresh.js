@@ -579,53 +579,15 @@ class WarpEngine {
     _renderGridPoints() {
         const gl = this.gl;
         
-        // CORRECTED: Create perspective matrix that transforms grid coordinates properly
-        const aspect = this.canvas.width / this.canvas.height;
-        const fov = Math.PI / 3;  // 60 degrees - wider FOV to see more grid
-        const near = 0.1;
-        const far = 20.0;
-        
-        // Perspective projection matrix
-        const f = 1.0 / Math.tan(fov / 2);
-        let mvpMatrix = new Float32Array([
-            f/aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far+near)/(near-far), (2*far*near)/(near-far),
-            0, 0, -1, 0
-        ]);
-        
-        // Apply view transformation (camera positioned to see the grid clearly)
-        const time = performance.now() * 0.0003;
-        const rotY = Math.sin(time) * 0.2;  // Gentle rotation
-        const rotX = 0.1;                   // Slight downward angle
-        
-        // Translation: Move grid back and down to center it in view
-        const translateX = 0.0;
-        const translateY = 0.1;             // Slightly up
-        const translateZ = 2.5;             // FIXED: Move world AWAY from camera
-        
-        // Scale: Make grid fit nicely in view (diagnostic showed coordinates ±0.8)
-        const scale = 0.8;
-        
-        // Combined transform matrix: Scale, Rotate, Translate
-        mvpMatrix[0] *= scale * Math.cos(rotY);   // Scale X with rotation
-        mvpMatrix[2] *= scale * Math.sin(rotY);   // Rotation Y effect on X
-        mvpMatrix[5] *= scale * Math.cos(rotX);   // Scale Y with rotation
-        mvpMatrix[6] *= scale * Math.sin(rotX);   // Rotation X effect on Y
-        mvpMatrix[8] *= scale;                    // Scale Z
-        mvpMatrix[12] += translateX;              // Translate X
-        mvpMatrix[13] += translateY;              // Translate Y  
-        mvpMatrix[14] += translateZ;              // Translate Z
-        
         gl.useProgram(this.gridProgram);
         console.log("Using grid program for rendering...");
         
         // DIAGNOSTIC STEP 2: Test perspective projection only (no view transform)
-        const fov = Math.PI/4;
+        const testFov = Math.PI/4;
         const aspect = this.canvas.width / this.canvas.height;
         const near = 0.01;
         const far = 10.0;
-        const f = 1.0 / Math.tan(fov / 2);
+        const f = 1.0 / Math.tan(testFov / 2);
         
         const perspectiveOnly = new Float32Array([
             f/aspect, 0, 0, 0,
@@ -634,7 +596,7 @@ class WarpEngine {
             0, 0, -1, 0
         ]);
         console.log("🔧 PERSPECTIVE TEST: Using perspective projection only (identity view)");
-        console.log(`🔍 Projection matrix: near=${near}, far=${far}, fov=${fov*180/Math.PI}°`);
+        console.log(`🔍 Projection matrix: near=${near}, far=${far}, fov=${testFov*180/Math.PI}°`);
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, perspectiveOnly);
         
         // Bind grid vertices
