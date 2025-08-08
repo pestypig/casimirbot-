@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 CACHE-BUST-STAMP-v2.6-FRESH-REBUILD-NATARIO 🚨');
+            console.error('🚨 BUNDLE VERSION: MASTER-SWITCH-TEST-v2.7 - FINAL GRID DEBUG 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -526,39 +526,43 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        // Clear with dark blue background for contrast
-        gl.clearColor(0.05, 0.1, 0.15, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        console.log(">> TOP OF DRAW - MASTER SWITCH TEST");
         
-        // Upload all uniforms for the warp field shader
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.time, time);
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
-        
-        // Upload β₀ from amplifier chain
-        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.beta0, currentBeta0);
-        
-        // Render quad first 
-        this._renderQuad();
-        
-        // Clear ONLY the depth buffer so grid can render on top
-        gl.clear(gl.DEPTH_BUFFER_BIT);
-        
-        // Now enable depth testing for 3D grid overlay
-        gl.enable(gl.DEPTH_TEST);
-        
-        // Render the grid with FIXED physics and coordinate transformation
-        this._updateGrid();
-        this._renderGridPoints();
-        
+        // 1) Clear the color buffer only
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        // 2) Use the grid program
+        gl.useProgram(this.gridProgram);
+
+        // 3) Force a fat white point-cloud
         gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+
+        // 4) Identity MVP so points land at ±0.8 in NDC
+        const I = new Float32Array([
+            1,0,0,0,
+            0,1,0,0,
+            0,0,1,0,
+            0,0,0,1
+        ]);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, I);
+
+        // 5) Bind VBO & attribute
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+
+        // 6) Override sheetColor to white & energyFlag to 0
+        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
+        gl.uniform3f(this.gridUniforms.sheetColor, 1, 1, 1);
+
+        // 7) Draw as POINTS for maximum visibility
+        gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+        console.log(`🔍 MASTER SWITCH: Drew ${this.gridVertexCount} white points with identity matrix`);
+
+        // 8) Cleanup
+        gl.disableVertexAttribArray(this.gridUniforms.position);
     }
 
     _renderQuad() {
