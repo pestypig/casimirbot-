@@ -439,14 +439,14 @@ class WarpEngine {
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 4.0;\n" +
+            "    gl_PointSize = 8.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 4.0;\n" +
+            "    gl_PointSize = 8.0;\n" +  // Larger points for better visibility
             "}";
 
         const gridFs = isWebGL2 ?
@@ -628,7 +628,7 @@ class WarpEngine {
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        console.log("Using POINTS for visible grid rendering");
+        console.log("Using LINES for visible grid rendering (better visibility than points)");
         
         // Calculate vertex counts per sheet
         const totalVertices = this.gridVertexCount;
@@ -639,17 +639,17 @@ class WarpEngine {
         // Draw XY sheet (cyan floor)
         gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 1.0);  // Cyan
         gl.uniform1f(this.gridUniforms.energyFlag, 0.0);            // Normal matter
-        gl.drawArrays(gl.POINTS, 0, verticesPerSheet);
+        gl.drawArrays(gl.LINES, 0, verticesPerSheet);
         console.log("🔍 OFFSET DEBUG: XY offset=0, count=" + verticesPerSheet);
         
         // Draw XZ sheet (magenta wall)
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 1.0);  // Magenta
-        gl.drawArrays(gl.POINTS, verticesPerSheet, verticesPerSheet);
+        gl.drawArrays(gl.LINES, verticesPerSheet, verticesPerSheet);
         console.log("🔍 OFFSET DEBUG: XZ offset=" + verticesPerSheet + ", count=" + verticesPerSheet);
         
         // Draw YZ sheet (yellow wall)
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.0);  // Yellow
-        gl.drawArrays(gl.POINTS, verticesPerSheet * 2, verticesPerSheet);
+        gl.drawArrays(gl.LINES, verticesPerSheet * 2, verticesPerSheet);
         console.log("🔍 OFFSET DEBUG: YZ offset=" + (verticesPerSheet * 2) + ", count=" + verticesPerSheet);
         
         console.log(`Rendered ${totalVertices} grid lines with 3D perspective - should now be visible!`);
