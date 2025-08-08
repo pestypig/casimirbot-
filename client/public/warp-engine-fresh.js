@@ -346,10 +346,6 @@ class WarpEngine {
         this.normClip = 0.8 / this.gridHalfNm;  // = 0.8/20000 = 4e-5
         this.bubbleRadius_nm = 10000;  // 10 µm bubble radius
         
-        // Compute bubble's clip-space radius for sheet positioning
-        this.sagRclip = this.bubbleRadius_nm * this.normClip;  // = 0.4
-        console.log("🔧 Bubble clip-radius =", this.sagRclip.toFixed(3));
-        
         console.log(`Grid initialized: ${this.gridVertexCount} vertices across 3 sheets`);
         console.log(`XY sheet: ${xySheet.length/3} vertices`);
         console.log(`XZ sheet: ${xzSheet.length/3} vertices`);
@@ -369,9 +365,8 @@ class WarpEngine {
         const norm = 0.8;  // Normalize to clip space bounds
         
         if (plane === 'XY') {
-            // XY plane (floor) - cyan at bubble radius
-            const zPos = this.sagRclip || 0.4;  // At bubble's clip-space radius
-            console.log(`XY sheet positioned at z=${zPos.toFixed(3)} (bubble radius)`);
+            // XY plane (floor) - cyan
+            const zPos = -half * 0.3;  // Below center
             for (let x = 0; x <= divisions; ++x) {
                 const xPos = (-half + x * step) * norm;
                 for (let y = 0; y < divisions; ++y) {
@@ -390,9 +385,8 @@ class WarpEngine {
             }
         }
         else if (plane === 'XZ') {
-            // XZ plane (back wall) - magenta at bubble radius
-            const yPos = this.sagRclip || 0.4;  // At bubble's clip-space radius
-            console.log(`XZ sheet positioned at y=${yPos.toFixed(3)} (bubble radius)`);
+            // XZ plane (back wall) - magenta
+            const yPos = half * 0.3;  // Above center
             for (let x = 0; x <= divisions; ++x) {
                 const xPos = (-half + x * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
@@ -411,9 +405,8 @@ class WarpEngine {
             }
         }
         else if (plane === 'YZ') {
-            // YZ plane (side wall) - yellow at bubble radius
-            const xSheet = -(this.sagRclip || 0.4);  // At negative bubble's clip-space radius
-            console.log(`YZ sheet positioned at x=${xSheet.toFixed(3)} (-bubble radius)`);
+            // YZ plane (side wall) - yellow
+            const xSheet = half * 0.3;  // To the right
             for (let y = 0; y <= divisions; ++y) {
                 const yPos = (-half + y * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
@@ -423,11 +416,11 @@ class WarpEngine {
                 }
             }
             for (let z = 0; z <= divisions; ++z) {
-                const zPos = (-half + z * step) * norm;
+                const zPos = (-half * 0.3 + z * step) * norm;
                 for (let y = 0; y < divisions; ++y) {
                     const y0 = (-half + y * step) * norm;
                     const y1 = (-half + (y + 1) * step) * norm;
-                    verts.push(xSheet, y0, zPos, xSheet, y1, zPos);  // Y-lines at fixed x
+                    verts.push(xSheet, y0, zPos, xSheet, y1, zPos);  // Y-lines at offset x
                 }
             }
         }
