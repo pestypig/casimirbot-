@@ -136,13 +136,14 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sagDepth_nm: parameters.sagDepth_nm,
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
+        tsRatio: parameters.tsRatio || 4100, // Time-scale ratio for animation scaling
         // Operational mode parameters
         currentMode: parameters.currentMode,
         sectorStrobing: parameters.sectorStrobing,
         qSpoilingFactor: parameters.qSpoilingFactor,
         // Legacy compatibility
         g_y: parameters.g_y,
-        // Computed amplifier chain result
+        // Computed amplifier chain result - COMPLETE PIPELINE
         beta0: beta0
       });
     }

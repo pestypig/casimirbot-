@@ -119,8 +119,8 @@ class WarpEngine {
             "    \n" +
             "    float bmag = length(betaField(pos));\n" +
             "    \n" +
-            "    // Enhanced ripple: Power controls speed, Duty controls amplitude\n" +
-            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0;\n" +
+            "    // Enhanced ripple: Power controls speed, tsRatio controls animation rate\n" +
+            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0 / max(u_tsRatio / 1000.0, 1.0);\n" +
             "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
             "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
             "    \n" +
@@ -176,8 +176,8 @@ class WarpEngine {
             "    \n" +
             "    float bmag = length(betaField(pos));\n" +
             "    \n" +
-            "    // Enhanced ripple effects\n" +
-            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0;\n" +
+            "    // Enhanced ripple effects with tsRatio scaling\n" +
+            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0 / max(u_tsRatio / 1000.0, 1.0);\n" +
             "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
             "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
             "    \n" +
@@ -521,6 +521,7 @@ class WarpEngine {
         gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
         gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
         gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
+        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);  // Time-scale ratio for animation speed
         gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
         gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
         
@@ -641,10 +642,12 @@ class WarpEngine {
         // WarpFactory energy condition flags simulation (future: load from pre-computed texture)
         const energyConditionViolated = beta0 > 1000;  // Simplified WEC check
         
+        const tsRatio = bubbleParams.tsRatio || 4100;
         console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
         console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
         console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
-        console.log(`  powerAvg=${powerAvg_MW}MW (scales deformation)`);
+        console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
+        console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
         console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius)`);
 
         for (let i = 0; i < vtx.length; i += 3) {
@@ -668,9 +671,12 @@ class WarpEngine {
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement scaled by realistic power --------
-            const powerScale = powerAvg_MW / 100.0;  // Scale by realistic power (100MW baseline)
-            const dy = beta * 0.05 * powerScale;     // Power-scaled vertical displacement
-            vtx[i + 1] = y_original + dy;             // Y warped vertically from original position
+            // Use logarithmic scaling to prevent grid explosion at very high powers
+            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / Math.log10(100);  // Log scale (100MW baseline)
+            const tsRatio = bubbleParams.tsRatio || 4100;
+            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
+            const dy = beta * 0.05 * powerScale * timeScale;      // Power and time-scaled displacement
+            vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
