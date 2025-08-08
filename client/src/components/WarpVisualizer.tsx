@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Extend Window interface for SimpleWarpEngine
+// Extend Window interface for 3D WarpEngine
 declare global {
   interface Window {
-    SimpleWarpEngine: any;
+    WarpEngine: any;
   }
 }
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,40 +40,39 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       if (!canvasRef.current) return;
 
       try {
-        // Check if SimpleWarpEngine is already loaded
-        if (window.SimpleWarpEngine) {
+        // Check if WarpEngine is already loaded  
+        if (window.WarpEngine) {
           try {
-            engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
+            engineRef.current = new window.WarpEngine(canvasRef.current);
             setIsLoaded(true);
           } catch (error) {
-            console.error('Failed to initialize existing SimpleWarpEngine:', error);
+            console.error('Failed to initialize existing WarpEngine:', error);
           }
           return;
         }
 
-        // Load the Simple WarpEngine for reliable visualization
+        // Load the 3D WebGL WarpEngine with full pipeline debugging
         const script = document.createElement('script');
-        script.src = '/warp-simple.js?v=' + Date.now(); // 2D Canvas fallback for reliability
-        console.log('Loading Simple WarpEngine from:', script.src);
+        script.src = '/warp-engine.js?v=' + Date.now(); // 3D WebGL with pipeline debugging
+        console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
-          console.log('SimpleWarpEngine loaded, window.SimpleWarpEngine available:', !!window.SimpleWarpEngine);
-          if (window.SimpleWarpEngine) {
+          console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
+          if (window.WarpEngine) {
             try {
-              console.log('Creating SimpleWarpEngine instance...');
-              engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
-              console.log('SimpleWarpEngine instance created successfully');
+              console.log('Creating WarpEngine instance...');
+              engineRef.current = new window.WarpEngine(canvasRef.current);
+              console.log('WarpEngine instance created successfully - checking mode:', engineRef.current.isWebGLFallback ? 'FALLBACK' : 'WEBGL');
               setIsLoaded(true);
             } catch (error) {
-              console.error('Failed to initialize SimpleWarpEngine:', error);
-              console.error('Error details:', (error as Error).message, (error as Error).stack);
+              console.error('Failed to initialize WarpEngine:', error);
               setIsLoaded(false);
             }
           } else {
-            console.error('SimpleWarpEngine not found on window after script load');
+            console.error('WarpEngine not found on window after script load');
           }
         };
         script.onerror = () => {
-          console.error('Failed to load SimpleWarpEngine');
+          console.error('Failed to load WarpEngine');
           setIsLoaded(false);
         };
         document.head.appendChild(script);
