@@ -8,6 +8,9 @@
 class WarpEngine {
     constructor(canvas) {
         try {
+            // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging
+            console.log('🏷️ WARP-ENGINE-STAMP-v2025.01.16-PIPELINE-CONNECTED - Fresh Load Confirmed');
+            
             console.log("WarpEngine v2.0: Starting 3D volumetric cage initialization...");
             this.canvas = canvas;
             this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
@@ -491,6 +494,10 @@ class WarpEngine {
     //----------------------------------------------------------------
     updateUniforms(params) {
         Object.assign(this.uniforms, params);
+        
+        // 🔍 DEBUG CHECKPOINT 2: Uniforms changing verification
+        console.log('🔧 updateUniforms called with:', params);
+        console.table(this.uniforms);
     }
 
     //----------------------------------------------------------------
@@ -526,7 +533,13 @@ class WarpEngine {
         gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
         
         // CRITICAL FIX: Upload directly injected β₀ from amplifier chain
-        gl.uniform1f(this.uLoc.beta0, this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y));
+        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
+        gl.uniform1f(this.uLoc.beta0, currentBeta0);
+        
+        // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification
+        if (performance.now() % 1000 < 16) {  // Log every second
+            console.log(`🎮 GPU Uniforms: β₀=${currentBeta0.toExponential(2)}, sagDepth=${this.uniforms.sagDepth_nm}nm, power=${this.uniforms.powerAvg_MW}MW`);
+        }
         
         // Render main warp field visualization first
         this._renderQuad();
@@ -592,7 +605,8 @@ class WarpEngine {
 
     // Exact warpGridVertices implementation from the minimal recipe
     _updateGrid() {
-        console.log("_updateGrid called");
+        // 🔍 DEBUG CHECKPOINT 3: _updateGrid entry verification
+        console.log('📊 _updateGrid called - Grid warping initiated');
         
         if (!this.gridVertices) {
             console.warn("Grid vertices not initialized!");
@@ -617,6 +631,8 @@ class WarpEngine {
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
+        // 🔍 DEBUG CHECKPOINT 4: VBO re-upload verification
+        console.log(`💾 VBO Upload: ${this.gridVertices.length} floats = ${this.gridVertices.byteLength} bytes`);
         console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
