@@ -210,12 +210,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           
           <div className="text-xs text-slate-400 space-y-1">
             <div className="font-semibold text-slate-300">Visual Effects Guide:</div>
-            <div>• <span className="text-cyan-400">Duty Cycle</span>: Controls overall brightness & ripple depth</div>
-            <div>• <span className="text-orange-400">γ Geometric</span>: Adjusts color contrast & bubble sharpness</div>
-            <div>• <span className="text-blue-400">Sag Depth</span>: Bubble size (larger = wider disc)</div>
+            <div>• <span className="text-cyan-400">Duty Cycle</span>: Controls brightness, ripple depth & grid curvature</div>
+            <div>• <span className="text-orange-400">γ Geometric</span>: Adjusts contrast, sharpness & curvature amplitude</div>
+            <div>• <span className="text-blue-400">Sag Depth</span>: Bubble size & spacetime grid deformation scale</div>
             <div>• <span className="text-green-400">Power</span>: Ripple propagation speed</div>
             <div>• <span className="text-yellow-400">Q Factor</span>: Golden halo intensity</div>
             <div>• <span className="text-purple-400">Exotic Mass</span>: Outer shock ring visibility</div>
+            <div className="mt-2 text-slate-500">
+              <span className="font-semibold">3D Grid:</span> Live spacetime curvature visualization showing Natário field deformation
+            </div>
           </div>
         </div>
       </CardContent>

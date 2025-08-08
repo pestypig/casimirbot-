@@ -33,6 +33,9 @@ class WarpEngine {
         this._cacheUniformLocations();
         this._resize();
         
+        // Enable depth buffer for 3D grid rendering
+        this.gl.enable(this.gl.DEPTH_TEST);
+        
         // Auto-resize and continuous rendering
         window.addEventListener("resize", () => this._resize());
         this._startRenderLoop();
@@ -223,6 +226,97 @@ class WarpEngine {
         ]), gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         this.vbo = vbo;
+        
+        // Initialize 3D grid for spacetime curvature visualization
+        this._initGrid();
+    }
+
+    _initGrid() {
+        const gl = this.gl;
+        
+        // Grid parameters from gravity_sim.cpp
+        const size = 40e-9;      // 40nm grid size to match visualization scale
+        const divisions = 30;    // 30x30 grid for performance
+        const step = size / divisions;
+        const half = size / 2;
+        const yPlane = -half * 0.3 + 3 * step;  // reference plane from C++
+        
+        const vertices = [];
+        
+        // Generate horizontal lines (z-direction)
+        for (let z = 0; z <= divisions; z++) {
+            const zPos = -half + z * step;
+            for (let x = 0; x < divisions; x++) {
+                const x0 = -half + x * step;
+                const x1 = x0 + step;
+                vertices.push(x0, yPlane, zPos, x1, yPlane, zPos);
+            }
+        }
+        
+        // Generate vertical lines (x-direction)
+        for (let x = 0; x <= divisions; x++) {
+            const xPos = -half + x * step;
+            for (let z = 0; z < divisions; z++) {
+                const z0 = -half + z * step;
+                const z1 = z0 + step;
+                vertices.push(xPos, yPlane, z0, xPos, yPlane, z1);
+            }
+        }
+        
+        this.gridVertices = new Float32Array(vertices);
+        this.gridVertexCount = vertices.length / 3;
+        this.gridSize = size;
+        this.gridHalf = half;
+        this.gridY0 = yPlane;
+        
+        // Create dynamic grid buffer
+        this.gridVbo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        
+        // Compile grid shader program
+        this._compileGridShaders();
+    }
+
+    _compileGridShaders() {
+        const isWebGL2 = this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0");
+        
+        const gridVs = isWebGL2 ?
+            "#version 300 es\n" +
+            "in vec3 a_position;\n" +
+            "uniform mat4 u_mvpMatrix;\n" +
+            "void main() {\n" +
+            "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+            "}"
+            :
+            "attribute vec3 a_position;\n" +
+            "uniform mat4 u_mvpMatrix;\n" +
+            "void main() {\n" +
+            "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+            "}";
+
+        const gridFs = isWebGL2 ?
+            "#version 300 es\n" +
+            "precision highp float;\n" +
+            "out vec4 frag;\n" +
+            "void main() {\n" +
+            "    frag = vec4(0.7, 0.7, 0.9, 0.6);\n" +  // Semi-transparent blue-white grid
+            "}"
+            :
+            "precision highp float;\n" +
+            "void main() {\n" +
+            "    gl_FragColor = vec4(0.7, 0.7, 0.9, 0.6);\n" +
+            "}";
+
+        this.gridProgram = this._linkProgram(gridVs, gridFs);
+        
+        const gl = this.gl;
+        gl.useProgram(this.gridProgram);
+        this.gridUniforms = {
+            mvpMatrix: gl.getUniformLocation(this.gridProgram, "u_mvpMatrix"),
+            position: gl.getAttribLocation(this.gridProgram, "a_position")
+        };
     }
 
     //----------------------------------------------------------------
@@ -265,11 +359,15 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        
+        // Enable depth testing for 3D grid
+        gl.enable(gl.DEPTH_TEST);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
+        // 1. Render background warp field
         gl.useProgram(this.program);
-
-        // Efficiently set all uniforms
         gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle);
         gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y);
         gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ);
@@ -279,13 +377,92 @@ class WarpEngine {
         gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
         gl.uniform1f(this.uLoc.time, time);
 
-        // Render full-screen quad
         const loc = gl.getAttribLocation(this.program, "a_position");
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.disableVertexAttribArray(loc);
+
+        // 2. Update and render dynamic spacetime grid
+        this._updateGrid();
+        this._renderGrid();
+        
+        gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+    }
+
+    // Warp grid vertices based on Natário physics (from gravity_sim.cpp)
+    _updateGrid() {
+        const sagR = this.uniforms.sagDepth_nm * 1e-9;    // nm → m conversion
+        const beta0 = this.uniforms.dutyCycle * this.uniforms.g_y;  // β₀ amplitude
+        const vertices = this.gridVertices;
+        
+        for (let i = 0; i < vertices.length; i += 3) {
+            const x = vertices[i];
+            const z = vertices[i + 2];
+            
+            // Radial distance from bubble center
+            const r = Math.sqrt(x * x + z * z);
+            
+            // Natário β-field profile: (r/R) * exp(-(r/R)²)
+            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
+            const beta = beta0 * prof;
+            
+            // Map |β| to vertical displacement for spacetime curvature visualization
+            const dy = beta * sagR * 8000;  // Amplification factor for visibility
+            
+            vertices[i + 1] = this.gridY0 + dy;
+        }
+        
+        // Upload warped vertices to GPU
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, vertices);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    _renderGrid() {
+        const gl = this.gl;
+        gl.useProgram(this.gridProgram);
+        
+        // Create perspective projection matrix
+        const aspect = this.canvas.width / this.canvas.height;
+        const fov = Math.PI / 3;  // 60 degrees
+        const near = 1e-10;
+        const far = 1e-7;
+        
+        // Simple perspective matrix calculation
+        const f = 1 / Math.tan(fov / 2);
+        const projection = new Float32Array([
+            f/aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far+near)/(near-far), -1,
+            0, 0, (2*far*near)/(near-far), 0
+        ]);
+        
+        // Camera positioned to view the grid at an angle
+        const eyeZ = -this.gridSize * 1.5;
+        const eyeY = this.gridSize * 0.8;
+        
+        // View-projection matrix (simplified for this demo)
+        const mvp = new Float32Array([
+            1, 0, 0, 0,
+            0, 0.8, 0.6, 0,     // Slight rotation to show 3D effect
+            0, -0.6, 0.8, 0,
+            0, eyeY, eyeZ, 1
+        ]);
+        
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+        
+        // Render grid lines
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        
+        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+        
+        gl.disableVertexAttribArray(this.gridUniforms.position);
     }
 
     //----------------------------------------------------------------
@@ -314,8 +491,14 @@ class WarpEngine {
         if (this.gl && this.program) {
             this.gl.deleteProgram(this.program);
         }
+        if (this.gl && this.gridProgram) {
+            this.gl.deleteProgram(this.gridProgram);
+        }
         if (this.gl && this.vbo) {
             this.gl.deleteBuffer(this.vbo);
+        }
+        if (this.gl && this.gridVbo) {
+            this.gl.deleteBuffer(this.gridVbo);
         }
     }
 }
