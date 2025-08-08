@@ -619,7 +619,7 @@ class WarpEngine {
         gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
         console.log(`🔍 PROJECTION TEST: Drew ${this.gridVertexCount} vertices as white lines`);
         
-        console.log(`Rendered ${totalVertices} grid lines with 3D perspective - should now be visible!`);
+        console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
         console.log("3D spacetime grid rendered with authentic Natário warp bubble physics");
         
         gl.disableVertexAttribArray(this.gridUniforms.position);
