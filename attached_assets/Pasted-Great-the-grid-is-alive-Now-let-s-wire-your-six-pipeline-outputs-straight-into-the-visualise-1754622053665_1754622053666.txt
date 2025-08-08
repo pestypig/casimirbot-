@@ -1,0 +1,88 @@
+Great — the grid is alive!
+Now let’s wire your six **pipeline outputs** straight into the visualiser so you can *watch* curvature change in real time and know exactly what each slider is doing.
+
+---
+
+## 1 · Where each parameter already lands
+
+| Pipeline variable      | JavaScript uniform | Touches the code here                                                      | What it changes on-screen                                    |
+| ---------------------- | ------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Duty Cycle** (ℓ/ℓRF) | `u_dutyCycle`      | `beta0 = Duty * γ` in both the fragment shader **and** `_warpGridVertices` | Overall field strength → grid bulges more, β-colour brighter |
+| **γ Geometric**        | `u_g_y`            | Same line (`beta0 = …`)                                                    | Contrast slider: higher γ sharpens gradients & curvature     |
+| **Q Factor**           | `u_cavityQ`        | Fragment shader halo `halo = smoothstep(..., log(Q))`                      | Warm outer glow grows with Q                                 |
+| **Sag Depth (nm)**     | `u_sagDepth_nm`    | `sagRclip = sagDepth_nm / halfSize * 0.8`                                  | Bubble radius: larger sag = wider ring, gentler warp         |
+| **Power (MW)**         | `u_powerAvg_MW`    | Ripple speed `√P` & amplitude mod                                          | Faster pulsation and stronger shimmering                     |
+| **Exotic Mass (kg)**   | `u_exoticMass_kg`  | Shock-ring radius + optional grid lift (see §3)                            | Expands pale shock ring; can also deepen grid wells          |
+
+---
+
+## 2 · Live-hook the dashboard or pipeline JSON
+
+```html
+<!-- simple HTML controls for quick tests -->
+<label>Duty&nbsp;<input type="range" id="duty" min="0" max="0.3" step="0.005" value="0.14"></label>
+<label>γ&nbsp;<input type="range" id="gamma" min="1" max="50" step="1" value="26"></label>
+<!-- add others similarly -->
+<script type="module">
+import WarpEngine from "./warp-engine-fixed.js";
+
+const canvas = document.getElementById("warpView");
+const engine = new WarpEngine(canvas);
+
+function push() {
+  engine.updateUniforms({
+    dutyCycle: +duty.value,
+    g_y:       +gamma.value,
+    cavityQ:   +q.value,
+    sagDepth_nm:+sag.value,
+    powerAvg_MW:+power.value,
+    exoticMass_kg:+mass.value
+  });
+}
+document.querySelectorAll("input[type=range]").forEach(i=>i.oninput = push);
+</script>
+```
+
+*Drag a slider* → `updateUniforms` fires → next frame calls `_warpGridVertices` and the grid morphs before your eyes.
+
+If your “energy pipeline solution” arrives over WebSocket/REST, call `engine.updateUniforms(freshNumbers)` inside the handler instead.
+
+---
+
+## 3 · (Optional) make curvature respond to **negative energy density**
+
+Right now the grid only bends laterally & vertically by `β`.
+To visualise the *volume integral* (exotic mass) add a depression proportional to **–ρ**:
+
+```js
+// bottom of _warpGridVertices()
+const rho = -beta*beta * bubbleParams.cavityQ;   // toy ρ≈–β²Q
+const extraDip = rho * 5e-3;                     // scale for visibility
+vtx[i+1] += extraDip;
+```
+
+When **Exotic Mass** climbs, the whole mesh sinks deeper, showing how much spacetime you “bought” with the energy pipeline.
+
+---
+
+## 4 · Colour-code the grid itself (quick heat-map)
+
+Change the grid fragment shader to tint by vertical stretch:
+
+```glsl
+float h = abs(gl_Position.y);              // 0 = flat, 1 = deep well
+frag = vec4(mix(vec3(0.2,0.8,1.0),         // cyan
+                vec3(1.0,0.3,0.1), h*4.0), 1.0);
+```
+
+Blue lines stay near equilibrium; orange/red show regions where the pipeline is forcing large curvature.
+
+---
+
+### TL;DR – next three steps
+
+1. **Add sliders (or feed live numbers)** → call `engine.updateUniforms`.
+2. **Watch** grid bulge, colour ripple, halo expand in real time.
+3. **(Optional)** deepen Y-dip with `ρ ~ –β²Q` to visualise exotic mass “budget”.
+
+That’s all you need to turn raw pipeline variables into an intuitive, live spacetime dashboard. Have fun tilting spacetime—let me know if you want a more physical energy-density formula or an on-screen legend!

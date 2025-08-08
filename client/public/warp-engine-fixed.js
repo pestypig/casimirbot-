@@ -243,7 +243,12 @@ class WarpEngine {
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
             const dy = beta * 0.05;                 // FIXED: Keep inside clip cube (-1 to +1)
-            vtx[i + 1] = y_original + dy;            // Y warped vertically from original position
+            
+            // Optional: Add exotic mass-based depression (negative energy density effect)
+            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9);  // Toy ρ ≈ -β²Q (normalized)
+            const extraDip = rho * 0.002;           // Scale for subtle visibility
+            
+            vtx[i + 1] = y_original + dy + extraDip;  // Y warped with curvature + mass depression
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array

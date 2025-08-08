@@ -40,7 +40,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the FIXED WarpEngine script with cache bypass
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?' + Date.now(); // Cache bypass with new file
+        script.src = '/warp-engine-fixed.js?v=' + Date.now(); // Cache bypass with new file
         console.log('Loading FIXED WarpEngine script from:', script.src);
         script.onload = () => {
           console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -53,7 +53,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               // Engine now auto-starts its render loop
             } catch (error) {
               console.error('Failed to initialize WarpEngine:', error);
-              console.error('Error details:', error.message, error.stack);
+              console.error('Error details:', (error as Error).message, (error as Error).stack);
               setIsLoaded(false);
             }
           } else {
@@ -89,6 +89,14 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
   useEffect(() => {
     if (engineRef.current && isLoaded) {
+      console.log('🔄 Updating spacetime curvature with live parameters:', {
+        dutyCycle: parameters.dutyCycle,
+        g_y: parameters.g_y,
+        cavityQ: parameters.cavityQ,
+        sagDepth_nm: parameters.sagDepth_nm,
+        powerAvg_MW: parameters.powerAvg_MW,
+        exoticMass_kg: parameters.exoticMass_kg
+      });
       engineRef.current.updateUniforms(parameters);
     }
   }, [parameters, isLoaded]);
