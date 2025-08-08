@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 CACHE-BUST-STAMP-v2.4-NATARIO-ANALYTIC-CURVATURE 🚨');
+            console.error('🚨 CACHE-BUST-STAMP-v2.5-AGGRESSIVE-RELOAD-NATARIO 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with fallback compatibility loaded');
             
@@ -619,7 +619,8 @@ class WarpEngine {
         const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
         gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
-        // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification
+        // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification + Beta0 shader check
+        console.log("🔍 BETA0 SHADER DEBUG: currentBeta0 =", currentBeta0, "(should be > 0)");
         if (performance.now() % 1000 < 16) {  // Log every second
             console.log(`🎮 GPU Uniforms: β₀=${currentBeta0.toExponential(2)}, sagDepth=${this.uniforms.sagDepth_nm}nm, power=${this.uniforms.powerAvg_MW}MW`);
         }

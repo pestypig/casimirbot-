@@ -53,7 +53,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with full pipeline debugging
         const script = document.createElement('script');
-        script.src = '/warp-engine.js?v=' + Date.now(); // 3D WebGL with pipeline debugging
+        script.src = '/warp-engine.js?cb=' + Date.now() + '&force=' + Math.random(); // Aggressive cache busting
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
