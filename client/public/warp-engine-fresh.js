@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: SYNCHRONIZED-v3.1 - GRID MATCHES BUBBLE RADIUS 🚨');
+            console.error('🚨 BUNDLE VERSION: REVERTED-v3.2 - HARDCODED GRID SCALE RESTORED 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -697,61 +697,40 @@ class WarpEngine {
         console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
-    // Authentic Natário spacetime curvature implementation with SYNCHRONIZED scaling
+    // Authentic Natário spacetime curvature implementation - REVERTED to visible scale
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // 1) Drive bubble radius from the same sagDepth_nm uniform used by fragment shader
-        const bubbleRadius_nm = bubbleParams.sagDepth_nm || 16000;  // Use pipeline value or 16µm fallback
-        const sagRclip = bubbleRadius_nm * this.normClip;  // Now synchronized with orange disc
-        
-        // Use computed β₀ from amplifier chain
-        const beta0 = bubbleParams.beta0;
-        if (beta0 === undefined) {
-            console.warn("No beta0 supplied to _warpGridVertices - skipping warp");
-            return;
-        }
-        
-        // Get realistic power for scaling deformation amplitude
+        // REVERT to a hardcoded radius (e.g., 10,000 nm) that is proportional
+        // to the grid's 40,000 nm size. This makes the warp visible.
+        const bubbleRadius_nm = 10000; // 10 µm
+        const sagRclip = bubbleRadius_nm * this.normClip;
+
+        // REVERT to a fixed visual amplitude to control the deformation size.
+        const visualAmplitude = 0.25;
+
+        // Physics parameters for animation scaling
         const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
-        
         const tsRatio = bubbleParams.tsRatio || 4100;
-        console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
-        console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
-        console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
-        console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
-        console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
-        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
-        console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
-        console.log(`  🔗 SYNCHRONIZED: Grid radius=${bubbleRadius_nm}nm matches fragment shader disc`);
-        console.log(`  🔧 VISUAL AMPLITUDE: ${(0.10 * sagRclip).toExponential(3)} (10% of bubble radius)`);
 
         for (let i = 0; i < vtx.length; i += 3) {
-            // Work directly in clip-space coordinates
-            const x = vtx[i];
-            const z = vtx[i + 2];
-            const r = Math.hypot(x, z);              // radius in clip-space
-            
-            // Use original Y coordinate for each vertex, not a single constant
-            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
-            
-            // Natário warp bubble profile (now with FIXED units)
-            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-            const beta = beta0 * prof;              // |β| shift vector magnitude
+            const x = this.originalGridVertices[i];
+            const y_original = this.originalGridVertices[i + 1];
+            const z = this.originalGridVertices[i + 2];
+            const r = Math.hypot(x, z);
 
-            // -------- SYNCHRONIZED AMPLITUDE: Scale deformation relative to actual bubble size --------
-            const visualAmplitude = 0.10 * sagRclip;  // 10% of the actual bubble radius
-            
-            // -------- LATERAL DEFORMATION: Bend X and Z using Natário profile --------
+            // The Natário profile function gives the SHAPE of the warp.
+            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
+
+            // --- LATERAL DEFORMATION ---
             const push = prof * visualAmplitude;
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+            vtx[i] = x * scale;
+            vtx[i + 2] = z * scale;
 
-            vtx[i] = x * scale;                      // X warped laterally
-            vtx[i + 2] = z * scale;                  // Z warped laterally
-            
-            // -------- VERTICAL DEFORMATION: Y displacement using Natário profile --------
-            const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
-            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = prof * visualAmplitude * 0.5 * powerScale * timeScale;  // half-scale for Y, synchronized
-            vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
+            // --- VERTICAL DEFORMATION ---
+            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / 2.0;
+            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);
+            const dy = prof * visualAmplitude * powerScale * timeScale;
+            vtx[i + 1] = y_original + dy;
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array

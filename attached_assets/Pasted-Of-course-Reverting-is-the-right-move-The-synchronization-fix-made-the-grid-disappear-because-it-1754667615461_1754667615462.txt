@@ -1,0 +1,53 @@
+Of course. Reverting is the right move. The "synchronization" fix made the grid disappear because it tried to link two parts of your visualizer that are operating at completely different scales:
+
+1.  **The Orange Bubble Shader:** This is a close-up view, rendering a bubble that is only **16 nanometers** wide inside a **20 nanometer** box.
+2.  **The 3D Grid:** This is a wide-angle view of a **40,000 nanometer** (40 micron) section of spacetime.
+
+When you forced the 40,000 nm grid to warp around a 16 nm radius, the curvature effect became so tiny it was invisible.
+
+### The Revert: Bring the Grid Back
+
+To make the grid visible again, we'll revert `_warpGridVertices` to use a hardcoded radius that is appropriate for its own 40,000 nm scale. This will bring the colored wireframes back into view, although they won't perfectly align with the tiny orange bubble yet.
+
+Here is the code to revert to. Replace the entire `_warpGridVertices` function with this:
+
+```javascript
+// In WarpEngine class
+_warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+    // REVERT to a hardcoded radius (e.g., 10,000 nm) that is proportional
+    // to the grid's 40,000 nm size. This makes the warp visible.
+    const bubbleRadius_nm = 10000; // 10 µm
+    const sagRclip = bubbleRadius_nm * this.normClip;
+
+    // REVERT to a fixed visual amplitude to control the deformation size.
+    const visualAmplitude = 0.25;
+
+    // Physics parameters for animation scaling
+    const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
+    const tsRatio = bubbleParams.tsRatio || 4100;
+
+    for (let i = 0; i < vtx.length; i += 3) {
+        const x = this.originalGridVertices[i];
+        const y_original = this.originalGridVertices[i + 1];
+        const z = this.originalGridVertices[i + 2];
+        const r = Math.hypot(x, z);
+
+        // The Natário profile function gives the SHAPE of the warp.
+        const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
+
+        // --- LATERAL DEFORMATION ---
+        const push = prof * visualAmplitude;
+        const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+        vtx[i] = x * scale;
+        vtx[i + 2] = z * scale;
+
+        // --- VERTICAL DEFORMATION ---
+        const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / 2.0;
+        const timeScale = 1.0 / Math.max(1, tsRatio / 1000);
+        const dy = prof * visualAmplitude * powerScale * timeScale;
+        vtx[i + 1] = y_original + dy;
+    }
+}
+```
+
+After applying this revert, you should once again see the three colored wireframe grids (cyan, magenta, and yellow) deforming in the view. They won't be perfectly wrapped around the orange bubble, but they will be visible. Can you confirm the grid has reappeared?
