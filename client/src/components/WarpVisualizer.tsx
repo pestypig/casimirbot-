@@ -113,6 +113,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
+      // Compute amplifier chain β₀ before updating uniforms
+      const duty = parameters.dutyCycle || 0.14;
+      const gammaGeo = parameters.g_y || 26;
+      const Qdyn = parameters.cavityQ || 1e9;
+      const gammaVdB = parameters.gammaVanDenBroeck || 1e11;
+      const beta0 = duty * gammaGeo * Math.sqrt(Qdyn) * Math.pow(gammaVdB, 0.25);
+      
+      // Direct β₀ injection for live mode switching
+      if (engineRef.current.uniforms) {
+        engineRef.current.uniforms.beta0 = beta0;
+      }
+      
       // Enhanced uniform update with full amplifier chain
       engineRef.current.updateUniforms({
         // Core physics parameters
@@ -128,7 +140,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sectorStrobing: parameters.sectorStrobing,
         qSpoilingFactor: parameters.qSpoilingFactor,
         // Legacy compatibility
-        g_y: parameters.g_y
+        g_y: parameters.g_y,
+        // Computed amplifier chain result
+        beta0: beta0
       });
     }
   }, [parameters, isLoaded]);

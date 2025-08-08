@@ -5,6 +5,7 @@ class SimpleWarpEngine {
         this.animationId = null;
         this.initialized = false;
         this.amplificationMode = 'auto'; // 'auto', 'legacy', 'amplified'
+        this.uniforms = {}; // Store uniforms for direct access
         
         // Default operational mode parameters with full amplifier chain
         this.params = {
@@ -73,12 +74,16 @@ class SimpleWarpEngine {
             exoticMass_kg: parameters.exoticMass_kg || this.params.exoticMass_kg || 1405
         };
         
+        // Store in uniforms for direct access (enables live β₀ injection)
+        Object.assign(this.uniforms, this.params);
+        
         console.log('🎯 Mode Update:', {
             mode: this.params.currentMode,
             power: this.params.powerAvg_MW,
             duty: this.params.dutyCycle,
             beta0: (this.params.dutyCycle * this.params.g_y).toFixed(3),
-            sagDepth: this.params.sagDepth_nm + 'nm'
+            sagDepth: this.params.sagDepth_nm + 'nm',
+            uniforms_beta0: this.uniforms.beta0 ? this.uniforms.beta0.toExponential(2) : 'none'
         });
     }
     
@@ -199,8 +204,8 @@ class SimpleWarpEngine {
         const Qdyn = this.params.Qdyn || 1e9;
         const gammaVdB = this.params.gammaVdB || 1e11;
         
-        // Full amplifier chain: β₀ = duty × γ_geo × √Q_dyn × γ_VdB^0.25
-        const beta0 = duty * gammaGeo * Math.sqrt(Qdyn) * Math.pow(gammaVdB, 0.25);
+        // Use directly injected β₀ if available, otherwise compute amplifier chain
+        const beta0 = this.uniforms.beta0 || (duty * gammaGeo * Math.sqrt(Qdyn) * Math.pow(gammaVdB, 0.25));
         const normScale = Math.min(w, h) / 2; // screen scale for ±0.8 range
         
         console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toExponential(3)}, VIEW=${VIEW_DIAM*1e9}nm (ZOOMED)`);
