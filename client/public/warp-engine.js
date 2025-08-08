@@ -742,5 +742,5 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
     window.WarpEngine = WarpEngine;
-    console.log("WarpEngine class loaded and available on window - version", Date.now());
+    console.log("WarpEngine class loaded and available on window - UPDATED VERSION", Date.now());
 }
