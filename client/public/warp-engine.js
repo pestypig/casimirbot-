@@ -308,12 +308,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.7, 0.9, 1.0, 0.6);\n" +  // Light cyan for spacetime visualization
+            "    frag = vec4(1.0, 1.0, 1.0, 1.0);\n" +  // Solid white for maximum visibility
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.7, 0.9, 1.0, 0.6);\n" +
+            "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n" +  // Solid white
             "}";
 
         this.gridProgram = this._linkProgram(gridVs, gridFs);
@@ -453,23 +453,22 @@ class WarpEngine {
             return;
         }
         
-        // Simple identity matrix - no transformations
+        // Simple identity matrix - no transformations, but ensure it's in view
         const mvp = new Float32Array([
-            1, 0, 0, 0,
-            0, 1, 0, 0,     
-            0, 0, 1, 0,     
+            0.5, 0, 0, 0,    // Scale down by half to ensure it's in viewport
+            0, 0.5, 0, 0,     
+            0, 0, 0.5, 0,     
             0, 0, 0, 1
         ]);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Ensure grid renders on top
+        // Force grid to render on top without blending
         gl.disable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.BLEND);
         
-        // Moderate line thickness for spacetime grid
-        gl.lineWidth(1.5);
+        // Thick lines for maximum visibility
+        gl.lineWidth(3.0);
         
         // Grid rendering
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -488,7 +487,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
         
-        console.log(`Spacetime grid rendered: ${this.gridVertexCount} vertices with physics deformation`);
+        console.log(`WHITE GRID RENDERED: ${this.gridVertexCount} vertices - should be CLEARLY VISIBLE`);
     }
 
     //----------------------------------------------------------------
