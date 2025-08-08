@@ -332,15 +332,15 @@ class WarpEngine {
             "in vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
-            "    gl_PointSize = 5.0;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+            "    gl_PointSize = 4.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
-            "    gl_PointSize = 5.0;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+            "    gl_PointSize = 4.0;\n" +
             "}";
 
         const gridFs = isWebGL2 ?
@@ -348,13 +348,11 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    gl_PointSize = 5.0;\n" +
             "    frag = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red for maximum visibility
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_PointSize = 5.0;\n" +
             "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red
             "}";
 
