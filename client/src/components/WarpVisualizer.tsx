@@ -32,41 +32,40 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       if (!canvasRef.current) return;
 
       try {
-        // Check if WarpEngine is already loaded to avoid duplicate declarations
-        if (window.WarpEngine) {
+        // Check if SimpleWarpEngine is already loaded
+        if (window.SimpleWarpEngine) {
           try {
-            engineRef.current = new window.WarpEngine(canvasRef.current);
+            engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
             setIsLoaded(true);
           } catch (error) {
-            console.error('Failed to initialize existing WarpEngine:', error);
+            console.error('Failed to initialize existing SimpleWarpEngine:', error);
           }
           return;
         }
 
-        // Load the V3 WarpEngine script with fixed visibility
+        // Load the Simple WarpEngine for reliable visualization
         const script = document.createElement('script');
-        script.src = '/warp-engine-v3.js?v=' + Date.now(); // Fixed visibility and operational mode
-        console.log('Loading FIXED WarpEngine script from:', script.src);
+        script.src = '/warp-simple.js?v=' + Date.now(); // 2D Canvas fallback for reliability
+        console.log('Loading Simple WarpEngine from:', script.src);
         script.onload = () => {
-          console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
-          if (window.WarpEngine) {
+          console.log('SimpleWarpEngine loaded, window.SimpleWarpEngine available:', !!window.SimpleWarpEngine);
+          if (window.SimpleWarpEngine) {
             try {
-              console.log('Creating new WarpEngine instance...');
-              engineRef.current = new window.WarpEngine(canvasRef.current);
-              console.log('WarpEngine instance created successfully');
+              console.log('Creating SimpleWarpEngine instance...');
+              engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
+              console.log('SimpleWarpEngine instance created successfully');
               setIsLoaded(true);
-              // Engine now auto-starts its render loop
             } catch (error) {
-              console.error('Failed to initialize WarpEngine:', error);
+              console.error('Failed to initialize SimpleWarpEngine:', error);
               console.error('Error details:', (error as Error).message, (error as Error).stack);
               setIsLoaded(false);
             }
           } else {
-            console.error('WarpEngine not found on window after script load');
+            console.error('SimpleWarpEngine not found on window after script load');
           }
         };
         script.onerror = () => {
-          console.error('Failed to load WarpEngine');
+          console.error('Failed to load SimpleWarpEngine');
           setIsLoaded(false);
         };
         document.head.appendChild(script);
