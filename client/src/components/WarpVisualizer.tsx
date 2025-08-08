@@ -113,12 +113,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // Enhanced uniform update with smooth transitions (inspired by GPT's suggestion)
+      // Enhanced uniform update with full amplifier chain
       engineRef.current.updateUniforms({
         // Core physics parameters
         dutyCycle: parameters.dutyCycle,
-        g_y: parameters.g_y,
-        cavityQ: parameters.cavityQ,
+        gammaGeo: parameters.g_y,        // Stage 1: Geometric amplification
+        Qdyn: parameters.cavityQ,        // Stage 2: Dynamic Q-factor
+        gammaVdB: parameters.gammaVanDenBroeck, // Stage 4: Van den Broeck amplification
         sagDepth_nm: parameters.sagDepth_nm,
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
@@ -126,7 +127,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         currentMode: parameters.currentMode,
         sectorStrobing: parameters.sectorStrobing,
         qSpoilingFactor: parameters.qSpoilingFactor,
-        gammaVanDenBroeck: parameters.gammaVanDenBroeck
+        // Legacy compatibility
+        g_y: parameters.g_y
       });
     }
   }, [parameters, isLoaded]);

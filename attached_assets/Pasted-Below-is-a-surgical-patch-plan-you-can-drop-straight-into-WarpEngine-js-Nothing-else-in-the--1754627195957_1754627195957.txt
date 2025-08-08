@@ -1,0 +1,101 @@
+Below is a **surgical patch-plan** you can drop straight into *WarpEngine.js*.
+Nothing else in the file has to change—just replace / add the indicated blocks.
+
+---
+
+### 1 — Expose the full “amplifier chain” to the GPU
+
+```js
+// after _cacheUniformLocations()
+this.uLoc.gammaGeo      = gl.getUniformLocation(this.program,"u_gammaGeo");
+this.uLoc.Qdyn          = gl.getUniformLocation(this.program,"u_Qdyn");
+this.uLoc.gammaVdB      = gl.getUniformLocation(this.program,"u_gammaVdB");
+```
+
+Update the default `uniforms` object:
+
+```js
+this.uniforms = {
+  dutyCycle     : 0.14,
+  gammaGeo      : 26.0,     // concave-pocket boost (stage-1)
+  Qdyn          : 1e9,      // dynamic Casimir boost (stage-2)
+  gammaVdB      : 1e11,     // VdB throat boost (stage-4)
+  sagDepth_nm   : 16.0,
+  powerAvg_MW   : 83.3,
+  exoticMass_kg : 1405
+};
+```
+
+### 2 — Send those new uniforms each frame
+
+*(inside **\_draw()** just before any draw-calls)*
+
+```js
+gl.useProgram(this.program);
+gl.uniform1f(this.uLoc.gammaGeo , this.uniforms.gammaGeo );
+gl.uniform1f(this.uLoc.Qdyn     , this.uniforms.Qdyn     );
+gl.uniform1f(this.uLoc.gammaVdB , this.uniforms.gammaVdB );
+```
+
+### 3 — Let the shader convert *amplifier chain → curvature*
+
+Patch **\_compileShaders()** → fragment-shader source.
+Replace the *betaField* helper with a version that multiplies the gains:
+
+```glsl
+float beta0   = u_dutyCycle *          // stage-5 (duty)
+                u_gammaGeo  *          // stage-1
+                sqrt(u_Qdyn) *         // stage-2 (pair production ∝ √Q)
+                pow(u_gammaVdB,0.25);  // stage-4 (redshift, weaker exponent)
+```
+
+*(keep the rest of the function as-is)*
+
+Then add the new uniforms at the top of the shader:
+
+```glsl
+uniform float u_gammaGeo, u_Qdyn, u_gammaVdB;
+```
+
+### 4 — Warp the grid with the *same* β-field
+
+Inside **\_warpGridVertices()** change the line that builds `beta0`:
+
+```js
+const beta0 = bubbleParams.dutyCycle *
+              bubbleParams.gammaGeo  *
+              Math.sqrt(bubbleParams.Qdyn) *
+              Math.pow(bubbleParams.gammaVdB,0.25);
+```
+
+*(leave the rest untouched)*
+
+### 5 — Hook up the dashboard
+
+Wherever your React panel calls `warp.updateUniforms(...)`, simply pass the four amplifiers:
+
+```js
+warp.updateUniforms({
+  dutyCycle : mode.duty,
+  gammaGeo  : physics.gammaGeo,
+  Qdyn      : physics.Qdyn,
+  gammaVdB  : physics.gammaVdB,
+  powerAvg_MW : mode.Pavg,
+  exoticMass_kg : mode.Mexotic
+});
+```
+
+---
+
+## What this gives you
+
+* **Mode-to-mode differentiation** – the β-field magnitude now scales as
+  $β₀ ∝ d_{\text{mode}} γ_{\text{geo}} √Q γ_{\text{VdB}}^{¼}$.
+  Hover / Cruise / Emergency will visibly bulge the grid by factors of 1-200× without you “inflating” anything.
+
+* **One place to tweak physics** – change the amplifier exponents in **step 3** if later papers suggest a different scaling law.
+
+* **GPU & CPU in perfect sync** – the same `beta0` expression drives the JavaScript grid warp and the fragment-shader colour map, so you can debug curvature numerically (console) and visually (glow/halo) at once.
+
+Try it with **γ\_geo = 5, Q = 10⁸, duty = 1 %** first; you should see a shallow “dimple.”
+Crank γ\_geo → 25 and Q → 10⁹ and the surface should sag distinctly—matching the numbers in your 83 MW pipeline.

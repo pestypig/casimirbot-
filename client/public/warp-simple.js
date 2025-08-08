@@ -5,17 +5,20 @@ class SimpleWarpEngine {
         this.animationId = null;
         this.initialized = false;
         
-        // Default operational mode parameters
+        // Default operational mode parameters with full amplifier chain
         this.params = {
             dutyCycle: 0.14,
+            gammaGeo: 26.0,     // concave-pocket boost (stage-1)
+            Qdyn: 1e9,          // dynamic Casimir boost (stage-2)
+            gammaVdB: 1e11,     // VdB throat boost (stage-4)
+            sagDepth_nm: 16.0,
             powerAvg_MW: 83.3,
+            exoticMass_kg: 1405,
             currentMode: 'hover',
             sectorStrobing: 1,
             qSpoilingFactor: 1,
-            gammaVanDenBroeck: 286000,
-            sagDepth_nm: 16,
-            g_y: 26,
-            exoticMass_kg: 1405
+            // Legacy compatibility
+            g_y: 26
         };
         
         this.debugDisableWarp = false; // debug toggle
@@ -173,11 +176,15 @@ class SimpleWarpEngine {
         const metresPerClip = VIEW_DIAM / (2 * CLIP_HALF); // consistent length scale
         
         const duty = this.params.dutyCycle || 0.14;
-        const gamma_geo = this.params.g_y || 26;
-        const beta0 = duty * gamma_geo; // β₀ = duty × γ_geo
+        const gammaGeo = this.params.gammaGeo || 26;
+        const Qdyn = this.params.Qdyn || 1e9;
+        const gammaVdB = this.params.gammaVdB || 1e11;
+        
+        // Full amplifier chain: β₀ = duty × γ_geo × √Q_dyn × γ_VdB^0.25
+        const beta0 = duty * gammaGeo * Math.sqrt(Qdyn) * Math.pow(gammaVdB, 0.25);
         const normScale = Math.min(w, h) / 2; // screen scale for ±0.8 range
         
-        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, VIEW=${VIEW_DIAM*1e9}nm (ZOOMED)`);
+        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toExponential(3)}, VIEW=${VIEW_DIAM*1e9}nm (ZOOMED)`);
         console.log('Scale Debug:', { R_nm: R*1e9, VIEW_nm: VIEW_DIAM*1e9, metresPerClip, zoom: '4×' });
         
         // Draw grid with authentic Natário warp deformation
@@ -241,10 +248,16 @@ class SimpleWarpEngine {
                 // Log once per frame to verify parameter flow
                 if (i === 0 && j === 0) {
                     console.log('Engine Uniforms:', { 
-                        beta0: this.params.dutyCycle * this.params.g_y,
+                        amplifier_chain: {
+                            duty: duty,
+                            γ_geo: gammaGeo,
+                            Q_dyn: Qdyn.toExponential(1),
+                            γ_VdB: gammaVdB.toExponential(1)
+                        },
+                        beta0: beta0.toExponential(3),
                         sagDepth: this.params.sagDepth_nm,
                         mode: this.params.currentMode,
-                        maxBeta: beta_magnitude
+                        maxBeta: beta_magnitude.toExponential(3)
                     });
                 }
                 
@@ -342,14 +355,19 @@ class SimpleWarpEngine {
         ctx.fillStyle = effects.color;
         ctx.font = '12px monospace';
         
-        // Scientific parameters display
-        const beta0 = (this.params.dutyCycle || 0.14) * (this.params.g_y || 26);
+        // Scientific parameters display with amplifier chain
+        const duty_disp = this.params.dutyCycle || 0.14;
+        const gamma_geo_disp = this.params.gammaGeo || 26;
+        const Q_dyn_disp = this.params.Qdyn || 1e9;
+        const gamma_VdB_disp = this.params.gammaVdB || 1e11;
+        const beta0_disp = duty_disp * gamma_geo_disp * Math.sqrt(Q_dyn_disp) * Math.pow(gamma_VdB_disp, 0.25);
         const R_nm = this.params.sagDepth_nm || 16;
         
         ctx.fillText(`${this.params.currentMode?.toUpperCase() || 'HOVER'} MODE - NATÁRIO BUBBLE`, 10, 25);
         ctx.fillText(`${effects.description}`, 10, 40);
-        ctx.fillText(`β₀: ${beta0.toFixed(3)} | R: ${R_nm}nm | P: ${this.params.powerAvg_MW?.toFixed(1) || '0.0'}MW`, 10, 55);
-        ctx.fillText(`Duty: ${(this.params.dutyCycle * 100).toFixed(1)}% | γᵢⱼ = δᵢⱼ + βᵢβⱼ`, 10, 70);
+        ctx.fillText(`β₀: ${beta0_disp.toExponential(2)} | R: ${R_nm}nm | P: ${this.params.powerAvg_MW?.toFixed(1) || '0.0'}MW`, 10, 55);
+        ctx.fillText(`Amplifiers: γ=${gamma_geo_disp} × Q=${Q_dyn_disp.toExponential(0)} × VdB=${gamma_VdB_disp.toExponential(0)}^0.25`, 10, 70);
+        ctx.fillText(`Duty: ${(duty_disp * 100).toFixed(1)}% | γᵢⱼ = δᵢⱼ + βᵢβⱼ`, 10, 85);
         
         // Energy density indicator
         ctx.fillStyle = '#FF00FF';
