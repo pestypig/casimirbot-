@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: PERSPECTIVE-FIXED-v3.0 - CORRECTED VIEW MATRIX 🚨');
+            console.error('🚨 BUNDLE VERSION: 3D-GRID-CAGE-v3.1 - FULL XYZ SHEETS WITH VARIABLE COORDINATES 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -366,34 +366,39 @@ class WarpEngine {
         const norm = 0.8;  // Normalize to clip space bounds
         
         if (plane === 'XY') {
-            // XY plane (floor) - cyan
-            const zPos = -half * 0.3;  // Below center
-            for (let x = 0; x <= divisions; ++x) {
-                const xPos = (-half + x * step) * norm;
-                for (let y = 0; y < divisions; ++y) {
-                    const y0 = (-half + y * step) * norm;
-                    const y1 = (-half + (y + 1) * step) * norm;
-                    verts.push(xPos, y0, zPos, xPos, y1, zPos);  // Y-lines at fixed x
-                }
-            }
-            for (let y = 0; y <= divisions; ++y) {
-                const yPos = (-half + y * step) * norm;
+            // XY plane (floor) - cyan - FIXED: Keep variable Z and add offset
+            const zOff = 0.4;  // sagRclip offset to position sheet at bubble surface
+            for (let z = 0; z <= divisions; ++z) {
+                const rawZ = -half + z * step;
+                const zPos = rawZ * norm + zOff;  // preserve variable z and add offset
                 for (let x = 0; x < divisions; ++x) {
                     const x0 = (-half + x * step) * norm;
                     const x1 = (-half + (x + 1) * step) * norm;
-                    verts.push(x0, yPos, zPos, x1, yPos, zPos);  // X-lines at fixed y
+                    const yBase = -0.15;  // slight offset below center
+                    verts.push(x0, yBase, zPos, x1, yBase, zPos);  // X-lines with variable z
+                }
+            }
+            for (let x = 0; x <= divisions; ++x) {
+                const xPos = (-half + x * step) * norm;
+                for (let z = 0; z < divisions; ++z) {
+                    const rawZ0 = -half + z * step;
+                    const rawZ1 = -half + (z + 1) * step;
+                    const z0 = rawZ0 * norm + zOff;
+                    const z1 = rawZ1 * norm + zOff;
+                    const yBase = -0.15;
+                    verts.push(xPos, yBase, z0, xPos, yBase, z1);  // Z-lines with variable z
                 }
             }
         }
         else if (plane === 'XZ') {
-            // XZ plane (back wall) - magenta
-            const yPos = half * 0.3;  // Above center
+            // XZ plane (back wall) - magenta  
+            const ySheet = 0.4;  // sagRclip offset - shift this vertical sheet to bubble surface
             for (let x = 0; x <= divisions; ++x) {
                 const xPos = (-half + x * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
                     const z0 = (-half + z * step) * norm;
                     const z1 = (-half + (z + 1) * step) * norm;
-                    verts.push(xPos, yPos, z0, xPos, yPos, z1);  // Z-lines at fixed x
+                    verts.push(xPos, ySheet, z0, xPos, ySheet, z1);  // Z-lines at fixed x
                 }
             }
             for (let z = 0; z <= divisions; ++z) {
@@ -401,13 +406,13 @@ class WarpEngine {
                 for (let x = 0; x < divisions; ++x) {
                     const x0 = (-half + x * step) * norm;
                     const x1 = (-half + (x + 1) * step) * norm;
-                    verts.push(x0, yPos, zPos, x1, yPos, zPos);  // X-lines at fixed z
+                    verts.push(x0, ySheet, zPos, x1, ySheet, zPos);  // X-lines at fixed z
                 }
             }
         }
         else if (plane === 'YZ') {
             // YZ plane (side wall) - yellow
-            const xSheet = half * 0.3;  // To the right
+            const xSheet = -0.4;  // -sagRclip offset - shift that vertical sheet to other side
             for (let y = 0; y <= divisions; ++y) {
                 const yPos = (-half + y * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
