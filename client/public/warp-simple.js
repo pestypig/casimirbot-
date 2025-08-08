@@ -140,6 +140,32 @@ class SimpleWarpEngine {
         const centerX = w / 2;
         const centerY = h / 2;
         
+        // 3D Camera setup for proper depth perception
+        const cameraEye = [0.0, 0.25, 1.4];    // raised & pulled back
+        const cameraCenter = [0.0, 0.0, 0.0];  // looking at origin
+        const cameraUp = [0.0, 1.0, 0.0];      // up vector
+        
+        // Simple 3D to 2D projection helper
+        const project3D = (x, y, z) => {
+            // Simple perspective projection
+            const fov = Math.PI / 4; // 45 degrees
+            const aspect = w / h;
+            const near = 0.1;
+            const far = 10.0;
+            
+            // Transform to camera space
+            const dx = x - cameraEye[0];
+            const dy = y - cameraEye[1]; 
+            const dz = z - cameraEye[2];
+            
+            // Simple perspective divide
+            const projZ = Math.max(0.1, Math.abs(dz));
+            const screenX = centerX + (dx / projZ) * centerX * 0.8;
+            const screenY = centerY - (dy / projZ) * centerY * 0.8;
+            
+            return { x: screenX, y: screenY, depth: projZ };
+        };
+        
         // Proper scale matching: physical lengths to clip-space ruler
         const CLIP_HALF = 0.8; // normalized clip coordinates
         const R = (this.params.sagDepth_nm || 16) * 1e-9; // bubble radius in meters
@@ -161,30 +187,26 @@ class SimpleWarpEngine {
             const lineVertices = [];
             
             for (let j = 0; j <= gridSize; j++) {
-                const screenX = (j / gridSize) * w;
-                const screenY = (i / gridSize) * h;
-                
-                // Convert screen to normalized clip coordinates (-0.8 to 0.8)
-                const clipX = (screenX - centerX) / normScale * CLIP_HALF;
-                const clipY = (screenY - centerY) / normScale * CLIP_HALF;
-                const clipZ = 0; // 2D projection
+                // Map to 3D world coordinates
+                const worldX = ((j / gridSize) - 0.5) * 2.0; // -1 to +1
+                const worldZ = ((i / gridSize) - 0.5) * 2.0; // -1 to +1
+                let worldY = 0; // start flat
                 
                 // Debug toggle for warp effects  
                 if (this.debugDisableWarp) {
                     // Render flat grid without warp
-                    const finalX = centerX + clipX * normScale / CLIP_HALF;
-                    const finalY = centerY + clipY * normScale / CLIP_HALF;
+                    const projected = project3D(worldX, worldY, worldZ);
                     
                     if (j === 0) {
-                        ctx.moveTo(finalX, finalY);
+                        ctx.moveTo(projected.x, projected.y);
                     } else {
-                        ctx.lineTo(finalX, finalY);
+                        ctx.lineTo(projected.x, projected.y);
                     }
                     continue;
                 }
                 
                 // (i) Authentic Natário β profile with proper scaling
-                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
+                const r = Math.sqrt(worldX*worldX + worldZ*worldZ) * metresPerClip; // physical radius
                 const s = r / R; // normalized radius
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // Natário canonical bell profile
                 
@@ -193,12 +215,12 @@ class SimpleWarpEngine {
                     console.log('β Debug:', { r_nm: r*1e9, R_nm: R*1e9, s, beta0, beta_magnitude });
                 }
                 
-                // Convert β displacement to clip space with clamping for stability
-                const xShiftPhysical = beta_magnitude; // β displacement in meters
-                let xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
+                // Apply Y displacement for Natário warp bubble height
+                const yDisplacement = beta_magnitude / metresPerClip * 50; // scale for visibility
+                worldY = yDisplacement;
                 
-                // Clamp warp displacement to prevent vertices from leaving clip space
-                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip));
+                // Clamp warp displacement for stability
+                worldY = Math.max(-0.2, Math.min(0.2, worldY));
                 
                 // Debug logging once per frame
                 if (i === 0 && j === 0) {
@@ -206,7 +228,7 @@ class SimpleWarpEngine {
                         r_nm: r*1e9, 
                         s: s.toFixed(3), 
                         beta: beta_magnitude.toExponential(3),
-                        pushClip: xShiftClip.toFixed(6)
+                        yShiftClip: worldY.toFixed(6)
                     });
                 }
                 
@@ -239,9 +261,8 @@ class SimpleWarpEngine {
                 const curlBeta2 = 0; // curl of radial field is zero
                 const rho = (curlBeta2 - gradBeta2) / (16 * Math.PI); // authentic Natário energy density
                 
-                // Convert back to screen coordinates with proper scaling
-                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
-                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
+                // Project 3D world coordinates to 2D screen with proper 3D camera
+                const projected = project3D(worldX, worldY, worldZ);
                 
                 // Use color-coded β field strength for visibility
                 const rgbColor = `rgb(${Math.round(red*255)}, ${Math.round(green*255)}, ${Math.round(blue*255)})`;
@@ -249,14 +270,12 @@ class SimpleWarpEngine {
                 ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, warpIntensity);
                 ctx.lineWidth = 1 + Math.min(2, warpIntensity * 5); // vary line thickness with β strength
                 
-                lineVertices.push({ x: finalX, y: finalY, rho: rho });
-                
-                // Sanity check - log first vertex per frame (removed since moved above)
+                lineVertices.push({ x: projected.x, y: projected.y, rho: projected.depth });
                 
                 if (j === 0) {
-                    ctx.moveTo(finalX, finalY);
+                    ctx.moveTo(projected.x, projected.y);
                 } else {
-                    ctx.lineTo(finalX, finalY);
+                    ctx.lineTo(projected.x, projected.y);
                 }
             }
             ctx.stroke();
@@ -273,50 +292,49 @@ class SimpleWarpEngine {
             });
         }
         
-        // Vertical lines with same scientific treatment
+        // Vertical lines with same 3D treatment
         for (let i = 0; i <= gridSize; i++) {
             ctx.beginPath();
             for (let j = 0; j <= gridSize; j++) {
-                const screenX = (i / gridSize) * w;
-                const screenY = (j / gridSize) * h;
-                
-                const clipX = (screenX - centerX) / normScale * CLIP_HALF;
-                const clipY = (screenY - centerY) / normScale * CLIP_HALF;
-                const clipZ = 0;
+                // Map to 3D world coordinates
+                const worldX = ((i / gridSize) - 0.5) * 2.0; // -1 to +1
+                const worldZ = ((j / gridSize) - 0.5) * 2.0; // -1 to +1
+                let worldY = 0; // start flat
                 
                 // Debug toggle for vertical lines too
                 if (this.debugDisableWarp) {
                     // Render flat vertical lines without warp
-                    const finalX = centerX + clipX * normScale / CLIP_HALF;
-                    const finalY = centerY + clipY * normScale / CLIP_HALF;
+                    const projected = project3D(worldX, worldY, worldZ);
                     
                     if (j === 0) {
-                        ctx.moveTo(finalX, finalY);
+                        ctx.moveTo(projected.x, projected.y);
                     } else {
-                        ctx.lineTo(finalX, finalY);
+                        ctx.lineTo(projected.x, projected.y);
                     }
                     continue;
                 }
                 
-                const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
+                const r = Math.sqrt(worldX*worldX + worldZ*worldZ) * metresPerClip; // physical radius
                 const s = r / R;
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                let xShiftClip = beta_magnitude / metresPerClip; // proper scaling
-                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip)); // clamp for stability
+                // Apply Y displacement for Natário warp bubble height
+                const yDisplacement = beta_magnitude / metresPerClip * 50; // scale for visibility
+                worldY = yDisplacement;
                 
-                const stretchedY = clipY; // keep spatial metric flat per Natário
+                // Clamp warp displacement for stability
+                worldY = Math.max(-0.2, Math.min(0.2, worldY));
                 
-                const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
-                const finalY = centerY + stretchedY * normScale / CLIP_HALF;
+                // Project 3D world coordinates to 2D screen
+                const projected = project3D(worldX, worldY, worldZ);
                 
                 ctx.strokeStyle = effects.color;
                 ctx.globalAlpha = 0.6;
                 
                 if (j === 0) {
-                    ctx.moveTo(finalX, finalY);
+                    ctx.moveTo(projected.x, projected.y);
                 } else {
-                    ctx.lineTo(finalX, finalY);
+                    ctx.lineTo(projected.x, projected.y);
                 }
             }
             ctx.stroke();
