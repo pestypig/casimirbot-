@@ -608,18 +608,12 @@ class WarpEngine {
         console.log(`Updating ${this.gridVertices.length / 3} grid vertices...`);
         this._warpGridVertices(this.gridVertices, this.gridHalf, this.gridY0, this.uniforms);
         
-        // WarpFactory-inspired: Optimize GPU bandwidth with partial updates
+        // Upload all three sheets (XY, XZ, YZ) to GPU
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         
-        // Only update center region where warp is strongest (25% of vertices)
-        const centerStart = Math.floor(this.gridVertexCount * 0.375);  // Start at 37.5%
-        const centerCount = Math.floor(this.gridVertexCount * 0.25);   // Update 25%
-        const updateStart = centerStart * 3 * 4;  // 3 floats per vertex, 4 bytes per float
-        const updateSize = centerCount * 3 * 4;
-        
-        gl.bufferSubData(gl.ARRAY_BUFFER, updateStart, 
-            this.gridVertices.subarray(centerStart * 3, (centerStart + centerCount) * 3));
+        // Upload the whole vertex array (works for all three sheets)
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
         console.log("Grid vertices updated and uploaded to GPU");
