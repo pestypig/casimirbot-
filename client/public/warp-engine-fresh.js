@@ -456,14 +456,20 @@ class WarpEngine {
             "uniform vec3 u_sheetColor;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.0, 1.0, 0.0, 1.0);  // Force green for diagnostic\n" +
+            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
+            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
+            "        u_sheetColor;           // Sheet-specific color\n" +
+            "    frag = vec4(baseColor, 0.8);\n" +
             "}"
             :
             "precision highp float;\n" +
             "uniform float u_energyFlag;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);  // Force green for diagnostic\n" +
+            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
+            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
+            "        u_sheetColor;           // Sheet-specific color\n" +
+            "    gl_FragColor = vec4(baseColor, 0.8);\n" +
             "}";
 
         console.log("Compiling grid shaders for POINTS rendering...");
@@ -520,48 +526,38 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        // DIAGNOSTIC TEST: Draw grid by itself with green points
-        gl.clearColor(0, 0, 0, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        // Clear with dark blue background for contrast
+        gl.clearColor(0.05, 0.1, 0.15, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        // Use the grid program
-        gl.useProgram(this.gridProgram);
+        // Upload all uniforms for the warp field shader
+        gl.useProgram(this.program);
+        gl.uniform1f(this.uLoc.time, time);
+        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
+        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
+        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
+        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
+        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);
+        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
+        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
         
-        // Disable depth & blending so nothing hides the points
-        gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
+        // Upload β₀ from amplifier chain
+        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
+        gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
-        // Set simple orthographic matrix that moves grid into view
-        const ortho = new Float32Array([
-            0.5,0,0,0,      // Scale X down to fit better
-            0,0.5,0,0,      // Scale Y down to fit better  
-            0,0,0.5,0,      // Scale Z down
-            0,0,-0.5,1      // Translate Z back into view
-        ]);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, ortho);
+        // Enable depth testing for 3D grid overlay
+        gl.enable(gl.DEPTH_TEST);
         
-        // Update grid first (to ensure we have data)
+        // FIX 1: Stop the quad from killing Z-buffer
+        gl.depthMask(false);         // quad does NOT write Z
+        this._renderQuad();
+        gl.depthMask(true);          // restore for the sheets
+        
+        // Now render the grid with FIXED physics and coordinate transformation
         this._updateGrid();
+        this._renderGridPoints();
         
-        // Bind VBO & setup attributes
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.enableVertexAttribArray(this.gridUniforms.position);
-        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
-        
-        // Check point size support and VBO data
-        console.log("PointSize range:", gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE));
-        console.log("Drawing", this.gridVertexCount, "vertices as POINTS");
-        console.log("First 9 floats of gridVertices:", this.gridVertices ? this.gridVertices.slice(0,9) : "NO DATA");
-        
-        // Set green color and draw all vertices as points
-        gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 0.0);  // Green
-        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);  // No energy flag
-        gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
-        
-        // Cleanup
-        gl.disableVertexAttribArray(this.gridUniforms.position);
-        
-        console.log("DIAGNOSTIC: Grid drawn as green points with identity matrix");
+        gl.disable(gl.DEPTH_TEST);
     }
 
     _renderQuad() {
@@ -582,34 +578,43 @@ class WarpEngine {
     _renderGridPoints() {
         const gl = this.gl;
         
-        // Create simple perspective matrix for 3D view
+        // CORRECTED: Create perspective matrix that transforms grid coordinates properly
         const aspect = this.canvas.width / this.canvas.height;
-        const fov = Math.PI / 4;  // 45 degrees
+        const fov = Math.PI / 3;  // 60 degrees - wider FOV to see more grid
         const near = 0.1;
-        const far = 10.0;
+        const far = 20.0;
         
-        // Simple perspective projection
+        // Perspective projection matrix
         const f = 1.0 / Math.tan(fov / 2);
-        const mvpMatrix = new Float32Array([
+        let mvpMatrix = new Float32Array([
             f/aspect, 0, 0, 0,
             0, f, 0, 0,
             0, 0, (far+near)/(near-far), (2*far*near)/(near-far),
             0, 0, -1, 0
         ]);
         
-        // Apply camera transform (slight rotation for 3D view)
-        const time = performance.now() * 0.0005;
-        const rotY = Math.sin(time) * 0.3;
-        const rotX = 0.2;
+        // Apply view transformation (camera positioned to see the grid clearly)
+        const time = performance.now() * 0.0003;
+        const rotY = Math.sin(time) * 0.2;  // Gentle rotation
+        const rotX = 0.1;                   // Slight downward angle
         
-        // Simple rotation matrices (simplified for performance)
-        const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
-        const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+        // Translation: Move grid back and down to center it in view
+        const translateX = 0.0;
+        const translateY = 0.1;             // Slightly up
+        const translateZ = -2.5;            // Back from camera
         
-        // Combined rotation and translation
-        mvpMatrix[0] *= cosY;   mvpMatrix[2] *= sinY;
-        mvpMatrix[4] *= cosX;   mvpMatrix[5] *= sinX;
-        mvpMatrix[14] -= 3.0;   // Move camera back
+        // Scale: Make grid fit nicely in view (diagnostic showed coordinates ±0.8)
+        const scale = 0.8;
+        
+        // Combined transform matrix: Scale, Rotate, Translate
+        mvpMatrix[0] *= scale * Math.cos(rotY);   // Scale X with rotation
+        mvpMatrix[2] *= scale * Math.sin(rotY);   // Rotation Y effect on X
+        mvpMatrix[5] *= scale * Math.cos(rotX);   // Scale Y with rotation
+        mvpMatrix[6] *= scale * Math.sin(rotX);   // Rotation X effect on Y
+        mvpMatrix[8] *= scale;                    // Scale Z
+        mvpMatrix[12] += translateX;              // Translate X
+        mvpMatrix[13] += translateY;              // Translate Y  
+        mvpMatrix[14] += translateZ;              // Translate Z
         
         gl.useProgram(this.gridProgram);
         console.log("Using grid program for rendering...");
