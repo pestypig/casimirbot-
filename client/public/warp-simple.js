@@ -123,14 +123,14 @@ class SimpleWarpEngine {
     }
     
     drawWarpGrid(ctx, w, h, effects) {
-        const gridSize = 40; // higher resolution for smooth bubble contours
+        const gridSize = 60; // ultra-high resolution for smooth Natário contours
         const centerX = w / 2;
         const centerY = h / 2;
         
         // Proper scale matching: physical lengths to clip-space ruler
         const CLIP_HALF = 0.8; // normalized clip coordinates
         const R = (this.params.sagDepth_nm || 16) * 1e-9; // bubble radius in meters
-        const VIEW_DIAM = 8 * R; // view 8× bubble diameter for proper context
+        const VIEW_DIAM = 4 * R; // view 4× bubble diameter for closer zoom (better visibility)
         const metresPerClip = VIEW_DIAM / (2 * CLIP_HALF); // consistent length scale
         
         const duty = this.params.dutyCycle || 0.14;
@@ -138,8 +138,8 @@ class SimpleWarpEngine {
         const beta0 = duty * gamma_geo; // β₀ = duty × γ_geo
         const normScale = Math.min(w, h) / 2; // screen scale for ±0.8 range
         
-        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, VIEW=${VIEW_DIAM*1e9}nm`);
-        console.log('Scale Debug:', { R_nm: R*1e9, VIEW_nm: VIEW_DIAM*1e9, metresPerClip });
+        console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, VIEW=${VIEW_DIAM*1e9}nm (ZOOMED)`);
+        console.log('Scale Debug:', { R_nm: R*1e9, VIEW_nm: VIEW_DIAM*1e9, metresPerClip, zoom: '4×' });
         
         // Draw grid with authentic Natário warp deformation
         for (let i = 0; i <= gridSize; i++) {
@@ -170,11 +170,21 @@ class SimpleWarpEngine {
                 const xShiftPhysical = beta_magnitude; // β displacement in meters
                 const xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
                 
-                // Color-code the warp field strength for visibility
-                const warpIntensity = Math.abs(beta_magnitude * 1e6); // amplify for color mapping
+                // Color-code the warp field strength for visibility (exaggerated for visual feedback)
+                const warpIntensity = Math.abs(beta_magnitude * 1e7); // exaggerate ONLY for color, not geometry
                 const red = Math.min(1, warpIntensity * 2);
                 const green = Math.min(1, warpIntensity * 0.5);
                 const blue = 0.3 + Math.min(0.7, warpIntensity);
+                
+                // Log once per frame to verify parameter flow
+                if (i === 0 && j === 0) {
+                    console.log('Engine Uniforms:', { 
+                        beta0: this.params.dutyCycle * this.params.g_y,
+                        sagDepth: this.params.sagDepth_nm,
+                        mode: this.params.currentMode,
+                        maxBeta: beta_magnitude
+                    });
+                }
                 
                 // (ii) Correct Natário spatial metric: γᵢⱼ = δᵢⱼ (keep flat!)
                 // The β² term goes in the lapse function, not spatial metric
@@ -193,17 +203,15 @@ class SimpleWarpEngine {
                 const finalX = centerX + (clipX + xShiftClip) * normScale / CLIP_HALF;
                 const finalY = centerY + stretchedY * normScale / CLIP_HALF;
                 
-                // Color-code based on β field strength and energy density
+                // Use color-coded β field strength for visibility
                 const rgbColor = `rgb(${Math.round(red*255)}, ${Math.round(green*255)}, ${Math.round(blue*255)})`;
-                ctx.strokeStyle = warpIntensity > 0.001 ? rgbColor : effects.color;
-                ctx.globalAlpha = 0.7 + 0.3 * Math.min(1, warpIntensity);
+                ctx.strokeStyle = warpIntensity > 0.0001 ? rgbColor : effects.color;
+                ctx.globalAlpha = 0.5 + 0.5 * Math.min(1, warpIntensity);
+                ctx.lineWidth = 1 + Math.min(2, warpIntensity * 5); // vary line thickness with β strength
                 
                 lineVertices.push({ x: finalX, y: finalY, rho: rho });
                 
-                // Sanity check - log first vertex per frame
-                if (i === 0 && j === 0) {
-                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta_magnitude.toExponential(2)} shiftClip≈${xShiftClip.toExponential(3)}`);
-                }
+                // Sanity check - log first vertex per frame (removed since moved above)
                 
                 if (j === 0) {
                     ctx.moveTo(finalX, finalY);
