@@ -545,10 +545,11 @@ class WarpEngine {
         const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
         gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
-        // Render quad first WITHOUT writing to depth buffer
-        gl.depthMask(false);         // quad does NOT write Z
+        // Render quad first 
         this._renderQuad();
-        gl.depthMask(true);          // restore for the sheets
+        
+        // Clear ONLY the depth buffer so grid can render on top
+        gl.clear(gl.DEPTH_BUFFER_BIT);
         
         // Now enable depth testing for 3D grid overlay
         gl.enable(gl.DEPTH_TEST);
