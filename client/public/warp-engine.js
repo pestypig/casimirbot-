@@ -255,32 +255,24 @@ class WarpEngine {
         this._compileGridShaders();
     }
 
-    // Exact implementation from the minimal recipe, but normalized to [-1,1] for visibility
-    _createGrid(size = 40_000, divisions = 50) {
+    // Simple test grid - just a few large lines that should be clearly visible
+    _createGrid(size = 40_000, divisions = 10) {  // Reduce to 10x10 for testing
         const verts = [];
-        const step = size / divisions;
-        const half = size / 2;
-        const yPlane = 0;   // Start with flat grid at z=0 for visibility
         
-        // Normalize coordinates to [-1, 1] range for direct screen mapping
-        const norm = 1.0 / half;
-
-        for (let z = 0; z <= divisions; ++z) {
-            const zPos = (-half + z * step) * norm;
-            for (let x = 0; x < divisions; ++x) {
-                const x0 = (-half + x * step) * norm;
-                const x1 = (-half + (x + 1) * step) * norm;
-                verts.push(x0, yPlane, zPos, x1, yPlane, zPos);      // x–lines
-            }
+        // Create a simple cross pattern first for testing
+        verts.push(-0.8, 0, 0,   0.8, 0, 0);  // Horizontal line
+        verts.push(0, -0.8, 0,   0, 0.8, 0);  // Vertical line
+        
+        // Add a few more lines to make a visible grid
+        for (let i = -2; i <= 2; i++) {
+            const pos = i * 0.3;
+            // Horizontal lines
+            verts.push(-0.8, pos, 0,   0.8, pos, 0);
+            // Vertical lines  
+            verts.push(pos, -0.8, 0,   pos, 0.8, 0);
         }
-        for (let x = 0; x <= divisions; ++x) {
-            const xPos = (-half + x * step) * norm;
-            for (let z = 0; z < divisions; ++z) {
-                const z0 = (-half + z * step) * norm;
-                const z1 = (-half + (z + 1) * step) * norm;
-                verts.push(xPos, yPlane, z0, xPos, yPlane, z1);     // z–lines
-            }
-        }
+        
+        console.log(`Simple test grid created with ${verts.length/6} lines`);
         return new Float32Array(verts);
     }
 
@@ -389,9 +381,8 @@ class WarpEngine {
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         gl.disableVertexAttribArray(loc);
 
-        // 2. Update and render dynamic spacetime grid
-        this._updateGrid();
-        this._renderGrid();
+        // 2. Update and render dynamic spacetime grid  
+        this._renderGrid();  // Skip update for now, just test rendering
         
         gl.disable(gl.DEPTH_TEST);
         gl.disable(gl.BLEND);
@@ -436,7 +427,9 @@ class WarpEngine {
 
     _renderGrid() {
         const gl = this.gl;
-        gl.useProgram(this.gridProgram);
+        
+        // Skip grid program validation temporarily - just force render with main program
+        gl.useProgram(this.program);
         
         // Debug: Check if we have valid grid data
         if (!this.gridVbo || this.gridVertexCount === 0) {
@@ -444,33 +437,50 @@ class WarpEngine {
             return;
         }
         
-        // Make grid much more visible - scale it to fill most of the viewport
-        // Use a simple 2D projection that maps the grid directly to screen space
-        const scale = 0.8;  // Fill 80% of the viewport
+        // Force render without any matrix transformations - identity matrix
         const mvp = new Float32Array([
-            scale, 0, 0, 0,
-            0, scale, 0, 0,     
+            1, 0, 0, 0,
+            0, 1, 0, 0,     
             0, 0, 1, 0,     
             0, 0, 0, 1
         ]);
         
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+        // Try to set matrix uniform (may fail but that's OK for testing)
+        const matLoc = gl.getUniformLocation(this.program, "u_mvpMatrix");
+        if (matLoc) {
+            gl.uniformMatrix4fv(matLoc, false, mvp);
+        }
         
-        // Disable depth test temporarily to ensure grid is visible on top
+        // Disable all tests and render directly on top
         gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
         
-        // Grid rendering with error checking
+        // Force line width (may not work on all systems but worth trying)
+        gl.lineWidth(3.0);
+        
+        // Grid rendering
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.enableVertexAttribArray(this.gridUniforms.position);
-        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        const posLoc = gl.getAttribLocation(this.program, "a_position");
+        if (posLoc >= 0) {
+            gl.enableVertexAttribArray(posLoc);
+            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
+            
+            // Force manual color to white
+            const colorLoc = gl.getUniformLocation(this.program, "u_color");
+            if (colorLoc) {
+                gl.uniform4f(colorLoc, 1.0, 1.0, 1.0, 1.0);
+            }
+            
+            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+            gl.disableVertexAttribArray(posLoc);
+            
+            console.log(`Rendered ${this.gridVertexCount} grid vertices`);
+        } else {
+            console.warn("Could not find position attribute");
+        }
         
-        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
-        
-        gl.disableVertexAttribArray(this.gridUniforms.position);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        
-        // Re-enable depth test
-        gl.enable(gl.DEPTH_TEST);
+        gl.lineWidth(1.0);
     }
 
     //----------------------------------------------------------------
