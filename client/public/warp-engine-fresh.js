@@ -200,7 +200,24 @@ class WarpEngine {
             "in vec2 v_uv;\n" +
             "out vec4 fragColor;\n" +
             "void main() {\n" +
-            "    fragColor = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // TEST: Red screen
+            "    vec2 p = (v_uv - 0.5) * 2.0;\n" +
+            "    float r = length(p);\n" +
+            "    \n" +
+            "    // FIXED: Proper radius scaling to prevent orange fill\n" +
+            "    float sagR = u_sagDepth_nm / 50000.0 * 0.4;\n" +  // 0.4 keeps warp visible
+            "    float prof = (r / sagR) * exp(-(r * r) / (sagR * sagR));\n" +
+            "    float beta = u_beta0 * prof / 1000000.0;\n" +
+            "    \n" +
+            "    // FIXED: Reduced intensity to prevent banding\n" +
+            "    float intensity = clamp(abs(beta) * 10.0, 0.0, 1.0);\n" +  // Reduced from 20.0
+            "    \n" +
+            "    vec3 color = mix(\n" +
+            "        vec3(0.05, 0.1, 0.15),\n" +      // Dark blue background
+            "        vec3(1.0, 0.5, 0.0),\n" +        // Orange for warp field
+            "        intensity\n" +
+            "    );\n" +
+            "    \n" +
+            "    fragColor = vec4(color, 1.0);\n" +
             "}"
             :
             "precision highp float;\n" +
@@ -215,7 +232,24 @@ class WarpEngine {
             "uniform float u_beta0;\n" +
             "varying vec2 v_uv;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // TEST: Red screen
+            "    vec2 p = (v_uv - 0.5) * 2.0;\n" +
+            "    float r = length(p);\n" +
+            "    \n" +
+            "    // FIXED: Proper radius scaling to prevent orange fill\n" +
+            "    float sagR = u_sagDepth_nm / 50000.0 * 0.4;\n" +  // 0.4 keeps warp visible
+            "    float prof = (r / sagR) * exp(-(r * r) / (sagR * sagR));\n" +
+            "    float beta = u_beta0 * prof / 1000000.0;\n" +
+            "    \n" +
+            "    // FIXED: Reduced intensity to prevent banding\n" +
+            "    float intensity = clamp(abs(beta) * 10.0, 0.0, 1.0);\n" +  // Reduced from 20.0
+            "    \n" +
+            "    vec3 color = mix(\n" +
+            "        vec3(0.05, 0.1, 0.15),\n" +      // Dark blue background
+            "        vec3(1.0, 0.5, 0.0),\n" +        // Orange for warp field
+            "        intensity\n" +
+            "    );\n" +
+            "    \n" +
+            "    gl_FragColor = vec4(color, 1.0);\n" +
             "}";
 
         this.program = this._linkProgram(vs, fs);
@@ -515,9 +549,9 @@ class WarpEngine {
         // Enable depth testing for 3D grid overlay
         gl.enable(gl.DEPTH_TEST);
         
-        // TEMPORARILY DISABLE GRID FOR QUAD TESTING
-        // this._updateGrid();
-        // this._renderGridPoints();
+        // Now render the grid with FIXED physics
+        this._updateGrid();
+        this._renderGridPoints();
         
         gl.disable(gl.DEPTH_TEST);
     }
@@ -646,7 +680,8 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Use energy pipeline bubble radius instead of hardcoded value
         const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;  // From pipeline or fallback
-        const sagRclip = bubbleRadius_nm / halfSize * 0.4;  // FIXED: keeps the warp inside ±0.8
+        // CRITICAL FIX: halfSize is in clip-space units (0.8), not nanometers
+        const sagRclip = (bubbleRadius_nm / 50000.0) * 0.4;  // FIXED: Convert nm to clip-space properly
         
         // Use computed β₀ from amplifier chain
         const beta0 = bubbleParams.beta0;
