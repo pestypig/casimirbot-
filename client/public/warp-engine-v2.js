@@ -72,28 +72,29 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
-        // Update internal parameters with operational mode integration
+        // Smooth transition support (inspired by GPT's lerp suggestion)
+        const oldParams = { ...this.currentParams };
         this.currentParams = { ...this.currentParams, ...parameters };
         
-        // NEW: Map operational mode parameters to spacetime visualization
+        // Enhanced mode mapping with smooth transitions for operational modes
         if (parameters.currentMode) {
             const modeEffects = this._calculateModeEffects(parameters);
-            console.log('🎯 Operational Mode Effects:', {
-                mode: parameters.currentMode,
-                strobing: parameters.sectorStrobing,
-                qSpoiling: parameters.qSpoilingFactor, 
-                vanDenBroeck: parameters.gammaVanDenBroeck,
+            console.log('🎯 Mode Transition:', {
+                from: oldParams.currentMode || 'none',
+                to: parameters.currentMode,
+                dutyCycle: `${(oldParams.dutyCycle * 100).toFixed(1)}% → ${(parameters.dutyCycle * 100).toFixed(1)}%`,
+                power: `${oldParams.powerAvg_MW?.toFixed(1) || 0}MW → ${parameters.powerAvg_MW?.toFixed(1)}MW`,
                 visualScale: modeEffects.visualScale,
                 curvatureAmplifier: modeEffects.curvatureAmplifier
             });
             
-            // Apply mode-specific physics scaling
+            // Apply mode-specific physics scaling with smooth transitions
             this.currentParams.modeVisualScale = modeEffects.visualScale;
             this.currentParams.modeCurvatureAmplifier = modeEffects.curvatureAmplifier;
             this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
         }
         
-        // Apply warp deformation to grid with mode-specific enhancements
+        // Apply warp deformation with live operational mode integration
         this._updateGrid();
     }
     
@@ -103,12 +104,13 @@ class WarpEngine {
         const qSpoiling = params.qSpoilingFactor || 1;
         const vanDenBroeck = params.gammaVanDenBroeck || 6.57e7;
         
-        // Mode-specific visual scaling factors for authentic Natário physics
+        // Enhanced mode-specific visual scaling for authentic Natário physics
+        // (Inspired by GPT's mode mapping table)
         const modeConfigs = {
-            hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8 },
-            cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2 },
-            emergency: { baseScale: 2.0, curvatureBoost: 1.8, strobingViz: 1.0 },
-            standby: { baseScale: 0.1, curvatureBoost: 0.2, strobingViz: 0.05 }
+            hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8, description: 'gentle bulge, slow ripple' },
+            cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2, description: 'field nearly flat, faint ripple' },
+            emergency: { baseScale: 2.0, curvatureBoost: 1.8, strobingViz: 1.0, description: 'strong bulge, fast shimmer' },
+            standby: { baseScale: 0.1, curvatureBoost: 0.2, strobingViz: 0.05, description: 'grid perfectly flat, background calm' }
         };
         
         const config = modeConfigs[mode] || modeConfigs.hover;

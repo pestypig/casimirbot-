@@ -94,7 +94,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
   useEffect(() => {
     if (engineRef.current && isLoaded) {
-      console.log('🔄 Updating Natário warp bubble for operational mode:', {
+      console.log('🔄 Live operational mode update:', {
         mode: parameters.currentMode || 'hover',
         dutyCycle: parameters.dutyCycle,
         g_y: parameters.g_y,
@@ -106,7 +106,22 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         qSpoilingFactor: parameters.qSpoilingFactor,
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
-      engineRef.current.updateUniforms(parameters);
+
+      // Enhanced uniform update with smooth transitions (inspired by GPT's suggestion)
+      engineRef.current.updateUniforms({
+        // Core physics parameters
+        dutyCycle: parameters.dutyCycle,
+        g_y: parameters.g_y,
+        cavityQ: parameters.cavityQ,
+        sagDepth_nm: parameters.sagDepth_nm,
+        powerAvg_MW: parameters.powerAvg_MW,
+        exoticMass_kg: parameters.exoticMass_kg,
+        // Operational mode parameters
+        currentMode: parameters.currentMode,
+        sectorStrobing: parameters.sectorStrobing,
+        qSpoilingFactor: parameters.qSpoilingFactor,
+        gammaVanDenBroeck: parameters.gammaVanDenBroeck
+      });
     }
   }, [parameters, isLoaded]);
 
@@ -203,6 +218,19 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               </div>
             </div>
           )}
+          
+          {/* Live operational mode HUD (inspired by GPT's suggestion) */}
+          {isLoaded && (
+            <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono">
+              <div className="text-cyan-400 font-semibold">
+                {parameters.currentMode?.toUpperCase() || 'HOVER'} MODE
+              </div>
+              <div className="text-green-400">
+                P: {parameters.powerAvg_MW.toFixed(1)}MW | 
+                D: {(parameters.dutyCycle * 100).toFixed(1)}%
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="mt-4 space-y-3">
@@ -241,10 +269,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <div className="font-semibold text-slate-300">Operational Mode Physics:</div>
             <div className="mb-2 text-cyan-300">
               <strong>{parameters.currentMode?.toUpperCase() || 'HOVER'} MODE</strong> - 
-              {parameters.currentMode === 'hover' && ' High-power station-keeping'}
-              {parameters.currentMode === 'cruise' && ' Low-power sustained travel'}
-              {parameters.currentMode === 'emergency' && ' Maximum power output'}
-              {parameters.currentMode === 'standby' && ' Minimal power conservation'}
+              {parameters.currentMode === 'hover' && ' gentle bulge, slow ripple'}
+              {parameters.currentMode === 'cruise' && ' field nearly flat, faint ripple'}
+              {parameters.currentMode === 'emergency' && ' strong bulge, fast shimmer'}
+              {parameters.currentMode === 'standby' && ' grid perfectly flat, background calm'}
             </div>
             <div>• <span className="text-orange-400">Sector Strobing</span>: {parameters.sectorStrobing || 1}× spatial coherence</div>
             <div>• <span className="text-yellow-400">Q Spoiling</span>: {((parameters.qSpoilingFactor || 1) * 100).toFixed(0)}% cavity efficiency</div>
