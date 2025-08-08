@@ -52,6 +52,9 @@ class WarpEngine {
             this._startRenderLoop();
             
             console.log("WarpEngine: Initialization completed successfully!");
+        console.log(`Canvas dimensions: ${this.canvas.width}x${this.canvas.height}`);
+        console.log(`WebGL context: ${this.gl ? 'OK' : 'FAILED'}`);
+        console.log(`Grid vertices: ${this.gridVertexCount} points`);
         } catch (error) {
             console.error("WarpEngine initialization failed:", error);
             console.error("Error stack:", error.stack);
@@ -425,38 +428,64 @@ class WarpEngine {
     _draw(time) {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        gl.clearColor(0, 0, 0, 1);
+        
+        // Clear with distinctive blue background to verify rendering
+        gl.clearColor(0.1, 0.2, 0.5, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        // Enable depth testing for 3D grid
-        gl.enable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-        // 1. Render background warp field
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio);
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
-        gl.uniform1f(this.uLoc.time, time);
-
-        const loc = gl.getAttribLocation(this.program, "a_position");
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        gl.disableVertexAttribArray(loc);
-
-        // 2. Update and render dynamic spacetime grid with physics
-        this._updateGrid();
-        this._renderGrid();
+        console.log(`Frame ${Math.floor(time)}: Canvas ${this.canvas.width}x${this.canvas.height}, GL context OK`);
         
-        gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
+        // SIMPLE TEST: Draw 4 red corner dots with identity matrix
+        this._drawSimpleTest();
+    }
+    
+    _drawSimpleTest() {
+        const gl = this.gl;
+        
+        // Create simple 4-corner test pattern
+        if (!this.testVbo) {
+            const testVertices = new Float32Array([
+                -0.8, -0.8, 0.0,    // bottom left
+                 0.8, -0.8, 0.0,    // bottom right
+                 0.8,  0.8, 0.0,    // top right
+                -0.8,  0.8, 0.0     // top left
+            ]);
+            
+            this.testVbo = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.testVbo);
+            gl.bufferData(gl.ARRAY_BUFFER, testVertices, gl.STATIC_DRAW);
+            console.log("Test VBO created with 4 corner points");
+        }
+        
+        // Use grid shader (which should work for simple points)
+        gl.useProgram(this.gridProgram);
+        
+        // Identity matrix (no transformations)
+        const identity = new Float32Array([
+            1,0,0,0,
+            0,1,0,0,
+            0,0,1,0,
+            0,0,0,1
+        ]);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identity);
+        
+        // Bind test vertices and draw
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.testVbo);
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        
+        console.log("Drawing 4 red corner dots...");
+        gl.drawArrays(gl.POINTS, 0, 4);
+        
+        // Check for errors
+        const error = gl.getError();
+        if (error !== gl.NO_ERROR) {
+            console.error("WebGL error in simple test:", error);
+        } else {
+            console.log("Simple test completed - should see 4 red dots in corners");
+        }
+        
+        gl.disableVertexAttribArray(this.gridUniforms.position);
     }
 
     // Exact warpGridVertices implementation from the minimal recipe
@@ -598,6 +627,12 @@ class WarpEngine {
         if (this.gridUniforms.position !== -1) {
             console.log(`Attempting to render ${this.gridVertexCount} RED POINTS...`);
             
+            // Enable point sprite rendering and set viewport
+            gl.enable(gl.DEPTH_TEST);
+            gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+            gl.clearColor(0.0, 0.0, 0.0, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            
             // TEMPORARY: Use identity MVP matrix to ensure visibility
             const identityMVP = new Float32Array([
                 1,0,0,0,
@@ -607,6 +642,7 @@ class WarpEngine {
             ]);
             gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identityMVP);
             console.log("Using IDENTITY MVP matrix for visibility test");
+            console.log(`Canvas size: ${this.canvas.width}x${this.canvas.height}`);
             
             const error1 = gl.getError();
             if (error1 !== gl.NO_ERROR) console.error("WebGL error before draw:", error1);
@@ -616,6 +652,10 @@ class WarpEngine {
             const error2 = gl.getError();
             if (error2 !== gl.NO_ERROR) console.error("WebGL error after draw:", error2);
             console.log("Grid draw call completed - should see bright red dots with identity matrix");
+            
+            // Force a flush to ensure rendering happens
+            gl.flush();
+            gl.finish();
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }
