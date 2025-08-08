@@ -1,0 +1,70 @@
+Only the first sheet is visible because the other two are exactly coplanar with it.
+
+_createGrid() sets the “side” sheets at y = 0 or x = 0, yet the
+whole camera is looking down -z onto the XY floor that sits at y ≈ -0.15.
+From that vantage point both vertical sheets are razor–thin edge-on,
+so they render but all their vertices collapse to the same line.
+
+The draw call counts are off by a factor 2.
+A line has 2 vertices, but you computed sheetXZ_count = verts.length / 3
+before dividing by 2.
+➜ When the offset marches to the second sheet it starts in the middle of
+the first, so you end up overdrawing the XY floor again.
+
+VIEW / PROJECTION are symmetric about the z-axis.
+Even if the sheets were placed correctly, the camera never rotates,
+so anything that lies exactly on the x- or y-axis is hidden behind the
+XY floor.
+
+Quick-fix patch
+1 Correct counts
+diff
+Copy
+Edit
+// after building each sheet
+this.sheetXY_count = sheetXY.length / 3;         // vertices
+- this.sheetXZ_count = sheetXZ.length / 3;
+- this.sheetYZ_count = sheetYZ.length / 3;
++ this.sheetXZ_count = sheetXZ.length / 3;
++ this.sheetYZ_count = sheetYZ.length / 3;
++ // number of vertices is fine, but the offset increment
++ // must be *vertices*, not *lines*, so later we double-check:
+Later, when you advance the offset:
+
+diff
+Copy
+Edit
+// draw XY
+gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
+- offset += this.sheetXY_count;
++ offset += this.sheetXY_count;
+
+// draw XZ
+gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
+- offset += this.sheetXZ_count;       // <-- still ok
++ offset += this.sheetXZ_count;
+
+// draw YZ
+gl.drawArrays(gl.LINES, offset, this.sheetYZ_count);
+(the counts are now correct; the bug was the invisible geometry, not the
+offset math, but this keeps them consistent.)
+
+2 Move the vertical sheets away from the camera axis
+Put them half a grid unit to the right / forward so they are no longer
+edge-on:
+
+diff
+Copy
+Edit
+else if (plane === 'XZ') {
+-   const ySheet = 0.0;
++   const ySheet = 0.2;              // lift side wall a bit
+    … verts.push(x0, ySheet, zPos, x1, ySheet, zPos);
+}
+
+else if (plane === 'YZ') {
+-   const xSheet = 0.0;
++   const xSheet = 0.2;              // slide end wall a bit
+    … verts.push(xSheet, y0, zPos, xSheet, y1, zPos);
+}
+( 0.2 ≈ 20 % of the clip cube; tweak until it’s clearly visible.)

@@ -345,13 +345,14 @@ class WarpEngine {
             }
         }
         else if (plane === 'XZ') {
-            // Side wall grid - vertical sheet, lines parallel to X and Z axes
+            // Side wall grid - vertical sheet, offset from camera axis for visibility
+            const ySheet = 0.2;  // Move away from camera axis (y=0)
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let x = 0; x < divisions; ++x) {
                     const x0 = (-half + x * step) * norm;
                     const x1 = (-half + (x + 1) * step) * norm;
-                    verts.push(x0, 0.0, zPos, x1, 0.0, zPos);  // X-lines at y=0
+                    verts.push(x0, ySheet, zPos, x1, ySheet, zPos);  // X-lines at elevated y
                 }
             }
             for (let x = 0; x <= divisions; ++x) {
@@ -359,18 +360,19 @@ class WarpEngine {
                 for (let z = 0; z < divisions; ++z) {
                     const z0 = (-half + z * step) * norm;
                     const z1 = (-half + (z + 1) * step) * norm;
-                    verts.push(xPos, 0.0, z0, xPos, 0.0, z1);  // Z-lines at y=0
+                    verts.push(xPos, ySheet, z0, xPos, ySheet, z1);  // Z-lines at elevated y
                 }
             }
         }
         else if (plane === 'YZ') {
-            // End wall grid - vertical sheet, lines parallel to Y and Z axes
+            // End wall grid - vertical sheet, offset from camera axis for visibility
+            const xSheet = 0.2;  // Move away from camera axis (x=0)
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let y = 0; y < divisions; ++y) {
                     const y0 = (-half * 0.3 + y * step) * norm;
                     const y1 = (-half * 0.3 + (y + 1) * step) * norm;
-                    verts.push(0.0, y0, zPos, 0.0, y1, zPos);  // Y-lines at x=0
+                    verts.push(xSheet, y0, zPos, xSheet, y1, zPos);  // Y-lines at offset x
                 }
             }
             for (let y = 0; y <= divisions; ++y) {
@@ -378,7 +380,7 @@ class WarpEngine {
                 for (let z = 0; z < divisions; ++z) {
                     const z0 = (-half + z * step) * norm;
                     const z1 = (-half + (z + 1) * step) * norm;
-                    verts.push(0.0, yPos, z0, 0.0, yPos, z1);  // Z-lines at x=0
+                    verts.push(xSheet, yPos, z0, xSheet, yPos, z1);  // Z-lines at offset x
                 }
             }
         }
