@@ -12,8 +12,21 @@ class SimpleWarpEngine {
             currentMode: 'hover',
             sectorStrobing: 1,
             qSpoilingFactor: 1,
-            gammaVanDenBroeck: 286000
+            gammaVanDenBroeck: 286000,
+            sagDepth_nm: 16,
+            g_y: 26,
+            exoticMass_kg: 1405
         };
+        
+        this.debugDisableWarp = false; // debug toggle
+        
+        // Add debug controls
+        window.addEventListener('keydown', e => {
+            if (e.key === 'w' || e.key === 'W') {
+                this.debugDisableWarp = !this.debugDisableWarp;
+                console.log('🔧 Warp debug toggle:', this.debugDisableWarp ? 'DISABLED' : 'ENABLED');
+            }
+        });
         
         this.init();
     }
@@ -156,6 +169,18 @@ class SimpleWarpEngine {
                 const clipY = (screenY - centerY) / normScale * CLIP_HALF;
                 const clipZ = 0; // 2D projection
                 
+                // Debug toggle for warp effects
+                if (this.debugDisableWarp) {
+                    // Render flat grid without warp
+                    const finalX = centerX + clipX * normScale / CLIP_HALF;
+                    const finalY = centerY + clipY * normScale / CLIP_HALF;
+                    ctx.strokeStyle = effects.color;
+                    ctx.globalAlpha = 0.7;
+                    ctx.lineWidth = 1;
+                    lineVertices.push({ x: finalX, y: finalY, rho: 0 });
+                    continue;
+                }
+                
                 // (i) Authentic Natário β profile with proper scaling
                 const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
                 const s = r / R; // normalized radius
@@ -166,9 +191,22 @@ class SimpleWarpEngine {
                     console.log('β Debug:', { r_nm: r*1e9, R_nm: R*1e9, s, beta0, beta_magnitude });
                 }
                 
-                // Convert β displacement to clip space and use color coding for visibility
+                // Convert β displacement to clip space with clamping for stability
                 const xShiftPhysical = beta_magnitude; // β displacement in meters
-                const xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
+                let xShiftClip = xShiftPhysical / metresPerClip; // convert to clip coordinates
+                
+                // Clamp warp displacement to prevent vertices from leaving clip space
+                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip));
+                
+                // Debug logging once per frame
+                if (i === 0 && j === 0) {
+                    console.log('Warp Debug:', { 
+                        r_nm: r*1e9, 
+                        s: s.toFixed(3), 
+                        beta: beta_magnitude.toExponential(3),
+                        pushClip: xShiftClip.toFixed(6)
+                    });
+                }
                 
                 // Color-code the warp field strength for visibility (exaggerated for visual feedback)
                 const warpIntensity = Math.abs(beta_magnitude * 1e7); // exaggerate ONLY for color, not geometry
@@ -244,11 +282,24 @@ class SimpleWarpEngine {
                 const clipY = (screenY - centerY) / normScale * CLIP_HALF;
                 const clipZ = 0;
                 
+                // Debug toggle for vertical lines too
+                if (this.debugDisableWarp) {
+                    // Render flat vertical lines without warp
+                    const finalX = centerX + clipX * normScale / CLIP_HALF;
+                    const finalY = centerY + clipY * normScale / CLIP_HALF;
+                    ctx.strokeStyle = effects.color;
+                    ctx.globalAlpha = 0.7;
+                    ctx.lineWidth = 1;
+                    lineVertices.push({ x: finalX, y: finalY, rho: 0 });
+                    continue;
+                }
+                
                 const r = Math.sqrt(clipX*clipX + clipY*clipY + clipZ*clipZ) * metresPerClip; // physical radius
                 const s = r / R;
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                const xShiftClip = beta_magnitude / metresPerClip; // proper scaling without exaggeration
+                let xShiftClip = beta_magnitude / metresPerClip; // proper scaling
+                xShiftClip = Math.max(-0.1, Math.min(0.1, xShiftClip)); // clamp for stability
                 
                 const stretchedY = clipY; // keep spatial metric flat per Natário
                 
