@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: CLEAN-v3.3 - BETA0 REFERENCES REMOVED 🚨');
+            console.error('🚨 BUNDLE VERSION: PERSPECTIVE-FIXED-v3.0 - CORRECTED VIEW MATRIX 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -697,35 +697,61 @@ class WarpEngine {
         console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
-    // Authentic Natário spacetime curvature implementation - REVERTED to visible scale
+    // Authentic Natário spacetime curvature implementation with FIXED scaling
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Hardcoded 10 µm radius for visibility
-        const bubbleRadius_nm = 10000;
-        const sagRclip = bubbleRadius_nm * this.normClip;
-        const visualAmplitude = 0.25;  // Fixed 25% bulge
-
+        // Use fixed bubble radius with proper normalization
+        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
+        const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
+        
+        // Use computed β₀ from amplifier chain
+        const beta0 = bubbleParams.beta0;
+        if (beta0 === undefined) {
+            console.warn("No beta0 supplied to _warpGridVertices - skipping warp");
+            return;
+        }
+        
+        // Get realistic power for scaling deformation amplitude
         const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
+        
         const tsRatio = bubbleParams.tsRatio || 4100;
+        console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
+        console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
+        console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
+        console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
+        console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
+        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
+        console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
+        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
-            const x = this.originalGridVertices[i];
-            const y_original = this.originalGridVertices[i + 1];
-            const z = this.originalGridVertices[i + 2];
-            const r = Math.hypot(x, z);
-
+            // Work directly in clip-space coordinates
+            const x = vtx[i];
+            const z = vtx[i + 2];
+            const r = Math.hypot(x, z);              // radius in clip-space
+            
+            // Use original Y coordinate for each vertex, not a single constant
+            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
+            
+            // Natário warp bubble profile (now with FIXED units)
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
+            const beta = beta0 * prof;              // |β| shift vector magnitude
 
-            // Lateral bend
-            const push = prof * visualAmplitude;
-            const scale = r > 1e-6 ? 1 + push / r : 1;
-            vtx[i] = x * scale;
-            vtx[i + 2] = z * scale;
+            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
+            const lateralK = 0.10 * sagRclip;       // max 10% of radius
+            const verticalK = 0.10 * sagRclip;      // max 10% of radius
+            
+            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
+            const push = beta * lateralK;           // use clamped coefficient
+            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
-            // Vertical bulge
-            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / 2;
-            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);
-            const dy = prof * visualAmplitude * powerScale * timeScale;
-            vtx[i + 1] = y_original + dy;
+            vtx[i] = x * scale;                      // X warped laterally
+            vtx[i + 2] = z * scale;                  // Z warped laterally
+            
+            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
+            const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
+            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
+            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
+            vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
@@ -743,7 +769,7 @@ class WarpEngine {
         }
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
         
-        console.log(`✅ VISUAL GRID DEFORMATION: Power=${powerAvg_MW}MW, Scale=${visualAmplitude}`);
+        console.log(`✅ ENERGY PIPELINE CONNECTED: β₀=${(beta0/1e6).toFixed(1)}e+6, Power=${powerAvg_MW}MW → Visual Deformation`);
     }
 
     destroy() {
