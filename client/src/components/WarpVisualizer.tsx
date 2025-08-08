@@ -38,19 +38,26 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the WarpEngine script dynamically
+        // Load the WarpEngine script dynamically with aggressive cache busting
         const script = document.createElement('script');
-        script.src = '/warp-engine.js?' + Date.now(); // Cache bust
+        script.src = '/warp-engine.js?' + Date.now() + Math.random(); // Cache bust
+        console.log('Loading WarpEngine script from:', script.src);
         script.onload = () => {
+          console.log('WarpEngine script loaded, window.WarpEngine available:', !!window.WarpEngine);
           if (window.WarpEngine) {
             try {
+              console.log('Creating new WarpEngine instance...');
               engineRef.current = new window.WarpEngine(canvasRef.current);
+              console.log('WarpEngine instance created successfully');
               setIsLoaded(true);
               // Engine now auto-starts its render loop
             } catch (error) {
               console.error('Failed to initialize WarpEngine:', error);
+              console.error('Error details:', error.message, error.stack);
               setIsLoaded(false);
             }
+          } else {
+            console.error('WarpEngine not found on window after script load');
           }
         };
         script.onerror = () => {
