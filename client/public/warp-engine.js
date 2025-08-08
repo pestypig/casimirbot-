@@ -303,6 +303,7 @@ class WarpEngine {
         
         console.log(`3D Cage created: XY(${this.sheetXY_count}) + XZ(${this.sheetXZ_count}) + YZ(${this.sheetYZ_count}) = ${this.gridVertexCount} vertices`);
         console.log(`Grid parameters: size=${this.gridSize}nm, Y0=${this.gridY0}`);
+        console.log(`Sheet arrays - XY: ${sheetXY.length}, XZ: ${sheetXZ.length}, YZ: ${sheetYZ.length}`);
         
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
@@ -796,19 +797,24 @@ class WarpEngine {
             // Render each sheet with different colors for 3D perception
             let offset = 0;
             
+            console.log(`Rendering 3D cage - XY: ${this.sheetXY_count}, XZ: ${this.sheetXZ_count}, YZ: ${this.sheetYZ_count}`);
+            
             // XY Floor sheet - cyan
             gl.uniform3f(this.gridUniforms.sheetColor, 0.1, 0.8, 1.0);
             gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
+            console.log(`XY sheet drawn: offset=${offset}, count=${this.sheetXY_count}`);
             offset += this.sheetXY_count;
             
             // XZ Side wall - magenta  
             gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.1, 0.8);
             gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
+            console.log(`XZ sheet drawn: offset=${offset}, count=${this.sheetXZ_count}`);
             offset += this.sheetXZ_count;
             
             // YZ End wall - yellow
             gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.1);
             gl.drawArrays(gl.LINES, offset, this.sheetYZ_count);
+            console.log(`YZ sheet drawn: offset=${offset}, count=${this.sheetYZ_count}`);
             
             gl.disable(gl.BLEND);
             
