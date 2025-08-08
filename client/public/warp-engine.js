@@ -303,12 +303,14 @@ class WarpEngine {
             "in vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
+            "    gl_PointSize = 5.0;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
+            "    gl_PointSize = 5.0;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
             "}";
 
@@ -317,17 +319,19 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.7, 0.9, 1.0, 0.8);\n" +  // Light cyan with good visibility
+            "    gl_PointSize = 5.0;\n" +
+            "    frag = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red for maximum visibility
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.7, 0.9, 1.0, 0.8);\n" +
+            "    gl_PointSize = 5.0;\n" +
+            "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red
             "}";
 
-        console.log("Compiling grid shaders...");
-        console.log("Grid vertex shader:", gridVs);
-        console.log("Grid fragment shader:", gridFs);
+        console.log("Compiling grid shaders for POINTS rendering...");
+        console.log("Grid vertex shader with gl_PointSize:", gridVs.substring(0, 200));
+        console.log("Grid fragment shader with red color:", gridFs.substring(0, 200));
         
         this.gridProgram = this._linkProgram(gridVs, gridFs);
         
@@ -441,6 +445,20 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
+        // NUCLEAR OPTION: "nuke it" sanity check - bypass all physics
+        for (let i = 0; i < vtx.length; i += 3) {
+            if (i === 0) {  // run once per frame
+                console.log("*** NUCLEAR TEST: Grid nuked for visibility test ***");
+                for (let k = 0; k < vtx.length; k += 3) {
+                    vtx[k]     *= 1.4;         // stretch X
+                    vtx[k + 2] *= 1.4;         // stretch Z  
+                    vtx[k + 1] += 0.15;        // lift Y
+                }
+                console.log("Grid stretched and lifted - should be VERY visible now");
+                return;
+            }
+        }
+
         // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
         const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
         const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
@@ -545,8 +563,15 @@ class WarpEngine {
         
         // DIAGNOSTIC 4: Test with POINTS to bypass line-width issues
         if (this.gridUniforms.position !== -1) {
-            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);  // Using POINTS instead of LINES
-            console.log("Rendering grid as POINTS for diagnostic");
+            console.log(`Attempting to render ${this.gridVertexCount} RED POINTS...`);
+            const error1 = gl.getError();
+            if (error1 !== gl.NO_ERROR) console.error("WebGL error before draw:", error1);
+            
+            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+            
+            const error2 = gl.getError();
+            if (error2 !== gl.NO_ERROR) console.error("WebGL error after draw:", error2);
+            console.log("Grid draw call completed - should see bright red dots");
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }
