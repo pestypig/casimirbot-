@@ -46,7 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Live Energy Pipeline**: Transparent, step-by-step display of physics equations with real-time parameter substitution, showing the calculation flow from static Casimir to power and mass generation.
 - **Operational Modes**: Comprehensive system for switching between predefined operational modes (e.g., Hover, Cruise, Emergency, Standby), each with specific physical parameters and real-time calculation updates.
 - **Documentation System**: Integrated access to research papers, physics guides, and API references.
-- **3D Spacetime Curvature Visualization**: Real-time 2D Canvas-based grid rendering showing authentic Natário warp bubble deformation effects with full operational mode integration. Features mode-specific visual effects (hover: cyan gentle bulge, cruise: green flat field, emergency: red strong bulge, standby: blue minimal activity) and physics-accurate parameter mapping responding to duty cycle, power output, and operational mode transitions. Successfully resolved WebGL compatibility issues through reliable Canvas fallback implementation (January 2025).
+- **3D Spacetime Curvature Visualization**: Real-time WebGL-based grid rendering showing authentic Natário warp bubble deformation effects with full operational mode integration. Features three orthogonal sheets (XY cyan floor, XZ magenta wall, YZ yellow wall) displaying physics-accurate parameter mapping responding to duty cycle, power output, and operational mode transitions. Energy pipeline successfully connected to 3D visualization with all 4 debugging checkpoints operational (January 2025). Currently applying Natário curvature fixes to resolve "orange blob-in-a-box" visual scaling issues.
 
 ## External Dependencies
 
