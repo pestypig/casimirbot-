@@ -1,13 +1,14 @@
 //====================================================================
-//  Natário Warp‑Bubble Visualiser (optimized with enhanced physics visualization)
+//  Natário Warp‑Bubble Visualiser (3D Volumetric Cage v2.0)
 //  ------------------------------------------------------------------
 //  Real-time WebGL visualization with authentic parameter mapping
+//  Now featuring: Three orthogonal sheets for full 3D warp perception
 //====================================================================
 
 class WarpEngine {
     constructor(canvas) {
         try {
-            console.log("WarpEngine: Starting initialization...");
+            console.log("WarpEngine v2.0: Starting 3D volumetric cage initialization...");
             this.canvas = canvas;
             this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
             if (!this.gl) throw new Error("WebGL not supported");
