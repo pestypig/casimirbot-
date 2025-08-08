@@ -456,20 +456,14 @@ class WarpEngine {
             "uniform vec3 u_sheetColor;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
-            "        u_sheetColor;           // Sheet-specific color\n" +
-            "    frag = vec4(baseColor, 0.7);\n" +
+            "    frag = vec4(0.0, 1.0, 0.0, 1.0);  // Force green for diagnostic\n" +
             "}"
             :
             "precision highp float;\n" +
             "uniform float u_energyFlag;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "void main() {\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
-            "        u_sheetColor;           // Sheet-specific color\n" +
-            "    gl_FragColor = vec4(baseColor, 0.7);\n" +
+            "    gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);  // Force green for diagnostic\n" +
             "}";
 
         console.log("Compiling grid shaders for POINTS rendering...");
@@ -526,45 +520,48 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        // Clear with dark blue background for contrast
-        gl.clearColor(0.05, 0.1, 0.15, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        // DIAGNOSTIC TEST: Draw grid by itself with green points
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
         
-        // Upload all uniforms for the warp field shader
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.time, time);
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
-        console.log("u_sagDepth_nm =", this.uniforms.sagDepth_nm);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
+        // Use the grid program
+        gl.useProgram(this.gridProgram);
         
-        // Upload β₀ from amplifier chain
-        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.beta0, currentBeta0);
-        
-        // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification + Beta0 shader check
-        console.log("🔍 BETA0 SHADER DEBUG: currentBeta0 =", currentBeta0, "(should be > 0)");
-        
-        // Render main warp field visualization first
-        this._renderQuad();
-        
-        // Enable depth testing for 3D grid overlay
-        gl.enable(gl.DEPTH_TEST);
-        
-        // FIX 1: Stop the quad from killing Z-buffer
-        gl.depthMask(false);         // quad does NOT write Z
-        this._renderQuad();
-        gl.depthMask(true);          // restore for the sheets
-        
-        // Now render the grid with FIXED physics
-        this._updateGrid();
-        this._renderGridPoints();
-        
+        // Disable depth & blending so nothing hides the points
         gl.disable(gl.DEPTH_TEST);
+        gl.disable(gl.BLEND);
+        
+        // Set identity MVP matrix
+        const identity = new Float32Array([
+            1,0,0,0,
+            0,1,0,0,
+            0,0,1,0,
+            0,0,0,1
+        ]);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identity);
+        
+        // Update grid first (to ensure we have data)
+        this._updateGrid();
+        
+        // Bind VBO & setup attributes
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        
+        // Check point size support and VBO data
+        console.log("PointSize range:", gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE));
+        console.log("Drawing", this.gridVertexCount, "vertices as POINTS");
+        console.log("First 9 floats of gridVertices:", this.gridVertices ? this.gridVertices.slice(0,9) : "NO DATA");
+        
+        // Set green color and draw all vertices as points
+        gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 0.0);  // Green
+        gl.uniform1f(this.gridUniforms.energyFlag, 0.0);  // No energy flag
+        gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+        
+        // Cleanup
+        gl.disableVertexAttribArray(this.gridUniforms.position);
+        
+        console.log("DIAGNOSTIC: Grid drawn as green points with identity matrix");
     }
 
     _renderQuad() {
