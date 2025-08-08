@@ -51,62 +51,37 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load base engine first, then theory patch
-        const baseScript = document.createElement('script');
-        baseScript.src = '/warp-engine-fresh.js?v=' + Date.now();
-        console.log('Loading base WarpEngine from:', baseScript.src);
+        // Load unified Natário v3.1 engine with all theory patches integrated
+        const script = document.createElement('script');
+        script.src = '/warp-engine-natario-v3.js?v=' + Date.now();
+        console.log('Loading unified Natário v3.1 WarpEngine from:', script.src);
         
-        baseScript.onload = async () => {
-          console.log('Base WarpEngine loaded, loading theory patch...');
-          
-          // Now load the theory patch
-          const patchScript = document.createElement('script');
-          patchScript.src = '/warp-patch.js?v=' + Date.now();
-          console.log('Loading theory patch from:', patchScript.src);
-          
-          patchScript.onload = () => {
-            console.log('Theory patch loaded, window.WarpEngine available:', !!window.WarpEngine);
-            if (window.WarpEngine) {
-              try {
-                console.log('Creating patched WarpEngine instance...');
-                engineRef.current = new window.WarpEngine(canvasRef.current);
-                console.log('Patched WarpEngine created - theory knobs active:', engineRef.current.mode || 'HOVER');
-                setIsLoaded(true);
-              } catch (error) {
-                console.error('Failed to initialize patched WarpEngine:', error);
-                setIsLoaded(false);
-              }
-            } else {
-              console.error('WarpEngine not found on window after patch load');
+        script.onload = () => {
+          console.log('Natário v3.1 WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
+          if (window.WarpEngine) {
+            try {
+              console.log('Creating Natário v3.1 WarpEngine instance...');
+              engineRef.current = new window.WarpEngine(canvasRef.current);
+              console.log('Natário v3.1 WarpEngine created - unified theory build active:', engineRef.current.mode || 'HOVER');
+              setIsLoaded(true);
+            } catch (error) {
+              console.error('Failed to initialize Natário v3.1 WarpEngine:', error);
+              setIsLoaded(false);
             }
-          };
-          
-          patchScript.onerror = () => {
-            console.error('Failed to load theory patch, falling back to base engine');
-            // Fallback to base engine without patch
-            if (window.WarpEngine) {
-              try {
-                engineRef.current = new window.WarpEngine(canvasRef.current);
-                setIsLoaded(true);
-              } catch (error) {
-                console.error('Failed to initialize base WarpEngine:', error);
-                setIsLoaded(false);
-              }
-            }
-          };
-          
-          document.head.appendChild(patchScript);
+          } else {
+            console.error('WarpEngine not found on window after unified engine load');
+          }
         };
         
-        baseScript.onerror = () => {
-          console.error('Failed to load base WarpEngine');
+        script.onerror = () => {
+          console.error('Failed to load unified Natário v3.1 WarpEngine');
           setIsLoaded(false);
         };
-        document.head.appendChild(baseScript);
+        document.head.appendChild(script);
 
         return () => {
-          if (document.head.contains(baseScript)) {
-            document.head.removeChild(baseScript);
+          if (document.head.contains(script)) {
+            document.head.removeChild(script);
           }
         };
       } catch (error) {
