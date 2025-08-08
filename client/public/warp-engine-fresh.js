@@ -456,20 +456,14 @@ class WarpEngine {
             "uniform vec3 u_sheetColor;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
-            "        u_sheetColor;           // Sheet-specific color\n" +
-            "    frag = vec4(baseColor, 0.8);\n" +
+            "    frag = vec4(1.0, 0.0, 0.0, 1.0);  // FORCE SOLID RED for testing\n" +
             "}"
             :
             "precision highp float;\n" +
             "uniform float u_energyFlag;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "void main() {\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations\n" +
-            "        u_sheetColor;           // Sheet-specific color\n" +
-            "    gl_FragColor = vec4(baseColor, 0.8);\n" +
+            "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);  // FORCE SOLID RED for testing\n" +
             "}";
 
         console.log("Compiling grid shaders for POINTS rendering...");
@@ -490,7 +484,21 @@ class WarpEngine {
             sheetColor: gl.getUniformLocation(this.gridProgram, "u_sheetColor")
         };
         
-        console.log("Grid shader compiled successfully!");
+        // Check uniform locations to diagnose potential issues
+        console.log("🔍 UNIFORM LOCATION DEBUG:");
+        console.log("sheetColor loc =", this.gridUniforms.sheetColor);
+        console.log("energyFlag loc =", this.gridUniforms.energyFlag);
+        console.log("mvpMatrix loc =", this.gridUniforms.mvpMatrix);
+        console.log("position loc =", this.gridUniforms.position);
+        
+        if (this.gridUniforms.sheetColor === null || this.gridUniforms.sheetColor === -1) {
+            console.error("❌ sheetColor uniform location is INVALID - this explains missing colors!");
+        }
+        if (this.gridUniforms.energyFlag === null || this.gridUniforms.energyFlag === -1) {
+            console.error("❌ energyFlag uniform location is INVALID - this explains missing colors!");
+        }
+        
+        console.log("🔴 Grid shader compiled - FORCED RED MODE for visibility test!");
     }
 
     _cacheUniformLocations() {
