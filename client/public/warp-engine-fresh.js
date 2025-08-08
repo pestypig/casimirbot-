@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: 3D-WIREFRAME-CAGE-v3.2 - ALL SHEETS PROPERLY POSITIONED 🚨');
+            console.error('🚨 BUNDLE VERSION: RENDERING-PIPELINE-FIXED-v3.3 - IDENTITY MATRIX + POINTS + BUBBLE RADIUS 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -623,9 +623,14 @@ class WarpEngine {
             0, 0, 0, 1
         ]);
 
-        // Multiply projection * view matrices
-        const mvp = this._multiplyMatrices4x4(proj, view);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+        // FIX #2: Use identity matrix since vertices are already in clip space
+        const I = new Float32Array([
+            1,0,0,0,
+            0,1,0,0,
+            0,0,1,0,
+            0,0,0,1
+        ]);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, I);
         
         // Bind grid vertices
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -640,15 +645,15 @@ class WarpEngine {
         // Draw XY sheet (cyan floor)
         gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 1.0);
         gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
-        gl.drawArrays(gl.LINES, 0, verticesPerSheet);
+        gl.drawArrays(gl.POINTS, 0, verticesPerSheet);
         
         // Draw XZ sheet (magenta wall)
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 1.0);
-        gl.drawArrays(gl.LINES, verticesPerSheet, verticesPerSheet);
+        gl.drawArrays(gl.POINTS, verticesPerSheet, verticesPerSheet);
         
         // Draw YZ sheet (yellow wall)
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.0);
-        gl.drawArrays(gl.LINES, verticesPerSheet * 2, verticesPerSheet);
+        gl.drawArrays(gl.POINTS, verticesPerSheet * 2, verticesPerSheet);
         
         console.log("✅ 3D spacetime grid rendered: Cyan XY + Magenta XZ + Yellow YZ sheets");
         
@@ -704,8 +709,8 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation with FIXED scaling
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Use fixed bubble radius with proper normalization
-        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
+        // FIX #3: Use dedicated bubbleRadius_nm instead of sagDepth_nm
+        const bubbleRadius_nm = bubbleParams.bubbleRadius_nm ?? 10000;
         const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
         
         // Use computed β₀ from amplifier chain
