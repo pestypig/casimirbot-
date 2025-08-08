@@ -1,0 +1,171 @@
+Heck yes — here’s a drop-in patch that wires the theory knobs (γ_geo, Q, duty, sector strobing, and Natário tilt) straight into the visual. It keeps your buffers, render loop, and grid exactly as-is.
+
+⸻
+
+1) Extend defaults (constructor)
+
+Add these to this.uniforms (right where you set dutyCycle, g_y, etc.):
+
+Object.assign(this.uniforms, {
+  gammaGeo: 25.0,         // concave blue-shift gain γ_geo
+  Qburst: 1e9,            // burst Q during on-window
+  deltaAOverA: 0.05,      // fractional boundary stroke (Δa/a)
+  sectorCount: 400.0,     // strobing wedges around the ring
+  phaseSplit: 0.5,        // fraction of +β sectors (0.5=HOVER, >0.5=CRUISE)
+  viewAvg: 1.0,           // 0 = show instantaneous, 1 = show GR cycle-average
+  axesClip: [0.35,0.22,0.22], // ellipsoid semi-axes in clip coords (x,y,z)
+  betaGradient: [0.0,-0.02,0.0], // “tilt”: small linear β-gradient (clip units)
+  sectorSpeed: 2.0        // how fast the active wedge spins (rev/s)
+});
+this.mode = 'HOVER'; // or 'CRUISE' / 'TILT'
+
+
+⸻
+
+2) Fragment shader: replace your FS with ellipsoid + strobing + tilt
+
+Find where you build fs and replace its contents with this version (provide both WebGL2 and WebGL1 strings as you already do):
+
+// WebGL2 branch
+"#version 300 es\n"
+"precision highp float;\n"
+"uniform float u_time, u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm, u_tsRatio, u_powerAvg_MW, u_exoticMass_kg;\n"
+"uniform float u_gammaGeo, u_Qburst, u_deltaAOverA, u_sectorCount, u_phaseSplit, u_viewAvg, u_sectorIndex;\n"
+"uniform vec3  u_axesClip;        // ellipsoid axes in clip coords\n"
+"uniform vec3  u_betaGradient;    // Natário tilt gradient in clip coords\n"
+"in vec2 v_uv;\n"
+"out vec4 fragColor;\n"
+"\n"
+// simple ellipsoid SDF helper (clip-space)
+"float sdEllipsoid(vec3 p, vec3 a){ vec3 q = p / a; return length(q) - 1.0; }\n"
+"\n"
+"void main(){\n"
+"  // map full-screen quad uv -> clip-like coords in XZ plane (Y=0 sheet)\n"
+"  vec2 p2 = (v_uv - 0.5) * 2.0;           // [-1,1]^2\n"
+"  vec3 p  = vec3(p2.x, 0.0, p2.y);        // X,Z from uv; Y=0 section\n"
+"\n"
+"  // Ellipsoidal wall: Gaussian ring around sd=0 with thickness w\n"
+"  float w = 0.06;                          // visual wall thickness in clip units\n"
+"  float sd = sdEllipsoid(p, u_axesClip);   // <0 inside shell, >0 outside\n"
+"  float ring = exp(- (sd*sd) / (w*w));     // peak on the shell\n"
+"\n"
+"  // Sector strobing sign pattern (+β vs -β) by wedge index\n"
+"  float theta = atan(p.z, p.x);            // [-pi,pi]\n"
+"  theta = (theta < 0.0) ? theta + 6.28318530718 : theta; // [0,2pi)\n"
+"  float wedge = floor(theta / (6.28318530718 / max(1.0, u_sectorCount)));\n"
+"  // Animate wedge reference (optional HUD-ish feel)\n"
+"  float idx = mod(wedge + u_sectorIndex, u_sectorCount);\n"
+"  float split = floor(u_phaseSplit * u_sectorCount);\n"
+"  float signBeta = (idx < split) ? 1.0 : -1.0;\n"
+"\n"
+"  // Instantaneous vs averaged β magnitude per the pipeline\n"
+"  float beta_inst = u_gammaGeo * u_Qburst * u_deltaAOverA * ring;\n"
+"  float beta_avg  = beta_inst * sqrt(max(1e-9, u_dutyCycle / max(1.0, u_sectorCount)));\n"
+"  float beta_core = mix(beta_inst, beta_avg, clamp(u_viewAvg,0.0,1.0));\n"
+"\n"
+"  // Baseline amplifier chain (kept for continuity), then apply strobe sign\n"
+"  float beta_amp  = (u_g_y > 0.0 ? u_g_y : 1.0) * beta_core;\n"
+"  float beta      = signBeta * beta_amp;\n"
+"\n"
+"  // Natário tilt: tiny linear gradient across cabin\n"
+"  beta += dot(u_betaGradient, p);\n"
+"\n"
+"  // Simple intensity map (bounded)\n"
+"  float intensity = clamp(abs(beta) * 3.0, 0.0, 1.0);\n"
+"  vec3 base = vec3(0.05,0.10,0.15);\n"
+"  vec3 warp = vec3(1.0,0.5,0.0);\n"
+"  vec3 color = mix(base, warp, intensity);\n"
+"  fragColor = vec4(color, 1.0);\n"
+"}"
+
+For WebGL1, same code but with varying vec2 v_uv; and write to gl_FragColor. Keep your existing branching pattern.
+
+⸻
+
+3) Cache the new uniform locations
+
+In _cacheUniformLocations() add:
+
+u_gammaGeo:    gl.getUniformLocation(this.program, "u_gammaGeo"),
+u_Qburst:      gl.getUniformLocation(this.program, "u_Qburst"),
+u_deltaAOverA: gl.getUniformLocation(this.program, "u_deltaAOverA"),
+u_sectorCount: gl.getUniformLocation(this.program, "u_sectorCount"),
+u_phaseSplit:  gl.getUniformLocation(this.program, "u_phaseSplit"),
+u_viewAvg:     gl.getUniformLocation(this.program, "u_viewAvg"),
+u_sectorIndex: gl.getUniformLocation(this.program, "u_sectorIndex"),
+u_axesClip:    gl.getUniformLocation(this.program, "u_axesClip"),
+u_betaGradient:gl.getUniformLocation(this.program, "u_betaGradient"),
+
+
+⸻
+
+4) Feed the new uniforms each frame
+
+In _draw(time) after you set the existing uniforms, add:
+
+// Animate sector wheel
+const sectorIndex = (time * (this.uniforms.sectorSpeed || 2.0) * (this.uniforms.sectorCount||400.0)) % (this.uniforms.sectorCount||400.0);
+
+// Write theory-linked uniforms
+gl.uniform1f(this.uLoc.gammaGeo,    this.uniforms.gammaGeo);
+gl.uniform1f(this.uLoc.Qburst,      this.uniforms.Qburst);
+gl.uniform1f(this.uLoc.deltaAOverA, this.uniforms.deltaAOverA);
+gl.uniform1f(this.uLoc.sectorCount, this.uniforms.sectorCount);
+gl.uniform1f(this.uLoc.phaseSplit,  this.uniforms.phaseSplit);
+gl.uniform1f(this.uLoc.viewAvg,     this.uniforms.viewAvg);
+gl.uniform1f(this.uLoc.sectorIndex, sectorIndex);
+
+// Ellipsoid axes + tilt
+const ax = this.uniforms.axesClip || [0.35,0.22,0.22];
+gl.uniform3f(this.uLoc.axesClip, ax[0], ax[1], ax[2]);
+const bg = this.uniforms.betaGradient || [0,0,0];
+gl.uniform3f(this.uLoc.betaGradient, bg[0], bg[1], bg[2]);
+
+Also remember to declare the new uLoc.* keys in the object you build in _cacheUniformLocations().
+
+⸻
+
+5) Tiny API sugar (optional)
+
+Drop these helpers somewhere in the class:
+
+setMode(mode){
+  this.mode = mode;
+  if(mode === 'HOVER'){        // cancel on average
+    this.uniforms.phaseSplit = 0.5;
+    this.uniforms.viewAvg = 1.0;
+    this.uniforms.betaGradient = [0,0,0];
+  } else if(mode === 'CRUISE'){// net +β
+    this.uniforms.phaseSplit = 0.65; // tweak for effect
+    this.uniforms.viewAvg = 1.0;
+    this.uniforms.betaGradient = [0,0,0];
+  } else if(mode === 'TILT'){  // artificial-g demo
+    this.uniforms.phaseSplit = 0.5;
+    this.uniforms.viewAvg = 1.0;
+    this.uniforms.betaGradient = [0.0,-0.02,0.0]; // subtle “down”
+  }
+}
+setEllipsoidAxes(x,z,y){ this.uniforms.axesClip = [x,y,z]; } // quick aspect control
+toggleInstantaneous(showInstant){ this.uniforms.viewAvg = showInstant? 0.0 : 1.0; }
+
+
+⸻
+
+6) (Nice-to-have) make grid color echo “exotic on” periods
+
+You already have u_energyFlag in the grid shader. Flip it on when the instantaneous β is being shown or when phaseSplit != 0.5:
+
+const exoticOn = (this.uniforms.viewAvg < 0.5 || Math.abs(this.uniforms.phaseSplit-0.5) > 0.001) ? 1.0 : 0.0;
+gl.useProgram(this.gridProgram);
+gl.uniform1f(this.gridUniforms.energyFlag, exoticOn);
+
+
+⸻
+
+What this gives you, visually
+	•	Sane shape: ellipsoidal “needle” wall instead of a blob.
+	•	Real strobing: wedges flip +β/–β; HOVER vs CRUISE is literally phaseSplit.
+	•	Physics knobs: γ_geo, Q, Δa/a brighten the instantaneous field; duty+sectorCount only dim the average (toggle with viewAvg).
+	•	Natário tilt: a tiny, linear “down” you can toggle without blowing the picture up.
+
+If you want, I can package this as a single warp-patch.js you can drop next to your file (or I can spit out a ready-to-download JS file).
