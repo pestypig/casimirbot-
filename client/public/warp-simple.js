@@ -129,11 +129,14 @@ class SimpleWarpEngine {
         
         // Scientifically correct Natário parameters
         const R = (this.params.sagDepth_nm || 16) * 1e-9; // bubble radius in meters
-        const beta0 = (this.params.dutyCycle || 0.14) * (this.params.g_y || 26); // peak β
+        const duty = this.params.dutyCycle || 0.14;
+        const gamma_geo = this.params.g_y || 26;
+        const beta0 = duty * gamma_geo; // β₀ = duty × γ_geo
         const direction = [1, 0, 0]; // +x direction warp bubble
         const normScale = Math.min(w, h) / 4; // screen to physical scale
         
         console.log(`Natário params: R=${R*1e9}nm, β₀=${beta0.toFixed(3)}, power=${this.params.powerAvg_MW}MW`);
+        console.log('Physics Debug:', { duty, gamma_geo, beta0, params: this.params });
         
         // Draw grid with authentic Natário warp deformation
         for (let i = 0; i <= gridSize; i++) {
@@ -154,6 +157,11 @@ class SimpleWarpEngine {
                 const r_perp = Math.sqrt(clipY * clipY + clipZ * clipZ) * 20e-6; // convert to meters for physics
                 const prof = (r_perp / R) * Math.exp(-r_perp * r_perp / (R * R)); // Natário profile
                 const beta = beta0 * prof;
+                
+                // Debug first vertex β calculation
+                if (i === 0 && j === 0) {
+                    console.log('β Debug:', { r_perp, R, prof, beta0, beta });
+                }
                 
                 // Convert β (meters) to clip-space units properly
                 const halfSize = 20e-6; // 20 µm in meters
