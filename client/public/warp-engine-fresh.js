@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: AMPLITUDE-CLAMPED-v2.9 - 3D GRID RESTORATION 🚨');
+            console.error('🚨 BUNDLE VERSION: PERSPECTIVE-FIXED-v3.0 - CORRECTED VIEW MATRIX 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -600,20 +600,22 @@ class WarpEngine {
         const near = 0.01, far = 10.0;
         const f = 1/Math.tan(fov/2);
 
-        // Corrected projection matrix
+        // Corrected projection matrix with proper depth coefficients
+        // M[2,2] = (far+near)/(near-far) ≈ -1.002  
+        // M[2,3] = (2*far*near)/(near-far) ≈ -0.020
         const proj = new Float32Array([
-            f/aspect, 0,        0,                             0,
-            0,        f,        0,                             0,
-            0,        0,   (far+near)/(near-far),  (2*far*near)/(near-far),
-            0,        0,       -1,                             0
+            f/aspect, 0,      0,               0,
+            0,        f,      0,               0,
+            0,        0, (far+near)/(near-far), (2*far*near)/(near-far),
+            0,        0,     -1,               0
         ]);
 
-        // View matrix: camera at (0,0,2.5) looking at origin
+        // View matrix: camera at (0, -0.15, -2.5) looking at origin
         const view = new Float32Array([
             1, 0, 0, 0,
-            0, 1, 0, 0,
-            0, 0, 1, 0,
-            0, 0, 2.5, 1
+            0, 1, 0, -0.15,
+            0, 0, 1, 2.5,    // push the world *back*, not forward
+            0, 0, 0, 1
         ]);
 
         // Multiply projection * view matrices
@@ -719,6 +721,7 @@ class WarpEngine {
         console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
         console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
         console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
+        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -733,18 +736,21 @@ class WarpEngine {
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
-            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.000001;            // ULTRA-REDUCED: micro deformation for proper scaling
+            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
+            const lateralK = 0.10 * sagRclip;       // max 10% of radius
+            const verticalK = 0.10 * sagRclip;      // max 10% of radius
+            
+            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
+            const push = beta * lateralK;           // use clamped coefficient
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
-            // -------- VERTICAL DEFORMATION: Y displacement scaled by realistic power --------
-            // FIXED: Use clamped linear scaling to keep within frustum
+            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
             const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * 0.000003 * powerScale * timeScale;  // ULTRA-REDUCED: micro deformation for proper scaling
+            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
             vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
