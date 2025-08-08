@@ -342,9 +342,8 @@ class WarpEngine {
         this.gridVertexCount = totalVertices / 3;
         
         // CRITICAL FIX: clip-space normalizer (nm → –0.8…+0.8)
-        this.gridSize = 80000;  // 80 µm total cage in nm
-        this.gridHalfNm = this.gridSize / 2;  // 40 µm radius in nm
-        this.normClip = 0.8 / this.gridHalfNm;  // nm to clip-space conversion
+        this.gridHalfNm = 20000;  // 20 µm radius in nm (proper scale)
+        this.normClip = 0.8 / this.gridHalfNm;  // = 0.8/20000 = 4e-5
         this.bubbleRadius_nm = 10000;  // 10 µm bubble radius
         
         console.log(`Grid initialized: ${this.gridVertexCount} vertices across 3 sheets`);
@@ -700,8 +699,8 @@ class WarpEngine {
     // Authentic Natário spacetime curvature implementation with FIXED scaling
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Use fixed bubble radius with proper normalization
-        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
-        const sagRclip = bubbleRadius_nm / this.gridHalfNm * 0.8;  // CORRECTED: 0.8 multiplier for full bubble alignment
+        const bubbleRadius_nm = bubbleParams.bubbleRadius_nm || this.bubbleRadius_nm || 10000;  // From pipeline or fallback
+        const sagRclip = bubbleRadius_nm * this.normClip;  // RESTORED: Working calculation from ORTHO test
         
         // Use computed β₀ from amplifier chain
         const beta0 = bubbleParams.beta0;
@@ -719,9 +718,10 @@ class WarpEngine {
         console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
         console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
         console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
-        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
+        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - PROPER ALIGNMENT`);
         console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
         console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
+        console.log(`  🎯 Expected sagRclip = ${bubbleRadius_nm} × ${this.normClip.toExponential(1)} = ${(bubbleRadius_nm * this.normClip).toFixed(4)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
