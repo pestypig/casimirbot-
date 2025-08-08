@@ -701,7 +701,7 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Use fixed bubble radius with proper normalization
         const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
-        const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
+        const sagRclip = bubbleRadius_nm / this.gridHalfNm * 0.8;  // CORRECTED: 0.8 multiplier for full bubble alignment
         
         // Use computed β₀ from amplifier chain
         const beta0 = bubbleParams.beta0;
