@@ -620,27 +620,35 @@ class WarpEngine {
         gl.useProgram(this.gridProgram);
         console.log("Using grid program for rendering...");
         
-        // DIAGNOSTIC: Test with pure orthographic identity matrix to isolate transform issue
-        const ortho = new Float32Array([
-            2/2, 0,   0, 0,   // scale X to ±1
-            0,   2/2, 0, 0,   // scale Y to ±1
-            0,   0,  -1, 0,   // leave Z alone
-            0,   0,   0, 1
+        // DIAGNOSTIC STEP 2: Test perspective projection only (no view transform)
+        const fov = Math.PI/4;
+        const aspect = this.canvas.width / this.canvas.height;
+        const near = 0.01;
+        const far = 10.0;
+        const f = 1.0 / Math.tan(fov / 2);
+        
+        const perspectiveOnly = new Float32Array([
+            f/aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far+near)/(near-far), (2*far*near)/(near-far),
+            0, 0, -1, 0
         ]);
-        console.log("🔧 ORTHO TEST: Using identity orthographic matrix to bypass transform issues");
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, ortho);
+        console.log("🔧 PERSPECTIVE TEST: Using perspective projection only (identity view)");
+        console.log(`🔍 Projection matrix: near=${near}, far=${far}, fov=${fov*180/Math.PI}°`);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, perspectiveOnly);
         
         // Bind grid vertices
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        // Disable depth test for diagnostic
-        gl.disable(gl.DEPTH_TEST);
+        // Re-enable depth test to see if perspective works with proper depth
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LESS);
         gl.disable(gl.BLEND);
         
         console.log("Using LINES for visible grid rendering (better visibility than points)");
-        console.log(`🔍 ORTHO DIAGNOSTIC: Should show grid at ±0.8 in X/Y if VBO data is correct`);
+        console.log(`🔍 PERSPECTIVE DIAGNOSTIC: Grid should be visible if projection matrix is correct`);
         
         // Calculate vertex counts per sheet
         const totalVertices = this.gridVertexCount;
