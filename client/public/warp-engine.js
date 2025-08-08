@@ -316,7 +316,16 @@ class WarpEngine {
             "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n" +  // Solid white
             "}";
 
+        console.log("Compiling grid shaders...");
+        console.log("Grid vertex shader:", gridVs);
+        console.log("Grid fragment shader:", gridFs);
+        
         this.gridProgram = this._linkProgram(gridVs, gridFs);
+        
+        if (!this.gridProgram) {
+            console.error("CRITICAL: Grid shader program compilation failed!");
+            return;
+        }
         
         const gl = this.gl;
         gl.useProgram(this.gridProgram);
@@ -324,6 +333,17 @@ class WarpEngine {
             mvpMatrix: gl.getUniformLocation(this.gridProgram, "u_mvpMatrix"),
             position: gl.getAttribLocation(this.gridProgram, "a_position")
         };
+        
+        console.log("Grid shader compiled successfully!");
+        console.log("Grid uniform mvpMatrix location:", this.gridUniforms.mvpMatrix);
+        console.log("Grid attribute position location:", this.gridUniforms.position);
+        
+        if (this.gridUniforms.mvpMatrix === null) {
+            console.error("CRITICAL: u_mvpMatrix uniform not found!");
+        }
+        if (this.gridUniforms.position === -1) {
+            console.error("CRITICAL: a_position attribute not found!");
+        }
     }
 
     //----------------------------------------------------------------
@@ -427,9 +447,11 @@ class WarpEngine {
         
         // Use the properly compiled grid program
         if (!this.gridProgram) {
-            console.warn("Grid program not available");
+            console.error("CRITICAL: Grid program not available in render!");
             return;
         }
+        
+        console.log("Using grid program for rendering...");
         
         gl.useProgram(this.gridProgram);
         
