@@ -203,8 +203,8 @@ class WarpEngine {
             "    vec2 p = (v_uv - 0.5) * 2.0;\n" +
             "    float r = length(p);\n" +
             "    \n" +
-            "    // FIXED: Proper radius scaling to prevent orange fill\n" +
-            "    float sagR = u_sagDepth_nm / 50000.0 * 0.4;\n" +  // 0.4 keeps warp visible
+            "    // FIXED: Proper radius scaling - make warp field visible\n" +
+            "    float sagR = u_sagDepth_nm / 50.0 * 0.4;\n" +  // Increased scaling for visibility
             "    float prof = (r / sagR) * exp(-(r * r) / (sagR * sagR));\n" +
             "    float beta = u_beta0 * prof / 1000000.0;\n" +
             "    \n" +
@@ -235,8 +235,8 @@ class WarpEngine {
             "    vec2 p = (v_uv - 0.5) * 2.0;\n" +
             "    float r = length(p);\n" +
             "    \n" +
-            "    // FIXED: Proper radius scaling to prevent orange fill\n" +
-            "    float sagR = u_sagDepth_nm / 50000.0 * 0.4;\n" +  // 0.4 keeps warp visible
+            "    // FIXED: Proper radius scaling - make warp field visible\n" +
+            "    float sagR = u_sagDepth_nm / 50.0 * 0.4;\n" +  // Increased scaling for visibility
             "    float prof = (r / sagR) * exp(-(r * r) / (sagR * sagR));\n" +
             "    float beta = u_beta0 * prof / 1000000.0;\n" +
             "    \n" +
@@ -680,8 +680,8 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Use energy pipeline bubble radius instead of hardcoded value
         const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;  // From pipeline or fallback
-        // CRITICAL FIX: halfSize is in clip-space units (0.8), not nanometers
-        const sagRclip = (bubbleRadius_nm / 50000.0) * 0.4;  // FIXED: Convert nm to clip-space properly
+        // CRITICAL FIX: halfSize is in clip-space units (0.8), not nanometers  
+        const sagRclip = (bubbleRadius_nm / 50.0) * 0.4;  // FIXED: Convert nm to clip-space properly
         
         // Use computed β₀ from amplifier chain
         const beta0 = bubbleParams.beta0;
