@@ -249,6 +249,8 @@ class WarpEngine {
         
         console.log(`Grid initialized: ${this.gridVertexCount} vertices, size=${this.gridSize}nm`);
         console.log(`Grid Y0 normalized: ${this.gridY0} (was ~-3600 in raw nm)`);
+        console.log(`First few vertices:`, this.gridVertices.slice(0, 12));
+        console.log(`Last few vertices:`, this.gridVertices.slice(-12));
         
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
@@ -288,6 +290,8 @@ class WarpEngine {
         }
         
         console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
+        console.log(`Grid coordinate range: X=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
+        console.log(`Grid coordinate range: Z=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
         return new Float32Array(verts);
     }
 
@@ -313,12 +317,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(1.0, 1.0, 1.0, 1.0);\n" +  // Solid white for maximum visibility
+            "    frag = vec4(0.7, 0.9, 1.0, 0.8);\n" +  // Light cyan with good visibility
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);\n" +  // Solid white
+            "    gl_FragColor = vec4(0.7, 0.9, 1.0, 0.8);\n" +
             "}";
 
         console.log("Compiling grid shaders...");
@@ -398,9 +402,23 @@ class WarpEngine {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // SKIP background warp field for grid debugging
-        // gl.useProgram(this.program);
-        // ...background rendering disabled...
+        // 1. Render background warp field
+        gl.useProgram(this.program);
+        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle);
+        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y);
+        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ);
+        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm);
+        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio);
+        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW);
+        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
+        gl.uniform1f(this.uLoc.time, time);
+
+        const loc = gl.getAttribLocation(this.program, "a_position");
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.disableVertexAttribArray(loc);
 
         // 2. Update and render dynamic spacetime grid with physics
         this._updateGrid();
@@ -470,19 +488,20 @@ class WarpEngine {
             return;
         }
         
-        // Ultra-simple orthographic projection for debugging
+        // Scale grid to ensure it's visible and centered
         const mvp = new Float32Array([
-            1, 0, 0, 0,    // No scaling - fill screen
-            0, 1, 0, 0,     
+            1.2, 0, 0, 0,    // Slightly larger than viewport
+            0, 1.2, 0, 0,     
             0, 0, 1, 0,     
             0, 0, 0, 1
         ]);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Force grid to render on top without blending
+        // Render grid on top with transparency
         gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         
         // Thick lines for maximum visibility
         gl.lineWidth(3.0);
@@ -504,7 +523,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
         
-        console.log(`WHITE GRID RENDERED: ${this.gridVertexCount} vertices - should be CLEARLY VISIBLE`);
+        console.log(`Spacetime grid rendered: ${this.gridVertexCount} vertices, light cyan overlay`);
     }
 
     //----------------------------------------------------------------
