@@ -441,35 +441,40 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
-        const sagR = bubbleParams.sagDepth_nm * 1e-9;          // nm → m
+        // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
+        const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
         const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
-        const norm = 0.8 / halfSize;                            // clip-space normalization
 
         for (let i = 0; i < vtx.length; i += 3) {
-            // Current clip-space coordinates
-            const xClip = vtx[i];
-            const zClip = vtx[i + 2];
+            // Work directly in clip-space coordinates
+            const x = vtx[i];
+            const z = vtx[i + 2];
+            const r = Math.hypot(x, z);              // radius in clip-space
             
-            // Convert back to physical metres for physics calculation
-            const xPhys = xClip / norm * 1e-9;
-            const zPhys = zClip / norm * 1e-9;
-            const r = Math.hypot(xPhys, zPhys);
-            
-            // Natário warp bubble profile
-            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
+            // Natário warp bubble profile (now with correct units)
+            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.05;               // 5% of β as sideways offset
-            const scale = (r > 1e-12) ? (1.0 + push / r) : 1.0;
+            const push = beta * 0.15;               // Increased visibility (3x stronger)
+            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
-            vtx[i] = xClip * scale;                  // X warped laterally
-            vtx[i + 2] = zClip * scale;              // Z warped laterally
+            vtx[i] = x * scale;                      // X warped laterally
+            vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dyNorm = beta * 0.1 * norm;       // Normalized Y displacement
-            vtx[i + 1] = y0 + dyNorm;                // Y warped vertically
+            const dy = beta * 0.15;                 // Keep in clip units (3x stronger)
+            vtx[i + 1] = y0 + dy;                    // Y warped vertically
         }
+        
+        // Visual smoke test - check Y range after warping
+        let ymax = -1e9, ymin = 1e9;
+        for (let i = 1; i < vtx.length; i += 3) {
+            const y = vtx[i];
+            if (y > ymax) ymax = y;
+            if (y < ymin) ymin = y;
+        }
+        console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
     }
 
     _renderGrid() {
@@ -505,12 +510,12 @@ class WarpEngine {
             0, 0, -1, 0
         ]);
 
-        // Look-at view matrix (camera slightly raised and back)
-        const eye = [0, 0.3, 2.0];
+        // Look-at view matrix (lower camera to see peaks and valleys better)
+        const eye = [0, 0.15, 1.6];
         const view = new Float32Array([
             1, 0, 0, 0,
-            0, 1, 0, -0.3,
-            0, 0, 1, -2.0,
+            0, 1, 0, -0.15,
+            0, 0, 1, -1.6,
             0, 0, 0, 1
         ]);
 
