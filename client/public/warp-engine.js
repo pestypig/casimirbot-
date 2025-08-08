@@ -429,14 +429,16 @@ class WarpEngine {
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
-        // Clear with distinctive blue background to verify rendering
-        gl.clearColor(0.1, 0.2, 0.5, 1.0);
+        // Clear with dark blue background for contrast
+        gl.clearColor(0.05, 0.1, 0.15, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
         
-        console.log(`Frame ${Math.floor(time)}: Canvas ${this.canvas.width}x${this.canvas.height}, GL context OK`);
+        // Enable depth testing for 3D grid
+        gl.enable(gl.DEPTH_TEST);
         
-        // SIMPLE TEST: Draw 4 red corner dots with identity matrix
-        this._drawSimpleTest();
+        // Now render the full grid with proper physics
+        this._updateGrid();
+        this._renderGridPoints();
     }
     
     _drawSimpleTest() {
@@ -501,25 +503,7 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
-        // NUCLEAR OPTION: "nuke it" sanity check - bypass all physics
-        for (let i = 0; i < vtx.length; i += 3) {
-            if (i === 0) {  // run once per frame
-                console.log("*** NUCLEAR TEST: Grid nuked for visibility test ***");
-                for (let k = 0; k < vtx.length; k += 3) {
-                    vtx[k]     *= 1.05;        // very mild stretch (was 1.4)
-                    vtx[k + 2] *= 1.05;        // very mild stretch (was 1.4)
-                    vtx[k + 1] += 0.05;        // small lift (was 0.15)
-                }
-                
-                // Check coordinate ranges after transformation
-                const xRange = [Math.min(...vtx.filter((_,i)=>i%3===0)), Math.max(...vtx.filter((_,i)=>i%3===0))];
-                const zRange = [Math.min(...vtx.filter((_,i)=>i%3===2)), Math.max(...vtx.filter((_,i)=>i%3===2))];
-                console.log(`Post-warp X range: ${xRange[0].toFixed(2)} → ${xRange[1].toFixed(2)}`);
-                console.log(`Post-warp Z range: ${zRange[0].toFixed(2)} → ${zRange[1].toFixed(2)}`);
-                console.log("Grid gently stretched - should stay in clip cube");
-                return;
-            }
-        }
+        // Removed nuclear test - now applying real physics
 
         // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
         const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
@@ -536,14 +520,14 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 1.5;                // HUGE exaggeration for testing (10x)
+            const push = beta * 0.1;                // Moderate lateral deformation
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.8;                  // HUGE exaggeration for testing (5x)
+            const dy = beta * 0.2;                  // Moderate deformation for visibility
             vtx[i + 1] = y0 + dy;                    // Y warped vertically
         }
         
@@ -564,7 +548,7 @@ class WarpEngine {
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
     }
 
-    _renderGrid() {
+    _renderGridPoints() {
         const gl = this.gl;
         
         // Use the properly compiled grid program
@@ -623,39 +607,29 @@ class WarpEngine {
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        // DIAGNOSTIC 4: Test with POINTS to bypass line-width issues
+        // Render grid as points with proper 3D perspective
         if (this.gridUniforms.position !== -1) {
-            console.log(`Attempting to render ${this.gridVertexCount} RED POINTS...`);
-            
-            // Enable point sprite rendering and set viewport
-            gl.enable(gl.DEPTH_TEST);
-            gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-            gl.clearColor(0.0, 0.0, 0.0, 1.0);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-            
-            // TEMPORARY: Use identity MVP matrix to ensure visibility
-            const identityMVP = new Float32Array([
-                1,0,0,0,
-                0,1,0,0,
-                0,0,1,0,
-                0,0,0,1
+            // Set up 3D perspective camera (moderate zoom)
+            const proj = new Float32Array([
+                2.4, 0, 0, 0,
+                0, 2.4, 0, 0,
+                0, 0, -1.002, -1,
+                0, 0, -0.2, 0
             ]);
-            gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identityMVP);
-            console.log("Using IDENTITY MVP matrix for visibility test");
-            console.log(`Canvas size: ${this.canvas.width}x${this.canvas.height}`);
             
-            const error1 = gl.getError();
-            if (error1 !== gl.NO_ERROR) console.error("WebGL error before draw:", error1);
+            const view = new Float32Array([
+                1, 0, 0, 0,
+                0, 1, 0, -0.1,   // slightly elevated camera
+                0, 0, 1, -1.2,   // closer camera position
+                0, 0, 0, 1
+            ]);
+            
+            const mvp = this._multiplyMatrices(proj, view);
+            gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
             
             gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
             
-            const error2 = gl.getError();
-            if (error2 !== gl.NO_ERROR) console.error("WebGL error after draw:", error2);
-            console.log("Grid draw call completed - should see bright red dots with identity matrix");
-            
-            // Force a flush to ensure rendering happens
-            gl.flush();
-            gl.finish();
+            console.log(`Rendered ${this.gridVertexCount} grid points with 3D perspective`);
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }
@@ -670,7 +644,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
         
-        console.log(`DIAGNOSTIC MODE: Grid rendered as ${this.gridVertexCount} points with 10x exaggerated deformation`);
+        console.log(`3D spacetime grid rendered with authentic Natário warp bubble physics`);
     }
 
     // Helper function for matrix multiplication
