@@ -9,6 +9,7 @@ declare global {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
+import { WarpDiagnostics } from './WarpDiagnostics';
 
 interface WarpVisualizerProps {
   parameters: {
@@ -369,6 +370,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               </div>
             </div>
           </div>
+        </div>
+        
+        {/* WarpFactory-inspired diagnostics panel */}
+        <div className="mt-4">
+          <WarpDiagnostics 
+            beta0={parameters.dutyCycle * parameters.g_y}
+            mode={parameters.currentMode || 'unknown'}
+            sagDepth={parameters.sagDepth_nm}
+          />
         </div>
       </CardContent>
     </Card>
