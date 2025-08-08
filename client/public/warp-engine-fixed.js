@@ -36,8 +36,7 @@ class WarpEngine {
             sagDepth_nm: 16,
             tsRatio: 4102.74,
             powerAvg_MW: 83.3,
-            exoticMass_kg: 1405,
-            warpStrength: 2.0  // New knob for visual deformation (0-10)
+            exoticMass_kg: 1405
         };
         
         // Initialize rendering pipeline
@@ -198,19 +197,12 @@ class WarpEngine {
         // Copy original vertices
         this.gridVertices.set(this.originalGridVertices);
         
-        // Add breathing/pulsing animation to make curvature obvious
-        const pulse = 1.0 + 0.3 * Math.sin(performance.now() * 0.002);
-        const animatedParams = { 
-            ...this.currentParams, 
-            warpStrength: this.currentParams.warpStrength * pulse 
-        };
-        
         // Apply warp field deformation
         const vtx = this.gridVertices;
         const halfSize = 20000; // Half grid size in original units
         const originalY = -0.144; // Base Y coordinate
         
-        this._warpGridVertices(vtx, halfSize, originalY, animatedParams);
+        this._warpGridVertices(vtx, halfSize, originalY, this.currentParams);
         
         // Upload updated vertices to GPU
         const gl = this.gl;
@@ -243,14 +235,14 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.05 * bubbleParams.warpStrength;  // Adjustable strength
+            const push = beta * 0.05;               // FIXED: Keep inside clip cube (-1 to +1)
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.05 * bubbleParams.warpStrength;    // Adjustable strength
+            const dy = beta * 0.05;                 // FIXED: Keep inside clip cube (-1 to +1)
             vtx[i + 1] = y_original + dy;            // Y warped vertically from original position
         }
         

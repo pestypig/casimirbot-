@@ -86,7 +86,6 @@ export default function HelixCore() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
-  const [warpStrength, setWarpStrength] = useState(2.0);  // Spacetime curvature strength
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Use centralized energy pipeline
@@ -813,62 +812,17 @@ export default function HelixCore() {
             </Card>
 
             {/* Natário Warp Bubble Visualizer */}
-            <div className="space-y-4">
-              {/* Spacetime Curvature Controls */}
-              <Card className="bg-slate-900 border-cyan-500">
-                <CardHeader>
-                  <CardTitle className="text-cyan-400 flex items-center gap-2">
-                    <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse" />
-                    Spacetime Curvature Control
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm text-slate-300 mb-2 block">
-                        Warp Strength: {warpStrength.toFixed(1)}x 
-                        <span className="text-cyan-400 ml-2 text-xs">
-                          {warpStrength > 0 ? "(breathing effect active)" : "(static spacetime)"}
-                        </span>
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={warpStrength}
-                        onChange={(e) => setWarpStrength(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer"
-                        style={{
-                          background: `linear-gradient(to right, #334155 0%, #334155 ${(warpStrength/10)*100}%, #0891b2 ${(warpStrength/10)*100}%, #0891b2 100%)`
-                        }}
-                      />
-                      <div className="flex justify-between text-xs text-slate-400 mt-1">
-                        <span>Flat Spacetime</span>
-                        <span>Moderate Curvature</span>
-                        <span>Extreme Warping</span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-2">
-                        The warp bubble automatically "breathes" at ~1Hz to make spacetime curvature more visible.
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <WarpVisualizer
-                parameters={{
-                  dutyCycle: pipelineState?.dutyCycle || 0.14,
-                  g_y: pipelineState?.gammaGeo || 26,
-                  cavityQ: pipelineState?.qFactor || 1e9,
-                  sagDepth_nm: pipelineState?.sagDepth || 16,
-                  tsRatio: pipelineState?.TS_ratio || 4102.74,
-                  powerAvg_MW: pipelineState?.P_avg || 83.3,
-                  exoticMass_kg: pipelineState?.M_exotic || 1405,
-                  warpStrength: warpStrength
-                }}
-              />
-            </div>
+            <WarpVisualizer
+              parameters={{
+                dutyCycle: pipelineState?.dutyCycle || 0.14,
+                g_y: pipelineState?.gammaGeo || 26,
+                cavityQ: pipelineState?.qFactor || 1e9,
+                sagDepth_nm: pipelineState?.sagDepth || 16,
+                tsRatio: pipelineState?.TS_ratio || 4102.74,
+                powerAvg_MW: pipelineState?.P_avg || 83.3,
+                exoticMass_kg: pipelineState?.M_exotic || 1405
+              }}
+            />
           </div>
         </div>
       </div>
