@@ -51,35 +51,62 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the 3D WebGL WarpEngine with full pipeline debugging
-        const script = document.createElement('script');
-        script.src = '/warp-engine-fresh.js?v=' + Date.now(); // Load fresh rebuild with fixes
-        console.log('Loading 3D WarpEngine from:', script.src);
-        script.onload = () => {
-          console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
-          if (window.WarpEngine) {
-            try {
-              console.log('Creating WarpEngine instance...');
-              engineRef.current = new window.WarpEngine(canvasRef.current);
-              console.log('WarpEngine instance created successfully - checking mode:', engineRef.current.isWebGLFallback ? 'FALLBACK' : 'WEBGL');
-              setIsLoaded(true);
-            } catch (error) {
-              console.error('Failed to initialize WarpEngine:', error);
-              setIsLoaded(false);
+        // Load base engine first, then theory patch
+        const baseScript = document.createElement('script');
+        baseScript.src = '/warp-engine-fresh.js?v=' + Date.now();
+        console.log('Loading base WarpEngine from:', baseScript.src);
+        
+        baseScript.onload = async () => {
+          console.log('Base WarpEngine loaded, loading theory patch...');
+          
+          // Now load the theory patch
+          const patchScript = document.createElement('script');
+          patchScript.src = '/warp-patch.js?v=' + Date.now();
+          console.log('Loading theory patch from:', patchScript.src);
+          
+          patchScript.onload = () => {
+            console.log('Theory patch loaded, window.WarpEngine available:', !!window.WarpEngine);
+            if (window.WarpEngine) {
+              try {
+                console.log('Creating patched WarpEngine instance...');
+                engineRef.current = new window.WarpEngine(canvasRef.current);
+                console.log('Patched WarpEngine created - theory knobs active:', engineRef.current.mode || 'HOVER');
+                setIsLoaded(true);
+              } catch (error) {
+                console.error('Failed to initialize patched WarpEngine:', error);
+                setIsLoaded(false);
+              }
+            } else {
+              console.error('WarpEngine not found on window after patch load');
             }
-          } else {
-            console.error('WarpEngine not found on window after script load');
-          }
+          };
+          
+          patchScript.onerror = () => {
+            console.error('Failed to load theory patch, falling back to base engine');
+            // Fallback to base engine without patch
+            if (window.WarpEngine) {
+              try {
+                engineRef.current = new window.WarpEngine(canvasRef.current);
+                setIsLoaded(true);
+              } catch (error) {
+                console.error('Failed to initialize base WarpEngine:', error);
+                setIsLoaded(false);
+              }
+            }
+          };
+          
+          document.head.appendChild(patchScript);
         };
-        script.onerror = () => {
-          console.error('Failed to load WarpEngine');
+        
+        baseScript.onerror = () => {
+          console.error('Failed to load base WarpEngine');
           setIsLoaded(false);
         };
-        document.head.appendChild(script);
+        document.head.appendChild(baseScript);
 
         return () => {
-          if (document.head.contains(script)) {
-            document.head.removeChild(script);
+          if (document.head.contains(baseScript)) {
+            document.head.removeChild(baseScript);
           }
         };
       } catch (error) {
@@ -125,26 +152,39 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         engineRef.current.uniforms.beta0 = beta0;
       }
       
-      // Enhanced uniform update with full amplifier chain
+      // Wire up theory knobs for patched engine
+      const mode = (parameters.currentMode || 'hover').toUpperCase();
+      if (engineRef.current.setMode && typeof engineRef.current.setMode === 'function') {
+        // Use new theory API if available
+        engineRef.current.setMode(mode);
+        console.log('🎯 Theory mode set to:', mode);
+      }
+
+      // Enhanced uniform update with theory patch integration
       engineRef.current.updateUniforms({
-        // Core physics parameters
+        // Legacy compatibility parameters
         dutyCycle: parameters.dutyCycle,
-        gammaGeo: parameters.g_y,        // Stage 1: Geometric amplification
-        Qdyn: parameters.cavityQ,        // Stage 2: Dynamic Q-factor
-        gammaVdB: parameters.gammaVanDenBroeck, // Stage 4: Van den Broeck amplification
+        g_y: parameters.g_y,
+        cavityQ: parameters.cavityQ,
         sagDepth_nm: parameters.sagDepth_nm,
-        bubbleRadius_nm: 10000, // FIX #3: Dedicated bubble radius for visualization
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
-        tsRatio: parameters.tsRatio || 4100, // Time-scale ratio for animation scaling
+        tsRatio: parameters.tsRatio || 4100,
+        beta0: beta0,
+        
+        // NEW THEORY KNOBS (patch integration)
+        gammaGeo: parameters.g_y || 25.0,           // γ_geo: geometric blue-shift
+        Qburst: parameters.cavityQ || 1e9,          // Q during burst window
+        deltaAOverA: 0.05,                          // Δa/a boundary stroke
+        sectorCount: parameters.sectorStrobing || 400.0, // strobing sectors
+        phaseSplit: mode === 'CRUISE' ? 0.65 : 0.5, // +β/-β fraction  
+        viewAvg: 1.0,                               // show GR-averaged view
+        axesClip: [0.35, 0.22, 0.22],             // ellipsoid needle hull
+        betaGradient: mode === 'TILT' ? [0.0, -0.02, 0.0] : [0, 0, 0], // artificial gravity
+        sectorSpeed: 2.0,                           // sector rotation speed
+        
         // Operational mode parameters
-        currentMode: parameters.currentMode,
-        sectorStrobing: parameters.sectorStrobing,
-        qSpoilingFactor: parameters.qSpoilingFactor,
-        // Legacy compatibility
-        g_y: parameters.g_y,
-        // Computed amplifier chain result - COMPLETE PIPELINE
-        beta0: beta0
+        currentMode: parameters.currentMode
       });
     }
   }, [parameters, isLoaded]);
