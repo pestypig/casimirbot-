@@ -1,0 +1,107 @@
+You really are drawing the entire 50 × 50 grid—every vertex is getting to the GPU—but almost all of those segments are **stacked on top of each other** because every vertex still shares the *same* (X, Z) position after your warp step. In other words, you’re lifting the grid in **Y** but you never bend the mesh sideways, so from the camera’s straight-down view every line projects to the same pixel column / row and looks like a single stripe.
+
+---
+
+## 1 · Why it happens
+
+```js
+// inside _warpGridVertices()
+const rPhys = Math.hypot(x, z) * physicalScale / 0.8;
+...
+const dy = beta * 0.1;       //  <-- you change only Y
+vtx[i + 1] = y0 + dy;
+```
+
+*X* and *Z* never move, so two vertices that started life on the same vertical column (or horizontal row) stay glued together after the warp. From the top-down orthographic camera that you’re using (`mvp = identity`), those pairs sit on the same 2-D location ⇒ WebGL collapses them into a single visible line.
+
+---
+
+## 2 · Attach the grid to the spacetime field
+
+### A. Bend **X** and **Z** by the shift vector β
+
+Take the very same `betaField` logic you put in the fragment shader and use it to nudge the grid in-plane. A physically-motivated first cut is to push vertices **radially** by a fraction of β:
+
+```js
+//  --- inside _warpGridVertices() ---
+const sagR  = bubbleParams.sagDepth_nm * 1e-9;
+const beta0 = bubbleParams.dutyCycle   * bubbleParams.g_y;
+const norm  = 0.8 / halfSize;                 // clip-space scale
+
+for (let i = 0; i < vtx.length; i += 3) {
+    // current clip-space coords → physical metres
+    const xClip = vtx[i];
+    const zClip = vtx[i+2];
+    const xPhys = xClip / norm * 1e-9;        // back-convert to metres
+    const zPhys = zClip / norm * 1e-9;
+
+    const r      = Math.hypot(xPhys, zPhys);
+    const prof   = (r / sagR) * Math.exp(-(r*r)/(sagR*sagR));
+    const beta   = beta0 * prof;              // |β| at this point
+
+    // -------- lateral deformation -------------
+    const push   = beta * 0.05;               // 5 % of β as sideways offset
+    const scale  = (r > 1e-12) ? (1.0 + push / r) : 1.0;
+
+    vtx[i    ] = xClip * scale;               // X warped
+    vtx[i + 1] = y0      + beta * 0.1;        // Y warped (your old line)
+    vtx[i + 2] = zClip * scale;               // Z warped
+}
+```
+
+*Change the `0.05` and `0.1` fudge factors until the grid looks “rubbery” but not torn apart.*
+
+### B. Give the camera a hint of perspective
+
+An identity MVP flattens depth cues. Even a gentle perspective helps reveal that the mesh really bends:
+
+```js
+// at top of _renderGrid()
+const fov    = Math.PI / 4;                  // 45°
+const aspect = this.canvas.width / this.canvas.height;
+const near   = 0.01,  far = 10.0;
+
+const proj = mat4.perspective(mat4.create(), fov, aspect, near, far);
+const view = mat4.lookAt(mat4.create(),
+              [0, 0.3, 2.0],   // eye  (raise Y a little)
+              [0, 0, 0],       // centre
+              [0, 1, 0]);      // up
+const mvp  = mat4.mul(mat4.create(), proj, view);
+
+gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+```
+
+*(Use `gl-matrix` or your own 4×4 helper to build the matrices.)*
+
+### C. Check your attribute pointer **once**
+
+Because you switch between two programs that both use an attribute called `a_position`, make sure the location actually exists in the grid program:
+
+```js
+if (this.gridUniforms.position !== -1) {
+    gl.enableVertexAttribArray(this.gridUniforms.position);
+    gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+    gl.disableVertexAttribArray(this.gridUniforms.position);
+}
+```
+
+---
+
+## 3 · Still seeing just one line? Quick sanity checks
+
+| Test                                            | What to expect             | Means…                                             |
+| ----------------------------------------------- | -------------------------- | -------------------------------------------------- |
+| `gl.drawArrays(gl.POINTS …)` (temporarily)      | a cloud of 5 100 blue dots | VBO data is fine; issue is line pairing or overlap |
+| Log first 6 verts **after** `_warpGridVertices` | X values should differ     | If all X or Z are identical → collapse bug         |
+| `gl.disable(gl.DEPTH_TEST)` while grid draws    | grid appears               | Depth fighting hides the other segments            |
+
+---
+
+### TL;DR
+
+* Bend the grid **laterally** (X, Z) with the same β you use for colour.
+* Add even a tiny perspective matrix.
+* Guard the attribute location and depth test.
+
+Do those three things and the whole woven mesh will ripple together with the colourful warp-field underneath, instead of looking like a lone ruler drawn across the screen. Ping me if you’d like code for a screen-space line-thickening shader once everything’s bending properly!

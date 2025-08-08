@@ -443,29 +443,32 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
         const sagR = bubbleParams.sagDepth_nm * 1e-9;          // nm → m
         const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
-        
-        // Convert normalized grid coordinates back to physical scale for calculations
-        const physicalScale = 20e-9;  // 20nm field scale from main shader
+        const norm = 0.8 / halfSize;                            // clip-space normalization
 
         for (let i = 0; i < vtx.length; i += 3) {
-            const x = vtx[i], z = vtx[i + 2];
-
-            // Convert normalized coordinates to physical distance
-            const rPhys = Math.hypot(x, z) * physicalScale / 0.8;  // Scale back from [-0.8,0.8] normalization
+            // Current clip-space coordinates
+            const xClip = vtx[i];
+            const zClip = vtx[i + 2];
+            
+            // Convert back to physical metres for physics calculation
+            const xPhys = xClip / norm * 1e-9;
+            const zPhys = zClip / norm * 1e-9;
+            const r = Math.hypot(xPhys, zPhys);
             
             // Natário warp bubble profile
-            const prof = (rPhys / sagR) * Math.exp(-(rPhys * rPhys) / (sagR * sagR));
+            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
-            // Map spacetime curvature to visible Y displacement 
-            // Scale for visibility while maintaining physics authenticity
-            const dy = beta * 0.1;           // Visible deformation amplitude
+            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
+            const push = beta * 0.05;               // 5% of β as sideways offset
+            const scale = (r > 1e-12) ? (1.0 + push / r) : 1.0;
+
+            vtx[i] = xClip * scale;                  // X warped laterally
+            vtx[i + 2] = zClip * scale;              // Z warped laterally
             
-            // Apply same normalization to deformation as base coordinates
-            const norm = 0.8 / 20000;  // Same normalization factor as grid creation
-            const dyNorm = dy * norm;
-            
-            vtx[i + 1] = y0 + dyNorm;
+            // -------- VERTICAL DEFORMATION: Y displacement --------
+            const dyNorm = beta * 0.1 * norm;       // Normalized Y displacement
+            vtx[i + 1] = y0 + dyNorm;                // Y warped vertically
         }
     }
 
@@ -488,13 +491,31 @@ class WarpEngine {
             return;
         }
         
-        // Scale grid to ensure it's visible and centered
-        const mvp = new Float32Array([
-            1.2, 0, 0, 0,    // Slightly larger than viewport
-            0, 1.2, 0, 0,     
-            0, 0, 1, 0,     
+        // Add perspective camera to reveal 3D warp deformation
+        const fov = Math.PI / 4;                    // 45°
+        const aspect = this.canvas.width / this.canvas.height;
+        const near = 0.01, far = 10.0;
+
+        // Simple perspective matrix (without gl-matrix dependency)
+        const f = 1.0 / Math.tan(fov / 2);
+        const proj = new Float32Array([
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
+            0, 0, -1, 0
+        ]);
+
+        // Look-at view matrix (camera slightly raised and back)
+        const eye = [0, 0.3, 2.0];
+        const view = new Float32Array([
+            1, 0, 0, 0,
+            0, 1, 0, -0.3,
+            0, 0, 1, -2.0,
             0, 0, 0, 1
         ]);
+
+        // Combine projection and view
+        const mvp = this._multiplyMatrices(proj, view);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
@@ -511,7 +532,12 @@ class WarpEngine {
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+        // Guard attribute location and render
+        if (this.gridUniforms.position !== -1) {
+            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+        } else {
+            console.warn("Grid attribute position not found, skipping render");
+        }
         
         // Check for WebGL errors after drawing
         const error = gl.getError();
@@ -523,7 +549,22 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
         
-        console.log(`Spacetime grid rendered: ${this.gridVertexCount} vertices, light cyan overlay`);
+        console.log(`Spacetime grid rendered: ${this.gridVertexCount} vertices with lateral warp deformation`);
+    }
+
+    // Helper function for matrix multiplication
+    _multiplyMatrices(a, b) {
+        const result = new Float32Array(16);
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                result[i * 4 + j] = 
+                    a[i * 4 + 0] * b[0 * 4 + j] +
+                    a[i * 4 + 1] * b[1 * 4 + j] +
+                    a[i * 4 + 2] * b[2 * 4 + j] +
+                    a[i * 4 + 3] * b[3 * 4 + j];
+            }
+        }
+        return result;
     }
 
     //----------------------------------------------------------------
