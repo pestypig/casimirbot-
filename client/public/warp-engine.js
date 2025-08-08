@@ -373,23 +373,9 @@ class WarpEngine {
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-        // 1. Render background warp field
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio);
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
-        gl.uniform1f(this.uLoc.time, time);
-
-        const loc = gl.getAttribLocation(this.program, "a_position");
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        gl.disableVertexAttribArray(loc);
+        // SKIP background warp field for grid debugging
+        // gl.useProgram(this.program);
+        // ...background rendering disabled...
 
         // 2. Update and render dynamic spacetime grid with physics
         this._updateGrid();
@@ -453,11 +439,11 @@ class WarpEngine {
             return;
         }
         
-        // Simple identity matrix - no transformations, but ensure it's in view
+        // Ultra-simple orthographic projection for debugging
         const mvp = new Float32Array([
-            0.5, 0, 0, 0,    // Scale down by half to ensure it's in viewport
-            0, 0.5, 0, 0,     
-            0, 0, 0.5, 0,     
+            1, 0, 0, 0,    // No scaling - fill screen
+            0, 1, 0, 0,     
+            0, 0, 1, 0,     
             0, 0, 0, 1
         ]);
         
