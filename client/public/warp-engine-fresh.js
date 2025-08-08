@@ -545,13 +545,13 @@ class WarpEngine {
         const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
         gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
-        // Render quad first 
+        // Render quad first WITHOUT writing to depth buffer
+        gl.depthMask(false);         // Stop writing Z to depth buffer
         this._renderQuad();
+        gl.depthMask(true);          // Restore depth writes for grid
+        console.log("🎯 DEPTH BUFFER FIX: Orange quad rendered without depth writes - grid should now be visible!");
         
-        // Clear ONLY the depth buffer so grid can render on top
-        gl.clear(gl.DEPTH_BUFFER_BIT);
-        
-        // Now render the grid with corrected projection
+        // Now render the grid with depth testing enabled
         gl.enable(gl.DEPTH_TEST);
         this._updateGrid();
         this._renderGridPointsFixed();
