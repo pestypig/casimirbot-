@@ -1,0 +1,58 @@
+Exactly — with that minimal three-point patch you’ll instantly bring everything into the same ±0.8 clip volume and your grid will spring to life. Here’s the distilled “two-minute” diff you can drop straight into your engine:
+
+1. In `_initGrids()`, after you compute `this.gridHalf`:
+
+```js
+// clip-space normaliser (nm → –0.8…+0.8)
+this.normClip       = 0.8 / this.gridHalf; 
+// choose a physical bubble radius (here 10 µm = 10 000 nm)
+this.bubbleRadius_nm = 10_000;  
+```
+
+2. In your warp-function (`_warpGridVertices`):
+
+```diff
+- const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;
+- const sagRclip       = bubbleRadius_nm / halfSize * 0.4;
++ const bubbleRadius_nm = this.bubbleRadius_nm;
++ const sagRclip       = bubbleRadius_nm * this.normClip;   // ≈ 0.4 clip-units
+```
+
+3. In your fragment shader, replace the “20 nm FOV” hack with the same normaliser (pass `u_normClip` as a uniform):
+
+```glsl
+// inject in JS: gl.uniform1f(uLoc.normClip, engine.normClip);
+uniform float u_normClip;
+…
+void main() {
+  vec2 center = v_uv - 0.5;
+  // now spans the full 40 µm cage instead of tiny 20 nm
+  vec3 pos = vec3(center / u_normClip, 0.0);
+  …
+}
+```
+
+4. (Optionally) render the grid as **points** with a non-zero `gl_PointSize` or crank `lineWidth` to make the sheets visible:
+
+```js
+// in _renderGridPoints, before draw:
+gl.drawArrays(gl.POINTS, offset, count);
+// and in your grid‐VS: gl_PointSize = 4.0;
+```
+
+After those three edits you should see:
+
+– sagRclip ≈ 0.3–0.5  
+– max drift < 0.1  
+– grid Y-range ≈ ±0.08  
+– three properly curved coloured sheets framing your orange warp dimple.
+
+If you still don’t, run through the one-minute checklist:
+
+• β₀ > 0 in the console?  
+• sagRclip logs ≈ 0.3–0.5?  
+• max lateral drift < 0.1?  
+• `_renderGridPoints` logs three draw-calls?  
+• depth‐writes disabled when drawing the quad, so the grid isn’t overwritten?  
+
+Once all those pass, you’ll have a perfectly scaled Natário warp bubble inside your tri-sheet “cage.” Happy curvature-hunting!
