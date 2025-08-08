@@ -241,9 +241,14 @@ class WarpEngine {
         // Store grid parameters for warping
         this.gridSize = 40_000;
         this.gridHalf = this.gridSize / 2;
-        this.gridY0 = -this.gridHalf * 0.3 + 3 * (this.gridSize / 50);  // exact yPlane from C++
+        
+        // CRITICAL FIX: Normalize Y coordinate to clip space like X and Z
+        const step = this.gridSize / 50;
+        const norm = 0.8 / this.gridHalf;
+        this.gridY0 = (-this.gridHalf * 0.3 + 3 * step) * norm;  // Apply same normalization as X/Z
         
         console.log(`Grid initialized: ${this.gridVertexCount} vertices, size=${this.gridSize}nm`);
+        console.log(`Grid Y0 normalized: ${this.gridY0} (was ~-3600 in raw nm)`);
         
         // Create dynamic grid buffer
         this.gridVbo = gl.createBuffer();
@@ -437,8 +442,12 @@ class WarpEngine {
             // Map spacetime curvature to visible Y displacement 
             // Scale for visibility while maintaining physics authenticity
             const dy = beta * 0.1;           // Visible deformation amplitude
-
-            vtx[i + 1] = y0 + dy;
+            
+            // Apply same normalization to deformation as base coordinates
+            const norm = 0.8 / 20000;  // Same normalization factor as grid creation
+            const dyNorm = dy * norm;
+            
+            vtx[i + 1] = y0 + dyNorm;
         }
     }
 
