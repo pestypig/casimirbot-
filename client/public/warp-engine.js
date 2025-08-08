@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 CACHE-BUST-STAMP-v2.3-VISUAL-SCALING-FIXED 🚨');
+            console.error('🚨 CACHE-BUST-STAMP-v2.4-NATARIO-ANALYTIC-CURVATURE 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with fallback compatibility loaded');
             
@@ -726,7 +726,7 @@ class WarpEngine {
 
         // Use energy pipeline bubble radius instead of hardcoded value
         const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;  // From pipeline or fallback
-        const sagRclip = bubbleRadius_nm / halfSize * 0.8;  // Convert to clip-space
+        const sagRclip = bubbleRadius_nm / halfSize * 0.4;  // keeps the warp inside ±0.8
         
         // Use computed β₀ from amplifier chain (duty × γ_geo × √Q_dyn × γ_VdB^0.25)
         const beta0 = bubbleParams.beta0;
@@ -763,21 +763,18 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            // Auto-scale to keep max deformation around 0.1 (10% of clip space)
-            const targetMaxDeformation = 0.1;
-            const betaNormalized = beta / Math.max(1e6, Math.abs(beta0)); // Normalize by peak beta0
-            const push = betaNormalized * targetMaxDeformation;           // Adaptive scaling
+            const push = beta * 0.05;                // simple, stable 5% of |β|
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement scaled by realistic power --------
-            // Use logarithmic scaling to prevent grid explosion at very high powers
-            const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / Math.log10(100);  // Log scale (100MW baseline)
+            // Use clamped linear scaling to keep within frustum
+            const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
             const tsRatio = bubbleParams.tsRatio || 4100;
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * 0.05 * powerScale * timeScale;      // Power and time-scaled displacement
+            const dy = beta * 0.03 * powerScale * timeScale;      // 3% keeps |y|<0.8
             vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
@@ -786,7 +783,7 @@ class WarpEngine {
         for (let i = 0; i < vtx.length; i += 3) {
             maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
         }
-        console.log("Max lateral drift =", maxDrift.toFixed(4), "(auto-scaled to stay visible, target ~0.1)");
+        console.log("Max lateral drift =", maxDrift.toFixed(4), "(target ≈ 0.08 for needle-hull pinch)");
         
         // Visual smoke test - check Y range after warping
         let ymax = -1e9, ymin = 1e9;

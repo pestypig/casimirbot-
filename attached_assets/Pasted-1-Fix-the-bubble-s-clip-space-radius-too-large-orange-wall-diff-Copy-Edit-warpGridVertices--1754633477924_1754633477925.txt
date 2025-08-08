@@ -1,0 +1,51 @@
+1 Fix the bubble’s clip-space radius (too large → orange wall)
+diff
+Copy
+Edit
+// _warpGridVertices
+- const sagRclip = bubbleRadius_nm / halfSize * 0.8;   // 0.8 over-fills the view
++ const sagRclip = bubbleRadius_nm / halfSize * 0.4;   // keeps the warp inside ±0.8
+Why it matters
+halfSize is already scaled to ±0.8 in _createGrid, so multiplying again by 0.8 doubles the physical radius in clip-space; the fragment shader then draws “inside the bubble” across almost the whole quad, hence the orange fill.
+
+2 Stop over-normalising β (makes the grid “melt”)
+diff
+Copy
+Edit
+// ------------ LATERAL DEFORMATION ------------
+- const betaNormalized = beta / Math.max(1e6, Math.abs(beta0));
+- const push = betaNormalized * targetMaxDeformation;
++ const push = beta * 0.05;                // simple, stable 5 % of |β|
+The 1e6 hard-floor means betaNormalized is ~0 for most pixels, then jumps to
+1 when β≈10^6, giving that dead-flat orange interior and a razor-sharp rim.
+Scale directly with β instead – you already clamp the result with targetMaxDeformation.
+
+3 Keep the vertical displacement within the frustum
+diff
+Copy
+Edit
+- const powerScale = Math.log10(Math.max(1, powerAvg_MW)) / Math.log10(100);
+- const dy = beta * 0.05 * powerScale * timeScale;
++ const powerScale = clamp(powerAvg_MW / 100.0, 0.1, 5.0); // linear, clamped
++ const dy = beta * 0.03 * powerScale * timeScale;         // 3 % keeps |y|<0.8
+The current log-scale still produces >1.0 displacements for large β; the grid sheet
+then stretches outside the view volume and gets clipped. A capped linear scale is
+much easier to reason about while you tune.
+
+Quick test loop
+Apply the three patches above.
+
+Hard-refresh (disable cache) – in the console you should still see
+🚨 CACHE-BUST-STAMP-v2.3-VISUAL-SCALING-FIXED 🚨.
+
+Confirm in the logs:
+
+sql
+Copy
+Edit
+sagRclip = 0.32   (not 0.64+)
+Max lateral drift ≈ 0.08
+Grid Y range      ≈ -0.10 … +0.10
+If those numbers are in the right ball-park the visual will show your expected
+needle-hull pinch and the three coloured sheets will curve smoothly instead of
+filling the screen.
