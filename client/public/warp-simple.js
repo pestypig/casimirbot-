@@ -4,6 +4,7 @@ class SimpleWarpEngine {
         this.ctx = canvas.getContext('2d');
         this.animationId = null;
         this.initialized = false;
+        this.amplificationMode = 'auto'; // 'auto', 'legacy', 'amplified'
         
         // Default operational mode parameters with full amplifier chain
         this.params = {
@@ -39,6 +40,24 @@ class SimpleWarpEngine {
         this.resize();
         this.initialized = true;
         this.startRenderLoop();
+        this.setupKeyboardControls();
+    }
+    
+    setupKeyboardControls() {
+        // Add keyboard toggle for amplification modes
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'a' || e.key === 'A') {
+                // Cycle through amplification modes
+                if (this.amplificationMode === 'auto') {
+                    this.amplificationMode = 'legacy';
+                } else if (this.amplificationMode === 'legacy') {
+                    this.amplificationMode = 'amplified';
+                } else {
+                    this.amplificationMode = 'auto';
+                }
+                console.log('🔄 Amplification mode:', this.amplificationMode);
+            }
+        });
     }
     
     updateUniforms(parameters) {
@@ -223,11 +242,32 @@ class SimpleWarpEngine {
                 }
                 
                 // Apply Y displacement for Natário warp bubble height
-                const yDisplacement = beta_magnitude / metresPerClip * 50; // scale for visibility
+                // Amplification mode selection
+                let visualScale;
+                if (this.amplificationMode === 'legacy') {
+                    // Original small β₀ values
+                    const legacyBeta0 = duty * gammaGeo; // Just duty × γ_geo
+                    const legacyBetaMag = legacyBeta0 * s * Math.exp(-s * s);
+                    worldY = (legacyBetaMag / metresPerClip) * 200;
+                    visualScale = 1.0;
+                } else if (this.amplificationMode === 'amplified') {
+                    // Force full amplification visible
+                    visualScale = 1e-4; // More aggressive scaling
+                } else {
+                    // Auto mode - dynamically scale based on β₀ magnitude
+                    if (beta0 > 1e6) {
+                        visualScale = 1e-6;  // High amplification: scale down heavily
+                    } else if (beta0 > 1e3) {
+                        visualScale = 1e-3;  // Medium amplification: moderate scaling
+                    } else {
+                        visualScale = 1.0;   // Low amplification: no extra scaling
+                    }
+                }
+                const yDisplacement = (beta_magnitude * visualScale) / metresPerClip * 200; // increased base scale
                 worldY = yDisplacement;
                 
-                // Clamp warp displacement for stability
-                worldY = Math.max(-0.2, Math.min(0.2, worldY));
+                // Clamp warp displacement for stability (increased range for amplified effects)
+                worldY = Math.max(-1.5, Math.min(1.5, worldY));
                 
                 // Debug logging once per frame
                 if (i === 0 && j === 0) {
@@ -235,6 +275,8 @@ class SimpleWarpEngine {
                         r_nm: r*1e9, 
                         s: s.toFixed(3), 
                         beta: beta_magnitude.toExponential(3),
+                        beta0: beta0.toExponential(3),
+                        visualScale: visualScale,
                         yShiftClip: worldY.toFixed(6)
                     });
                 }
@@ -326,12 +368,20 @@ class SimpleWarpEngine {
                 const s = r / R;
                 const beta_magnitude = beta0 * s * Math.exp(-s * s); // authentic Natário profile
                 
-                // Apply Y displacement for Natário warp bubble height
-                const yDisplacement = beta_magnitude / metresPerClip * 50; // scale for visibility
+                // Apply Y displacement for Natário warp bubble height (same scaling as horizontal)
+                let visualScale;
+                if (beta0 > 1e6) {
+                    visualScale = 1e-6;  // High amplification: scale down heavily
+                } else if (beta0 > 1e3) {
+                    visualScale = 1e-3;  // Medium amplification: moderate scaling
+                } else {
+                    visualScale = 1.0;   // Low amplification: no extra scaling
+                }
+                const yDisplacement = (beta_magnitude * visualScale) / metresPerClip * 200; // increased base scale
                 worldY = yDisplacement;
                 
-                // Clamp warp displacement for stability
-                worldY = Math.max(-0.2, Math.min(0.2, worldY));
+                // Clamp warp displacement for stability (increased range for amplified effects)
+                worldY = Math.max(-1.5, Math.min(1.5, worldY));
                 
                 // Project 3D world coordinates to 2D screen
                 const projected = project3D(worldX, worldY, worldZ);
@@ -367,7 +417,8 @@ class SimpleWarpEngine {
         ctx.fillText(`${effects.description}`, 10, 40);
         ctx.fillText(`β₀: ${beta0_disp.toExponential(2)} | R: ${R_nm}nm | P: ${this.params.powerAvg_MW?.toFixed(1) || '0.0'}MW`, 10, 55);
         ctx.fillText(`Amplifiers: γ=${gamma_geo_disp} × Q=${Q_dyn_disp.toExponential(0)} × VdB=${gamma_VdB_disp.toExponential(0)}^0.25`, 10, 70);
-        ctx.fillText(`Duty: ${(duty_disp * 100).toFixed(1)}% | γᵢⱼ = δᵢⱼ + βᵢβⱼ`, 10, 85);
+        ctx.fillText(`Duty: ${(duty_disp * 100).toFixed(1)}% | Mode: ${this.amplificationMode.toUpperCase()} | γᵢⱼ = δᵢⱼ + βᵢβⱼ`, 10, 85);
+        ctx.fillText(`Press 'A' to toggle amplification modes`, 10, 100);
         
         // Energy density indicator
         ctx.fillStyle = '#FF00FF';
