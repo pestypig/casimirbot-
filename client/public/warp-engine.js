@@ -255,24 +255,19 @@ class WarpEngine {
         this._compileGridShaders();
     }
 
-    // Simple test grid - just a few large lines that should be clearly visible
-    _createGrid(size = 40_000, divisions = 10) {  // Reduce to 10x10 for testing
+    // Ultra-simple test - just one giant bright green line across the screen
+    _createGrid(size = 40_000, divisions = 10) {
         const verts = [];
         
-        // Create a simple cross pattern first for testing
-        verts.push(-0.8, 0, 0,   0.8, 0, 0);  // Horizontal line
-        verts.push(0, -0.8, 0,   0, 0.8, 0);  // Vertical line
+        // Single diagonal line that should be impossible to miss
+        verts.push(-0.9, -0.9, 0,   0.9, 0.9, 0);  // Diagonal from corner to corner
+        verts.push(-0.9, 0.9, 0,   0.9, -0.9, 0);  // Other diagonal
         
-        // Add a few more lines to make a visible grid
-        for (let i = -2; i <= 2; i++) {
-            const pos = i * 0.3;
-            // Horizontal lines
-            verts.push(-0.8, pos, 0,   0.8, pos, 0);
-            // Vertical lines  
-            verts.push(pos, -0.8, 0,   pos, 0.8, 0);
-        }
+        // Big cross
+        verts.push(-0.9, 0, 0,   0.9, 0, 0);  // Horizontal
+        verts.push(0, -0.9, 0,   0, 0.9, 0);  // Vertical
         
-        console.log(`Simple test grid created with ${verts.length/6} lines`);
+        console.log(`Ultra-simple test grid: ${verts.length/6} lines, should be BRIGHT GREEN`);
         return new Float32Array(verts);
     }
 
@@ -298,12 +293,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(1.0, 1.0, 1.0, 0.9);\n" +  // Bright white for maximum visibility
+            "    frag = vec4(0.0, 1.0, 0.0, 1.0);\n" +  // Bright green - impossible to miss
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.9);\n" +
+            "    gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);\n" +  // Bright green
             "}";
 
         this.gridProgram = this._linkProgram(gridVs, gridFs);
@@ -428,8 +423,13 @@ class WarpEngine {
     _renderGrid() {
         const gl = this.gl;
         
-        // Skip grid program validation temporarily - just force render with main program
-        gl.useProgram(this.program);
+        // Use the properly compiled grid program
+        if (!this.gridProgram) {
+            console.warn("Grid program not available");
+            return;
+        }
+        
+        gl.useProgram(this.gridProgram);
         
         // Debug: Check if we have valid grid data
         if (!this.gridVbo || this.gridVertexCount === 0) {
@@ -437,7 +437,7 @@ class WarpEngine {
             return;
         }
         
-        // Force render without any matrix transformations - identity matrix
+        // Simple identity matrix - no transformations
         const mvp = new Float32Array([
             1, 0, 0, 0,
             0, 1, 0, 0,     
@@ -445,42 +445,34 @@ class WarpEngine {
             0, 0, 0, 1
         ]);
         
-        // Try to set matrix uniform (may fail but that's OK for testing)
-        const matLoc = gl.getUniformLocation(this.program, "u_mvpMatrix");
-        if (matLoc) {
-            gl.uniformMatrix4fv(matLoc, false, mvp);
-        }
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Disable all tests and render directly on top
+        // Ensure grid renders on top
         gl.disable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         
-        // Force line width (may not work on all systems but worth trying)
-        gl.lineWidth(3.0);
+        // Force thick lines
+        gl.lineWidth(4.0);
         
         // Grid rendering
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        const posLoc = gl.getAttribLocation(this.program, "a_position");
-        if (posLoc >= 0) {
-            gl.enableVertexAttribArray(posLoc);
-            gl.vertexAttribPointer(posLoc, 3, gl.FLOAT, false, 0, 0);
-            
-            // Force manual color to white
-            const colorLoc = gl.getUniformLocation(this.program, "u_color");
-            if (colorLoc) {
-                gl.uniform4f(colorLoc, 1.0, 1.0, 1.0, 1.0);
-            }
-            
-            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
-            gl.disableVertexAttribArray(posLoc);
-            
-            console.log(`Rendered ${this.gridVertexCount} grid vertices`);
-        } else {
-            console.warn("Could not find position attribute");
+        gl.enableVertexAttribArray(this.gridUniforms.position);
+        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        
+        gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+        
+        // Check for WebGL errors after drawing
+        const error = gl.getError();
+        if (error !== gl.NO_ERROR) {
+            console.error(`WebGL error during grid rendering: ${error}`);
         }
         
+        gl.disableVertexAttribArray(this.gridUniforms.position);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
+        
+        console.log(`Grid rendered: ${this.gridVertexCount} vertices, BRIGHT GREEN lines should be visible`);
     }
 
     //----------------------------------------------------------------
