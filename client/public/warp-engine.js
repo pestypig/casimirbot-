@@ -436,7 +436,7 @@ class WarpEngine {
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);     // DIAGNOSTIC 2: Ensure proper unbinding
     }
 
     // Authentic Natário spacetime curvature implementation
@@ -456,16 +456,23 @@ class WarpEngine {
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.15;               // Increased visibility (3x stronger)
+            const push = beta * 1.5;                // HUGE exaggeration for testing (10x)
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.15;                 // Keep in clip units (3x stronger)
+            const dy = beta * 0.8;                  // HUGE exaggeration for testing (5x)
             vtx[i + 1] = y0 + dy;                    // Y warped vertically
         }
+        
+        // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
+        let maxDrift = 0;
+        for (let i = 0; i < vtx.length; i += 3) {
+            maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
+        }
+        console.log("Max lateral drift =", maxDrift.toFixed(4), "(want 0.05-0.2)");
         
         // Visual smoke test - check Y range after warping
         let ymax = -1e9, ymin = 1e9;
@@ -524,10 +531,9 @@ class WarpEngine {
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
-        // Render grid on top with transparency
+        // DIAGNOSTIC 3: Disable depth and blending to eliminate hiding issues
         gl.disable(gl.DEPTH_TEST);
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.BLEND);
         
         // Thick lines for maximum visibility
         gl.lineWidth(3.0);
@@ -537,9 +543,10 @@ class WarpEngine {
         gl.enableVertexAttribArray(this.gridUniforms.position);
         gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
         
-        // Guard attribute location and render
+        // DIAGNOSTIC 4: Test with POINTS to bypass line-width issues
         if (this.gridUniforms.position !== -1) {
-            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);  // Using POINTS instead of LINES
+            console.log("Rendering grid as POINTS for diagnostic");
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }
@@ -554,7 +561,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         gl.lineWidth(1.0);
         
-        console.log(`Spacetime grid rendered: ${this.gridVertexCount} vertices with lateral warp deformation`);
+        console.log(`DIAGNOSTIC MODE: Grid rendered as ${this.gridVertexCount} points with 10x exaggerated deformation`);
     }
 
     // Helper function for matrix multiplication
