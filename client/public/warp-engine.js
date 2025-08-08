@@ -64,10 +64,6 @@ class WarpEngine {
             throw error;
         }
     }
-}
-
-// Expose globally for dynamic loading
-window.WarpEngine = WarpEngine;
 
     //----------------------------------------------------------------
     //  Enhanced shader compilation with visual physics mapping
