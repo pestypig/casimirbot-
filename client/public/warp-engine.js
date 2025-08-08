@@ -255,26 +255,29 @@ class WarpEngine {
         this._compileGridShaders();
     }
 
-    // Exact implementation from the minimal recipe
+    // Exact implementation from the minimal recipe, but normalized to [-1,1] for visibility
     _createGrid(size = 40_000, divisions = 50) {
         const verts = [];
         const step = size / divisions;
         const half = size / 2;
-        const yPlane = -half * 0.3 + 3 * step;   // exactly the plane used in C++
+        const yPlane = 0;   // Start with flat grid at z=0 for visibility
+        
+        // Normalize coordinates to [-1, 1] range for direct screen mapping
+        const norm = 1.0 / half;
 
         for (let z = 0; z <= divisions; ++z) {
-            const zPos = -half + z * step;
+            const zPos = (-half + z * step) * norm;
             for (let x = 0; x < divisions; ++x) {
-                const x0 = -half + x * step;
-                const x1 = x0 + step;
+                const x0 = (-half + x * step) * norm;
+                const x1 = (-half + (x + 1) * step) * norm;
                 verts.push(x0, yPlane, zPos, x1, yPlane, zPos);      // x–lines
             }
         }
         for (let x = 0; x <= divisions; ++x) {
-            const xPos = -half + x * step;
+            const xPos = (-half + x * step) * norm;
             for (let z = 0; z < divisions; ++z) {
-                const z0 = -half + z * step;
-                const z1 = z0 + step;
+                const z0 = (-half + z * step) * norm;
+                const z1 = (-half + (z + 1) * step) * norm;
                 verts.push(xPos, yPlane, z0, xPos, yPlane, z1);     // z–lines
             }
         }
@@ -303,12 +306,12 @@ class WarpEngine {
             "precision highp float;\n" +
             "out vec4 frag;\n" +
             "void main() {\n" +
-            "    frag = vec4(0.8, 0.8, 1.0, 0.7);\n" +  // More visible light blue for debugging
+            "    frag = vec4(1.0, 1.0, 1.0, 0.9);\n" +  // Bright white for maximum visibility
             "}"
             :
             "precision highp float;\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(0.8, 0.8, 1.0, 0.7);\n" +
+            "    gl_FragColor = vec4(1.0, 1.0, 1.0, 0.9);\n" +
             "}";
 
         this.gridProgram = this._linkProgram(gridVs, gridFs);
@@ -405,7 +408,7 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
-    // Direct implementation from the gravity sim recipe
+    // Direct implementation from the gravity sim recipe with enhanced visibility
     _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
         const G = 6.6743e-11, c = 2.99792458e8;
         const sagR = bubbleParams.sagDepth_nm * 1e-9;          // nm → m
@@ -415,12 +418,17 @@ class WarpEngine {
             const x = vtx[i], z = vtx[i + 2];
 
             // --- simple Natário–style shift vector approximation ---
-            const r = Math.hypot(x, z);           // radial distance in nm plane
-            const prof = (r / sagR) * Math.exp(-(r * r) / (sagR * sagR));
+            const r = Math.hypot(x, z);           // radial distance in normalized space
+            
+            // Scale the radius to work with normalized coordinates
+            const rScaled = r * 20e-9;  // Scale to 20nm range
+            const sagRScaled = sagR;
+            
+            const prof = (rScaled / sagRScaled) * Math.exp(-(rScaled * rScaled) / (sagRScaled * sagRScaled));
             const beta = beta0 * prof;              // |β| at this point
 
-            // map |β| to a vertical displacement just for visualisation
-            const dy = beta * sagR * 5;           // tuning factor '5' is artistic
+            // map |β| to a visible Y displacement in normalized coordinates
+            const dy = beta * 0.2;           // Much larger displacement for visibility
 
             vtx[i + 1] = y0 + dy;
         }
@@ -436,17 +444,20 @@ class WarpEngine {
             return;
         }
         
-        // Scale the 40μm grid to match the 20nm field of view from main shader
-        // 40μm = 40,000nm, so we need to scale by 20nm/40000nm = 0.0005
-        const scale = 0.0005;
+        // Make grid much more visible - scale it to fill most of the viewport
+        // Use a simple 2D projection that maps the grid directly to screen space
+        const scale = 0.8;  // Fill 80% of the viewport
         const mvp = new Float32Array([
             scale, 0, 0, 0,
-            0, scale, 0, 0,     // Keep normal X,Y mapping for now
-            0, 0, scale, 0,     // Z mapping 
+            0, scale, 0, 0,     
+            0, 0, 1, 0,     
             0, 0, 0, 1
         ]);
         
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
+        
+        // Disable depth test temporarily to ensure grid is visible on top
+        gl.disable(gl.DEPTH_TEST);
         
         // Grid rendering with error checking
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -457,6 +468,9 @@ class WarpEngine {
         
         gl.disableVertexAttribArray(this.gridUniforms.position);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        
+        // Re-enable depth test
+        gl.enable(gl.DEPTH_TEST);
     }
 
     //----------------------------------------------------------------
