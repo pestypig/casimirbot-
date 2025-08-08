@@ -135,29 +135,33 @@ class SimpleWarpEngine {
                 const screenX = (j / gridSize) * w;
                 const screenY = (i / gridSize) * h;
                 
-                // Convert to physical coordinates (meters)
-                const physX = (screenX - centerX) / normScale * 1e-9;
-                const physY = (screenY - centerY) / normScale * 1e-9;
-                const physZ = 0; // 2D projection
+                // Convert screen to normalized clip coordinates (-0.8 to 0.8)
+                const clipX = (screenX - centerX) / normScale * 0.8;
+                const clipY = (screenY - centerY) / normScale * 0.8;
+                const clipZ = 0; // 2D projection
                 
                 // (i) Apply β as translation in +x direction
-                const r_perp = Math.sqrt(physY * physY + physZ * physZ); // orthogonal radius
+                const r_perp = Math.sqrt(clipY * clipY + clipZ * clipZ) * 20e-6; // convert to meters for physics
                 const prof = (r_perp / R) * Math.exp(-r_perp * r_perp / (R * R)); // Natário profile
                 const beta = beta0 * prof;
-                const xShift = beta * direction[0]; // shift along chosen direction
                 
-                // (ii) Adjust transverse metric: γᵢⱼ = δᵢⱼ + βᵢβⱼ
+                // Convert β (meters) to clip-space units properly
+                const halfSize = 20e-6; // 20 µm in meters
+                const metresPerClip = halfSize / 0.8; // meters per clip unit
+                const xShiftClip = beta / metresPerClip; // proper coordinate conversion
+                
+                // (ii) Adjust transverse metric: γᵢⱼ = δᵢⱼ + βᵢβⱼ  
                 const stretch = Math.sqrt(1 + beta * beta); // metric correction
-                const stretchedY = physY * stretch;
-                const stretchedZ = physZ * stretch;
+                const stretchedY = clipY * stretch;
+                const stretchedZ = clipZ * stretch;
                 
                 // (iii) Derive energy density from β
                 const laplacian = (2/R - 2*r_perp*r_perp/(R*R*R)) * beta0 * Math.exp(-r_perp*r_perp/(R*R));
                 const rho = -(beta * laplacian) / (8 * Math.PI * 6.674e-11); // J/m³
                 
-                // Convert back to screen coordinates
-                const finalX = centerX + (physX + xShift) * normScale * 1e9;
-                const finalY = centerY + stretchedY * normScale * 1e9;
+                // Convert back to screen coordinates (no more 1e9 multiplication!)
+                const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
+                const finalY = centerY + stretchedY * normScale / 0.8;
                 
                 // Color based on energy density (exotic = magenta, normal = cyan)
                 const energyIntensity = Math.abs(rho) / 1e8; // normalize
@@ -170,6 +174,11 @@ class SimpleWarpEngine {
                 ctx.globalAlpha = 0.6 + 0.4 * Math.min(1, energyIntensity);
                 
                 lineVertices.push({ x: finalX, y: finalY, rho: rho });
+                
+                // Sanity check - log first vertex per frame
+                if (i === 0 && j === 0) {
+                    console.log(`β₀≈${beta0.toExponential(2)} max|β|≈${beta.toExponential(2)} shiftClip≈${xShiftClip.toFixed(3)}`);
+                }
                 
                 if (j === 0) {
                     ctx.moveTo(finalX, finalY);
@@ -198,20 +207,23 @@ class SimpleWarpEngine {
                 const screenX = (i / gridSize) * w;
                 const screenY = (j / gridSize) * h;
                 
-                const physX = (screenX - centerX) / normScale * 1e-9;
-                const physY = (screenY - centerY) / normScale * 1e-9;
-                const physZ = 0;
+                const clipX = (screenX - centerX) / normScale * 0.8;
+                const clipY = (screenY - centerY) / normScale * 0.8;
+                const clipZ = 0;
                 
-                const r_perp = Math.sqrt(physY * physY + physZ * physZ);
+                const r_perp = Math.sqrt(clipY * clipY + clipZ * clipZ) * 20e-6; // convert to meters
                 const prof = (r_perp / R) * Math.exp(-r_perp * r_perp / (R * R));
                 const beta = beta0 * prof;
-                const xShift = beta * direction[0];
+                
+                const halfSize = 20e-6; // 20 µm in meters
+                const metresPerClip = halfSize / 0.8;
+                const xShiftClip = beta / metresPerClip;
                 
                 const stretch = Math.sqrt(1 + beta * beta);
-                const stretchedY = physY * stretch;
+                const stretchedY = clipY * stretch;
                 
-                const finalX = centerX + (physX + xShift) * normScale * 1e9;
-                const finalY = centerY + stretchedY * normScale * 1e9;
+                const finalX = centerX + (clipX + xShiftClip) * normScale / 0.8;
+                const finalY = centerY + stretchedY * normScale / 0.8;
                 
                 ctx.strokeStyle = effects.color;
                 ctx.globalAlpha = 0.6;
