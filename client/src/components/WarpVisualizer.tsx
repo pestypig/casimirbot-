@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Extend Window interface for SimpleWarpEngine
+// Extend Window interface for both engines
 declare global {
   interface Window {
+    WarpEngine: any;
     SimpleWarpEngine: any;
   }
 }
@@ -40,51 +41,80 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       if (!canvasRef.current) return;
 
       try {
-        // Check if SimpleWarpEngine is already loaded
-        if (window.SimpleWarpEngine) {
+        // Check if WarpEngine is already loaded
+        if (window.WarpEngine) {
           try {
-            engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
+            engineRef.current = new window.WarpEngine(canvasRef.current);
             setIsLoaded(true);
           } catch (error) {
-            console.error('Failed to initialize existing SimpleWarpEngine:', error);
+            console.error('Failed to initialize existing WarpEngine:', error);
           }
           return;
         }
 
-        // Load the Simple WarpEngine for reliable visualization
+        // Load the 3D WarpEngine with volumetric cage visualization
         const script = document.createElement('script');
-        script.src = '/warp-simple.js?v=' + Date.now(); // 2D Canvas fallback for reliability
-        console.log('Loading Simple WarpEngine from:', script.src);
+        script.src = '/warp-engine.js?v=' + Date.now(); // 3D WebGL engine with orthogonal sheets
+        console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
-          console.log('SimpleWarpEngine loaded, window.SimpleWarpEngine available:', !!window.SimpleWarpEngine);
-          if (window.SimpleWarpEngine) {
+          console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
+          if (window.WarpEngine) {
             try {
-              console.log('Creating SimpleWarpEngine instance...');
-              engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
-              console.log('SimpleWarpEngine instance created successfully');
+              console.log('Creating WarpEngine instance...');
+              engineRef.current = new window.WarpEngine(canvasRef.current);
+              console.log('WarpEngine instance created successfully');
               setIsLoaded(true);
             } catch (error) {
-              console.error('Failed to initialize SimpleWarpEngine:', error);
+              console.error('Failed to initialize WarpEngine:', error);
               console.error('Error details:', (error as Error).message, (error as Error).stack);
-              setIsLoaded(false);
+              
+              // If WebGL fails, try 2D Canvas fallback
+              if ((error as Error).message.includes('WebGL not supported')) {
+                console.log('WebGL not available, loading 2D Canvas fallback...');
+                const fallbackScript = document.createElement('script');
+                fallbackScript.src = '/warp-simple.js?v=' + Date.now();
+                fallbackScript.onload = () => {
+                  if (window.SimpleWarpEngine) {
+                    try {
+                      engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
+                      setIsLoaded(true);
+                      console.log('2D Canvas fallback engine loaded successfully');
+                    } catch (fallbackError) {
+                      console.error('Failed to initialize fallback engine:', fallbackError);
+                      setIsLoaded(false);
+                    }
+                  }
+                };
+                document.head.appendChild(fallbackScript);
+              } else {
+                setIsLoaded(false);
+              }
             }
           } else {
-            console.error('SimpleWarpEngine not found on window after script load');
+            console.error('WarpEngine not found on window after script load');
           }
         };
         script.onerror = () => {
-          console.error('Failed to load SimpleWarpEngine');
-          setIsLoaded(false);
+          console.error('Failed to load WarpEngine script, falling back to 2D Canvas version');
+          // Fallback to Canvas 2D version
+          const fallbackScript = document.createElement('script');
+          fallbackScript.src = '/warp-simple.js?v=' + Date.now();
+          fallbackScript.onload = () => {
+            if (window.SimpleWarpEngine) {
+              try {
+                engineRef.current = new window.SimpleWarpEngine(canvasRef.current);
+                setIsLoaded(true);
+              } catch (error) {
+                console.error('Failed to initialize fallback engine:', error);
+              }
+            }
+          };
+          document.head.appendChild(fallbackScript);
         };
+        
         document.head.appendChild(script);
-
-        return () => {
-          if (document.head.contains(script)) {
-            document.head.removeChild(script);
-          }
-        };
       } catch (error) {
-        console.error('Failed to initialize WarpEngine:', error);
+        console.error('Error setting up engine:', error);
         setIsLoaded(false);
       }
     };
