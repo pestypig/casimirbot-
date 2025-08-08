@@ -272,6 +272,10 @@ class WarpEngine {
         this.gridVertices = this._createGrid(40_000, 50);  // 40μm grid, 50 divisions
         this.gridVertexCount = this.gridVertices.length / 3;
         
+        // CRITICAL FIX: Store original grid vertices for proper Y coordinate warping
+        this.originalGridVertices = new Float32Array(this.gridVertices);
+        console.log("Stored original grid vertices for proper Y warping");
+        
         // Store grid parameters for warping
         this.gridSize = 40_000;
         this.gridHalf = this.gridSize / 2;
@@ -301,7 +305,10 @@ class WarpEngine {
         const verts = [];
         const step = size / divisions;
         const half = size / 2;
-        const yPlane = 0;   // Start flat for deformation
+        
+        // Create a slight height variation across the grid for proper 3D visualization
+        const yBase = -0.15;  // Base Y level
+        const yVariation = 0.05;  // Small height variation
         
         // Normalize to [-0.8, 0.8] to keep grid visible within viewport
         const norm = 0.8 / half;
@@ -311,7 +318,12 @@ class WarpEngine {
             for (let x = 0; x < divisions; ++x) {
                 const x0 = (-half + x * step) * norm;
                 const x1 = (-half + (x + 1) * step) * norm;
-                verts.push(x0, yPlane, zPos, x1, yPlane, zPos);      // x–lines
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                const y1 = yBase + yVariation * Math.sin(x1 * 2) * Math.cos(zPos * 3);
+                
+                verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
             }
         }
         for (let x = 0; x <= divisions; ++x) {
@@ -319,7 +331,12 @@ class WarpEngine {
             for (let z = 0; z < divisions; ++z) {
                 const z0 = (-half + z * step) * norm;
                 const z1 = (-half + (z + 1) * step) * norm;
-                verts.push(xPos, yPlane, z0, xPos, yPlane, z1);     // z–lines
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                const y1 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z1 * 3);
+                
+                verts.push(xPos, y0, z0, xPos, y1, z1);     // z–lines with height variation
             }
         }
         
@@ -338,14 +355,14 @@ class WarpEngine {
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 4.0;\n" +
+            "    gl_PointSize = 12.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
             "void main() {\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 4.0;\n" +
+            "    gl_PointSize = 12.0;\n" +
             "}";
 
         const gridFs = isWebGL2 ?
@@ -516,12 +533,14 @@ class WarpEngine {
     }
 
     // Authentic Natário spacetime curvature implementation
-    _warpGridVertices(vtx, halfSize, y0, bubbleParams) {
+    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Removed nuclear test - now applying real physics
 
         // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
         const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
         const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
+        
+        console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -529,20 +548,23 @@ class WarpEngine {
             const z = vtx[i + 2];
             const r = Math.hypot(x, z);              // radius in clip-space
             
+            // Use original Y coordinate for each vertex, not a single constant
+            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
+            
             // Natário warp bubble profile (now with correct units)
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.1;                // Moderate lateral deformation
+            const push = beta * 0.3;                // Increased lateral deformation
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
             // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.2;                  // Moderate deformation for visibility
-            vtx[i + 1] = y0 + dy;                    // Y warped vertically
+            const dy = beta * 0.5;                  // Increased deformation for visibility
+            vtx[i + 1] = y_original + dy;            // Y warped vertically from original position
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
@@ -641,9 +663,10 @@ class WarpEngine {
             const mvp = this._multiplyMatrices(proj, view);
             gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
             
-            gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+            // Switch to LINES for wireframe effect (more visible than tiny points)
+            gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
             
-            console.log(`Rendered ${this.gridVertexCount} grid points with 3D perspective`);
+            console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
         } else {
             console.warn("Grid attribute position not found, skipping render");
         }
