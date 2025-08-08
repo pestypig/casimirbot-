@@ -748,7 +748,8 @@ class WarpEngine {
         console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
         console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
         console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
-        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius)`);
+        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
+        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -763,19 +764,21 @@ class WarpEngine {
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
             const beta = beta0 * prof;              // |β| shift vector magnitude
 
-            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            const push = beta * 0.05;                // simple, stable 5% of |β|
+            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
+            const lateralK = 0.10 * sagRclip;       // max 10% of radius
+            const verticalK = 0.10 * sagRclip;      // max 10% of radius
+            
+            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
+            const push = beta * lateralK;           // use clamped coefficient
             const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
 
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
-            // -------- VERTICAL DEFORMATION: Y displacement scaled by realistic power --------
-            // Use clamped linear scaling to keep within frustum
+            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
             const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
-            const tsRatio = bubbleParams.tsRatio || 4100;
             const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * 0.03 * powerScale * timeScale;      // 3% keeps |y|<0.8
+            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
             vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
         }
         
