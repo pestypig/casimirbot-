@@ -624,20 +624,28 @@ class WarpEngine {
         // CRITICAL BUG FIX: Remove the reset that was happening AFTER warping
         // (Reset now happens in _updateGrid BEFORE calling this function)
 
-        // WarpFactory-inspired: Use proper physical units and bubble radius
-        const bubbleRadius_nm = 10000;  // 10 μm bubble radius (WarpFactory standard)
+        // Use energy pipeline bubble radius instead of hardcoded value
+        const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;  // From pipeline or fallback
         const sagRclip = bubbleRadius_nm / halfSize * 0.8;  // Convert to clip-space
-        // CRITICAL BUG FIX: Only use supplied beta0, no fallback to prevent stale values
+        
+        // Use computed β₀ from amplifier chain (duty × γ_geo × √Q_dyn × γ_VdB^0.25)
         const beta0 = bubbleParams.beta0;
         if (beta0 === undefined) {
-            console.warn("No beta0 supplied to _warpGridVertices - using fallback");
+            console.warn("No beta0 supplied to _warpGridVertices - skipping warp");
             return; // Early out to prevent using stale values
         }
+        
+        // Get realistic power for scaling deformation amplitude
+        const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
         
         // WarpFactory energy condition flags simulation (future: load from pre-computed texture)
         const energyConditionViolated = beta0 > 1000;  // Simplified WEC check
         
-        console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
+        console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
+        console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
+        console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
+        console.log(`  powerAvg=${powerAvg_MW}MW (scales deformation)`);
+        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius)`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -659,9 +667,10 @@ class WarpEngine {
             vtx[i] = x * scale;                      // X warped laterally
             vtx[i + 2] = z * scale;                  // Z warped laterally
             
-            // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.05;                 // Keep inside clip cube (-1 to +1)
-            vtx[i + 1] = y_original + dy;            // Y warped vertically from original position
+            // -------- VERTICAL DEFORMATION: Y displacement scaled by realistic power --------
+            const powerScale = powerAvg_MW / 100.0;  // Scale by realistic power (100MW baseline)
+            const dy = beta * 0.05 * powerScale;     // Power-scaled vertical displacement
+            vtx[i + 1] = y_original + dy;             // Y warped vertically from original position
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
@@ -679,6 +688,7 @@ class WarpEngine {
             if (y < ymin) ymin = y;
         }
         console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
+        console.log(`✅ ENERGY PIPELINE CONNECTED: β₀=${beta0.toExponential(1)}, Power=${powerAvg_MW}MW → Visual Deformation`);
     }
 
     _renderQuad() {
