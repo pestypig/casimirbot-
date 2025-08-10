@@ -38,6 +38,16 @@ class WarpEngine {
             powerAvg_MW: 83.3,
             exoticMass_kg: 1405
         };
+
+        // Display-only controls (do NOT feed these back into pipeline math)
+        this.uniforms = {
+            vizGain: 4.0,        // how exaggerated the bend looks
+            colorByTheta: 1.0,   // 1=York colors, 0=solid sheet color
+            vShip: 1.0,          // ship-frame speed scale for θ
+            wallWidth: 0.06,
+            axesClip: [0.40, 0.22, 0.22],
+            driveDir: [1, 0, 0]
+        };
         
         // Initialize rendering pipeline
         this._setupCamera();
@@ -140,14 +150,18 @@ class WarpEngine {
             "#version 300 es\n" +
             "in vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
+            "out vec3 v_pos;\n" +
             "void main() {\n" +
+            "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
             "    gl_PointSize = 12.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
+            "varying vec3 v_pos;\n" +
             "void main() {\n" +
+            "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
             "    gl_PointSize = 12.0;\n" +
             "}";
@@ -155,14 +169,70 @@ class WarpEngine {
         const gridFs = isWebGL2 ?
             "#version 300 es\n" +
             "precision highp float;\n" +
+            "uniform float u_colorByTheta;\n" +
+            "uniform vec3 u_sheetColor;\n" +
+            "uniform vec3 u_axes;\n" +
+            "uniform vec3 u_driveDir;\n" +
+            "uniform float u_wallWidth;\n" +
+            "uniform float u_vShip;\n" +
+            "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
+            "vec3 diverge(float t) {\n" +
+            "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
+            "    vec3 c1 = vec3(0.15, 0.45, 1.0);\n" +  // blue
+            "    vec3 c2 = vec3(1.0);\n" +               // white  
+            "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
+            "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
+            "}\n" +
             "void main() {\n" +
-            "    frag = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red for maximum visibility
+            "    if (u_colorByTheta < 0.5) {\n" +
+            "        frag = vec4(u_sheetColor, 0.85);\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    vec3 pN = v_pos / u_axes;\n" +
+            "    float rs = length(pN) + 1e-6;\n" +
+            "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
+            "    float xs = dot(pN, dN);\n" +
+            "    float w = max(1e-4, u_wallWidth);\n" +
+            "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
+            "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
+            "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
+            "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+            "    vec3 col = diverge(tVis);\n" +
+            "    frag = vec4(col, 0.9);\n" +
             "}"
             :
             "precision highp float;\n" +
+            "uniform float u_colorByTheta;\n" +
+            "uniform vec3 u_sheetColor;\n" +
+            "uniform vec3 u_axes;\n" +
+            "uniform vec3 u_driveDir;\n" +
+            "uniform float u_wallWidth;\n" +
+            "uniform float u_vShip;\n" +
+            "varying vec3 v_pos;\n" +
+            "vec3 diverge(float t) {\n" +
+            "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
+            "    vec3 c1 = vec3(0.15, 0.45, 1.0);\n" +  // blue
+            "    vec3 c2 = vec3(1.0);\n" +               // white  
+            "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
+            "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
+            "}\n" +
             "void main() {\n" +
-            "    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);\n" +  // Bright red for maximum visibility
+            "    if (u_colorByTheta < 0.5) {\n" +
+            "        gl_FragColor = vec4(u_sheetColor, 0.85);\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    vec3 pN = v_pos / u_axes;\n" +
+            "    float rs = length(pN) + 1e-6;\n" +
+            "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
+            "    float xs = dot(pN, dN);\n" +
+            "    float w = max(1e-4, u_wallWidth);\n" +
+            "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
+            "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
+            "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
+            "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+            "    vec3 col = diverge(tVis);\n" +
+            "    gl_FragColor = vec4(col, 0.9);\n" +
             "}";
 
         this.gridProgram = this._createShaderProgram(gridVs, gridFs);
@@ -172,7 +242,19 @@ class WarpEngine {
             return;
         }
         
-        console.log("Grid shader program compiled successfully");
+        // Cache uniform locations for York-time coloring
+        const gl = this.gl;
+        this.gridUniforms = {
+            mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
+            colorByTheta: gl.getUniformLocation(this.gridProgram, 'u_colorByTheta'),
+            sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
+            axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
+            driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
+            wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
+            vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip')
+        };
+        
+        console.log("Grid shader program compiled successfully with York-time coloring support");
     }
 
     updateUniforms(parameters) {
@@ -328,6 +410,9 @@ class WarpEngine {
             // Base displacement
             let disp = gridK * betaVis * ring * band * sgn * front;
             
+            // NEW: Exaggerate for display only (viewer-only, physics unchanged)
+            disp *= (this.uniforms?.vizGain || 4.0);
+            
             // CRITICAL: Clamp displacement to ≤ 10% of local shell radius
             const localR = Math.max(1e-3, Math.hypot(p[0]/axesClip[0], p[1]/axesClip[1], p[2]/axesClip[2]));
             const maxPush = 0.10 * 1.0;  // 10% of shell nominal radius (1.0 in normalized coords)
@@ -380,9 +465,20 @@ class WarpEngine {
         gl.enableVertexAttribArray(positionLocation);
         gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
         
-        // Set MVP matrix
-        const mvpLocation = gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix');
-        gl.uniformMatrix4fv(mvpLocation, false, this.mvpMatrix);
+        // Set all uniforms for York-time visualization
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+        gl.uniform1f(this.gridUniforms.colorByTheta, this.uniforms?.colorByTheta || 1.0);
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
+        gl.uniform3f(this.gridUniforms.axes, 
+            this.uniforms?.axesClip[0] || 0.40,
+            this.uniforms?.axesClip[1] || 0.22, 
+            this.uniforms?.axesClip[2] || 0.22);
+        gl.uniform3f(this.gridUniforms.driveDir,
+            this.uniforms?.driveDir[0] || 1.0,
+            this.uniforms?.driveDir[1] || 0.0,
+            this.uniforms?.driveDir[2] || 0.0);
+        gl.uniform1f(this.gridUniforms.wallWidth, this.uniforms?.wallWidth || 0.06);
+        gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;
