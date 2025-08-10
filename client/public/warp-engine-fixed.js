@@ -262,7 +262,7 @@ class WarpEngine {
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
-        // Enhanced pipeline-driven beta calculation
+        // Enhanced pipeline-driven beta calculation with proper normalization
         const sectors = Math.max(1, bubbleParams.sectorCount || 1);
         const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
         const Qburst = bubbleParams.Qburst || bubbleParams.cavityQ || 1e9;
@@ -270,16 +270,18 @@ class WarpEngine {
         const dutyCycle = bubbleParams.dutyCycle || 0.14;
         const phaseSplit = bubbleParams.phaseSplit || 0.50;  // 0.5 = hover, >0.5 = cruise
         const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
+        const betaGain = bubbleParams.betaGain || 1e-10;     // Normalize huge β to visual range
         
         const betaInst = gammaGeo * Qburst * deltaAOverA;
         const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, dutyCycle / sectors));
         const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
+        const betaVis = betaUsed * betaGain;  // Scale to sane visual magnitude
         
-        console.log(`🔗 ENHANCED PIPELINE → 3D SHELL CONNECTION:`);
+        console.log(`🔗 AMPLITUDE-CONTROLLED PIPELINE → 3D SHELL:`);
         console.log(`  γ_geo=${gammaGeo}, Q_burst=${Qburst.toExponential(2)}, Δa/a=${deltaAOverA}`);
-        console.log(`  β_inst=${betaInst.toExponential(2)}, β_avg=${betaAvg.toExponential(2)}`);
-        console.log(`  sectors=${sectors}, phaseSplit=${phaseSplit}, viewAvg=${viewAvg}`);
-        console.log(`  3D ellipsoid axes: [${axesClip.join(', ')}]`);
+        console.log(`  β_raw=${betaInst.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (gain=${betaGain})`);
+        console.log(`  phaseSplit=${phaseSplit} (${phaseSplit === 0.5 ? 'HOVER' : 'CRUISE'}), wallWidth=${wallWidth}`);
+        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius`);
 
         // Ellipsoid utilities
         const sdEllipsoid = (p, a) => {
@@ -302,37 +304,54 @@ class WarpEngine {
             return [t[0]/m, t[1]/m, t[2]/m];
         })();
 
+        const split = Math.floor(phaseSplit * sectors);
+        
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
-            const sd = sdEllipsoid(p, axesClip);
-            const n = nEllipsoid(p, axesClip);
-
-            // Gaussian shell around ellipsoid
-            const ring = Math.exp(-(sd * sd) / (wallWidth * wallWidth));
             
             // Sector sign for strobing
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            const sectorIndex = Math.floor(u * sectors);
-            const split = Math.floor(phaseSplit * sectors);
-            const sgn = (sectorIndex < split) ? +1 : -1;  // (+) rear, (−) front
+            const sgn = (Math.floor(u * sectors) < split) ? +1 : -1;  // (+) rear, (−) front
+            
+            const sd = sdEllipsoid(p, axesClip);
+            
+            // Tight band: weight is strong only near the shell + hard gate for outliers
+            const ring = Math.exp(-(sd * sd) / (wallWidth * wallWidth));
+            const band = (Math.abs(sd) <= 3.0 * wallWidth) ? 1.0 : 0.0;  // Kill far-away outliers
+            
+            const n = nEllipsoid(p, axesClip);
             
             // Front/back asymmetry
             const front = Math.sign(n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]) || 1;
             
-            // Final displacement
-            const disp = gridK * betaUsed * ring * sgn * front;
+            // Base displacement
+            let disp = gridK * betaVis * ring * band * sgn * front;
+            
+            // CRITICAL: Clamp displacement to ≤ 10% of local shell radius
+            const localR = Math.max(1e-3, Math.hypot(p[0]/axesClip[0], p[1]/axesClip[1], p[2]/axesClip[2]));
+            const maxPush = 0.10 * 1.0;  // 10% of shell nominal radius (1.0 in normalized coords)
+            if (disp > maxPush) disp = maxPush;
+            if (disp < -maxPush) disp = -maxPush;
+            
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
             vtx[i + 2] = p[2] - n[2] * disp;
         }
         
-        // Enhanced diagnostics
-        let maxDrift = 0;
+        // Enhanced diagnostics - check for amplitude overflow
+        let maxRadius = 0, maxDisp = 0;
         for (let i = 0; i < vtx.length; i += 3) {
-            maxDrift = Math.max(maxDrift, Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]));
+            const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
+            maxRadius = Math.max(maxRadius, r);
+            // Check displacement from original
+            if (this.originalGridVertices) {
+                const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
+                maxDisp = Math.max(maxDisp, Math.abs(r - origR));
+            }
         }
-        console.log(`Max 3D displacement = ${maxDrift.toFixed(4)} (3D ellipsoidal shell)`);
+        console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
+        console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
         
         let ymax = -1e9, ymin = 1e9;
         for (let i = 1; i < vtx.length; i += 3) {
@@ -340,7 +359,7 @@ class WarpEngine {
             if (y > ymax) ymax = y;
             if (y < ymin) ymin = y;
         }
-        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (3D shell deformation)`);
+        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (amplitude-controlled shell)`);
     }
 
     _renderGridPoints() {
