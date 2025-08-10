@@ -1,0 +1,79 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Natário Warp Bubble — York Time Viewer (Patched)</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b111a;color:#e2e8f0;}
+  #stage{position:relative;width:100%;height:100%;}
+  #warp{position:absolute;inset:0;display:block;width:100%;height:100%;}
+  /* Minimal HUD placeholder so we can at least see text even if WebGL fails */
+  #fallbackNote{position:fixed;left:12px;bottom:12px;padding:8px 10px;
+    background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.12);border-radius:8px;
+    font:12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;color:#a7f3d0;}
+</style>
+</head>
+<body>
+  <div id="stage"><canvas id="warp"></canvas></div>
+  <div id="hud"></div>
+  <div id="fallbackNote" style="display:none">WebGL fallback active — you should still see text here.</div>
+
+<script>
+console.log("Boot timestamp: %s");
+</script>
+<script>
+// Hard-set canvas dimensions using window size (not clientWidth) so it works in iframes/replit
+(function(){
+  const canvas = document.getElementById('warp');
+  function setSize(){
+    const w = Math.max(1, window.innerWidth || document.documentElement.clientWidth || screen.width);
+    const h = Math.max(1, window.innerHeight|| document.documentElement.clientHeight|| screen.height);
+    canvas.width = w; canvas.height = h;
+    canvas.style.width = '100%'; canvas.style.height = '100vh';
+  }
+  window.addEventListener('resize', setSize); setSize();
+})();
+</script>
+<script>
+// Inline engine + HUD (from previous build)
+</script>
+<script>
+// warp-engine-natario-v3.3-york.js placeholder with York-time overlay
+
+</script>
+<script>
+// warp-hud.js placeholder - see earlier content
+
+</script>
+<script>
+// warp-hud-york.js placeholder for York-time controls
+
+</script>
+<script>
+(function(){
+  const canvas = document.getElementById('warp');
+  const note = document.getElementById('fallbackNote');
+  const engine = new window.WarpEngine(canvas);
+  const hud = new window.WarpHUD(engine, { container: '#hud' });
+  // If engine fell back to 2D, show note
+  setTimeout(()=>{
+    if (!engine.gl) note.style.display = 'block';
+  }, 500);
+  // Defaults
+  engine.setMode('CRUISE');
+  engine.updateUniforms({
+    axesClip:[0.40,0.22,0.22],
+    phaseSplit:0.65,
+    sectorCount:400,
+    gridK:0.12,
+    showK:1.0,
+    kScale:1.6,
+    vShip:1.2
+  });
+  console.log('Viewer initialized.');
+})();
+</script>
+</body>
+</html>

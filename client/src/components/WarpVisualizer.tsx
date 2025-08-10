@@ -32,19 +32,45 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<any>(null);
   const animationRef = useRef<number>();
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const [isRunning, setIsRunning] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
     const initializeEngine = async () => {
       if (!canvasRef.current) return;
 
       try {
+        // Hard-set canvas dimensions using window size (not clientWidth) for iframe compatibility
+        const canvas = canvasRef.current;
+        const setSize = () => {
+          const w = Math.max(1, window.innerWidth || document.documentElement.clientWidth || screen.width);
+          const h = Math.max(1, window.innerHeight || document.documentElement.clientHeight || screen.height);
+          canvas.width = w;
+          canvas.height = h;
+          canvas.style.width = '100%';
+          canvas.style.height = '100%';
+          console.log('Canvas sized for WebGL (iframe-safe):', { width: w, height: h });
+        };
+        
+        // Set initial size and listen for resize
+        setSize();
+        const resizeListener = () => setSize();
+        window.addEventListener('resize', resizeListener);
+        resizeCleanupRef.current = () => window.removeEventListener('resize', resizeListener);
+
         // Check if WarpEngine is already loaded  
         if (window.WarpEngine) {
           try {
             engineRef.current = new window.WarpEngine(canvasRef.current);
             setIsLoaded(true);
+            // Check for WebGL fallback after initialization
+            setTimeout(() => {
+              if (engineRef.current && !engineRef.current.gl) {
+                setIsFallback(true);
+              }
+            }, 500);
           } catch (error) {
             console.error('Failed to initialize existing WarpEngine:', error);
           }
@@ -64,6 +90,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               engineRef.current = new window.WarpEngine(canvasRef.current);
               console.log('Natário v3.1 WarpEngine created - unified theory build active:', engineRef.current.mode || 'HOVER');
               setIsLoaded(true);
+              // Check for WebGL fallback after initialization
+              setTimeout(() => {
+                if (engineRef.current && !engineRef.current.gl) {
+                  setIsFallback(true);
+                }
+              }, 500);
             } catch (error) {
               console.error('Failed to initialize Natário v3.1 WarpEngine:', error);
               setIsLoaded(false);
@@ -96,6 +128,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Clean up engine resources
       if (engineRef.current?.destroy) {
         engineRef.current.destroy();
+      }
+      // Clean up resize listener
+      if (resizeCleanupRef.current) {
+        resizeCleanupRef.current();
       }
     };
   }, []);
@@ -253,12 +289,20 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <div className="absolute inset-0 flex items-center justify-center text-white/70">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
-                <div className="text-sm">Loading Warp Engine...</div>
+                <div className="text-sm">Loading Natário v3.1 Engine...</div>
               </div>
             </div>
           )}
           
-          {/* Live operational mode HUD (inspired by GPT's suggestion) */}
+          {isFallback && (
+            <div className="absolute left-2 bottom-2 bg-black/60 border border-green-400/30 rounded px-2 py-1">
+              <div className="text-xs font-mono text-green-300">
+                WebGL fallback — theory parameters active
+              </div>
+            </div>
+          )}
+          
+          {/* Live operational mode HUD */}
           {isLoaded && (
             <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono">
               <div className="text-cyan-400 font-semibold">
@@ -267,6 +311,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               <div className="text-green-400">
                 P: {parameters.powerAvg_MW.toFixed(1)}MW | 
                 D: {(parameters.dutyCycle * 100).toFixed(1)}%
+              </div>
+              <div className="text-slate-400">
+                Engine: {isFallback ? '⚠ 2D' : '✓ WebGL'}
               </div>
             </div>
           )}
