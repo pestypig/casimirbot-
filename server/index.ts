@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 
 (async () => {
   // Initialize physics modules
-  const { initializeModules } = await import('./modules/module-loader.js');
+  const { initializeModules } = await import('./modules/module-loader');
   await initializeModules();
   
   const server = await registerRoutes(app);

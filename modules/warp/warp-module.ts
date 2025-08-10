@@ -3,9 +3,9 @@
  * Integrates Natário zero-expansion warp bubble calculations with the module system
  */
 
-import type { CasimirModule } from '../core/module-registry.js';
-import type { SimulationParameters } from '../../shared/schema.js';
-import { calculateNatarioWarpBubble, type NatarioWarpParams, type NatarioWarpResult } from './natario-warp.js';
+import type { CasimirModule } from '../core/module-registry';
+import type { SimulationParameters } from '../../shared/schema';
+import { calculateNatarioWarpBubble, type NatarioWarpParams, type NatarioWarpResult } from './natario-warp';
 
 export interface WarpBubbleResult extends NatarioWarpResult {
   // Module-specific additions

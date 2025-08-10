@@ -3,10 +3,10 @@
  * Based on math-gpt.org formulation reference and theoretical foundations
  */
 
-import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.js';
-import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
-import type { CasimirModule } from '../core/module-registry.js';
-import type { SimulationParameters } from '../../shared/schema.js';
+import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants';
+import type { CasimirModule } from '../core/module-registry';
+import type { SimulationParameters } from '../../shared/schema';
 
 export interface DynamicCasimirParams {
   // Static Casimir baseline

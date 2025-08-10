@@ -5,7 +5,7 @@ import { scuffemService } from "./services/scuffem";
 import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
-import targetValidationRoutes from "./routes/target-validation.js";
+import targetValidationRoutes from "./routes/target-validation";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -339,7 +339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getPipelineState,
     updatePipelineParams,
     switchOperationalMode
-  } = await import('./helix-core.js');
+  } = await import('./helix-core');
   
   app.post("/api/helix/command", handleHelixCommand);
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
