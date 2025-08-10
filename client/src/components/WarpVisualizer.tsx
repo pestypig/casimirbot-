@@ -133,7 +133,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         Qdyn: parameters.cavityQ,        // Stage 2: Dynamic Q-factor
         gammaVdB: parameters.gammaVanDenBroeck, // Stage 4: Van den Broeck amplification
         sagDepth_nm: parameters.sagDepth_nm,
-        bubbleRadius_nm: 10000, // FIX #3: Dedicated bubble radius for visualization
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
         tsRatio: parameters.tsRatio || 4100, // Time-scale ratio for animation scaling

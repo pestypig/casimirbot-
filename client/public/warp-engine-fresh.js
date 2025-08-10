@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: CAGE-HUGGING-v3.4 - CENTERED SHEETS + 3D RADIUS + CAMERA PERSPECTIVE 🚨');
+            console.error('🚨 BUNDLE VERSION: 3D-WIREFRAME-CAGE-v3.2 - ALL SHEETS PROPERLY POSITIONED 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -367,7 +367,7 @@ class WarpEngine {
         
         if (plane === 'XY') {
             // XY plane (floor) - cyan - FIXED: Keep variable Z and add offset
-            const zOff = 0.0;  // CENTER FIX: Position sheet through bubble center
+            const zOff = 0.4;  // sagRclip offset to position sheet at bubble surface
             for (let z = 0; z <= divisions; ++z) {
                 const rawZ = -half + z * step;
                 const zPos = rawZ * norm + zOff;  // preserve variable z and add offset
@@ -392,7 +392,7 @@ class WarpEngine {
         }
         else if (plane === 'XZ') {
             // XZ plane (back wall) - magenta  
-            const ySheet = 0.0;  // CENTER FIX: Position sheet through bubble center
+            const ySheet = 0.4;  // sagRclip offset - shift this vertical sheet to bubble surface
             for (let x = 0; x <= divisions; ++x) {
                 const xPos = (-half + x * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
@@ -412,7 +412,7 @@ class WarpEngine {
         }
         else if (plane === 'YZ') {
             // YZ plane (side wall) - yellow
-            const xSheet = 0.0;  // CENTER FIX: Position sheet through bubble center
+            const xSheet = 0.4;  // +sagRclip offset - shift that vertical sheet to right side of bubble
             for (let y = 0; y <= divisions; ++y) {
                 const yPos = (-half + y * step) * norm;
                 for (let z = 0; z < divisions; ++z) {
@@ -623,34 +623,9 @@ class WarpEngine {
             0, 0, 0, 1
         ]);
 
-        // CAMERA FIX: Use perspective + yaw/pitch instead of identity
-        const yaw = 20 * Math.PI/180, pitch = -12 * Math.PI/180;
-        const cy = Math.cos(yaw),  sy = Math.sin(yaw);
-        const cp = Math.cos(pitch), sp = Math.sin(pitch);
-        // rotation (pitch then yaw)
-        const R = new Float32Array([
-          cy,      0,  sy, 0,
-          sy*sp,   cp, -cy*sp, 0,
-          -sy*cp,  sp,  cy*cp, 0,
-          0,       0,   0, 1
-        ]);
-        // translate world back a bit so it fits the frustum
-        const T = new Float32Array([
-          1,0,0,0,  0,1,0,0,  0,0,1,0,  0,0,-2.2,1
-        ]);
-        const PV = (()=>{
-          const fov = Math.PI/4, aspect = this.canvas.width/this.canvas.height;
-          const n = 0.1, f = 10, fct = 1/Math.tan(fov/2);
-          return new Float32Array([
-            fct/aspect,0,0,0,
-            0,fct,0,0,
-            0,0,(f+n)/(n-f),(2*f*n)/(n-f),
-            0,0,-1,0
-          ]);
-        })();
-        const VR = this._multiplyMatrices4x4(T, R);
-        const MVP = this._multiplyMatrices4x4(PV, VR);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, MVP);
+        // Multiply projection * view matrices
+        const mvp = this._multiplyMatrices4x4(proj, view);
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
         
         // Bind grid vertices
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -665,9 +640,6 @@ class WarpEngine {
         // Draw XY sheet (cyan floor)
         gl.uniform3f(this.gridUniforms.sheetColor, 0.0, 1.0, 1.0);
         gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
-        // LINES RENDERING FIX: Use lines with blend for better visibility
-        gl.enable(gl.BLEND); 
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.drawArrays(gl.LINES, 0, verticesPerSheet);
         
         // Draw XZ sheet (magenta wall)
@@ -732,8 +704,8 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation with FIXED scaling
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // FIX #3: Use dedicated bubbleRadius_nm instead of sagDepth_nm
-        const bubbleRadius_nm = bubbleParams.bubbleRadius_nm ?? 10000;
+        // Use fixed bubble radius with proper normalization
+        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
         const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
         
         // Use computed β₀ from amplifier chain
@@ -757,13 +729,13 @@ class WarpEngine {
         console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
-            // Work directly in clip-space coordinates with 3D radius
+            // Work directly in clip-space coordinates
             const x = vtx[i];
-            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
             const z = vtx[i + 2];
-            const r = Math.hypot(x, y_original, z);  // 3D RADIUS FIX: Use spherical symmetry
+            const r = Math.hypot(x, z);              // radius in clip-space
             
-            // Y coordinate already extracted above for radius calculation
+            // Use original Y coordinate for each vertex, not a single constant
+            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
             
             // Natário warp bubble profile (now with FIXED units)
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
