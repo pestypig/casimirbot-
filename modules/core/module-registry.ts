@@ -79,8 +79,7 @@ export class ModuleRegistry {
    * Clean up all modules
    */
   async cleanup(): Promise<void> {
-    const moduleNames = Array.from(this.modules.keys());
-    for (const name of moduleNames) {
+    for (const name of this.modules.keys()) {
       const module = this.modules.get(name);
       if (module && this.initialized.has(name) && module.cleanup) {
         await module.cleanup();
@@ -94,9 +93,9 @@ export class ModuleRegistry {
 export const moduleRegistry = new ModuleRegistry();
 
 // Import and register physics modules
-import { staticCasimirModule } from '../sim_core/static-casimir';
-import { dynamicCasimirModule } from '../dynamic/dynamic-casimir';
-import { warpBubbleModule } from '../warp/warp-module';
+import { staticCasimirModule } from '../sim_core/static-casimir.js';
+import { dynamicCasimirModule } from '../dynamic/dynamic-casimir.js';
+import { warpBubbleModule } from '../warp/warp-module.js';
 
 // Register all available modules
 moduleRegistry.register(staticCasimirModule);

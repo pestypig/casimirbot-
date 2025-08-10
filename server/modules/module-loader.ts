@@ -3,7 +3,7 @@
  * Handles loading and registration of physics modules
  */
 
-import { moduleRegistry } from '../../modules/core/module-registry';
+import { moduleRegistry } from '../../modules/core/module-registry.js';
 
 /**
  * Initialize and register all available physics modules
@@ -11,11 +11,11 @@ import { moduleRegistry } from '../../modules/core/module-registry';
 export async function initializeModules(): Promise<void> {
   try {
     // Register static Casimir module
-    const { staticCasimirModule } = await import('../../modules/sim_core/static-casimir');
+    const { staticCasimirModule } = await import('../../modules/sim_core/static-casimir.js');
     moduleRegistry.register(staticCasimirModule);
     
     // Register dynamic Casimir module
-    const { dynamicCasimirModule } = await import('../../modules/dynamic/dynamic-casimir');
+    const { dynamicCasimirModule } = await import('../../modules/dynamic/dynamic-casimir.js');
     moduleRegistry.register(dynamicCasimirModule);
     
     console.log('Physics modules initialized:', moduleRegistry.getAvailable());

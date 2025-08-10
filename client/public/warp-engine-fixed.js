@@ -4,15 +4,9 @@
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
-        
-        // Force proper canvas sizing before WebGL context creation
-        this._ensureCanvasSize();
-        
         this.gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
         
         if (!this.gl) {
-            console.error('WebGL not supported, falling back to 2D canvas');
-            this._showWebGLFallback();
             throw new Error('WebGL not supported');
         }
 
@@ -34,7 +28,7 @@ class WarpEngine {
         this.projMatrix = new Float32Array(16);
         this.mvpMatrix = new Float32Array(16);
         
-        // Current warp parameters with energy pipeline uniforms
+        // Current warp parameters
         this.currentParams = {
             dutyCycle: 0.14,
             g_y: 26,
@@ -42,19 +36,7 @@ class WarpEngine {
             sagDepth_nm: 16,
             tsRatio: 4102.74,
             powerAvg_MW: 83.3,
-            exoticMass_kg: 1405,
-            // Energy pipeline parameters for proper β calculation
-            gammaGeo: 26.0,         // γ_geo
-            Qburst: 1e9,           // Q_burst
-            deltaAOverA: 0.05,     // Δa/a
-            sectorCount: 400,
-            phaseSplit: 0.50,      // 0.5 hover, >0.5 cruise
-            viewAvg: 1.0,          // 1 = average (GR), 0 = instantaneous
-            // 3D ellipsoidal shell parameters
-            axesClip: [0.40, 0.22, 0.22],   // ellipsoid radii in clip units
-            wallWidth: 0.06,                // shell thickness in clip units
-            driveDir: [1,0,0],              // "front" direction
-            gridK: 0.12                     // grid-warp gain
+            exoticMass_kg: 1405
         };
         
         // Initialize rendering pipeline
@@ -199,45 +181,50 @@ class WarpEngine {
         // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
         
-        // Update energy pipeline parameters for proper β calculation
-        if (parameters.gammaGeo !== undefined) this.currentParams.gammaGeo = parameters.gammaGeo;
-        if (parameters.Qburst !== undefined) this.currentParams.Qburst = parameters.Qburst;
-        if (parameters.deltaAOverA !== undefined) this.currentParams.deltaAOverA = parameters.deltaAOverA;
-        if (parameters.sectorCount !== undefined) this.currentParams.sectorCount = parameters.sectorCount;
-        if (parameters.dutyCycle !== undefined) this.currentParams.dutyCycle = parameters.dutyCycle;
-        
-        // Map operational mode to phaseSplit for HOVER/CRUISE distinction
+        // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
-            switch (parameters.currentMode) {
-                case 'hover':
-                    this.currentParams.phaseSplit = 0.50;  // Symmetric β distribution
-                    break;
-                case 'cruise':
-                    this.currentParams.phaseSplit = 0.65;  // Front compression / rear expansion
-                    break;
-                case 'emergency':
-                    this.currentParams.phaseSplit = 0.70;  // Strong asymmetry
-                    break;
-                case 'standby':
-                    this.currentParams.phaseSplit = 0.45;  // Slight asymmetry
-                    break;
-                default:
-                    this.currentParams.phaseSplit = 0.50;
-            }
-            
-            console.log('🎯 Energy Pipeline Mode Update:', {
+            const modeEffects = this._calculateModeEffects(parameters);
+            console.log('🎯 Operational Mode Effects:', {
                 mode: parameters.currentMode,
-                phaseSplit: this.currentParams.phaseSplit,
-                gammaGeo: this.currentParams.gammaGeo,
-                Qburst: this.currentParams.Qburst,
-                deltaAOverA: this.currentParams.deltaAOverA
+                strobing: parameters.sectorStrobing,
+                qSpoiling: parameters.qSpoilingFactor, 
+                vanDenBroeck: parameters.gammaVanDenBroeck,
+                visualScale: modeEffects.visualScale,
+                curvatureAmplifier: modeEffects.curvatureAmplifier
             });
+            
+            // Apply mode-specific physics scaling
+            this.currentParams.modeVisualScale = modeEffects.visualScale;
+            this.currentParams.modeCurvatureAmplifier = modeEffects.curvatureAmplifier;
+            this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
         }
         
-        // Apply warp deformation to grid with energy pipeline integration
+        // Apply warp deformation to grid with mode-specific enhancements
         this._updateGrid();
     }
-
+    
+    _calculateModeEffects(params) {
+        const mode = params.currentMode || 'hover';
+        const strobing = params.sectorStrobing || 1;
+        const qSpoiling = params.qSpoilingFactor || 1;
+        const vanDenBroeck = params.gammaVanDenBroeck || 6.57e7;
+        
+        // Mode-specific visual scaling factors for authentic Natário physics
+        const modeConfigs = {
+            hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8 },
+            cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2 },
+            emergency: { baseScale: 2.0, curvatureBoost: 1.8, strobingViz: 1.0 },
+            standby: { baseScale: 0.1, curvatureBoost: 0.2, strobingViz: 0.05 }
+        };
+        
+        const config = modeConfigs[mode] || modeConfigs.hover;
+        
+        return {
+            visualScale: config.baseScale * Math.sqrt(qSpoiling),
+            curvatureAmplifier: config.curvatureBoost * (vanDenBroeck / 1e7) * 0.1, 
+            strobingFactor: config.strobingViz * (400 / Math.max(strobing, 1))
+        };
+    }
 
     _updateGrid() {
         console.log("_updateGrid called");
@@ -267,92 +254,62 @@ class WarpEngine {
         console.log("Grid vertices updated and uploaded to GPU");
     }
 
-    // Authentic Natário spacetime curvature implementation with energy pipeline and York-time
-    _warpGridVertices(vtx, halfSize, originalY, U) {
-        const bubbleParams = U; // Uniform parameter alias
+    // Authentic Natário spacetime curvature implementation
+    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+        // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
+        const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
+        const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
         
-        // Ellipsoid SDF helpers for 3D shell deformation
-        const sdEllipsoid = (p, a) => {
-            const q = [p[0]/a[0], p[1]/a[1], p[2]/a[2]];
-            return Math.hypot(q[0], q[1], q[2]) - 1.0;
-        };
-        
-        const nEllipsoid = (p, a) => {
-            const qa = [p[0]/(a[0]*a[0]), p[1]/(a[1]*a[1]), p[2]/(a[2]*a[2])];
-            const L = Math.max(1e-6, Math.hypot(p[0]/a[0], p[1]/a[1], p[2]/a[2]));
-            const n = [qa[0]/L, qa[1]/L, qa[2]/L];
-            const m = Math.hypot(n[0], n[1], n[2]);
-            return [n[0]/m, n[1]/m, n[2]/m];
-        };
-        
-        // Per-wedge ±β sign for HOVER/CRUISE sector strobing
-        const sectorSign = (x, z, time) => {
-            const sectors = Math.max(1, bubbleParams.sectorCount || 1);
-            const theta = Math.atan2(z, x);                         // [-π, π]
-            const u = (theta < 0 ? theta + 2*Math.PI : theta) / (2*Math.PI);
-            const i = Math.floor(u * sectors);
-            const split = Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
-            return (i < split) ? +1 : -1;
-        };
-        
-        // Energy pipeline β calculation - properly tied to physics parameters
-        const sectors = Math.max(1, bubbleParams.sectorCount || 1);
-        const betaInst = (bubbleParams.gammaGeo || 0) * (bubbleParams.Qburst || 0) * (bubbleParams.deltaAOverA || 0);
-        const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, (bubbleParams.dutyCycle || 0) / sectors));
-        const betaUsed = (bubbleParams.viewAvg >= 0.5) ? betaAvg : betaInst;
-        
-        // 3D ellipsoidal shell parameters
-        const a = bubbleParams.axesClip || [0.4, 0.22, 0.22];
-        const w = Math.max(1e-4, bubbleParams.wallWidth || 0.06);
-        const d = bubbleParams.driveDir || [1, 0, 0];
-        const t = [d[0]/a[0], d[1]/a[1], d[2]/a[2]];
-        const m = Math.hypot(...t) || 1;
-        const dN = [t[0]/m, t[1]/m, t[2]/m];
-        
-        console.log(`ENERGY PIPELINE β: betaInst=${betaInst.toExponential(3)}, betaAvg=${betaAvg.toExponential(3)}, betaUsed=${betaUsed.toExponential(3)}`);
-        
+        console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
+
         for (let i = 0; i < vtx.length; i += 3) {
-            const p = [vtx[i], vtx[i+1], vtx[i+2]];
+            // Work directly in clip-space coordinates
+            const x = vtx[i];
+            const z = vtx[i + 2];
+            const r = Math.hypot(x, z);              // radius in clip-space
             
-            // Sector sign (+β/−β) for HOVER/CRUISE distinction
-            const sgn = sectorSign(p[0], p[2], 0);
+            // Use original Y coordinate for each vertex, not a single constant
+            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
             
-            // Distance & normal to ellipsoid for 3D shell deformation
-            const sd = sdEllipsoid(p, a);
-            const n = nEllipsoid(p, a);
+            // Natário warp bubble profile (now with correct units)
+            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
+            const beta = beta0 * prof;              // |β| shift vector magnitude
+
+            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
+            // Apply operational mode scaling to lateral warp effects
+            const modeScale = this.currentParams?.modeVisualScale || 1.0;
+            const curvatureBoost = this.currentParams?.modeCurvatureAmplifier || 1.0;
+            const push = beta * 0.05 * modeScale * curvatureBoost;  // Mode-dependent deformation
+            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+
+            vtx[i] = x * scale;                      // X warped laterally
+            vtx[i + 2] = z * scale;                  // Z warped laterally
             
-            // Ring weight (Gaussian shell around ellipsoid)
-            const ring = Math.exp(-(sd*sd)/(w*w));
+            // -------- VERTICAL DEFORMATION: Y displacement --------
+            const dy = beta * 0.05 * modeScale;     // Mode-scaled vertical deformation
             
-            // Front/back factor for York-time compression/expansion
-            const front = Math.sign(n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]) || 1;
+            // Enhanced: Mode-dependent exotic mass effects
+            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9) * curvatureBoost;  // Enhanced with mode boost
+            const extraDip = rho * 0.002 * this.currentParams?.modeStrobingFactor || 0.002;  // Strobing-dependent
             
-            // Displacement tied to energy pipeline
-            const disp = (bubbleParams.gridK || 0.12) * betaUsed * ring * sgn * front;
-            
-            vtx[i] = p[0] - n[0] * disp;      // X with York-time front-compression
-            vtx[i+1] = p[1] - n[1] * disp;    // Y with 3D shell deformation  
-            vtx[i+2] = p[2] - n[2] * disp;    // Z with rear-expansion
+            vtx[i + 1] = y_original + dy + extraDip;  // Y with full mode-dependent curvature
         }
         
-        // Diagnostic output for energy pipeline verification
-        let maxDisp = 0, totalDisp = 0;
-        let xmin = 1e9, xmax = -1e9, ymin = 1e9, ymax = -1e9, zmin = 1e9, zmax = -1e9;
-        
+        // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
+        let maxDrift = 0;
         for (let i = 0; i < vtx.length; i += 3) {
-            const x = vtx[i], y = vtx[i+1], z = vtx[i+2];
-            const origX = this.originalGridVertices[i], origY = this.originalGridVertices[i+1], origZ = this.originalGridVertices[i+2];
-            const disp = Math.hypot(x - origX, y - origY, z - origZ);
-            maxDisp = Math.max(maxDisp, disp);
-            totalDisp += disp;
-            
-            xmin = Math.min(xmin, x); xmax = Math.max(xmax, x);
-            ymin = Math.min(ymin, y); ymax = Math.max(ymax, y);
-            zmin = Math.min(zmin, z); zmax = Math.max(zmax, z);
+            maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
         }
+        console.log("Max lateral drift =", maxDrift.toFixed(4), "(FIXED: should be < 0.2 to stay visible)");
         
-        console.log(`York-time Deformation: max=${maxDisp.toFixed(4)}, avg=${(totalDisp/(vtx.length/3)).toFixed(4)}`);
-        console.log(`Grid bounds: X[${xmin.toFixed(3)},${xmax.toFixed(3)}] Y[${ymin.toFixed(3)},${ymax.toFixed(3)}] Z[${zmin.toFixed(3)},${zmax.toFixed(3)}]`);
+        // Visual smoke test - check Y range after warping
+        let ymax = -1e9, ymin = 1e9;
+        for (let i = 1; i < vtx.length; i += 3) {
+            const y = vtx[i];
+            if (y > ymax) ymax = y;
+            if (y < ymin) ymin = y;
+        }
+        console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
     }
 
     _renderGridPoints() {

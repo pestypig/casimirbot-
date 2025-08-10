@@ -4,11 +4,11 @@
  * and "Geometry-Amplified Dynamic Casimir Effect in a Concave Microwave Micro-Resonator"
  */
 
-import { PHYSICS_CONSTANTS } from '../core/physics-constants';
-import type { SimulationParameters } from '../../shared/schema';
+import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 
 // Add gravitational constant for stress-energy calculations
 const G = 6.67430e-11; // m³/(kg⋅s²) - gravitational constant
+import type { SimulationParameters } from '../../shared/schema.js';
 
 export interface NatarioMetricResult {
   // Stress-energy tensor components

@@ -10,7 +10,7 @@ class WarpEngine {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 BUNDLE VERSION: ALCUBIERRE-PROFILE-v3.5 - DIRECTIONAL WARP + MODE SWITCHING 🚨');
+            console.error('🚨 BUNDLE VERSION: CAGE-HUGGING-v3.4 - CENTERED SHEETS + 3D RADIUS + CAMERA PERSPECTIVE 🚨');
             console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
             console.error('✅ 3D WebGL WarpEngine with FIXED Natário curvature');
             
@@ -747,7 +747,6 @@ class WarpEngine {
         const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
         
         const tsRatio = bubbleParams.tsRatio || 4100;
-        const warpMode = bubbleParams.currentMode || 'hover';
         console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
         console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
         console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
@@ -756,7 +755,6 @@ class WarpEngine {
         console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
         console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
         console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
-        console.log(`  🚀 WARP PROFILE: ${warpMode.toUpperCase()} mode (${warpMode === 'cruise' ? 'Alcubierre asymmetric' : 'Natário symmetric'})`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates with 3D radius
@@ -767,19 +765,9 @@ class WarpEngine {
             
             // Y coordinate already extracted above for radius calculation
             
-            // Mode-dependent warp profile: Symmetric Natário vs Asymmetric Alcubierre
-            let beta;
-            if (bubbleParams.currentMode === 'cruise') {
-                // CRUISE mode: Alcubierre-style asymmetric profile for directional warp
-                const forwardBias = -0.12; // Shift center rearward
-                const zShift = z - forwardBias; // asymmetry along Z
-                const asymProf = Math.exp(-Math.pow(zShift / sagRclip, 2));
-                beta = beta0 * asymProf; // Unidirectional warp for Alcubierre field
-            } else {
-                // HOVER mode: Symmetric Natário profile
-                const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-                beta = beta0 * prof; // Original spherically symmetric field
-            }
+            // Natário warp bubble profile (now with FIXED units)
+            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
+            const beta = beta0 * prof;              // |β| shift vector magnitude
 
             // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
             const lateralK = 0.10 * sagRclip;       // max 10% of radius

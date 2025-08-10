@@ -3,9 +3,9 @@
  * Implements scientifically accurate SCUFF-EM FSC method
  */
 
-import { PHYSICS_CONSTANTS, thermalLength } from '../core/physics-constants';
-import type { CasimirModule } from '../core/module-registry';
-import type { SimulationParameters } from '../../shared/schema';
+import { PHYSICS_CONSTANTS, thermalLength } from '../core/physics-constants.js';
+import type { CasimirModule } from '../core/module-registry.js';
+import type { SimulationParameters } from '../../shared/schema.js';
 
 export interface StaticCasimirResult {
   totalEnergy: number;
