@@ -51,9 +51,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           return;
         }
 
-        // Load the 3D WebGL WarpEngine with full pipeline debugging
+        // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fresh.js?v=' + Date.now(); // Load fresh rebuild with fixes
+        script.src = '/warp-engine-fixed.js?v=' + Date.now(); // Load enhanced pipeline-driven version
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);

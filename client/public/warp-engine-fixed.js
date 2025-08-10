@@ -10,7 +10,7 @@ class WarpEngine {
             throw new Error('WebGL not supported');
         }
 
-        console.log("3D spacetime grid rendered with authentic Natário warp bubble physics");
+        console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
         
         // Initialize WebGL state
         this.gl.clearColor(0.0, 0.0, 0.3, 1.0); // Dark blue background
@@ -256,60 +256,91 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // CRITICAL FIX: Work entirely in clip-space to avoid unit mismatch
-        const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;  // Convert sag to clip-space
-        const beta0 = bubbleParams.dutyCycle * bubbleParams.g_y;
+        // 3D Ellipsoidal shell parameters
+        const axesClip = [0.40, 0.22, 0.22];      // ellipsoid radii in clip coords
+        const wallWidth = 0.06;                    // shell thickness (visual σ ~ 1/w)
+        const driveDir = [1, 0, 0];               // +x is "aft" by convention
+        const gridK = 0.12;                       // deformation gain
         
-        console.log(`WARP DEBUG: originalY=${originalY} (should be original grid Y), halfSize=${halfSize}, sagRclip=${sagRclip}`);
+        // Enhanced pipeline-driven beta calculation
+        const sectors = Math.max(1, bubbleParams.sectorCount || 1);
+        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
+        const Qburst = bubbleParams.Qburst || bubbleParams.cavityQ || 1e9;
+        const deltaAOverA = bubbleParams.deltaAOverA || 0.05;
+        const dutyCycle = bubbleParams.dutyCycle || 0.14;
+        const phaseSplit = bubbleParams.phaseSplit || 0.50;  // 0.5 = hover, >0.5 = cruise
+        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
+        
+        const betaInst = gammaGeo * Qburst * deltaAOverA;
+        const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, dutyCycle / sectors));
+        const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
+        
+        console.log(`🔗 ENHANCED PIPELINE → 3D SHELL CONNECTION:`);
+        console.log(`  γ_geo=${gammaGeo}, Q_burst=${Qburst.toExponential(2)}, Δa/a=${deltaAOverA}`);
+        console.log(`  β_inst=${betaInst.toExponential(2)}, β_avg=${betaAvg.toExponential(2)}`);
+        console.log(`  sectors=${sectors}, phaseSplit=${phaseSplit}, viewAvg=${viewAvg}`);
+        console.log(`  3D ellipsoid axes: [${axesClip.join(', ')}]`);
+
+        // Ellipsoid utilities
+        const sdEllipsoid = (p, a) => {
+            const q = [p[0]/a[0], p[1]/a[1], p[2]/a[2]];
+            return Math.hypot(q[0], q[1], q[2]) - 1.0;
+        };
+        
+        const nEllipsoid = (p, a) => {
+            const qa = [p[0]/(a[0]*a[0]), p[1]/(a[1]*a[1]), p[2]/(a[2]*a[2])];
+            const L = Math.max(1e-6, Math.hypot(p[0]/a[0], p[1]/a[1], p[2]/a[2]));
+            const n = [qa[0]/L, qa[1]/L, qa[2]/L];
+            const m = Math.hypot(n[0], n[1], n[2]) || 1;
+            return [n[0]/m, n[1]/m, n[2]/m];
+        };
+        
+        // Normalize drive direction
+        const dN = (() => {
+            const t = [driveDir[0]/axesClip[0], driveDir[1]/axesClip[1], driveDir[2]/axesClip[2]];
+            const m = Math.hypot(...t) || 1;
+            return [t[0]/m, t[1]/m, t[2]/m];
+        })();
 
         for (let i = 0; i < vtx.length; i += 3) {
-            // Work directly in clip-space coordinates
-            const x = vtx[i];
-            const z = vtx[i + 2];
-            const r = Math.hypot(x, z);              // radius in clip-space
-            
-            // Use original Y coordinate for each vertex, not a single constant
-            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
-            
-            // Natário warp bubble profile (now with correct units)
-            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-            const beta = beta0 * prof;              // |β| shift vector magnitude
+            const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
+            const sd = sdEllipsoid(p, axesClip);
+            const n = nEllipsoid(p, axesClip);
 
-            // -------- LATERAL DEFORMATION: Bend X and Z with the warp field --------
-            // Apply operational mode scaling to lateral warp effects
-            const modeScale = this.currentParams?.modeVisualScale || 1.0;
-            const curvatureBoost = this.currentParams?.modeCurvatureAmplifier || 1.0;
-            const push = beta * 0.05 * modeScale * curvatureBoost;  // Mode-dependent deformation
-            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
-
-            vtx[i] = x * scale;                      // X warped laterally
-            vtx[i + 2] = z * scale;                  // Z warped laterally
+            // Gaussian shell around ellipsoid
+            const ring = Math.exp(-(sd * sd) / (wallWidth * wallWidth));
             
-            // -------- VERTICAL DEFORMATION: Y displacement --------
-            const dy = beta * 0.05 * modeScale;     // Mode-scaled vertical deformation
+            // Sector sign for strobing
+            const theta = Math.atan2(p[2], p[0]);
+            const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+            const sectorIndex = Math.floor(u * sectors);
+            const split = Math.floor(phaseSplit * sectors);
+            const sgn = (sectorIndex < split) ? +1 : -1;  // (+) rear, (−) front
             
-            // Enhanced: Mode-dependent exotic mass effects
-            const rho = -beta * beta * (bubbleParams.cavityQ / 1e9) * curvatureBoost;  // Enhanced with mode boost
-            const extraDip = rho * 0.002 * this.currentParams?.modeStrobingFactor || 0.002;  // Strobing-dependent
+            // Front/back asymmetry
+            const front = Math.sign(n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]) || 1;
             
-            vtx[i + 1] = y_original + dy + extraDip;  // Y with full mode-dependent curvature
+            // Final displacement
+            const disp = gridK * betaUsed * ring * sgn * front;
+            vtx[i] = p[0] - n[0] * disp;
+            vtx[i + 1] = p[1] - n[1] * disp;
+            vtx[i + 2] = p[2] - n[2] * disp;
         }
         
-        // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
+        // Enhanced diagnostics
         let maxDrift = 0;
         for (let i = 0; i < vtx.length; i += 3) {
-            maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
+            maxDrift = Math.max(maxDrift, Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]));
         }
-        console.log("Max lateral drift =", maxDrift.toFixed(4), "(FIXED: should be < 0.2 to stay visible)");
+        console.log(`Max 3D displacement = ${maxDrift.toFixed(4)} (3D ellipsoidal shell)`);
         
-        // Visual smoke test - check Y range after warping
         let ymax = -1e9, ymin = 1e9;
         for (let i = 1; i < vtx.length; i += 3) {
             const y = vtx[i];
             if (y > ymax) ymax = y;
             if (y < ymin) ymin = y;
         }
-        console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
+        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (3D shell deformation)`);
     }
 
     _renderGridPoints() {
