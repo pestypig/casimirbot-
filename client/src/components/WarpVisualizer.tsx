@@ -32,81 +32,47 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<any>(null);
   const animationRef = useRef<number>();
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
   const [isRunning, setIsRunning] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [isFallback, setIsFallback] = useState(false);
 
   useEffect(() => {
     const initializeEngine = async () => {
       if (!canvasRef.current) return;
 
       try {
-        // Hard-set canvas dimensions using window size (not clientWidth) for iframe compatibility
-        const canvas = canvasRef.current;
-        const setSize = () => {
-          const w = Math.max(1, window.innerWidth || document.documentElement.clientWidth || screen.width);
-          const h = Math.max(1, window.innerHeight || document.documentElement.clientHeight || screen.height);
-          canvas.width = w;
-          canvas.height = h;
-          canvas.style.width = '100%';
-          canvas.style.height = '100%';
-          console.log('Canvas sized for WebGL (iframe-safe):', { width: w, height: h });
-        };
-        
-        // Set initial size and listen for resize
-        setSize();
-        const resizeListener = () => setSize();
-        window.addEventListener('resize', resizeListener);
-        resizeCleanupRef.current = () => window.removeEventListener('resize', resizeListener);
-
         // Check if WarpEngine is already loaded  
         if (window.WarpEngine) {
           try {
             engineRef.current = new window.WarpEngine(canvasRef.current);
             setIsLoaded(true);
-            // Check for WebGL fallback after initialization
-            setTimeout(() => {
-              if (engineRef.current && !engineRef.current.gl) {
-                setIsFallback(true);
-              }
-            }, 500);
           } catch (error) {
             console.error('Failed to initialize existing WarpEngine:', error);
           }
           return;
         }
 
-        // Load unified Natário v3.1 engine with all theory patches integrated
+        // Load the 3D WebGL WarpEngine with full pipeline debugging
         const script = document.createElement('script');
-        script.src = '/warp-engine-natario-v3.js?v=' + Date.now();
-        console.log('Loading unified Natário v3.1 WarpEngine from:', script.src);
-        
+        script.src = '/warp-engine-fresh.js?v=' + Date.now(); // Load fresh rebuild with fixes
+        console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
-          console.log('Natário v3.1 WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
+          console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
           if (window.WarpEngine) {
             try {
-              console.log('Creating Natário v3.1 WarpEngine instance...');
+              console.log('Creating WarpEngine instance...');
               engineRef.current = new window.WarpEngine(canvasRef.current);
-              console.log('Natário v3.1 WarpEngine created - unified theory build active:', engineRef.current.mode || 'HOVER');
+              console.log('WarpEngine instance created successfully - checking mode:', engineRef.current.isWebGLFallback ? 'FALLBACK' : 'WEBGL');
               setIsLoaded(true);
-              // Check for WebGL fallback after initialization
-              setTimeout(() => {
-                if (engineRef.current && !engineRef.current.gl) {
-                  setIsFallback(true);
-                }
-              }, 500);
             } catch (error) {
-              console.error('Failed to initialize Natário v3.1 WarpEngine:', error);
+              console.error('Failed to initialize WarpEngine:', error);
               setIsLoaded(false);
             }
           } else {
-            console.error('WarpEngine not found on window after unified engine load');
+            console.error('WarpEngine not found on window after script load');
           }
         };
-        
         script.onerror = () => {
-          console.error('Failed to load unified Natário v3.1 WarpEngine');
+          console.error('Failed to load WarpEngine');
           setIsLoaded(false);
         };
         document.head.appendChild(script);
@@ -128,10 +94,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Clean up engine resources
       if (engineRef.current?.destroy) {
         engineRef.current.destroy();
-      }
-      // Clean up resize listener
-      if (resizeCleanupRef.current) {
-        resizeCleanupRef.current();
       }
     };
   }, []);
@@ -163,39 +125,26 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         engineRef.current.uniforms.beta0 = beta0;
       }
       
-      // Wire up theory knobs for patched engine
-      const mode = (parameters.currentMode || 'hover').toUpperCase();
-      if (engineRef.current.setMode && typeof engineRef.current.setMode === 'function') {
-        // Use new theory API if available
-        engineRef.current.setMode(mode);
-        console.log('🎯 Theory mode set to:', mode);
-      }
-
-      // Enhanced uniform update with theory patch integration
+      // Enhanced uniform update with full amplifier chain
       engineRef.current.updateUniforms({
-        // Legacy compatibility parameters
+        // Core physics parameters
         dutyCycle: parameters.dutyCycle,
-        g_y: parameters.g_y,
-        cavityQ: parameters.cavityQ,
+        gammaGeo: parameters.g_y,        // Stage 1: Geometric amplification
+        Qdyn: parameters.cavityQ,        // Stage 2: Dynamic Q-factor
+        gammaVdB: parameters.gammaVanDenBroeck, // Stage 4: Van den Broeck amplification
         sagDepth_nm: parameters.sagDepth_nm,
+        bubbleRadius_nm: 10000, // FIX #3: Dedicated bubble radius for visualization
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
-        tsRatio: parameters.tsRatio || 4100,
-        beta0: beta0,
-        
-        // NEW THEORY KNOBS (patch integration)
-        gammaGeo: parameters.g_y || 25.0,           // γ_geo: geometric blue-shift
-        Qburst: parameters.cavityQ || 1e9,          // Q during burst window
-        deltaAOverA: 0.05,                          // Δa/a boundary stroke
-        sectorCount: parameters.sectorStrobing || 400.0, // strobing sectors
-        phaseSplit: mode === 'CRUISE' ? 0.65 : 0.5, // +β/-β fraction  
-        viewAvg: 1.0,                               // show GR-averaged view
-        axesClip: [0.35, 0.22, 0.22],             // ellipsoid needle hull
-        betaGradient: mode === 'TILT' ? [0.0, -0.02, 0.0] : [0, 0, 0], // artificial gravity
-        sectorSpeed: 2.0,                           // sector rotation speed
-        
+        tsRatio: parameters.tsRatio || 4100, // Time-scale ratio for animation scaling
         // Operational mode parameters
-        currentMode: parameters.currentMode
+        currentMode: parameters.currentMode,
+        sectorStrobing: parameters.sectorStrobing,
+        qSpoilingFactor: parameters.qSpoilingFactor,
+        // Legacy compatibility
+        g_y: parameters.g_y,
+        // Computed amplifier chain result - COMPLETE PIPELINE
+        beta0: beta0
       });
     }
   }, [parameters, isLoaded]);
@@ -289,20 +238,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <div className="absolute inset-0 flex items-center justify-center text-white/70">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
-                <div className="text-sm">Loading Natário v3.1 Engine...</div>
+                <div className="text-sm">Loading Warp Engine...</div>
               </div>
             </div>
           )}
           
-          {isFallback && (
-            <div className="absolute left-2 bottom-2 bg-black/60 border border-green-400/30 rounded px-2 py-1">
-              <div className="text-xs font-mono text-green-300">
-                WebGL fallback — theory parameters active
-              </div>
-            </div>
-          )}
-          
-          {/* Live operational mode HUD */}
+          {/* Live operational mode HUD (inspired by GPT's suggestion) */}
           {isLoaded && (
             <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono">
               <div className="text-cyan-400 font-semibold">
@@ -311,9 +252,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               <div className="text-green-400">
                 P: {parameters.powerAvg_MW.toFixed(1)}MW | 
                 D: {(parameters.dutyCycle * 100).toFixed(1)}%
-              </div>
-              <div className="text-slate-400">
-                Engine: {isFallback ? '⚠ 2D' : '✓ WebGL'}
               </div>
             </div>
           )}

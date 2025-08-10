@@ -47,7 +47,6 @@ Preferred communication style: Simple, everyday language.
 - **Operational Modes**: Comprehensive system for switching between predefined operational modes (e.g., Hover, Cruise, Emergency, Standby), each with specific physical parameters and real-time calculation updates.
 - **Documentation System**: Integrated access to research papers, physics guides, and API references.
 - **3D Spacetime Curvature Visualization**: Real-time WebGL-based grid rendering with dual warp profiles - symmetric Natário (HOVER mode) and asymmetric Alcubierre directional compression (CRUISE mode). Features three orthogonal cage sheets (XY cyan floor, XZ magenta wall, YZ yellow wall) centered through bubble origin with proper 3D radius calculation and perspective camera viewing. Energy pipeline fully connected with mode-dependent physics profiles, amplitude clamping, and bubble-hugging cage geometry (January 2025).
-- **Unified Natário v3.1 Engine**: Single-file WebGL engine with comprehensive theory integration connecting real research parameters (γ_geo geometric blue-shift, Q_burst cavity enhancement, Δa/a boundary stroke, 400-sector strobing, Natário tilt gradient) to visualization behavior. Features ellipsoidal needle hull geometry, instantaneous vs GR cycle-averaged view modes, sector-by-sector +β/-β strobing with HOVER (phaseSplit=0.5) vs CRUISE (phaseSplit=0.65) modes, artificial gravity demonstration via subtle β-gradient, and WebGL2→WebGL1→2D fallback (January 2025).
 
 ## External Dependencies
 
