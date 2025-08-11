@@ -1012,7 +1012,7 @@ export default function HelixCore() {
                     onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
                     originPx={{ x: 10123.142, y: 9480.491 }}
                     scalePxPerPc={1.6666667}
-                    debug={useDeepZoom}
+                    debug
                     width={800}
                     height={400}
                   />
