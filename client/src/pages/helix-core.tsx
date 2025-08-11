@@ -16,8 +16,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
-import { FuelGauge } from "@/components/FuelGauge";
+import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 import { TripPlayer } from "@/components/TripPlayer";
+import { GalaxyMapPanZoom } from "@/components/GalaxyMapPanZoom";
+import { RouteSteps } from "@/components/RouteSteps";
+import { BODIES } from "@/lib/galaxy-catalog";
+import { HelixPerf } from "@/lib/galaxy-schema";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -89,6 +93,7 @@ export default function HelixCore() {
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
@@ -876,6 +881,63 @@ export default function HelixCore() {
                 console.log(`Trip phase: ${phase}, time: ${t}s`);
               }}
             />
+
+            {/* Mission Planner - Galactic Maps */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold">Mission Planner (Galactic Grid)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <GalaxyMapPanZoom
+                  imageUrl="/galaxymap.png"
+                  bodies={BODIES}
+                  routeIds={route}
+                  onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                  originPx={{x: 500, y: 250}}  // Approximate Sol position in the Local region
+                  scalePxPerPc={0.25}           // Scale: pixels per parsec (adjust based on image)
+                  width={800}
+                  height={400}
+                />
+                <RouteSteps 
+                  bodies={BODIES} 
+                  plan={{ waypoints: route }} 
+                  perf={{
+                    mode: pipelineState?.currentMode || 'Hover',
+                    powerMW: pipelineState?.P_avg || 83.3,
+                    duty: pipelineState?.dutyCycle || 0.14,
+                    gammaGeo: pipelineState?.gammaGeo || 26,
+                    qFactor: pipelineState?.qCavity || 1e9,
+                    zeta: pipelineState?.zeta || 0.032,
+                    tsRatio: pipelineState?.TS_ratio || 4102.74,
+                    freqGHz: 15.0,
+                    energyPerLyMWh: (() => {
+                      const vLyPerHour = computeEffectiveLyPerHour(
+                        pipelineState?.currentMode || 'Hover',
+                        pipelineState?.dutyCycle || 0.14,
+                        pipelineState?.gammaGeo || 26,
+                        pipelineState?.qCavity || 1e9,
+                        pipelineState?.zeta || 0.032,
+                        pipelineState?.TS_ratio || 4102.74
+                      );
+                      const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
+                      return isFinite(hoursPerLy) ? (pipelineState?.P_avg || 83.3) * hoursPerLy : Infinity;
+                    })(),
+                    energyPerCycleJ: (() => {
+                      const cyclesPerSec = 15.0 * 1e9;
+                      return cyclesPerSec > 0 ? ((pipelineState?.P_avg || 83.3) * 1e6) / cyclesPerSec : Infinity;
+                    })(),
+                    vEffLyPerHour: (mode, duty) => computeEffectiveLyPerHour(
+                      mode, 
+                      duty, 
+                      pipelineState?.gammaGeo || 26,
+                      pipelineState?.qCavity || 1e9,
+                      pipelineState?.zeta || 0.032,
+                      pipelineState?.TS_ratio || 4102.74
+                    )
+                  } as HelixPerf}
+                />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>

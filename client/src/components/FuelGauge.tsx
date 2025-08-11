@@ -30,7 +30,7 @@ export type FuelGaugeProps = {
 /** Derive effective velocity (ly/hour) from current parameters.
  *  v_eff is provisional: tuned constants today, later replace with warp visual slope -> metric factor.
  */
-function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0) {
+export function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0) {
   // base per-mode nominal speeds (training wheels; update when you wire metric output)
   const base: Record<string, number> = { Hover: 0.002, Cruise: 0.02, Emergency: 0.03, Standby: 0 };
   let v = base[mode] ?? 0;
