@@ -21,9 +21,11 @@ import { TripPlayer } from "@/components/TripPlayer";
 import { GalaxyMapPanZoom } from "@/components/GalaxyMapPanZoom";
 import { GalaxyDeepZoom } from "@/components/GalaxyDeepZoom";
 import { GalaxyOverlays } from "@/components/GalaxyOverlays";
+import { SolarMap } from "@/components/SolarMap";
 import { RouteSteps } from "@/components/RouteSteps";
 import { BODIES } from "@/lib/galaxy-catalog";
 import { HelixPerf } from "@/lib/galaxy-schema";
+import { computeSolarXY, solarToBodies } from "@/lib/solar-adapter";
 import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
@@ -99,6 +101,8 @@ export default function HelixCore() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   const [useDeepZoom, setUseDeepZoom] = useState(false);
+  const [mapMode, setMapMode] = useState<"galactic" | "solar">("galactic");
+  const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
   const [deepZoomViewer, setDeepZoomViewer] = useState<any>(null);
   const [galaxyCalibration, setGalaxyCalibration] = useState<{originPx:{x:number;y:number}; pxPerPc:number} | null>(null);
 
@@ -116,6 +120,18 @@ export default function HelixCore() {
     };
     img.src = "/galaxymap.png";
   }, []);
+  
+  // Update solar system positions periodically
+  useEffect(() => {
+    if (mapMode === "solar") {
+      const updateSolarPositions = () => {
+        setSolarBodies(solarToBodies(computeSolarXY()));
+      };
+      
+      const interval = setInterval(updateSolarPositions, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [mapMode]);
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
@@ -907,18 +923,46 @@ export default function HelixCore() {
             {/* Mission Planner - Galactic Maps */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Mission Planner (Galactic Grid)</CardTitle>
-                <div className="flex items-center space-x-2">
-                  <Label htmlFor="deep-zoom-toggle" className="text-xs">High-Res Mode</Label>
-                  <Switch
-                    id="deep-zoom-toggle"
-                    checked={useDeepZoom}
-                    onCheckedChange={setUseDeepZoom}
-                  />
+                <CardTitle className="text-sm font-semibold">Mission Planner</CardTitle>
+                <div className="flex items-center space-x-4">
+                  <Select value={mapMode} onValueChange={(v: "galactic" | "solar") => {
+                    setMapMode(v);
+                    // Reset route when switching modes
+                    if (v === "solar") {
+                      setRoute(["SUN", "MARS", "SUN"]);
+                    } else {
+                      setRoute(["SOL", "ORI_OB1", "VEL_OB2", "SOL"]);
+                    }
+                  }}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="View" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="galactic">Galactic (pc)</SelectItem>
+                      <SelectItem value="solar">Solar (AU)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {mapMode === "galactic" && (
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="deep-zoom-toggle" className="text-xs">High-Res</Label>
+                      <Switch
+                        id="deep-zoom-toggle"
+                        checked={useDeepZoom}
+                        onCheckedChange={setUseDeepZoom}
+                      />
+                    </div>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {!galaxyCalibration ? (
+                {mapMode === "solar" ? (
+                  <SolarMap
+                    width={800}
+                    height={400}
+                    routeIds={route}
+                    onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                  />
+                ) : !galaxyCalibration ? (
                   <div className="h-40 grid place-items-center text-xs text-slate-400">
                     Loading galactic coordinate system…
                   </div>
@@ -956,8 +1000,9 @@ export default function HelixCore() {
                   />
                 )}
                 <RouteSteps 
-                  bodies={BODIES} 
-                  plan={{ waypoints: route }} 
+                  bodies={mapMode === "solar" ? solarBodies : BODIES}
+                  plan={{ waypoints: route }}
+                  mode={mapMode}
                   perf={{
                     mode: pipelineState?.currentMode || 'Hover',
                     powerMW: pipelineState?.P_avg || 83.3,
