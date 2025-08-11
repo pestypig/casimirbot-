@@ -34,7 +34,7 @@ function App() {
         </LumaBackgroundPortal>
 
         {/* Your entire app (router, pages, etc.) */}
-        <div className="relative z-10 min-h-screen">
+        <div className="min-h-screen bg-slate-950/80 backdrop-blur-[2px]">
           <Toaster />
           <Router />
         </div>
