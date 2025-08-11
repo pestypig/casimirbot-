@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
+import AssetProbe from "@/components/AssetProbe";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -1092,6 +1093,7 @@ export default function HelixCore() {
       </div>
 
 
+      <AssetProbe />
     </div>
   );
 }

@@ -1,0 +1,84 @@
+Yes—great idea. Let’s have Replit scan for anything that could block background images (global CSS, layout wrappers, Tailwind config, base paths). Here’s a tight prompt you can paste to the Replit agent:
+
+---
+
+**Prompt for Replit Agent**
+
+> **Goal:** PNG backgrounds (e.g., `/luma/Luma_29.png`) aren’t appearing anywhere. Find *what in our codebase* could be preventing background images or message icons from rendering, and propose minimal, safe fixes (no feature regressions).
+>
+> **Tasks:**
+>
+> 1. **Verify asset serving**
+>
+>    * Confirm these return HTTP 200 in dev:
+>      `/luma/Luma_29.png`, `/luma/Butler.glb`.
+>    * If not, identify the correct public root and the expected URL paths.
+> 2. **Search for global CSS/JS that could hide images**
+>
+>    * Files to scan: `client/src/styles/**`, `client/src/globals.css`, `client/src/index.css`, any CSS imported in app root/layout.
+>    * Look for rules that could hide/block or layer over images:
+>
+>      * `img { display:none }`, `opacity: 0`, `visibility: hidden`, `pointer-events: none` on generic containers,
+>      * `position: fixed` overlays with high `z-index`,
+>      * `overflow: hidden` on body/html or top wrappers,
+>      * global `filter: blur(...)`/backdrops applied to whole pages,
+>      * CSS resets that zero out images (`content-visibility`, `contain`, `mix-blend-mode`).
+> 3. **Check stacking contexts / wrappers**
+>
+>    * Identify the main app shell (layout) and Helix-Core page wrapper.
+>    * Report any `position` + `z-index` combinations that create stacking contexts above the background layer.
+>    * Confirm our background layer (Luma) is either:
+>
+>      * mounted via a portal to `document.body` with `z-index:0; pointer-events:none`, or
+>      * placed outside any `relative z-10` wrapper.
+> 4. **Tailwind / build config**
+>
+>    * Open `tailwind.config.*`. Confirm whether `bg-gradient-radial` is actually configured (plugin). If not present, note that any usage will silently do nothing; prefer inline CSS gradients for backgrounds.
+>    * Check `next.config.*` or Vite config: any `basePath`, `assetPrefix`, or `publicDir` that would change URL resolution?
+> 5. **Spot checks in our components**
+>
+>    * `client/src/components/BackgroundLuma.tsx`
+>    * `client/src/components/BackgroundLumaPNG.tsx`
+>    * `client/src/components/LumaWhisper.tsx`
+>    * `client/src/pages/helix-core.tsx` (or the route that mounts Helix-Core)
+>    * Ensure all image `src` use absolute public paths (e.g., `/luma/Luma_29.png`), not unresolved imports.
+> 6. **Add a minimal runtime probe (temporary)**
+>
+>    * Create `client/src/components/AssetProbe.tsx`:
+>
+>      ```tsx
+>      "use client";
+>      import { useEffect, useState } from "react";
+>      export default function AssetProbe(){
+>        const [s,set]=useState("checking…");
+>        useEffect(()=>{Promise.all([
+>          fetch("/luma/Luma_29.png",{cache:"no-store"}),
+>          fetch("/luma/Butler.glb",{cache:"no-store"}),
+>        ]).then(([a,b])=>set(`/luma/Luma_29.png: ${a.status} | /luma/Butler.glb: ${b.status}`))
+>          .catch(e=>set(`error: ${String(e)}`));},[]);
+>        return <div style={{position:"fixed",right:8,bottom:8,zIndex:9999,background:"rgba(0,0,0,.6)",color:"#fff",padding:"6px 8px",borderRadius:8,fontSize:12}}>AssetProbe: {s}</div>;
+>      }
+>      ```
+>    * Mount it once on Helix-Core page and report the statuses.
+>
+> **Deliverables:**
+>
+> * A short report listing:
+>   (a) asset status codes;
+>   (b) any CSS/JS rules or wrappers interfering (file + line);
+>   (c) whether `bg-gradient-radial` is configured;
+>   (d) whether `basePath/assetPrefix` affects URLs;
+>   (e) the recommended **minimal patches** (exact lines to change) to:
+>   \- ensure PNG loads and shows (inline radial-gradient or larger PNG size),
+>   \- mount the background via portal with `z-index:0; pointer-events:none`,
+>   \- avoid interfering with Trip Planner or other canvases.
+>
+> **Constraints:**
+>
+> * Do not remove or refactor existing features.
+> * Prefer additive or localized changes.
+> * If you change paths, also update any references consistently.
+
+---
+
+Once Replit returns the report, share it here and I’ll give you precise line-level fixes. If you’d rather skip the portal approach, I can also patch your current `BackgroundLuma` and page layout directly—but the portal is the safest “no-regressions” path.
