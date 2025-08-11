@@ -114,37 +114,35 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // Compute amplifier chain β₀ before updating uniforms
-      const duty = parameters.dutyCycle || 0.14;
-      const gammaGeo = parameters.g_y || 26;
-      const Qdyn = parameters.cavityQ || 1e9;
-      const gammaVdB = parameters.gammaVanDenBroeck || 1e11;
-      const beta0 = duty * gammaGeo * Math.sqrt(Qdyn) * Math.pow(gammaVdB, 0.25);
+      // Map mode to phase split for front/back asymmetry
+      const mode = parameters.currentMode || 'hover';
+      const phaseSplit = mode === 'cruise' ? 0.65        // aft-heavy
+                       : mode === 'hover' ? 0.50         // balanced
+                       : mode === 'emergency' ? 0.70     // maximum aft
+                       : 0.50;                           // default
       
-      // Direct β₀ injection for live mode switching
-      if (engineRef.current.uniforms) {
-        engineRef.current.uniforms.beta0 = beta0;
-      }
-      
-      // Enhanced uniform update with full amplifier chain
+      // Fixed parameter mapping for engine consumption
       engineRef.current.updateUniforms({
-        // Core physics parameters
+        // Core physics parameters - using engine's expected names
         dutyCycle: parameters.dutyCycle,
-        gammaGeo: parameters.g_y,        // Stage 1: Geometric amplification
-        Qdyn: parameters.cavityQ,        // Stage 2: Dynamic Q-factor
-        gammaVdB: parameters.gammaVanDenBroeck, // Stage 4: Van den Broeck amplification
+        gammaGeo: parameters.g_y,                        // Stage 1: Geometric amplification
+        Qburst: parameters.cavityQ,                      // Map to engine name (was Qdyn)
+        deltaAOverA: parameters.qSpoilingFactor || 1.0,  // Map Q spoiling to Δa/a
+        gammaVdB: parameters.gammaVanDenBroeck,          // Stage 4: Van den Broeck amplification
+        
         sagDepth_nm: parameters.sagDepth_nm,
         powerAvg_MW: parameters.powerAvg_MW,
         exoticMass_kg: parameters.exoticMass_kg,
-        tsRatio: parameters.tsRatio || 4100, // Time-scale ratio for animation scaling
-        // Operational mode parameters
-        currentMode: parameters.currentMode,
-        sectorStrobing: parameters.sectorStrobing,
-        qSpoilingFactor: parameters.qSpoilingFactor,
-        // Legacy compatibility
-        g_y: parameters.g_y,
-        // Computed amplifier chain result - COMPLETE PIPELINE
-        beta0: beta0
+        tsRatio: parameters.tsRatio || 4100,             // Time-scale ratio for animation scaling
+        
+        // Operational mode parameters - fixed mapping
+        currentMode: mode,
+        sectorCount: parameters.sectorStrobing || 400,   // Was sectorStrobing - engine reads sectorCount
+        phaseSplit: phaseSplit,                          // NEW: Front/back asymmetry control
+        
+        // Visual control
+        viewAvg: 1.0,                                    // Show GR average
+        betaGain: 1e-10                                  // Visual scaling factor
       });
     }
   }, [parameters, isLoaded]);

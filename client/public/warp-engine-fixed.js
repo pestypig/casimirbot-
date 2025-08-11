@@ -344,17 +344,18 @@ class WarpEngine {
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
-        // Enhanced pipeline-driven beta calculation with proper normalization
-        const sectors = Math.max(1, bubbleParams.sectorCount || 1);
+        // Enhanced pipeline-driven beta calculation with fixed parameter mapping
+        const sectors = Math.max(1, bubbleParams.sectorCount || bubbleParams.sectorStrobing || 1);
         const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
         const Qburst = bubbleParams.Qburst || bubbleParams.cavityQ || 1e9;
-        const deltaAOverA = bubbleParams.deltaAOverA || 0.05;
+        const deltaAOverA = bubbleParams.deltaAOverA || bubbleParams.qSpoilingFactor || 0.05;
         const dutyCycle = bubbleParams.dutyCycle || 0.14;
-        const phaseSplit = bubbleParams.phaseSplit || 0.50;  // 0.5 = hover, >0.5 = cruise
+        const phaseSplit = bubbleParams.phaseSplit || (bubbleParams.currentMode === 'cruise' ? 0.65 : 0.5);
         const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
         const betaGain = bubbleParams.betaGain || 1e-10;     // Normalize huge β to visual range
+        const gammaVdB = bubbleParams.gammaVdB || bubbleParams.gammaVanDenBroeck || 1.0;
         
-        const betaInst = gammaGeo * Qburst * deltaAOverA;
+        const betaInst = gammaGeo * Qburst * deltaAOverA * Math.pow(gammaVdB, 0.25);
         const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, dutyCycle / sectors));
         const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
         const betaVis = betaUsed * betaGain;  // Scale to sane visual magnitude
@@ -407,8 +408,12 @@ class WarpEngine {
             // Front/back asymmetry
             const front = Math.sign(n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]) || 1;
             
-            // Base displacement
-            let disp = gridK * betaVis * ring * band * sgn * front;
+            // Get mode-specific amplification factors
+            const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
+            const modeViz = (this.currentParams.modeVisualScale || 1.0);
+            
+            // Base displacement with mode scaling
+            let disp = gridK * betaVis * modeAmp * modeViz * ring * band * sgn * front;
             
             // NEW: Exaggerate for display only (viewer-only, physics unchanged)
             disp *= (this.uniforms?.vizGain || 4.0);
