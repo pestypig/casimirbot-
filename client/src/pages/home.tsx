@@ -89,7 +89,7 @@ export default function Home() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Atom className="w-6 h-6" />
-            <h1 className="text-2xl font-bold">Needle Hull Mk 1 Research Platform</h1>
+            <h1 className="text-2xl font-bold text-[#387ec7]">Needle Hull Mk 1 Research Platform</h1>
           </div>
           <div className="flex gap-2">
             <Link href="/simulation">
@@ -133,7 +133,7 @@ export default function Home() {
           {/* Live Energy Pipeline */}
           <div className="space-y-4">
             <div className="bg-card border rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-[#61a5e8]">
                 <Atom className="w-5 h-5" />
                 Live Energy Pipeline
               </h2>
