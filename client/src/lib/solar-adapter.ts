@@ -65,3 +65,18 @@ export function solarToBodies(solarPoints: SolarPoint[]): Body[] {
 export function auToLightMinutes(au: number): number {
   return au * 8.317; // 1 AU ≈ 8.317 light-minutes
 }
+
+// Helper to get live solar system positions as unified Body objects for route planning
+export function getSolarBodiesAsPc(): Body[] {
+  const AU_PER_PC = 206265;
+  const pts = computeSolarXY(new Date());
+  
+  return pts.map(p => ({
+    id: p.id,                // "EARTH", "SATURN", "SUN", ...
+    name: p.name,
+    x_pc: p.x_au / AU_PER_PC,
+    y_pc: p.y_au / AU_PER_PC,
+    kind: p.kind,
+    notes: `${p.x_au.toFixed(2)} AU, ${p.y_au.toFixed(2)} AU`
+  }));
+}

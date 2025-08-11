@@ -1,0 +1,115 @@
+Perfect—here’s a tight set of changes so **Mission Planner → Solar (AU)** defaults to the route **Earth → Saturn → Sun**, and the view **auto-centers on Earth**.
+
+---
+
+# 1) Default route (Solar mode)
+
+Where you keep the planner state, set the initial route for Solar to:
+
+```ts
+// default route for Solar (AU)
+const [route, setRoute] = useState<string[]>(["EARTH", "SATURN", "SUN"]);
+```
+
+(Keep your galactic route separately if you switch modes.)
+
+---
+
+# 2) Solar bodies → planner “Body” coords (AU → pc)
+
+Add this helper (any util file is fine):
+
+```ts
+// lib/solar-to-bodies.ts
+import { computeSolarXY } from "@/lib/solar-adapter"; // the astronomy-engine adapter
+
+const AU_PER_PC = 206265;
+
+export function getSolarBodiesAsPc() {
+  // live positions (AU) → Body[] in parsecs relative to the Sun
+  const pts = computeSolarXY(new Date());
+  return pts.map(p => ({
+    id: p.id,                // "EARTH", "SATURN", "SUN", ...
+    name: p.name,
+    x_pc: p.x_au / AU_PER_PC,
+    y_pc: p.y_au / AU_PER_PC,
+  }));
+}
+```
+
+---
+
+# 3) Center the Solar map on Earth
+
+Update your `SolarMap` to accept `centerOnId` and center once after positions load:
+
+```tsx
+// components/SolarMap.tsx (add these props/lines)
+export function SolarMap({ width=1200, height=650, centerOnId="EARTH", ... }) {
+  const [points, setPoints] = React.useState<SolarPoint[]>(computeSolarXY());
+
+  // center once on mount
+  React.useEffect(()=>{
+    const me = points.find(p=>p.id===centerOnId);
+    if (!me) return;
+    setOffset({ x: width/2 - me.x_au*zoom, y: height/2 + me.y_au*zoom });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // run once
+  ...
+}
+```
+
+Usage:
+
+```tsx
+<SolarMap width={1200} height={650} centerOnId="EARTH" />
+```
+
+---
+
+# 4) Route drawing + steps for Solar (AU)
+
+In your planner page:
+
+```tsx
+import { getSolarBodiesAsPc } from "@/lib/solar-to-bodies";
+import { RouteSteps } from "@/components/RouteSteps";
+
+// refresh planet positions every 5s
+const [tick, setTick] = useState(0);
+useEffect(()=>{ const id=setInterval(()=>setTick(t=>t+1), 5000); return ()=>clearInterval(id); },[]);
+const solarBodies = useMemo(()=> getSolarBodiesAsPc(), [tick]);
+
+// default Solar route
+const [route, setRoute] = useState<string[]>(["EARTH","SATURN","SUN"]);
+```
+
+Render:
+
+```tsx
+{/* Map */}
+<SolarMap
+  width={1200}
+  height={650}
+  centerOnId="EARTH"
+/>
+
+{/* Route steps (Earth → Saturn → Sun) driven by live positions */}
+<RouteSteps
+  bodies={solarBodies}
+  plan={{ waypoints: route }}
+  perf={perf /* your existing Helix perf object */}
+/>
+```
+
+Your existing route glow (in the map that draws from `bodies` + `routeIds`) will use the same `solarBodies` list: just pass `bodies={solarBodies}` wherever you draw the line.
+
+---
+
+## Notes
+
+* Distances now come from **real AU positions**, converted to **parsecs** for the shared planner math; `RouteSteps` will still display **ly/ETA/energy** correctly.
+* If you want the route to update smoothly as planets move, you’ve already got the `setInterval` tick (5 s).
+* You can keep the zen/theory popups the same—just key them by waypoint id (“EARTH”, “SATURN”, “SUN”).
+
+That’s it. You’ll open the planner in **Solar (AU)** with the view centered on **Earth**, and the default legs **Earth → Saturn → Sun** shown in the steps and on the route line.

@@ -7,13 +7,15 @@ type Props = {
   height?: number;
   routeIds?: string[];
   onPickBody?: (id: string) => void;
+  centerOnId?: string;
 };
 
 export function SolarMap({
   width = 800,
   height = 400,
   routeIds = [],
-  onPickBody
+  onPickBody,
+  centerOnId = "EARTH"
 }: Props) {
   const [zoom, setZoom] = React.useState(80); // pixels per AU
   const [offset, setOffset] = React.useState({ x: width / 2, y: height / 2 });
@@ -30,6 +32,18 @@ export function SolarMap({
     const id = setInterval(updatePositions, 30000);
     return () => clearInterval(id);
   }, []);
+
+  // Auto-center on specified body once when positions load
+  React.useEffect(() => {
+    const targetBody = points.find(p => p.id === centerOnId);
+    if (targetBody && points.length > 0) {
+      setOffset({ 
+        x: width / 2 - targetBody.x_au * zoom, 
+        y: height / 2 + targetBody.y_au * zoom 
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.length > 0]); // Run once when points first populate
 
   // Drawing
   React.useEffect(() => {

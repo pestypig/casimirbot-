@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Grid3X3, Gauge, Brain, Calendar, Terminal, Atom, Cpu, Send, AlertCircle, CheckCircle2, Zap, Database, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
+
 import { TripPlayer } from "@/components/TripPlayer";
 import { GalaxyMapPanZoom } from "@/components/GalaxyMapPanZoom";
 import { GalaxyDeepZoom } from "@/components/GalaxyDeepZoom";
@@ -25,7 +26,7 @@ import { SolarMap } from "@/components/SolarMap";
 import { RouteSteps } from "@/components/RouteSteps";
 import { BODIES } from "@/lib/galaxy-catalog";
 import { HelixPerf } from "@/lib/galaxy-schema";
-import { computeSolarXY, solarToBodies } from "@/lib/solar-adapter";
+import { computeSolarXY, solarToBodies, getSolarBodiesAsPc } from "@/lib/solar-adapter";
 import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
@@ -103,6 +104,10 @@ export default function HelixCore() {
   const [useDeepZoom, setUseDeepZoom] = useState(false);
   const [mapMode, setMapMode] = useState<"galactic" | "solar">("galactic");
   const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
+  
+  // Live solar positions for route planning (updates every 5 seconds)
+  const [solarTick, setSolarTick] = useState(0);
+  const solarBodiesForRoutes = useMemo(() => getSolarBodiesAsPc(), [solarTick]);
   const [deepZoomViewer, setDeepZoomViewer] = useState<any>(null);
   const [galaxyCalibration, setGalaxyCalibration] = useState<{originPx:{x:number;y:number}; pxPerPc:number} | null>(null);
 
@@ -132,6 +137,18 @@ export default function HelixCore() {
       return () => clearInterval(interval);
     }
   }, [mapMode]);
+  
+  // Update route calculation positions every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setSolarTick(t => t + 1), 5000);
+    return () => clearInterval(interval);
+  }, []);
+  
+  // Update route calculation positions every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setSolarTick(t => t + 1), 5000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
@@ -929,7 +946,7 @@ export default function HelixCore() {
                     setMapMode(v);
                     // Reset route when switching modes
                     if (v === "solar") {
-                      setRoute(["SUN", "MARS", "SUN"]);
+                      setRoute(["EARTH", "SATURN", "SUN"]);
                     } else {
                       setRoute(["SOL", "ORI_OB1", "VEL_OB2", "SOL"]);
                     }
@@ -960,6 +977,7 @@ export default function HelixCore() {
                     width={800}
                     height={400}
                     routeIds={route}
+                    centerOnId="EARTH"
                     onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
                   />
                 ) : !galaxyCalibration ? (
@@ -1000,7 +1018,7 @@ export default function HelixCore() {
                   />
                 )}
                 <RouteSteps 
-                  bodies={mapMode === "solar" ? solarBodies : BODIES}
+                  bodies={mapMode === "solar" ? solarBodiesForRoutes : BODIES}
                   plan={{ waypoints: route }}
                   mode={mapMode}
                   perf={{
