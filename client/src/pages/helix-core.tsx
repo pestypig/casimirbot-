@@ -145,16 +145,19 @@ export default function HelixCore() {
     }
   }, [mapMode]);
   
-  // Update route calculation positions every 5 seconds
+  // Update route calculation positions every 5 seconds and test Luma whisper
   useEffect(() => {
     const interval = setInterval(() => setSolarTick(t => t + 1), 5000);
-    return () => clearInterval(interval);
-  }, []);
-  
-  // Update route calculation positions every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(() => setSolarTick(t => t + 1), 5000);
-    return () => clearInterval(interval);
+    
+    // Test Luma whisper on first load
+    const timer = setTimeout(() => {
+      publish("luma:whisper", { text: "HELIX-CORE initialized. Welcome to the cosmic bridge." });
+    }, 2000);
+    
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
   
   // Use centralized energy pipeline
@@ -294,7 +297,7 @@ export default function HelixCore() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100">
+    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
       <div className="container mx-auto p-4 text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -1089,8 +1092,8 @@ export default function HelixCore() {
         </div>
       </div>
 
-      {/* Luma Background Guardian Star */}
-      <BackgroundLuma />
+      {/* Luma Background Guardian Star - temporarily increased visibility for testing */}
+      <BackgroundLuma opacity={0.6} blurPx={0} />
       
       {/* Luma Whisper Overlay Host */}
       <LumaOverlayHost />

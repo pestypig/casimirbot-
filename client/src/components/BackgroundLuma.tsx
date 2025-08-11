@@ -1,3 +1,5 @@
+"use client";
+
 // components/BackgroundLuma.tsx
 // Simplified version without Three.js - using CSS animations for now
 import * as React from "react";
@@ -23,9 +25,15 @@ export function BackgroundLuma({
 
   return (
     <div
-      className="fixed inset-0 -z-10 pointer-events-none"
-      style={{ filter: `blur(${blurPx}px)`, opacity }}
+      className="fixed inset-0 pointer-events-none"
+      style={{ zIndex: 0, filter: `blur(${blurPx}px)`, opacity }}
     >
+      {/* Debug visibility test - bright border */}
+      <div 
+        className="absolute inset-2 border-2 border-dashed border-red-400 pointer-events-none"
+        style={{ zIndex: 5 }}
+      />
+      
       {/* Simplified CSS-based background until Three.js is available */}
       <div className="absolute inset-0 bg-gradient-radial from-amber-300/20 via-orange-400/10 to-transparent">
         <BackgroundStars />

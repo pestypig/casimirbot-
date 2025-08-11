@@ -1,0 +1,91 @@
+Totally doable—this sounds like a layering/init issue, not “no opacity.” Quick checklist + tiny patches to make it show up immediately:
+
+## Fast checks (likely fixes)
+
+1. **Add `"use client"`** to both components if you’re on Next.js (App Router):
+
+```tsx
+// At the very top of BackgroundLuma.tsx and LumaWhisper.tsx
+"use client";
+```
+
+Three/Fiber hooks must run client-side; without this they won’t render.
+
+2. **Make sure it’s actually mounted** at the page root. Drop it near your layout root:
+
+```tsx
+<BackgroundLuma />   {/* behind everything */}
+<MainAppContent />   {/* your site */}
+<LumaOverlayHost />  {/* the whisper bubble host */}
+```
+
+3. **Z-layering:** if your page has an opaque background, a `-z-10` canvas will be hidden. Bump it *above* the page background but *under* content:
+
+* Give `BackgroundLuma` wrapper `zIndex: 0`.
+* Give your main app container `position: relative; z-index: 10;`
+* Keep `pointer-events: none` on the background.
+
+Change the wrapper like this:
+
+```tsx
+<div
+  className="fixed inset-0 pointer-events-none"
+  style={{ zIndex: 0, filter: `blur(${blurPx}px)`, opacity }}
+>
+  ...
+</div>
+```
+
+Then on your top-level app container:
+
+```html
+<div class="relative z-10"> ... </div>
+```
+
+4. **Asset path:** confirm the model is at `/public/luma/Butler.glb`. In the browser, open `/luma/Butler.glb`—it should download. If 404, fix the path you pass: `glbUrl="/luma/Butler.glb"`.
+
+5. **Make it obvious for 10 seconds (debug):** remove blur/opacity temporarily so you can see it:
+
+```tsx
+<BackgroundLuma opacity={0.6} blurPx={0} />
+```
+
+If you see it now, it was just under a solid page background—apply step #3.
+
+---
+
+## Tiny diagnostic patch
+
+Add this inside `BackgroundLuma.tsx` (just under `<Canvas ...>`), to paint a faint border so you know the layer is mounted:
+
+```tsx
+<Html position={[0,0,0]}>
+  <div style="position:fixed;inset:8px;border:1px dashed rgba(255,255,255,0.08);pointer-events:none"></div>
+</Html>
+```
+
+Remove after confirming.
+
+---
+
+## If it still doesn’t show
+
+* **Console:** any “useGLTF” or “GLTFLoader” network errors? That’s path.
+* **Dimensions:** your wrapper is `fixed inset-0`, so it always fills the viewport. If you changed it, ensure it has width/height.
+* **Packages:** ensure `@react-three/fiber` and `@react-three/drei` are installed.
+
+```bash
+npm i @react-three/fiber @react-three/drei three
+```
+
+---
+
+## TL;DR you can paste to Replit Agent
+
+* Add `"use client"` to `components/BackgroundLuma.tsx` and `components/LumaWhisper.tsx`.
+* Render `<BackgroundLuma />` at the layout root, and give the main app container `relative z-10`.
+* Set the background wrapper to `zIndex: 0` (not negative), `pointer-events: none`.
+* Verify `/public/luma/Butler.glb` exists; use `glbUrl="/luma/Butler.glb"`.
+* Temporarily set `<BackgroundLuma opacity={0.6} blurPx={0} />` to confirm visibility, then dial back.
+
+Try that—if it’s still hiding, send me a screenshot of the full page (and the dev console errors) and I’ll pinpoint the exact tweak in one go.

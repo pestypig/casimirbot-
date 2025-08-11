@@ -1,3 +1,5 @@
+"use client";
+
 // components/LumaWhisper.tsx
 import * as React from "react";
 
