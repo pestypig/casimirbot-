@@ -19,9 +19,12 @@ import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 import { TripPlayer } from "@/components/TripPlayer";
 import { GalaxyMapPanZoom } from "@/components/GalaxyMapPanZoom";
+import { GalaxyDeepZoom } from "@/components/GalaxyDeepZoom";
+import { GalaxyOverlays } from "@/components/GalaxyOverlays";
 import { RouteSteps } from "@/components/RouteSteps";
 import { BODIES } from "@/lib/galaxy-catalog";
 import { HelixPerf } from "@/lib/galaxy-schema";
+import { Switch } from "@/components/ui/switch";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -94,6 +97,8 @@ export default function HelixCore() {
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
+  const [useDeepZoom, setUseDeepZoom] = useState(false);
+  const [deepZoomViewer, setDeepZoomViewer] = useState<any>(null);
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
@@ -884,20 +889,50 @@ export default function HelixCore() {
 
             {/* Mission Planner - Galactic Maps */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-sm font-semibold">Mission Planner (Galactic Grid)</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="deep-zoom-toggle" className="text-xs">High-Res Mode</Label>
+                  <Switch
+                    id="deep-zoom-toggle"
+                    checked={useDeepZoom}
+                    onCheckedChange={setUseDeepZoom}
+                  />
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <GalaxyMapPanZoom
-                  imageUrl="/galaxymap.png"
-                  bodies={BODIES}
-                  routeIds={route}
-                  onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
-                  originPx={{x: 512, y: 200}}  // Sol position in the Local Bubble region center  
-                  scalePxPerPc={0.8}           // Scale: pixels per parsec (calibrated for 20k ly span)
-                  width={800}
-                  height={400}
-                />
+                {useDeepZoom ? (
+                  <div className="relative">
+                    <GalaxyDeepZoom
+                      dziUrl="/galaxy_tiles.dzi"
+                      width={800}
+                      height={400}
+                      onViewerReady={setDeepZoomViewer}
+                    />
+                    {deepZoomViewer && (
+                      <GalaxyOverlays
+                        viewer={deepZoomViewer}
+                        labels={[]} // Will load from JSON when available
+                        bodies={BODIES}
+                        routeIds={route}
+                        originPx={{x: 512, y: 200}}
+                        pxPerPc={0.8}
+                        onBodyClick={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <GalaxyMapPanZoom
+                    imageUrl="/galaxymap.png"
+                    bodies={BODIES}
+                    routeIds={route}
+                    onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                    originPx={{x: 512, y: 200}}  // Sol position in the Local Bubble region center  
+                    scalePxPerPc={0.8}           // Scale: pixels per parsec (calibrated for 20k ly span)
+                    width={800}
+                    height={400}
+                  />
+                )}
                 <RouteSteps 
                   bodies={BODIES} 
                   plan={{ waypoints: route }} 

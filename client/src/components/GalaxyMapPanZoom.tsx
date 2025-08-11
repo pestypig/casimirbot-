@@ -32,6 +32,7 @@ export function GalaxyMapPanZoom({
   const [zoom, setZoom] = React.useState(1);
   const [offset, setOffset] = React.useState({ x: 0, y: 0 }); // px in screen coords
   const dragging = React.useRef<null | {x:number;y:number}>(null);
+  const [imageLoaded, setImageLoaded] = React.useState(false);
 
   // pc -> image pixels (untransformed)
   const toImgPx = React.useCallback((xpc:number, ypc:number) => ({
@@ -44,6 +45,24 @@ export function GalaxyMapPanZoom({
     x: pt.x * zoom + offset.x,
     y: pt.y * zoom + offset.y
   }), [zoom, offset]);
+
+  // Fit image to screen on initial load
+  React.useEffect(() => {
+    if (!imageLoaded || !imgRef.current) return;
+    const img = imgRef.current;
+    
+    // Compute zoom to fit entire image into viewport
+    const zx = width / img.naturalWidth;
+    const zy = height / img.naturalHeight;
+    const fitZoom = Math.min(zx, zy, 0.8); // Max 80% to leave some padding
+
+    // Center image
+    const ox = (width - img.naturalWidth * fitZoom) / 2;
+    const oy = (height - img.naturalHeight * fitZoom) / 2;
+
+    setZoom(fitZoom);
+    setOffset({ x: ox, y: oy });
+  }, [imageLoaded, width, height]);
 
   // draw route + markers on canvas (already positioned/scaled by CSS)
   React.useEffect(() => {
@@ -145,6 +164,7 @@ export function GalaxyMapPanZoom({
         alt="Galaxy Map"
         className="absolute top-0 left-0 select-none pointer-events-none"
         style={{ transform: `translate(${offset.x}px,${offset.y}px) scale(${zoom})`, transformOrigin: "0 0" }}
+        onLoad={() => setImageLoaded(true)}
       />
       <canvas
         ref={canvasRef}
