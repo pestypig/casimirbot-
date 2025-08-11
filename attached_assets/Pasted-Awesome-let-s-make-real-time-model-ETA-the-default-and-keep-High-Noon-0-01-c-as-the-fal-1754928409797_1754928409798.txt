@@ -1,0 +1,133 @@
+Awesome—let’s make **real-time (model) ETA** the default, and keep **High Noon (0.01 c)** as the fallback.
+
+Below are drop-in patches. They use your existing `computeEffectiveLyPerHour` (already passed into `RouteSteps` via `perf.vEffLyPerHour`).
+
+---
+
+# 1) Shared ETA helpers
+
+Create `lib/eta.ts`:
+
+```ts
+// lib/eta.ts
+export const LY_PER_PC = 3.26156;
+export const HOURS_PER_YEAR = 365.25 * 24;
+
+export function formatETA(hours: number) {
+  if (!isFinite(hours) || hours <= 0) return "—";
+  if (hours >= HOURS_PER_YEAR) return `${(hours / HOURS_PER_YEAR).toFixed(1)} yr`;
+  if (hours >= 24)              return `${(hours / 24).toFixed(1)} d`;
+  return `${hours.toFixed(1)} h`;
+}
+
+// constant-speed baseline (High Noon @ 0.01 c)
+export function hoursAtHighNoon(distanceLy: number, speedC = 0.01) {
+  // c = 1 ly/yr → 0.01c = 0.01 ly/yr
+  const years = distanceLy / speedC;
+  return years * HOURS_PER_YEAR;
+}
+```
+
+---
+
+# 2) RouteSteps: default to **model** ETA, fallback to High Noon
+
+In `RouteSteps` (or wherever you build legs), change the ETA calculation:
+
+```ts
+import { LY_PER_PC, formatETA, hoursAtHighNoon } from "@/lib/eta";
+
+type Perf = {
+  mode: string;
+  duty: number;
+  vEffLyPerHour?: (mode: string, duty: number) => number; // already passed from FuelGauge helper
+  // ...rest of your fields
+};
+
+type Props = {
+  bodies: { id:string; name:string; x_pc:number; y_pc:number }[];
+  plan: { waypoints: string[] };
+  perf: Perf;
+  etaMode?: "model" | "highnoon";   // NEW (optional)
+};
+
+const RouteSteps = ({ bodies, plan, perf, etaMode = "model" }: Props) => {
+  const byId = Object.fromEntries(bodies.map(b => [b.id, b]));
+  const legs = [];
+
+  for (let i = 0; i < plan.waypoints.length - 1; i++) {
+    const A = byId[plan.waypoints[i]];
+    const B = byId[plan.waypoints[i+1]];
+    if (!A || !B) continue;
+
+    const d_pc = Math.hypot(B.x_pc - A.x_pc, B.y_pc - A.y_pc);
+    const d_ly = d_pc * LY_PER_PC;
+
+    // --- ETA (default = model / real-time) ---
+    let hours: number;
+    if (etaMode === "model" && typeof perf.vEffLyPerHour === "function") {
+      const v = perf.vEffLyPerHour(perf.mode, perf.duty); // ly/hr
+      hours = v > 0 ? d_ly / v : Infinity;
+    } else {
+      hours = hoursAtHighNoon(d_ly, 0.01); // High Noon baseline
+    }
+
+    legs.push({
+      from: A.name, to: B.name,
+      d_pc, d_ly,
+      etaHours: hours,
+      etaPretty: formatETA(hours),
+    });
+  }
+
+  const totalHours = legs.reduce((s, L) => s + L.etaHours, 0);
+  const totalETA = formatETA(totalHours);
+
+  // ...render list with L.etaPretty and totalETA
+};
+export default RouteSteps;
+```
+
+This makes **model ETA** the default automatically (live, using current mode/duty), and seamlessly falls back to **0.01 c** if the model speed isn’t available.
+
+---
+
+# 3) (Optional) Tiny UI toggle
+
+If you want a switch later, just pass `etaMode`:
+
+```tsx
+<RouteSteps
+  bodies={...}
+  plan={{ waypoints: route }}
+  perf={perf}
+  etaMode="model"   // default; omit to keep model by default
+/>
+```
+
+---
+
+# 4) Equations shown in the UI (quick explainer)
+
+When `etaMode="model"`:
+
+$$
+v_{\text{eff}} \ (\text{ly/hr}) \quad\Rightarrow\quad \text{ETA}_{\text{hours}}=\frac{D_{\text{ly}}}{v_{\text{eff}}}
+$$
+
+When `etaMode="highnoon"` at 0.01 c:
+
+$$
+v=0.01\,c=0.01\ \frac{\text{ly}}{\text{yr}}
+\quad\Rightarrow\quad
+\text{ETA}_{\text{years}}=\frac{D_{\text{ly}}}{0.01},\quad
+\text{hours}=\text{years}\times 8766
+$$
+
+with $D_{\text{ly}}=3.26156\,D_{\text{pc}}$.
+
+You can drop those into a small “details” tooltip under the total ETA so users see the math.
+
+---
+
+That’s it—now your planner’s ETA is **real-time by default**, driven by the current Helix pipeline state, and **High Noon (0.01 c)** is always there as a clean baseline when needed.
