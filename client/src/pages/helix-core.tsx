@@ -29,6 +29,9 @@ import { HelixPerf } from "@/lib/galaxy-schema";
 import { computeSolarXY, solarToBodies, getSolarBodiesAsPc } from "@/lib/solar-adapter";
 import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
+import { BackgroundLuma } from "@/components/BackgroundLuma";
+import { LumaOverlayHost } from "@/components/LumaOverlayHost";
+import { publish } from "@/lib/luma-bus";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -929,6 +932,14 @@ export default function HelixCore() {
               setMode={(mode) => {
                 if (switchMode) {
                   switchMode(mode as any);
+                  // Luma whisper on mode change
+                  const whispers = {
+                    'Hover': "Form first. Speed follows.",
+                    'Cruise': "Timing matched. Take the interval; apply thrust.",
+                    'Emergency': "Breathe once. Choose the useful distance.",
+                    'Standby': "Meet change with correct posture. The rest aligns."
+                  };
+                  publish("luma:whisper", { text: whispers[mode as keyof typeof whispers] || "Configuration updated." });
                 }
               }}
               setDuty={(duty) => {
@@ -952,8 +963,10 @@ export default function HelixCore() {
                     // Reset route when switching modes
                     if (v === "solar") {
                       setRoute(["EARTH", "SATURN", "SUN"]);
+                      publish("luma:whisper", { text: "Solar navigation initialized. Near-space trajectory computed." });
                     } else {
                       setRoute(["SOL", "ORI_OB1", "VEL_OB2", "SOL"]);
+                      publish("luma:whisper", { text: "Galactic coordinates engaged. Interstellar passage mapped." });
                     }
                   }}>
                     <SelectTrigger className="w-32">
@@ -983,7 +996,10 @@ export default function HelixCore() {
                     height={400}
                     routeIds={route}
                     centerOnId="EARTH"
-                    onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                    onPickBody={(id) => {
+                      setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                      publish("luma:whisper", { text: "Waypoint selected. Route updated." });
+                    }}
                   />
                 ) : !galaxyCalibration ? (
                   <div className="h-40 grid place-items-center text-xs text-slate-400">
@@ -1066,6 +1082,12 @@ export default function HelixCore() {
           </div>
         </div>
       </div>
+
+      {/* Luma Background Guardian Star */}
+      <BackgroundLuma />
+      
+      {/* Luma Whisper Overlay Host */}
+      <LumaOverlayHost />
     </div>
   );
 }
