@@ -29,7 +29,8 @@ import { HelixPerf } from "@/lib/galaxy-schema";
 import { computeSolarXY, solarToBodies, getSolarBodiesAsPc } from "@/lib/solar-adapter";
 import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
-
+import { BackgroundLuma } from "@/components/BackgroundLuma";
+import { LumaOverlayHost } from "@/components/LumaOverlayHost";
 import { publish } from "@/lib/luma-bus";
 
 // Mainframe zones configuration
@@ -1091,7 +1092,11 @@ export default function HelixCore() {
         </div>
       </div>
 
-
+      {/* Luma Background Guardian Star - atmospheric mode with PNG fallback */}
+      <BackgroundLuma opacity={0.18} blurPx={6} />
+      
+      {/* Luma Whisper Overlay Host */}
+      <LumaOverlayHost />
     </div>
   );
 }

@@ -3,6 +3,9 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import LumaBackgroundPortal from "@/components/LumaBackgroundPortal";
+import { BackgroundLuma } from "@/components/BackgroundLuma";
+import { LumaOverlayHost } from "@/components/LumaOverlayHost";
 import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
@@ -25,8 +28,19 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Router />
+        {/* Background behind everything, once */}
+        <LumaBackgroundPortal>
+          <BackgroundLuma opacity={0.18} blurPx={6} />
+        </LumaBackgroundPortal>
+
+        {/* Your entire app (router, pages, etc.) */}
+        <div className="relative z-10 min-h-screen">
+          <Toaster />
+          <Router />
+        </div>
+
+        {/* Whispers host once, on top */}
+        <LumaOverlayHost />
       </TooltipProvider>
     </QueryClientProvider>
   );
