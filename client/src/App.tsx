@@ -30,7 +30,7 @@ function App() {
       <TooltipProvider>
         {/* Background behind everything, once */}
         <LumaBackgroundPortal>
-          <BackgroundLuma opacity={0.18} blurPx={6} />
+          <BackgroundLuma opacity={0.12} blurPx={8} />
         </LumaBackgroundPortal>
 
         {/* Your entire app (router, pages, etc.) */}
