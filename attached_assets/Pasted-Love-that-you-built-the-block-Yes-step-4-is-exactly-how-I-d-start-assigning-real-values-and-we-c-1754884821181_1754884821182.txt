@@ -1,0 +1,266 @@
+Love that you built the block. Yes—step 4 is exactly how I’d start assigning “real” values, and we can make it useful today with two upgrades:
+
+1. derive **effective velocity** and **safe window** from the parameters you already have, and
+2. add a **“cycles required”** readout so the gauge acts like a real fuel meter.
+
+I’ll give you drop-in code for both, plus a tiny, “playable” trip runner that sequences modes (take-off → cruise → station-keep → return).
+
+---
+
+# 1) Upgrade the FuelGauge (add cycles + smarter window)
+
+Paste this over your `FuelGauge.tsx` (only differences are the `computeEffectiveLyPerHour`, `computeSafeWindowHours`, and the new “cycles” block).
+
+```tsx
+// client/src/components/FuelGauge.tsx
+import * as React from "react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+
+function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
+function fmt(x?: number, d=2) {
+  if (x == null || !isFinite(x)) return "—";
+  const a = Math.abs(x);
+  return (a >= 1e4 || a < 1e-3) ? x.toExponential(2) : x.toFixed(d);
+}
+
+export type FuelGaugeProps = {
+  mode: "Hover" | "Cruise" | "Emergency" | "Standby" | string;
+  powerMW: number;      // P_avg (throttled)
+  zeta: number;         // ζ margin (e.g., 0.032)
+  tsRatio: number;      // T_s / T_LC (e.g., 4102.74)
+  frOk?: boolean;
+  natarioOk?: boolean;
+  curvatureOk?: boolean;
+
+  // Optional extras for better estimates
+  freqGHz?: number;     // modulation frequency (cycles/sec = GHz * 1e9)
+  duty?: number;        // 0..1
+  gammaGeo?: number;
+  qFactor?: number;
+  pMaxMW?: number;      // constraint panel "Max Power"
+};
+
+/** Derive effective velocity (ly/hour) from current parameters.
+ *  v_eff is provisional: tuned constants today, later replace with warp visual slope -> metric factor.
+ */
+function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0) {
+  // base per-mode nominal speeds (training wheels; update when you wire metric output)
+  const base: Record<string, number> = { Hover: 0.002, Cruise: 0.02, Emergency: 0.03, Standby: 0 };
+  let v = base[mode] ?? 0;
+
+  // gentle scaling with current tuning (kept bounded)
+  const g = Math.min(40, Math.max(10, gammaGeo || 26));
+  const qn = Math.log10(Math.max(1, q || 1e9)) - 6; // ~3 when q~1e9
+  const dutyBoost = Math.sqrt(Math.max(0, duty || 0));     // 0..1
+  const safety = clamp01(zeta / 0.84) * clamp01(tsRatio / 100);
+
+  // small multipliers so we don’t explode estimates
+  v *= (1 + 0.01*(g - 26)) * (1 + 0.05*qn) * (0.5 + 0.5*dutyBoost) * (0.5 + 0.5*safety);
+  return v; // ly per hour
+}
+
+/** Derive safe continuous window (hours) using constraints/budgets. */
+function computeSafeWindowHours(mode: string, zeta=0, tsRatio=0, frOk?: boolean, natarioOk?: boolean, curvatureOk?: boolean, powerMW?: number, pMaxMW?: number) {
+  const base: Record<string, number> = { Hover: 24, Cruise: 8, Emergency: 2, Standby: 168 };
+  const baseWin = base[mode] ?? 0;
+
+  const fZ  = clamp01(zeta / 0.84);
+  const fT  = clamp01(tsRatio / 100);
+  const fFR = frOk === false ? 0.6 : 1.0;
+  const fNa = natarioOk === false ? 0.7 : 1.0;
+  const fCu = curvatureOk === false ? 0.7 : 1.0;
+  const fPw = pMaxMW && powerMW ? clamp01(pMaxMW / Math.max(1e-9, powerMW)) : 1.0; // throttle if near cap
+
+  return baseWin * clamp01(fZ * fT * fFR * fNa * fCu * fPw);
+}
+
+export function FuelGauge(props: FuelGaugeProps) {
+  const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk, freqGHz=0, duty=0, gammaGeo=26, qFactor=1e9, pMaxMW } = props;
+
+  const safeHours = computeSafeWindowHours(mode, zeta, tsRatio, frOk, natarioOk, curvatureOk, powerMW, pMaxMW);
+  const vLyPerHour = computeEffectiveLyPerHour(mode, duty, gammaGeo, qFactor, zeta, tsRatio);
+
+  // ----- Energy / ly & Range -----
+  const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
+  const energyPerLyMWh = isFinite(hoursPerLy) ? powerMW * hoursPerLy : Infinity;
+  const rangeLy = vLyPerHour * safeHours;
+
+  // ----- Cycles (simple, useful now) -----
+  // Per-cycle energy ≈ P_avg / f.  P[MW]*1e6 W  /  (GHz*1e9)  =  J per cycle.
+  const cyclesPerSec = freqGHz > 0 ? freqGHz * 1e9 : 0;
+  const energyPerCycleJ = cyclesPerSec > 0 ? (powerMW * 1e6) / cyclesPerSec : Infinity;
+
+  // Energy per ly in Joules: MWh * 3.6e9
+  const energyPerLyJ = isFinite(energyPerLyMWh) ? energyPerLyMWh * 3.6e9 : Infinity;
+  const cyclesPerLy = (isFinite(energyPerLyJ) && isFinite(energyPerCycleJ)) ? (energyPerLyJ / energyPerCycleJ) : Infinity;
+
+  // Gauge fill
+  const baseWindow = { Hover: 24, Cruise: 8, Emergency: 2, Standby: 168 }[mode] ?? 0;
+  const percent = baseWindow > 0 ? clamp01(safeHours / baseWindow) * 100 : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CardTitle className="text-sm font-semibold capitalize cursor-help">
+              Mission Fuel / Range (mode: {String(mode).toLowerCase()})
+            </CardTitle>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-md text-sm leading-snug">
+            <strong>Theory</strong><br/>
+            Usable negative-energy “fuel” is the throttled Casimir power P<span className="align-[0.1em]">avg</span> times a safe operating window from constraints (ζ, T<sub>s</sub>/T<sub>LC</sub>, Natário, curvature, power cap).<br/>
+            Energy/ly = P<span className="align-[0.1em]">avg</span> × hours/ly.  Per-cycle yield ≈ P<span className="align-[0.1em]">avg</span>/f.<br/><br/>
+            <em>Moving Zen:</em> Restraint extends reach; the longest journey is walked by preserving each step.
+          </TooltipContent>
+        </Tooltip>
+      </CardHeader>
+
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="text-muted-foreground">Safe window</div>
+          <div className="text-right tabular-nums">{fmt(safeHours,2)} h</div>
+
+          <div className="text-muted-foreground">Energy / light-year</div>
+          <div className="text-right tabular-nums">
+            {isFinite(energyPerLyMWh) ? `${fmt(energyPerLyMWh,1)} MWh/ly` : "—"}
+          </div>
+
+          <div className="text-muted-foreground">Range @ current</div>
+          <div className="text-right tabular-nums">{fmt(rangeLy,3)} ly</div>
+
+          <div className="text-muted-foreground">P_avg</div>
+          <div className="text-right tabular-nums">{fmt(powerMW,1)} MW</div>
+
+          <div className="text-muted-foreground">Cycles / light-year</div>
+          <div className="text-right tabular-nums">
+            {isFinite(cyclesPerLy) ? `${fmt(cyclesPerLy,2)}` : "—"}
+          </div>
+
+          <div className="text-muted-foreground">Per-cycle energy</div>
+          <div className="text-right tabular-nums">
+            {isFinite(energyPerCycleJ) ? `${fmt(energyPerCycleJ,2)} J` : "—"}
+          </div>
+        </div>
+
+        <Progress value={percent} className="h-2" />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>constraints</span>
+          <span>window {fmt(baseWindow,0)} h</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+```
+
+**Hook-up notes**
+
+* Pass `freqGHz`, `duty`, `gammaGeo`, `qFactor`, and `pMaxMW` if you have them in HELIX-CORE; otherwise the component still works and shows “—” where unknown.
+* Later, replace `computeEffectiveLyPerHour` with a call that reads your **warp visual slope** / metric factor.
+
+---
+
+# 2) “Playable” trip (simple state machine)
+
+This runs a round-trip with phases and uses your existing setters (`setMode`, `setDuty`, etc.). It doesn’t simulate physics—just sequences operations in a believable, constraint-aware way.
+
+```tsx
+// client/src/components/TripPlayer.tsx
+import * as React from "react";
+import { Button } from "@/components/ui/button";
+
+type Phase = "Preflight" | "SpoolUp" | "Cruise" | "StationKeep" | "Return" | "Complete";
+type TripPlan = {
+  distanceLy: number;
+  cruiseDuty: number;
+  cruiseMode?: "Cruise";
+  hoverMode?: "Hover";
+  stationKeepHours?: number;
+};
+
+type TripPlayerProps = {
+  plan: TripPlan;
+  getState: () => { zeta:number; tsRatio:number; powerMW:number; freqGHz:number };
+  setMode: (m:"Hover"|"Cruise"|"Emergency"|"Standby" | string)=>void;
+  setDuty: (d:number)=>void;
+  onTick?: (phase:Phase, t:number)=>void; // optional progress callback
+};
+
+export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPlayerProps) {
+  const [phase, setPhase] = React.useState<Phase>("Preflight");
+  const [running, setRunning] = React.useState(false);
+  const [progress, setProgress] = React.useState(0); // 0..1 within current phase
+
+  // simple durations (seconds) — tune as you like
+  const DUR = { Preflight: 5, SpoolUp: 8, Cruise: Math.max(6, plan.distanceLy*2), StationKeep: (plan.stationKeepHours??1)*3, Return: Math.max(6, plan.distanceLy*2) };
+
+  React.useEffect(() => {
+    if (!running) return;
+    let t = 0, id: any;
+
+    function step() {
+      const total = DUR[phase];
+      t += 0.5; // tick every 0.5s
+      setProgress(Math.min(1, t/total));
+      onTick?.(phase, t);
+
+      // micro-guard: if constraints look bad, ease duty
+      const s = getState();
+      if (s.zeta < 0.6 || s.tsRatio < 80) setDuty(Math.max(0.05, plan.cruiseDuty * 0.7));
+
+      if (t >= total) {
+        // advance
+        if (phase === "Preflight") { setMode(plan.hoverMode ?? "Hover"); setDuty(0.10); setPhase("SpoolUp"); t=0; }
+        else if (phase === "SpoolUp") { setMode(plan.cruiseMode ?? "Cruise"); setDuty(plan.cruiseDuty); setPhase("Cruise"); t=0; }
+        else if (phase === "Cruise") { setMode(plan.hoverMode ?? "Hover"); setDuty(0.08); setPhase("StationKeep"); t=0; }
+        else if (phase === "StationKeep") { setMode(plan.cruiseMode ?? "Cruise"); setDuty(plan.cruiseDuty*0.9); setPhase("Return"); t=0; }
+        else if (phase === "Return") { setMode("Standby"); setDuty(0); setPhase("Complete"); setRunning(false); }
+      } else {
+        id = setTimeout(step, 500);
+      }
+    }
+    id = setTimeout(step, 500);
+    return () => clearTimeout(id);
+  }, [running, phase]);
+
+  return (
+    <div className="p-3 rounded-lg border">
+      <div className="text-sm font-semibold mb-2">Trip Player</div>
+      <div className="text-xs mb-2">Phase: <span className="font-mono">{phase}</span> — {Math.round(progress*100)}%</div>
+      <div className="flex gap-2">
+        <Button onClick={()=>{ setPhase("Preflight"); setRunning(true); }}>Start</Button>
+        <Button variant="secondary" onClick={()=>setRunning(false)} disabled={!running}>Pause</Button>
+        <Button variant="outline" onClick={()=>{ setRunning(false); setPhase("Complete"); setProgress(0); }}>Stop</Button>
+      </div>
+    </div>
+  );
+}
+```
+
+**Mount it** in HELIX-CORE (e.g., next to the gauge):
+
+```tsx
+import { TripPlayer } from "@/components/TripPlayer";
+
+<TripPlayer
+  plan={{ distanceLy: 0.5, cruiseDuty: 0.14, stationKeepHours: 2 }}
+  getState={()=>({ zeta, tsRatio, powerMW: powerAvgMW, freqGHz })}
+  setMode={setMode}
+  setDuty={setDuty}
+/>
+```
+
+This gives you a playable round-trip that actually flips your **operational modes** and **duty** while watching constraints.
+
+---
+
+## Where we’re headed (clean hand-off for your agent)
+
+* Replace `computeEffectiveLyPerHour` with a call that reads the **warp visual’s slope/metric** (I can stub the function signature if you share the visual’s API).
+* Feed real **Max Power** and thermal budgets into `computeSafeWindowHours`.
+* In the Mission Planner, attach a target distance (e.g., Betelgeuse SNR @ 642 ly) → show **Trips required** and **Cycles required** using the same math you now have in the gauge.
+
+If you want, I’ll add the **warp-visual slope hook** signature next, so your Replit agent has a clear TODO to wire v\_eff from the renderer.

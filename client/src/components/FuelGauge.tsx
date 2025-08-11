@@ -3,22 +3,6 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
-// --- Tunables (pick any nominal values; you can wire these to mode configs later)
-const MODE_SPEED_LY_PER_HOUR: Record<string, number> = {
-  Hover: 0.002,     // ly/hour (training value; adjust to your metric)
-  Cruise: 0.02,
-  Emergency: 0.03,
-  Standby: 0.0,
-};
-
-// "full" safe window per mode before constraints throttle hard
-const MODE_BASE_WINDOW_HOURS: Record<string, number> = {
-  Hover: 24,
-  Cruise: 8,
-  Emergency: 2,
-  Standby: 168,
-};
-
 function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
 function fmt(x?: number, d=2) {
   if (x == null || !isFinite(x)) return "—";
@@ -34,35 +18,71 @@ export type FuelGaugeProps = {
   frOk?: boolean;
   natarioOk?: boolean;
   curvatureOk?: boolean;
+
+  // Optional extras for better estimates
+  freqGHz?: number;     // modulation frequency (cycles/sec = GHz * 1e9)
+  duty?: number;        // 0..1
+  gammaGeo?: number;
+  qFactor?: number;
+  pMaxMW?: number;      // constraint panel "Max Power"
 };
 
-export function FuelGauge(props: FuelGaugeProps) {
-  const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk } = props;
+/** Derive effective velocity (ly/hour) from current parameters.
+ *  v_eff is provisional: tuned constants today, later replace with warp visual slope -> metric factor.
+ */
+function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0) {
+  // base per-mode nominal speeds (training wheels; update when you wire metric output)
+  const base: Record<string, number> = { Hover: 0.002, Cruise: 0.02, Emergency: 0.03, Standby: 0 };
+  let v = base[mode] ?? 0;
 
-  // --- Constraint factor: 0..1 scales allowed continuous run-time
-  const zetaTarget = 0.84;         // your "operational" margin
-  const tsMin = 100;               // homogenization floor (from UI)
-  const fZ = clamp01(zeta / zetaTarget);
-  const fT = clamp01(tsRatio / tsMin);
+  // gentle scaling with current tuning (kept bounded)
+  const g = Math.min(40, Math.max(10, gammaGeo || 26));
+  const qn = Math.log10(Math.max(1, q || 1e9)) - 6; // ~3 when q~1e9
+  const dutyBoost = Math.sqrt(Math.max(0, duty || 0));     // 0..1
+  const safety = clamp01(zeta / 0.84) * clamp01(tsRatio / 100);
+
+  // small multipliers so we don't explode estimates
+  v *= (1 + 0.01*(g - 26)) * (1 + 0.05*qn) * (0.5 + 0.5*dutyBoost) * (0.5 + 0.5*safety);
+  return v; // ly per hour
+}
+
+/** Derive safe continuous window (hours) using constraints/budgets. */
+function computeSafeWindowHours(mode: string, zeta=0, tsRatio=0, frOk?: boolean, natarioOk?: boolean, curvatureOk?: boolean, powerMW?: number, pMaxMW?: number) {
+  const base: Record<string, number> = { Hover: 24, Cruise: 8, Emergency: 2, Standby: 168 };
+  const baseWin = base[mode] ?? 0;
+
+  const fZ  = clamp01(zeta / 0.84);
+  const fT  = clamp01(tsRatio / 100);
   const fFR = frOk === false ? 0.6 : 1.0;
   const fNa = natarioOk === false ? 0.7 : 1.0;
   const fCu = curvatureOk === false ? 0.7 : 1.0;
-  const safeFactor = clamp01(fZ * fT * fFR * fNa * fCu);
+  const fPw = pMaxMW && powerMW ? clamp01(pMaxMW / Math.max(1e-9, powerMW)) : 1.0; // throttle if near cap
 
-  const vLyPerHour = MODE_SPEED_LY_PER_HOUR[mode] ?? 0;
-  const baseWindow = MODE_BASE_WINDOW_HOURS[mode] ?? 0;
+  return baseWin * clamp01(fZ * fT * fFR * fNa * fCu * fPw);
+}
 
-  // Safe continuous window at current settings
-  const safeHours = baseWindow * safeFactor;
+export function FuelGauge(props: FuelGaugeProps) {
+  const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk, freqGHz=0, duty=0, gammaGeo=26, qFactor=1e9, pMaxMW } = props;
 
-  // Energy per light-year (MWh / ly): P_avg [MW] * (hours per ly)
+  const safeHours = computeSafeWindowHours(mode, zeta, tsRatio, frOk, natarioOk, curvatureOk, powerMW, pMaxMW);
+  const vLyPerHour = computeEffectiveLyPerHour(mode, duty, gammaGeo, qFactor, zeta, tsRatio);
+
+  // ----- Energy / ly & Range -----
   const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
   const energyPerLyMWh = isFinite(hoursPerLy) ? powerMW * hoursPerLy : Infinity;
-
-  // Range if you run for "safeHours"
   const rangeLy = vLyPerHour * safeHours;
 
-  // A visual percent vs. the nominal base window
+  // ----- Cycles (simple, useful now) -----
+  // Per-cycle energy ≈ P_avg / f.  P[MW]*1e6 W  /  (GHz*1e9)  =  J per cycle.
+  const cyclesPerSec = freqGHz > 0 ? freqGHz * 1e9 : 0;
+  const energyPerCycleJ = cyclesPerSec > 0 ? (powerMW * 1e6) / cyclesPerSec : Infinity;
+
+  // Energy per ly in Joules: MWh * 3.6e9
+  const energyPerLyJ = isFinite(energyPerLyMWh) ? energyPerLyMWh * 3.6e9 : Infinity;
+  const cyclesPerLy = (isFinite(energyPerLyJ) && isFinite(energyPerCycleJ)) ? (energyPerLyJ / energyPerCycleJ) : Infinity;
+
+  // Gauge fill
+  const baseWindow = { Hover: 24, Cruise: 8, Emergency: 2, Standby: 168 }[mode] ?? 0;
   const percent = baseWindow > 0 ? clamp01(safeHours / baseWindow) * 100 : 0;
 
   return (
@@ -70,16 +90,15 @@ export function FuelGauge(props: FuelGaugeProps) {
       <CardHeader className="pb-3">
         <Tooltip>
           <TooltipTrigger asChild>
-            <CardTitle className="text-sm font-semibold cursor-help">
-              Mission Fuel / Range (mode: {mode})
+            <CardTitle className="text-sm font-semibold capitalize cursor-help">
+              Mission Fuel / Range (mode: {String(mode).toLowerCase()})
             </CardTitle>
           </TooltipTrigger>
           <TooltipContent className="max-w-md text-sm leading-snug">
             <strong>Theory</strong><br/>
-            Usable negative-energy "fuel" is the throttled Casimir power P<span className="align-[0.1em]">avg</span> multiplied by the safe
-            operating window set by constraints (ζ, T<sub>s</sub>/T<sub>LC</sub>, Natário, curvature). Range follows from the mode's
-            effective warp velocity: E/ly = P<span className="align-[0.1em]">avg</span> × hours/ly, Range = v<sub>eff</sub> × t<sub>safe</sub>.<br/><br/>
-            <em>Moving Zen:</em> Restraint extends reach. The longest journey is walked by preserving each step.
+            Usable negative-energy "fuel" is the throttled Casimir power P<span className="align-[0.1em]">avg</span> times a safe operating window from constraints (ζ, T<sub>s</sub>/T<sub>LC</sub>, Natário, curvature, power cap).<br/>
+            Energy/ly = P<span className="align-[0.1em]">avg</span> × hours/ly.  Per-cycle yield ≈ P<span className="align-[0.1em]">avg</span>/f.<br/><br/>
+            <em>Moving Zen:</em> Restraint extends reach; the longest journey is walked by preserving each step.
           </TooltipContent>
         </Tooltip>
       </CardHeader>
@@ -98,6 +117,16 @@ export function FuelGauge(props: FuelGaugeProps) {
 
           <div className="text-muted-foreground">P_avg</div>
           <div className="text-right tabular-nums">{fmt(powerMW,1)} MW</div>
+
+          <div className="text-muted-foreground">Cycles / light-year</div>
+          <div className="text-right tabular-nums">
+            {isFinite(cyclesPerLy) ? `${fmt(cyclesPerLy,2)}` : "—"}
+          </div>
+
+          <div className="text-muted-foreground">Per-cycle energy</div>
+          <div className="text-right tabular-nums">
+            {isFinite(energyPerCycleJ) ? `${fmt(energyPerCycleJ,2)} J` : "—"}
+          </div>
         </div>
 
         <Progress value={percent} className="h-2" />

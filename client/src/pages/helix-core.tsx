@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge } from "@/components/FuelGauge";
+import { TripPlayer } from "@/components/TripPlayer";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -839,6 +840,41 @@ export default function HelixCore() {
               frOk={pipelineState?.fordRomanCompliance || true}
               natarioOk={pipelineState?.natarioConstraint || true}
               curvatureOk={pipelineState?.curvatureLimit || true}
+              freqGHz={15.0}
+              duty={pipelineState?.dutyCycle || 0.14}
+              gammaGeo={pipelineState?.gammaGeo || 26}
+              qFactor={pipelineState?.qCavity || 1e9}
+              pMaxMW={120}
+            />
+
+            {/* Trip Player */}
+            <TripPlayer
+              plan={{ 
+                distanceLy: 0.5, 
+                cruiseDuty: 0.14, 
+                cruiseMode: "Cruise",
+                hoverMode: "Hover",
+                stationKeepHours: 2 
+              }}
+              getState={() => ({
+                zeta: pipelineState?.zeta || 0.032,
+                tsRatio: pipelineState?.TS_ratio || 4102.74,
+                powerMW: pipelineState?.P_avg || 83.3,
+                freqGHz: 15.0
+              })}
+              setMode={(mode) => {
+                if (switchMode) {
+                  switchMode(mode as any);
+                }
+              }}
+              setDuty={(duty) => {
+                // Note: In real implementation, would need a setDuty function from energy pipeline
+                console.log('Setting duty:', duty);
+              }}
+              onTick={(phase, t) => {
+                // Optional: Log trip progress
+                console.log(`Trip phase: ${phase}, time: ${t}s`);
+              }}
             />
           </div>
         </div>
