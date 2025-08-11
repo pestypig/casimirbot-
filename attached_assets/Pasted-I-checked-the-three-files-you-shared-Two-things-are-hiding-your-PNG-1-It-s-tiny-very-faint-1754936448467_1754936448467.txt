@@ -1,0 +1,87 @@
+I checked the three files you shared. Two things are hiding your PNG:
+
+1. **It’s tiny + very faint in `BackgroundLuma.tsx`.**
+   That component renders the PNG at `w-32 h-32` (small), wrapped in a blurred container with `opacity={0.18}`. Net visibility ≈ 0.18 × 0.8 ≈ **0.14**. Easy to miss.
+
+2. **It’s mounted *inside* the z-10 wrapper in `helix-core.tsx`.**
+   Because the parent creates a stacking context (`relative z-10`), your “fixed” background sits in that same context and can get covered/weirdly layered.
+
+Here’s a minimal, safe patch that will make it obvious, then you can dial it back:
+
+---
+
+### Patch 1 — Make the background PNG big & visible
+
+Replace the inside of `BackgroundLuma.tsx` with this simpler block (keep your imports + wrapper):
+
+```tsx
+// BackgroundLuma.tsx  (inside the return)
+<div
+  className="fixed inset-0 pointer-events-none"
+  style={{ zIndex: 0, opacity, filter: `blur(${blurPx}px)` }}
+>
+  <img
+    src="/luma/Luma_29.png"
+    alt="Luma Guardian"
+    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-luma-float drop-shadow-lg"
+    style={{ width: "60vmin", maxWidth: 900, opacity: 0.95, filter: "brightness(1.05)" }}
+    onLoad={() => console.log("✅ Luma PNG loaded")}
+    onError={(e) => {
+      console.warn("Luma PNG not found at /luma/Luma_29.png");
+      (e.currentTarget as HTMLImageElement).style.display = "none";
+    }}
+  />
+
+  <style>{`
+    @keyframes luma-float {
+      0%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+      50%{transform:translate(-50%,-50%) translateY(-12px) rotate(1.5deg) scale(1.02)}
+      100%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+    }
+    .animate-luma-float{animation:luma-float 8s ease-in-out infinite}
+  `}</style>
+</div>
+```
+
+(You can re-add your star specks later; for now let’s make sure the PNG shows.)
+
+---
+
+### Patch 2 — Mount background **outside** the z-10 app wrapper
+
+In `helix-core.tsx`, move `<BackgroundLuma …/>` **above** the main container and keep the container `relative z-10`. Example:
+
+```tsx
+// helix-core.tsx
+import { BackgroundLuma } from "@/components/BackgroundLuma";
+import { LumaOverlayHost } from "@/components/LumaOverlayHost";
+
+export default function HelixCore() {
+  return (
+    <>
+      {/* background FIRST so it sits under everything */}
+      <BackgroundLuma opacity={0.6} blurPx={0} />  {/* make obvious for test */}
+
+      {/* your whole app on top */}
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
+        {/* ...all existing content... */}
+      </div>
+
+      {/* whisper host stays on top */}
+      <LumaOverlayHost />
+    </>
+  );
+}
+```
+
+Once you see the PNG, tune back to something like `opacity={0.18}` and `blurPx={6}`.
+
+---
+
+### Quick sanity checks
+
+* In the browser, open **`/luma/Luma_29.png`** directly — it should 200 and display.
+* Look for **“✅ Luma PNG loaded”** in the console. If it logs, the element exists; if you still don’t see it, it’s layering/opacity, not path.
+* If you keep `BackgroundLumaPNG.tsx`, it already uses `width: 60vmin`; you could also render that component directly while testing.
+
+Want me to flip it back to the 3D GLB after the PNG is visible? We can keep the same placement and just swap the internals once the layering is confirmed solid.
