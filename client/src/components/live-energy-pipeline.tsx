@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
 import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -288,7 +289,18 @@ export function LiveEnergyPipeline({
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Calculator className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Live Energy Pipeline: {currentMode.name} Mode</CardTitle>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CardTitle className="text-lg cursor-help">
+                  Live Energy Pipeline: {currentMode.name} Mode
+                </CardTitle>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-md text-sm leading-snug">
+                <strong>Pipeline overview</strong><br/>
+                This view assembles cavity energy, geometric amplification (γ_geo), Q-enhancement, duty, sector strobing, and safety guards (ζ, Natário, curvature) into a single operational picture.<br/><br/>
+                <em>Moving Zen:</em> Presence before action—see the whole garden before you rake a single line.
+              </TooltipContent>
+            </Tooltip>
           </div>
           <Badge variant={isRunning ? "default" : "secondary"} className="flex items-center space-x-1">
             <Zap className="h-3 w-3" />
@@ -298,10 +310,19 @@ export function LiveEnergyPipeline({
         
         {/* Mode Selector */}
         <div className="flex items-center gap-4 mt-3">
-          <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Operational Mode:</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 cursor-help">
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Operational Mode:</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              Mode rebalances contraction/expansion zones, duty, sector strobing, and Q-spoiling. It changes power, ζ, and viable payload.<br/><br/>
+              <em>Moving Zen:</em> Every journey begins in stillness. Choose bearing; then move without hesitation (maai).
+            </TooltipContent>
+          </Tooltip>
           <Select value={selectedMode} onValueChange={(value) => {
             handleModeChange(value);
             // Trigger zen toast for mode change
@@ -371,10 +392,19 @@ export function LiveEnergyPipeline({
       <CardContent className="space-y-4">
         {/* Foundation: Cycle-Averaged Cavity Energy */}
         <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">∞</span>
-            Foundation: Cycle-Averaged Cavity Energy
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">∞</span>
+                Foundation: Cycle-Averaged Cavity Energy
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              u_Casimir = -π²ℏc/(720a⁴) defines the baseline field energy. U_static = u_Casimir·A_tile·a, then geometry sets U_geo = γ·U_static; Q_mech lifts it to U_Q = Q_mech·U_geo—the posture of all later steps.<br/><br/>
+              <em>Moving Zen:</em> Posture before movement. A stance you can hold quietly is the root of accurate cuts.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-xs space-y-1">
             <div>u_Casimir = -π²ℏc/(720a⁴) = {formatScientific(u_casimir)} J/m³</div>
             <div>U_static = u_Casimir × A_tile = {formatScientific(U_static)} J</div>
@@ -387,10 +417,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 1: Raw Per-Tile Loss Power */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
-            Raw Per-Tile Loss Power
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
+                Raw Per-Tile Loss Power
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              P_raw,tile = |U_geo|·ω/Q_on. This is the tile's intrinsic dissipation at resonance before throttles (duty, sectors, Q-spoiling) are applied.<br/><br/>
+              <em>Moving Zen:</em> Accuracy is final—form (boundary & frequency) makes speed a consequence, not a goal.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>P_raw,tile = U_geo × ω / Q_on</div>
             <div className="text-muted-foreground">
@@ -404,10 +443,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 2: Raw Hull Power */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
-            Raw Hull Power
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
+                Raw Hull Power
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              P_raw = P_raw,tile × N_tiles with N_tiles = A_hull/A_tile. Scaling preserves physics but magnifies any misalignment—geometry and Q settings must remain coherent.<br/><br/>
+              <em>Moving Zen:</em> Many hands, one motion. Coordination turns parts into purpose.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>P_raw = P_raw,tile × N_tiles</div>
             <div className="text-muted-foreground">
@@ -421,10 +469,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 3: Combined Throttling Factor */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">3</span>
-            Combined Throttling Factor
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">3</span>
+                Combined Throttling Factor
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              f_throttle = d × (Q_idle/Q_on) × (1/S). Duty, Q-spoiling, and sector strobing set the real cadence and safe average output.<br/><br/>
+              <em>Moving Zen:</em> Breath and step together—distance and timing are interdependent (maai).
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
             <div className="text-muted-foreground">
@@ -444,10 +501,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 4: Realistic Average Power */}
         <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
-            Realistic Average Power (83 MW Target)
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
+                Realistic Average Power (83 MW Target)
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              P_avg = P_raw × f_throttle. This is the actionable budget that respects thermal and coherence limits—what the system can truly sustain.<br/><br/>
+              <em>Moving Zen:</em> Flow before force—guiding energy beats grinding it.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>P_avg = P_raw × f_throttle</div>
             <div className="text-muted-foreground">
@@ -463,10 +529,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 5: Duty Cycle Averaging */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">5</span>
-            Duty Cycle Averaging
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">5</span>
+                Duty Cycle Averaging
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              U_cycle = U_Q × d (plus pocket boost if configured). This per-cycle yield is the natural "fuel unit" Helix-Core can count.<br/><br/>
+              <em>Moving Zen:</em> Keep cadence you can keep—consistency turns effort into inevitability.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>U_cycle = U_Q × d (with pocket boost)</div>
             <div className="text-muted-foreground">
@@ -480,10 +555,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 6: Time-Scale Separation */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
-            Time-Scale Separation
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
+                Time-Scale Separation
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              A minimum T_s/T_LC keeps homogenization ahead of drive changes, avoiding spurious curvature growth and decoherence.<br/><br/>
+              <em>Moving Zen:</em> Patience is speed in disguise—let structure settle before you move again.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>TS_ratio = τ_LC / T_m</div>
             <div className="text-muted-foreground">
@@ -497,10 +581,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 7: Quantum Safety */}
         <div className="bg-muted/50 rounded-lg p-4">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
-            Quantum Inequality Margin
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
+                Quantum Inequality Margin
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              ζ summarizes Ford–Roman compliance; schedules throttle to keep ζ within safe bounds even if instantaneous output drops.<br/><br/>
+              <em>Moving Zen:</em> Compassion is part of skill—guard the system to guard the mission.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>ζ = 1 / (d × √Q_on)</div>
             <div className="text-muted-foreground">
@@ -514,10 +607,19 @@ export function LiveEnergyPipeline({
 
         {/* Step 8: Total Exotic Mass */}
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
-          <h4 className="font-semibold text-sm mb-2 flex items-center">
-            <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
-            Total Exotic Mass ({formatScientific(exoticMassTarget)} kg Target)
-          </h4>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
+                Total Exotic Mass ({formatScientific(exoticMassTarget)} kg Target)
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Theory</strong><br/>
+              Aggregated per-cycle yield across tiles toward a mission budget. This ties directly to payload support and "cycles required."<br/><br/>
+              <em>Moving Zen:</em> Honor your role to its completion—finish the cut you begin.
+            </TooltipContent>
+          </Tooltip>
           <div className="font-mono text-sm space-y-1">
             <div>M_exotic = N_tiles × |U_cycle| / c²</div>
             <div className="text-muted-foreground">
