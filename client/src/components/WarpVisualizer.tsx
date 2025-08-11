@@ -398,6 +398,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             beta0={parameters.dutyCycle * parameters.g_y}
             mode={parameters.currentMode || 'unknown'}
             sagDepth={parameters.sagDepth_nm}
+            gapNm={1.0} // Standard Casimir gap
+            gammaGeo={parameters.g_y}
+            qFactor={parameters.cavityQ}
+            duty={parameters.dutyCycle}
+            powerMW={parameters.powerAvg_MW}
+            tsRatio={parameters.tsRatio || 4102.7}
+            zeta={0.032}
           />
         </div>
       </CardContent>
