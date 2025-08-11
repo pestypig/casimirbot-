@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
 import { useState } from "react";
+import { zenLongToast } from "@/lib/zen-long-toasts";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -301,7 +302,19 @@ export function LiveEnergyPipeline({
             <Settings className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Operational Mode:</span>
           </div>
-          <Select value={selectedMode} onValueChange={handleModeChange}>
+          <Select value={selectedMode} onValueChange={(value) => {
+            handleModeChange(value);
+            // Trigger zen toast for mode change
+            const mode = modes[value as keyof typeof modes];
+            if (mode) {
+              zenLongToast("mode:switch", {
+                mode: mode.name,
+                duty: mode.duty,
+                powerMW: 83.3, // Will be updated with actual values
+                zeta: 0.032
+              });
+            }
+          }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>

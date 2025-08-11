@@ -6,6 +6,7 @@
 import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
+import { zenLongToast } from "@/lib/zen-long-toasts";
 import { SimulationParameters } from "@shared/schema";
 
 interface NeedleHullPresetProps {
@@ -78,7 +79,16 @@ export function NeedleHullPreset({ form, onTileAreaChange, onShipRadiusChange, o
     <div className="space-y-2">
       <Button 
         type="button" 
-        onClick={applyNeedleHullPreset}
+        onClick={() => {
+          applyNeedleHullPreset();
+          zenLongToast("sim:create", {
+            gammaGeo: 26,
+            qFactor: 1e9,
+            duty: 0.14,
+            shipRadiusM: 86.5,
+            gapNm: 1.0
+          });
+        }}
         className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
       >
         <Rocket className="mr-2 h-4 w-4" />

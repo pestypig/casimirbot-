@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MetricsDashboard from './metrics-dashboard';
+import { zenLongToast } from '@/lib/zen-long-toasts';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -349,7 +350,20 @@ function InteractiveHeatMap({
             <Label>Operational Mode</Label>
             <Select 
               value={selectedMode} 
-              onValueChange={(value) => updateParameter('selectedMode', value)}
+              onValueChange={(value) => {
+                updateParameter('selectedMode', value);
+                // Trigger zen toast with current metrics
+                const preset = modePresets[value as keyof typeof modePresets];
+                if (preset) {
+                  zenLongToast("mode:switch", {
+                    mode: preset.name,
+                    duty: preset.duty,
+                    powerMW: parseFloat(preset.description.split('MW')[0]) || 83.3,
+                    exoticKg: parseInt(preset.description.split('kg')[0].split('• ')[1]) || 1405,
+                    zeta: parseFloat(preset.description.split('ζ=')[1]) || 0.032
+                  });
+                }
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -375,7 +389,14 @@ function InteractiveHeatMap({
               <div onDoubleClick={() => handleSliderDoubleClick('gammaGeo')}>
                 <Slider
                   value={[localParams.gammaGeo]}
-                  onValueChange={([value]) => updateParameter('gammaGeo', value)}
+                  onValueChange={([value]) => {
+                    updateParameter('gammaGeo', value);
+                    zenLongToast("geom:gamma", {
+                      gammaGeo: value,
+                      shipRadiusM: currentShipRadius,
+                      gapNm: 1.0 // Typical gap
+                    });
+                  }}
                   min={1}
                   max={100}
                   step={1}
@@ -394,7 +415,15 @@ function InteractiveHeatMap({
                 <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
                   <Slider
                     value={[Math.log10(localParams.qFactor)]}
-                    onValueChange={([value]) => updateParameter('qFactor', Math.pow(10, value))}
+                    onValueChange={([value]) => {
+                      const qFactor = Math.pow(10, value);
+                      updateParameter('qFactor', qFactor);
+                      zenLongToast("geom:qfactor", {
+                        qFactor: qFactor,
+                        powerMW: 83.3, // Current power estimate
+                        zeta: 0.032 // Current zeta
+                      });
+                    }}
                     min={6}
                     max={10}
                     step={0.1}

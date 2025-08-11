@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
+import { zenLongToast } from '@/lib/zen-long-toasts';
 
 interface WarpVisualizerProps {
   parameters: {
@@ -208,7 +209,17 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={toggleAnimation}
+              onClick={() => {
+                toggleAnimation();
+                zenLongToast("helix:pulse", {
+                  duty: parameters.dutyCycle,
+                  freqGHz: 15.0, // Based on 15 GHz from TS ratio
+                  sectors: parameters.sectorStrobing || 1,
+                  frOk: true, // Assume good state for demo
+                  natarioOk: true,
+                  curvatureOk: true
+                });
+              }}
               data-testid="button-toggle-animation"
             >
               {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -216,7 +227,16 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <Button
               variant="outline"
               size="sm"
-              onClick={resetView}
+              onClick={() => {
+                resetView();
+                zenLongToast("helix:diagnostics", {
+                  zeta: 0.032,
+                  tsRatio: parameters.tsRatio,
+                  frOk: true,
+                  natarioOk: true,
+                  curvatureOk: true
+                });
+              }}
               data-testid="button-reset-view"
             >
               <RotateCcw className="w-4 h-4" />
