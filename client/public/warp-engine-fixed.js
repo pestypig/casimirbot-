@@ -263,6 +263,41 @@ class WarpEngine {
         // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
         
+        // Numeric coercion helper
+        const N = v => (Number.isFinite(+v) ? +v : 0);
+        const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
+
+        // duty as fraction [0..1]
+        const dutyFrac = (() => {
+          const d = parameters.dutyCycle;
+          if (d == null) return N(this.currentParams.dutyCycle);
+          return d > 1 ? d/100 : N(d);
+        })();
+
+        // Mirror pipeline fields into uniforms for diagnostics
+        this.uniforms = {
+            ...this.uniforms,
+            vizGain: 4,
+            colorByTheta: 1,
+            vShip: parameters.vShip || 1,
+            wallWidth: parameters.wallWidth || 0.06,
+            axesClip: parameters.axesClip || [0.4, 0.22, 0.22],
+            driveDir: parameters.driveDir || [1, 0, 0],
+            
+            // Mirror pipeline fields for diagnostics
+            currentMode: mode,
+            dutyCycle: dutyFrac,
+            gammaGeo: N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y),
+            Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
+            deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
+            gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
+            sectorCount: N(parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
+            phaseSplit: N(
+              parameters.phaseSplit ??
+              (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
+            )
+        };
+        
         // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
             const modeEffects = this._calculateModeEffects(parameters);
@@ -693,7 +728,7 @@ class WarpEngine {
     }
 
     computeDiagnostics(){
-        const U=this.uniforms||{};
+        const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
         const P=this._computePipelineBetas(U);
         const Y=this._sampleYorkAndEnergy(U);
         const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
