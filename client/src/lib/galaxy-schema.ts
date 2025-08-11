@@ -23,5 +23,23 @@ export type HelixPerf = {
   freqGHz?: number;
   energyPerLyMWh: number;         // from FuelGauge
   energyPerCycleJ?: number;       // from FuelGauge (P_avg / f)
+  vEffLyPerHour: (mode: string, duty: number) => number; // same func you use in FuelGauge
+};
+
+export type RoutePlan = {
+  waypoints: string[];    // ids in order (e.g., ["SOL","ORI_OB1","VEL_OB2","SOL"])
+};
+
+export type HelixPerf = {
+  mode: string; 
+  powerMW: number; 
+  duty: number; 
+  gammaGeo: number; 
+  qFactor: number;
+  zeta: number; 
+  tsRatio: number; 
+  freqGHz?: number;
+  energyPerLyMWh: number;         // from FuelGauge
+  energyPerCycleJ?: number;       // from FuelGauge (P_avg / f)
   vEffLyPerHour: (mode:string, duty:number)=>number; // same func you use in FuelGauge
 };
