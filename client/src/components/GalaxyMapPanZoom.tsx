@@ -13,6 +13,20 @@ type Props = {
   debug?: boolean;                   // draws crosshair + pc rings
 };
 
+// Clamping helper to prevent image from being dragged completely off-screen
+function clampOffset(off: { x: number; y: number }, zoom: number, nat: { w: number; h: number }, view: { w: number; h: number }) {
+  const imgW = nat.w * zoom, imgH = nat.h * zoom;
+  const margin = 80; // allow a little breathing room
+  const minX = Math.min(margin, view.w - imgW - margin);
+  const maxX = Math.max(view.w - imgW - margin, margin);
+  const minY = Math.min(margin, view.h - imgH - margin);
+  const maxY = Math.max(view.h - imgH - margin, margin);
+  return {
+    x: Math.max(minX, Math.min(maxX, off.x)),
+    y: Math.max(minY, Math.min(maxY, off.y)),
+  };
+}
+
 export function GalaxyMapPanZoom({
   imageUrl, bodies, routeIds = [],
   width=900, height=420,
@@ -38,16 +52,18 @@ export function GalaxyMapPanZoom({
     im.src = imageUrl;
   }, [imageUrl]);
 
-  // fit-to-screen on mount / when nat known
-  React.useEffect(()=>{
+  // Center on Sol (originPx) when image loads
+  React.useEffect(() => {
     if (!nat) return;
-    const zx = width / nat.w, zy = height / nat.h;
-    const fit = Math.min(zx, zy);
-    const ox = (width  - nat.w*fit)/2;
-    const oy = (height - nat.h*fit)/2;
+    const zx = width / nat.w;
+    const zy = height / nat.h;
+    const fit = Math.min(zx, zy) * 1.1; // Show a bit more around Sol
     setZoom(fit);
-    setOff({ x: ox, y: oy });
-  }, [nat, width, height]);
+    // Put Sol at the middle of the viewport
+    const ox = width / 2 - originPx.x * fit;
+    const oy = height / 2 - originPx.y * fit;
+    setOff(clampOffset({ x: ox, y: oy }, fit, nat, { w: width, h: height }));
+  }, [nat, width, height, originPx.x, originPx.y]);
 
   // drawing
   React.useEffect(()=>{
@@ -109,8 +125,9 @@ export function GalaxyMapPanZoom({
     dragging.current = { dx: e.clientX - offset.x, dy: e.clientY - offset.y };
   };
   const onMouseMove: React.MouseEventHandler<HTMLDivElement> = (e) => {
-    if (!dragging.current) return;
-    setOff({ x: e.clientX - dragging.current.dx, y: e.clientY - dragging.current.dy });
+    if (!dragging.current || !nat) return;
+    const newOff = { x: e.clientX - dragging.current.dx, y: e.clientY - dragging.current.dy };
+    setOff(clampOffset(newOff, zoom, nat, { w: width, h: height }));
   };
   const onMouseUp = () => (dragging.current = null);
 
@@ -124,7 +141,8 @@ export function GalaxyMapPanZoom({
     const newZoom = Math.max(0.2, Math.min(6, zoom * dz));
     const sx = (mx - offset.x) / zoom;
     const sy = (my - offset.y) / zoom;
-    setOff({ x: mx - sx*newZoom, y: my - sy*newZoom });
+    const newOff = { x: mx - sx * newZoom, y: my - sy * newZoom };
+    setOff(clampOffset(newOff, newZoom, nat, { w: width, h: height }));
     setZoom(newZoom);
   };
 
@@ -154,7 +172,7 @@ export function GalaxyMapPanZoom({
       onMouseLeave={onMouseUp}
       onMouseUp={onMouseUp}
       onWheel={onWheel}
-      className="relative rounded-lg border bg-black"
+      className="relative rounded-lg border bg-black overflow-hidden"
       style={{
         width, height,
         cursor: dragging.current ? "grabbing" : "grab",
