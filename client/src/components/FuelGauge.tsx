@@ -1,0 +1,111 @@
+import * as React from "react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+
+// --- Tunables (pick any nominal values; you can wire these to mode configs later)
+const MODE_SPEED_LY_PER_HOUR: Record<string, number> = {
+  Hover: 0.002,     // ly/hour (training value; adjust to your metric)
+  Cruise: 0.02,
+  Emergency: 0.03,
+  Standby: 0.0,
+};
+
+// "full" safe window per mode before constraints throttle hard
+const MODE_BASE_WINDOW_HOURS: Record<string, number> = {
+  Hover: 24,
+  Cruise: 8,
+  Emergency: 2,
+  Standby: 168,
+};
+
+function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
+function fmt(x?: number, d=2) {
+  if (x == null || !isFinite(x)) return "—";
+  const a = Math.abs(x);
+  return (a >= 1e4 || a < 1e-3) ? x.toExponential(2) : x.toFixed(d);
+}
+
+export type FuelGaugeProps = {
+  mode: "Hover" | "Cruise" | "Emergency" | "Standby" | string;
+  powerMW: number;      // P_avg (throttled)
+  zeta: number;         // ζ margin (e.g., 0.032)
+  tsRatio: number;      // T_s / T_LC (e.g., 4102.74)
+  frOk?: boolean;
+  natarioOk?: boolean;
+  curvatureOk?: boolean;
+};
+
+export function FuelGauge(props: FuelGaugeProps) {
+  const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk } = props;
+
+  // --- Constraint factor: 0..1 scales allowed continuous run-time
+  const zetaTarget = 0.84;         // your "operational" margin
+  const tsMin = 100;               // homogenization floor (from UI)
+  const fZ = clamp01(zeta / zetaTarget);
+  const fT = clamp01(tsRatio / tsMin);
+  const fFR = frOk === false ? 0.6 : 1.0;
+  const fNa = natarioOk === false ? 0.7 : 1.0;
+  const fCu = curvatureOk === false ? 0.7 : 1.0;
+  const safeFactor = clamp01(fZ * fT * fFR * fNa * fCu);
+
+  const vLyPerHour = MODE_SPEED_LY_PER_HOUR[mode] ?? 0;
+  const baseWindow = MODE_BASE_WINDOW_HOURS[mode] ?? 0;
+
+  // Safe continuous window at current settings
+  const safeHours = baseWindow * safeFactor;
+
+  // Energy per light-year (MWh / ly): P_avg [MW] * (hours per ly)
+  const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
+  const energyPerLyMWh = isFinite(hoursPerLy) ? powerMW * hoursPerLy : Infinity;
+
+  // Range if you run for "safeHours"
+  const rangeLy = vLyPerHour * safeHours;
+
+  // A visual percent vs. the nominal base window
+  const percent = baseWindow > 0 ? clamp01(safeHours / baseWindow) * 100 : 0;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CardTitle className="text-sm font-semibold cursor-help">
+              Mission Fuel / Range (mode: {mode})
+            </CardTitle>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-md text-sm leading-snug">
+            <strong>Theory</strong><br/>
+            Usable negative-energy "fuel" is the throttled Casimir power P<span className="align-[0.1em]">avg</span> multiplied by the safe
+            operating window set by constraints (ζ, T<sub>s</sub>/T<sub>LC</sub>, Natário, curvature). Range follows from the mode's
+            effective warp velocity: E/ly = P<span className="align-[0.1em]">avg</span> × hours/ly, Range = v<sub>eff</sub> × t<sub>safe</sub>.<br/><br/>
+            <em>Moving Zen:</em> Restraint extends reach. The longest journey is walked by preserving each step.
+          </TooltipContent>
+        </Tooltip>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="text-muted-foreground">Safe window</div>
+          <div className="text-right tabular-nums">{fmt(safeHours,2)} h</div>
+
+          <div className="text-muted-foreground">Energy / light-year</div>
+          <div className="text-right tabular-nums">
+            {isFinite(energyPerLyMWh) ? `${fmt(energyPerLyMWh,1)} MWh/ly` : "—"}
+          </div>
+
+          <div className="text-muted-foreground">Range @ current</div>
+          <div className="text-right tabular-nums">{fmt(rangeLy,3)} ly</div>
+
+          <div className="text-muted-foreground">P_avg</div>
+          <div className="text-right tabular-nums">{fmt(powerMW,1)} MW</div>
+        </div>
+
+        <Progress value={percent} className="h-2" />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>constraints</span>
+          <span>window {fmt(baseWindow,0)} h</span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

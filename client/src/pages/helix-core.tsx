@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
+import { FuelGauge } from "@/components/FuelGauge";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -827,6 +828,17 @@ export default function HelixCore() {
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7
               }}
+            />
+            
+            {/* Mission Fuel / Range Gauge */}
+            <FuelGauge
+              mode={pipelineState?.currentMode || 'Hover'}
+              powerMW={pipelineState?.P_avg || 83.3}
+              zeta={pipelineState?.zeta || 0.032}
+              tsRatio={pipelineState?.TS_ratio || 4102.74}
+              frOk={pipelineState?.fordRomanCompliance || true}
+              natarioOk={pipelineState?.natarioConstraint || true}
+              curvatureOk={pipelineState?.curvatureLimit || true}
             />
           </div>
         </div>
