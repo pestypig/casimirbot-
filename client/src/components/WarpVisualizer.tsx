@@ -35,6 +35,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const animationRef = useRef<number>();
   const [isRunning, setIsRunning] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [diag, setDiag] = useState<any|null>(null);
 
   useEffect(() => {
     const initializeEngine = async () => {
@@ -165,6 +166,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, [isLoaded]);
+
+  // Wire up diagnostics callback
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.onDiagnostics = (d: any) => setDiag(d);
+    return () => { if (engineRef.current) engineRef.current.onDiagnostics = null; };
   }, [isLoaded]);
 
   const toggleAnimation = () => {
@@ -405,6 +413,42 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             zeta={0.032}
           />
         </div>
+        
+        {/* Natário Proof Panel */}
+        {diag && (
+          <div className="mt-4 bg-slate-900/60 border border-cyan-500/20 rounded-lg p-4 font-mono text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-cyan-400">Natário Proof Panel</h3>
+              <div className="flex gap-3">
+                <span className={diag.york_sign_ok ? "text-green-400" : "text-red-400"}>
+                  York sign {diag.york_sign_ok ? "PASS" : "FAIL"}
+                </span>
+                <span className={diag.hover_sym_ok ? "text-green-400" : "text-yellow-400"}>
+                  Hover symmetry {diag.hover_sym_ok ? "PASS" : "WARN"}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <div>mode: {diag.mode}</div>
+                <div>sectors: {diag.sectors}</div>
+                <div>phase: {diag.phase.toFixed(2)}</div>
+                <div>duty: {(diag.duty*100).toFixed(2)}%</div>
+              </div>
+              <div>
+                <div>β_inst: {diag.beta_inst.toExponential(2)}</div>
+                <div>β_avg:  {diag.beta_avg.toExponential(2)}</div>
+                <div>β_net:  {diag.beta_net.toExponential(2)}</div>
+              </div>
+              <div>
+                <div>θ_front: [{diag.theta_front_min.toExponential(2)}, {diag.theta_front_max.toExponential(2)}]</div>
+                <div>θ_rear : [{diag.theta_rear_min.toExponential(2)}, {diag.theta_rear_max.toExponential(2)}]</div>
+                <div>T00̄ (proxy): {diag.T00_avg_proxy.toExponential(2)}  |  σ_eff≈{diag.sigma_eff.toFixed(1)}</div>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

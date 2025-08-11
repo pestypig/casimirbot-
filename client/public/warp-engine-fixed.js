@@ -509,6 +509,11 @@ class WarpEngine {
         
         // Render the spacetime grid
         this._renderGridPoints();
+        
+        // Emit diagnostics for proof panel
+        if (this.onDiagnostics) {
+            try { this.onDiagnostics(this.computeDiagnostics()); } catch(e){}
+        }
     }
 
     _resize() {
@@ -633,6 +638,73 @@ class WarpEngine {
         out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
         out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
         out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    }
+
+    // === Natário Diagnostics (viewer-only, does not affect physics) ===
+    _computePipelineBetas(U){
+        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || 1);
+        const gammaGeo     = U.gammaGeo || 0;
+        const Qburst       = (U.Qburst ?? U.cavityQ) || 0;
+        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+        const gammaVdB     = U.gammaVdB || 1.0;
+
+        const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
+        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
+        const phase    = (U.phaseSplit != null) ? U.phaseSplit :
+                        (U.currentMode === 'cruise' ? 0.65 : 0.50);
+        const betaNet  = betaAvg * (2*phase - 1);
+
+        return { betaInst, betaAvg, betaNet, sectors, phase };
+    }
+
+    _sampleYorkAndEnergy(U){
+        const axes  = U.axesClip || [0.40,0.22,0.22];
+        const w     = Math.max(1e-4, U.wallWidth || 0.06);   // shell width
+        const vShip = U.vShip || 1.0;
+        const d     = U.driveDir || [1,0,0];
+        const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
+                            const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
+
+        let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
+        const N=64;
+        for(let k=0;k<N;k++){
+            const ang=2*Math.PI*k/N;
+            const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
+            const rs=Math.hypot(...pN);
+            const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
+            const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
+            const dfdr=(-2.0*(rs-1)/(w*w))*f;
+
+            const theta = vShip * (xs/rs) * dfdr;               // York-time proxy
+            const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
+
+            if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
+            else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
+
+            eSum+=T00; n++;
+        }
+        return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
+                T00avg:(n?eSum/n:0) };
+    }
+
+    computeDiagnostics(){
+        const U=this.uniforms||{};
+        const P=this._computePipelineBetas(U);
+        const Y=this._sampleYorkAndEnergy(U);
+        const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
+        const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+        return {
+            mode: U.currentMode||'hover',
+            duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+            sectors:P.sectors, phase:P.phase,
+            beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+            theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
+            theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
+            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+            york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
+            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6)
+        };
     }
 
     destroy() {

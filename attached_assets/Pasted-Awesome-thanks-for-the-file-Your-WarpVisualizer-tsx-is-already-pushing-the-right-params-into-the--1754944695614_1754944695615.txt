@@ -1,0 +1,156 @@
+Awesome—thanks for the file. Your `WarpVisualizer.tsx` is already pushing the right params into the engine. To get the “Proof Panel” working we just need two tiny patches:
+
+---
+
+# A) Add diagnostics in `warp-engine-fixed.js`
+
+Drop these helpers **inside the WarpEngine class** (anywhere with the other methods), then emit them once per frame.
+
+```js
+// === Diagnostics (viewer-only, does not affect physics) ===
+_computePipelineBetas(U){
+  const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || 1);
+  const gammaGeo     = U.gammaGeo || 0;
+  const Qburst       = (U.Qburst ?? U.cavityQ) || 0;
+  const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+  const gammaVdB     = U.gammaVdB || 1.0;
+
+  const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
+  const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
+  const phase    = (U.phaseSplit != null) ? U.phaseSplit :
+                   (U.currentMode === 'cruise' ? 0.65 : 0.50);
+  const betaNet  = betaAvg * (2*phase - 1);
+
+  return { betaInst, betaAvg, betaNet, sectors, phase };
+}
+
+_sampleYorkAndEnergy(U){
+  const axes  = U.axesClip || [0.40,0.22,0.22];
+  const w     = Math.max(1e-4, U.wallWidth || 0.06);   // shell width
+  const vShip = U.vShip || 1.0;
+  const d     = U.driveDir || [1,0,0];
+  const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
+                       const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
+
+  let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
+  const N=64;
+  for(let k=0;k<N;k++){
+    const ang=2*Math.PI*k/N;
+    const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
+    const rs=Math.hypot(...pN);
+    const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
+    const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
+    const dfdr=(-2.0*(rs-1)/(w*w))*f;
+
+    const theta = vShip * (xs/rs) * dfdr;               // York-time proxy
+    const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
+
+    if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
+    else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
+
+    eSum+=T00; n++;
+  }
+  return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
+           T00avg:(n?eSum/n:0) };
+}
+
+computeDiagnostics(){
+  const U=this.uniforms||{};
+  const P=this._computePipelineBetas(U);
+  const Y=this._sampleYorkAndEnergy(U);
+  const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
+  const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+  return {
+    mode: U.currentMode||'hover',
+    duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+    dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+    sectors:P.sectors, phase:P.phase,
+    beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+    theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
+    theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
+    T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+    york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
+    hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6)
+  };
+}
+```
+
+Emit it at the end of your draw:
+
+```js
+_draw(time){
+  // ... your existing rendering ...
+  if (this.onDiagnostics) {
+    try { this.onDiagnostics(this.computeDiagnostics()); } catch(e){}
+  }
+}
+```
+
+---
+
+# B) Wire it in `WarpVisualizer.tsx` and render the panel
+
+1. Add state + effect near the top:
+
+```ts
+const [diag, setDiag] = useState<any|null>(null);
+
+useEffect(() => {
+  if (!engineRef.current) return;
+  engineRef.current.onDiagnostics = (d: any) => setDiag(d);
+  return () => { if (engineRef.current) engineRef.current.onDiagnostics = null; };
+}, [isLoaded]);
+```
+
+2. Render a compact proof panel under your current sections:
+
+```tsx
+{diag && (
+  <div className="mt-4 bg-slate-900/60 border border-cyan-500/20 rounded-lg p-4 font-mono text-xs">
+    <div className="flex items-center justify-between mb-2">
+      <h3 className="text-cyan-400">Natário Proof Panel</h3>
+      <div className="flex gap-3">
+        <span className={diag.york_sign_ok ? "text-green-400" : "text-red-400"}>
+          York sign {diag.york_sign_ok ? "PASS" : "FAIL"}
+        </span>
+        <span className={diag.hover_sym_ok ? "text-green-400" : "text-yellow-400"}>
+          Hover symmetry {diag.hover_sym_ok ? "PASS" : "WARN"}
+        </span>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div>mode: {diag.mode}</div>
+        <div>sectors: {diag.sectors}</div>
+        <div>phase: {diag.phase.toFixed(2)}</div>
+        <div>duty: {(diag.duty*100).toFixed(2)}%</div>
+      </div>
+      <div>
+        <div>β_inst: {diag.beta_inst.toExponential(2)}</div>
+        <div>β_avg:  {diag.beta_avg.toExponential(2)}</div>
+        <div>β_net:  {diag.beta_net.toExponential(2)}</div>
+      </div>
+      <div>
+        <div>θ_front: [{diag.theta_front_min.toExponential(2)}, {diag.theta_front_max.toExponential(2)}]</div>
+        <div>θ_rear : [{diag.theta_rear_min.toExponential(2)}, {diag.theta_rear_max.toExponential(2)}]</div>
+        <div>T00̄ (proxy): {diag.T00_avg_proxy.toExponential(2)}  |  σ_eff≈{diag.sigma_eff.toFixed(1)}</div>
+      </div>
+    </div>
+  </div>
+)}
+```
+
+---
+
+## How to use it (what “proof” should show)
+
+* **Hover** (phase≈0.50): `york_sign_ok: PASS`, and `hover_sym_ok: PASS` (front/rear |θ| nearly equal, opposite sign).
+* **Cruise** (phase≠0.50): `york_sign_ok: PASS`, `hover_sym_ok: WARN` (asymmetry increases).
+* **Increase sectors** with fixed duty: `β_avg` drops \~∝√(duty/sectors); grid visibly softens.
+* **Narrow wall** (smaller `wallWidth`): `σ_eff` grows; |θ| and |T00̄| increase together.
+* **Raise γ\_geo / Q / Δa/a / duty**: `β_avg` rises and so does the bend.
+
+This gives you a live, quantitative “receipt” that the viewer is driven by the same relationships in the papers—without changing any physics under the hood.
+
+If you want, send back your updated `warp-engine-fixed.js` after pasting the helpers, and I’ll sanity check a couple of frames’ diagnostics against your Hover/Cruise presets.
