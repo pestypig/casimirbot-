@@ -512,7 +512,12 @@ class WarpEngine {
         
         // Emit diagnostics for proof panel
         if (this.onDiagnostics) {
-            try { this.onDiagnostics(this.computeDiagnostics()); } catch(e){}
+            try { 
+                const diag = this.computeDiagnostics();
+                this.onDiagnostics(diag);
+            } catch(e){
+                console.warn('Diagnostics error:', e);
+            }
         }
     }
 

@@ -122,29 +122,46 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                        : mode === 'emergency' ? 0.70     // maximum aft
                        : 0.50;                           // default
       
-      // Fixed parameter mapping for engine consumption
+      // Helper to ensure numeric values
+      const num = (v: any, def = 0) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : def;
+      };
+
+      // Duty as fraction [0..1]
+      const dutyFrac = (() => {
+        const d = String(parameters.dutyCycle ?? '').replace('%','').trim();
+        const n = Number(d);
+        if (!Number.isFinite(n)) return 0;
+        return n > 1 ? n/100 : n;
+      })();
+
+      // Fixed parameter mapping for engine consumption with numeric coercion
       engineRef.current.updateUniforms({
-        // Core physics parameters - using engine's expected names
-        dutyCycle: parameters.dutyCycle,
-        gammaGeo: parameters.g_y,                        // Stage 1: Geometric amplification
-        Qburst: parameters.cavityQ,                      // Map to engine name (was Qdyn)
-        deltaAOverA: parameters.qSpoilingFactor || 1.0,  // Map Q spoiling to Δa/a
-        gammaVdB: parameters.gammaVanDenBroeck,          // Stage 4: Van den Broeck amplification
+        // Core physics parameters - all coerced to numbers
+        dutyCycle: dutyFrac,
+        gammaGeo: num(parameters.g_y),                   // Stage 1: Geometric amplification
+        Qburst: num(parameters.cavityQ),                 // Map to engine name (was Qdyn)
+        deltaAOverA: num(parameters.qSpoilingFactor, 1), // Map Q spoiling to Δa/a
+        gammaVdB: num(parameters.gammaVanDenBroeck, 1),  // Stage 4: Van den Broeck amplification
         
-        sagDepth_nm: parameters.sagDepth_nm,
-        powerAvg_MW: parameters.powerAvg_MW,
-        exoticMass_kg: parameters.exoticMass_kg,
-        tsRatio: parameters.tsRatio || 4100,             // Time-scale ratio for animation scaling
+        sagDepth_nm: num(parameters.sagDepth_nm),
+        powerAvg_MW: num(parameters.powerAvg_MW),
+        exoticMass_kg: num(parameters.exoticMass_kg),
+        tsRatio: num(parameters.tsRatio, 4100),          // Time-scale ratio for animation scaling
         
         // Operational mode parameters - fixed mapping
         currentMode: mode,
-        sectorCount: parameters.sectorStrobing || 400,   // Was sectorStrobing - engine reads sectorCount
+        sectorCount: num(parameters.sectorStrobing, 1),  // Was sectorStrobing - engine reads sectorCount
         phaseSplit: phaseSplit,                          // NEW: Front/back asymmetry control
         
         // Visual control
         viewAvg: 1.0,                                    // Show GR average
         betaGain: 1e-10                                  // Visual scaling factor
       });
+
+      // Debug output to console
+      console.table(engineRef.current.uniforms);
     }
   }, [parameters, isLoaded]);
 
@@ -433,18 +450,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               <div>
                 <div>mode: {diag.mode}</div>
                 <div>sectors: {diag.sectors}</div>
-                <div>phase: {diag.phase.toFixed(2)}</div>
-                <div>duty: {(diag.duty*100).toFixed(2)}%</div>
+                <div>phase: {diag.phase?.toFixed?.(2) ?? '—'}</div>
+                <div>duty: {diag.duty != null ? (diag.duty*100).toFixed(2)+'%' : '—'}</div>
               </div>
               <div>
-                <div>β_inst: {diag.beta_inst.toExponential(2)}</div>
-                <div>β_avg:  {diag.beta_avg.toExponential(2)}</div>
-                <div>β_net:  {diag.beta_net.toExponential(2)}</div>
+                <div>β_inst: {diag.beta_inst?.toExponential?.(2) ?? '—'}</div>
+                <div>β_avg:  {diag.beta_avg?.toExponential?.(2) ?? '—'}</div>
+                <div>β_net:  {diag.beta_net?.toExponential?.(2) ?? '—'}</div>
               </div>
               <div>
-                <div>θ_front: [{diag.theta_front_min.toExponential(2)}, {diag.theta_front_max.toExponential(2)}]</div>
-                <div>θ_rear : [{diag.theta_rear_min.toExponential(2)}, {diag.theta_rear_max.toExponential(2)}]</div>
-                <div>T00̄ (proxy): {diag.T00_avg_proxy.toExponential(2)}  |  σ_eff≈{diag.sigma_eff.toFixed(1)}</div>
+                <div>θ_front: [{diag.theta_front_min?.toExponential?.(2) ?? '—'}, {diag.theta_front_max?.toExponential?.(2) ?? '—'}]</div>
+                <div>θ_rear : [{diag.theta_rear_min?.toExponential?.(2) ?? '—'}, {diag.theta_rear_max?.toExponential?.(2) ?? '—'}]</div>
+                <div>T00̄ (proxy): {diag.T00_avg_proxy?.toExponential?.(2) ?? '—'}  |  σ_eff≈{diag.sigma_eff?.toFixed?.(1) ?? '—'}</div>
               </div>
             </div>
           </div>
