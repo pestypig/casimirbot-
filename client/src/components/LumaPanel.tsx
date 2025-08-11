@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 interface LumaPanelProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface LumaPanelProps {
 }
 
 export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
+  const { data: pipeline } = useEnergyPipeline();
+  
   if (!isOpen) return null;
 
   return (
@@ -61,9 +64,18 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
             <TabsContent value="now" className="space-y-3 mt-4">
               <div className="text-sm text-slate-300">
                 <p className="font-medium text-cyan-200">Current Status</p>
-                <p>Hover mode active. Form held at 14% duty.</p>
-                <p>ζ = 0.032 (quantum safety maintained)</p>
-                <p>TS ratio = 4.1k (homogenized GR regime)</p>
+                {pipeline ? (
+                  <>
+                    <p className="capitalize">{pipeline.currentMode} mode active. Form held at {(pipeline.dutyCycle * 100).toFixed(1)}% duty.</p>
+                    <p>ζ = {pipeline.zeta?.toFixed(3) ?? '0.000'} ({pipeline.zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
+                    <p>TS ratio = {(pipeline.TS_ratio / 1000).toFixed(1)}k ({pipeline.TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Power: {(pipeline.P_avg / 1e6).toFixed(1)} MW • Mass: {(pipeline.M_exotic / 1000).toFixed(1)} t
+                    </p>
+                  </>
+                ) : (
+                  <p>Loading status...</p>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="theory" className="space-y-3 mt-4">
