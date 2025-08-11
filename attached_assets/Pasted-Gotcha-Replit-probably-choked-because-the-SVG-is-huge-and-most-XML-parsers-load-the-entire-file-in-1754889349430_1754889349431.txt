@@ -1,0 +1,181 @@
+Gotcha—Replit probably choked because the SVG is huge and most XML parsers load the *entire* file into memory. The fix is to **stream-parse** the SVG and write labels incrementally. Here’s a copy-paste solution that works within tight memory.
+
+---
+
+# 1) Install a streaming XML parser
+
+```bash
+npm i saxes
+```
+
+---
+
+# 2) Stream extractor (no full SVG in memory)
+
+Create `scripts/svg_labels_stream.js`:
+
+```js
+// scripts/svg_labels_stream.js
+// Usage: node scripts/svg_labels_stream.js public/map_2020_6000pc.svg public/galaxy_labels.json
+const fs = require("fs");
+const { SaxesParser } = require("saxes");
+
+// classify label "kind" for filtering/coloring later
+function classify(text) {
+  const t = text.trim();
+  if (/\b(SNR|super\s*nova|Cassiopeia\s*A|Tycho|Vela)\b/i.test(t)) return "snr";
+  if (/\bOB\s*\d+\b/i.test(t) || /\bOB\s*(Ass|Assoc|I{0,3})\b/i.test(t)) return "ob";
+  if (/\b(HII|H\s*II|nebula|molecular\s*clouds?|dark\s*clouds?|rift|bubble|superbubble)\b/i.test(t)) return "nebula";
+  if (/\b(M\d{1,3}|NGC\s*\d{1,4}|IC\s*\d{1,4}|Collinder|Trumpler|Pleiades|Hyades)\b/i.test(t)) return "cluster";
+  if (/\b(Spur|Arm|Region|Bay|Strait|Tunnel|Flare|Complex|Local\s*bubble)\b/i.test(t)) return "region";
+  if (/\b(Orion|Vela|Lupus|Perseus|Taurus|Sagittarius|Scorpius|Aquila|Ara|Norma|Cygnus|Cepheus|Hercules|Pegasus)\b/.test(t))
+    return "constellation";
+  if (/\b(Betelgeuse|Rigel|Deneb|Antares|Aldebaran|Procyon|Sirius|Mirzam)\b/i.test(t)) return "star";
+  return "misc";
+}
+
+// parse "translate(x,y) scale(sx,sy)" chains (enough for most group transforms in this SVG)
+function parseTransform(s) {
+  const out = { tx: 0, ty: 0, sx: 1, sy: 1 };
+  if (!s) return out;
+  const re = /(translate|scale)\s*\(([^)]+)\)/g;
+  let m;
+  while ((m = re.exec(s))) {
+    const kind = m[1];
+    const nums = m[2].split(/[,\s]+/).map(Number);
+    if (kind === "translate") {
+      out.tx += nums[0] || 0;
+      out.ty += nums[1] || 0;
+    } else {
+      const sx = nums[0] ?? 1, sy = nums[1] ?? sx;
+      out.sx *= sx; out.sy *= sy;
+    }
+  }
+  return out;
+}
+
+function apply(x, y, tr) {
+  return { x: x * tr.sx + tr.tx, y: y * tr.sy + tr.ty };
+}
+
+const inPath  = process.argv[2] || "public/map_2020_6000pc.svg";
+const outPath = process.argv[3] || "public/galaxy_labels.json";
+
+const parser = new SaxesParser({ xmlns: false });
+const inStream = fs.createReadStream(inPath, { encoding: "utf8" });
+
+const tfStack = [{ tx: 0, ty: 0, sx: 1, sy: 1 }]; // group transform stack
+let curText = null; // collecting <text> content/attrs
+
+const labels = [];
+let countSeen = 0;
+
+parser.on("opentag", (node) => {
+  const name = node.name.toLowerCase();
+  const attrs = node.attributes || {};
+
+  if (name === "g") {
+    // push transform context
+    const top = tfStack[tfStack.length - 1];
+    const tr = parseTransform(attrs.transform);
+    tfStack.push({
+      tx: top.tx + tr.tx,
+      ty: top.ty + tr.ty,
+      sx: top.sx * tr.sx,
+      sy: top.sy * tr.sy,
+    });
+  } else if (name === "text") {
+    // start capturing a label
+    curText = {
+      x: Number(attrs.x || 0),
+      y: Number(attrs.y || 0),
+      fontSize: attrs["font-size"] ? Number(attrs["font-size"]) : undefined,
+      fill: attrs.fill,
+      content: "",
+      tr: { ...tfStack[tfStack.length - 1] },
+    };
+  } else if ((name === "tspan" || name === "#text") && curText) {
+    // tspan content is handled in ontext
+  }
+});
+
+parser.on("text", (txt) => {
+  if (curText) curText.content += txt;
+});
+
+parser.on("closetag", (nameRaw) => {
+  const name = nameRaw.toLowerCase();
+  if (name === "g") {
+    tfStack.pop();
+  } else if (name === "text" && curText) {
+    const content = curText.content.replace(/\s+/g, " ").trim();
+    if (content.length >= 2) {
+      const p = apply(curText.x, curText.y, curText.tr);
+      labels.push({
+        text: content,
+        kind: classify(content),
+        x: p.x,
+        y: p.y,
+        fontSize: curText.fontSize ? curText.fontSize * curText.tr.sy : undefined,
+        fill: curText.fill || undefined,
+      });
+      if (++countSeen % 500 === 0) console.log("labels:", countSeen);
+    }
+    curText = null;
+  }
+});
+
+parser.on("error", (e) => {
+  console.error("SVG parse error:", e.message);
+  process.exit(1);
+});
+
+parser.on("end", () => {
+  // write compact JSON (or JSONL if you prefer streaming output)
+  const out = { meta: { source: inPath, count: labels.length, note: "coords in SVG native px; includes kind" }, labels };
+  fs.writeFileSync(outPath, JSON.stringify(out));
+  console.log(`Done. Wrote ${labels.length} labels -> ${outPath}`);
+});
+
+inStream.pipe(parser);
+```
+
+**Run it in Replit:**
+
+```bash
+node scripts/svg_labels_stream.js public/map_2020_6000pc.svg public/galaxy_labels.json
+```
+
+> Tip: if Replit RAM is tight, run Node with a lower heap and stream still works:
+> `node --max-old-space-size=256 scripts/svg_labels_stream.js ...`
+
+This script never loads the whole SVG in memory; it walks tags as they stream in, maintains a tiny **transform stack**, and emits clean `{text, x, y, fontSize, fill, kind}` entries.
+
+---
+
+# 3) Use the JSON with your overlay
+
+Point your overlay to the generated file:
+
+```tsx
+<GalaxyTextOverlay
+  width={1200}
+  height={650}
+  zoom={zoom}
+  offset={offset}
+  svgToScreen={svgToScreen}
+  labelUrl="/galaxy_labels.json"
+  // optionally filter:
+  // showKinds={{ ob:true, snr:true, nebula:true, cluster:true, region:true, constellation:false, star:false, misc:false }}
+/>
+```
+
+---
+
+## If the SVG still fails (rare edge cases)
+
+* Some labels may be inside `<text>` with **nested tspans** or styles — the stream parser handles text content regardless.
+* If the SVG uses **rotations** on text, we ignore angle (we draw at the anchor point). You can extend `parseTransform` to support `rotate(a[,cx,cy])` later.
+* If you want **JSONL** (one label per line while parsing), swap the final array for a write stream and append each label as you go—useful on super-huge files.
+
+If you hit a specific error in Replit, paste the error text and I’ll adjust the parser (e.g., handle namespaces, weird entities).

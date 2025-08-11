@@ -25,6 +25,7 @@ import { RouteSteps } from "@/components/RouteSteps";
 import { BODIES } from "@/lib/galaxy-catalog";
 import { HelixPerf } from "@/lib/galaxy-schema";
 import { Switch } from "@/components/ui/switch";
+import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -99,6 +100,22 @@ export default function HelixCore() {
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   const [useDeepZoom, setUseDeepZoom] = useState(false);
   const [deepZoomViewer, setDeepZoomViewer] = useState<any>(null);
+  const [galaxyCalibration, setGalaxyCalibration] = useState<{originPx:{x:number;y:number}; pxPerPc:number} | null>(null);
+
+  // Load galaxy map and compute calibration
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const { originPx, pxPerPc } = calibrateToImage(img.naturalWidth, img.naturalHeight, SVG_CALIB);
+      setGalaxyCalibration({ originPx, pxPerPc });
+      console.log('🗺️ Galaxy calibration:', { 
+        imageSize: { w: img.naturalWidth, h: img.naturalHeight },
+        sunPixel: originPx, 
+        scale: `${pxPerPc.toFixed(4)} px/pc` 
+      });
+    };
+    img.src = "/galaxymap.png";
+  }, []);
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
@@ -901,7 +918,11 @@ export default function HelixCore() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {useDeepZoom ? (
+                {!galaxyCalibration ? (
+                  <div className="h-40 grid place-items-center text-xs text-slate-400">
+                    Loading galactic coordinate system…
+                  </div>
+                ) : useDeepZoom ? (
                   <div className="relative">
                     <GalaxyDeepZoom
                       dziUrl="/galaxy_tiles.dzi"
@@ -915,8 +936,8 @@ export default function HelixCore() {
                         labels={[]} // Will load from JSON when available
                         bodies={BODIES}
                         routeIds={route}
-                        originPx={{x: 512, y: 200}}
-                        pxPerPc={0.8}
+                        originPx={galaxyCalibration.originPx}
+                        pxPerPc={galaxyCalibration.pxPerPc}
                         onBodyClick={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
                       />
                     )}
@@ -927,8 +948,9 @@ export default function HelixCore() {
                     bodies={BODIES}
                     routeIds={route}
                     onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
-                    originPx={{x: 512, y: 200}}  // Sol position in the Local Bubble region center  
-                    scalePxPerPc={0.8}           // Scale: pixels per parsec (calibrated for 20k ly span)
+                    originPx={galaxyCalibration.originPx}  // Exact Sol position from SVG coordinates
+                    scalePxPerPc={galaxyCalibration.pxPerPc} // Accurate parsec scaling
+                    showDebugOrigin={true} // Show Sol crosshair and distance rings for verification
                     width={800}
                     height={400}
                   />

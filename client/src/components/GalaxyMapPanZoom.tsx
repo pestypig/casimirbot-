@@ -15,6 +15,8 @@ type Props = {
   // label overlay
   showLabels?: boolean;
   labelFilter?: (text: string) => boolean;
+  // debug visualization
+  showDebugOrigin?: boolean;
 };
 
 export function GalaxyMapPanZoom({
@@ -23,7 +25,8 @@ export function GalaxyMapPanZoom({
   width = 1024, height = 600,
   onPickBody,
   showLabels = true,
-  labelFilter = (t) => /(OB|SNR|Orion|Vela|Cas|Perseus|Lupus|Local|region|Arm|Spur)/i.test(t)
+  labelFilter = (t) => /(OB|SNR|Orion|Vela|Cas|Perseus|Lupus|Local|region|Arm|Spur)/i.test(t),
+  showDebugOrigin = false
 }: Props) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const imgRef = React.useRef<HTMLImageElement>(null);
@@ -74,6 +77,37 @@ export function GalaxyMapPanZoom({
 
     // transform image->screen: (imgPx * zoom) + offset
     const imgToScreen = (p:{x:number;y:number}) => ({ x: p.x*zoom + offset.x, y: p.y*zoom + offset.y });
+
+    // Debug: Draw Sol origin crosshair and distance rings
+    if (showDebugOrigin) {
+      const solImgPx = toImgPx(0, 0); // Sol at (0,0) parsecs
+      const solScreen = imgToScreen(solImgPx);
+      
+      // Draw crosshair at Sol
+      ctx.strokeStyle = "#ff6b6b";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(solScreen.x - 10, solScreen.y);
+      ctx.lineTo(solScreen.x + 10, solScreen.y);
+      ctx.moveTo(solScreen.x, solScreen.y - 10);
+      ctx.lineTo(solScreen.x, solScreen.y + 10);
+      ctx.stroke();
+
+      // Draw distance rings (500, 1000, 2000 pc)
+      ctx.strokeStyle = "rgba(255, 107, 107, 0.3)";
+      ctx.lineWidth = 1;
+      [500, 1000, 2000].forEach(radius_pc => {
+        const radiusScreen = radius_pc * scalePxPerPc * zoom;
+        ctx.beginPath();
+        ctx.arc(solScreen.x, solScreen.y, radiusScreen, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // Label the origin
+      ctx.fillStyle = "#ff6b6b";
+      ctx.font = "12px monospace";
+      ctx.fillText("Sol (0,0)", solScreen.x + 15, solScreen.y - 10);
+    }
 
     // route glow
     const routeBodies = routeIds.map(id => bodies.find(b=>b.id===id)).filter(Boolean) as Body[];
