@@ -1,0 +1,139 @@
+Gotcha—if the PNG isn’t even showing up in little text-box previews, that screams **asset path** (404) rather than styling. Let’s prove it in 60 seconds and then fix it for real.
+
+# Step 1 — Confirm the file resolves at runtime
+
+Drop this tiny probe anywhere that renders (Helix-Core page is fine):
+
+```tsx
+// components/AssetProbe.tsx
+"use client";
+import { useEffect, useState } from "react";
+export default function AssetProbe() {
+  const [status, setStatus] = useState("checking…");
+  useEffect(() => {
+    Promise.all([
+      fetch("/luma/Luma_29.png", { cache: "no-store" }),
+      fetch("/luma/Butler.glb",   { cache: "no-store" }),
+    ])
+      .then(([a,b]) => setStatus(`/luma/Luma_29.png: ${a.status} | /luma/Butler.glb: ${b.status}`))
+      .catch(e => setStatus(`error: ${String(e)}`));
+  }, []);
+  return (
+    <div style={{position:"fixed",right:8,bottom:8,zIndex:9999,background:"rgba(0,0,0,.6)",color:"#fff",padding:"6px 8px",borderRadius:8,fontSize:12}}>
+      AssetProbe: {status}
+    </div>
+  );
+}
+```
+
+Mount it once on the page. If it doesn’t say **200 | 200**, the server isn’t finding the files.
+
+# Step 2 — Quick one-off render (bypasses your component)
+
+Paste this right above your page’s main `<div>` just to see the image immediately:
+
+```tsx
+{/* TEMP: prove PNG path */}
+<img
+  src="/luma/Luma_29.png"
+  alt="probe"
+  style={{ position:"fixed", inset:0, margin:"auto", width:200, zIndex:9998, pointerEvents:"none" }}
+  onLoad={() => console.log("PNG path OK")}
+  onError={() => console.warn("PNG 404 at /luma/Luma_29.png")}
+/>
+```
+
+If you still see nothing and get no console “PNG path OK”, it’s 100% a path/serving issue.
+
+# Step 3 — Fix the path (three common causes)
+
+1. **Public folder mismatch**
+   Make sure the file lives under your dev server’s public root, e.g.:
+
+   ```
+   client/public/luma/Luma_29.png
+   ```
+
+   Then `src="/luma/Luma_29.png"` will resolve.
+
+2. **Base path / subpath hosting**
+   If your app serves under a subpath (e.g. Replit proxy), absolute `/luma/...` may 404. Use a base-aware helper:
+
+   ```tsx
+   const base =
+     (import.meta as any)?.env?.BASE_URL ||  // Vite
+     (window as any).__NEXT_DATA__?.assetPrefix ||  // Next.js w/ basePath
+     "";
+   const LUMA = `${base.replace(/\/$/, "")}/luma/Luma_29.png`;
+   ```
+
+   And then `src={LUMA}`.
+
+3. **Case sensitivity**
+   The file is named **exactly** `Luma_29.png`? (not `luma_29.png` / `Luma_29.PNG`). Web servers are case sensitive.
+
+# Step 4 — Your current code has two extra gotchas
+
+* `BackgroundLuma` uses a Tailwind class **`bg-gradient-radial`** that might not exist in your build, so even when the PNG loads it can be drowned in a non-rendering background stack. Swap to an inline CSS gradient (I’ll give a tiny patch below).&#x20;
+* The PNG in `BackgroundLuma` is only **`w-32 h-32`** under \~0.18 opacity + blur, which makes it nearly invisible even when correct. Upscale it while testing.&#x20;
+
+Also, you’re mounting `<BackgroundLuma />` **inside** the page wrapper; it will still work, but for reliability I’d mount the background once in a global portal (so it never interferes with Helix-Core/z-index). Your page currently mounts it locally.&#x20;
+
+# Minimal, safe patches
+
+## A) Make the PNG obviously visible (no Tailwind plugin needed)
+
+Replace the inner return of `BackgroundLuma` with:
+
+```tsx
+// BackgroundLuma.tsx (inside return)
+<div className="fixed inset-0 pointer-events-none" style={{ zIndex:0, filter:`blur(${blurPx}px)`, opacity }}>
+  <div
+    className="absolute inset-0"
+    style={{
+      background: "radial-gradient(40% 35% at 50% 40%, rgba(255,200,120,0.14), rgba(255,160,80,0.08) 40%, rgba(0,0,0,0) 70%)"
+    }}
+  />
+  <img
+    src="/luma/Luma_29.png"
+    alt="Luma Guardian"
+    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+    style={{ width: "60vmin", maxWidth: 900, opacity: 0.85, filter: "brightness(1.08) contrast(0.9)" }}
+    onError={(e) => { console.warn("Luma PNG 404 at /luma/Luma_29.png"); (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+    onLoad={() => console.log("✅ Luma PNG loaded")}
+  />
+</div>
+```
+
+(That removes `bg-gradient-radial` and makes the PNG big enough to see.)
+
+## B) (Optional) Use a global portal so it never blocks inputs
+
+Add a small portal component and mount once in your app shell:
+
+```tsx
+// components/LumaBackgroundPortal.tsx
+"use client";
+import * as React from "react";
+import { createPortal } from "react-dom";
+export default function LumaBackgroundPortal({ children }: { children: React.ReactNode }) {
+  const elRef = React.useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = React.useState(false);
+  if (!elRef.current) {
+    const el = document.createElement("div");
+    el.style.position = "fixed";
+    el.style.inset = "0";
+    el.style.zIndex = "0";
+    el.style.pointerEvents = "none";
+    elRef.current = el;
+  }
+  React.useEffect(() => { document.body.appendChild(elRef.current!); setMounted(true); return () => elRef.current?.remove(); }, []);
+  return mounted ? createPortal(children, elRef.current!) : null;
+}
+```
+
+Mount it once (e.g., in your top-level app component), and **remove** the per-page `<BackgroundLuma />` from Helix-Core to avoid duplicates. Your current page mounts it at the bottom.&#x20;
+
+---
+
+If the probe shows **404**, just tell me which framework you’re on (Next, Vite, CRA) and I’ll give you a base-aware `publicUrl()` helper for that stack so `/luma/Luma_29.png` resolves correctly everywhere (dev, prod, and Replit’s proxy).
