@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "source": "manual_extraction_from_galaxy_map.png", 
+    "count": 12,
+    "note": "coords in image pixels calibrated to galaxy map"
+  },
+  "labels": [
+    {
+      "text": "Cam region",
+      "x": 350,
+      "y": 60,
+      "fontSize": 16,
+      "fill": "#ffd166"
+    },
+    {
+      "text": "Local region", 
+      "x": 480,
+      "y": 160,
+      "fontSize": 18,
+      "fill": "#06ffa5"
+    },
+    {
+      "text": "Local Bubble",
+      "x": 500,
+      "y": 180,
+      "fontSize": 14,
+      "fill": "#06ffa5"
+    },
+    {
+      "text": "Sagittarius region",
+      "x": 750,
+      "y": 120,
+      "fontSize": 16,
+      "fill": "#ffd166"
+    },
+    {
+      "text": "Bay of Lynx",
+      "x": 180,
+      "y": 250,
+      "fontSize": 15,
+      "fill": "#7dd3fc"
+    },
+    {
+      "text": "Bay of Capricornus", 
+      "x": 680,
+      "y": 280,
+      "fontSize": 15,
+      "fill": "#7dd3fc"
+    },
+    {
+      "text": "Vela",
+      "x": 380,
+      "y": 360,
+      "fontSize": 16,
+      "fill": "#ffd166"
+    },
+    {
+      "text": "Orion OB1",
+      "x": 520,
+      "y": 140,
+      "fontSize": 12,
+      "fill": "#ff6b6b"
+    },
+    {
+      "text": "Vela OB2", 
+      "x": 400,
+      "y": 340,
+      "fontSize": 12,
+      "fill": "#ff6b6b"
+    },
+    {
+      "text": "Perseus Arm",
+      "x": 250,
+      "y": 100,
+      "fontSize": 14,
+      "fill": "#a78bfa"
+    },
+    {
+      "text": "Local Arm",
+      "x": 480,
+      "y": 200,
+      "fontSize": 14, 
+      "fill": "#a78bfa"
+    },
+    {
+      "text": "Sagittarius Arm",
+      "x": 700,
+      "y": 300,
+      "fontSize": 14,
+      "fill": "#a78bfa"
+    }
+  ]
+}

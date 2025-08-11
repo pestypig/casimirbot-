@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Body } from "@/lib/galaxy-schema";
+import { GalaxyTextOverlay } from "./GalaxyTextOverlay";
 
 type Props = {
   imageUrl: string;
@@ -11,13 +12,18 @@ type Props = {
   // viewport size
   width?: number; height?: number;
   onPickBody?: (id:string)=>void;
+  // label overlay
+  showLabels?: boolean;
+  labelFilter?: (text: string) => boolean;
 };
 
 export function GalaxyMapPanZoom({
   imageUrl, bodies, routeIds = [],
   originPx, scalePxPerPc,
   width = 1024, height = 600,
-  onPickBody
+  onPickBody,
+  showLabels = true,
+  labelFilter = (t) => /(OB|SNR|Orion|Vela|Cas|Perseus|Lupus|Local|region|Arm|Spur)/i.test(t)
 }: Props) {
   const containerRef = React.useRef<HTMLDivElement>(null);
   const imgRef = React.useRef<HTMLImageElement>(null);
@@ -32,6 +38,12 @@ export function GalaxyMapPanZoom({
     x: originPx.x + xpc * scalePxPerPc,
     y: originPx.y - ypc * scalePxPerPc,
   }), [originPx, scalePxPerPc]);
+
+  // SVG coordinates to screen coordinates (for label overlay)
+  const svgToScreen = React.useCallback((pt: {x:number;y:number}) => ({
+    x: pt.x * zoom + offset.x,
+    y: pt.y * zoom + offset.y
+  }), [zoom, offset]);
 
   // draw route + markers on canvas (already positioned/scaled by CSS)
   React.useEffect(() => {
@@ -142,6 +154,17 @@ export function GalaxyMapPanZoom({
         className="absolute inset-0"
         style={{ pointerEvents: "auto" }}
       />
+      {showLabels && (
+        <GalaxyTextOverlay
+          width={width}
+          height={height}
+          zoom={zoom}
+          offset={offset}
+          svgToScreen={svgToScreen}
+          filterText={labelFilter}
+          alpha={0.85}
+        />
+      )}
     </div>
   );
 }
