@@ -41,3 +41,15 @@ export function whisperSystem(context: keyof typeof SYSTEM_WHISPERS) {
 export function whisperCustom(text: string) {
   publish("luma:whisper", { text });
 }
+
+// Get wisdom for mode changes
+export function getModeWisdom(mode: 'hover' | 'cruise' | 'emergency' | 'standby'): string {
+  const modeWisdom = {
+    hover: "Form first. Speed follows.",
+    cruise: "Steady rhythm creates distance.",
+    emergency: "Power serves purpose, not pride.",
+    standby: "In stillness, all possibilities rest."
+  };
+  
+  return modeWisdom[mode] || "Balance in all things.";
+}

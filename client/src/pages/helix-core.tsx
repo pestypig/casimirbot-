@@ -1092,8 +1092,8 @@ export default function HelixCore() {
         </div>
       </div>
 
-      {/* Luma Background Guardian Star - temporarily increased visibility for testing */}
-      <BackgroundLuma opacity={0.6} blurPx={0} />
+      {/* Luma Background Guardian Star - atmospheric mode */}
+      <BackgroundLuma opacity={0.3} blurPx={15} />
       
       {/* Luma Whisper Overlay Host */}
       <LumaOverlayHost />

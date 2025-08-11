@@ -1,6 +1,8 @@
 // Hook for accessing the centralized HELIX-CORE energy pipeline
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { publish } from "@/lib/luma-bus";
+import { getModeWisdom } from "@/lib/luma-whispers";
 
 export interface EnergyPipelineState {
   // Input parameters
@@ -72,9 +74,13 @@ export function useSwitchMode() {
       const response = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, mode) => {
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+      
+      // Trigger Luma whisper for mode changes
+      const wisdom = getModeWisdom(mode);
+      publish("luma:whisper", { text: wisdom });
     }
   });
 }

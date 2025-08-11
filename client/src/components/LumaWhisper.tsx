@@ -28,7 +28,15 @@ export function LumaWhisper({
 
   return (
     <div className="fixed bottom-5 right-5 z-40 flex items-center gap-3 px-3 py-2 rounded-2xl border bg-slate-950/85 border-slate-700 backdrop-blur shadow-lg">
-      <img src={icon} alt="Luma" className="w-8 h-8 drop-shadow" />
+      <img 
+        src={icon} 
+        alt="Luma" 
+        className="w-8 h-8 drop-shadow" 
+        onError={(e) => { 
+          console.warn("Luma icon not found:", icon); 
+          (e.currentTarget as HTMLImageElement).style.display = "none"; 
+        }}
+      />
       <p className="text-sm text-slate-100 leading-snug">
         {shown}
         <span className="inline-block w-[6px] animate-pulse">▌</span>
