@@ -1021,7 +1021,10 @@ export default function HelixCore() {
                         routeIds={route}
                         originPx={galaxyCalibration.originPx}
                         pxPerPc={galaxyCalibration.pxPerPc}
-                        onBodyClick={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                        onBodyClick={(id) => {
+                          setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                          publish("luma:whisper", { text: "Stellar target acquired. Course adjusted." });
+                        }}
                       />
                     )}
                   </div>
@@ -1030,7 +1033,10 @@ export default function HelixCore() {
                     imageUrl="/galaxymap.png"
                     bodies={BODIES}
                     routeIds={route}
-                    onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
+                    onPickBody={(id) => {
+                      setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                      publish("luma:whisper", { text: "Galactic destination set. Navigation computed." });
+                    }}
                     originPx={{ x: 10123.142, y: 9480.491 }}
                     scalePxPerPc={1.6666667}
                     debug
