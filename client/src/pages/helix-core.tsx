@@ -893,8 +893,8 @@ export default function HelixCore() {
                   bodies={BODIES}
                   routeIds={route}
                   onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
-                  originPx={{x: 500, y: 250}}  // Approximate Sol position in the Local region
-                  scalePxPerPc={0.25}           // Scale: pixels per parsec (adjust based on image)
+                  originPx={{x: 512, y: 200}}  // Sol position in the Local Bubble region center  
+                  scalePxPerPc={0.8}           // Scale: pixels per parsec (calibrated for 20k ly span)
                   width={800}
                   height={400}
                 />
