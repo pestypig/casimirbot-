@@ -102,7 +102,11 @@ export default function HelixCore() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   const [useDeepZoom, setUseDeepZoom] = useState(false);
-  const [mapMode, setMapMode] = useState<"galactic" | "solar">("galactic");
+  const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
+    // Persist mode preference with Solar (AU) as default
+    const stored = localStorage.getItem("helix-mapMode");
+    return (stored === "galactic" || stored === "solar") ? stored : "solar";
+  });
   const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
   
   // Live solar positions for route planning (updates every 5 seconds)
@@ -944,6 +948,7 @@ export default function HelixCore() {
                 <div className="flex items-center space-x-4">
                   <Select value={mapMode} onValueChange={(v: "galactic" | "solar") => {
                     setMapMode(v);
+                    localStorage.setItem("helix-mapMode", v); // Persist preference
                     // Reset route when switching modes
                     if (v === "solar") {
                       setRoute(["EARTH", "SATURN", "SUN"]);
