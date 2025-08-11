@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import LumaBackgroundPortal from "@/components/LumaBackgroundPortal";
-import { BackgroundLuma } from "@/components/BackgroundLuma";
+import BackgroundLumaPNG from "@/components/BackgroundLumaPNG";
 import { LumaOverlayHost } from "@/components/LumaOverlayHost";
 import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
@@ -30,7 +30,7 @@ function App() {
       <TooltipProvider>
         {/* Background behind everything, once */}
         <LumaBackgroundPortal>
-          <BackgroundLuma opacity={0.12} blurPx={8} />
+          <BackgroundLumaPNG opacity={0.18} blurPx={6} />
         </LumaBackgroundPortal>
 
         {/* Your entire app (router, pages, etc.) */}
