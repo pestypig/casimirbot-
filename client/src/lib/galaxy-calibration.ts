@@ -22,6 +22,14 @@ export function calibrateToImage(
   const svgPxPerPc = (svg.svgW / 2) / svg.radiusPc; // ≈ 0.2648598167
   const pxPerPc = svgPxPerPc * sx; // consistent in X; map is circular so sx≈sy
 
+  console.log(`🌌 Galaxy calibration computed:`, {
+    imageSize: `${imgNatW}×${imgNatH}`,
+    svgSize: `${svg.svgW}×${svg.svgH}`,
+    scaleFactors: { sx, sy },
+    solPosition: `SVG(${svg.sunSvgX}, ${svg.sunSvgY}) → IMG(${originPx.x.toFixed(1)}, ${originPx.y.toFixed(1)})`,
+    parsecScale: `${pxPerPc.toFixed(4)} px/pc`
+  });
+
   return { originPx, pxPerPc };
 }
 

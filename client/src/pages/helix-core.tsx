@@ -950,7 +950,7 @@ export default function HelixCore() {
                     onPickBody={(id) => setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id])}
                     originPx={galaxyCalibration.originPx}  // Exact Sol position from SVG coordinates
                     scalePxPerPc={galaxyCalibration.pxPerPc} // Accurate parsec scaling
-                    showDebugOrigin={true} // Show Sol crosshair and distance rings for verification
+                    debug={true} // Show Sol crosshair and distance rings for verification
                     width={800}
                     height={400}
                   />
