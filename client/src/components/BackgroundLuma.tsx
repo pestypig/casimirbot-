@@ -1,22 +1,33 @@
 "use client";
-
-// components/BackgroundLuma.tsx
-// Simplified version without Three.js - using CSS animations for now
 import * as React from "react";
 
-type Props = {
-  opacity?: number;          // 0.12–0.25 feels right
-  blurPx?: number;           // 4–10px (CSS filter)
-  paused?: boolean;          // allow toggling
-};
+// Background stars component
+function BackgroundStars() {
+  return (
+    <div className="absolute inset-0">
+      {Array.from({ length: 50 }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 bg-white rounded-full opacity-60 animate-pulse"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 2}s`,
+            animationDuration: `${2 + Math.random() * 3}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function BackgroundLuma({
   opacity = 0.18,
   blurPx = 6,
-  paused = false
-}: Props) {
-  // Pause when tab hidden (perf)
+}: { opacity?: number; blurPx?: number }) {
+  const [paused, setPaused] = React.useState(false);
   const [visPaused, setVisPaused] = React.useState(false);
+
   React.useEffect(() => {
     const h = () => setVisPaused(document.hidden);
     document.addEventListener("visibilitychange", h);
@@ -28,7 +39,7 @@ export function BackgroundLuma({
       className="fixed inset-0 pointer-events-none"
       style={{ zIndex: 0, filter: `blur(${blurPx}px)`, opacity }}
     >
-      {/* Simplified CSS-based background until Three.js is available */}
+      {/* Simplified CSS-based background */}
       <div className="absolute inset-0 bg-gradient-radial from-amber-300/20 via-orange-400/10 to-transparent">
         <BackgroundStars />
         <div 
@@ -39,7 +50,7 @@ export function BackgroundLuma({
             animation: paused || visPaused ? 'none' : 'gentle-float 8s ease-in-out infinite, gentle-glow 4s ease-in-out infinite alternate',
           }}
         >
-          {/* Luma PNG as fallback until 3D model loads */}
+          {/* Luma PNG as cosmic guardian */}
           <img 
             src="/luma/Luma_29.png" 
             alt="Luma Guardian" 
@@ -55,40 +66,6 @@ export function BackgroundLuma({
           />
         </div>
       </div>
-    </div>
-  );
-}
-
-function BackgroundStars() {
-  // CSS-based star field
-  const stars = React.useMemo(() => {
-    return Array.from({ length: 100 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2 + 1,
-      opacity: Math.random() * 0.6 + 0.2,
-      delay: Math.random() * 4
-    }));
-  }, []);
-
-  return (
-    <div className="absolute inset-0">
-      {stars.map(star => (
-        <div
-          key={star.id}
-          className="absolute rounded-full bg-white animate-pulse"
-          style={{
-            left: `${star.x}%`,
-            top: `${star.y}%`,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            animationDelay: `${star.delay}s`,
-            animationDuration: `${2 + Math.random() * 2}s`
-          }}
-        />
-      ))}
     </div>
   );
 }

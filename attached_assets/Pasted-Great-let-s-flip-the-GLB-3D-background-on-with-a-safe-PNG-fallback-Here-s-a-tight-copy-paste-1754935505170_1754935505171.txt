@@ -1,0 +1,207 @@
+Great—let’s flip the **GLB 3D background** on (with a safe PNG fallback). Here’s a tight, copy-paste prompt for Replit Agent plus the exact code you need.
+
+---
+
+## Replit prompt (paste this)
+
+1. **Install deps**
+
+```
+npm i three @react-three/fiber @react-three/drei
+```
+
+2. **Ensure assets exist**
+
+* `public/luma/Butler.glb`
+* `public/luma/Luma_29.png`
+
+3. **Add 3D background component (client-only)**
+   Create `client/src/components/BackgroundLuma.tsx`:
+
+```tsx
+"use client";
+import * as React from "react";
+import * as THREE from "three";
+import { Canvas, useFrame } from "@react-three/fiber";
+import { Html, useGLTF, useAnimations } from "@react-three/drei";
+
+export function BackgroundLuma({
+  glbUrl = "/luma/Butler.glb",
+  opacity = 0.18,
+  blurPx = 6,
+}: { glbUrl?: string; opacity?: number; blurPx?: number }) {
+
+  const [visPaused, setVisPaused] = React.useState(false);
+  React.useEffect(() => {
+    const h = () => setVisPaused(document.hidden);
+    document.addEventListener("visibilitychange", h);
+    return () => document.removeEventListener("visibilitychange", h);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 pointer-events-none"
+      style={{ zIndex: 0, opacity, filter: `blur(${blurPx}px)` }}
+    >
+      <Canvas
+        camera={{ position: [0, 0, 16], fov: 35 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, powerPreference: "low-power" }}
+        onCreated={({ gl }) => gl.setClearColor("#000000", 0)}
+        frameloop="always"
+      >
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[6, 8, 10]} intensity={1.1} />
+        <React.Suspense fallback={<CenteredHint />}>
+          <LumaModel url={glbUrl} paused={visPaused} />
+        </React.Suspense>
+      </Canvas>
+    </div>
+  );
+}
+
+function CenteredHint() {
+  return <Html center><div className="text-xs text-slate-400">Loading Luma…</div></Html>;
+}
+
+function FallbackStar() {
+  return (
+    <group>
+      <mesh>
+        <icosahedronGeometry args={[2.4, 2]} />
+        <meshStandardMaterial emissive={"#ffe89b"} emissiveIntensity={0.8} color={"white"} roughness={0.5}/>
+      </mesh>
+    </group>
+  );
+}
+
+function LumaModel({ url, paused }: { url: string; paused?: boolean }) {
+  try {
+    const { scene, animations } = useGLTF(url) as any;
+    const { actions, names } = useAnimations(animations, scene);
+
+    React.useEffect(() => {
+      // normalize scale & center
+      const box = new THREE.Box3().setFromObject(scene);
+      const size = new THREE.Vector3(); box.getSize(size);
+      const s = 8 / Math.max(size.x, size.y, size.z || 1);
+      scene.scale.setScalar(s);
+      const c = new THREE.Vector3(); box.getCenter(c);
+      scene.position.sub(c);
+      // materials
+      scene.traverse((o: any) => {
+        const m = o.material;
+        if (m && m.isMaterial) {
+          m.emissive = new THREE.Color("#ffe89b");
+          m.emissiveIntensity = 0.6;
+          m.roughness = 0.5;
+          m.metalness = 0.0;
+        }
+      });
+    }, [scene]);
+
+    React.useEffect(() => {
+      const hover = names.find((n: string) => /hover|idle/i.test(n)) ?? names[0];
+      const act = hover ? actions[hover] : undefined;
+      if (act) { act.reset().fadeIn(0.3).play(); }
+      return () => { if (act) act.fadeOut(0.3); };
+    }, [actions, names]);
+
+    useFrame(({ clock }) => {
+      if (paused) return;
+      const t = clock.getElapsedTime();
+      scene.position.y = Math.sin(t * 0.5) * 0.35;
+      scene.rotation.y = Math.sin(t * 0.2) * 0.05;
+    });
+
+    return <primitive object={scene} />;
+  } catch {
+    // if GLB fails or WebGL absent
+    return <FallbackStar />;
+  }
+}
+```
+
+4. **PNG fallback background**
+   Create `client/src/components/BackgroundLumaPNG.tsx`:
+
+```tsx
+"use client";
+import * as React from "react";
+export default function BackgroundLumaPNG({
+  src = "/luma/Luma_29.png",
+  opacity = 0.18,
+  blurPx = 6
+}:{src?:string;opacity?:number;blurPx?:number}) {
+  return (
+    <div className="fixed inset-0 pointer-events-none" style={{ zIndex:0, opacity, filter:`blur(${blurPx}px)` }}>
+      <img
+        src={src}
+        alt="Luma"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 animate-luma-float"
+        style={{ width:"60vmin", maxWidth:900, opacity:0.8 }}
+      />
+      <style>{`
+        @keyframes luma-float {
+          0%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+          50%{transform:translate(-50%,-50%) translateY(-12px) rotate(1.5deg) scale(1.02)}
+          100%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+        }
+        .animate-luma-float{animation:luma-float 8s ease-in-out infinite}
+      `}</style>
+    </div>
+  );
+}
+```
+
+5. **Mount in the page/layout (client-only & fallback)**
+   Edit `client/src/pages/helix-core.tsx` (or your layout):
+
+```tsx
+import * as React from "react";
+import dynamic from "next/dynamic";
+import BackgroundLumaPNG from "@/components/BackgroundLumaPNG";
+
+const BackgroundLuma = dynamic(
+  () => import("@/components/BackgroundLuma").then(m => m.BackgroundLuma),
+  { ssr: false, loading: () => null }
+);
+
+// helper: basic WebGL capability check
+const canWebGL = () => {
+  try {
+    const c = document.createElement("canvas");
+    return !!(c.getContext("webgl") || c.getContext("experimental-webgl"));
+  } catch { return false; }
+};
+
+export default function HelixCorePage() {
+  const [webgl, setWebgl] = React.useState<boolean | null>(null);
+  React.useEffect(() => setWebgl(canWebGL()), []);
+
+  return (
+    <>
+      {webgl
+        ? <BackgroundLuma glbUrl="/luma/Butler.glb" opacity={0.18} blurPx={6} />
+        : <BackgroundLumaPNG opacity={0.18} blurPx={6} />}
+      <main className="relative z-10">
+        {/* …existing HELIX-CORE UI… */}
+      </main>
+    </>
+  );
+}
+```
+
+6. **Verify**
+
+* Open `/luma/Butler.glb` and `/luma/Luma_29.png` in the browser (HTTP 200).
+* Reload the page; you should see the blurred 3D Luma moving behind the UI. If WebGL is disabled, you’ll see the PNG version.
+
+---
+
+### If anything’s off
+
+* If the canvas is invisible, your page wrapper might be covering it—ensure `<main>` has `relative z-10`, and the background wrapper uses `zIndex: 0` (not negative).
+* If the GLB loads but looks huge/tiny, we can tweak the normalization scale (`const s = 8 / maxSize`) to taste.
+
+Want me to add an on-mode-change **whisper** trigger at the same time so you can instantly see Luma speak when you switch modes?
