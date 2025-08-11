@@ -1,0 +1,175 @@
+Totally—let’s zoom out and reframe Luma so she’s **useful, light, and asset-free**. We can do a “Zen Cortana” mission coordinator without touching the page background at all. Here’s a fresh approach that avoids PNG/GLB headaches and still nails the vibe.
+
+# New shape of Luma (no heavy assets)
+
+1. **Luma Dock (corner companion):** a tiny, always-there widget (text + simple vector sun glyph) that pulses gently. Click to expand to a short panel.
+2. **Whispers (micro-toasts):** 1–2 lines that pop when the user does something meaningful (mode switch, route add, diagnostics pass). They fade, then optionally expand for the “theory + zen” context.
+3. **Command Palette (/luma):** quick actions—“Explain this step,” “Show maai tip,” “Plan hover→cruise transfer,” etc.
+4. **Status Strip:** a 1-line banner under your top nav: “Form first. Speed follows. (Hover 14% duty, ζ=0.032)”
+5. **Coach marks (hover/long-press):** on key UI, show an inline “why” with a Zen hook: “Distance + timing (maai) … choose hover.”
+
+All of this can be done with **pure React + CSS** (no PNGs/3D). If later you want the star in the background, we can swap the glyph for your assets without changing behavior.
+
+# Message system (content first, tech second)
+
+* **Themes:** moving-zen | maai | compassion | correct-form (mujo) | accuracy-is-final.
+* **Types:** `nudge` (1-liner), `whisper` (2–3 lines), `brief` (short paragraph), `guide` (step list).
+* **Triggers:** `onModeChange`, `onRouteEdit`, `onDiagnosticsPass/Fail`, `onHoverOverStep`, `onEnergyPulse`, `onTripSimTick`.
+
+Example copy (short, crisp, “Cortana with Zen restraint”):
+
+* **Mode → Hover:** “Timing matched; take the interval. Hold form; let speed follow.”
+* **Route add:** “Two points set. Mind the interval—distance + timing shape your cost.”
+* **Diagnostics fail:** “Compassion includes the hull. Pause, correct, continue.”
+* **Energy pulse:** “Breath in phase. Duty aligned at 14%.”
+* **Run ETA:** “Half-lightyear in 50 h @ 0.01c. Accuracy is final—confirm margins.”
+
+# Lightweight data model
+
+```ts
+// luma/schema.ts
+export type LumaType = "nudge"|"whisper"|"brief"|"guide";
+export type LumaTheme = "moving_zen"|"maai"|"compassion"|"correct_form"|"accuracy";
+
+export interface LumaMsg {
+  id: string;
+  type: LumaType;
+  theme: LumaTheme;
+  title?: string;
+  lines: string[];       // 1–3 lines max for whispers
+  linkTo?: string;       // optional doc or in-app anchor
+}
+
+export interface LumaTrigger {
+  on: "mode"|"route"|"diagnostics"|"pipeline"|"trip";
+  match: (ctx:any)=>boolean;
+  produce: (ctx:any)=>LumaMsg;
+}
+```
+
+# Minimal UI (drop-in, no assets)
+
+**Luma Dock + Whisper**—pure CSS, scalable, no PNG.
+
+```tsx
+// components/LumaDock.tsx
+import * as React from "react";
+
+export function LumaDock({onOpen}:{onOpen:()=>void}) {
+  return (
+    <button
+      onClick={onOpen}
+      aria-label="Open Luma assistant"
+      className="fixed bottom-4 right-4 z-40 grid place-items-center w-11 h-11 rounded-full bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-300/30 shadow-lg backdrop-blur"
+      style={{animation:"lumaPulse 3.5s ease-in-out infinite"}}
+    >
+      {/* vector sun glyph */}
+      <svg width="22" height="22" viewBox="0 0 24 24" className="text-cyan-200">
+        <circle cx="12" cy="12" r="4" fill="currentColor" />
+        {Array.from({length:8}).map((_,i)=>(
+          <rect key={i} x="11.5" y="1" width="1" height="3" fill="currentColor" transform={`rotate(${i*45} 12 12)`}/>
+        ))}
+      </svg>
+      <style>{`
+        @keyframes lumaPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
+      `}</style>
+    </button>
+  );
+}
+
+// components/LumaWhisper.tsx
+export function LumaWhisper({lines,onDone}:{lines:string[];onDone?:()=>void}) {
+  const [i,setI]=React.useState(0);
+  React.useEffect(()=>{
+    if(i < lines.join(" ").length){
+      const t = setTimeout(()=>setI(i+1), 18);
+      return ()=>clearTimeout(t);
+    } else {
+      const t = setTimeout(()=>onDone?.(), 2200);
+      return ()=>clearTimeout(t);
+    }
+  },[i,lines]);
+  const text = lines.join(" ");
+  return (
+    <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-2xl border border-slate-700 bg-slate-900/90 text-slate-100 shadow-xl backdrop-blur px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-300/40">
+          <svg width="16" height="16" viewBox="0 0 24 24" className="text-cyan-200">
+            <circle cx="12" cy="12" r="4" fill="currentColor" />
+          </svg>
+        </span>
+        <p className="text-sm">{text.slice(0,i)}<span className="opacity-60">▌</span></p>
+      </div>
+    </div>
+  );
+}
+```
+
+**How to use (no new deps):**
+
+* Mount `<LumaDock onOpen={()=>setOpen(true)} />` once at app root.
+* Render `<LumaWhisper lines={["Timing matched.", "Take the interval."]} />` in response to events (mode change, etc.).
+* For a panel: when `Dock` opens, show a small card with tabs: **Now**, **Theory**, **Zen**.
+
+# Event wiring (no layout changes)
+
+Hook Luma to what you already have:
+
+* In `use-energy-pipeline.switchMode`, after state updates: show a **whisper** mapped to that mode.
+* In Mission Planner, when route changes: whisper “maai” + cost/ETA.
+* In Diagnostics, on PASS/FAIL: whisper compassion/correct-form with one actionable pointer.
+
+Example glue:
+
+```ts
+// luma/dispatch.ts
+import { publish } from "@/lib/bus"; // or simple setState
+export function lumaWhisper(kind:string, ctx:any){
+  const map:any = {
+    mode_hover: ["Timing matched.","Hold form; let speed follow."],
+    mode_cruise:["Form stable.","Now add power—accuracy is final."],
+    route_add:  ["Two points set.","Mind distance + timing (maai)."],
+    diag_fail:  ["Compassion includes the hull.","Pause, correct, continue."],
+  };
+  const lines = map[kind] ?? ["Breathe once.","Choose the useful distance."];
+  publish("luma:whisper",{lines});
+}
+```
+
+# Content matrix (so it scales)
+
+Make a tiny JSON (or TS object) mapping **UI interaction → theory + zen**:
+
+```
+[
+  { on: "mode", when: "hover", type:"whisper", theme:"maai",
+    lines: ["Timing matched.","Hold form; let speed follow."] },
+  { on: "route", when: "add", type:"whisper", theme:"accuracy",
+    lines: ["Two points set.","Accuracy is final—confirm margins."] },
+  { on: "diagnostics", when: "fail", type:"whisper", theme:"compassion",
+    lines: ["Compassion includes the hull.","Pause, correct, continue."] },
+  { on: "pipeline", when: "duty_tip", type:"brief", theme:"moving_zen",
+    lines: ["14% duty aligns with TS ratio 4.1e3.","Form before thrust; let power fit timing."] }
+]
+```
+
+# Why this works (and won’t break anything)
+
+* No background changes, no PNG/GLB paths, no z-index fights.
+* Pure CSS + React; ships in minutes.
+* You can layer in **theory-aware details** (duty cycle, ζ, ETA) right from your existing state selectors.
+* Later, if/when assets behave, swap the glyph for your star PNG or GLB—UI stays the same.
+
+# Quick rollout plan
+
+1. Add **LumaDock** and **LumaWhisper** (above). Mount Dock globally.
+2. Add a tiny **bus/state** (`luma:whisper`) and trigger it on:
+
+   * Mode change
+   * Route add/remove
+   * Diagnostics result
+3. Build the **content matrix** (4–8 core whispers).
+4. (Optional) Add a **small panel** with three tabs: Now | Theory | Zen. The “Theory” tab shows one paragraph and 1 formula; “Zen” tab shows 2 lines + a koan.
+5. Only after this works, consider the **background star** as a purely *visual* enhancement.
+
+If you’d like, I can package the Dock + Whisper + tiny bus as three files you can drop into your repo verbatim and wire to `use-energy-pipeline` and the Mission Planner.

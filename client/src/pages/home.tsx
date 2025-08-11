@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
 import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
+import { lumaWhisper } from "@/lib/luma-dispatch";
 
 export default function Home() {
   // Hook for updating backend pipeline
@@ -92,19 +93,31 @@ export default function Home() {
           </div>
           <div className="flex gap-2">
             <Link href="/simulation">
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={() => lumaWhisper("nav_simulation")}
+              >
                 <Settings className="w-4 h-4" />
                 Simulation Config
               </Button>
             </Link>
             <Link href="/documentation">
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={() => lumaWhisper("nav_documentation")}
+              >
                 <Book className="w-4 h-4" />
                 Documentation
               </Button>
             </Link>
             <Link href="/helix-core">
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                className="flex items-center gap-2"
+                onClick={() => lumaWhisper("nav_helix_core")}
+              >
                 <Cpu className="w-4 h-4" />
                 HELIX-CORE
               </Button>
