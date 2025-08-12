@@ -85,6 +85,26 @@ interface ChatMessage {
   };
 }
 
+// Stable UI mode hook to prevent Select flicker during pipeline refreshes
+const MODE_ID = (m?: string) => String(m ?? "").toLowerCase();
+
+function useStableMode(current?: string) {
+  const [uiMode, setUiMode] = React.useState<string | null>(null);
+  const last = React.useRef<string | null>(null);
+
+  // when pipeline delivers a (possibly refetched) mode, only apply if different
+  React.useEffect(() => {
+    const id = current ? MODE_ID(current) : null;
+    if (!id) return;
+    if (last.current !== id) {
+      last.current = id;
+      setUiMode(id);
+    }
+  }, [current]);
+
+  return { uiMode, setUiMode };
+}
+
 export default function HelixCore() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [mainframeLog, setMainframeLog] = useState<string[]>([
@@ -163,7 +183,9 @@ export default function HelixCore() {
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
-  const switchMode = useSwitchMode();
+  
+  // Stable mode state to prevent Select flicker
+  const { uiMode, setUiMode } = useStableMode(pipelineState?.currentMode);
 
   // Publish pipeline snapshot only when Helix-CORE has complete numeric data
   React.useEffect(() => {
@@ -578,15 +600,26 @@ export default function HelixCore() {
                   <div className="space-y-2">
                     <Label className="text-slate-200">Operational Mode</Label>
                     <Select 
-                      value={pipelineState?.currentMode || 'hover'}
-                      onValueChange={(mode) => {
-                        switchMode.mutate(mode as any, {
-                          onSuccess: () => {
-                            // Invalidate pipeline query to get fresh values
-                            queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
-                          }
-                        });
+                      value={uiMode ?? undefined}
+                      onValueChange={async (mode) => {
+                        // Optimistic: keep UI steady
+                        setUiMode(mode);
                         setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
+                        
+                        // Actually switch mode via switchMode hook if available
+                        try {
+                          const response = await fetch('/api/switch-mode', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ mode })
+                          });
+                          if (response.ok) {
+                            setMainframeLog(prev => [...prev, `[MODE] Successfully switched to ${mode}`]);
+                          }
+                        } catch (error) {
+                          console.error('Mode switch failed:', error);
+                          setMainframeLog(prev => [...prev, `[ERROR] Failed to switch to ${mode}`]);
+                        }
                       }}
                     >
                       <SelectTrigger className="bg-slate-950 border-slate-700">
@@ -603,8 +636,8 @@ export default function HelixCore() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {pipelineState && (
-                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
+                    {uiMode && (
+                      <p className="text-xs text-slate-400">{MODE_CONFIGS[uiMode]?.description}</p>
                     )}
                   </div>
 
@@ -960,7 +993,7 @@ export default function HelixCore() {
                 powerAvg_MW: pipelineState?.P_avg || 83.3,
                 exoticMass_kg: pipelineState?.M_exotic || 1405,
                 // Operational mode parameters for authentic Natário computations
-                currentMode: pipelineState?.currentMode || 'hover',
+                currentMode: uiMode || 'hover',
                 sectorStrobing: pipelineState?.sectorStrobing || 1,
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7
@@ -969,7 +1002,7 @@ export default function HelixCore() {
             
             {/* Mission Fuel / Range Gauge */}
             <FuelGauge
-              mode={pipelineState?.currentMode || 'Hover'}
+              mode={uiMode || 'Hover'}
               powerMW={pipelineState?.P_avg || 83.3}
               zeta={pipelineState?.zeta || 0.032}
               tsRatio={pipelineState?.TS_ratio || 4102.74}
@@ -1118,7 +1151,7 @@ export default function HelixCore() {
                   plan={{ waypoints: route }}
                   mode={mapMode}
                   perf={{
-                    mode: pipelineState?.currentMode || 'Hover',
+                    mode: uiMode || 'Hover',
                     powerMW: pipelineState?.P_avg || 83.3,
                     duty: pipelineState?.dutyCycle || 0.14,
                     gammaGeo: pipelineState?.gammaGeo || 26,
@@ -1128,7 +1161,7 @@ export default function HelixCore() {
                     freqGHz: 15.0,
                     energyPerLyMWh: (() => {
                       const vLyPerHour = computeEffectiveLyPerHour(
-                        pipelineState?.currentMode || 'Hover',
+                        uiMode || 'Hover',
                         pipelineState?.dutyCycle || 0.14,
                         pipelineState?.gammaGeo || 26,
                         pipelineState?.qCavity || 1e9,

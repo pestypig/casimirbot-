@@ -1,0 +1,96 @@
+Got it—the “blink to Cruise for a split-second” on **Helix-CORE** is a classic UI race:
+
+* while `pipelineState` is still `undefined/refreshing`, the `<Select>` briefly renders its **first option** (“Cruise”) or a hardcoded fallback,
+* then your real state arrives and flips it back to the actual mode,
+* polling/refetch repeats → tiny flickers.
+
+Let’s make the UI **stable** and remove any “default to cruise” fallbacks.
+
+---
+
+## Quick, safe patch
+
+1. **Keep a stable UI mode** that only updates when the pipeline really changes.
+2. **Don’t show a default option** while loading.
+3. **Optimistically set** the UI mode when the user picks a new one.
+
+Drop this right in `helix-core.tsx` near your component top:
+
+```tsx
+// helpers
+const MODE_ID = (m?: string) => String(m ?? "").toLowerCase();
+
+function useStableMode(current?: string) {
+  const [uiMode, setUiMode] = React.useState<string | null>(null);
+  const last = React.useRef<string | null>(null);
+
+  // when pipeline delivers a (possibly refetched) mode, only apply if different
+  React.useEffect(() => {
+    const id = current ? MODE_ID(current) : null;
+    if (!id) return;
+    if (last.current !== id) {
+      last.current = id;
+      setUiMode(id);
+    }
+  }, [current]);
+
+  return { uiMode, setUiMode };
+}
+```
+
+Then in your page:
+
+```tsx
+const ps = pipelineState; // shorthand
+const { uiMode, setUiMode } = useStableMode(ps?.currentMode);
+
+// Render the select *only* when we know the mode
+<Select
+  value={uiMode ?? undefined}
+  onValueChange={async (mode) => {
+    // optimistic: keep UI steady
+    setUiMode(mode);
+    setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode}...`]);
+    switchMode.mutate(mode as any);
+  }}
+>
+  <SelectTrigger className="bg-slate-950 border-slate-700">
+    {/* no placeholder that defaults to first item */}
+    <SelectValue />
+  </SelectTrigger>
+  <SelectContent>
+    {Object.entries(MODE_CONFIGS).map(([mode, config]) => (
+      <SelectItem key={mode} value={mode}>
+        <div className="flex items-center gap-2">
+          <span className={config.color}>{config.name}</span>
+          <span className="text-xs text-slate-500">({config.powerTarget} MW)</span>
+        </div>
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+// (Optional) while uiMode is null, show a small skeleton or "—" instead of a mode label.
+```
+
+### Also make sure:
+
+* Nowhere do you render `value={pipelineState?.currentMode || "cruise"}` (that’s the flicker).
+* Don’t mount the `<Select>` until you have a mode: `uiMode !== null`.
+* If you have a `useEffect` that **publishes** snapshots from Helix-CORE, keep it; it doesn’t cause flicker. Flicker comes from the Select’s initial value.
+
+---
+
+## Bonus: guard values everywhere
+
+You already fixed crashes—keep using null-safe formatters for things like `qSpoilingFactor`, `gammaVanDenBroeck`, etc., so refetches never throw.
+
+---
+
+## Why this works
+
+* The UI shows the **last known mode** and only changes when the pipeline truly changes.
+* While the query is loading/refetching, it doesn’t momentarily fall back to the first option (“Cruise”), so no blink.
+* User changes are reflected instantly (optimistic), and your hook/server update catches up.
+
+If you paste the Select block from `helix-core.tsx`, I’ll return it pre-patched with the exact lines dropped in.
