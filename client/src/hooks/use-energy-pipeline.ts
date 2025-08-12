@@ -53,22 +53,8 @@ export function useEnergyPipeline() {
     refetchInterval: 1000, // Refresh every second
   });
 
-  // Also trigger pipeline bus whenever we get new data from the backend
-  React.useEffect(() => {
-    if (query.data) {
-      const data = query.data as any;
-      const snap = {
-        currentMode: data.currentMode || 'hover',
-        dutyCycle: data.dutyCycle || 0,
-        P_avg: data.P_avg || 0,
-        zeta: data.zeta || 0,
-        TS_ratio: data.TS_ratio || 0,
-        M_exotic: data.M_exotic || 0,
-        updatedAt: Date.now()
-      };
-      pushPipelineSnapshot(snap);
-    }
-  }, [query.data]);
+  // DON'T trigger pipeline bus from backend data
+  // Only the Live Energy Pipeline component should trigger pipeline bus with its calculated values
 
   return query;
 }
@@ -104,19 +90,8 @@ export function useSwitchMode() {
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
       
-      // 3) Trigger pipeline bus with the fresh data from the API response
-      if (data && data.state) {
-        const snap = {
-          currentMode: data.state.currentMode || mode,
-          dutyCycle: data.state.dutyCycle || 0,
-          P_avg: data.state.P_avg || 0,
-          zeta: data.state.zeta || 0,
-          TS_ratio: data.state.TS_ratio || 0,
-          M_exotic: data.state.M_exotic || 0,
-          updatedAt: Date.now()
-        };
-        pushPipelineSnapshot(snap);
-      }
+      // DON'T trigger pipeline bus from API response
+      // Only the Live Energy Pipeline component should trigger pipeline bus with its physics calculations
       
       /* LUMA-HOOK >>> */
       emit(LumaEvt.MODE_CHANGED, { mode });

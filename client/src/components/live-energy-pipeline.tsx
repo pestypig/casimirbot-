@@ -1,8 +1,8 @@
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
-import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
@@ -256,6 +256,29 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
+  
+  // ALWAYS trigger pipeline bus with latest calculated values (whenever this component re-renders)
+  React.useEffect(() => {
+    const snap = {
+      currentMode: currentMode || 'hover',
+      dutyCycle: d_mode,
+      P_avg: P_total_realistic,
+      zeta,
+      TS_ratio,
+      M_exotic: M_exotic_total,
+      updatedAt: Date.now()
+    };
+
+    // Update cache and broadcast to pipeline bus
+    queryClient.setQueryData(['/api/helix/pipeline'], snap);
+    pushPipelineSnapshot(snap);
+    
+    console.log('🔧 Live Energy Pipeline triggered pipeline bus:', {
+      mode: snap.currentMode,
+      P_avg: snap.P_avg.toFixed(1) + ' MW',
+      duty: (snap.dutyCycle * 100).toFixed(1) + '%'
+    });
+  }, [currentMode, d_mode, P_total_realistic, zeta, TS_ratio, M_exotic_total]);
   
   // Handle mode changes and notify parent
   const handleModeChange = (newMode: string) => {

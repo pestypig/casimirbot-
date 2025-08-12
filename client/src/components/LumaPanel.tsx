@@ -13,36 +13,26 @@ interface LumaPanelProps {
 }
 
 export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
-  const { data: cached } = useEnergyPipeline();
   const [live, setLive] = React.useState<PipelineSnapshot | null>(null);
 
   React.useEffect(() => onPipelineSnapshot(setLive), []);
 
-  // Use live data first (from pipeline bus), then cached data (from react-query)
-  const snap: PipelineSnapshot = live ?? (cached ? {
-    currentMode: (cached as any).currentMode || 'hover',
-    dutyCycle: (cached as any).dutyCycle || 0.14,
-    P_avg: (cached as any).P_avg || 0,    // Show 0 if no data instead of fake numbers
-    zeta: (cached as any).zeta || 0,
-    TS_ratio: (cached as any).TS_ratio || 0,
-    M_exotic: (cached as any).M_exotic || 0,
-    updatedAt: Date.now()
-  } : {
+  // ONLY use live data from Live Energy Pipeline component
+  // Do NOT use backend API data - only the Live Energy Pipeline has the correct physics calculations
+  const snap: PipelineSnapshot = live ?? {
     currentMode: 'hover',
     dutyCycle: 0.14,
-    P_avg: 0,     // Show 0 to indicate no data available
+    P_avg: 0,     // Show 0 until Live Energy Pipeline provides data
     zeta: 0,
     TS_ratio: 0,
     M_exotic: 0,
     updatedAt: 0
-  });
+  };
 
   // Debug: show what data sources we have
-  console.log('🔍 Luma Data Sources:', { 
+  console.log('🔍 Luma Data Sources (Live Energy Pipeline Only):', { 
     live: live ? 'yes' : 'no', 
-    cached: cached ? 'yes' : 'no',
     live_P_avg: live?.P_avg,
-    cached_P_avg: (cached as any)?.P_avg,
     final_P_avg: snap.P_avg
   });
   
