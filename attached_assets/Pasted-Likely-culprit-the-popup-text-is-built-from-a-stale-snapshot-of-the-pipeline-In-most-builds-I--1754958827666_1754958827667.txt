@@ -1,0 +1,118 @@
+Likely culprit: the popup text is built from a **stale snapshot** of the pipeline. In most builds I’ve seen this happens in one (or more) of these ways:
+
+1. **The popup builds its text before the mode switch has actually updated the cache.**
+   e.g., `switchMode()` fires → you immediately compose the “Operational Mode Committed” string from `pipelineState` → but the query hasn’t been invalidated/refetched yet, so you stringify old Hover values.
+
+2. **The popup component isn’t subscribed to the live source.**
+   It either:
+
+   * doesn’t call `useEnergyPipeline()` itself, or
+   * reads values passed in once as props, or
+   * captures `pipelineState` in a closure (e.g., inside a `useCallback` with empty deps).
+
+3. **No cache invalidation / wrong query key.**
+   The mode label changes, but the React-Query cache holding the numbers never refetches—so any consumer (popover or Luma) keeps seeing the old values.
+
+4. **Two different QueryClientProviders.**
+   If the main page and Helix-Core mount under different `QueryClientProvider` instances, they won’t see each other’s updates.
+
+---
+
+## Fast fixes (pick all that apply)
+
+### A) Invalidate & optimistically update on mode commit
+
+In `use-energy-pipeline.ts` where you handle the mode mutation success:
+
+```ts
+import { queryClient } from "@/lib/queryClient"; // adjust path
+import { emit, LumaEvt } from "@/lib/luma-bus";
+
+onSuccess: (result, variables) => {
+  // 1) Optimistically update current mode so UI/popup reads immediately
+  queryClient.setQueryData(["/api/energy/pipeline"], (old: any) =>
+    old ? { ...old, currentMode: variables } : old
+  );
+
+  // 2) Pull fresh numbers (P_avg, duty, ζ, TS, M_exotic)
+  queryClient.invalidateQueries({ queryKey: ["/api/energy/pipeline"] });
+
+  // 3) (optional) emit mode-changed for Luma/other listeners
+  emit(LumaEvt.MODE_CHANGED, { mode: variables });
+}
+```
+
+> Make sure the query key you invalidate is **exactly** the one your `useEnergyPipeline()` hook uses.
+
+### B) Build the popup from **live state at display time**
+
+Refactor the popup factory so it **reads the hook when rendering**, not when you trigger it:
+
+```tsx
+// TheoryZenPopover.tsx
+export function TheoryZenPopover() {
+  const pipe = useEnergyPipeline().data;   // subscribe here
+  if (!pipe) return null;
+
+  return (
+    <Popover ...>
+      <h4>Operational Mode Committed</h4>
+      <p>
+        Mode set to {pretty(pipe.currentMode)}. The pipeline recalculates constraints
+        (ζ={pipe.zeta.toFixed(3)}, TS≈{formatTS(pipe.TS_ratio)}), expected power{" "}
+        {pipe.P_avg.toFixed(1)} MW, and exotic mass budget {fmtMass(pipe.M_exotic)}.
+        …
+      </p>
+    </Popover>
+  );
+}
+```
+
+If your popover is created by a “showToast” function, pass a **render function** that calls the hook, not a prebuilt string:
+
+```ts
+// bad: captures stale `pipelineState` right now
+showTheoryToast(buildTextFrom(pipelineState));
+
+// good: render reads current values when toast mounts
+showTheoryToast(() => <TheoryZenToast />);  // component uses useEnergyPipeline()
+```
+
+### C) Avoid stale closures
+
+If you must construct text in a callback, include the right dependencies:
+
+```ts
+const pipe = useEnergyPipeline().data;
+const show = useCallback(() => {
+  if (!pipe) return;
+  toast({... description: makeText(pipe) });
+}, [pipe?.currentMode, pipe?.P_avg, pipe?.dutyCycle, pipe?.zeta, pipe?.TS_ratio, pipe?.M_exotic]);
+```
+
+### D) Ensure a **single** QueryClientProvider
+
+At the app root:
+
+```tsx
+<QueryClientProvider client={queryClient}>
+  {/* LumaProvider and all pages inside this single provider */}
+</QueryClientProvider>
+```
+
+---
+
+## Quick test
+
+1. Add a temporary log in the popup component that uses the hook:
+
+```ts
+console.log("[POPUP] pipe", pipe?.currentMode, pipe?.P_avg, pipe?.TS_ratio);
+```
+
+2. Switch Hover → Cruise.
+   You should see the numbers change in the log. If they don’t, your query key or providers are mismatched.
+
+---
+
+If you paste the **query key** used in `useEnergyPipeline()` and the code that **creates the popover text**, I’ll give you exact line-level patches so the popup always reflects the newest mode values.

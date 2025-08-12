@@ -74,6 +74,12 @@ export function useSwitchMode() {
       return response.json();
     },
     onSuccess: (data, mode) => {
+      // 1) Optimistically update current mode so UI/popup reads immediately
+      queryClient.setQueryData(['/api/helix/pipeline'], (old: any) => 
+        old ? { ...old, currentMode: mode } : old
+      );
+      
+      // 2) Pull fresh numbers (P_avg, duty, ζ, TS, M_exotic)
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
       

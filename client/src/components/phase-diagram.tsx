@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MetricsDashboard from './metrics-dashboard';
 import { zenLongToast } from '@/lib/zen-long-toasts';
+import { queryClient } from '@/lib/queryClient';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -352,17 +353,20 @@ function InteractiveHeatMap({
               value={selectedMode} 
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
-                // Trigger zen toast with current metrics
-                const preset = modePresets[value as keyof typeof modePresets];
-                if (preset) {
-                  zenLongToast("mode:switch", {
-                    mode: preset.name,
-                    duty: preset.duty,
-                    powerMW: parseFloat(preset.description.split('MW')[0]) || 83.3,
-                    exoticKg: parseInt(preset.description.split('kg')[0].split('• ')[1]) || 1405,
-                    zeta: parseFloat(preset.description.split('ζ=')[1]) || 0.032
-                  });
-                }
+                // Trigger zen toast with current metrics - delay to get fresh values
+                setTimeout(() => {
+                  const currentPipeline = queryClient.getQueryData(['/api/helix/pipeline']) as any;
+                  if (currentPipeline) {
+                    zenLongToast("mode:switch", {
+                      mode: currentPipeline.currentMode,
+                      duty: currentPipeline.dutyCycle,
+                      powerMW: currentPipeline.P_avg,
+                      zeta: currentPipeline.zeta,
+                      tsRatio: currentPipeline.TS_ratio,
+                      exoticKg: currentPipeline.M_exotic
+                    });
+                  }
+                }, 100); // Small delay to ensure optimistic update has applied
               }}
             >
               <SelectTrigger>
