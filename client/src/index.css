@@ -2,24 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-:root{
-  --bg:#0b1220;
-  --panel:#111a2e;
-  --panelAlt:#0d1627;
-  --text:#e6f2ff;
-  --accent:#ffd166;
-  --accentSoft:rgba(255,209,102,.25);
-}
-
-/* handy utilities if you use Tailwind arbitrary values */
-.theme-bg       { background: var(--bg); }
-.theme-panel    { background: var(--panel); }
-.theme-panelAlt { background: var(--panelAlt); }
-.theme-text     { color: var(--text); }
-.theme-accent   { color: var(--accent); }
-.theme-chip     { background: var(--accentSoft); }
-.theme-ring     { box-shadow: 0 0 0 1px var(--accent) inset; }
-
 /* Custom animations for Luma */
 @keyframes gentle-float {
   0%, 100% { transform: translate(-50%, -50%) translateY(0px); }

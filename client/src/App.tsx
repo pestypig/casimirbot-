@@ -6,19 +6,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import LumaBackgroundPortal from "@/components/LumaBackgroundPortal";
 import { BackgroundLuma } from "@/components/BackgroundLuma";
 import { LumaOverlayHost } from "@/components/LumaOverlayHost";
-import { ThemeProvider } from "@/context/ThemeProvider";
 import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
 import HelixCore from "@/pages/helix-core";
-import ProfileSelect from "@/pages/profile-select";
 import NotFound from "@/pages/not-found";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={ProfileSelect} />
-      <Route path="/home" component={Home} />
+      <Route path="/" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
@@ -29,25 +26,23 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          {/* Background behind everything, once */}
-          <LumaBackgroundPortal>
-            <BackgroundLuma opacity={0.12} blurPx={8} />
-          </LumaBackgroundPortal>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        {/* Background behind everything, once */}
+        <LumaBackgroundPortal>
+          <BackgroundLuma opacity={0.12} blurPx={8} />
+        </LumaBackgroundPortal>
 
-          {/* Your entire app (router, pages, etc.) */}
-          <div className="theme-bg theme-text relative z-10 min-h-screen">
-            <Toaster />
-            <Router />
-          </div>
+        {/* Your entire app (router, pages, etc.) */}
+        <div className="relative z-10 min-h-screen">
+          <Toaster />
+          <Router />
+        </div>
 
-          {/* Whispers host once, on top */}
-          <LumaOverlayHost />
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+        {/* Whispers host once, on top */}
+        <LumaOverlayHost />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
