@@ -464,26 +464,40 @@ export function getTileStatus(req: Request, res: Response) {
 const pipelineState = calculateEnergyPipeline(initializePipelineState());
 setGlobalPipelineState(pipelineState);
 
-// System metrics endpoint
+// System metrics endpoint (STROBING-CORRECTED)
 export function getSystemMetrics(req: Request, res: Response) {
   const state = getGlobalPipelineState();
+  const C = 299792458; // m/s
+  
   res.json({
-    activeTiles: Math.floor(state.N_tiles * 0.78),
-    totalTiles: Math.floor(state.N_tiles),
-    energyOutput: state.P_avg, // MW
-    exoticMass: Math.round(state.M_exotic), // kg
+    activeTiles: state.sectorStrobing,             // S (concurrent sectors)
+    totalTiles: state.N_tiles,                      // N (total tiles)
+    activeFraction: (state.sectorStrobing / state.N_tiles),  // S/N
+
+    energyOutput: state.P_avg,                      // MW
+    exoticMass: state.M_exotic,                     // kg (final, with optional calibration)
+    exoticMassRaw: state.M_exotic_raw,              // kg (raw physics)
+    massCalibration: state.massCalibration,         // calibration factor
+
+    dutyGlobal: state.dutyCycle,                    // 0..1
+    dutyBurst: state.dutyBurst,                     // tiny 0..1 (fs/T)
+    dutyEffectiveFR: state.dutyEffective_FR,        // for ζ
+
+    strobeHz: state.strobeHz,
+    sectorPeriod_ms: state.sectorPeriod_ms,
+
     fordRoman: {
       value: state.zeta,
-      limit: 1.0,
-      status: state.fordRomanCompliance ? "PASS" : "FAIL"
+      limit: 1,
+      status: state.zeta < 1 ? "PASS" : "FAIL"
     },
     natario: {
       value: 0,
-      status: "VALID"
+      status: state.natarioConstraint ? "VALID" : "CHECK"
     },
-    curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
+    curvatureMax: Math.abs(state.U_cycle ?? 0) / (C*C),
     timeScaleRatio: state.TS_ratio,
-    overallStatus: state.overallStatus
+    overallStatus: (state.zeta < 1 && state.curvatureLimit) ? "NOMINAL" : "CHECK"
   });
 }
 

@@ -53,6 +53,12 @@ export interface EnergyPipelineState {
   natarioConstraint: boolean;
   curvatureLimit: boolean;
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+  
+  // Strobing and timing properties
+  strobeHz?: number;
+  sectorPeriod_ms?: number;
+  dutyBurst?: number;
+  dutyEffective_FR?: number;
 }
 
 // Physical constants
@@ -231,10 +237,20 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const sectorsActive = Math.max(1, Math.round(state.sectorStrobing ?? 1));
   const activeFrac    = Math.min(1, sectorsActive / N_tiles);
 
-  // Duty
+  // Duty components (add femtosecond burst duty)
   const duty          = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
+  const f_m           = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
+  const T_m           = 1 / f_m;                                // s
+  const burst_s       = 0.5 * 1e-15; // default 0.5 fs (hardcoded for now)
+  const dutyBurst     = Math.min(1, Math.max(0, burst_s / T_m)); // << very small (~1e-5 .. 1e-6)
+  
+  // Effective duty for tile-level production
+  const dutyTile      = duty * dutyBurst;
+  
+  // Effective duty for Ford–Roman sampling (include spoiling + strobing)
+  const effDuty_FR    = duty * (state.qSpoilingFactor ?? 1) * activeFrac;
 
-  // Hull average power
+  // Hull average power (only active sectors dissipate at once)
   const P_total_W     = P_loss_per_tile_raw * N_tiles * duty * activeFrac;
 
   state.P_loss_raw    = P_loss_per_tile_raw;   // W per tile (raw)
@@ -256,9 +272,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const geoAmp    = Math.pow(gammaGeo, 3);        // γ_geo^3
   const qBurst    = state.qCavity ?? 1e9;         // use cavity Q as the DCE burst/Q factor
 
-  // Per-tile enhanced energy over a cycle
-  const U_static_abs = Math.abs(state.U_static ?? 0);   // J (from calculateStaticCasimir)
-  const E_tile_enh   = U_static_abs * geoAmp * qBurst * gammaVdBSeed * duty;
+  // Per-tile enhanced energy over a cycle (use tile-level duty)
+  const U_static_abs = Math.abs(state.U_static ?? 0);   // J (from calculateStaticCasimir)  
+  const E_tile_enh   = U_static_abs * geoAmp * qBurst * gammaVdBSeed * dutyTile;
 
   // Raw physics totals
   const massPerTile_kg = E_tile_enh / (C * C);
@@ -289,17 +305,20 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
      Additional metrics (derived)
   ──────────────────────────────── */
 
-  // Time-scale ratio TS ≡ T_hull / T_m
+  // Time-scale ratio TS ≡ T_hull / T_m (reuse f_m, T_m from above)
   const R_hull   = 82;  // m
-  const f_m      = (state.modulationFreq_GHz ?? 15) * 1e9;
-  const T_m      = 1 / f_m;
   const T_hull   = R_hull / C;
   state.TS_ratio = T_hull / T_m;
 
-  // Ford–Roman proxy (use effective duty incl. strobing & spoiling)
+  // Ford–Roman proxy (use corrected effective duty)
   const Q_quantum = 1e10;
-  const effectiveDuty = duty * (state.qSpoilingFactor ?? 1) * activeFrac;
-  state.zeta = 1 / (effectiveDuty * Math.sqrt(Q_quantum));
+  state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_quantum));
+  
+  // Expose timing details for metrics API
+  state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
+  state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
+  state.dutyBurst           = dutyBurst;  // for client visibility
+  state.dutyEffective_FR    = effDuty_FR; // for client visibility
   
   // Compliance flags
   state.fordRomanCompliance = state.zeta < 1.0;

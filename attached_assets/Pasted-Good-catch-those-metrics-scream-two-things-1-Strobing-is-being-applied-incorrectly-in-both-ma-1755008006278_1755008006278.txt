@@ -1,0 +1,208 @@
+Good catch—those metrics scream two things:
+
+1. **Strobing is being applied incorrectly in both math and the metrics.**
+
+   * `activeTiles` is coming back as **873,600,000** of **1,120,000,000** (≈78% “active”), which defeats the whole point of time-slicing. If `sectorStrobing = S`, the *concurrent* active tiles should be **S**, not \~N·fraction.
+2. **Duty is effectively huge** (hence ζ ≈ 1.12×10^8 → FAIL).
+
+   * With proper strobing, the **effective duty** seen by any worldline must include *both* the global duty and the tiny **active fraction** S/N (and, ideally, the femtosecond burst duty). Right now it looks like you’re multiplying by something much larger (or not reducing by S/N at all).
+
+That also explains the **enormous exotic mass** (\~3×10^10 kg). With your current constants (γ\_VdB=1e11, Q≈1e9, γ\_geo^3≈1.76×10^4), if you don’t time-slice aggressively, the enhancement product explodes.
+
+Here’s a tight, surgical fix plan.
+
+---
+
+# A) Fix the strobing math in the pipeline (server)
+
+Use **concurrent sectors**, not a “big activeTiles” count, everywhere:
+
+```ts
+// Tiles & strobing
+const N_tiles        = Math.max(1, Math.round(state.N_tiles ?? 1.96e9));
+const sectorsActive  = Math.max(1, Math.round(state.sectorStrobing ?? 1)); // this is S
+const activeFrac     = Math.min(1, sectorsActive / N_tiles);               // S / N
+```
+
+Use this `activeFrac` in **power averaging** and **ζ**:
+
+```ts
+// Duty (global)
+const dutyGlobal = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
+
+// Optional femtosecond burst duty (tile-local pulse width over RF period)
+const f_m        = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
+const T_m        = 1 / f_m;                                // s
+const burst_s    = (state.burstLength_fs ?? 0.5) * 1e-15;  // default 0.5 fs
+const dutyBurst  = Math.min(1, Math.max(0, burst_s / T_m));  // << very small (~1e-5 .. 1e-6)
+
+// Effective duty for **tile level** production
+const dutyTile   = dutyGlobal * dutyBurst;
+
+// Effective duty for **Ford–Roman sampling** (include spoiling + strobing)
+const effDuty_FR = dutyGlobal * (state.qSpoilingFactor ?? 1) * activeFrac;
+
+// Power (physics-first)
+const omega            = 2 * Math.PI * f_m;
+const Q_eff            = Math.max(1, (state.qCavity ?? 1e9) * (state.qSpoilingFactor ?? 1));
+const P_loss_per_tile  = Math.abs(state.U_Q ?? 0) * omega / Q_eff;     // W/tile
+const P_total_W        = P_loss_per_tile * N_tiles * dutyGlobal * activeFrac;
+state.P_loss_raw       = P_loss_per_tile;
+state.P_avg            = P_total_W / 1e6;                              // MW
+
+// ζ proxy
+const Q_quantum = 1e10;
+state.zeta      = 1 / (effDuty_FR * Math.sqrt(Q_quantum));
+```
+
+Apply the same **active fraction** and **tile duty** in the exotic-mass path:
+
+```ts
+// Amplifications
+const gammaVdBSeed = Number(process.env.GAMMA_VDB_SEED) || 1e11;
+const gammaGeo     = state.gammaGeo ?? 26;
+const geoAmp       = Math.pow(gammaGeo, 3);          // γ_geo^3
+const qBurst       = state.qCavity ?? 1e9;           // if you’re using Q as DCE multiplier
+
+// Per-tile enhanced energy over a cycle (tile-local duty!)
+const U_static_abs = Math.abs(state.U_static ?? 0);
+const E_tile_enh   = U_static_abs * geoAmp * qBurst * gammaVdBSeed * dutyTile;
+
+// Raw physics totals (sum over *all* tiles; strobing is already in dutyTile & activeFrac for power/ζ)
+const massPerTile_kg = E_tile_enh / (C*C);
+const M_raw_total_kg = massPerTile_kg * N_tiles;
+
+state.M_exotic_raw   = M_raw_total_kg;
+
+// Optional mass calibration (UI/demo), never touch γ_VdB:
+const MASS_LOCK      = process.env.MASS_LOCK_TO_TARGET === "1";
+const TARGET_MASS_KG = Number(process.env.MASS_TARGET_KG ?? 1405);
+const massCalibration= MASS_LOCK && M_raw_total_kg > 0 ? (TARGET_MASS_KG / M_raw_total_kg) : 1;
+
+state.massCalibration     = massCalibration;
+state.M_exotic            = M_raw_total_kg * massCalibration;
+
+// publish helpful timing:
+state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
+state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
+state.dutyBurst           = dutyBurst;  // for client visibility
+state.dutyEffective_FR    = effDuty_FR; // for client visibility
+```
+
+> Two subtleties worth keeping:
+>
+> * **Power averaging** uses `activeFrac` (only S sectors consume power at once).
+> * **Mass production** typically already accounts for duty at tile level (`dutyTile`); you *don’t* multiply by `activeFrac` again when summing over N, or you’ll double-penalize. (If your production model absolutely requires `activeFrac`, apply it explicitly and keep it consistent.)
+
+---
+
+# B) Fix the metrics endpoint (so the UI reads the truth)
+
+Right now `/api/helix/metrics` is misleading:
+
+* `activeTiles` should be **sectorsActive (S)**, not 7.8e8.
+* Expose the **active fraction**, **duty components**, and **strobe rate** so we can see what GR “sees”.
+
+Change your metrics building to:
+
+```ts
+res.json({
+  activeTiles: state.sectorStrobing,             // S (concurrent)
+  totalTiles: state.N_tiles,                      // N
+  activeFraction: (state.sectorStrobing / state.N_tiles),  // S/N
+
+  energyOutput: state.P_avg,                      // MW
+  exoticMass: state.M_exotic,                     // kg
+  exoticMassRaw: state.M_exotic_raw,              // kg (physics)
+  massCalibration: state.massCalibration,         // ×k (optional)
+
+  dutyGlobal: state.dutyCycle,                    // 0..1
+  dutyBurst: state.dutyBurst,                     // tiny 0..1 (fs/T)
+  dutyEffectiveFR: state.dutyEffective_FR,        // for ζ
+
+  strobeHz: state.strobeHz,
+  sectorPeriod_ms: state.sectorPeriod_ms,
+
+  fordRoman: {
+    value: state.zeta,
+    limit: 1,
+    status: state.zeta < 1 ? "PASS" : "FAIL"
+  },
+  natario: {
+    value: state.natario?.value ?? 0,
+    status: state.natarioConstraint ? "VALID" : "CHECK"
+  },
+  curvatureMax: state.curvatureMax ?? (Math.abs(state.U_cycle ?? 0) / (C*C)), // optional
+  timeScaleRatio: state.TS_ratio,
+  overallStatus: (state.zeta < 1 && state.curvatureLimit) ? "NOMINAL" : "CHECK"
+});
+```
+
+This immediately fixes the “78% active” confusion and gives you visibility into why ζ is failing.
+
+---
+
+# C) Light up the “Interactive map of all tile sectors”
+
+Make the grid reflect **sectorsActive** and the **current sector cursor**.
+
+If the server doesn’t stream a cursor, the client can derive it from `strobeHz`. Here’s a compact client block you can drop in (replaces your mock grid, keeps your styling):
+
+```tsx
+const N      = metrics?.totalTiles ?? 400;
+const S      = metrics?.activeTiles ?? 1;       // now S, not 7.8e8
+const cols   = Math.min(40, Math.ceil(Math.sqrt(N)));
+const rows   = Math.ceil(N / cols);
+
+// stripe assignment
+const sectorOf = (i:number) => Math.floor((i / N) * S); // 0..S-1
+
+// animate the current active sector
+const hz      = metrics?.strobeHz ?? 2000;
+const [cursor, setCursor] = React.useState(0);
+React.useEffect(() => {
+  if (!S || !hz) return;
+  const id = setInterval(() => setCursor(c => (c + 1) % S), Math.max(1, 1000 / hz));
+  return () => clearInterval(id);
+}, [S, hz]);
+
+<div className="grid" style={{gridTemplateColumns:`repeat(${cols}, minmax(0,1fr))`, gap:4}}>
+  {Array.from({length:N}, (_,i) => {
+    const s = sectorOf(i);
+    const active  = s === cursor;
+    const pending = s === ((cursor + 1) % S);
+    return (
+      <div
+        key={i}
+        className={[
+          "h-3 rounded-sm transition-all",
+          active  ? "ring-1 ring-cyan-400 scale-110 bg-emerald-400" :
+          pending ? "ring-1 ring-blue-400/50 bg-slate-500" :
+                    "bg-slate-700"
+        ].join(" ")}
+        title={`Tile ${i+1} • Sector ${s+1}/${S}`}
+      />
+    );
+  })}
+</div>
+```
+
+If you later add `strobeCursor` to the server state, drive `cursor` from that instead of a client interval.
+
+---
+
+# D) Quick sanity targets (so you’ll know it’s working)
+
+After these patches:
+
+* `/api/helix/metrics` should show:
+
+  * `activeTiles` = your `sectorStrobing` (e.g., 4 or 400), not hundreds of millions.
+  * `activeFraction` ≪ 1. For N≈1.12e9 and S=400, S/N ≈ **3.6×10⁻⁷**.
+  * `dutyEffectiveFR` very small (global duty × spoiling × S/N) → **ζ drops by orders of magnitude** toward <1.
+* `P_avg` should drop in proportion to `activeFrac` (because only S sectors dissipate at once).
+* `M_exotic_raw` should land much closer to research-scale once **dutyBurst** and **activeFrac** are both in place. If still large, check that you’re not multiplying by `activeFrac` *and* also integrating over N incorrectly.
+
+---
+
+If you want, paste your current `/api/helix/metrics` builder function, and I’ll return it line-edited with the fields above so it matches your existing naming and avoids any breakage.
