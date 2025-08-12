@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
 import HelixCore from "@/pages/helix-core";
+import StartPortal from "@/pages/start";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
+      <Route path="/start" component={StartPortal} />
       <Route component={NotFound} />
     </Switch>
   );
