@@ -244,20 +244,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const exactPaperUcycle = -39.45; // J per tile (from attached file)
   state.U_cycle = exactPaperUcycle;
   
-  // Step 7: Power calculations (calibrated to research targets)
-  // Research targets from Needle Hull Mk 1 papers:
-  // - Hover mode: 83.3 MW for full hull
-  // - Cruise mode: ~7.4 MW for full hull
-  const powerTargets = {
-    hover: 83.3,      // MW
-    cruise: 7.4,      // MW
-    emergency: 297.5, // MW (scaled appropriately)
-    standby: 0        // MW
-  };
-  
-  state.P_avg = powerTargets[state.currentMode] || 83.3; // Default to hover mode target
-  
-  // Calculate raw power loss per tile
+  // Calculate raw power loss per tile first
   // The research papers specify ~595 MW peak power for hover mode
   // This requires calibration to match the expected values
   const omega = 2 * PI * state.modulationFreq_GHz * 1e9;
@@ -268,9 +255,38 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Calibration factor to match research target of 595 MW total (0.531 W per tile)
   // Current calculation gives 0.1084 W/tile, we need 0.531 W/tile
   // Calibration factor = 0.531 / 0.1084 ≈ 4.9
-  const powerCalibrationFactor = 2.0e-5; // Calibrated to produce 0.531 W per tile
+  const powerCalibrationFactor = 4.9; // Calibrated to produce 0.531 W per tile
   
   state.P_loss_raw = P_loss_uncalibrated * powerCalibrationFactor; // W per tile
+  
+  // Step 7.5: Apply power calculations with mode-specific throttling
+  console.log(`🔧 Power Calculation Debug (${state.currentMode.charAt(0).toUpperCase() + state.currentMode.slice(1)} Mode):`);
+  console.log(`  P_loss_raw (per tile): ${state.P_loss_raw} W`);
+  console.log(`  N_tiles: ${state.N_tiles}`);
+  
+  // Calculate raw total power
+  const P_raw_total = state.P_loss_raw * state.N_tiles;
+  console.log(`  P_raw (total): ${P_raw_total} W`);
+  
+  // Apply mode-specific throttling
+  console.log(`  mode_duty: ${state.dutyCycle}, sectors: ${state.sectorStrobing}`);
+  console.log(`  Q_spoiling_factor: ${state.qSpoilingFactor} (Q_idle=${state.qMechanical}, Q_cavity=${state.qCavity})`);
+  
+  // Mode throttle calculation
+  const mode_throttle = state.dutyCycle / state.sectorStrobing * state.qSpoilingFactor;
+  console.log(`  mode_throttle: ${mode_throttle}`);
+  
+  // Combined throttle for realistic power levels
+  const combined_throttle = mode_throttle;
+  console.log(`  combined_throttle: ${combined_throttle}`);
+  
+  // Apply throttling to get realistic power
+  const P_avg_throttled = P_raw_total * combined_throttle;
+  console.log(`  P_avg (throttled): ${P_avg_throttled} W`);
+  
+  // Convert to MW
+  state.P_avg = P_avg_throttled / 1e6;
+  console.log(`  P_total_realistic (final): ${state.P_avg} MW`);
   
   // Step 8: Exotic mass calculation (paper-specified exact values)
   // According to attached file: exoticMassTotal: 1.405e+3 kg (≃1,405 kg)

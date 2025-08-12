@@ -12,7 +12,14 @@ interface LumaPanelProps {
 }
 
 export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
-  const { data: pipeline } = useEnergyPipeline();
+  const { data: pipeline, refetch } = useEnergyPipeline();
+  
+  // Force refresh when panel opens to get latest data
+  React.useEffect(() => {
+    if (isOpen) {
+      refetch();
+    }
+  }, [isOpen, refetch]);
   
   if (!isOpen) return null;
 
