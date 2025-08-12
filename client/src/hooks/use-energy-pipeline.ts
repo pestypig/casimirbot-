@@ -2,6 +2,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { emit, LumaEvt } from "@/lib/luma-bus";
+import { pushPipelineSnapshot } from "@/lib/pipeline-bus";
 
 export interface EnergyPipelineState {
   // Input parameters
@@ -82,6 +83,20 @@ export function useSwitchMode() {
       // 2) Pull fresh numbers (P_avg, duty, ζ, TS, M_exotic)
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+      
+      // 3) Trigger pipeline bus with the fresh data from the API response
+      if (data && data.state) {
+        const snap = {
+          currentMode: data.state.currentMode || mode,
+          dutyCycle: data.state.dutyCycle || 0,
+          P_avg: data.state.P_avg || 0,
+          zeta: data.state.zeta || 0,
+          TS_ratio: data.state.TS_ratio || 0,
+          M_exotic: data.state.M_exotic || 0,
+          updatedAt: Date.now()
+        };
+        pushPipelineSnapshot(snap);
+      }
       
       /* LUMA-HOOK >>> */
       emit(LumaEvt.MODE_CHANGED, { mode });

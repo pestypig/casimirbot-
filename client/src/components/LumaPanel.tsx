@@ -18,22 +18,32 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
 
   React.useEffect(() => onPipelineSnapshot(setLive), []);
 
+  // Use live data first (from pipeline bus), then cached data (from react-query)
   const snap: PipelineSnapshot = live ?? (cached ? {
     currentMode: (cached as any).currentMode || 'hover',
     dutyCycle: (cached as any).dutyCycle || 0.14,
-    P_avg: (cached as any).P_avg || 83.3,
-    zeta: (cached as any).zeta || 0.032,
-    TS_ratio: (cached as any).TS_ratio || 4102.7,
-    M_exotic: (cached as any).M_exotic || 1405,
+    P_avg: (cached as any).P_avg || 0,    // Show 0 if no data instead of fake numbers
+    zeta: (cached as any).zeta || 0,
+    TS_ratio: (cached as any).TS_ratio || 0,
+    M_exotic: (cached as any).M_exotic || 0,
     updatedAt: Date.now()
   } : {
     currentMode: 'hover',
     dutyCycle: 0.14,
-    P_avg: 83.3,
-    zeta: 0.032,
-    TS_ratio: 4102.7,
-    M_exotic: 1405,
+    P_avg: 0,     // Show 0 to indicate no data available
+    zeta: 0,
+    TS_ratio: 0,
+    M_exotic: 0,
     updatedAt: 0
+  });
+
+  // Debug: show what data sources we have
+  console.log('🔍 Luma Data Sources:', { 
+    live: live ? 'yes' : 'no', 
+    cached: cached ? 'yes' : 'no',
+    live_P_avg: live?.P_avg,
+    cached_P_avg: (cached as any)?.P_avg,
+    final_P_avg: snap.P_avg
   });
   
   if (!isOpen) return null;
