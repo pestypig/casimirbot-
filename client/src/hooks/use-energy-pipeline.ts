@@ -1,9 +1,8 @@
 // Hook for accessing the centralized HELIX-CORE energy pipeline
-import React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { emit, LumaEvt } from "@/lib/luma-bus";
-import { pushPipelineSnapshot } from "@/lib/pipeline-bus";
+import { publish } from "@/lib/luma-bus";
+import { getModeWisdom } from "@/lib/luma-whispers";
 
 export interface EnergyPipelineState {
   // Input parameters
@@ -48,15 +47,10 @@ export interface EnergyPipelineState {
 
 // Hook to get current pipeline state
 export function useEnergyPipeline() {
-  const query = useQuery({
+  return useQuery({
     queryKey: ['/api/helix/pipeline'],
     refetchInterval: 1000, // Refresh every second
   });
-
-  // DON'T trigger pipeline bus from backend data
-  // Only the Live Energy Pipeline component should trigger pipeline bus with its calculated values
-
-  return query;
 }
 
 // Hook to update pipeline parameters
@@ -81,34 +75,12 @@ export function useSwitchMode() {
       return response.json();
     },
     onSuccess: (data, mode) => {
-      // 1) Optimistically update current mode so UI/popup reads immediately
-      queryClient.setQueryData(['/api/helix/pipeline'], (old: any) => 
-        old ? { ...old, currentMode: mode } : old
-      );
-      
-      // 2) Pull fresh numbers (P_avg, duty, ζ, TS, M_exotic)
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
       
-      // DON'T trigger pipeline bus from API response
-      // Only the Live Energy Pipeline component should trigger pipeline bus with its physics calculations
-      
-      /* LUMA-HOOK >>> */
-      emit(LumaEvt.MODE_CHANGED, { mode });
-      
-      // Mode-specific wisdom whispers
-      const wisdom = mode === "hover"
-        ? { lines: ["Timing matched.", "Hold form; let speed follow."] }
-        : mode === "cruise"
-        ? { lines: ["Form stable.", "Now add power—accuracy is final."] }
-        : mode === "emergency"
-        ? { lines: ["Maximum power engaged.", "Precision under pressure."] }
-        : mode === "standby"
-        ? { lines: ["Systems minimal.", "Ready state maintained."] }
-        : { lines: ["Mode updated.", "Accuracy is final—confirm margins."] };
-      
-      emit(LumaEvt.WHISPER, wisdom);
-      /* <<< LUMA-HOOK */
+      // Trigger Luma whisper for mode changes
+      const wisdom = getModeWisdom(mode);
+      publish("luma:whisper", { text: wisdom });
     }
   });
 }

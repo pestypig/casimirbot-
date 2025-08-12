@@ -1,12 +1,10 @@
-import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
+import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { queryClient } from "@/lib/queryClient";
-import { pushPipelineSnapshot } from "@/lib/pipeline-bus";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -257,50 +255,6 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
-  // Trigger pipeline bus only with complete calculated values
-  React.useEffect(() => {
-    // Only publish complete snapshots with valid numeric data
-    if (
-      !Number.isFinite(P_total_realistic) ||
-      !Number.isFinite(d_mode) ||
-      !Number.isFinite(zeta) ||
-      !Number.isFinite(TS_ratio) ||
-      !Number.isFinite(M_exotic_total)
-    ) {
-      console.log('🔧 Live Energy Pipeline: Skipping incomplete snapshot publish', {
-        P_avg_valid: Number.isFinite(P_total_realistic),
-        duty_valid: Number.isFinite(d_mode),
-        zeta_valid: Number.isFinite(zeta),
-        TS_ratio_valid: Number.isFinite(TS_ratio),
-        M_exotic_valid: Number.isFinite(M_exotic_total)
-      });
-      return;
-    }
-
-    const snap = {
-      currentModeId: selectedMode || 'hover',
-      currentModeName: currentMode?.name || 'Hover',
-      dutyCycle: d_mode,
-      P_avg: P_total_realistic,
-      zeta,
-      TS_ratio,
-      M_exotic: M_exotic_total,
-      origin: "live-energy" as const,
-      updatedAt: Date.now()
-    };
-
-    // Update cache and broadcast to pipeline bus
-    queryClient.setQueryData(['/api/helix/pipeline'], snap);
-    pushPipelineSnapshot(snap);
-    
-    console.log('🔧 Live Energy Pipeline published complete snapshot:', {
-      modeId: snap.currentModeId,
-      modeName: snap.currentModeName,
-      P_avg: snap.P_avg.toFixed(1) + ' MW',
-      duty: (snap.dutyCycle * 100).toFixed(1) + '%'
-    });
-  }, [selectedMode, currentMode?.name, d_mode, P_total_realistic, zeta, TS_ratio, M_exotic_total]);
-  
   // Handle mode changes and notify parent
   const handleModeChange = (newMode: string) => {
     const mode = modes[newMode];
@@ -315,37 +269,6 @@ export function LiveEnergyPipeline({
         gammaGeo: gammaGeo // Keep existing gamma
       });
     }
-
-    // --- BUILD A LIVE SNAPSHOT FROM THIS COMPONENT'S CALCULATION ---
-    const snap = {
-      currentModeId: newMode.toLowerCase(),      // 'hover' | 'cruise' | ...
-      currentModeName: mode.name,               // 'Hover' | 'Cruise' | ...
-      dutyCycle: mode.duty,
-      P_avg: P_total_realistic,                  // MW
-      zeta,
-      TS_ratio,
-      M_exotic: M_exotic_total,
-      origin: "live-energy" as const,
-      updatedAt: Date.now()
-    };
-
-    // 1) update react-query cache immediately (so readers get fresh values)
-    queryClient.setQueryData(['/api/helix/pipeline'], snap);
-
-    // 2) broadcast to anything that listens (Luma, HUD, etc.)
-    pushPipelineSnapshot(snap);
-
-    // 3) show the toast using these *fresh* values (no cache read)
-    setTimeout(() => {
-      zenLongToast("mode:switch", {
-        mode: snap.currentModeId,
-        duty: snap.dutyCycle,
-        powerMW: snap.P_avg,
-        zeta: snap.zeta,
-        tsRatio: snap.TS_ratio,
-        exoticKg: snap.M_exotic
-      });
-    }, 50);
   };
   
   // Utility functions (declare before using)
@@ -400,7 +323,19 @@ export function LiveEnergyPipeline({
               <em>Moving Zen:</em> Every journey begins in stillness. Choose bearing; then move without hesitation (maai).
             </TooltipContent>
           </Tooltip>
-          <Select value={selectedMode} onValueChange={handleModeChange}>
+          <Select value={selectedMode} onValueChange={(value) => {
+            handleModeChange(value);
+            // Trigger zen toast for mode change
+            const mode = modes[value as keyof typeof modes];
+            if (mode) {
+              zenLongToast("mode:switch", {
+                mode: mode.name,
+                duty: mode.duty,
+                powerMW: 83.3, // Will be updated with actual values
+                zeta: 0.032
+              });
+            }
+          }}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>
@@ -450,7 +385,7 @@ export function LiveEnergyPipeline({
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
-          {currentMode?.description?.replace('1,405', exoticMassTarget.toString()) || `${currentMode.name} mode`}
+          {currentMode.description.replace('1,405', exoticMassTarget.toString())}
         </p>
       </CardHeader>
       

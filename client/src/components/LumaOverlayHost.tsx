@@ -1,8 +1,17 @@
-// components/LumaOverlayHost.tsx (legacy - now handled by main App)
+// components/LumaOverlayHost.tsx
 import * as React from "react";
+import { LumaWhisper } from "./LumaWhisper";
+import { subscribe, unsubscribe } from "@/lib/luma-bus";
 
 export function LumaOverlayHost() {
-  // This component is now deprecated as whispers are handled directly in App.tsx
-  // Keeping it for backward compatibility but it renders nothing
-  return null;
+  const [msg, setMsg] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    const id = subscribe("luma:whisper", (p: any) => setMsg(p.text));
+    return () => unsubscribe(id);
+  }, []);
+  
+  if (!msg) return null;
+  
+  return <LumaWhisper text={msg} onDone={() => setMsg(null)} />;
 }

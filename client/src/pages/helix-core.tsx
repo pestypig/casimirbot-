@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Grid3X3, Gauge, Brain, Calendar, Terminal, Atom, Cpu, Send, AlertCircle, CheckCircle2, Zap, Database, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,10 +12,9 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
-import { pushPipelineSnapshot, PIPELINE_KEY } from "@/lib/pipeline-bus";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -32,7 +31,6 @@ import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
-import AssetProbe from "@/components/AssetProbe";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -83,26 +81,6 @@ interface ChatMessage {
     name: string;
     result: any;
   };
-}
-
-// Stable UI mode hook to prevent Select flicker during pipeline refreshes
-const MODE_ID = (m?: string) => String(m ?? "").toLowerCase();
-
-function useStableMode(current?: string) {
-  const [uiMode, setUiMode] = React.useState<string | null>(null);
-  const last = React.useRef<string | null>(null);
-
-  // when pipeline delivers a (possibly refetched) mode, only apply if different
-  React.useEffect(() => {
-    const id = current ? MODE_ID(current) : null;
-    if (!id) return;
-    if (last.current !== id) {
-      last.current = id;
-      setUiMode(id);
-    }
-  }, [current]);
-
-  return { uiMode, setUiMode };
 }
 
 export default function HelixCore() {
@@ -183,45 +161,7 @@ export default function HelixCore() {
   
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
-  
-  // Stable mode state to prevent Select flicker
-  const { uiMode, setUiMode } = useStableMode(pipelineState?.currentMode);
-
-  // Publish pipeline snapshot only when Helix-CORE has complete numeric data
-  React.useEffect(() => {
-    const ps = pipelineState;
-    if (!ps) return;
-    // Require the core numeric fields before broadcasting (no zero/undefined snapshots)
-    if (
-      !Number.isFinite(ps.P_avg) ||
-      !Number.isFinite(ps.dutyCycle) ||
-      !Number.isFinite(ps.zeta) ||
-      !Number.isFinite(ps.TS_ratio) ||
-      !Number.isFinite(ps.M_exotic)
-    ) return;
-
-    const snap = {
-      currentModeId: String(ps.currentMode).toLowerCase(),
-      currentModeName: MODE_CONFIGS[ps.currentMode]?.name ?? String(ps.currentMode),
-      dutyCycle: ps.dutyCycle,
-      P_avg: ps.P_avg,
-      zeta: ps.zeta,
-      TS_ratio: ps.TS_ratio,
-      M_exotic: ps.M_exotic,
-      origin: "helix-core" as const,
-      updatedAt: Date.now(),
-    };
-    queryClient.setQueryData(PIPELINE_KEY, snap);
-    pushPipelineSnapshot(snap);
-    console.log('[PIPELINE] Helix-CORE published complete snapshot:', snap.currentModeId, snap.P_avg, snap.origin);
-  }, [
-    pipelineState?.currentMode,
-    pipelineState?.P_avg,
-    pipelineState?.dutyCycle,
-    pipelineState?.zeta,
-    pipelineState?.TS_ratio,
-    pipelineState?.M_exotic,
-  ]);
+  const switchMode = useSwitchMode();
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -561,22 +501,10 @@ export default function HelixCore() {
                   <div className="mt-4 p-3 bg-slate-950 rounded-lg text-sm">
                     <p className="font-mono text-cyan-400">Sector {selectedSector}</p>
                     <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                      <div>Q-Factor: {(() => {
-                        const sector = TILE_SECTORS.find(s => s.id === selectedSector);
-                        return sector ? sector.qFactor.toExponential(2) : "—";
-                      })()}</div>
-                      <div>Temp: {(() => {
-                        const sector = TILE_SECTORS.find(s => s.id === selectedSector);
-                        return sector ? sector.temperature.toFixed(1) : "—";
-                      })()} K</div>
-                      <div>Error: {(() => {
-                        const sector = TILE_SECTORS.find(s => s.id === selectedSector);
-                        return sector ? (sector.errorRate * 100).toFixed(1) : "—";
-                      })()}%</div>
-                      <div>Curvature: {(() => {
-                        const sector = TILE_SECTORS.find(s => s.id === selectedSector);
-                        return sector ? sector.curvatureContribution.toExponential(1) : "—";
-                      })()}</div>
+                      <div>Q-Factor: {TILE_SECTORS.find(s => s.id === selectedSector)?.qFactor.toExponential(2)}</div>
+                      <div>Temp: {TILE_SECTORS.find(s => s.id === selectedSector)?.temperature.toFixed(1)} K</div>
+                      <div>Error: {((TILE_SECTORS.find(s => s.id === selectedSector)?.errorRate || 0) * 100).toFixed(1)}%</div>
+                      <div>Curvature: {TILE_SECTORS.find(s => s.id === selectedSector)?.curvatureContribution.toExponential(1)}</div>
                     </div>
                   </div>
                 )}
@@ -600,26 +528,10 @@ export default function HelixCore() {
                   <div className="space-y-2">
                     <Label className="text-slate-200">Operational Mode</Label>
                     <Select 
-                      value={uiMode ?? undefined}
-                      onValueChange={async (mode) => {
-                        // Optimistic: keep UI steady
-                        setUiMode(mode);
+                      value={pipelineState?.currentMode || 'hover'}
+                      onValueChange={(mode) => {
+                        switchMode.mutate(mode as any);
                         setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
-                        
-                        // Actually switch mode via switchMode hook if available
-                        try {
-                          const response = await fetch('/api/switch-mode', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ mode })
-                          });
-                          if (response.ok) {
-                            setMainframeLog(prev => [...prev, `[MODE] Successfully switched to ${mode}`]);
-                          }
-                        } catch (error) {
-                          console.error('Mode switch failed:', error);
-                          setMainframeLog(prev => [...prev, `[ERROR] Failed to switch to ${mode}`]);
-                        }
                       }}
                     >
                       <SelectTrigger className="bg-slate-950 border-slate-700">
@@ -636,8 +548,8 @@ export default function HelixCore() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {uiMode && (
-                      <p className="text-xs text-slate-400">{MODE_CONFIGS[uiMode]?.description}</p>
+                    {pipelineState && (
+                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
                     )}
                   </div>
 
@@ -648,18 +560,14 @@ export default function HelixCore() {
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Energy Output</p>
-                      <p className="text-lg font-mono text-yellow-400">
-                        {Number.isFinite(pipelineState?.P_avg) ? pipelineState.P_avg.toFixed(1) : systemMetrics?.energyOutput || "83.3"} MW
-                      </p>
+                      <p className="text-lg font-mono text-yellow-400">{pipelineState?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Exotic Mass</p>
-                      <p className="text-lg font-mono text-purple-400">
-                        {Number.isFinite(pipelineState?.M_exotic) ? pipelineState.M_exotic.toFixed(0) : systemMetrics?.exoticMass || "1405"} kg
-                      </p>
+                      <p className="text-lg font-mono text-purple-400">{pipelineState?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">System Status</p>
@@ -672,10 +580,10 @@ export default function HelixCore() {
                     <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                       <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                       <div className="grid grid-cols-2 gap-1 text-slate-300">
-                        <div>Duty: {Number.isFinite(pipelineState.dutyCycle) ? (pipelineState.dutyCycle * 100).toFixed(1) + "%" : "—"}</div>
-                        <div>Sectors: {pipelineState.sectorStrobing ?? "—"}</div>
-                        <div>Q-Spoil: {Number.isFinite(pipelineState.qSpoilingFactor) ? pipelineState.qSpoilingFactor.toFixed(3) : "—"}</div>
-                        <div>γ_VdB: {Number.isFinite(pipelineState.gammaVanDenBroeck) ? pipelineState.gammaVanDenBroeck.toExponential(1) : "—"}</div>
+                        <div>Duty: {(pipelineState.dutyCycle * 100).toFixed(1)}%</div>
+                        <div>Sectors: {pipelineState.sectorStrobing}</div>
+                        <div>Q-Spoil: {pipelineState.qSpoilingFactor.toFixed(3)}</div>
+                        <div>γ_VdB: {pipelineState.gammaVanDenBroeck.toExponential(1)}</div>
                       </div>
                     </div>
                   )}
@@ -767,7 +675,7 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Ford-Roman Inequality</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">ζ = {Number.isFinite(pipelineState?.zeta) ? pipelineState.zeta.toFixed(3) : (Number.isFinite(systemMetrics?.fordRoman?.value) ? systemMetrics.fordRoman.value.toFixed(3) : '0.032')}</span>
+                      <span className="font-mono text-sm">ζ = {pipelineState?.zeta?.toFixed(3) || systemMetrics?.fordRoman.value.toFixed(3) || '0.032'}</span>
                       <Badge className={`${(pipelineState?.fordRomanCompliance || systemMetrics?.fordRoman.status === 'PASS') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         {pipelineState?.fordRomanCompliance ? 'PASS' : systemMetrics?.fordRoman.status || 'PASS'}
                       </Badge>
@@ -777,7 +685,7 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Natário Zero-Expansion</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">∇·ξ = {systemMetrics?.natario?.value ?? 0}</span>
+                      <span className="font-mono text-sm">∇·ξ = {systemMetrics?.natario.value || 0}</span>
                       <Badge className={`${(pipelineState?.natarioConstraint || systemMetrics?.natario.status === 'VALID') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         {pipelineState?.natarioConstraint ? 'VALID' : systemMetrics?.natario.status || 'VALID'}
                       </Badge>
@@ -787,15 +695,7 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Curvature Threshold</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">R {'<'} {(() => {
-                        if (pipelineState && Number.isFinite(pipelineState.U_cycle)) {
-                          return (Math.abs(pipelineState.U_cycle) / (3e8 * 3e8)).toExponential(0);
-                        }
-                        if (Number.isFinite(systemMetrics?.curvatureMax)) {
-                          return systemMetrics.curvatureMax.toExponential(0);
-                        }
-                        return '1e-21';
-                      })()}</span>
+                      <span className="font-mono text-sm">R {'<'} {(pipelineState && Math.abs(pipelineState.U_cycle) / (3e8 * 3e8))?.toExponential(0) || systemMetrics?.curvatureMax.toExponential(0) || '1e-21'}</span>
                       <Badge className={`${pipelineState?.curvatureLimit ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                         {pipelineState?.curvatureLimit ? 'SAFE' : 'WARN'}
                       </Badge>
@@ -805,7 +705,7 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Time-Scale Separation</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">TS = {Number.isFinite(pipelineState?.TS_ratio) ? pipelineState.TS_ratio.toFixed(1) : (Number.isFinite(systemMetrics?.timeScaleRatio) ? systemMetrics.timeScaleRatio.toFixed(1) : '4102.7')}</span>
+                      <span className="font-mono text-sm">TS = {pipelineState?.TS_ratio?.toFixed(1) || systemMetrics?.timeScaleRatio.toFixed(1) || '4102.7'}</span>
                       <Badge className={`${(pipelineState && pipelineState.TS_ratio < 1) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                         {(pipelineState && pipelineState.TS_ratio < 1) ? 'SAFE' : 'CHECK'}
                       </Badge>
@@ -818,12 +718,12 @@ export default function HelixCore() {
                   <div className="mt-4 p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-2">Energy Pipeline Values:</p>
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
-                      <div>U_static: {Number.isFinite(pipelineState.U_static) ? pipelineState.U_static.toExponential(2) : "—"} J</div>
-                      <div>U_geo: {Number.isFinite(pipelineState.U_geo) ? pipelineState.U_geo.toExponential(2) : "—"} J</div>
-                      <div>U_Q: {Number.isFinite(pipelineState.U_Q) ? pipelineState.U_Q.toExponential(2) : "—"} J</div>
-                      <div>U_cycle: {Number.isFinite(pipelineState.U_cycle) ? pipelineState.U_cycle.toExponential(2) : "—"} J</div>
-                      <div>P_loss: {Number.isFinite(pipelineState.P_loss_raw) ? pipelineState.P_loss_raw.toFixed(3) : "—"} W/tile</div>
-                      <div>N_tiles: {Number.isFinite(pipelineState.N_tiles) ? pipelineState.N_tiles.toExponential(2) : "—"}</div>
+                      <div>U_static: {pipelineState.U_static.toExponential(2)} J</div>
+                      <div>U_geo: {pipelineState.U_geo.toExponential(2)} J</div>
+                      <div>U_Q: {pipelineState.U_Q.toExponential(2)} J</div>
+                      <div>U_cycle: {pipelineState.U_cycle.toExponential(2)} J</div>
+                      <div>P_loss: {pipelineState.P_loss_raw.toFixed(3)} W/tile</div>
+                      <div>N_tiles: {pipelineState.N_tiles.toExponential(2)}</div>
                     </div>
                   </div>
                 )}
@@ -993,7 +893,7 @@ export default function HelixCore() {
                 powerAvg_MW: pipelineState?.P_avg || 83.3,
                 exoticMass_kg: pipelineState?.M_exotic || 1405,
                 // Operational mode parameters for authentic Natário computations
-                currentMode: uiMode || 'hover',
+                currentMode: pipelineState?.currentMode || 'hover',
                 sectorStrobing: pipelineState?.sectorStrobing || 1,
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7
@@ -1002,7 +902,7 @@ export default function HelixCore() {
             
             {/* Mission Fuel / Range Gauge */}
             <FuelGauge
-              mode={uiMode || 'Hover'}
+              mode={pipelineState?.currentMode || 'Hover'}
               powerMW={pipelineState?.P_avg || 83.3}
               zeta={pipelineState?.zeta || 0.032}
               tsRatio={pipelineState?.TS_ratio || 4102.74}
@@ -1151,7 +1051,7 @@ export default function HelixCore() {
                   plan={{ waypoints: route }}
                   mode={mapMode}
                   perf={{
-                    mode: uiMode || 'Hover',
+                    mode: pipelineState?.currentMode || 'Hover',
                     powerMW: pipelineState?.P_avg || 83.3,
                     duty: pipelineState?.dutyCycle || 0.14,
                     gammaGeo: pipelineState?.gammaGeo || 26,
@@ -1161,7 +1061,7 @@ export default function HelixCore() {
                     freqGHz: 15.0,
                     energyPerLyMWh: (() => {
                       const vLyPerHour = computeEffectiveLyPerHour(
-                        uiMode || 'Hover',
+                        pipelineState?.currentMode || 'Hover',
                         pipelineState?.dutyCycle || 0.14,
                         pipelineState?.gammaGeo || 26,
                         pipelineState?.qCavity || 1e9,
@@ -1192,7 +1092,6 @@ export default function HelixCore() {
       </div>
 
 
-      <AssetProbe />
     </div>
   );
 }

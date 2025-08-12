@@ -1,21 +1,43 @@
-// Luma event bus for mode changes and whispers
-export const LumaEvt = {
-  MODE_CHANGED: 'luma:mode_changed',
-  WHISPER: 'luma:whisper',
-  PIPELINE_TICK: 'luma:pipeline_tick'
-} as const;
+// lib/luma-bus.ts - Simple event bus for Luma whispers
+type LumaEventHandler = (payload: any) => void;
 
-export function emit(eventType: string, data: any): void {
-  const event = new CustomEvent(eventType, { detail: data });
-  document.dispatchEvent(event);
-}
+const eventBus = new Map<string, Map<string, LumaEventHandler>>();
 
-export function subscribe(eventType: string, handler: (data: any) => void): () => void {
-  const listener = (event: CustomEvent) => handler(event.detail);
-  document.addEventListener(eventType, listener as EventListener);
+let idCounter = 0;
+
+export function subscribe(eventType: string, handler: LumaEventHandler): string {
+  const handlerId = `handler_${++idCounter}`;
   
-  return () => document.removeEventListener(eventType, listener as EventListener);
+  if (!eventBus.has(eventType)) {
+    eventBus.set(eventType, new Map());
+  }
+  
+  eventBus.get(eventType)!.set(handlerId, handler);
+  return handlerId;
 }
 
-// Backward compatibility
-export const publish = emit;
+export function unsubscribe(handlerId: string) {
+  for (const [eventType, handlers] of eventBus.entries()) {
+    if (handlers.has(handlerId)) {
+      handlers.delete(handlerId);
+      if (handlers.size === 0) {
+        eventBus.delete(eventType);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+export function publish(eventType: string, payload: any) {
+  const handlers = eventBus.get(eventType);
+  if (handlers) {
+    handlers.forEach(handler => {
+      try {
+        handler(payload);
+      } catch (error) {
+        console.error(`Error in Luma event handler for ${eventType}:`, error);
+      }
+    });
+  }
+}

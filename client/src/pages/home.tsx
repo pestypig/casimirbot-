@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
 import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
-import { lumaWhisper } from "@/lib/luma-dispatch";
 
 export default function Home() {
   // Hook for updating backend pipeline
@@ -89,35 +88,23 @@ export default function Home() {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <Atom className="w-6 h-6" />
-            <h1 className="text-2xl font-bold text-[#387ec7]">Needle Hull Mk 1 Research Platform</h1>
+            <h1 className="text-2xl font-bold">Needle Hull Mk 1 Research Platform</h1>
           </div>
           <div className="flex gap-2">
             <Link href="/simulation">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2"
-                onClick={() => lumaWhisper("nav_simulation")}
-              >
+              <Button variant="outline" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
                 Simulation Config
               </Button>
             </Link>
             <Link href="/documentation">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2"
-                onClick={() => lumaWhisper("nav_documentation")}
-              >
+              <Button variant="outline" className="flex items-center gap-2">
                 <Book className="w-4 h-4" />
                 Documentation
               </Button>
             </Link>
             <Link href="/helix-core">
-              <Button 
-                variant="outline" 
-                className="flex items-center gap-2"
-                onClick={() => lumaWhisper("nav_helix_core")}
-              >
+              <Button variant="outline" className="flex items-center gap-2">
                 <Cpu className="w-4 h-4" />
                 HELIX-CORE
               </Button>
@@ -133,7 +120,7 @@ export default function Home() {
           {/* Live Energy Pipeline */}
           <div className="space-y-4">
             <div className="bg-card border rounded-lg p-6">
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-[#61a5e8]">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <Atom className="w-5 h-5" />
                 Live Energy Pipeline
               </h2>
