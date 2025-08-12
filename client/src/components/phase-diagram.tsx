@@ -354,18 +354,7 @@ function InteractiveHeatMap({
               value={selectedMode} 
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
-                // Read the cache we just wrote in LiveEnergyPipeline
-                const snap = queryClient.getQueryData(['/api/helix/pipeline']) as any;
-                if (snap) {
-                  zenLongToast("mode:switch", {
-                    mode: snap.currentMode,
-                    duty: snap.dutyCycle,
-                    powerMW: snap.P_avg,
-                    zeta: snap.zeta,
-                    tsRatio: snap.TS_ratio,
-                    exoticKg: snap.M_exotic
-                  });
-                }
+                // LiveEnergyPipeline handles the mode switch toast with fresh values
               }}
             >
               <SelectTrigger>
