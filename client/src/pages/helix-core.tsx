@@ -43,21 +43,13 @@ const MAINFRAME_ZONES = {
   WARP_VISUALIZER: "Natário Warp Bubble"
 };
 
-// Mock tile sectors for demo
-const TILE_SECTORS = Array.from({ length: 400 }, (_, i) => ({
-  id: `S${i + 1}`,
-  qFactor: 5e4 + Math.random() * 1e5,
-  errorRate: Math.random() * 0.05,
-  temperature: 20 + Math.random() * 5,
-  active: Math.random() > 0.3,
-  strobing: Math.random() > 0.8,
-  curvatureContribution: Math.random() * 1e-15
-}));
+
 
 interface SystemMetrics {
   activeTiles: number;
   totalTiles: number;
-  sectorStrobing?: number;  // Added for strobing display
+  sectorStrobing?: number;   // Added for strobing display
+  currentSector?: number;    // NEW: physics-timed sweep index
   energyOutput: number;
   exoticMass: number;
   fordRoman: {
@@ -85,6 +77,11 @@ interface ChatMessage {
 }
 
 export default function HelixCore() {
+  // Generate logical sector list (no physics here)
+  const SECTORS = useMemo(
+    () => Array.from({ length: 400 }, (_, i) => ({ id: `S${i + 1}` })), []
+  );
+
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [mainframeLog, setMainframeLog] = useState<string[]>([
     "[HELIX-CORE] System initialized",
@@ -104,6 +101,9 @@ export default function HelixCore() {
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
+  
+  // Fade memory for trailing glow (per-sector intensity 0..1)
+  const [trail, setTrail] = useState<number[]>(() => Array(400).fill(0));
   const [useDeepZoom, setUseDeepZoom] = useState(false);
   const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
     // Persist mode preference with Solar (AU) as default
@@ -238,60 +238,96 @@ export default function HelixCore() {
     }
   };
   
+  // Physics-timed sector sweep for UI animation
+  useEffect(() => {
+    if (!systemMetrics) return;
+
+    const S = Math.max(1, systemMetrics.sectorStrobing || 1);
+    const idx = (systemMetrics.currentSector ?? 0) % S;
+
+    // Decay all sectors
+    setTrail(prev => prev.map(v => Math.max(0, v * 0.90)));
+    // Energize current sector
+    setTrail(prev => {
+      const copy = prev.slice();
+      copy[idx] = 1; // full bright
+      return copy;
+    });
+  }, [systemMetrics?.currentSector, systemMetrics?.sectorStrobing]);
+
+  // Sync 3D engine with strobing state
+  useEffect(() => {
+    if (!systemMetrics) return;
+    (window as any).setStrobingState?.({
+      sectorCount: systemMetrics.sectorStrobing,
+      currentSector: systemMetrics.currentSector
+    });
+  }, [systemMetrics?.sectorStrobing, systemMetrics?.currentSector]);
+
+  // Color mapper (blue→active; red if ζ breach)
+  const sectorColor = (i: number) => {
+    const ζ = systemMetrics?.fordRoman?.value ?? 0.0;
+    const limitBreach = ζ >= 1.0;
+    const v = trail[i] ?? 0;
+    if (limitBreach) {
+      return `rgba(239, 68, 68, ${0.2 + 0.8*v})`; // red
+    }
+    return `rgba(34, 197, 94, ${0.2 + 0.8*v})`; // green
+  };
+
   // Handle tile click
   const handleTileClick = async (sectorId: string) => {
     setSelectedSector(sectorId);
-    const sector = TILE_SECTORS.find(s => s.id === sectorId);
-    if (sector) {
-      setMainframeLog(prev => [...prev, 
-        `[TILE] Selected ${sectorId}`,
-        `[DATA] Q-Factor: ${sector.qFactor.toExponential(2)}, Temp: ${sector.temperature.toFixed(1)}K`
-      ]);
-      
-      // In manual mode, pulse the sector
-      if (activeMode === "manual") {
-        setIsProcessing(true);
-        try {
-          const command = `Pulse sector ${sectorId} with 1 nm gap`;
-          const userMessage: ChatMessage = {
-            role: 'user',
-            content: command,
-            timestamp: new Date()
+    const sectorIndex = parseInt(sectorId.replace('S', '')) - 1;
+    
+    setMainframeLog(prev => [...prev, 
+      `[TILE] Selected ${sectorId}`,
+      `[DATA] Sector Index: ${sectorIndex}, Fade: ${trail[sectorIndex]?.toFixed(3) || '0.000'}`
+    ]);
+    
+    // In manual mode, pulse the sector
+    if (activeMode === "manual") {
+      setIsProcessing(true);
+      try {
+        const command = `Pulse sector ${sectorId} with 1 nm gap`;
+        const userMessage: ChatMessage = {
+          role: 'user',
+          content: command,
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, userMessage]);
+        
+        const response = await apiRequest('POST', '/api/helix/command', {
+          messages: chatMessages.concat({ role: 'user', content: command })
+        });
+        
+        const responseData = await response.json();
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: responseData.message.content,
+          timestamp: new Date()
+        };
+        
+        if (responseData.functionResult) {
+          assistantMessage.functionCall = {
+            name: responseData.message.function_call.name,
+            result: responseData.functionResult
           };
-          setChatMessages(prev => [...prev, userMessage]);
-          
-          const response = await apiRequest('POST', '/api/helix/command', {
-            messages: chatMessages.concat({ role: 'user', content: command })
-          });
-          
-          const responseData = await response.json();
-          const assistantMessage: ChatMessage = {
-            role: 'assistant',
-            content: responseData.message.content,
-            timestamp: new Date()
-          };
-          
-          if (responseData.functionResult) {
-            assistantMessage.functionCall = {
-              name: responseData.message.function_call.name,
-              result: responseData.functionResult
-            };
-            setMainframeLog(prev => [...prev, 
-              `[MANUAL] ${sectorId} pulsed: Energy=${responseData.functionResult.energy?.toExponential(2)} J`
-            ]);
-            refetchMetrics();
-          }
-          
-          setChatMessages(prev => [...prev, assistantMessage]);
-        } catch (error) {
-          toast({
-            title: "Manual Pulse Error",
-            description: error instanceof Error ? error.message : "Failed to pulse sector",
-            variant: "destructive"
-          });
-        } finally {
-          setIsProcessing(false);
+          setMainframeLog(prev => [...prev, 
+            `[MANUAL] ${sectorId} pulsed: Energy=${responseData.functionResult.energy?.toExponential(2)} J`
+          ]);
+          refetchMetrics();
         }
+        
+        setChatMessages(prev => [...prev, assistantMessage]);
+      } catch (error) {
+        toast({
+          title: "Manual Pulse Error",
+          description: error instanceof Error ? error.message : "Failed to pulse sector",
+          variant: "destructive"
+        });
+      } finally {
+        setIsProcessing(false);
       }
     }
   };
@@ -466,46 +502,45 @@ export default function HelixCore() {
                   <Grid3X3 className="w-5 h-5 text-cyan-400" />
                   {MAINFRAME_ZONES.TILE_GRID}
                 </CardTitle>
-                <CardDescription>
-                  Interactive map of all tile sectors
+                <CardDescription className="text-xs">
+                  Instant tiles: {systemMetrics?.activeTiles?.toLocaleString() || '1,120,000,000'} / {systemMetrics?.totalTiles?.toLocaleString() || '1,120,000,000'} •
+                  Sectors: {systemMetrics?.sectorStrobing || 1} •
+                  Current: S{((systemMetrics?.currentSector ?? 0) + 1)}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {activeMode === "manual" && (
                   <div className="mb-2 text-center text-sm text-cyan-400">
-                    Click any tile to pulse it manually
+                    Click any sector to pulse it manually
                   </div>
                 )}
-                <div className="grid grid-cols-10 gap-1 p-4 bg-slate-950 rounded-lg">
-                  {TILE_SECTORS.slice(0, 100).map(sector => (
+                <div className="grid grid-cols-20 gap-1 p-4 bg-slate-950 rounded-lg">
+                  {SECTORS.slice(0, systemMetrics?.sectorStrobing ?? 1).map((s, i) => (
                     <div
-                      key={sector.id}
-                      onClick={() => handleTileClick(sector.id)}
+                      key={s.id}
+                      onClick={() => handleTileClick(s.id)}
+                      title={`Sector ${i+1} - Fade: ${trail[i]?.toFixed(3) || '0.000'}`}
                       className={`
-                        w-3 h-3 rounded-sm transition-all
+                        h-3 rounded-sm transition-[background] duration-120
                         ${activeMode === "manual" ? "cursor-pointer hover:scale-110" : "cursor-default"}
-                        ${sector.strobing ? 'animate-pulse' : ''}
-                        ${selectedSector === sector.id ? 'ring-2 ring-cyan-400' : ''}
-                        ${isProcessing && selectedSector === sector.id ? 'animate-pulse' : ''}
-                        ${sector.active 
-                          ? sector.errorRate > 0.03 
-                            ? 'bg-red-500' 
-                            : 'bg-green-500'
-                          : 'bg-slate-700'
-                        }
+                        ${selectedSector === s.id ? 'ring-2 ring-cyan-400' : ''}
+                        ${isProcessing && selectedSector === s.id ? 'animate-pulse' : ''}
                       `}
-                      title={`${sector.id}: Q=${sector.qFactor.toExponential(1)}, Error=${(sector.errorRate * 100).toFixed(1)}%`}
+                      style={{ background: sectorColor(i) }}
                     />
                   ))}
+                </div>
+                <div className="mt-2 text-xs text-slate-400">
+                  ζ = {(systemMetrics?.fordRoman?.value ?? 0).toExponential(2)} • TS = {(systemMetrics?.timeScaleRatio ?? 0).toFixed(1)}
                 </div>
                 {selectedSector && (
                   <div className="mt-4 p-3 bg-slate-950 rounded-lg text-sm">
                     <p className="font-mono text-cyan-400">Sector {selectedSector}</p>
                     <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                      <div>Q-Factor: {TILE_SECTORS.find(s => s.id === selectedSector)?.qFactor.toExponential(2)}</div>
-                      <div>Temp: {TILE_SECTORS.find(s => s.id === selectedSector)?.temperature.toFixed(1)} K</div>
-                      <div>Error: {((TILE_SECTORS.find(s => s.id === selectedSector)?.errorRate || 0) * 100).toFixed(1)}%</div>
-                      <div>Curvature: {TILE_SECTORS.find(s => s.id === selectedSector)?.curvatureContribution.toExponential(1)}</div>
+                      <div>Fade Value: {trail[parseInt(selectedSector.replace('S', '')) - 1]?.toFixed(3) || '0.000'}</div>
+                      <div>Physics Status: {systemMetrics?.fordRoman?.status || 'PASS'}</div>
+                      <div>Ford-Roman: ζ = {(systemMetrics?.fordRoman?.value ?? 0).toFixed(3)}</div>
+                      <div>Current Active: {systemMetrics?.currentSector === parseInt(selectedSector.replace('S', '')) - 1 ? 'Yes' : 'No'}</div>
                     </div>
                   </div>
                 )}

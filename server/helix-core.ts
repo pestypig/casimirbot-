@@ -482,11 +482,17 @@ export function getSystemMetrics(req: Request, res: Response) {
   const strobeHz        = Number(state.strobeHz ?? process.env.STROBE_HZ ?? 2000);
   const sectorPeriod_ms = 1000 / Math.max(1, strobeHz);
 
+  // Physics-timed sector sweep for UI sync
+  const f_m = (state.modulationFreq_GHz ?? 15) * 1e9;
+  const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
+  const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, S);
+
   res.json({
     // Strobe-aware tile counts (CORRECTED)
     activeTiles: Math.max(1, Math.floor(N / S)),  // << FIXED: instantaneous energized tiles (N/S)
     totalTiles: N,
     sectorStrobing: S,                // include sectors for UI display
+    currentSector,                    // << NEW: physics-timed sweep index
     activeFraction,                   // S / N (should be << 1)
 
     // Power / mass (server-authoritative)

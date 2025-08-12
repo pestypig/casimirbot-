@@ -12,6 +12,12 @@ class WarpEngine {
 
         console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
         
+        // Strobing state for sector sync
+        this.strobingState = {
+            sectorCount: 1,
+            currentSector: 0
+        };
+        
         // Initialize WebGL state
         this.gl.clearColor(0.0, 0.0, 0.3, 1.0); // Dark blue background
         this.gl.enable(this.gl.DEPTH_TEST);
@@ -52,6 +58,12 @@ class WarpEngine {
         // Initialize rendering pipeline
         this._setupCamera();
         this._initializeGrid();
+        
+        // Expose strobing sync function globally
+        window.setStrobingState = ({ sectorCount, currentSector }) => {
+            this.strobingState.sectorCount = sectorCount;
+            this.strobingState.currentSector = currentSector;
+        };
         
         // Bind resize handler
         this._resize = this._resize.bind(this);
