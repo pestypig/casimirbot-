@@ -508,6 +508,8 @@ export function getSystemMetrics(req: Request, res: Response) {
     totalSectors: sec.TOTAL_SECTORS,
     activeSectors: sec.activeSectors,
     activeFraction: sec.activeFraction,
+    sectorStrobing: state.sectorStrobing,
+    currentSector: currentSector,
 
     // timing (optional but nice for the HUD)
     strobeHz: state.modulationFreq_GHz * 1e9 / sec.TOTAL_SECTORS,        // per sector sweep rate

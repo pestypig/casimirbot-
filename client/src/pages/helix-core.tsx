@@ -31,6 +31,7 @@ import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
+import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -50,8 +51,11 @@ interface SystemMetrics {
   totalSectors: number;      // NEW: total sectors (400)
   activeTiles: number;       // Updated: actual tile count
   totalTiles: number;
-  sectorStrobing?: number;   // Added for strobing display
-  currentSector?: number;    // NEW: physics-timed sweep index
+  tilesPerSector: number;    // NEW: tiles per sector
+  sectorStrobing: number;    // Added for strobing display
+  currentSector: number;     // NEW: physics-timed sweep index
+  strobeHz: number;          // NEW: sector sweep frequency
+  sectorPeriod_ms: number;   // NEW: time per sector
   energyOutput: number;
   exoticMass: number;
   fordRoman: {
@@ -497,57 +501,23 @@ export default function HelixCore() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left Column - Tile Grid & Energy */}
           <div className="space-y-4">
-            {/* Casimir Tile Grid */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Grid3X3 className="w-5 h-5 text-cyan-400" />
-                  {MAINFRAME_ZONES.TILE_GRID}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Instant tiles: {systemMetrics?.activeTiles?.toLocaleString() || '1,120,000,000'} / {systemMetrics?.totalTiles?.toLocaleString() || '1,120,000,000'} •
-                  Sectors: {systemMetrics?.sectorStrobing || 1} •
-                  Current: S{((systemMetrics?.currentSector ?? 0) + 1)}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {activeMode === "manual" && (
-                  <div className="mb-2 text-center text-sm text-cyan-400">
-                    Click any sector to pulse it manually
-                  </div>
-                )}
-                <div className="grid grid-cols-20 gap-1 p-4 bg-slate-950 rounded-lg">
-                  {SECTORS.slice(0, systemMetrics?.sectorStrobing ?? 1).map((s, i) => (
-                    <div
-                      key={s.id}
-                      onClick={() => handleTileClick(s.id)}
-                      title={`Sector ${i+1} - Fade: ${trail[i]?.toFixed(3) || '0.000'}`}
-                      className={`
-                        h-3 rounded-sm transition-[background] duration-120
-                        ${activeMode === "manual" ? "cursor-pointer hover:scale-110" : "cursor-default"}
-                        ${selectedSector === s.id ? 'ring-2 ring-cyan-400' : ''}
-                        ${isProcessing && selectedSector === s.id ? 'animate-pulse' : ''}
-                      `}
-                      style={{ background: sectorColor(i) }}
-                    />
-                  ))}
-                </div>
-                <div className="mt-2 text-xs text-slate-400">
-                  ζ = {(systemMetrics?.fordRoman?.value ?? 0).toExponential(2)} • TS = {(systemMetrics?.timeScaleRatio ?? 0).toFixed(1)}
-                </div>
-                {selectedSector && (
-                  <div className="mt-4 p-3 bg-slate-950 rounded-lg text-sm">
-                    <p className="font-mono text-cyan-400">Sector {selectedSector}</p>
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                      <div>Fade Value: {trail[parseInt(selectedSector.replace('S', '')) - 1]?.toFixed(3) || '0.000'}</div>
-                      <div>Physics Status: {systemMetrics?.fordRoman?.status || 'PASS'}</div>
-                      <div>Ford-Roman: ζ = {(systemMetrics?.fordRoman?.value ?? 0).toFixed(3)}</div>
-                      <div>Current Active: {systemMetrics?.currentSector === parseInt(selectedSector.replace('S', '')) - 1 ? 'Yes' : 'No'}</div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Casimir Tile Grid - New Canvas Component */}
+            {systemMetrics && (
+              <CasimirTileGridPanel
+                metrics={{
+                  totalTiles: systemMetrics.totalTiles,
+                  sectorStrobing: systemMetrics.sectorStrobing,
+                  totalSectors: systemMetrics.totalSectors,
+                  tilesPerSector: systemMetrics.tilesPerSector,
+                  currentSector: systemMetrics.currentSector,
+                  strobeHz: systemMetrics.strobeHz,
+                  sectorPeriod_ms: systemMetrics.sectorPeriod_ms,
+                  overallStatus: systemMetrics.overallStatus as any,
+                }}
+                width={320}
+                height={170}
+              />
+            )}
 
             {/* Energy Control Panel */}
             <Card className="bg-slate-900/50 border-slate-800">
