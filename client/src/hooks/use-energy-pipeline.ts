@@ -34,6 +34,8 @@ export interface EnergyPipelineState {
   P_loss_raw: number;
   P_avg: number;
   M_exotic: number;
+  M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
+  massCalibration: number;  // Mass calibration factor
   TS_ratio: number;
   zeta: number;
   N_tiles: number;

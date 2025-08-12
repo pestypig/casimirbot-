@@ -1,0 +1,126 @@
+Awesome — that swap will unblock a lot. To finish the cleanup and avoid the old bugs creeping back in, here’s a short, surgical checklist of the **other places to patch** (most are one-liners or simple removals).
+
+---
+
+# Must-do patches (quick)
+
+1. **Remove the static fudge in `calculateStaticCasimir`**
+
+* File: `server/energy-pipeline.ts`
+* Replace the function body to *not* use the `0.159` factor:
+
+```ts
+function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
+  const gap_m   = gap_nm * NM_TO_M;
+  const E_overA = -(PI * PI * HBAR_C) / (720 * Math.pow(gap_m, 3)); // J/m^2
+  return E_overA * area_m2; // J
+}
+```
+
+2. **Delete hard locks anywhere else**
+
+* In `server/energy-pipeline.ts`, ensure there are **no** remaining lines like:
+
+  * `state.M_exotic = 1405;`
+  * `state.gammaVanDenBroeck = 2.86e5 * ...;`
+  * power targets object hard-setting `state.P_avg` to 83.3/7.4/etc.
+* Quick find:
+
+```
+grep -nE "M_exotic\s*=|gammaVanDenBroeck\s*=|powerTargets|1405|2\.86e5|0\.159" server/energy-pipeline.ts
+```
+
+3. **Keep γ\_VdB a physics param**
+
+* In the server pipeline, set once:
+
+```ts
+state.gammaVanDenBroeck = Number(process.env.GAMMA_VDB_SEED) || 1e11;
+```
+
+* Never overwrite it for calibration.
+
+4. **(Optional) Paper mass as a toggle**
+
+* You pasted the new Step 7–8 block—great. If you want the demo lock:
+
+  * `MASS_LOCK_TO_TARGET=1`
+  * `MASS_TARGET_KG=1405`
+* Otherwise leave `MASS_LOCK_TO_TARGET=0` to show raw physics.
+
+---
+
+# Nice-to-do (prevents regressions)
+
+5. **Expose raw mass alongside final mass**
+
+* In the server state, you now set:
+
+  * `state.M_exotic_raw` (physics)
+  * `state.M_exotic` (final; equals raw × `massCalibration`)
+  * `state.massCalibration`
+* This makes UI/diagnostics clearer and keeps everyone honest.
+
+6. **Null-safe UI formatters**
+
+* Wherever the client renders numbers (Helix-CORE panels, popovers), guard against undefined:
+
+```ts
+const exp  = (x?: number) => Number.isFinite(x!) ? x!.toExponential(1) : "—";
+const fix1 = (x?: number) => Number.isFinite(x!) ? x!.toFixed(1) : "—";
+const pct  = (x?: number) => Number.isFinite(x!) ? (x!*100).toFixed(1)+"%" : "—";
+```
+
+* Then use: `exp(ps?.gammaVanDenBroeck)`, `fix1(ps?.P_avg)+" MW"`, etc.
+
+7. **Invalidate/refetch after mode changes**
+
+* Wherever you call `switchMode.mutate(...)` on the client:
+
+```ts
+import { queryClient } from "@/lib/queryClient";
+queryClient.invalidateQueries({ queryKey: ["/api/helix/pipeline"] });
+```
+
+* Ensures panels pick up the new physics values.
+
+8. **(If Luma returns later) Read-only first**
+
+* Make Luma read the same `/api/helix/pipeline` snapshot **only**.
+* Don’t let it publish/overwrite pipeline numbers.
+* Optional badge in UI if `massCalibration !== 1`:
+
+  * `Mass (final): 1,405 kg · cal × 0.87`
+
+---
+
+# Quick self-test (60 seconds)
+
+After restarting the server with your patches:
+
+1. **Check static energy**
+
+```ts
+console.log("U_static", state.U_static);  // For 5 cm², 1 nm: ≈ -2.17e-4 J
+```
+
+2. **Log physics summary**
+   Right after Step 8:
+
+```ts
+console.log("[PIPELINE]",
+  { duty: state.dutyCycle, sectors: state.sectorStrobing, N: state.N_tiles,
+    gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
+    U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
+    P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
+    massCal: state.massCalibration
+  });
+```
+
+3. **Client sanity**
+
+* Flip modes; verify `P_avg`, `zeta`, and `TS_ratio` change smoothly and no field shows `undefined` or crashes.
+
+---
+
+If you hit anything odd after this (e.g., power looks too high/low), send me the logged summary from `[PIPELINE]` and I’ll spot-check the numbers against the formulas you’re using.

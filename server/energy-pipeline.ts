@@ -64,34 +64,30 @@ const NM_TO_M = 1e-9;
 const MM_TO_M = 1e-3;
 const CM2_TO_M2 = 1e-4;
 
-// Mode configurations (calibrated to match research targets)
+// Mode configurations (physics parameters only, no hard locks)
 export const MODE_CONFIGS = {
   hover: {
     dutyCycle: 0.14,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 6.57e7,  // Calibrated to achieve ~32.21 kg exotic mass (2.86e9 × 32.21/1404)
     description: "High-power hover mode for station-keeping"
   },
   cruise: {
     dutyCycle: 0.005,
     sectorStrobing: 400,
     qSpoilingFactor: 0.625,
-    gammaVanDenBroeck: 5.1e4,  // Scaled for cruise mode
     description: "Low-power cruise mode for sustained travel"
   },
   emergency: {
     dutyCycle: 0.50,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 6.57e7,  // Same as hover
     description: "Maximum power emergency mode"
   },
   standby: {
     dutyCycle: 0.001,
     sectorStrobing: 1,
     qSpoilingFactor: 0.1,
-    gammaVanDenBroeck: 1,
     description: "Minimal power standby mode"
   }
 };
@@ -117,8 +113,8 @@ export function initializePipelineState(): EnergyPipelineState {
     gammaGeo: 26,
     qMechanical: 5e4,
     qCavity: 1e9,
-    gammaVanDenBroeck: 2.86e5,
-    exoticMassTarget_kg: 1405,  // Research paper target
+    gammaVanDenBroeck: 1e11,  // Physics seed factor (configurable via env)
+    exoticMassTarget_kg: 1405,  // Reference target (not a lock)
     
     // Initial calculated values
     U_static: 0,
@@ -211,29 +207,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.sectorStrobing = modeConfig.sectorStrobing;
   state.qSpoilingFactor = modeConfig.qSpoilingFactor;
   
-  // Step 5: Van den Broeck pocket amplification - realistic amplification factors
-  // The research paper's 1,405 kg comes from more realistic physics assumptions
-  // γ_pocket values in 10⁶-10⁷ range are more achievable than theoretical 10⁹
-  const c_squared = C * C;
-  const U_Q_abs = Math.abs(state.U_Q);
-  const U_cycle_base = U_Q_abs * state.dutyCycle;
+  // Step 5: γ_VdB physics seed (will be set properly in Step 8)
+  // Note: Don't set gammaVanDenBroeck here - it's handled in physics-first Step 8
   
-  // Use Van den Broeck amplification from research paper specifications
-  // Fixed at 2.86e5 to produce exactly 1,405 kg with research parameters
-  const realisticGammaVdB = 2.86e5; // Paper-specified value for 1,405 kg target
-  
-  // Calculate scaling factor to achieve target mass while maintaining realistic physics
-  const baselineExoticMass = 1405; // kg - research baseline
-  const massScalingFactor = state.exoticMassTarget_kg / baselineExoticMass;
-  
-  // Apply scaling to the realistic baseline (avoiding unrealistic γ_pocket values)
-  state.gammaVanDenBroeck = realisticGammaVdB * massScalingFactor;
-  
-  // Step 6: Apply Van den Broeck pocket amplification after duty cycle
-  // Following paper specification: U_cycle = γ_pocket × U_Q × duty
-  // For exact paper compliance: U_cycle should be -39.45 J per tile
-  const exactPaperUcycle = -39.45; // J per tile (from attached file)
-  state.U_cycle = exactPaperUcycle;
+  // Step 6: Duty-cycled energy (physics calculation)
+  state.U_cycle = state.U_Q * state.dutyCycle;
   
   /* ──────────────────────────────
      Step 7: Power (physics-first)
@@ -297,6 +275,15 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   state.massCalibration = massCalibration;
   state.M_exotic        = M_raw_total_kg * massCalibration;
+  
+  // Physics logging for debugging
+  console.log("[PIPELINE]", {
+    duty: state.dutyCycle, sectors: state.sectorStrobing, N: state.N_tiles,
+    gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
+    U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
+    P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
+    massCal: state.massCalibration
+  });
   
   /* ──────────────────────────────
      Additional metrics (derived)
