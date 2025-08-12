@@ -488,11 +488,19 @@ export function getSystemMetrics(req: Request, res: Response) {
     totalTiles: N,
     activeFraction,                   // S / N (should be << 1)
 
-    // Power / mass (already computed on server)
-    energyOutput: state.P_avg,        // MW
+    // Power / mass (server-authoritative)
+    energyOutput: state.P_avg,        // MW (calibrated or raw based on MODEL_MODE)
     exoticMass: Number.isFinite(state.M_exotic) ? Math.round(state.M_exotic) : null,       // kg
     exoticMassRaw: Number.isFinite((state as any).M_exotic_raw) ? Math.round((state as any).M_exotic_raw) : undefined,
     massCalibration: (state as any).massCalibration ?? 1,
+
+    // Server-authoritative parameters (for client consistency)
+    gammaVanDenBroeck: state.gammaVanDenBroeck,  // Use server value, not client hardcode
+    gammaGeo: state.gammaGeo,
+    qCavity: state.qCavity,
+    
+    // Model mode indicator
+    modelMode: (state as any).modelMode || 'calibrated',
 
     // Duty visibility (helps explain ζ)
     dutyGlobal,

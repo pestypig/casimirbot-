@@ -1,0 +1,72 @@
+Quick, safe fix (make the server authoritative & consistent)
+A) Server: add a model switch and export both raw & calibrated
+In server/energy-pipeline.ts define one knob and stick to it:
+
+ts
+Copy
+Edit
+// top-level
+const MODEL_MODE: 'calibrated' | 'raw' =
+  (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
+Step 5 – γ_VdB should always come from the server
+
+ts
+Copy
+Edit
+const realisticGammaVdB = 2.86e5; // paper-consistent
+const massScaling = (state.exoticMassTarget_kg ?? 1405) / 1405;
+state.gammaVanDenBroeck = realisticGammaVdB * massScaling;
+Step 8 – expose both masses; choose which one to publish
+
+ts
+Copy
+Edit
+// compute raw mass (your existing physics path)
+// state.M_exotic_raw = <E/c^2 from dynamic-casimir with current params>;
+state.M_exotic_raw = Math.max(0, Number(state.M_exotic_raw ?? 0));
+
+// calibrated mass (paper target)
+const M_CAL = 1405; // kg
+
+state.M_exotic = (MODEL_MODE === 'calibrated') ? M_CAL : state.M_exotic_raw;
+Power (same idea—either target or raw):
+
+ts
+Copy
+Edit
+const powerTargets = { hover: 83.3, cruise: 7.4, emergency: 297.5, standby: 0 };
+state.P_avg = (MODEL_MODE === 'calibrated')
+  ? (powerTargets as any)[state.currentMode] ?? 83.3
+  : Number(state.P_avg_raw ?? 0); // compute raw if you want, or leave 0 for now
+B) Server: make /api/helix/metrics the single “truth”
+Return the strobe-aware fields and the parameters the UI needs:
+
+gammaVanDenBroeck (from server)
+
+dutyGlobal, dutyEffectiveFR, activeTiles=S, totalTiles=N
+
+exoticMass (published value) and exoticMassRaw for tooltips
+
+modelMode so the client knows what it’s showing
+
+(Your previous metrics patch is almost there—just add gammaVanDenBroeck and modelMode.)
+
+C) Client: stop using client defaults at render time
+In HELIX-CORE:
+
+For the “Pipeline Parameters” footer, read:
+
+Duty from metrics.dutyGlobal
+
+Sectors from metrics.activeTiles
+
+γ_VdB from metrics.gammaVanDenBroeck
+
+For “Exotic Mass” show metrics.exoticMass; optionally put exoticMassRaw in a tooltip.
+
+For “Energy Output” show metrics.energyOutput only.
+
+Remove/ignore any γ_VdB = 1e11 constants in MODE_CONFIGS, natario-warp.ts, dynamic-casimir.ts. If those modules need γ_VdB for visuals, pass the server value in props; don’t hardcode it.
+
+D) Optional UI hint
+If modelMode === 'raw', add a tiny caption: “raw physics (strobe-aware)”. If calibrated, show: “paper-calibrated”.
