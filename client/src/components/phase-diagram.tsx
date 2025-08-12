@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MetricsDashboard from './metrics-dashboard';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 import { queryClient } from '@/lib/queryClient';
+import { pushPipelineSnapshot } from '@/lib/pipeline-bus';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -353,20 +354,18 @@ function InteractiveHeatMap({
               value={selectedMode} 
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
-                // Trigger zen toast with current metrics - delay to get fresh values
-                setTimeout(() => {
-                  const currentPipeline = queryClient.getQueryData(['/api/helix/pipeline']) as any;
-                  if (currentPipeline) {
-                    zenLongToast("mode:switch", {
-                      mode: currentPipeline.currentMode,
-                      duty: currentPipeline.dutyCycle,
-                      powerMW: currentPipeline.P_avg,
-                      zeta: currentPipeline.zeta,
-                      tsRatio: currentPipeline.TS_ratio,
-                      exoticKg: currentPipeline.M_exotic
-                    });
-                  }
-                }, 100); // Small delay to ensure optimistic update has applied
+                // Read the cache we just wrote in LiveEnergyPipeline
+                const snap = queryClient.getQueryData(['/api/helix/pipeline']) as any;
+                if (snap) {
+                  zenLongToast("mode:switch", {
+                    mode: snap.currentMode,
+                    duty: snap.dutyCycle,
+                    powerMW: snap.P_avg,
+                    zeta: snap.zeta,
+                    tsRatio: snap.TS_ratio,
+                    exoticKg: snap.M_exotic
+                  });
+                }
               }}
             >
               <SelectTrigger>

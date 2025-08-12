@@ -6,6 +6,7 @@ import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { queryClient } from "@/lib/queryClient";
+import { pushPipelineSnapshot } from "@/lib/pipeline-bus";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -270,6 +271,35 @@ export function LiveEnergyPipeline({
         gammaGeo: gammaGeo // Keep existing gamma
       });
     }
+
+    // --- BUILD A LIVE SNAPSHOT FROM THIS COMPONENT'S CALCULATION ---
+    const snap = {
+      currentMode: mode.name.toLowerCase(),      // 'hover' | 'cruise' | ...
+      dutyCycle: mode.duty,
+      P_avg: P_total_realistic,                  // MW
+      zeta,
+      TS_ratio,
+      M_exotic: M_exotic_total,
+      updatedAt: Date.now()
+    };
+
+    // 1) update react-query cache immediately (so readers get fresh values)
+    queryClient.setQueryData(['/api/helix/pipeline'], snap);
+
+    // 2) broadcast to anything that listens (Luma, HUD, etc.)
+    pushPipelineSnapshot(snap);
+
+    // 3) show the toast using these *fresh* values (no cache read)
+    setTimeout(() => {
+      zenLongToast("mode:switch", {
+        mode: snap.currentMode,
+        duty: snap.dutyCycle,
+        powerMW: snap.P_avg,
+        zeta: snap.zeta,
+        tsRatio: snap.TS_ratio,
+        exoticKg: snap.M_exotic
+      });
+    }, 50);
   };
   
   // Utility functions (declare before using)
@@ -324,23 +354,7 @@ export function LiveEnergyPipeline({
               <em>Moving Zen:</em> Every journey begins in stillness. Choose bearing; then move without hesitation (maai).
             </TooltipContent>
           </Tooltip>
-          <Select value={selectedMode} onValueChange={(value) => {
-            handleModeChange(value);
-            // Trigger zen toast for mode change - delay to get fresh values
-            setTimeout(() => {
-              const currentPipeline = queryClient.getQueryData(['/api/helix/pipeline']) as any;
-              if (currentPipeline) {
-                zenLongToast("mode:switch", {
-                  mode: currentPipeline.currentMode,
-                  duty: currentPipeline.dutyCycle,
-                  powerMW: currentPipeline.P_avg,
-                  zeta: currentPipeline.zeta,
-                  tsRatio: currentPipeline.TS_ratio,
-                  exoticKg: currentPipeline.M_exotic
-                });
-              }
-            }, 100); // Small delay to ensure optimistic update has applied
-          }}>
+          <Select value={selectedMode} onValueChange={handleModeChange}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>

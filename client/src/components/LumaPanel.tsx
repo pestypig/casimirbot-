@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+import { onPipelineSnapshot, type PipelineSnapshot } from "@/lib/pipeline-bus";
 
 interface LumaPanelProps {
   isOpen: boolean;
@@ -12,14 +13,28 @@ interface LumaPanelProps {
 }
 
 export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
-  const { data: pipeline, refetch } = useEnergyPipeline();
-  
-  // Force refresh when panel opens to get latest data
-  React.useEffect(() => {
-    if (isOpen) {
-      refetch();
-    }
-  }, [isOpen, refetch]);
+  const { data: cached } = useEnergyPipeline();
+  const [live, setLive] = React.useState<PipelineSnapshot | null>(null);
+
+  React.useEffect(() => onPipelineSnapshot(setLive), []);
+
+  const snap: PipelineSnapshot = live ?? (cached ? {
+    currentMode: (cached as any).currentMode || 'hover',
+    dutyCycle: (cached as any).dutyCycle || 0.14,
+    P_avg: (cached as any).P_avg || 83.3,
+    zeta: (cached as any).zeta || 0.032,
+    TS_ratio: (cached as any).TS_ratio || 4102.7,
+    M_exotic: (cached as any).M_exotic || 1405,
+    updatedAt: Date.now()
+  } : {
+    currentMode: 'hover',
+    dutyCycle: 0.14,
+    P_avg: 83.3,
+    zeta: 0.032,
+    TS_ratio: 4102.7,
+    M_exotic: 1405,
+    updatedAt: 0
+  });
   
   if (!isOpen) return null;
 
@@ -71,18 +86,14 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
             <TabsContent value="now" className="space-y-3 mt-4">
               <div className="text-sm text-slate-300">
                 <p className="font-medium text-cyan-200">Current Status</p>
-                {pipeline ? (
-                  <>
-                    <p className="capitalize">{(pipeline as EnergyPipelineState).currentMode} mode active. Form held at {((pipeline as EnergyPipelineState).dutyCycle * 100).toFixed(1)}% duty.</p>
-                    <p>ζ = {((pipeline as EnergyPipelineState).zeta?.toFixed(3) ?? '0.000')} ({(pipeline as EnergyPipelineState).zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
-                    <p>TS ratio = {((pipeline as EnergyPipelineState).TS_ratio / 1000).toFixed(1)}k ({(pipeline as EnergyPipelineState).TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
-                    <p className="text-xs text-slate-400 mt-2">
-                      Power: {((pipeline as EnergyPipelineState).P_avg / 1e6).toFixed(1)} MW • Mass: {((pipeline as EnergyPipelineState).M_exotic / 1000).toFixed(1)} t
-                    </p>
-                  </>
-                ) : (
-                  <p>Loading status...</p>
-                )}
+                <>
+                  <p className="capitalize">{snap.currentMode} mode active. Form held at {(snap.dutyCycle * 100).toFixed(1)}% duty.</p>
+                  <p>ζ = {(snap.zeta?.toFixed(3) ?? '0.000')} ({snap.zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
+                  <p>TS ratio = {(snap.TS_ratio / 1000).toFixed(1)}k ({snap.TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
+                  <p className="text-xs text-slate-400 mt-2">
+                    Power: {snap.P_avg.toFixed(1)} MW • Mass: {(snap.M_exotic / 1000).toFixed(1)} t
+                  </p>
+                </>
               </div>
             </TabsContent>
             <TabsContent value="theory" className="space-y-3 mt-4">
