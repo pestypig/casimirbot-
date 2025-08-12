@@ -354,7 +354,18 @@ function InteractiveHeatMap({
               value={selectedMode} 
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
-                // LiveEnergyPipeline handles the mode switch toast with fresh values
+                
+                // Update pipeline bus so Luma gets the new mode immediately
+                const snap = queryClient.getQueryData(['/api/helix/pipeline']) as any;
+                if (snap) {
+                  const updatedSnap = {
+                    ...snap,
+                    currentMode: value,
+                    updatedAt: Date.now()
+                  };
+                  queryClient.setQueryData(['/api/helix/pipeline'], updatedSnap);
+                  pushPipelineSnapshot(updatedSnap);
+                }
               }}
             >
               <SelectTrigger>
