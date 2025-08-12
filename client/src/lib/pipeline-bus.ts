@@ -7,8 +7,11 @@ export type PipelineSnapshot = {
   zeta: number;
   TS_ratio: number;
   M_exotic: number;   // kg
+  origin: "live-energy" | "helix-core" | "server";
   updatedAt: number;
 };
+
+export const PIPELINE_KEY = ["/api/helix/pipeline"];
 
 const EVT = 'helix:pipeline:update';
 

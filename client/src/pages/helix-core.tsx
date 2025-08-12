@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Grid3X3, Gauge, Brain, Calendar, Terminal, Atom, Cpu, Send, AlertCircle, CheckCircle2, Zap, Database, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { pushPipelineSnapshot, PIPELINE_KEY } from "@/lib/pipeline-bus";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -163,6 +164,25 @@ export default function HelixCore() {
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
   const switchMode = useSwitchMode();
+
+  // Publish pipeline snapshot whenever Helix-CORE's pipeline state updates
+  React.useEffect(() => {
+    if (!pipelineState) return;
+    const snap = {
+      currentModeId: String(pipelineState.currentMode).toLowerCase(),
+      currentModeName: MODE_CONFIGS[pipelineState.currentMode]?.name ?? String(pipelineState.currentMode),
+      dutyCycle: pipelineState.dutyCycle ?? 0,
+      P_avg: pipelineState.P_avg ?? 0,
+      zeta: pipelineState.zeta ?? 0,
+      TS_ratio: pipelineState.TS_ratio ?? 0,
+      M_exotic: pipelineState.M_exotic ?? 0,
+      origin: "helix-core" as const,
+      updatedAt: Date.now(),
+    };
+    queryClient.setQueryData(PIPELINE_KEY, snap);
+    pushPipelineSnapshot(snap);
+    console.log('[PIPELINE] Helix-CORE published:', snap.currentModeId, snap.P_avg, snap.origin);
+  }, [pipelineState?.currentMode, pipelineState?.dutyCycle, pipelineState?.P_avg, pipelineState?.zeta, pipelineState?.TS_ratio, pipelineState?.M_exotic]);
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -531,7 +551,23 @@ export default function HelixCore() {
                     <Select 
                       value={pipelineState?.currentMode || 'hover'}
                       onValueChange={(mode) => {
-                        switchMode.mutate(mode as any);
+                        switchMode.mutate(mode as any, {
+                          onSuccess: () => {
+                            // Optimistic broadcast with new mode
+                            const ps = queryClient.getQueryData(PIPELINE_KEY) as any;
+                            if (ps) {
+                              const snap = { 
+                                ...ps,
+                                currentModeId: String(mode).toLowerCase(),
+                                currentModeName: MODE_CONFIGS[mode]?.name ?? String(mode),
+                                origin: "helix-core" as const,
+                                updatedAt: Date.now()
+                              };
+                              queryClient.setQueryData(PIPELINE_KEY, snap);
+                              pushPipelineSnapshot(snap);
+                            }
+                          }
+                        });
                         setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
                       }}
                     >

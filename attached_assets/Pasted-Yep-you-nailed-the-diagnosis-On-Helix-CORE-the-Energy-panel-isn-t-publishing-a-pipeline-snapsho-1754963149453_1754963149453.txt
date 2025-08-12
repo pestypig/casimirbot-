@@ -1,0 +1,163 @@
+Yep—you nailed the diagnosis. On **Helix-CORE** the Energy panel isn’t publishing a pipeline snapshot, so Luma gets `undefined` fields and then tries to `.toFixed()` them → crash. On the home page you already publish a snapshot, so it works there.
+
+Let’s make both pages write to the **same source of truth** and make Luma bullet-proof when a snapshot hasn’t arrived yet.
+
+---
+
+## 1) One shared snapshot channel
+
+(If you already added this earlier, keep using it.)
+
+```ts
+// lib/pipeline-bus.ts
+export type PipelineSnapshot = {
+  currentModeId: string;   // "hover" | "cruise" | ...
+  currentModeName: string; // "Hover"
+  dutyCycle: number;       // 0.14
+  P_avg: number;           // MW
+  zeta: number;
+  TS_ratio: number;
+  M_exotic: number;        // kg
+  origin: "live-energy" | "helix-core" | "server";
+  updatedAt: number;
+};
+
+export const PIPELINE_KEY = ["/api/helix/pipeline"];
+
+const EVT = "helix:pipeline:update";
+export function pushPipelineSnapshot(s: PipelineSnapshot) {
+  window.dispatchEvent(new CustomEvent(EVT, { detail: s }));
+}
+export function onPipelineSnapshot(cb: (s: PipelineSnapshot) => void) {
+  const h = (e: Event) => cb((e as CustomEvent).detail as PipelineSnapshot);
+  window.addEventListener(EVT, h);
+  return () => window.removeEventListener(EVT, h);
+}
+```
+
+---
+
+## 2) Helix-CORE: publish a snapshot
+
+In **`client/src/pages/helix-core.tsx`** (Energy Control Panel section):
+
+* When the page **receives/changes** `pipelineState`, broadcast it.
+* When **mode changes** via the select, broadcast immediately using the *new* values (if you compute them locally) or the latest `pipelineState` plus new `mode` if that’s all you have.
+
+Add near the imports:
+
+```ts
+import { queryClient } from "@/lib/queryClient";
+import { pushPipelineSnapshot, PIPELINE_KEY } from "@/lib/pipeline-bus";
+import { MODE_CONFIGS } from "@/hooks/use-energy-pipeline"; // already there in your file
+```
+
+Add an effect that fires whenever Helix-CORE’s pipeline state updates:
+
+```tsx
+const ps = pipelineState; // shorthand
+
+React.useEffect(() => {
+  if (!ps) return;
+  const snap = {
+    currentModeId: String(ps.currentMode).toLowerCase(),
+    currentModeName: MODE_CONFIGS[ps.currentMode]?.name ?? String(ps.currentMode),
+    dutyCycle: ps.dutyCycle ?? 0,
+    P_avg: ps.P_avg ?? 0,
+    zeta: ps.zeta ?? 0,
+    TS_ratio: ps.TS_ratio ?? 0,
+    M_exotic: ps.M_exotic ?? 0,
+    origin: "helix-core" as const,
+    updatedAt: Date.now(),
+  };
+  queryClient.setQueryData(PIPELINE_KEY, snap);
+  pushPipelineSnapshot(snap);
+}, [ps?.currentMode, ps?.dutyCycle, ps?.P_avg, ps?.zeta, ps?.TS_ratio, ps?.M_exotic]);
+```
+
+When the **mode selector** runs `switchMode.mutate(...)`, after success you can also emit (optional, but snappier):
+
+```ts
+onSuccess: () => {
+  // force a refetch if your hook uses react-query
+  queryClient.invalidateQueries({ queryKey: PIPELINE_KEY });
+
+  // optional: optimistic broadcast using last known numbers + new mode label
+  const ps = queryClient.getQueryData(PIPELINE_KEY) as any;
+  if (ps) {
+    const snap = { ...ps,
+      currentModeId: String(mode).toLowerCase(),
+      currentModeName: MODE_CONFIGS[mode]?.name ?? String(mode),
+      origin: "helix-core",
+      updatedAt: Date.now()
+    };
+    queryClient.setQueryData(PIPELINE_KEY, snap);
+    pushPipelineSnapshot(snap);
+  }
+}
+```
+
+> Do **not** compute alternate numbers in Helix-CORE if the pipeline math lives elsewhere—just publish what that page actually knows. The Live-Energy page will overwrite the snapshot with its authoritative math when it opens/updates.
+
+---
+
+## 3) Luma: guard against `undefined`
+
+Patch Luma’s render helpers so it never calls `.toFixed()` on `undefined`:
+
+```tsx
+const fmtPct = (x?: number) => (Number.isFinite(x!) ? (x! * 100).toFixed(1) + "%" : "—");
+const fmt3   = (x?: number) => (Number.isFinite(x!) ? x!.toFixed(3) : "—");
+const fmtTS  = (x?: number) =>
+  Number.isFinite(x!) ? (x! >= 1000 ? (x!/1000).toFixed(1) + "k" : x!.toFixed(0)) : "—";
+const fmtMW  = (x?: number) => (Number.isFinite(x!) ? x!.toFixed(1) + " MW" : "—");
+const fmtMass= (kg?: number) =>
+  Number.isFinite(kg!) ? (kg! >= 1000 ? (kg!/1000).toFixed(1) + " t" : kg!.toFixed(0) + " kg") : "—";
+
+// snap may be null on first paint
+if (!snap) return <div className="px-4 py-2 text-sm text-slate-400">Awaiting pipeline…</div>;
+
+<div className="text-sm leading-6">
+  <div>{snap.currentModeName ?? "—"} • Duty {fmtPct(snap.dutyCycle)}</div>
+  <div>ζ = {fmt3(snap.zeta)} • TS ≈ {fmtTS(snap.TS_ratio)}</div>
+  <div>Power {fmtMW(snap.P_avg)} • Mass {fmtMass(snap.M_exotic)}</div>
+</div>
+```
+
+This eliminates the “read properties of undefined (toFixed)” crash on the Helix-CORE page.
+
+---
+
+## 4) Make sure both routes share the same QueryClient
+
+Double-check `App.tsx`:
+
+```tsx
+<QueryClientProvider client={queryClient}>
+  <LumaProvider>{/* all routes, including Helix-CORE */}</LumaProvider>
+</QueryClientProvider>
+```
+
+If Helix-CORE was outside this provider, it wouldn’t see updates.
+
+---
+
+## 5) Optional: who’s writing the snapshot?
+
+Temporarily log in the bus subscriber (Luma) to confirm both pages publish:
+
+```ts
+console.log("[PIPELINE]", snap.currentModeId, snap.P_avg, snap.origin, snap.updatedAt);
+```
+
+You should see `origin: live-energy` on the home page and `origin: helix-core` when you’re on Helix-CORE.
+
+---
+
+### What this fixes
+
+* Luma no longer crashes on Helix-CORE (null-safe formatting).
+* Luma shows **current numbers** on **both pages** because each page publishes a snapshot to the same key + bus.
+* The Helix-CORE panel’s mode selector and the Live-Energy page will stay in sync (last writer wins, but both write to the same place).
+
+If you want, paste the current Helix-CORE “Energy Control Panel” block; I’ll drop the exact `useEffect` + `onSuccess` lines right where they belong.

@@ -267,6 +267,7 @@ export function LiveEnergyPipeline({
       zeta,
       TS_ratio,
       M_exotic: M_exotic_total,
+      origin: "live-energy" as const,
       updatedAt: Date.now()
     };
 
@@ -306,6 +307,7 @@ export function LiveEnergyPipeline({
       zeta,
       TS_ratio,
       M_exotic: M_exotic_total,
+      origin: "live-energy" as const,
       updatedAt: Date.now()
     };
 

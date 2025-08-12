@@ -87,14 +87,18 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
             <TabsContent value="now" className="space-y-3 mt-4">
               <div className="text-sm text-slate-300">
                 <p className="font-medium text-cyan-200">Current Status</p>
-                <>
-                  <p className="capitalize">{snap.currentModeName} mode active. Form held at {(snap.dutyCycle * 100).toFixed(1)}% duty.</p>
-                  <p>ζ = {(snap.zeta?.toFixed(3) ?? '0.000')} ({snap.zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
-                  <p>TS ratio = {(snap.TS_ratio / 1000).toFixed(1)}k ({snap.TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Power: {snap.P_avg.toFixed(1)} MW • Mass: {(snap.M_exotic / 1000).toFixed(1)} t
-                  </p>
-                </>
+                {!snap ? (
+                  <div className="px-4 py-2 text-sm text-slate-400">Awaiting pipeline…</div>
+                ) : (
+                  <>
+                    <p className="capitalize">{snap.currentModeName ?? "—"} mode active. Form held at {(Number.isFinite(snap.dutyCycle) ? (snap.dutyCycle * 100).toFixed(1) : "—")}% duty.</p>
+                    <p>ζ = {(Number.isFinite(snap.zeta) ? snap.zeta.toFixed(3) : "—")} ({(snap.zeta || 0) < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
+                    <p>TS ratio = {Number.isFinite(snap.TS_ratio) ? (snap.TS_ratio >= 1000 ? (snap.TS_ratio/1000).toFixed(1) + "k" : snap.TS_ratio.toFixed(0)) : "—"} ({(snap.TS_ratio || 0) > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
+                    <p className="text-xs text-slate-400 mt-2">
+                      Power: {Number.isFinite(snap.P_avg) ? snap.P_avg.toFixed(1) + " MW" : "—"} • Mass: {Number.isFinite(snap.M_exotic) ? (snap.M_exotic >= 1000 ? (snap.M_exotic/1000).toFixed(1) + " t" : snap.M_exotic.toFixed(0) + " kg") : "—"}
+                    </p>
+                  </>
+                )}
               </div>
             </TabsContent>
             <TabsContent value="theory" className="space-y-3 mt-4">
