@@ -325,28 +325,41 @@ export function LiveEnergyPipeline({
           </Tooltip>
           <Select value={selectedMode} onValueChange={(value) => {
             handleModeChange(value);
-            // Trigger zen toast for mode change
+            
+            // Calculate NEW mode values on the fly for toast
             const mode = modes[value as keyof typeof modes];
             if (mode) {
+              // Recalculate power and zeta with new mode duty cycle
+              const new_mode_throttle = mode.duty;
+              const new_combined_throttle = new_mode_throttle;
+              const new_P_avg_W = P_raw_W * new_combined_throttle;
+              const new_P_total_realistic = new_P_avg_W / 1e6; // Convert to MW
+              const new_zeta = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : Infinity;
+              
+              // Calculate new exotic mass with new duty cycle
+              const new_U_cycle = U_cycle_base * new_mode_throttle;
+              const new_M_exotic_per_tile = Math.abs(new_U_cycle) / (c * c);
+              const new_M_exotic_total = new_M_exotic_per_tile * N_tiles;
+              
               zenLongToast("mode:switch", {
                 mode: mode.name,
                 duty: mode.duty,
-                powerMW: P_total_realistic, // Use actual calculated power
-                zeta: zeta, // Use actual calculated ζ
-                tsRatio: TS_ratio, // Use actual T_s/T_LC ratio
-                exoticKg: M_exotic_total, // Use actual exotic mass
+                powerMW: new_P_total_realistic, // Use NEW calculated power for this mode
+                zeta: new_zeta, // Use NEW calculated ζ for this mode
+                tsRatio: TS_ratio, // This is mode-independent
+                exoticKg: new_M_exotic_total, // Use NEW exotic mass for this mode
                 gammaGeo: gamma_geo,
                 qFactor: Q_cavity,
-                sagDepthMm: 16, // From current sag depth
-                freqGHz: f_m / 1e9, // Convert Hz to GHz
+                sagDepthMm: 16,
+                freqGHz: f_m / 1e9,
                 sectors: mode.sectors,
-                maxPowerMW: 120, // Mode-dependent constraint
+                maxPowerMW: value === 'hover' ? 120 : value === 'cruise' ? 20 : value === 'emergency' ? 200 : 10,
                 massTolerancePct: 5,
                 shipRadiusM: R_ship,
-                gapNm: 16, // cavity gap
-                frOk: zeta < (value === 'hover' ? 0.05 : value === 'cruise' ? 1.0 : 20.0),
+                gapNm: 16,
+                frOk: new_zeta < (value === 'hover' ? 0.05 : value === 'cruise' ? 1.0 : 20.0),
                 natarioOk: TS_ratio > 100,
-                curvatureOk: P_total_realistic < 120
+                curvatureOk: new_P_total_realistic < (value === 'hover' ? 120 : value === 'cruise' ? 20 : 200)
               });
             }
           }}>
