@@ -341,26 +341,26 @@ export default function HelixCore() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
-      <div className="container mx-auto p-4 text-slate-100">
+    <div className="theme-bg theme-text min-h-screen relative z-10">
+      <div className="container mx-auto p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <Cpu className="w-8 h-8 text-cyan-400" />
+            <Cpu className="w-8 h-8" style={{ color: "var(--accent)" }} />
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold" style={{ color: "var(--accent)" }}>
                 HELIX-CORE
               </h1>
-              <p className="text-sm text-slate-400">Needle Hull Mainframe System</p>
+              <p className="text-sm opacity-70">Needle Hull Mainframe System</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <Badge variant="outline" className="border-green-400 text-green-400">
+            <Badge variant="outline" className="theme-ring" style={{ color: "var(--accent)" }}>
               <Activity className="w-3 h-3 mr-1" />
               ONLINE
             </Badge>
             <Link href="/">
-              <Button variant="outline" className="flex items-center gap-2">
+              <Button variant="outline" className="theme-ring flex items-center gap-2">
                 <Home className="w-4 h-4" />
                 Bridge
               </Button>
@@ -522,7 +522,7 @@ export default function HelixCore() {
             )}
 
             {/* Energy Control Panel */}
-            <Card className="bg-slate-900/50 border-slate-800">
+            <Card className="theme-panel border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="w-5 h-5 text-yellow-400" />
@@ -768,7 +768,7 @@ export default function HelixCore() {
             <AmplificationPanel />
 
             {/* Resonance Scheduler */}
-            <Card className="bg-slate-900/50 border-slate-800">
+            <Card className="theme-panel border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-purple-400" />
@@ -826,7 +826,7 @@ export default function HelixCore() {
           {/* Right Column - Terminal & Inspector */}
           <div className="space-y-4">
             {/* Log + Document Terminal */}
-            <Card className="bg-slate-900/50 border-slate-800">
+            <Card className="theme-panel border-white/10">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Terminal className="w-5 h-5 text-orange-400" />
@@ -1128,7 +1128,10 @@ export default function HelixCore() {
         </div>
       </div>
 
-
+      {/* Floating Change View Button */}
+      <Link href="/" className="fixed bottom-4 right-4 theme-panelAlt theme-ring px-3 py-2 rounded-md text-sm hover:translate-y-[-2px] transition-all z-50">
+        Change View
+      </Link>
     </div>
   );
 }
