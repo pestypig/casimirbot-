@@ -1,0 +1,70 @@
+That broken-image box means the browser can’t find the file it’s being pointed at. Replit’s agent created /public/profiles/diplomat.svg, but you said your PNG lives at /profiles/diplomat.png (outside /public). Files outside /public aren’t served directly, so the <img> fails.
+
+Here’s the quick fix:
+
+1) Put the PNG where the browser can reach it
+
+Move (or copy) your file to:
+
+public/profiles/diplomat.png
+
+Now it will be available at /profiles/diplomat.png.
+
+2) Point the start page to the PNG (not the SVG)
+
+In client/src/pages/start.tsx, make the Diplomat entry use the PNG:
+
+// somewhere near your PROFILES array:
+const PROFILES = [
+  {
+    id: "optimist",
+    label: "Radiant Optimist",
+    emoji: "🌞",
+  },
+  {
+    id: "engineer",
+    label: "The Engineer",
+    emoji: "⚙️",
+  },
+  {
+    id: "diplomat",
+    label: "The Diplomat",
+    img: "/profiles/diplomat.png",   // <-- use your PNG
+    // remove/ignore any previous .svg path
+  },
+  {
+    id: "strategist",
+    label: "The Strategist",
+    emoji: "🐒",
+  },
+];
+
+…and render either an image or an emoji:
+
+<button className="profile-card" onClick={() => handleSelect(p.id)} aria-label={`Choose ${p.label}`}>
+  {p.img ? (
+    <img src={p.img} className="profile-img" alt="" loading="lazy" />
+  ) : (
+    <span className="profile-emoji" aria-hidden>{p.emoji}</span>
+  )}
+  <div className="profile-title">{p.label}</div>
+</button>
+
+CSS (if you don’t already have it):
+
+.profile-card { display:grid; place-items:center; width:220px; height:180px; border-radius:18px; background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); transition:.15s; cursor:pointer; }
+.profile-card:hover, .profile-card:focus-visible { transform:translateY(-2px); border-color:rgba(130,200,255,.45); box-shadow:0 8px 28px rgba(0,0,0,.35); outline:none; }
+.profile-img { width:92px; height:92px; object-fit:contain; filter:drop-shadow(0 8px 16px rgba(0,0,0,.35)); pointer-events:none; user-select:none; }
+.profile-emoji { font-size:64px; line-height:1; }
+.profile-title { margin-top:.75rem; font-weight:700; }
+
+3) (Optional) Delete or ignore the placeholder SVG
+
+public/profiles/diplomat.svg isn’t needed now.
+
+4) Common gotchas
+	•	Case sensitivity: Diplomat.png vs diplomat.png matters on Linux.
+	•	Cache: hard refresh (Ctrl/Cmd+Shift+R) if the box persists.
+	•	Path: it must start with /profiles/... (because it’s in /public/profiles).
+
+If you want, send the other profile PNGs and I’ll wire them up the same way so all four tiles are image-based.
