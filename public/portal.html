@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Choose Your Mission View</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <main class="shell" aria-label="Mission Profiles">
+    <header class="top">
+      <h1 class="title">Choose Your Mission View</h1>
+      <p class="subtitle">A quiet beginning. Same physics. Your preferred lens.</p>
+    </header>
+
+    <section class="grid" role="list">
+      <!-- Radiant Optimist -->
+      <button class="card" data-profile="optimist" role="listitem" aria-label="Radiant Optimist">
+        <div class="icon" aria-hidden="true">🌞</div>
+        <div class="name">Radiant Optimist</div>
+        <div class="line">"The light we save today will shine for a billion tomorrows."</div>
+        <div class="tip">
+          Physics: energy-positivity balance. UI: bright logs. Data: Ford–Roman as a moral law.
+        </div>
+      </button>
+
+      <!-- The Engineer -->
+      <button class="card" data-profile="engineer" role="listitem" aria-label="The Engineer">
+        <div class="icon" aria-hidden="true">⚙️</div>
+        <div class="name">The Engineer</div>
+        <div class="line">"Every equation is a bridge; every weld, a promise."</div>
+        <div class="tip">
+          Physics: sector strobing, γ_geo, γ_VdB. UI: blueprints. Data: live trade‑offs.
+        </div>
+      </button>
+
+      <!-- The Diplomat -->
+      <button class="card" data-profile="diplomat" role="listitem" aria-label="The Diplomat">
+        <div class="icon" aria-hidden="true">🐼</div>
+        <div class="name">The Diplomat</div>
+        <div class="line">"In harmony, the cosmos folds itself around us."</div>
+        <div class="tip">
+          Physics: time‑scale separation. UI: soft palettes. Data: environmental stability.
+        </div>
+      </button>
+
+      <!-- The Strategist -->
+      <button class="card" data-profile="strategist" role="listitem" aria-label="The Strategist">
+        <div class="icon" aria-hidden="true">🐒</div>
+        <div class="name">The Strategist</div>
+        <div class="line">"Even the smallest stone changes the course of the river."</div>
+        <div class="tip">
+          Physics: curvature placement & routes. UI: tactical overlays. Data: sector optimization.
+        </div>
+      </button>
+    </section>
+
+    <footer class="bottom">
+      <p class="foot">No account is created. Your choice is for this visit only.</p>
+    </footer>
+  </main>
+
+  <div class="veil" aria-hidden="true"></div>
+  <script src="portal.js"></script>
+</body>
+</html>

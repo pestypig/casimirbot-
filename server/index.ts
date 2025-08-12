@@ -9,6 +9,11 @@ app.use(express.urlencoded({ extended: false }));
 // Serve PDF files from attached_assets folder
 app.use('/attached_assets', express.static('attached_assets'));
 
+// Serve portal as the default route
+app.get('/', (req, res) => {
+  res.sendFile('portal.html', { root: 'public' });
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

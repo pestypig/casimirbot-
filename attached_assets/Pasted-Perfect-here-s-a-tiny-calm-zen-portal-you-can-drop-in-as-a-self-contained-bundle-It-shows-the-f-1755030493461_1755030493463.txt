@@ -1,0 +1,246 @@
+Perfect—here’s a tiny, calm, “zen” portal you can drop in as a self‑contained bundle.
+It shows the four profiles, enlarges the chosen icon, and then fades into your site (default redirect → /helix-core). No accounts, no persistence, non‑stimulating visuals.
+
+⸻
+
+1) portal.html
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Choose Your Mission View</title>
+  <link rel="stylesheet" href="portal.css" />
+</head>
+<body>
+  <main class="shell" aria-label="Mission Profiles">
+    <header class="top">
+      <h1 class="title">Choose Your Mission View</h1>
+      <p class="subtitle">A quiet beginning. Same physics. Your preferred lens.</p>
+    </header>
+
+    <section class="grid" role="list">
+      <!-- Radiant Optimist -->
+      <button class="card" data-profile="optimist" role="listitem" aria-label="Radiant Optimist">
+        <div class="icon" aria-hidden="true">🌞</div>
+        <div class="name">Radiant Optimist</div>
+        <div class="line">“The light we save today will shine for a billion tomorrows.”</div>
+        <div class="tip">
+          Physics: energy-positivity balance. UI: bright logs. Data: Ford–Roman as a moral law.
+        </div>
+      </button>
+
+      <!-- The Engineer -->
+      <button class="card" data-profile="engineer" role="listitem" aria-label="The Engineer">
+        <div class="icon" aria-hidden="true">⚙️</div>
+        <div class="name">The Engineer</div>
+        <div class="line">“Every equation is a bridge; every weld, a promise.”</div>
+        <div class="tip">
+          Physics: sector strobing, γ_geo, γ_VdB. UI: blueprints. Data: live trade‑offs.
+        </div>
+      </button>
+
+      <!-- The Diplomat -->
+      <button class="card" data-profile="diplomat" role="listitem" aria-label="The Diplomat">
+        <div class="icon" aria-hidden="true">🐼</div>
+        <div class="name">The Diplomat</div>
+        <div class="line">“In harmony, the cosmos folds itself around us.”</div>
+        <div class="tip">
+          Physics: time‑scale separation. UI: soft palettes. Data: environmental stability.
+        </div>
+      </button>
+
+      <!-- The Strategist -->
+      <button class="card" data-profile="strategist" role="listitem" aria-label="The Strategist">
+        <div class="icon" aria-hidden="true">🐒</div>
+        <div class="name">The Strategist</div>
+        <div class="line">“Even the smallest stone changes the course of the river.”</div>
+        <div class="tip">
+          Physics: curvature placement & routes. UI: tactical overlays. Data: sector optimization.
+        </div>
+      </button>
+    </section>
+
+    <footer class="bottom">
+      <p class="foot">No account is created. Your choice is for this visit only.</p>
+    </footer>
+  </main>
+
+  <div class="veil" aria-hidden="true"></div>
+  <script src="portal.js"></script>
+</body>
+</html>
+
+
+⸻
+
+2) portal.css
+
+/* Minimal, non-stimulating: soft contrast, gentle motion, plenty of whitespace */
+:root{
+  --bg:#0b1020;           /* deep blue-black */
+  --panel:#0f1530;        /* quiet panel */
+  --ink:#e8eefb;          /* calm text */
+  --muted:#9fb0c9;        /* secondary */
+  --accent:#8ac6ff;       /* very soft blue accent */
+  --ring:rgba(255,255,255,.08);
+}
+
+* { box-sizing: border-box; }
+html,body { height:100%; }
+body{
+  margin:0;
+  color:var(--ink);
+  background: radial-gradient(1200px 600px at 50% -10%, #111a3a 0%, var(--bg) 60%);
+  font: 14px/1.6 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.shell{
+  min-height:100%;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:2.5rem;
+  padding:4rem 1.5rem;
+}
+
+.top{ text-align:center; }
+.title{
+  margin:0 0 .25rem 0;
+  font-weight:600;
+  font-size: clamp(20px, 2.6vw, 28px);
+  letter-spacing:.2px;
+}
+.subtitle{
+  margin:0; opacity:.65;
+  font-size: 13px;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap:1rem;
+  width:min(920px, 92vw);
+}
+@media (max-width: 900px){
+  .grid{ grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+}
+@media (max-width: 520px){
+  .grid{ grid-template-columns: 1fr; }
+}
+
+.card{
+  appearance:none; border:0; cursor:pointer;
+  background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.00));
+  border-radius:14px;
+  padding:1.1rem .9rem;
+  text-align:center;
+  color:var(--ink);
+  outline: none;
+  box-shadow: 0 1px 0 var(--ring) inset, 0 0 0 1px var(--ring);
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease, opacity .18s ease;
+}
+.card:focus-visible{
+  box-shadow: 0 0 0 2px rgba(138,198,255,.40), 0 1px 0 rgba(255,255,255,.07) inset;
+}
+.card:hover{
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.00));
+}
+.card.selected{
+  transform: scale(1.08);
+  z-index: 10;
+}
+
+.icon{
+  font-size: clamp(40px, 6.2vw, 56px);
+  line-height:1; margin-bottom:.6rem;
+  filter: drop-shadow(0 1px 0 rgba(255,255,255,.05));
+}
+.name{
+  font-size: 15px; font-weight:600; letter-spacing:.2px;
+}
+.line{
+  margin-top:.2rem; font-size:12px; opacity:.75;
+}
+.tip{
+  margin-top:.8rem; font-size:11px; opacity:.6;
+}
+
+.bottom .foot{
+  margin:0; opacity:.55; font-size:12px;
+}
+
+/* entry/exit veil */
+.veil{
+  position: fixed; inset:0;
+  background: radial-gradient(1200px 600px at 50% -10%, rgba(10,14,24,.0), rgba(10,14,24,.82));
+  pointer-events:none;
+  opacity:0;
+  transition: opacity .45s ease;
+}
+.veil.on{ opacity:1; }
+
+/* respects reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .card, .veil { transition: none; }
+}
+
+
+⸻
+
+3) portal.js
+
+// Minimal interactions: enlarge chosen card, fade veil, then redirect.
+const REDIRECT_TO = "/helix-core"; // <-- change if your main page is different
+
+const cards = Array.from(document.querySelectorAll(".card"));
+const veil  = document.querySelector(".veil");
+
+function select(card){
+  // Clear selection, select this one
+  cards.forEach(c => c.classList.remove("selected"));
+  card.classList.add("selected");
+
+  // Gentle page veil
+  requestAnimationFrame(() => {
+    veil.classList.add("on");
+  });
+
+  // Short, calm delay then navigate
+  const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 650;
+  setTimeout(() => {
+    // No persistence; purely aesthetic entry
+    window.location.assign(REDIRECT_TO);
+  }, delay);
+}
+
+cards.forEach(card => {
+  card.addEventListener("click", () => select(card));
+  // Enter key support for keyboard users
+  card.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      select(card);
+    }
+  });
+});
+
+
+⸻
+
+How to wire it in
+	•	Put these three files in your web root (or wherever you serve static assets):
+	•	/portal.html
+	•	/portal.css
+	•	/portal.js
+	•	Make your app’s default route ( / ) serve portal.html.
+	•	If you already have an SPA router, add a route like /portal that shows this page and temporarily make / redirect to /portal.
+	•	Ensure the JS REDIRECT_TO matches your main page (I set it to /helix-core).
+
+That’s it. It’s intentionally simple and calm. If you want a slightly more narrative touch later, we can add a one‑line “mission whisper” under the subtitle that rotates between:
+	•	“Rescue the Sun: a public compact to keep the light.”
+	•	“Geometry, compassion, and discipline: moving Zen.”
+	•	“Casimir lattices aligned; duty cycles ready.”
+
+…but right now this version keeps the first impression minimal and non‑stimulating, like you requested.
