@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -161,7 +161,8 @@ export default function HelixCore() {
   }, []);
   
   // Use centralized energy pipeline
-  const { data: pipelineState } = useEnergyPipeline();
+  const { data: pipelineData } = useEnergyPipeline();
+  const pipelineState = pipelineData as EnergyPipelineState | undefined;
   const switchMode = useSwitchMode();
   
   // Fetch system metrics
