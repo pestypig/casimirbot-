@@ -1,4 +1,5 @@
 // Hook for accessing the centralized HELIX-CORE energy pipeline
+import React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { emit, LumaEvt } from "@/lib/luma-bus";
@@ -47,10 +48,29 @@ export interface EnergyPipelineState {
 
 // Hook to get current pipeline state
 export function useEnergyPipeline() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['/api/helix/pipeline'],
     refetchInterval: 1000, // Refresh every second
   });
+
+  // Also trigger pipeline bus whenever we get new data from the backend
+  React.useEffect(() => {
+    if (query.data) {
+      const data = query.data as any;
+      const snap = {
+        currentMode: data.currentMode || 'hover',
+        dutyCycle: data.dutyCycle || 0,
+        P_avg: data.P_avg || 0,
+        zeta: data.zeta || 0,
+        TS_ratio: data.TS_ratio || 0,
+        M_exotic: data.M_exotic || 0,
+        updatedAt: Date.now()
+      };
+      pushPipelineSnapshot(snap);
+    }
+  }, [query.data]);
+
+  return query;
 }
 
 // Hook to update pipeline parameters

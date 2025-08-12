@@ -8,6 +8,7 @@ import MetricsDashboard from './metrics-dashboard';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 import { queryClient } from '@/lib/queryClient';
 import { pushPipelineSnapshot } from '@/lib/pipeline-bus';
+import { useSwitchMode } from '@/hooks/use-energy-pipeline';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -32,6 +33,9 @@ function InteractiveHeatMap({
 }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Use the backend API for mode switching (same as LiveEnergyPipeline)
+  const switchMode = useSwitchMode();
   
   // Mode presets with authentic calculated values from Live Energy Pipeline
   const modePresets = {
@@ -355,16 +359,12 @@ function InteractiveHeatMap({
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
                 
-                // Update pipeline bus so Luma gets the new mode immediately
-                const snap = queryClient.getQueryData(['/api/helix/pipeline']) as any;
-                if (snap) {
-                  const updatedSnap = {
-                    ...snap,
-                    currentMode: value,
-                    updatedAt: Date.now()
-                  };
-                  queryClient.setQueryData(['/api/helix/pipeline'], updatedSnap);
-                  pushPipelineSnapshot(updatedSnap);
+                // Call backend API to switch mode (triggers pipeline bus with correct values)
+                switchMode.mutate(value as any);
+                
+                // Also notify parent if needed
+                if (onModeChange) {
+                  onModeChange(value);
                 }
               }}
             >
