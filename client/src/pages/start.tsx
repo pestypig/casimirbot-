@@ -44,7 +44,7 @@ export default function StartPortal() {
   const [location, setLocation] = useLocation();
 
   const pick = (k: ProfileKey) => setSelected(k);
-  const enter = () => setLocation("/");
+  const enter = () => setLocation("/bridge");
 
   return (
     <div className="min-h-screen bg-[#0b1020] text-slate-100 grid place-items-center">

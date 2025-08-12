@@ -16,11 +16,11 @@ import NotFound from "@/pages/not-found";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={StartPortal} />
+      <Route path="/bridge" component={Home} />
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
-      <Route path="/start" component={StartPortal} />
       <Route component={NotFound} />
     </Switch>
   );

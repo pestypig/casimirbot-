@@ -359,7 +359,7 @@ export default function HelixCore() {
               <Activity className="w-3 h-3 mr-1" />
               ONLINE
             </Badge>
-            <Link href="/">
+            <Link href="/bridge">
               <Button variant="outline" className="flex items-center gap-2">
                 <Home className="w-4 h-4" />
                 Bridge
