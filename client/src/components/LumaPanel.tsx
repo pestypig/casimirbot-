@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 
 interface LumaPanelProps {
   isOpen: boolean;
@@ -66,11 +66,11 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
                 <p className="font-medium text-cyan-200">Current Status</p>
                 {pipeline ? (
                   <>
-                    <p className="capitalize">{pipeline.currentMode} mode active. Form held at {(pipeline.dutyCycle * 100).toFixed(1)}% duty.</p>
-                    <p>ζ = {pipeline.zeta?.toFixed(3) ?? '0.000'} ({pipeline.zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
-                    <p>TS ratio = {(pipeline.TS_ratio / 1000).toFixed(1)}k ({pipeline.TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
+                    <p className="capitalize">{(pipeline as EnergyPipelineState).currentMode} mode active. Form held at {((pipeline as EnergyPipelineState).dutyCycle * 100).toFixed(1)}% duty.</p>
+                    <p>ζ = {((pipeline as EnergyPipelineState).zeta?.toFixed(3) ?? '0.000')} ({(pipeline as EnergyPipelineState).zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
+                    <p>TS ratio = {((pipeline as EnergyPipelineState).TS_ratio / 1000).toFixed(1)}k ({(pipeline as EnergyPipelineState).TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      Power: {(pipeline.P_avg / 1e6).toFixed(1)} MW • Mass: {(pipeline.M_exotic / 1000).toFixed(1)} t
+                      Power: {((pipeline as EnergyPipelineState).P_avg / 1e6).toFixed(1)} MW • Mass: {((pipeline as EnergyPipelineState).M_exotic / 1000).toFixed(1)} t
                     </p>
                   </>
                 ) : (

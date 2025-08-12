@@ -33,7 +33,9 @@ function App() {
   // Subscribe to luma whispers
   React.useEffect(() => {
     const handleWhisper = (event: CustomEvent) => {
-      const { lines } = event.detail;
+      const data = event.detail;
+      // Handle both old format {text} and new format {lines}
+      const lines = data.lines || (data.text ? [data.text] : ["Breathe once."]);
       setWhisperMsg(lines);
     };
 

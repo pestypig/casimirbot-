@@ -1,7 +1,7 @@
 // Hook for accessing the centralized HELIX-CORE energy pipeline
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { lumaWhisperWithContext } from "@/lib/luma-dispatch";
+import { emit, LumaEvt } from "@/lib/luma-bus";
 
 export interface EnergyPipelineState {
   // Input parameters
@@ -77,11 +77,22 @@ export function useSwitchMode() {
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
       
-      // Trigger Luma whisper for mode changes
-      lumaWhisperWithContext(`mode_${mode}`, {
-        dutyCycle: MODE_CONFIGS[mode]?.dutyCycle || 0.14,
-        powerMW: MODE_CONFIGS[mode]?.powerTarget || 83.3
-      });
+      /* LUMA-HOOK >>> */
+      emit(LumaEvt.MODE_CHANGED, { mode });
+      
+      // Mode-specific wisdom whispers
+      const wisdom = mode === "hover"
+        ? { lines: ["Timing matched.", "Hold form; let speed follow."] }
+        : mode === "cruise"
+        ? { lines: ["Form stable.", "Now add power—accuracy is final."] }
+        : mode === "emergency"
+        ? { lines: ["Maximum power engaged.", "Precision under pressure."] }
+        : mode === "standby"
+        ? { lines: ["Systems minimal.", "Ready state maintained."] }
+        : { lines: ["Mode updated.", "Accuracy is final—confirm margins."] };
+      
+      emit(LumaEvt.WHISPER, wisdom);
+      /* <<< LUMA-HOOK */
     }
   });
 }
