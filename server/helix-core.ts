@@ -487,51 +487,60 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
   const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, S);
 
+  const sec = state.__sectors ?? { 
+    TOTAL_SECTORS: 400, 
+    activeSectors: 1, 
+    activeFraction: 1/400, 
+    tilesPerSector: Math.floor(state.N_tiles/400), 
+    activeTiles: Math.floor(state.N_tiles/400) 
+  };
+  const fr = state.__fr ?? { 
+    dutyInstant: state.dutyCycle * state.qSpoilingFactor, 
+    dutyEffectiveFR: (state.dutyCycle * state.qSpoilingFactor) * sec.activeFraction, 
+    Q_quantum: 1e10 
+  };
+
   res.json({
-    // Sectors (from pipeline state)
-    activeSectors: state.activeSectors,
-    totalSectors: 400,
-    
-    // Tiles (from pipeline state)
-    activeTiles: state.activeTiles,
+    // tile/sector truth (these are what your Tile Grid should use)
     totalTiles: Math.floor(state.N_tiles),
-    tilesPerSector: state.tilesPerSector,
-    
-    // Strobing details
-    sectorStrobing: state.sectorStrobing,
-    currentSector,
-    activeFraction: state.activeFraction,
+    activeTiles: Math.floor(sec.activeTiles),
+    tilesPerSector: sec.tilesPerSector,
+    totalSectors: sec.TOTAL_SECTORS,
+    activeSectors: sec.activeSectors,
+    activeFraction: sec.activeFraction,
 
-    // Power and mass
-    energyOutput: state.P_avg, 
-    exoticMass: Math.round(state.M_exotic),
-    exoticMassRaw: Number.isFinite(state.M_exotic_raw) ? Math.round(state.M_exotic_raw) : undefined,
-    massCalibration: state.massCalibration ?? 1,
+    // timing (optional but nice for the HUD)
+    strobeHz: state.modulationFreq_GHz * 1e9 / sec.TOTAL_SECTORS,        // per sector sweep rate
+    sectorPeriod_ms: 1000 * sec.TOTAL_SECTORS / (state.modulationFreq_GHz * 1e9),
 
-    // Physics parameters
+    // core outputs
+    energyOutput: state.P_avg,                 // MW (your calibrated target)
+    exoticMass: Math.round(state.M_exotic),    // kg (calibrated/paper value)
+    exoticMassRaw: Math.round(state.M_exotic_raw ?? state.M_exotic), // if you keep a raw
+
+    // FR & friends
+    dutyGlobal: state.dutyCycle,
+    dutyInstant: fr.dutyInstant,
+    dutyEffectiveFR: fr.dutyEffectiveFR,
     gammaVanDenBroeck: state.gammaVanDenBroeck,
     gammaGeo: state.gammaGeo,
     qCavity: state.qCavity,
-    modelMode: state.modelMode || 'calibrated',
-    
-    // Duty calculations
-    dutyGlobal: state.dutyCycle,
-    dutyEffectiveFR: state.dutyEffective_FR,
-    strobeHz: state.strobeHz,
-    sectorPeriod_ms: state.sectorPeriod_ms,
 
-    // Constraints
     fordRoman: {
       value: state.zeta,
       limit: 1.0,
-      status: state.zeta < 1.0 ? "PASS" : "FAIL"
+      status: state.fordRomanCompliance ? "PASS" : "FAIL"
     },
-    natario: { value: 0, status: "VALID" },
-
-    // System status
-    curvatureMax: Math.abs(state.U_cycle ?? 0) / (299792458 * 299792458),
+    natario: {
+      value: 0,
+      status: state.natarioConstraint ? "VALID" : "WARN"
+    },
+    curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
     timeScaleRatio: state.TS_ratio,
-    overallStatus: state.fordRomanCompliance ? "NOMINAL" : "CHECK"
+    overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
+
+    // optional debugging breadcrumbs
+    modelMode: state.modelMode ?? "calibrated"
   });
 }
 

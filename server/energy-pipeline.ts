@@ -58,6 +58,10 @@ export interface EnergyPipelineState {
   activeTiles: number;      // Currently active tiles
   activeFraction: number;   // Active sectors / total sectors
   
+  // Internal calculation helpers (optional fields)
+  __sectors?: any;          // Sector calculation cache
+  __fr?: any;               // Ford-Roman calculation cache
+  
   // System status
   fordRomanCompliance: boolean;
   natarioConstraint: boolean;
@@ -331,28 +335,49 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const T_hull   = R_hull / C;
   state.TS_ratio = T_hull / T_m;
 
-  // ---- Ford–Roman proxy (consistent across modes) ----
-  const Q_cavity_quantum = 1e10;                  // proxy "quantum" Q
-  const effDuty_FR = Math.max(
-    1e-9,                                          // floor to avoid div-by-zero spikes
-    (state.dutyCycle * state.qSpoilingFactor) / Math.max(1, state.sectorStrobing)
-  );
-  state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_cavity_quantum));
+  // ----- Sector model (consistent across modes) -----
+  const TOTAL_SECTORS = 400;                           // Fixed logical partitioning
+  const activeSectors = Math.max(1, state.sectorStrobing);
+  const activeFraction = activeSectors / TOTAL_SECTORS;
+  const tilesPerSector = Math.floor(state.N_tiles / TOTAL_SECTORS);
+  const activeTiles = tilesPerSector * activeSectors;
+
+  // Export so /metrics can expose same numbers
+  state.__sectors = { TOTAL_SECTORS, activeSectors, activeFraction, tilesPerSector, activeTiles };
+
+  // ----- Ford–Roman proxy with time-sliced strobing -----
+  // Instantaneous duty seen by a local observer inside an energized sector
+  const dutyInstant = state.dutyCycle * state.qSpoilingFactor;
+
+  // Effective duty used in ζ after strobing fraction is applied
+  const dutyEffectiveFR = dutyInstant * activeFraction;
+
+  // Quantum cavity Q used for the Ford–Roman inequality proxy
+  const Q_quantum = 1e10;
+
+  // ζ = 1 / (duty_eff * sqrt(Q))
+  state.zeta = 1 / (dutyEffectiveFR * Math.sqrt(Q_quantum));
+  // Compliance
+  state.fordRomanCompliance = state.zeta < 1.0;
+
+  // Keep these around for the metrics + HUD
+  state.__fr = {
+    dutyInstant,            // e.g. 0.14 in hover
+    dutyEffectiveFR,        // scaled by sectors
+    Q_quantum,
+  };
   
-  // Coherent sector and tile calculations
-  const MAX_SECTORS = 400;
-  state.tilesPerSector = Math.floor(state.N_tiles / MAX_SECTORS);
-  state.activeSectors  = Math.max(1, Math.min(state.sectorStrobing, MAX_SECTORS));
-  state.activeTiles    = state.tilesPerSector * state.activeSectors;
-  
-  // Display-only fraction of lattice energized at an instant
-  state.activeFraction = state.activeSectors / MAX_SECTORS;
+  // Update state with sector calculations
+  state.tilesPerSector = tilesPerSector;
+  state.activeSectors  = activeSectors;
+  state.activeTiles    = activeTiles;
+  state.activeFraction = activeFraction;
   
   // Expose timing details for metrics API
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.dutyBurst           = dutyBurst;  // for client visibility
-  state.dutyEffective_FR    = effDuty_FR; // for client visibility
+  state.dutyEffective_FR    = dutyEffectiveFR; // for client visibility
   state.modelMode           = MODEL_MODE; // for client consistency
   
   // Compliance flags
