@@ -57,6 +57,7 @@ const TILE_SECTORS = Array.from({ length: 400 }, (_, i) => ({
 interface SystemMetrics {
   activeTiles: number;
   totalTiles: number;
+  sectorStrobing?: number;  // Added for strobing display
   energyOutput: number;
   exoticMass: number;
   fordRoman: {
@@ -555,8 +556,13 @@ export default function HelixCore() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400">Active Tiles</p>
-                      <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles || 312}/{systemMetrics?.totalTiles || 400}</p>
+                      <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
+                      <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles.toLocaleString() || '2,800,000'}</p>
+                      {systemMetrics?.sectorStrobing && (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {systemMetrics.sectorStrobing} sectors strobing
+                        </p>
+                      )}
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Energy Output</p>

@@ -483,9 +483,10 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sectorPeriod_ms = 1000 / Math.max(1, strobeHz);
 
   res.json({
-    // Strobe-aware tile counts
-    activeTiles: S,                   // concurrent tiles (sectors) energized
+    // Strobe-aware tile counts (CORRECTED)
+    activeTiles: Math.max(1, Math.floor(N / S)),  // << FIXED: instantaneous energized tiles (N/S)
     totalTiles: N,
+    sectorStrobing: S,                // include sectors for UI display
     activeFraction,                   // S / N (should be << 1)
 
     // Power / mass (server-authoritative)
