@@ -1,0 +1,130 @@
+Love the pick for The Diplomat 👌
+Here’s the cleanest way to swap the emoji/title for your PNG while keeping the whole card clickable and accessible.
+
+⸻
+
+1) Put the PNG where the app can serve it
+
+Drop your file here (recommended):
+
+/public/profiles/diplomat.png
+
+Then it’s available at /profiles/diplomat.png in the browser.
+
+⸻
+
+2) If your start page is React – make the card use an <img>
+
+Update your ProfileCard (or wherever you render each profile) to accept an imgSrc and render it. Keep the label for screen readers, but visually hide it so the PNG is the face of the card.
+
+// client/src/components/ProfileCard.tsx
+type ProfileCardProps = {
+  id: "optimist" | "engineer" | "diplomat" | "strategist";
+  title: string;
+  imgSrc: string;        // <-- new
+  onSelect: (id: ProfileCardProps["id"]) => void;
+};
+
+export function ProfileCard({ id, title, imgSrc, onSelect }: ProfileCardProps) {
+  return (
+    <button
+      onClick={() => onSelect(id)}
+      className="profile-card"
+      aria-label={`Choose ${title}`}
+    >
+      <img
+        src={imgSrc}
+        alt=""                 // image is decorative; text label is below for a11y
+        loading="lazy"
+        className="profile-img"
+      />
+      <span className="sr-only">{title}</span>
+    </button>
+  );
+}
+
+Use it like:
+
+<ProfileCard
+  id="diplomat"
+  title="The Diplomat"
+  imgSrc="/profiles/diplomat.png"   // <-- your PNG
+  onSelect={handleSelect}
+/>
+
+If you want the card to navigate immediately to the Bridge after choosing:
+
+import { useNavigate } from "react-router-dom";
+const navigate = useNavigate();
+const handleSelect = (id: string) => {
+  // save the profile for the session if you want
+  sessionStorage.setItem("profile", id);
+  navigate("/bridge");
+};
+
+
+⸻
+
+3) Minimal CSS so the PNG looks great and the whole card is clickable
+
+/* Somewhere globally or in the Start page CSS */
+.profile-card {
+  display: grid;
+  place-items: center;
+  width: 220px;               /* match your layout */
+  height: 180px;
+  border-radius: 18px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  cursor: pointer;
+}
+
+.profile-card:hover,
+.profile-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(130, 200, 255, 0.45);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(130,200,255,0.25);
+  outline: none;
+}
+
+.profile-img {
+  width: 92px;                /* tweak per image */
+  height: 92px;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0,0,0,.35));
+  user-select: none;
+  pointer-events: none;       /* ensures the BUTTON gets the click, not the img */
+}
+
+/* visually hidden (keeps text for screen readers) */
+.sr-only {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+That’s it—the PNG becomes the face of the profile, the entire tile is clickable, and accessibility is preserved.
+
+⸻
+
+4) If you need a pure-HTML version
+
+You can also do this without React—wrap the image in a link and keep a hidden label:
+
+<a href="/bridge" class="profile-card" aria-label="Choose The Diplomat">
+  <img src="/profiles/diplomat.png" alt="" class="profile-img">
+  <span class="sr-only">The Diplomat</span>
+</a>
+
+Same CSS as above.
+
+⸻
+
+Tips
+	•	If your PNG has lots of transparent padding, trim it so the hover/focus feels tight.
+	•	Want a subtle “selection” glow after clicking? Add a class like .selected on click and style box-shadow or a faint ring.
+	•	You can mix-and-match: use PNGs for some profiles and emojis/SVGs for others by passing either imgSrc or an icon component prop.
+
+If you want, send the other PNGs and I’ll give you the exact sizes and per-card CSS tweaks so they all feel uniform.
