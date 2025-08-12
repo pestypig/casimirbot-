@@ -24,7 +24,7 @@ const PROFILES: Record<ProfileKey, {
       "Sector strobing, γ_geo, γ_VdB, Q_cavity; trade-offs and tolerances explained.",
   },
   diplomat: {
-    icon: "🐼",
+    icon: "/images/diplomat-soccer.jpg",
     name: "The Diplomat",
     zen: "\"In harmony, the cosmos folds itself around us.\"",
     physics:
@@ -86,7 +86,17 @@ export default function StartPortal() {
                   }
                 }}
               >
-                <div className="text-5xl md:text-6xl mb-2">{p.icon}</div>
+                <div className="text-5xl md:text-6xl mb-2 flex items-center justify-center">
+                  {p.icon.startsWith('/') ? (
+                    <img 
+                      src={p.icon} 
+                      alt={p.name}
+                      className="w-16 h-16 md:w-20 md:h-20 object-contain rounded-lg"
+                    />
+                  ) : (
+                    p.icon
+                  )}
+                </div>
                 <div className="text-sm md:text-base font-medium opacity-90">
                   {p.name}
                 </div>
@@ -103,7 +113,17 @@ export default function StartPortal() {
           >
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
               <div className="flex items-start gap-3">
-                <div className="text-3xl md:text-4xl">{PROFILES[selected].icon}</div>
+                <div className="text-3xl md:text-4xl flex items-center justify-center">
+                  {PROFILES[selected].icon.startsWith('/') ? (
+                    <img 
+                      src={PROFILES[selected].icon} 
+                      alt={PROFILES[selected].name}
+                      className="w-12 h-12 md:w-16 md:h-16 object-contain rounded-lg"
+                    />
+                  ) : (
+                    PROFILES[selected].icon
+                  )}
+                </div>
                 <div className="flex-1">
                   <h2 className="text-base md:text-lg font-semibold">
                     {PROFILES[selected].name}
