@@ -256,8 +256,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Effective duty for tile-level production
   const dutyTile      = duty * dutyBurst;
   
-  // Effective duty for Ford–Roman sampling (include spoiling + strobing)
-  const effDuty_FR    = duty * (state.qSpoilingFactor ?? 1) * activeFrac;
+  // Note: effDuty_FR is calculated later in Ford-Roman section
 
   // Hull average power (only active sectors dissipate at once)
   const P_total_W     = P_loss_per_tile_raw * N_tiles * duty * activeFrac;
@@ -320,9 +319,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const T_hull   = R_hull / C;
   state.TS_ratio = T_hull / T_m;
 
-  // Ford–Roman proxy (use corrected effective duty)
-  const Q_quantum = 1e10;
-  state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_quantum));
+  // ---- Ford–Roman proxy (consistent across modes) ----
+  const Q_cavity_quantum = 1e10;                  // proxy "quantum" Q
+  const effDuty_FR = Math.max(
+    1e-9,                                          // floor to avoid div-by-zero spikes
+    (state.dutyCycle * state.qSpoilingFactor) / Math.max(1, state.sectorStrobing)
+  );
+  state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_cavity_quantum));
   
   // Expose timing details for metrics API
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec

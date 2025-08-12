@@ -487,48 +487,44 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
   const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, S);
 
+  const MAX_SECTORS = 400;
+  const tilesPerSector = Math.floor(state.N_tiles / MAX_SECTORS);
+  const activeSectors = Math.max(1, Math.min(state.sectorStrobing, MAX_SECTORS));
+  const activeTiles = tilesPerSector * activeSectors;
+
   res.json({
-    // Strobe-aware tile counts (CORRECTED)
-    activeTiles: Math.max(1, Math.floor(N / S)),  // << FIXED: instantaneous energized tiles (N/S)
-    totalTiles: N,
+    activeSectors,             // NEW: 1, 400, ...
+    totalSectors: MAX_SECTORS, // NEW: 400
+    activeTiles,               // NEW: per-sector count * activeSectors
+    totalTiles: Math.floor(state.N_tiles),
     sectorStrobing: S,                // include sectors for UI display
     currentSector,                    // << NEW: physics-timed sweep index
     activeFraction,                   // S / N (should be << 1)
 
-    // Power / mass (server-authoritative)
-    energyOutput: state.P_avg,        // MW (calibrated or raw based on MODEL_MODE)
-    exoticMass: Number.isFinite(state.M_exotic) ? Math.round(state.M_exotic) : null,       // kg
+    energyOutput: state.P_avg, 
+    exoticMass: Math.round(state.M_exotic),
     exoticMassRaw: Number.isFinite((state as any).M_exotic_raw) ? Math.round((state as any).M_exotic_raw) : undefined,
     massCalibration: (state as any).massCalibration ?? 1,
 
-    // Server-authoritative parameters (for client consistency)
-    gammaVanDenBroeck: state.gammaVanDenBroeck,  // Use server value, not client hardcode
+    gammaVanDenBroeck: state.gammaVanDenBroeck,
     gammaGeo: state.gammaGeo,
     qCavity: state.qCavity,
-    
-    // Model mode indicator
     modelMode: (state as any).modelMode || 'calibrated',
-
-    // Duty visibility (helps explain ζ)
     dutyGlobal,
     dutyEffectiveFR,
     strobeHz,
     sectorPeriod_ms,
 
-    // Constraints
     fordRoman: {
       value: state.zeta,
       limit: 1.0,
-      status: state.zeta < 1 ? "PASS" : "FAIL",
+      status: state.zeta < 1.0 ? "PASS" : "FAIL"
     },
-    natario: {
-      value: 0,
-      status: state.natarioConstraint ? "VALID" : "CHECK",
-    },
-    curvatureMax: Math.abs(state.U_cycle ?? 0) / (3e8 * 3e8),
+    natario: { value: 0, status: "VALID" },
 
+    curvatureMax: Math.abs(state.U_cycle ?? 0) / (299792458 * 299792458),
     timeScaleRatio: state.TS_ratio,
-    overallStatus: (state.zeta < 1 && (state.curvatureLimit ?? true)) ? "NOMINAL" : "CHECK",
+    overallStatus: state.zeta < 1.0 ? "NOMINAL" : "CHECK"
   });
 }
 

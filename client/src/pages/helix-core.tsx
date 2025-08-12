@@ -46,7 +46,9 @@ const MAINFRAME_ZONES = {
 
 
 interface SystemMetrics {
-  activeTiles: number;
+  activeSectors: number;     // NEW: active sectors (1, 400, etc.)
+  totalSectors: number;      // NEW: total sectors (400)
+  activeTiles: number;       // Updated: actual tile count
   totalTiles: number;
   sectorStrobing?: number;   // Added for strobing display
   currentSector?: number;    // NEW: physics-timed sweep index

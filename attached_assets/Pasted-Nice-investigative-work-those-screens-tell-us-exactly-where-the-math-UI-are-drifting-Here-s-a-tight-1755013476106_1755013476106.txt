@@ -1,0 +1,126 @@
+Nice investigative work—those screens tell us exactly where the math/UI are drifting. Here’s a tight plan with safe patches so the HUD lines up with the pipeline and the labels stop lying 🙂
+
+# 1) Ford–Roman ζ is blowing up (80k → 1.12e8)
+
+**Why:** the current proxy divides duty again by strobing and/or by an extra “burst-time” factor, making the effective duty tiny → ζ = 1/(tiny · √Q) → huge.
+**What we want (proxy):**
+
+$$
+\textbf{effDuty\_FR}=\frac{\text{dutyCycle}\times q_{\text{spoiling}}}{\text{sectorStrobing}} \quad,\qquad
+\zeta=\frac{1}{\textbf{effDuty\_FR}\cdot \sqrt{Q_{\text{quantum}}}}
+$$
+
+With Hover: duty=0.14, sectors=1, qSpoil=1 → effDuty\_FR·√Q ≈ 0.14·1e5 → ζ≈ 7.1e-5 (PASS).
+With Cruise: duty=0.005, sectors=400, qSpoil=0.625 → effDuty\_FR≈7.8125e-6 → effDuty\_FR·√Q≈0.78125 → ζ≈1.28 (borderline but reasonable).
+
+### Patch (server/energy-pipeline.ts)
+
+Replace your ζ block with this (no hidden extra factors):
+
+```ts
+// ---- Ford–Roman proxy (consistent across modes) ----
+const Q_cavity_quantum = 1e10;                  // proxy “quantum” Q
+const effDuty_FR = Math.max(
+  1e-9,                                          // floor to avoid div-by-zero spikes
+  (state.dutyCycle * state.qSpoilingFactor) / Math.max(1, state.sectorStrobing)
+);
+state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_cavity_quantum));
+state.fordRomanCompliance = state.zeta < 1.0;
+```
+
+# 2) “Active Tiles” is actually showing *sectors*
+
+On your Helix-Core panels you’re printing `1/1120000000` etc. That’s sectors/tiles mixed together.
+
+### What to expose
+
+* **activeSectors** and **totalSectors** (e.g., 1 / 400)
+* **activeTiles** derived as `tilesPerSector * activeSectors`
+
+### Patch (server/helix-core.ts → getSystemMetrics)
+
+Add a max sectors constant once in the pipeline (or compute from your lattice); I’ll assume 400 is your max concurrent slices:
+
+```ts
+const MAX_SECTORS = 400;
+const tilesPerSector = Math.floor(state.N_tiles / MAX_SECTORS);
+const activeSectors = Math.max(1, Math.min(state.sectorStrobing, MAX_SECTORS));
+const activeTiles = tilesPerSector * activeSectors;
+
+res.json({
+  activeSectors,             // NEW: 1, 400, ...
+  totalSectors: MAX_SECTORS, // NEW: 400
+  activeTiles,               // NEW: per-sector count * activeSectors
+  totalTiles: Math.floor(state.N_tiles),
+
+  energyOutput: state.P_avg, 
+  exoticMass: Math.round(state.M_exotic),
+
+  fordRoman: {
+    value: state.zeta,
+    limit: 1.0,
+    status: state.fordRomanCompliance ? "PASS" : "FAIL"
+  },
+  natario: { value: 0, status: "VALID" },
+
+  curvatureMax: Math.abs(state.U_cycle) / (C * C),
+  timeScaleRatio: state.TS_ratio,
+  overallStatus: state.overallStatus
+});
+```
+
+### Patch (client Helix-Core “Energy Control Panel” cards)
+
+* Rename the label to **Active Sectors** and bind to `metrics.activeSectors / metrics.totalSectors`.
+* Add an extra small row below that: **Tiles online:** `metrics.activeTiles.toLocaleString()`.
+
+# 3) Curvature “R < …” jumps per mode
+
+You’re showing a changing threshold, which makes the WARN look arbitrary. Keep the *metric* stable and the *limit* constant so users can compare across modes.
+
+### Patch (server/helix-core.ts)
+
+You’re already sending `curvatureMax = |U_cycle| / c²`. Keep that, and in the UI:
+
+* Fix the limit to one value, e.g. `R_limit = 1e-15` (or whatever you’ve been using as your design guard).
+* Status = `curvatureMax < R_limit ? "SAFE" : "WARN"`.
+
+# 4) Numbers in the HUD’s “Energy Pipeline Values”
+
+Those are good sanity dials; just make sure they’re **mode-consistent**:
+
+* They should reflect *current* `state` (after mode commit), not a cached snapshot.
+* If you memoize or fire a toast during a transition, fetch the **fresh** state from the query cache (or immediately refetch after PATCH).
+
+In React where you render that block, prefer:
+
+```ts
+const { data: metrics } = useQuery(['/api/helix/metrics'], ...);
+// use metrics.curvatureMax, timeScaleRatio, etc., not stale local copies
+```
+
+# 5) Optional polish you’ll feel immediately
+
+* In toasts and the Luma panel, render mode from `MODE_CONFIGS[state.currentMode].name` to avoid “Undefined Mode”.
+* When switching modes, **optimistically** update the query cache for `/api/helix/metrics` with the new `sectorStrobing`, `dutyCycle`, `qSpoilingFactor`. Then refetch.
+
+---
+
+## Quick checklist to validate after patch
+
+* Hover:
+
+  * Sectors: `1/400`
+  * ζ ≈ `7.1e-5` (PASS)
+  * CurvatureMax stable; limit fixed (e.g., 1e-15)
+* Cruise:
+
+  * Sectors: `400/400`
+  * ζ ≈ `~1.3` (FAIL or WARN—expected)
+* Emergency:
+
+  * Sectors: `1/400`
+  * ζ small if duty is high but strobing is 1 → watch ζ; this reveals why cruise is “most gentle”
+* “Active Tiles” shows a **tile count**, not sector numbers (and a separate **Active Sectors** chip appears)
+
+If you want, paste me your current `/api/helix/metrics` payload after the changes and a screenshot of the panel—I’ll sanity-check the magnitudes (I’ll do the math inline).
