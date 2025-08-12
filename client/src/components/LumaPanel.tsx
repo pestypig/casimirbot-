@@ -20,7 +20,8 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
   // ONLY use live data from Live Energy Pipeline component
   // Do NOT use backend API data - only the Live Energy Pipeline has the correct physics calculations
   const snap: PipelineSnapshot = live ?? {
-    currentMode: 'hover',
+    currentModeId: 'hover',
+    currentModeName: 'Hover',
     dutyCycle: 0.14,
     P_avg: 0,     // Show 0 until Live Energy Pipeline provides data
     zeta: 0,
@@ -87,7 +88,7 @@ export function LumaPanel({ isOpen, onClose }: LumaPanelProps) {
               <div className="text-sm text-slate-300">
                 <p className="font-medium text-cyan-200">Current Status</p>
                 <>
-                  <p className="capitalize">{snap.currentMode} mode active. Form held at {(snap.dutyCycle * 100).toFixed(1)}% duty.</p>
+                  <p className="capitalize">{snap.currentModeName} mode active. Form held at {(snap.dutyCycle * 100).toFixed(1)}% duty.</p>
                   <p>ζ = {(snap.zeta?.toFixed(3) ?? '0.000')} ({snap.zeta < 0.05 ? 'quantum safety maintained' : 'approaching limits'})</p>
                   <p>TS ratio = {(snap.TS_ratio / 1000).toFixed(1)}k ({snap.TS_ratio > 100 ? 'homogenized GR regime' : 'classical regime'})</p>
                   <p className="text-xs text-slate-400 mt-2">

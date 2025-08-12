@@ -260,7 +260,8 @@ export function LiveEnergyPipeline({
   // ALWAYS trigger pipeline bus with latest calculated values (whenever this component re-renders)
   React.useEffect(() => {
     const snap = {
-      currentMode: currentMode || 'hover',
+      currentModeId: selectedMode || 'hover',
+      currentModeName: currentMode?.name || 'Hover',
       dutyCycle: d_mode,
       P_avg: P_total_realistic,
       zeta,
@@ -274,11 +275,12 @@ export function LiveEnergyPipeline({
     pushPipelineSnapshot(snap);
     
     console.log('🔧 Live Energy Pipeline triggered pipeline bus:', {
-      mode: snap.currentMode,
+      modeId: snap.currentModeId,
+      modeName: snap.currentModeName,
       P_avg: snap.P_avg.toFixed(1) + ' MW',
       duty: (snap.dutyCycle * 100).toFixed(1) + '%'
     });
-  }, [currentMode, d_mode, P_total_realistic, zeta, TS_ratio, M_exotic_total]);
+  }, [selectedMode, currentMode?.name, d_mode, P_total_realistic, zeta, TS_ratio, M_exotic_total]);
   
   // Handle mode changes and notify parent
   const handleModeChange = (newMode: string) => {
@@ -297,7 +299,8 @@ export function LiveEnergyPipeline({
 
     // --- BUILD A LIVE SNAPSHOT FROM THIS COMPONENT'S CALCULATION ---
     const snap = {
-      currentMode: mode.name.toLowerCase(),      // 'hover' | 'cruise' | ...
+      currentModeId: newMode.toLowerCase(),      // 'hover' | 'cruise' | ...
+      currentModeName: mode.name,               // 'Hover' | 'Cruise' | ...
       dutyCycle: mode.duty,
       P_avg: P_total_realistic,                  // MW
       zeta,
@@ -315,7 +318,7 @@ export function LiveEnergyPipeline({
     // 3) show the toast using these *fresh* values (no cache read)
     setTimeout(() => {
       zenLongToast("mode:switch", {
-        mode: snap.currentMode,
+        mode: snap.currentModeId,
         duty: snap.dutyCycle,
         powerMW: snap.P_avg,
         zeta: snap.zeta,

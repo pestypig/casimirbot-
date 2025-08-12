@@ -1,6 +1,7 @@
 // pipeline-bus.ts
 export type PipelineSnapshot = {
-  currentMode: string;
+  currentModeId: string;      // e.g. "hover", "cruise"
+  currentModeName: string;    // e.g. "Hover", "Cruise"
   dutyCycle: number;
   P_avg: number;      // MW
   zeta: number;
