@@ -464,40 +464,56 @@ export function getTileStatus(req: Request, res: Response) {
 const pipelineState = calculateEnergyPipeline(initializePipelineState());
 setGlobalPipelineState(pipelineState);
 
-// System metrics endpoint (STROBING-CORRECTED)
+// System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
   const state = getGlobalPipelineState();
-  const C = 299792458; // m/s
-  
+
+  const N = Math.max(1, Math.round(state.N_tiles ?? 0));          // total tiles
+  const S = Math.max(1, Math.round(state.sectorStrobing ?? 1));   // concurrent sectors
+  const activeFraction = Math.min(1, S / N);
+
+  const dutyGlobal = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
+  const qSpoil     = state.qSpoilingFactor ?? 1;
+
+  // Effective duty relevant to Ford–Roman sampling (time-sliced exposure)
+  const dutyEffectiveFR = dutyGlobal * qSpoil * activeFraction;
+
+  // Optional timing hints (client can animate the grid with these)
+  const strobeHz        = Number(state.strobeHz ?? process.env.STROBE_HZ ?? 2000);
+  const sectorPeriod_ms = 1000 / Math.max(1, strobeHz);
+
   res.json({
-    activeTiles: state.sectorStrobing,             // S (concurrent sectors)
-    totalTiles: state.N_tiles,                      // N (total tiles)
-    activeFraction: (state.sectorStrobing / state.N_tiles),  // S/N
+    // Strobe-aware tile counts
+    activeTiles: S,                   // concurrent tiles (sectors) energized
+    totalTiles: N,
+    activeFraction,                   // S / N (should be << 1)
 
-    energyOutput: state.P_avg,                      // MW
-    exoticMass: state.M_exotic,                     // kg (final, with optional calibration)
-    exoticMassRaw: state.M_exotic_raw,              // kg (raw physics)
-    massCalibration: state.massCalibration,         // calibration factor
+    // Power / mass (already computed on server)
+    energyOutput: state.P_avg,        // MW
+    exoticMass: Number.isFinite(state.M_exotic) ? Math.round(state.M_exotic) : null,       // kg
+    exoticMassRaw: Number.isFinite((state as any).M_exotic_raw) ? Math.round((state as any).M_exotic_raw) : undefined,
+    massCalibration: (state as any).massCalibration ?? 1,
 
-    dutyGlobal: state.dutyCycle,                    // 0..1
-    dutyBurst: state.dutyBurst,                     // tiny 0..1 (fs/T)
-    dutyEffectiveFR: state.dutyEffective_FR,        // for ζ
+    // Duty visibility (helps explain ζ)
+    dutyGlobal,
+    dutyEffectiveFR,
+    strobeHz,
+    sectorPeriod_ms,
 
-    strobeHz: state.strobeHz,
-    sectorPeriod_ms: state.sectorPeriod_ms,
-
+    // Constraints
     fordRoman: {
       value: state.zeta,
-      limit: 1,
-      status: state.zeta < 1 ? "PASS" : "FAIL"
+      limit: 1.0,
+      status: state.zeta < 1 ? "PASS" : "FAIL",
     },
     natario: {
       value: 0,
-      status: state.natarioConstraint ? "VALID" : "CHECK"
+      status: state.natarioConstraint ? "VALID" : "CHECK",
     },
-    curvatureMax: Math.abs(state.U_cycle ?? 0) / (C*C),
+    curvatureMax: Math.abs(state.U_cycle ?? 0) / (3e8 * 3e8),
+
     timeScaleRatio: state.TS_ratio,
-    overallStatus: (state.zeta < 1 && state.curvatureLimit) ? "NOMINAL" : "CHECK"
+    overallStatus: (state.zeta < 1 && (state.curvatureLimit ?? true)) ? "NOMINAL" : "CHECK",
   });
 }
 
