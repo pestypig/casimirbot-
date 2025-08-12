@@ -257,8 +257,26 @@ export function LiveEnergyPipeline({
   console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
   console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
-  // ALWAYS trigger pipeline bus with latest calculated values (whenever this component re-renders)
+  // Trigger pipeline bus only with complete calculated values
   React.useEffect(() => {
+    // Only publish complete snapshots with valid numeric data
+    if (
+      !Number.isFinite(P_total_realistic) ||
+      !Number.isFinite(d_mode) ||
+      !Number.isFinite(zeta) ||
+      !Number.isFinite(TS_ratio) ||
+      !Number.isFinite(M_exotic_total)
+    ) {
+      console.log('🔧 Live Energy Pipeline: Skipping incomplete snapshot publish', {
+        P_avg_valid: Number.isFinite(P_total_realistic),
+        duty_valid: Number.isFinite(d_mode),
+        zeta_valid: Number.isFinite(zeta),
+        TS_ratio_valid: Number.isFinite(TS_ratio),
+        M_exotic_valid: Number.isFinite(M_exotic_total)
+      });
+      return;
+    }
+
     const snap = {
       currentModeId: selectedMode || 'hover',
       currentModeName: currentMode?.name || 'Hover',
@@ -275,7 +293,7 @@ export function LiveEnergyPipeline({
     queryClient.setQueryData(['/api/helix/pipeline'], snap);
     pushPipelineSnapshot(snap);
     
-    console.log('🔧 Live Energy Pipeline triggered pipeline bus:', {
+    console.log('🔧 Live Energy Pipeline published complete snapshot:', {
       modeId: snap.currentModeId,
       modeName: snap.currentModeName,
       P_avg: snap.P_avg.toFixed(1) + ' MW',
