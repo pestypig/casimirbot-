@@ -427,7 +427,7 @@ export function LiveEnergyPipeline({
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
-          {currentMode.description.replace('1,405', exoticMassTarget.toString())}
+          {currentMode?.description?.replace('1,405', exoticMassTarget.toString()) || `${currentMode.name} mode`}
         </p>
       </CardHeader>
       
