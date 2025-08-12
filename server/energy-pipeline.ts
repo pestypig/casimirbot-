@@ -52,6 +52,12 @@ export interface EnergyPipelineState {
   zeta: number;             // Quantum inequality parameter
   N_tiles: number;          // Total number of tiles
   
+  // Sector management
+  tilesPerSector: number;   // Tiles per sector
+  activeSectors: number;    // Currently active sectors
+  activeTiles: number;      // Currently active tiles
+  activeFraction: number;   // Active sectors / total sectors
+  
   // System status
   fordRomanCompliance: boolean;
   natarioConstraint: boolean;
@@ -142,6 +148,12 @@ export function initializePipelineState(): EnergyPipelineState {
     TS_ratio: 0,
     zeta: 0,
     N_tiles: 0,
+    
+    // Sector management
+    tilesPerSector: 0,
+    activeSectors: 1,
+    activeTiles: 0,
+    activeFraction: 0,
     
     // Status
     fordRomanCompliance: true,
@@ -326,6 +338,15 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     (state.dutyCycle * state.qSpoilingFactor) / Math.max(1, state.sectorStrobing)
   );
   state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_cavity_quantum));
+  
+  // Coherent sector and tile calculations
+  const MAX_SECTORS = 400;
+  state.tilesPerSector = Math.floor(state.N_tiles / MAX_SECTORS);
+  state.activeSectors  = Math.max(1, Math.min(state.sectorStrobing, MAX_SECTORS));
+  state.activeTiles    = state.tilesPerSector * state.activeSectors;
+  
+  // Display-only fraction of lattice energized at an instant
+  state.activeFraction = state.activeSectors / MAX_SECTORS;
   
   // Expose timing details for metrics API
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec

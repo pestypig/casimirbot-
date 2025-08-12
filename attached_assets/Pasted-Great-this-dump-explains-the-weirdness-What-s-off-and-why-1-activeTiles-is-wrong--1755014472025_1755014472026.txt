@@ -1,0 +1,131 @@
+Great—this dump explains the weirdness.
+
+### What’s off (and why)
+
+1. **`activeTiles` is wrong**
+
+* You’re reporting `activeTiles = 1,120,000,000` (equals `totalTiles`) while also saying `sectorStrobing = 1` and `activeFraction = 8.93e-10`.
+* If 1 sector out of 400 is energized at an instant, **activeTiles should be tiles-per-sector × sectorStrobing**, not the whole lattice.
+
+2. **`dutyEffectiveFR` is orders of magnitude too small**
+
+* You’re sending `dutyEffectiveFR = 1.25e-10` which yields `ζ = 80,000` (FAIL).
+* For Ford–Roman we want an **instantaneous** duty proxy of:
+
+  $$
+  \textbf{effDuty\_FR}=\frac{\text{dutyGlobal}\times q_{\text{spoiling}}}{\text{sectorStrobing}}
+  $$
+
+  not multiplied by an “activeFraction” of the entire hull.
+* With Hover (duty=0.14, sectors=1, qSpoil≈1): `effDuty_FR ≈ 0.14` → `ζ ≈ 1/(0.14·1e5) ≈ 7.1e-5` (PASS), not 8e4.
+
+3. **`activeFraction` itself mixes levels**
+
+* `8.93e-10` looks like “energized tiles / total tiles right now”. That’s fine as a **display** field, but it must **not** feed Ford–Roman.
+
+---
+
+## Minimal, safe fixes
+
+### A) Compute sectors and active tiles coherently (server)
+
+Pick your global max sectors once (400). Then:
+
+```ts
+// energy-pipeline.ts (or a shared config)
+const MAX_SECTORS = 400;
+
+// in your state refresh step
+state.tilesPerSector = Math.floor(state.N_tiles / MAX_SECTORS);
+state.activeSectors  = Math.max(1, Math.min(state.sectorStrobing, MAX_SECTORS));
+state.activeTiles    = state.tilesPerSector * state.activeSectors;
+
+// display-only fraction of lattice energized at an instant
+state.activeFraction = state.activeSectors / MAX_SECTORS;
+```
+
+### B) Fix Ford–Roman proxy (server)
+
+```ts
+// ---- Ford–Roman proxy (do NOT include activeFraction) ----
+const Q_cavity_quantum = 1e10;
+
+// instantaneous duty proxy per sector
+const effDuty_FR = Math.max(
+  1e-9,
+  (state.dutyCycle * state.qSpoilingFactor) / Math.max(1, state.activeSectors)
+);
+
+state.zeta = 1 / (effDuty_FR * Math.sqrt(Q_cavity_quantum));
+state.fordRomanCompliance = state.zeta < 1.0;
+```
+
+### C) Serve coherent metrics (server/helix-core.ts)
+
+```ts
+res.json({
+  // sectors
+  activeSectors: state.activeSectors,
+  totalSectors : MAX_SECTORS,
+
+  // tiles
+  activeTiles  : state.activeTiles,
+  totalTiles   : Math.floor(state.N_tiles),
+  tilesPerSector: state.tilesPerSector,
+
+  // display-only
+  activeFraction: state.activeFraction,
+
+  // physics
+  energyOutput : state.P_avg,
+  exoticMass   : Math.round(state.M_exotic),
+  exoticMassRaw: state.M_exotic_raw ?? undefined,
+  massCalibration: state.massCalibration ?? undefined,
+
+  gammaVanDenBroeck: state.gammaVanDenBroeck,
+  gammaGeo: state.gammaGeo,
+  qCavity: state.qCavity,
+  modelMode: state.modelMode,
+  dutyGlobal: state.dutyCycle,
+  dutyEffectiveFR: effDuty_FR,           // <- corrected value
+
+  strobeHz: state.modulationFreq_GHz * 1e9 / MAX_SECTORS, // if you like
+  sectorPeriod_ms: 1000 / (state.modulationFreq_GHz * 1e9 / MAX_SECTORS),
+
+  fordRoman: { value: state.zeta, limit: 1, status: state.fordRomanCompliance ? "PASS" : "FAIL" },
+  natario:   { value: 0, status: "VALID" },
+  curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
+  timeScaleRatio: state.TS_ratio,
+  overallStatus: state.overallStatus
+});
+```
+
+### D) UI label tweaks (client)
+
+* In the Helix panel:
+
+  * Change the “Active Tiles” card to **Active Sectors** with `activeSectors/totalSectors`.
+  * Add a small caption: **Tiles online:** `activeTiles.toLocaleString()`.
+* Keep “activeFraction” only as a tooltip (“instantaneous energized fraction of lattice”).
+
+---
+
+## What you should see after this
+
+**Hover**
+
+* `activeSectors: 1/400`, `activeTiles ≈ N_tiles/400`
+* `dutyEffectiveFR ≈ 0.14`
+* `ζ ≈ 7.1e-5` (PASS)
+
+**Cruise**
+
+* `activeSectors: 400/400`, `activeTiles ≈ N_tiles`
+* With duty=0.005, qSpoil≈0.625 → `effDuty_FR ≈ 0.005*0.625/400 ≈ 7.8e-6`
+* `ζ ≈ 1/(7.8e-6*1e5) ≈ 1.28` (borderline/warn—expected)
+
+**Emergency/Standby**
+
+* Sectors flip back to 1; ζ responds to the new duty.
+
+If you push this and paste the new `/api/helix/metrics` again (plus a screenshot of the panel), I’ll sanity-check the magnitudes and we’ll call the HUD “physically consistent.”
