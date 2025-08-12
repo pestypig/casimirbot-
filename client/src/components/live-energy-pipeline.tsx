@@ -336,10 +336,8 @@ export function LiveEnergyPipeline({
               const new_P_total_realistic = new_P_avg_W / 1e6; // Convert to MW
               const new_zeta = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : Infinity;
               
-              // Calculate new exotic mass with new duty cycle
-              const new_U_cycle = U_cycle_base * new_mode_throttle;
-              const new_M_exotic_per_tile = Math.abs(new_U_cycle) / (c * c);
-              const new_M_exotic_total = new_M_exotic_per_tile * N_tiles;
+              // Exotic mass budget stays constant (1405 kg for all modes except standby=0)
+              const new_M_exotic_total = mode.duty === 0 ? 0 : 1405; // Standby=0kg, all others=1405kg
               
               zenLongToast("mode:switch", {
                 mode: mode.name,
