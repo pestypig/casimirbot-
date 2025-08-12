@@ -32,6 +32,8 @@ import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
+import { Tooltip } from "@/components/ui/Tooltip";
+import AmplificationPanel from "@/components/AmplificationPanel";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -592,11 +594,30 @@ export default function HelixCore() {
                   {pipelineState && (
                     <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                       <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
-                      <div className="grid grid-cols-2 gap-1 text-slate-300">
-                        <div>Duty: {(pipelineState.dutyCycle * 100).toFixed(1)}%</div>
-                        <div>Sectors: {pipelineState.sectorStrobing}</div>
-                        <div>Q-Spoil: {pipelineState.qSpoilingFactor.toFixed(3)}</div>
-                        <div>γ_VdB: {pipelineState.gammaVanDenBroeck.toExponential(1)}</div>
+                      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                        <div>Duty: {((pipelineState as any).dutyCycle * 100).toFixed(1)}%</div>
+                        <div>Sectors: {(pipelineState as any).sectorStrobing}</div>
+                        <div>Q-Spoil: {(pipelineState as any).qSpoilingFactor?.toFixed(3)}</div>
+                        <Tooltip
+                          label={
+                            <div className="space-y-1">
+                              <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
+                              <p>
+                                From Alcubierre's metric modified by Van den Broeck — the "folded pocket"
+                                lets a meter-scale cabin sit inside a kilometer-scale effective bubble
+                                without paying the bubble's full energy cost.
+                              </p>
+                              <p className="opacity-80">
+                                This is a geometry selection, not an operational setting. It doesn't vary
+                                with duty cycle or strobing sectors.
+                              </p>
+                            </div>
+                          }
+                        >
+                          <span className="cursor-help underline decoration-dotted">
+                            γ<sub>VdB</sub>: {((pipelineState as any).gammaVanDenBroeck || 286000).toExponential(1)}
+                          </span>
+                        </Tooltip>
                       </div>
                     </div>
                   )}
@@ -742,6 +763,9 @@ export default function HelixCore() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Amplification Panel */}
+            <AmplificationPanel />
 
             {/* Resonance Scheduler */}
             <Card className="bg-slate-900/50 border-slate-800">

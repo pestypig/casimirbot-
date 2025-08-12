@@ -1,0 +1,237 @@
+love this direction. let’s make it (a) easy to understand at a glance and (b) truly “live.”
+
+Below are two small, drop-in pieces:
+	•	a tiny Tooltip you can reuse anywhere (for γ_VdB on the pipeline row)
+	•	a compact Amplification Panel card that renders the multiplication chain in real-time from your pipeline values
+
+⸻
+
+1) Reusable Tooltip
+
+client/src/components/ui/Tooltip.tsx
+
+import * as React from "react";
+
+export function Tooltip({
+  children,
+  label,
+  side = "top",
+}: {
+  children: React.ReactNode;
+  label: React.ReactNode;
+  side?: "top" | "bottom" | "left" | "right";
+}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <span className="relative inline-block"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
+      {children}
+      {open && (
+        <div
+          className={[
+            "absolute z-[60] max-w-[28rem] rounded-md bg-slate-900/95 text-slate-100",
+            "shadow-xl ring-1 ring-white/10 px-3 py-2 text-xs leading-snug",
+            side === "top" && "bottom-full mb-2 left-1/2 -translate-x-1/2",
+            side === "bottom" && "top-full mt-2 left-1/2 -translate-x-1/2",
+            side === "left" && "right-full mr-2 top-1/2 -translate-y-1/2",
+            side === "right" && "left-full ml-2 top-1/2 -translate-y-1/2",
+          ].join(" ")}
+        >
+          {label}
+        </div>
+      )}
+    </span>
+  );
+}
+
+Use it on the pipeline row (γ_VdB hover)
+
+In client/src/pages/helix-core.tsx where you render “Pipeline Parameters,” wrap the γ_VdB value:
+
+import { Tooltip } from "@/components/ui/Tooltip";
+
+// helper if you don’t already have one
+const fmtSci = (v: number) =>
+  (v >= 1e6 || v < 1e-3) ? v.toExponential(1) : v.toLocaleString();
+
+{/* ...inside the Pipeline Parameters row... */}
+<div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+  <div>Duty: {(pipelineState.dutyCycle * 100).toFixed(1)}%</div>
+  <div>Sectors: {pipelineState.sectorStrobing}</div>
+  <div>Q-Spoil: {pipelineState.qSpoilingFactor.toFixed(3)}</div>
+
+  <Tooltip
+    label={
+      <div className="space-y-1">
+        <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
+        <p>
+          From Alcubierre’s metric modified by Van den Broeck — the “folded pocket”
+          lets a meter-scale cabin sit inside a kilometer-scale effective bubble
+          without paying the bubble’s full energy cost.
+        </p>
+        <p className="opacity-80">
+          This is a geometry selection, not an operational setting. It doesn’t vary
+          with duty cycle or strobing sectors.
+        </p>
+      </div>
+    }
+  >
+    <span className="cursor-help underline decoration-dotted">
+      γ<sub>VdB</sub>: {fmtSci(pipelineState.gammaVanDenBroeck)}
+    </span>
+  </Tooltip>
+</div>
+
+(If your page reads from /api/helix/metrics instead of the local pipelineState, swap in those field names—gammaVanDenBroeck, etc.)
+
+⸻
+
+2) Live Amplification Panel (diagram card)
+
+This renders the multiplicative chain and the total gain, updating whenever the pipeline changes. It’s pure display—no physics side-effects.
+
+client/src/components/AmplificationPanel.tsx
+
+import * as React from "react";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline"; // or fetch /api/helix/metrics
+
+const fmtSci = (v: number) =>
+  (v >= 1e6 || v < 1e-3) ? v.toExponential(1) : v.toLocaleString();
+
+export default function AmplificationPanel() {
+  const { data } = useEnergyPipeline(); // { gammaGeo, qSpoilingFactor, gammaVanDenBroeck, ... }
+  if (!data) return null;
+
+  const gammaGeo = data.gammaGeo ?? 26;
+  const qSpoil   = data.qSpoilingFactor ?? 1.0; // (your “qEnhancement” term for display)
+  const gammaVdB = data.gammaVanDenBroeck ?? 2.86e5;
+
+  // Display model: A_total = (γ_geo)^3 × q_spoil × γ_VdB
+  const A_geo   = Math.pow(gammaGeo, 3);
+  const A_total = A_geo * qSpoil * gammaVdB;
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4 text-slate-100">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Amplification Chain</h3>
+        <span className="text-xs opacity-70">live</span>
+      </div>
+
+      {/* Equation line */}
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Tooltip
+          label={
+            <div className="space-y-1">
+              <div className="font-semibold">γ<sub>geo</sub> (geometric amplification)</div>
+              <p>
+                Comes from the Natário/needle-hull geometry. In your hover mode the
+                working value is typically ~26. In 3D cavities the energy scaling is
+                cubic in γ<sub>geo</sub>.
+              </p>
+            </div>
+          }
+        >
+          <span className="px-2 py-0.5 rounded bg-sky-500/15 ring-1 ring-sky-400/30 cursor-help">
+            γ<sub>geo</sub> = {fmtSci(gammaGeo)}
+          </span>
+        </Tooltip>
+
+        <span className="opacity-60">^3 ×</span>
+
+        <Tooltip
+          label={
+            <div className="space-y-1">
+              <div className="font-semibold">q<sub>spoil</sub> (Q-spoiling factor)</div>
+              <p>
+                Operational quality adjustment for the cavity. Increases or reduces
+                effective amplification to reflect realistic losses.
+              </p>
+            </div>
+          }
+        >
+          <span className="px-2 py-0.5 rounded bg-amber-500/15 ring-1 ring-amber-400/30 cursor-help">
+            q<sub>spoil</sub> = {fmtSci(qSpoil)}
+          </span>
+        </Tooltip>
+
+        <span className="opacity-60">×</span>
+
+        <Tooltip
+          label={
+            <div className="space-y-1">
+              <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket)</div>
+              <p>
+                Geometry “pocket” factor from Van den Broeck’s modification — allows
+                a small interior with a large effective warp radius. Chosen by design,
+                not by mode, so it’s constant across hover/cruise/etc.
+              </p>
+            </div>
+          }
+        >
+          <span className="px-2 py-0.5 rounded bg-fuchsia-500/15 ring-1 ring-fuchsia-400/30 cursor-help">
+            γ<sub>VdB</sub> = {fmtSci(gammaVdB)}
+          </span>
+        </Tooltip>
+
+        <span className="opacity-60">=</span>
+
+        <span className="px-2 py-0.5 rounded bg-emerald-500/15 ring-1 ring-emerald-400/30">
+          A<sub>total</sub> = {fmtSci(A_total)}
+        </span>
+      </div>
+
+      {/* Tiny log bars so scale “reads” at a glance */}
+      <div className="mt-4 grid grid-cols-3 gap-3">
+        <Bar label="γ_geo^3" value={A_geo} />
+        <Bar label="q_spoil" value={qSpoil} />
+        <Bar label="γ_VdB" value={gammaVdB} />
+      </div>
+
+      <div className="mt-3 text-[11px] opacity-70">
+        Display model only: A<sub>total</sub> is the multiplier applied to the
+        per-tile Casimir energy in the physics pipeline. Q<sub>cavity</sub> still
+        participates separately in ζ (Ford-Roman) and loss terms.
+      </div>
+    </div>
+  );
+}
+
+function Bar({ label, value }: { label: string; value: number }) {
+  // simple log scale 0..1 for rendering
+  const v = Math.log10(Math.max(value, 1e-12));
+  const norm = Math.min(1, Math.max(0, (v + 12) / 18)); // maps ~1e-12..1e6 into 0..1 nicely
+  return (
+    <div>
+      <div className="mb-1 text-[11px] opacity-80">{label}</div>
+      <div className="h-2 rounded bg-white/5 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-sky-400/70 to-emerald-400/70"
+          style={{ width: `${norm * 100}%` }}
+        />
+      </div>
+      <div className="mt-1 text-[11px] opacity-70">{fmtSci(value)}</div>
+    </div>
+  );
+}
+
+Drop it into the page
+
+In client/src/pages/helix-core.tsx, import and place the card wherever you want (e.g., below the Metric Compliance HUD):
+
+import AmplificationPanel from "@/components/AmplificationPanel";
+
+// ...inside your layout grid / right column...
+<AmplificationPanel />
+
+
+⸻
+
+Why this helps
+	•	Clarity: the multiplication chain is visible and interactive. Hovering any token shows the theory snippet.
+	•	Consistency: γ_VdB remains constant across modes (design choice), while γ_geo and q_spoil can move with your mode presets.
+	•	Live: values come directly from the same hook/endpoints the rest of the dashboard uses.
+
+If you want, I can also wire the Casimir Tile Grid header to display activeSectors / totalSectors and use the same tooltip style (e.g., “1 sector strobing ⇒ 2.8M energized tiles (of 1.12B) at any instant”).
