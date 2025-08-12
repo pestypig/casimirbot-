@@ -331,8 +331,22 @@ export function LiveEnergyPipeline({
               zenLongToast("mode:switch", {
                 mode: mode.name,
                 duty: mode.duty,
-                powerMW: 83.3, // Will be updated with actual values
-                zeta: 0.032
+                powerMW: P_total_realistic, // Use actual calculated power
+                zeta: zeta, // Use actual calculated ζ
+                tsRatio: TS_ratio, // Use actual T_s/T_LC ratio
+                exoticKg: M_exotic_total, // Use actual exotic mass
+                gammaGeo: gamma_geo,
+                qFactor: Q_cavity,
+                sagDepthMm: 16, // From current sag depth
+                freqGHz: f_m / 1e9, // Convert Hz to GHz
+                sectors: mode.sectors,
+                maxPowerMW: 120, // Mode-dependent constraint
+                massTolerancePct: 5,
+                shipRadiusM: R_ship,
+                gapNm: 16, // cavity gap
+                frOk: zeta < (value === 'hover' ? 0.05 : value === 'cruise' ? 1.0 : 20.0),
+                natarioOk: TS_ratio > 100,
+                curvatureOk: P_total_realistic < 120
               });
             }
           }}>
