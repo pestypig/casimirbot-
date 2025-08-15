@@ -541,6 +541,16 @@ export function getSystemMetrics(req: Request, res: Response) {
     timeScaleRatio: state.TS_ratio,
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
+    // hull geometry and time-scale metrics
+    geometry: {
+      Lx_m: state.hull?.Lx_m ?? 1007,
+      Ly_m: state.hull?.Ly_m ?? 264,
+      Lz_m: state.hull?.Lz_m ?? 173,
+      TS_ratio: state.TS_ratio,
+      TS_long: state.TS_long,
+      TS_geom: state.TS_geom
+    },
+
     // optional debugging breadcrumbs
     modelMode: state.modelMode ?? "calibrated"
   });

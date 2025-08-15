@@ -73,6 +73,7 @@ const ROLE_META: Record<RoleKey, {
         render: (m) => (
           <MetricLine items={[
             ["TS ratio", m?.timeScaleRatio ? fmt(m.timeScaleRatio) : "—"],
+            ["Hull", m?.geometry ? `${m.geometry.Lx_m}×${m.geometry.Ly_m}×${m.geometry.Lz_m} m` : "—"],
             ["Energy Output", m?.energyOutput ? `${m.energyOutput.toFixed(1)} MW` : "—"],
           ]}/>
         )

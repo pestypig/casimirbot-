@@ -25,6 +25,9 @@ export interface EnergyPipelineState {
   temperature_K: number;
   modulationFreq_GHz: number;
   
+  // Hull geometry
+  hull?: { Lx_m: number; Ly_m: number; Lz_m: number };
+  
   // Mode parameters
   currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
@@ -48,7 +51,9 @@ export interface EnergyPipelineState {
   M_exotic: number;         // Exotic mass generated
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
-  TS_ratio: number;         // Time-scale separation ratio
+  TS_ratio: number;         // Time-scale separation ratio (conservative)
+  TS_long?: number;         // Time-scale using longest dimension
+  TS_geom?: number;         // Time-scale using geometric mean
   zeta: number;             // Quantum inequality parameter
   N_tiles: number;          // Total number of tiles
   
@@ -125,6 +130,13 @@ export function initializePipelineState(): EnergyPipelineState {
     sag_nm: 16,
     temperature_K: 20,
     modulationFreq_GHz: 15,
+    
+    // Hull geometry (actual 1.007 km needle dimensions)
+    hull: {
+      Lx_m: 1007,  // length (needle axis)
+      Ly_m: 264,   // width  
+      Lz_m: 173    // height
+    },
     
     // Mode defaults (hover)
     currentMode: 'hover',
@@ -330,10 +342,18 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
      Additional metrics (derived)
   ──────────────────────────────── */
 
-  // Time-scale ratio TS ≡ T_hull / T_m (reuse f_m, T_m from above)
-  const R_hull   = 82;  // m
-  const T_hull   = R_hull / C;
-  state.TS_ratio = T_hull / T_m;
+  // --- Time-scale separation (TS) using actual hull size ---
+  const { Lx_m, Ly_m, Lz_m } = state.hull!;
+  const L_long = Math.max(Lx_m, Ly_m, Lz_m);                // conservative: longest light-crossing
+  const L_geom = Math.cbrt(Lx_m * Ly_m * Lz_m);             // geometric mean (volume-equivalent length)
+  // Reuse f_m and T_m from above power calculation
+
+  const T_long = L_long / C;   // s
+  const T_geom = L_geom / C;   // s
+
+  state.TS_long = T_long / T_m;   // most conservative
+  state.TS_geom = T_geom / T_m;   // typical
+  state.TS_ratio = state.TS_long; // keep existing field = conservative
 
   // ----- Sector model (consistent across modes) -----
   const TOTAL_SECTORS = 400;                           // Fixed logical partitioning

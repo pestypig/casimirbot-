@@ -11,6 +11,14 @@ export type HelixMetrics = {
   totalTiles?: number;
   gammaVanDenBroeck?: number;
   modelMode?: string;
+  geometry?: {
+    Lx_m: number;                // Hull length
+    Ly_m: number;                // Hull width
+    Lz_m: number;                // Hull height
+    TS_ratio: number;            // Time-scale ratio (conservative)
+    TS_long?: number;            // Time-scale using longest dimension
+    TS_geom?: number;            // Time-scale using geometric mean
+  };
 };
 
 export function useMetrics(pollMs = 2000) {
