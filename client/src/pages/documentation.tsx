@@ -202,6 +202,49 @@ export default function Documentation() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Template for New Document */}
+              {/* 
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Your Document Title Here
+                  </CardTitle>
+                  <CardDescription>
+                    Brief description of what this document covers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    <p><strong>Key Topics:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 mt-2">
+                      <li>Key topic 1</li>
+                      <li>Key topic 2</li>
+                      <li>Key topic 3</li>
+                      <li>Key topic 4</li>
+                    </ul>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => window.open('/attached_assets/your-filename.pdf', '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download PDF
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.open('/attached_assets/your-filename.pdf', '_blank')}
+                      className="flex items-center gap-2"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View Online
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              */}
             </div>
           </TabsContent>
 
