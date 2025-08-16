@@ -519,56 +519,39 @@ class WarpEngine {
 
         const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
-        // --- Physics-consistent amplitude and averaged duty (no duplicate consts) ---
+        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
+        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
+        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
 
-        // Ensure numbers
-        const dutyCycleUniform = Number(this.uniforms?.dutyCycle ?? 0.14);
-        const sectorsUniform   = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
-        const gammaGeoUniform  = Number(this.uniforms?.gammaGeo ?? 26);
-        const QburstUniform    = Number(this.uniforms?.Qburst ?? this.uniforms?.cavityQ ?? 1e9);
-        const qSpoilUniform    = Number(this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0);
-        const gammaVdBUniform  = Number(this.uniforms?.gammaVdB ?? 2.86e5);
-        const betaGainUniform  = Number(this.uniforms?.betaGain ?? 0.15);
+        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
+        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
-        // FIX: wall thickness default must be meters (16 nm), not 0.016 (16 mm)
-        const wallWidthUniform = Number(this.uniforms?.wallWidth ?? 16e-9);
-
-        // Geometric amplification γ_geo^3
-        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform;
-
-        // Effective duty for averaged view (linear; cruise visibly flatter than hover)
-        const effDutyUniform = Math.max(1e-12, dutyCycleUniform / sectorsUniform);
-
-        // Instant vs averaged beta (use averaged unless viewAvg is explicitly false)
-        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
-        const betaAvgUniform  = betaInstUniform * effDutyUniform;
-        const betaUsedUniform = (this.uniforms?.viewAvg ?? true) ? betaAvgUniform : betaInstUniform;
-
-        // Final visual scale
-        const betaVisUniform = betaUsedUniform * betaGainUniform;
-
-        // Derived values for other calculations
-        const splitUniform = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? Math.floor(sectorsUniform / 2)));
         const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
-        // Debug once per ~second
-        if ((this._dbgTick = (this._dbgTick || 0) + 1) % 60 === 0) {
-          console.log("🎥 MODE VIS",
-            {
-              mode: this.uniforms?.currentMode,
-              duty: dutyCycleUniform,
-              sectors: sectorsUniform,
-              effDuty: effDutyUniform.toExponential(3),
-              A_geo: A_geoUniform.toExponential(3),
-              qBurst: QburstUniform.toExponential(3),
-              gVdB: gammaVdBUniform.toExponential(3),
-              qSpoil: qSpoilUniform,
-              betaInst: betaInstUniform.toExponential(3),
-              betaAvg: betaAvgUniform.toExponential(3),
-              betaVis: betaVisUniform.toExponential(3),
-              wallWidth_m: wallWidthUniform
-            }
-          );
+        // Physics-consistent amplitude and averaged duty
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
+        
+        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+        
+        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
+        const betaVisUniform  = betaUsedUniform * betaGainUniform;
+
+        // Debug per mode (once per 60 frames)
+        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🧪 warp-mode", {
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                betaVis: betaVisUniform.toExponential(2)
+            });
         }
         
         // Core displacement calculation loop (C²-smooth)
