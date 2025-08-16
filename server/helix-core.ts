@@ -8,6 +8,7 @@ import {
   updateParameters,
   getGlobalPipelineState,
   setGlobalPipelineState,
+  sampleDisplacementField,
   MODE_CONFIGS,
   type EnergyPipelineState 
 } from "./energy-pipeline.js";
@@ -641,4 +642,34 @@ export function switchOperationalMode(req: Request, res: Response) {
 // Get HELIX metrics (alias for compatibility)
 export function getHelixMetrics(req: Request, res: Response) {
   return getSystemMetrics(req, res);
+}
+
+// Get displacement field samples for physics validation
+export function getDisplacementField(req: Request, res: Response) {
+  try {
+    const state = getGlobalPipelineState();
+    const q = req.query;
+    const data = sampleDisplacementField(state, {
+      nTheta: q.nTheta ? Number(q.nTheta) : undefined,
+      nPhi: q.nPhi ? Number(q.nPhi) : undefined,
+      sectors: q.sectors ? Number(q.sectors) : undefined,
+      split: q.split ? Number(q.split) : undefined,
+      wallWidth_m: q.wallWidth_m ? Number(q.wallWidth_m) : undefined,
+      shellOffset: q.shellOffset ? Number(q.shellOffset) : undefined,
+    });
+    res.json({ 
+      count: data.length, 
+      axes: state.hull, 
+      w_m: (state.sag_nm ?? 16) * 1e-9, 
+      physics: {
+        gammaGeo: state.gammaGeo,
+        qSpoiling: state.qSpoilingFactor,
+        sectorStrobing: state.sectorStrobing
+      },
+      data 
+    });
+  } catch (e) {
+    console.error("field endpoint error:", e);
+    res.status(500).json({ error: "field sampling failed" });
+  }
 }

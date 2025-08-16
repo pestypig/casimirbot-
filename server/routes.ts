@@ -337,6 +337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getTileStatus, 
     getSystemMetrics,
     getPipelineState,
+    getDisplacementField,
     updatePipelineParams,
     switchOperationalMode
   } = await import('./helix-core.js');
@@ -345,6 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
   app.get("/api/helix/metrics", getSystemMetrics);
   app.get("/api/helix/pipeline", getPipelineState);
+  app.get("/api/helix/field", getDisplacementField);
   app.post("/api/helix/pipeline/update", updatePipelineParams);
   app.post("/api/helix/pipeline/mode", switchOperationalMode);
 

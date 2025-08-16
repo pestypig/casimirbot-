@@ -35,6 +35,7 @@ import { publish } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 import { Tooltip } from "@/components/ui/Tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
+import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -524,6 +525,9 @@ export default function HelixCore() {
                 height={170}
               />
             )}
+
+            {/* Physics Field Sampler for Validation */}
+            <PhysicsFieldSampler />
 
             {/* Energy Control Panel */}
             <Card className="bg-slate-900/50 border-slate-800">

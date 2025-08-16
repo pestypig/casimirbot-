@@ -5,6 +5,49 @@
 const MODEL_MODE: 'calibrated' | 'raw' = 
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
+// ---------- Ellipsoid helpers (match renderer math) ----------
+export type HullAxes = { a: number; b: number; c: number };
+
+function rhoEllipsoid(p: [number, number, number], ax: HullAxes) {
+  return Math.hypot(p[0] / ax.a, p[1] / ax.b, p[2] / ax.c);
+}
+
+function nEllipsoid(p: [number, number, number], ax: HullAxes): [number, number, number] {
+  // ∇(x^2/a^2 + y^2/b^2 + z^2/c^2) normalized
+  const nx = p[0] / (ax.a * ax.a);
+  const ny = p[1] / (ax.b * ax.b);
+  const nz = p[2] / (ax.c * ax.c);
+  const L = Math.hypot(
+    p[0] / ax.a,
+    p[1] / ax.b,
+    p[2] / ax.c
+  ) || 1;
+  const n0 = nx / L, n1 = ny / L, n2 = nz / L;
+  const m = Math.hypot(n0, n1, n2) || 1;
+  return [n0 / m, n1 / m, n2 / m];
+}
+
+// ---------- Physics-side displacement sampling for debug/validation ----------
+export interface FieldSample {
+  p: [number, number, number];   // sample coordinate (meters)
+  rho: number;                   // ellipsoidal radius (unitless)
+  bell: number;                  // canonical bell weight
+  n: [number, number, number];   // outward normal
+  sgn: number;                   // sector sign (+/-)
+  disp: number;                  // scalar displacement magnitude used
+}
+
+export interface FieldRequest {
+  // sampling grid
+  nTheta?: number;   // default 64
+  nPhi?: number;     // default 32
+  shellOffset?: number; // meters; 0 = on shell, >0 outside, <0 inside (default 0)
+  // physics
+  wallWidth_m?: number; // bell width wρ in meters (default from sag_nm)
+  sectors?: number;     // sector count (default state.sectorStrobing)
+  split?: number;       // (+)/(−) split index (default floor(sectors/2))
+}
+
 export interface TileParams {
   gap_nm: number;           // Casimir cavity gap in nanometers
   radius_mm: number;        // Radius of curvature in millimeters
@@ -425,4 +468,70 @@ export function getGlobalPipelineState(): EnergyPipelineState {
 
 export function setGlobalPipelineState(state: EnergyPipelineState): void {
   globalPipelineState = state;
+}
+
+/**
+ * Sample the Natário bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Returns ~ nTheta*nPhi points, suitable for JSON compare or CSV export.
+ */
+export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSample[] {
+  // Hull geometry: convert from Needle Hull format to ellipsoid axes
+  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+  const a = hullGeom.Lx_m / 2;  // Semi-axis X (length/2)
+  const b = hullGeom.Ly_m / 2;  // Semi-axis Y (width/2)
+  const c = hullGeom.Lz_m / 2;  // Semi-axis Z (height/2)
+  const axes: HullAxes = { a, b, c };
+
+  const nTheta = req.nTheta ?? 64;
+  const nPhi   = req.nPhi ?? 32;
+  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorStrobing ?? 1));
+  const split   = Math.max(1, Math.min(sectors - 1, Math.floor(req.split ?? sectors / 2)));
+
+  // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
+  // Use a geometric-mean effective radius so width is scale-invariant with axes.
+  const aEff = Math.cbrt(axes.a * axes.b * axes.c);
+  const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
+  const w_rho = Math.max(1e-6, w_m / aEff);
+
+  // Match renderer's gain chain (display-focused): disp ∝ γ_geo^3 * q_spoil * bell * sgn
+  const gammaGeo   = state.gammaGeo ?? 26;
+  const qSpoil     = state.qSpoilingFactor ?? 1;
+  const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
+  const vizGain    = 1.0;                                 // keep physics-scale here; renderer may apply extra gain
+
+  const samples: FieldSample[] = [];
+
+  for (let i = 0; i < nTheta; i++) {
+    const theta = (i / nTheta) * 2 * Math.PI;      // [-π, π] ring index
+    // sector sign like renderer (based on theta fraction)
+    const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+    const sgn = (Math.floor(u * sectors) < split) ? +1 : -1;
+
+    for (let j = 0; j < nPhi; j++) {
+      const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [-π/2, π/2]
+      // Base shell point (ρ≈1). Optional radial offset in meters.
+      const onShell: [number, number, number] = [
+        axes.a * Math.cos(phi) * Math.cos(theta),
+        axes.b * Math.sin(phi),
+        axes.c * Math.cos(phi) * Math.sin(theta),
+      ];
+
+      const n = nEllipsoid(onShell, axes);
+      const p: [number, number, number] = [
+        onShell[0] + (req.shellOffset ?? 0) * n[0],
+        onShell[1] + (req.shellOffset ?? 0) * n[1],
+        onShell[2] + (req.shellOffset ?? 0) * n[2],
+      ];
+
+      const rho = rhoEllipsoid(p, axes);
+      const sd  = rho - 1.0;
+      const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
+
+      // scalar displacement proxy (renderer multiplies by normal later)
+      const disp = vizGain * geoAmp * qSpoil * bell * sgn;
+
+      samples.push({ p, rho, bell, n, sgn, disp });
+    }
+  }
+  return samples;
 }
