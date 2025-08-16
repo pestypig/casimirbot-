@@ -127,12 +127,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // Map mode to phase split for front/back asymmetry
+      // Resolve sector count and phase split for strobing
+      const sectors = Number(parameters.sectorStrobing ?? 1);
       const mode = parameters.currentMode || 'hover';
-      const phaseSplit = mode === 'cruise' ? 0.65        // aft-heavy
-                       : mode === 'hover' ? 0.50         // balanced
-                       : mode === 'emergency' ? 0.70     // maximum aft
-                       : 0.50;                           // default
+      
+      // Calculate safe split index (half the sectors for static split)
+      const phaseSplit = Math.max(1, Math.floor(sectors / 2));
       
       // Helper to ensure numeric values
       const num = (v: any, def = 0) => {
@@ -173,10 +173,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         hullAxes: [hull.a, hull.b, hull.c],             // Semi-axes in meters
         wallWidth: wallWidth,                            // Normalized wall thickness
         
-        // Operational mode parameters - fixed mapping
+        // Strobing parameters
         currentMode: mode,
-        sectorCount: num(parameters.sectorStrobing, 1),  // Was sectorStrobing - engine reads sectorCount
-        phaseSplit: phaseSplit,                          // NEW: Front/back asymmetry control
+        sectors: sectors,                                // Number of sectors for strobing
+        split: phaseSplit,                               // Engine uses 'split' property for sector division
+        strobeHz: num(parameters.sectorStrobing > 1 ? 2000 : 0, 0), // Strobe frequency
         
         // Visual control
         viewAvg: 1.0,                                    // Show GR average

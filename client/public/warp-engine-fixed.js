@@ -517,7 +517,7 @@ class WarpEngine {
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
-        const split = Math.floor(phaseSplit * sectors);
+        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
         // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
