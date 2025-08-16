@@ -26,7 +26,7 @@ export interface EnergyPipelineState {
   modulationFreq_GHz: number;
   
   // Hull geometry
-  hull?: { Lx_m: number; Ly_m: number; Lz_m: number };
+  hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
   
   // Mode parameters
   currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
@@ -150,7 +150,8 @@ export function initializePipelineState(): EnergyPipelineState {
     hull: {
       Lx_m: 1007,  // length (needle axis)
       Ly_m: 264,   // width  
-      Lz_m: 173    // height
+      Lz_m: 173,   // height
+      wallThickness_m: 6.0  // physical wall thickness for Natário bell (meters)
     },
     
     // Mode defaults (hover)

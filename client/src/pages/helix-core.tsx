@@ -938,7 +938,7 @@ export default function HelixCore() {
                 sectorStrobing: pipelineState?.sectorStrobing || 1,
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7,
-                // Hull geometry for ellipsoidal bell calculation
+                // Hull geometry for ellipsoidal bell calculation (scientifically faithful)
                 hull: (metrics && metrics.hull) ? {
                   ...metrics.hull,
                   a: metrics.hull.a ?? metrics.hull.Lx_m / 2,
@@ -946,9 +946,11 @@ export default function HelixCore() {
                   c: metrics.hull.c ?? metrics.hull.Lz_m / 2
                 } : {
                   Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                  a: 503.5, b: 132, c: 86.5
+                  a: 503.5, b: 132, c: 86.5,
+                  wallThickness_m: 6.0
                 },
-                wall: (metrics && metrics.wall) ? metrics.wall : { w_norm: 0.06 }
+                // Pass physical wall thickness (meters) instead of normalized value
+                wallWidth_m: (metrics && metrics.hull?.wallThickness_m) ? metrics.hull.wallThickness_m : 6.0
               }}
             />
             

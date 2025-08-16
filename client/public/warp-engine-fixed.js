@@ -385,16 +385,18 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Get hull axes from uniforms or use needle hull defaults (in clip space coordinates)
+        // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
-        const wallWidth = bubbleParams.wallWidth || 0.06;             // Normalized wall thickness
+        const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
         
-        // Convert to clip space coordinates (normalize to typical display range)
-        const axesClip = [
-          hullAxes[0] / 1200,  // Scale to reasonable clip space (~0.4 for 503.5m)
-          hullAxes[1] / 600,   // Scale to reasonable clip space (~0.22 for 132m)  
-          hullAxes[2] / 400    // Scale to reasonable clip space (~0.22 for 86.5m)
-        ];
+        // Single scene scale based on long semi-axis (scientifically faithful)
+        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
+        const sceneScale = 1.0 / a;  // Make long semi-axis = 1 scene unit
+        const axesScene = [a * sceneScale, b * sceneScale, c * sceneScale]; // Exact aspect ratio [1, b/a, c/a]
+        
+        // Convert wall thickness to ρ-space using harmonic mean
+        const aH = 3 / (1/a + 1/b + 1/c);  // Harmonic mean of semi-axes
+        const w_rho = wallWidth_m / aH;     // Dimensionless wall thickness
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
@@ -414,29 +416,32 @@ class WarpEngine {
         const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
         const betaVis = betaUsed * betaGain;  // Scale to sane visual magnitude
         
-        console.log(`🔗 AMPLITUDE-CONTROLLED PIPELINE → 3D SHELL:`);
-        console.log(`  γ_geo=${gammaGeo}, Q_burst=${Qburst.toExponential(2)}, Δa/a=${deltaAOverA}`);
+        console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
+        console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
+        console.log(`  Wall: ${wallWidth_m} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  β_raw=${betaInst.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (gain=${betaGain})`);
-        console.log(`  phaseSplit=${phaseSplit} (${phaseSplit === 0.5 ? 'HOVER' : 'CRUISE'}), wallWidth=${wallWidth}`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius`);
 
-        // Ellipsoid utilities
-        const sdEllipsoid = (p, a) => {
-            const q = [p[0]/a[0], p[1]/a[1], p[2]/a[2]];
-            return Math.hypot(q[0], q[1], q[2]) - 1.0;
+        // Ellipsoid utilities (using consistent scene-scaled axes)
+        const rhoEllipsoidal = (p) => {
+            return Math.hypot(p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]);
         };
         
-        const nEllipsoid = (p, a) => {
-            const qa = [p[0]/(a[0]*a[0]), p[1]/(a[1]*a[1]), p[2]/(a[2]*a[2])];
-            const L = Math.max(1e-6, Math.hypot(p[0]/a[0], p[1]/a[1], p[2]/a[2]));
-            const n = [qa[0]/L, qa[1]/L, qa[2]/L];
+        const sdEllipsoid = (p, axes) => {
+            return rhoEllipsoidal(p) - 1.0;
+        };
+        
+        const nEllipsoid = (p, axes) => {
+            const qa = [p[0]/(axes[0]*axes[0]), p[1]/(axes[1]*axes[1]), p[2]/(axes[2]*axes[2])];
+            const rho = Math.max(1e-6, rhoEllipsoidal(p));
+            const n = [qa[0]/rho, qa[1]/rho, qa[2]/rho];
             const m = Math.hypot(n[0], n[1], n[2]) || 1;
             return [n[0]/m, n[1]/m, n[2]/m];
         };
         
-        // Normalize drive direction
+        // Normalize drive direction (using scene-scaled axes)
         const dN = (() => {
-            const t = [driveDir[0]/axesClip[0], driveDir[1]/axesClip[1], driveDir[2]/axesClip[2]];
+            const t = [driveDir[0]/axesScene[0], driveDir[1]/axesScene[1], driveDir[2]/axesScene[2]];
             const m = Math.hypot(...t) || 1;
             return [t[0]/m, t[1]/m, t[2]/m];
         })();
@@ -451,13 +456,15 @@ class WarpEngine {
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
             const sgn = (Math.floor(u * sectors) < split) ? +1 : -1;  // (+) rear, (−) front
             
-            const sd = sdEllipsoid(p, axesClip);
+            const rho = rhoEllipsoidal(p);
+            const sd = rho - 1.0;
             
-            // Tight band: weight is strong only near the shell + hard gate for outliers
-            const ring = Math.exp(-(sd * sd) / (wallWidth * wallWidth));
-            const band = (Math.abs(sd) <= 3.0 * wallWidth) ? 1.0 : 0.0;  // Kill far-away outliers
+            // Canonical Natário bell function B(ρ) with physics-derived wall thickness
+            const bellArg = sd / w_rho;
+            const ring = Math.exp(-bellArg * bellArg);
+            const band = (Math.abs(sd) <= 3.0 * w_rho) ? 1.0 : 0.0;  // Hard cutoff for outliers
             
-            const n = nEllipsoid(p, axesClip);
+            const n = nEllipsoid(p, axesScene);
             
             // Front/back asymmetry
             const front = Math.sign(n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]) || 1;
@@ -473,7 +480,7 @@ class WarpEngine {
             disp *= (this.uniforms?.vizGain || 4.0);
             
             // CRITICAL: Clamp displacement to ≤ 10% of local shell radius
-            const localR = Math.max(1e-3, Math.hypot(p[0]/axesClip[0], p[1]/axesClip[1], p[2]/axesClip[2]));
+            const localR = Math.max(1e-3, rho);
             const maxPush = 0.10 * 1.0;  // 10% of shell nominal radius (1.0 in normalized coords)
             if (disp > maxPush) disp = maxPush;
             if (disp < -maxPush) disp = -maxPush;
@@ -504,6 +511,11 @@ class WarpEngine {
             if (y < ymin) ymin = y;
         }
         console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (amplitude-controlled shell)`);
+        
+        // Update uniforms for scientific consistency (using scene-scaled axes)
+        this.uniforms.axesClip = axesScene;
+        this.uniforms.wallWidth = w_rho;
+        this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
     }
 
     _renderGridPoints() {
