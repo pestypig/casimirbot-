@@ -385,9 +385,16 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // 3D Ellipsoidal shell parameters
-        const axesClip = [0.40, 0.22, 0.22];      // ellipsoid radii in clip coords
-        const wallWidth = 0.06;                    // shell thickness (visual σ ~ 1/w)
+        // Get hull axes from uniforms or use needle hull defaults (in clip space coordinates)
+        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
+        const wallWidth = bubbleParams.wallWidth || 0.06;             // Normalized wall thickness
+        
+        // Convert to clip space coordinates (normalize to typical display range)
+        const axesClip = [
+          hullAxes[0] / 1200,  // Scale to reasonable clip space (~0.4 for 503.5m)
+          hullAxes[1] / 600,   // Scale to reasonable clip space (~0.22 for 132m)  
+          hullAxes[2] / 400    // Scale to reasonable clip space (~0.22 for 86.5m)
+        ];
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         

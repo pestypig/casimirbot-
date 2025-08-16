@@ -554,7 +554,13 @@ export function getSystemMetrics(req: Request, res: Response) {
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     // hull geometry and time-scale metrics for Bridge cards
-    hull: { Lx_m, Ly_m, Lz_m },
+    hull: { 
+      Lx_m, Ly_m, Lz_m,
+      a: Lx_m / 2,  // semi-axis x
+      b: Ly_m / 2,  // semi-axis y  
+      c: Lz_m / 2   // semi-axis z
+    },
+    wall: { w_norm: 0.06 }, // normalized wall thickness for ellipsoidal bell
     tiles: {
       tileArea_cm2: state.tileArea_cm2,
       hullArea_m2: state.hullArea_m2 ?? null,

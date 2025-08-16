@@ -26,6 +26,18 @@ interface WarpVisualizerProps {
     sectorStrobing?: number;
     qSpoilingFactor?: number;
     gammaVanDenBroeck?: number;
+    // Hull geometry data
+    hull?: {
+      Lx_m: number;
+      Ly_m: number;
+      Lz_m: number;
+      a: number;
+      b: number;
+      c: number;
+    };
+    wall?: {
+      w_norm: number;
+    };
   };
 }
 
@@ -136,6 +148,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         return n > 1 ? n/100 : n;
       })();
 
+      // Get hull geometry from parameters or use needle hull defaults
+      const hull = parameters.hull || {
+        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+        a: 503.5, b: 132, c: 86.5
+      };
+      const wallWidth = parameters.wall?.w_norm || 0.06;
+
       // Fixed parameter mapping for engine consumption with numeric coercion
       engineRef.current.updateUniforms({
         // Core physics parameters - all coerced to numbers
@@ -149,6 +168,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         powerAvg_MW: num(parameters.powerAvg_MW),
         exoticMass_kg: num(parameters.exoticMass_kg),
         tsRatio: num(parameters.tsRatio, 4100),          // Time-scale ratio for animation scaling
+        
+        // Hull geometry for ellipsoidal bell calculation
+        hullAxes: [hull.a, hull.b, hull.c],             // Semi-axes in meters
+        wallWidth: wallWidth,                            // Normalized wall thickness
         
         // Operational mode parameters - fixed mapping
         currentMode: mode,
@@ -401,6 +424,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 <div className="text-green-300">Mode: {parameters.currentMode || 'hover'}</div>
                 <div className="text-green-300">Power: {parameters.powerAvg_MW.toFixed(1)}MW</div>
                 <div className="text-green-300">Duty: {(parameters.dutyCycle * 100).toFixed(1)}%</div>
+                {parameters.hull && (
+                  <div className="text-blue-300 mt-2">
+                    <div>Hull: {parameters.hull.Lx_m}×{parameters.hull.Ly_m}×{parameters.hull.Lz_m}m</div>
+                    <div>Semi-axes: {parameters.hull.a.toFixed(1)}×{parameters.hull.b.toFixed(1)}×{parameters.hull.c.toFixed(1)}m</div>
+                  </div>
+                )}
                 <div className="text-green-300">Q-Factor: {parameters.cavityQ.toExponential(0)}</div>
                 <div className="text-green-300">Exotic Mass: {parameters.exoticMass_kg}kg</div>
               </div>
