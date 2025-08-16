@@ -500,6 +500,13 @@ export function getSystemMetrics(req: Request, res: Response) {
     Q_quantum: 1e10 
   };
 
+  // Derive τLC and T_m once here from the pipeline state used to compute TS_ratio
+  const f_m_Hz = state.modulationFreq_GHz * 1e9;   // Hz
+  const T_m = 1 / f_m_Hz;                           // s
+  const { Lx_m, Ly_m, Lz_m } = state.hull ?? { Lx_m: 82, Ly_m: 82, Lz_m: 82 };
+  const L_long = Math.max(Lx_m, Ly_m, Lz_m);
+  const tauLC = L_long / 299_792_458;               // s
+
   res.json({
     // tile/sector truth (these are what your Tile Grid should use)
     totalTiles: Math.floor(state.N_tiles),
@@ -519,6 +526,11 @@ export function getSystemMetrics(req: Request, res: Response) {
     energyOutput: state.P_avg,                 // MW (your calibrated target)
     exoticMass: Math.round(state.M_exotic),    // kg (calibrated/paper value)
     exoticMassRaw: Math.round(state.M_exotic_raw ?? state.M_exotic), // if you keep a raw
+
+    // NEW: time scale components (authoritative from server)
+    timeScaleRatio: state.TS_ratio,            // dimensionless
+    tauLC,                                     // light-crossing time actually used (s)
+    T_m,                                       // modulation period actually used (s)
 
     // FR & friends
     dutyGlobal: state.dutyCycle,
@@ -542,11 +554,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     // hull geometry and time-scale metrics for Bridge cards
-    hull: {
-      Lx_m: state.hull?.Lx_m ?? 1007,
-      Ly_m: state.hull?.Ly_m ?? 264,
-      Lz_m: state.hull?.Lz_m ?? 173
-    },
+    hull: { Lx_m, Ly_m, Lz_m },
     tiles: {
       tileArea_cm2: state.tileArea_cm2,
       hullArea_m2: state.hullArea_m2 ?? null,

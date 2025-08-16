@@ -5,6 +5,7 @@ import { Calculator, Zap, Atom, Settings } from "lucide-react";
 import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { useMetrics } from "@/hooks/use-metrics";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -141,6 +142,8 @@ export function LiveEnergyPipeline({
   onModeChange,
   onParameterUpdate
 }: LiveEnergyPipelineProps) {
+  // Get authoritative metrics from server
+  const { data: metrics } = useMetrics(); 
   
   // Constants from physics
   const h_bar = 1.055e-34; // J⋅s
@@ -229,12 +232,10 @@ export function LiveEnergyPipeline({
   console.log(`  combined_throttle: ${combined_throttle}`);
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
-  // Step 9: Time-Scale Separation (Equation 3 from PDF)
-  const f_m = 15e9; // Hz (mechanical frequency)
-  const T_m = 1 / f_m; // s (mechanical period)
-  const L_LC = R_ship; // Light-crossing distance
-  const tau_LC = L_LC / c; // Light-crossing time
-  const TS_ratio = tau_LC / T_m; // Should be ≫ 1
+  // Step 6 view values from the server (authoritative)
+  const tauLC = metrics?.tauLC;     // s
+  const T_m   = metrics?.T_m;       // s
+  const TS_ratio = metrics?.timeScaleRatio; // dimensionless
   
   // Step 10: Total Exotic Mass (Equation 5 from PDF)  
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
@@ -273,6 +274,7 @@ export function LiveEnergyPipeline({
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
+    if (value === undefined || value === null || isNaN(value)) return "...";
     if (Math.abs(value) === 0) return "0";
     const exp = Math.floor(Math.log10(Math.abs(value)));
     const mantissa = value / Math.pow(10, exp);
@@ -280,6 +282,7 @@ export function LiveEnergyPipeline({
   };
   
   const formatStandard = (value: number, decimals = 2) => {
+    if (value === undefined || value === null || isNaN(value)) return "...";
     return value.toFixed(decimals);
   };
 
@@ -596,10 +599,10 @@ export function LiveEnergyPipeline({
           <div className="font-mono text-sm space-y-1">
             <div>TS_ratio = τ_LC / T_m</div>
             <div className="text-muted-foreground">
-              τ_LC = {formatScientific(tau_LC)} s, T_m = {formatScientific(T_m)} s
+              τ_LC = {tauLC ? formatScientific(tauLC) : "..."} s, T_m = {T_m ? formatScientific(T_m) : "..."} s
             </div>
             <div className="text-primary font-semibold">
-              TS_ratio = {formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}
+              TS_ratio = {TS_ratio ? formatStandard(TS_ratio) : "..."} {TS_ratio && TS_ratio > 100 ? "✓" : "✗"}
             </div>
           </div>
         </div>
