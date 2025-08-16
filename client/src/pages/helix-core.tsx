@@ -15,6 +15,7 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { useMetrics } from "@/hooks/use-metrics";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -140,6 +141,9 @@ export default function HelixCore() {
     };
     img.src = "/galaxymap.png";
   }, []);
+  
+  // Get metrics data for hull geometry
+  const { metrics } = useMetrics();
   
   // Update solar system positions periodically
   useEffect(() => {
@@ -935,11 +939,16 @@ export default function HelixCore() {
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7,
                 // Hull geometry for ellipsoidal bell calculation
-                hull: metricsData?.hull || {
+                hull: (metrics && metrics.hull) ? {
+                  ...metrics.hull,
+                  a: metrics.hull.a ?? metrics.hull.Lx_m / 2,
+                  b: metrics.hull.b ?? metrics.hull.Ly_m / 2,
+                  c: metrics.hull.c ?? metrics.hull.Lz_m / 2
+                } : {
                   Lx_m: 1007, Ly_m: 264, Lz_m: 173,
                   a: 503.5, b: 132, c: 86.5
                 },
-                wall: metricsData?.wall || { w_norm: 0.06 }
+                wall: (metrics && metrics.wall) ? metrics.wall : { w_norm: 0.06 }
               }}
             />
             
