@@ -132,6 +132,10 @@ class WarpEngine {
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
     _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
+        // Adaptive mesh density for thin walls (smoother displacement)
+        const baseDiv = divisions;
+        const adaptiveDivisions = Math.max(baseDiv, Math.floor(baseDiv * (0.06 / (this.uniforms?.wallWidth || 0.06))));
+        divisions = Math.min(adaptiveDivisions, 150); // Cap at 150 for performance
         const verts = [];
         const step = (span * 2) / divisions;  // Full span width divided by divisions
         const half = span;  // Half-extent
@@ -472,44 +476,69 @@ class WarpEngine {
             return [t[0]/m, t[1]/m, t[2]/m];
         })();
 
+        // Smooth helper functions for C²-continuous displacement
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const smoothstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * (3 - 2 * t); 
+        }; // C¹
+        const smootherstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * t * (t * (t * 6 - 15) + 10); 
+        }; // C²
+        const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
+
         const split = Math.floor(phaseSplit * sectors);
         
+        // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
             
-            // Sector sign for strobing
+            // --- Sector strobing: smooth, not step ---
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            const sgn = (Math.floor(u * sectors) < split) ? +1 : -1;  // (+) rear, (−) front
+            // Map sector index to phase in [-1,1] and soften with tanh
+            const sectorIdx = Math.floor(u * sectors);
+            // Distance from current split boundary in sector units
+            const distToSplit = (sectorIdx - split + 0.5);
+            // Wider width => softer transition across boundary
+            const strobeWidth = 0.75;                 // tune: 0.5–1.0
+            const sgn = softSign(-distToSplit / strobeWidth); // smooth ±1
             
-            const rho = rhoEllipsoidal(p);
-            const sd = rho - 1.0;
+            // --- Ellipsoidal signed distance ---
+            const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
+            const sd = rho - 1.0;                     // negative inside wall
             
-            // Canonical Natário bell function B(ρ) with physics-derived wall thickness
-            const bellArg = sd / w_rho;
-            const ring = Math.exp(-bellArg * bellArg);
-            const band = (Math.abs(sd) <= 3.0 * w_rho) ? 1.0 : 0.0;  // Hard cutoff for outliers
+            // --- Natário bell with C² window across wall ---
+            const s = sd / w_rho;                     // normalize to wall thickness
+            const gaussian = Math.exp(-s * s);        // original bell
+            // Replace hard band with C² window of halfwidth ~ 3 w_rho
+            const window = smootherstep(-3.0, -2.0, s) * (1.0 - smootherstep(2.0, 3.0, s)) +
+                          smootherstep(-2.0, 2.0, s); // compact, C² across edges
             
+            // --- Surface normal ---
             const n = nEllipsoid(p, axesScene);
             
-            // Front/back asymmetry
-            const front = Math.sign(n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]) || 1;
+            // --- Front/back asymmetry: soften projection ---
+            const proj = (n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]);
+            const front = softSign(proj / 0.15);      // 0.1–0.2 gives gentle flip
             
-            // Get mode-specific amplification factors
+            // --- Mode gains ---
             const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
             const modeViz = (this.currentParams.modeVisualScale || 1.0);
             
-            // Base displacement with mode scaling
-            let disp = gridK * betaVis * modeAmp * modeViz * ring * band * sgn * front;
+            // --- Final displacement: smooth, odd across wall ---
+            // Multiply by tanh(-s) to enforce smooth odd symmetry (compress/expand)
+            const odd = softSign(-s);
+            let disp = gridK * betaVis * modeAmp * modeViz
+                     * gaussian * window * odd * sgn * front;
             
-            // NEW: Exaggerate for display only (viewer-only, physics unchanged)
+            // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
             
-            // CRITICAL: Clamp displacement to ≤ 10% of local shell radius
-            const localR = Math.max(1e-3, rho);
-            const maxPush = 0.10 * 1.0;  // 10% of shell nominal radius (1.0 in normalized coords)
-            if (disp > maxPush) disp = maxPush;
-            if (disp < -maxPush) disp = -maxPush;
+            // --- Physically safe clamp (relative to local curvature radius) ---
+            const maxPush = 0.10;                     // 10% of nominal radius 1.0
+            disp = Math.max(-maxPush, Math.min(maxPush, disp));
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
