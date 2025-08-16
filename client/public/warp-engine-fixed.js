@@ -133,9 +133,15 @@ class WarpEngine {
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
     _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
         // Adaptive mesh density for thin walls (smoother displacement)
-        const baseDiv = divisions;
-        const adaptiveDivisions = Math.max(baseDiv, Math.floor(baseDiv * (0.06 / (this.uniforms?.wallWidth || 0.06))));
-        divisions = Math.min(adaptiveDivisions, 150); // Cap at 150 for performance
+        const baseDiv = Math.max(divisions, 160);
+        const targetVertsAcrossWall = 12;
+        const hullAxes = this.currentParams?.hullAxes || [503.5, 132, 86.5];
+        const wallWidth_m = this.currentParams?.wallWidth_m || 6.0;
+        
+        // ρ-span of ±3σ wall thickness
+        const span_rho = Math.max(1e-3, (3 * wallWidth_m) / Math.min(...hullAxes));
+        const scale = Math.max(1.0, targetVertsAcrossWall / (span_rho * baseDiv));
+        divisions = Math.min(320, Math.floor(baseDiv * scale)); // Higher cap for smoother walls
         const verts = [];
         const step = (span * 2) / divisions;  // Full span width divided by divisions
         const half = span;  // Half-extent
@@ -509,12 +515,7 @@ class WarpEngine {
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
             const sd = rho - 1.0;                     // negative inside wall
             
-            // --- Natário bell with C² window across wall ---
-            const s = sd / w_rho;                     // normalize to wall thickness
-            const gaussian = Math.exp(-s * s);        // original bell
-            // Replace hard band with C² window of halfwidth ~ 3 w_rho
-            const window = smootherstep(-3.0, -2.0, s) * (1.0 - smootherstep(2.0, 3.0, s)) +
-                          smootherstep(-2.0, 2.0, s); // compact, C² across edges
+
             
             // --- Surface normal ---
             const n = nEllipsoid(p, axesScene);
@@ -527,18 +528,45 @@ class WarpEngine {
             const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
             const modeViz = (this.currentParams.modeVisualScale || 1.0);
             
+            // --- Local wall thickness in ellipsoidal ρ (correct units) ---
+            // Semi-axes in meters (not the clip-scaled ones)
+            const a_m = hullAxes[0]; // 503.5
+            const b_m = hullAxes[1]; // 132.0
+            const c_m = hullAxes[2]; // 86.5
+            
+            // Direction-dependent mapping of meters → Δρ
+            const invR = Math.sqrt(
+                (n[0]/a_m)*(n[0]/a_m) +
+                (n[1]/b_m)*(n[1]/b_m) +
+                (n[2]/c_m)*(n[2]/c_m)
+            );
+            const R_eff = 1.0 / Math.max(invR, 1e-6);
+            const w_rho_local = wallWidth_m / R_eff;   // thickness in ρ-units
+            
+            // Use local normalized coordinate instead of global w_rho
+            const s_local = sd / w_rho_local;
+            const gaussian_local = Math.exp(-s_local * s_local);
+            
+            // Compact C² window to avoid multiplying by a hard band
+            const smooth = (A, B, x) => { 
+                const t = Math.max(0, Math.min(1, (x - A) / (B - A))); 
+                return t * t * t * (t * (t * 6 - 15) + 10); 
+            };
+            const window_local = smooth(-3, -2, s_local) * (1 - smooth(2, 3, s_local)) + smooth(-2, 2, s_local);
+            
             // --- Final displacement: smooth, odd across wall ---
             // Multiply by tanh(-s) to enforce smooth odd symmetry (compress/expand)
-            const odd = softSign(-s);
+            const odd = softSign(-s_local);
             let disp = gridK * betaVis * modeAmp * modeViz
-                     * gaussian * window * odd * sgn * front;
+                     * gaussian_local * window_local * odd * sgn * front;
             
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
             
-            // --- Physically safe clamp (relative to local curvature radius) ---
-            const maxPush = 0.10;                     // 10% of nominal radius 1.0
-            disp = Math.max(-maxPush, Math.min(maxPush, disp));
+            // --- Soft clamp (removes the ring) ---
+            const maxPush = 0.10;           // keep same visual limit
+            const softness = 0.6;           // 0.5–0.8
+            disp = maxPush * Math.tanh(disp / (softness * maxPush));
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
@@ -566,6 +594,8 @@ class WarpEngine {
             if (y < ymin) ymin = y;
         }
         console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (amplitude-controlled shell)`);
+        console.log(`🔧 SOFT CLAMP: Applied tanh saturation instead of hard cutoff (eliminates jagged ring)`);
+        console.log(`🔧 LOCAL WALL: Direction-dependent ρ-thickness for ellipsoidal geometry`);
         
         // Update uniforms for scientific consistency (using scene-scaled axes)
         this.uniforms.axesClip = axesScene;
