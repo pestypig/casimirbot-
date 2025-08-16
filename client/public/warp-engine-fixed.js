@@ -435,7 +435,7 @@ class WarpEngine {
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
-        // Enhanced pipeline-driven beta calculation with fixed parameter mapping
+        // Enhanced pipeline-driven beta calculation (aligned with energy-pipeline.ts)
         const sectors = Math.max(1, bubbleParams.sectorCount || bubbleParams.sectorStrobing || 1);
         const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
         const Qburst = bubbleParams.Qburst || bubbleParams.cavityQ || 1e9;
@@ -446,9 +446,21 @@ class WarpEngine {
         const betaGain = bubbleParams.betaGain || 1e-10;     // Normalize huge β to visual range
         const gammaVdB = bubbleParams.gammaVdB || bubbleParams.gammaVanDenBroeck || 1.0;
         
-        const betaInst = gammaGeo * Qburst * deltaAOverA * Math.pow(gammaVdB, 0.25);
-        const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, dutyCycle / sectors));
-        const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
+        // Match energy pipeline physics: γ_geo³ amplification + proper duty scaling
+        const geoAmplification = Math.pow(gammaGeo, 3);      // Cubic geometric amplification (like energy pipeline)
+        const f_m = 15e9; // 15 GHz modulation frequency (from energy pipeline)
+        const T_m = 1 / f_m;
+        const burstDuration = 0.5e-15; // 0.5 fs burst (from energy pipeline)
+        const dutyBurst = Math.min(1, Math.max(0, burstDuration / T_m));
+        const dutyTile = dutyCycle * dutyBurst;              // Effective tile-level duty
+        
+        // Active sector fraction for strobing
+        const TOTAL_SECTORS = 400;
+        const activeFraction = Math.min(1, sectors / TOTAL_SECTORS);
+        
+        // Displacement beta: should be proportional to energy enhancement but scaled for visualization
+        const betaInst = Math.sqrt(geoAmplification * Qburst * gammaVdB * dutyTile * activeFraction);
+        const betaUsed = betaInst;  // No averaging - use instantaneous for visual responsiveness
         const betaVis = betaUsed * betaGain;  // Scale to sane visual magnitude
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
@@ -457,6 +469,7 @@ class WarpEngine {
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
         console.log(`  β_raw=${betaInst.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (gain=${betaGain})`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius`);
+        console.log(`🔧 PHYSICS ALIGNMENT: γ_geo³=${geoAmplification.toExponential(2)}, duty_tile=${dutyTile.toExponential(2)}, active_frac=${activeFraction.toFixed(4)}`);
 
         // Ellipsoid utilities (using consistent scene-scaled axes)
         const rhoEllipsoidal = (p) => {
