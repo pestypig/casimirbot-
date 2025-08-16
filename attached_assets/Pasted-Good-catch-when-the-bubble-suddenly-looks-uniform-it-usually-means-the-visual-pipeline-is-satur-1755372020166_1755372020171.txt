@@ -1,0 +1,147 @@
+Good catch — when the bubble suddenly looks “uniform,” it usually means the visual pipeline is saturating or normalizing away the per-mode differences you expect (duty, sectors, Q, etc.). In other words, your mode uniforms are arriving, but the final effective displacement the grid sees is almost constant.
+
+Below is a tight checklist and drop-in patches to make modes visibly different again.
+
+⸻
+
+Why this happens
+	1.	Clamp saturation
+
+	•	In the renderer we cap displacement: maxPush = 0.10 (10% of shell radius).
+	•	If vizGain is high, hover, cruise, and emergency may all hit this cap, so they look identical.
+
+	2.	Averaging / normalization
+
+	•	If the renderer is using the averaged view (viewAvg) and an RMS factor (e.g., 1/√2) or a constant modeCurvatureAmplifier, you can flatten most mode differences.
+	•	If you changed to a smooth sine strobe, the instantaneous amplitude becomes bounded and can be very similar across modes if you also clamp.
+
+	3.	Wrong power of γ_geo
+
+	•	If you accidentally left γ_geo¹ in one place and γ_geo³ in another, you’ll confuse relative scaling and end up retuning vizGain until everything saturates.
+
+	4.	Sectors/duty not applied to amplitude
+
+	•	If sectors or dutyCycle is no longer folded into betaUsed, the per-mode change won’t show.
+
+⸻
+
+What to fix (minimal, targeted)
+
+A. Use physics-consistent amplitude and keep it below the clamp
+
+In public/warp-engine-fixed.js, inside _warpGridVertices:
+
+// 1) Effective duty: averaged (for “Now” view) vs instantaneous
+const effDuty = viewAvg
+  ? Math.max(1e-12, dutyCycle / Math.max(1, sectors))   // FR-style proxy
+  : 1.0;
+
+// 2) Physics-consistent amplitude chain
+const A_geo = gammaGeo * gammaGeo * gammaGeo;           // γ_geo³
+const betaInst = A_geo * Qburst * gammaVdB * qSpoil;    // instantaneous
+const betaAvg  = betaInst * Math.sqrt(effDuty);         // averaged view (RMS)
+const betaUsed = viewAvg ? betaAvg : betaInst;
+
+// 3) Visual gain tuned to avoid clamp in hover/cruise
+//    (start conservative — we’ll add a live debug to check saturation)
+const betaVis  = betaUsed * (betaGain ?? 1.0);
+
+B. Make clamp depend on wall thickness (smaller and mode-revealing)
+
+// Before: const maxPush = 0.10;
+const maxPush = Math.min(0.06, 2.5 * w_rho);   // ≤6% of shell; scales with wall width
+
+This stops all modes from slamming the same ceiling.
+
+C. Add a tiny smoothing after you compute disp and before clamp (optional)
+
+// … compute disp for this vertex as before …
+
+// optional micro-smoothing to reduce grid aliasing (no mode wash-out):
+// (requires looking up a couple neighbor samples or a small 1D FIR by index if available)
+// disp = 0.6*disp + 0.2*disp_left + 0.2*disp_right;
+
+// clamp AFTER smoothing:
+disp = Math.max(-maxPush, Math.min(maxPush, disp));
+
+D. Add a one-frame debug overlay to see if you’re saturating
+
+Still in _warpGridVertices, accumulate stats:
+
+let maxAbs = 0, clamped = 0, total = 0;
+
+// inside the vertex loop, after clamping:
+maxAbs = Math.max(maxAbs, Math.abs(disp));
+if (Math.abs(disp) >= maxPush - 1e-6) clamped++;
+total++;
+
+// after the loop:
+if ((this._debugTick = (this._debugTick||0)+1) % 60 === 0) {
+  console.log("🧪 Warp viz debug", {
+    mode: currentMode, dutyCycle, sectors, qSpoil, gammaGeo, Qburst, gammaVdB,
+    viewAvg,
+    effDuty,
+    A_geo,
+    betaInst, betaAvg, betaUsed,
+    vizGain: (betaGain ?? 1.0),
+    maxAbsDisp: +maxAbs.toFixed(4),
+    clampPct: +(100*clamped/Math.max(1,total)).toFixed(1) + "%"
+  });
+}
+
+If you see clampPct near 100% for multiple modes, you’re saturating. Lower betaGain or maxPush (counter-intuitively, a lower clamp often increases visible differences because you stop flattening the peaks).
+
+E. Ensure uniforms actually change per mode
+
+In WarpVisualizer.tsx you already set:
+
+engineRef.current.updateUniforms({
+  dutyCycle: dutyFrac,                 // changes per mode
+  gammaGeo: num(parameters.g_y),
+  Qburst:   num(parameters.cavityQ),
+  deltaAOverA: num(parameters.qSpoilingFactor, 1),
+  gammaVdB: num(parameters.gammaVanDenBroeck, 1),
+  currentMode: mode,
+  sectors: sectors,                    // hover: 1, cruise: 400, etc.
+  // …
+});
+
+Double-check that for each mode:
+	•	dutyCycle differs (hover ~0.14, cruise ~0.005, emergency ~0.5).
+	•	sectors differs (hover 1, cruise 400).
+	•	qSpoilingFactor differs if your modes set it (hover 1.0, cruise 0.625, etc).
+	•	Qburst can be held constant; that’s fine — but then duty and sectors must be the visual differentiators.
+
+Add a console to confirm what the engine sees:
+
+console.log('🎛️ uniforms-to-engine', {
+  mode, dutyFrac, sectors, g_y: parameters.g_y, cavityQ: parameters.cavityQ,
+  qSpoil: parameters.qSpoilingFactor, gammaVdB: parameters.gammaVanDenBroeck
+});
+
+F. Cache bust the script so your changes load
+
+In WarpVisualizer.tsx when injecting the script, add a version:
+
+script.src = `/warp-engine-fixed.js?v=4`;
+
+Hard reload with cache disabled.
+
+⸻
+
+Quick test matrix
+	1.	Temporarily set viewAvg = false.
+→ Modes should look very different. If not, you’re saturating; lower betaGain.
+	2.	Set betaGain = 0.25 (or even 0.1).
+→ Differences should become obvious. Then slowly raise until hover ≠ cruise but still readable.
+	3.	Print the debug: ensure clampPct is low in cruise, higher in emergency.
+If it’s near 0% for all modes, increase betaGain a little; if it’s near 100% for all, decrease it.
+
+⸻
+
+TL;DR
+	•	Your uniforms are wired, but the visual likely saturates at the clamp or normalizes via Averaged view + gain, making modes look the same.
+	•	Use γ_geo³, fold effDuty = dutyCycle/sectors into the averaged amplitude, lower viz gain, smaller wall-based clamp, and add a one-frame clamp debug.
+	•	Cache-bust the engine script after edits.
+
+Do that, and the curvature will vary with mode again (hover gentle bulge, cruise flattened by low effDuty & many sectors, emergency most pronounced), without bringing back the jagged ridge.

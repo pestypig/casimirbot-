@@ -571,27 +571,70 @@ class WarpEngine {
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- (D) Physics-consistent amplitude (γ_geo³, not γ_geo¹) ---
+            // --- (D) Physics-consistent amplitude with mode differentiation ---
             const gammaGeo = this.uniforms?.gammaGeo || 26;
             const qBurst = this.uniforms?.Qburst || this.uniforms?.cavityQ || 1e9;
             const qSpoil = this.uniforms?.deltaAOverA || this.uniforms?.qSpoilingFactor || 1;
             const gammaVdB = this.uniforms?.gammaVdB || 1;
-            const A_geo = gammaGeo*gammaGeo*gammaGeo; // γ³ amplification
+            const dutyCycle = this.uniforms?.dutyCycle || 0.14;
+            const sectors = this.uniforms?.sectors || 1;
+            const viewAvg = this.uniforms?.viewAvg !== undefined ? this.uniforms.viewAvg : true;
+            const betaGain = this.uniforms?.betaGain || 0.25; // Lower gain to avoid saturation
             
-            let disp = gridK * betaVis * A_geo * qBurst * gammaVdB * qSpoil
-                     * wallWin * front * sgn * gaussian_local;
+            // 1) Effective duty: averaged vs instantaneous  
+            const effDuty = viewAvg
+              ? Math.max(1e-12, dutyCycle / Math.max(1, sectors))   // FR-style proxy
+              : 1.0;
             
-            // Viewer-only visual gain
-            disp *= (this.uniforms?.vizGain || 4.0);
+            // 2) Physics-consistent amplitude chain
+            const A_geo = gammaGeo * gammaGeo * gammaGeo;           // γ_geo³
+            const betaInst = A_geo * qBurst * gammaVdB * qSpoil;    // instantaneous
+            const betaAvg  = betaInst * Math.sqrt(effDuty);         // averaged view (RMS)
+            const betaUsed = viewAvg ? betaAvg : betaInst;
             
-            // --- Soft clamp (removes the ring) ---
-            const maxPush = 0.10;           // keep same visual limit
-            const softness = 0.6;           // 0.5–0.8
-            disp = maxPush * Math.tanh(disp / (softness * maxPush));
+            // 3) Visual gain tuned to avoid clamp saturation
+            const betaVis = betaUsed * betaGain;
+            
+            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+            
+            // Mode-revealing clamp: smaller and wall-dependent
+            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% of shell; scales with wall width
+            disp = Math.max(-maxPush, Math.min(maxPush, disp));
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
             vtx[i + 2] = p[2] - n[2] * disp;
+        }
+        
+        // Accumulate saturation stats for debug overlay
+        let maxAbs = 0, clamped = 0, total = vtx.length / 3;
+        for (let i = 0; i < vtx.length; i += 3) {
+            const disp_check = Math.hypot(
+                vtx[i] - (this.originalGridVertices ? this.originalGridVertices[i] : vtx[i]),
+                vtx[i + 1] - (this.originalGridVertices ? this.originalGridVertices[i + 1] : vtx[i + 1]),
+                vtx[i + 2] - (this.originalGridVertices ? this.originalGridVertices[i + 2] : vtx[i + 2])
+            );
+            maxAbs = Math.max(maxAbs, Math.abs(disp_check));
+            if (Math.abs(disp_check) >= (Math.min(0.06, 2.5 * w_rho) - 1e-6)) clamped++;
+        }
+        
+        // One-frame debug overlay (every 60 frames)
+        if ((this._debugTick = (this._debugTick||0)+1) % 60 === 0) {
+            console.log("🧪 Warp viz debug", {
+                mode: this.uniforms?.currentMode || 'unknown',
+                dutyCycle: this.uniforms?.dutyCycle || 0,
+                sectors: this.uniforms?.sectors || 1,
+                qSpoil: this.uniforms?.deltaAOverA || 1,
+                gammaGeo: this.uniforms?.gammaGeo || 26,
+                Qburst: this.uniforms?.Qburst || 1e9,
+                gammaVdB: this.uniforms?.gammaVdB || 1,
+                viewAvg: this.uniforms?.viewAvg !== undefined ? this.uniforms.viewAvg : true,
+                effDuty: Math.max(1e-12, (this.uniforms?.dutyCycle || 0.14) / Math.max(1, this.uniforms?.sectors || 1)),
+                A_geo: Math.pow(this.uniforms?.gammaGeo || 26, 3),
+                betaGain: this.uniforms?.betaGain || 0.25,
+                maxAbsDisp: +maxAbs.toFixed(4),
+                clampPct: +(100*clamped/Math.max(1,total)).toFixed(1) + "%"
+            });
         }
         
         // Enhanced diagnostics - check for amplitude overflow
