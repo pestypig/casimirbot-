@@ -67,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=6'; // Fixed duplicate const viewAvg
+        script.src = '/warp-engine-fixed.js?v=7'; // Fixed TDZ with safe destructuring
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -179,9 +179,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         split: phaseSplit,                               // Engine uses 'split' property for sector division
         strobeHz: num(parameters.sectorStrobing > 1 ? 2000 : 0, 0), // Strobe frequency
         
-        // Visual control - tuned to avoid saturation
-        viewAvg: true,                                   // Show GR average (mode-dependent effDuty)
-        betaGain: 0.25                                   // Lower gain to prevent clamp saturation
+        // Visual control - tuned to avoid saturation (send numbers, not undefined)
+        viewAvg: num(parameters.viewAvg, 1),             // 1 = averaged (safer default)
+        betaGain: num(parameters.betaGain, 0.25),        // Lower gain to prevent clamp saturation
+        vizGain: num(parameters.vizGain, 4)              // Visual scaling
       });
 
       // Debug output to console
