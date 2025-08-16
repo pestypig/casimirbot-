@@ -503,9 +503,15 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
 
   for (let i = 0; i < nTheta; i++) {
     const theta = (i / nTheta) * 2 * Math.PI;      // [-π, π] ring index
-    // sector sign like renderer (based on theta fraction)
+    // --- Smooth sector strobing (matches renderer exactly) ---
     const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-    const sgn = (Math.floor(u * sectors) < split) ? +1 : -1;
+    const sectorIdx = Math.floor(u * sectors);
+    // Distance from current split boundary in sector units
+    const distToSplit = (sectorIdx - split + 0.5);
+    // Wider width => softer transition across boundary
+    const strobeWidth = 0.75;                 // same as renderer
+    const softSign = (x: number) => Math.tanh(x); // smooth ±1 transition
+    const sgn = softSign(-distToSplit / strobeWidth); // smooth sector sign
 
     for (let j = 0; j < nPhi; j++) {
       const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [-π/2, π/2]
@@ -525,10 +531,28 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
 
       const rho = rhoEllipsoid(p, axes);
       const sd  = rho - 1.0;
+      
+      // --- Soft wall envelope (removes hard band cutoff) ---
+      const asd = Math.abs(sd);
+      const a = 2.5 * w_rho, b = 3.5 * w_rho; // pass band, stop band
+      let wallWin: number;
+      if (asd <= a) wallWin = 1.0;
+      else if (asd >= b) wallWin = 0.0;
+      else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a) / (b - a))); // smooth to 0
+      
       const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
-
-      // scalar displacement proxy (renderer multiplies by normal later)
-      const disp = vizGain * geoAmp * qSpoil * bell * sgn;
+      
+      // --- Soft front/back polarity (if needed) ---
+      // For future implementation: calculate normal vectors and use softSign for smooth polarity
+      const front = 1.0; // placeholder - can add soft polarity later if needed
+      
+      // --- Physics-consistent amplitude with soft clamp ---
+      let disp = vizGain * geoAmp * qSpoil * wallWin * bell * sgn * front;
+      
+      // Soft clamp (same as renderer to avoid flat shelves)
+      const maxPush = 0.10;
+      const softness = 0.6;
+      disp = maxPush * Math.tanh(disp / (softness * maxPush));
 
       samples.push({ p, rho, bell, n, sgn, disp });
     }
