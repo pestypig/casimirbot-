@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useQuery } from '@tanstack/react-query';
 import Plot from 'react-plotly.js';
 
 interface MetricsDashboardProps {
@@ -29,7 +31,21 @@ interface MetricConstraints {
 }
 
 export default function MetricsDashboard({ viabilityParams }: MetricsDashboardProps) {
-  const [metrics, setMetrics] = useState<ComputedMetrics | null>(null);
+  // Use React Query for real-time metrics with polling
+  const {
+    data: metrics,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["helix-metrics"],
+    queryFn: async () => {
+      const res = await fetch("/api/helix/metrics");
+      if (!res.ok) throw new Error("metrics fetch failed");
+      return res.json();
+    },
+    refetchInterval: 1500,            // refresh every 1.5s
+    refetchOnWindowFocus: true,       // ensures focus brings in fresh numbers
+  });
   // Mode-aware constraint calculation for dynamic safe zones
   const getModeAwareConstraints = (selectedMode: string): MetricConstraints => {
     const baseConstraints = {
@@ -78,127 +94,23 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
   const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints("hover"));
 
-  // Compute authentic metrics using slider-driven parameters in ALL steps (FIXED)
-  const computeMetrics = React.useCallback((params: any): ComputedMetrics => {
-    if (!params) return {
-      P_raw: 0, f_throttle: 0, P_avg: 0, U_cycle: 0, 
-      TS_ratio: 0, zeta: 0, M_exotic: 0
-    };
-
-    // Physics constants
-    const HBAR = 1.055e-34; // J⋅s
-    const C = 2.998e8; // m/s
-    const omega = 2 * Math.PI * 15e9; // 15 GHz modulation
-    
-    // Extract SLIDER-DRIVEN parameters (these must flow into every calculation step)
-    const { 
-      gammaGeo = 26, 
-      qFactor = 1e6,        // ← SLIDER VALUE: Cavity Q-factor (Q_on)
-      duty = 0.14,          // ← SLIDER VALUE: Duty cycle percentage  
-      tileArea = 5, 
-      shipRadius = 5,
-      gapDistance = 1.0,
-      selectedMode = "hover"
-    } = params || {};
-    
-    // Convert units  
-    const a = gapDistance * 1e-9; // nm to m
-    const A_tile = tileArea * 1e-4; // cm² to m²
-    const A_hull_needle = 5.6e5; // m²
-    const N_tiles = A_hull_needle / A_tile;
-    
-    // Step 1: Casimir energy per tile (match Live Energy Pipeline exactly)
-    // From Live Energy Pipeline: u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4))
-    const u_casimir = -(Math.PI * Math.PI * HBAR * C) / (720 * Math.pow(a, 4)); // Energy density J/m³
-    const U_static = u_casimir * A_tile * a; // J per tile
-    const U_geo = gammaGeo * U_static; // Geometric amplification
-    
-    console.log(`🔧 Energy Check: U_static = ${U_static.toExponential(3)} J (should be ~-2.168e-4 J)`);
-    console.log(`🔧 Energy Check: U_geo = ${U_geo.toExponential(3)} J (should be ~-5.636e-3 J)`);
-    
-    // Match Live Energy Pipeline calculation exactly
-    const Q_mechanical = 5e4; // Fixed mechanical Q  
-    const Q_cavity = 1e9; // Fixed cavity Q (NOT slider qFactor!)
-    const U_Q = Q_mechanical * U_geo; // Q-enhancement step
-    const U_cycle_base = U_Q * duty; // Use SLIDER duty
-    
-    // Van-den-Broeck pocket boost for fixed mass target (match Live Energy Pipeline)
-    const M_target = 1.405e3; // kg
-    const gamma_pocket = duty > 0 ? M_target * (C * C) / (Math.abs(U_cycle_base) * N_tiles) : 0;
-    const U_cycle = U_cycle_base * gamma_pocket;
-    
-    // Step 2: Power calculation (match Live Energy Pipeline exactly)
-    const P_loss_raw = Math.abs(U_geo) * omega / Q_cavity; // W per tile
-    const P_raw_total = P_loss_raw * N_tiles / 1e6; // MW (match Live Energy Pipeline)
-    const P_raw = P_raw_total; // Already in MW
-    
-    // Step 4: Throttle calculation (match Live Energy Pipeline exactly)  
-    // Live Energy Pipeline uses: mode_throttle = mode.duty / mode.sectors * mode.qSpoiling
-    const modeConfigs = {
-      hover: { sectors: 1, qSpoiling: 1.0 },
-      cruise: { sectors: 400, qSpoiling: 0.001 }, 
-      emergency: { sectors: 1, qSpoiling: 1.0 },
-      standby: { sectors: 1, qSpoiling: 1.0 }
-    };
-    
-    const currentModeConfig = modeConfigs[selectedMode as keyof typeof modeConfigs] || modeConfigs.hover;
-    const mode_throttle = duty / currentModeConfig.sectors * currentModeConfig.qSpoiling; // Uses SLIDER duty with mode params!
-    const P_avg = P_raw_total * mode_throttle; // MW (both values in MW)
-    
-    // Step 7: Time-scale ratio (MODE-INDEPENDENT - hull geometry + RF frequency)
-    // Needle Hull characteristic length determines light-crossing time (independent of duty/Q)
-    const L_hull = 82.0; // 82 m Needle Hull characteristic length (from research papers)
-    const tau_LC = L_hull / C; // Light-crossing time through hull
-    const f_RF = 15e9; // 15 GHz RF modulation frequency (fixed)
-    const tau_pulse = 1 / f_RF; // RF pulse period (~7×10⁻¹¹ s)
-    const TS_ratio = tau_LC / tau_pulse; // ~4100+ (mode-independent!)
-    
-    // Step 8: Quantum safety (match Live Energy Pipeline)
-    const zeta = duty > 0 ? 1 / (duty * Math.sqrt(Q_mechanical)) : 0; // Uses Q_mechanical!
-    
-    // Step 9: Exotic mass (match Live Energy Pipeline)
-    const M_exotic = duty > 0 ? Math.abs(U_cycle) / (C * C) * N_tiles : 0; // kg
-    
-    const f_throttle = mode_throttle; // For compatibility
-    
-    console.log(`🔧 Metrics Dashboard - FIXED with Slider Values for ${selectedMode}:`, {
-      inputs: {
-        gammaGeo: gammaGeo,
-        qFactor: qFactor,
-        duty_decimal: duty,
-        duty_percent: (duty * 100).toFixed(1) + "%"
-      },
-      mode_config: currentModeConfig,
-      calculated: {
-        P_raw_MW: P_raw.toFixed(1),
-        P_avg_MW: P_avg >= 1 ? P_avg.toFixed(3) : `${(P_avg * 1e6).toFixed(1)}W`,  // Smart units: MW or W
-        P_avg_scientific: P_avg.toExponential(3),
-        P_avg_watts: (P_avg * 1e6).toFixed(1), // Always show W value for debugging
-        TS_ratio: TS_ratio.toFixed(1) + " (MODE-INDEPENDENT: hull=82m, RF=15GHz)",
-        zeta: zeta.toFixed(3),
-        M_exotic_kg: M_exotic.toFixed(0),
-        mode_throttle: mode_throttle.toExponential(3),
-        gamma_pocket: gamma_pocket.toExponential(2)
-      },
-      note: "TS_ratio ≫ 100 ensures homogenized GR regime for ALL modes!"
-    });
+  // Convert React Query metrics to dashboard format
+  const dashboardMetrics = React.useMemo(() => {
+    if (!metrics) return null;
     
     return {
-      P_raw: P_raw,
-      f_throttle: f_throttle,
-      P_avg: P_avg,
-      U_cycle: Math.abs(U_cycle),
-      TS_ratio: TS_ratio,
-      zeta: zeta,
-      M_exotic: M_exotic
+      P_raw: metrics.energyOutput || 0,
+      f_throttle: metrics.dutyGlobal || 0,
+      P_avg: metrics.energyOutput || 0,
+      U_cycle: 0, // Not needed for this conversion
+      TS_ratio: metrics.timeScaleRatio || 0,
+      zeta: metrics.fordRoman?.value || 0,
+      M_exotic: metrics.exoticMass || 0
     };
-  }, [viabilityParams]);
+  }, [metrics]);
 
-  // Update metrics and constraints when parameters change
+  // Update constraints when parameters change
   useEffect(() => {
-    const newMetrics = computeMetrics(viabilityParams);
-    setMetrics(newMetrics);
-    
     // Update constraints based on operational mode for dynamic safe zones
     const selectedMode = viabilityParams?.selectedMode || "hover";
     const modeConstraints = getModeAwareConstraints(selectedMode);
@@ -206,14 +118,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     
     console.log(`🎯 Mode-Aware Constraints for ${selectedMode}:`, {
       P_avg_max: modeConstraints.P_avg_max,
-      zeta_max: modeConstraints.zeta_max,
-      current_metrics: newMetrics
+      zeta_max: modeConstraints.zeta_max
     });
-  }, [viabilityParams, computeMetrics]);
+  }, [viabilityParams]);
 
   // Memoize radar chart data with mode-aware safe zones
   const radarData = React.useMemo(() => {
-    if (!metrics) return null;
+    if (!dashboardMetrics) return null;
 
     // Current mode for debug logging
     const selectedMode = viabilityParams?.selectedMode || "hover";
@@ -223,13 +134,13 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
     // Define constraint types for proper normalization (all values should be ≤ 1 when safe)
     const rawValues = {
-      P_avg: metrics.P_avg,
-      duty: metrics.f_throttle,
-      mass_error: Math.abs(metrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100),
-      zeta: metrics.zeta,
-      TS_ratio: metrics.TS_ratio,
-      P_raw: metrics.P_raw,
-      U_cycle: Math.abs(metrics.U_cycle)
+      P_avg: dashboardMetrics.P_avg,
+      duty: dashboardMetrics.f_throttle,
+      mass_error: Math.abs(dashboardMetrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100),
+      zeta: dashboardMetrics.zeta,
+      TS_ratio: dashboardMetrics.TS_ratio,
+      P_raw: dashboardMetrics.P_raw,
+      U_cycle: Math.abs(dashboardMetrics.U_cycle)
     };
 
     const constraints = [
@@ -268,11 +179,11 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
     console.log(`🎯 Radar Vector for ${selectedMode.toUpperCase()}: [${normalizedData.map(v => v.toFixed(2)).join(', ')}]`, {
       breakdown: {
-        power: `${metrics.P_avg.toFixed(1)}MW/${currentConstraints.P_avg_max}MW = ${normalizedData[0].toFixed(2)}`,
-        duty: `${(metrics.f_throttle*100).toFixed(1)}%/50% = ${normalizedData[1].toFixed(2)}`,  
-        mass: `${Math.abs(metrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg error = ${normalizedData[2].toFixed(2)}`,
-        quantum: `${metrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`,
-        timescale: `${currentConstraints.TS_min}/${metrics.TS_ratio.toFixed(1)} = ${normalizedData[4].toFixed(2)} (min constraint: inverted)`
+        power: `${dashboardMetrics.P_avg.toFixed(1)}MW/${currentConstraints.P_avg_max}MW = ${normalizedData[0].toFixed(2)}`,
+        duty: `${(dashboardMetrics.f_throttle*100).toFixed(1)}%/50% = ${normalizedData[1].toFixed(2)}`,  
+        mass: `${Math.abs(dashboardMetrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg error = ${normalizedData[2].toFixed(2)}`,
+        quantum: `${dashboardMetrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`,
+        timescale: `${currentConstraints.TS_min}/${dashboardMetrics.TS_ratio.toFixed(1)} = ${normalizedData[4].toFixed(2)} (min constraint: inverted)`
       }
     });
 
@@ -293,7 +204,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       line: { color: '#22c55e', dash: 'dash', width: 2 },
       fillcolor: 'rgba(34, 197, 94, 0.1)'
     }];
-  }, [metrics, viabilityParams?.selectedMode, constraints]);
+  }, [dashboardMetrics, viabilityParams?.selectedMode, constraints]);
 
   // Force re-render when mode changes
   const [renderKey, setRenderKey] = React.useState(0);
@@ -355,12 +266,12 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                   revision={renderKey}
                 />
               )}
-              {!metrics && <div>Loading metrics...</div>}
-              {!radarData && metrics && <div>Generating chart...</div>}
+              {!dashboardMetrics && <div>Loading metrics...</div>}
+              {!radarData && dashboardMetrics && <div>Generating chart...</div>}
             </div>
             
             {/* Values Transparency Panel */}
-            {metrics && radarData && (
+            {dashboardMetrics && radarData && (
               <div className="w-80 bg-muted/30 rounded-lg p-4 space-y-4">
                 <h4 className="font-semibold text-sm mb-3">Vector Transparency</h4>
                 
@@ -407,28 +318,28 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_avg:</span>
                       <span className="font-semibold">
-                        {metrics.P_avg >= 1 ? `${metrics.P_avg.toFixed(1)} MW` : `${(metrics.P_avg * 1e6).toFixed(1)} W`}
+                        {dashboardMetrics.P_avg >= 1 ? `${dashboardMetrics.P_avg.toFixed(1)} MW` : `${(dashboardMetrics.P_avg * 1e6).toFixed(1)} W`}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Duty:</span>
-                      <span className="font-semibold">{(metrics.f_throttle * 100).toFixed(1)}%</span>
+                      <span className="font-semibold">{(dashboardMetrics.f_throttle * 100).toFixed(1)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">M_exotic:</span>
-                      <span className="font-semibold">{metrics.M_exotic.toFixed(0)} kg</span>
+                      <span className="font-semibold">{dashboardMetrics.M_exotic.toFixed(0)} kg</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ζ:</span>
-                      <span className="font-semibold">{metrics.zeta.toFixed(3)}</span>
+                      <span className="font-semibold">{dashboardMetrics.zeta.toFixed(3)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TS_ratio:</span>
-                      <span className="font-semibold">{metrics.TS_ratio.toFixed(1)}</span>
+                      <span className="font-semibold">{dashboardMetrics.TS_ratio.toFixed(1)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_raw:</span>
-                      <span className="font-semibold">{metrics.P_raw.toFixed(1)} MW</span>
+                      <span className="font-semibold">{dashboardMetrics.P_raw.toFixed(1)} MW</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">γ_geo:</span>
@@ -537,10 +448,23 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Time-Scale Ratio</p>
-                <p className="text-2xl font-bold">{metrics.TS_ratio.toFixed(2)}</p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <p className="text-2xl font-bold cursor-help">
+                      {metrics ? metrics.timeScaleRatio.toFixed(2) : "—"}
+                    </p>
+                  </TooltipTrigger>
+                  {metrics && (
+                    <TooltipContent className="text-xs">
+                      <div>τ<sub>LC</sub>: {metrics.tauLC?.toExponential?.(2) ?? "—"} s</div>
+                      <div>T<sub>m</sub>: {metrics.T_m?.toExponential?.(2) ?? "—"} s</div>
+                      <div>TS = τ<sub>LC</sub> / T<sub>m</sub></div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </div>
-              <Badge variant={getStatus(metrics.TS_ratio, constraints.TS_min, true) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(metrics.TS_ratio, constraints.TS_min, true) === 'pass' ? '✓' : '✗'}
+              <Badge variant={metrics && getStatus(metrics.timeScaleRatio, constraints.TS_min, true) === 'pass' ? 'default' : 'destructive'}>
+                {metrics && getStatus(metrics.timeScaleRatio, constraints.TS_min, true) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">

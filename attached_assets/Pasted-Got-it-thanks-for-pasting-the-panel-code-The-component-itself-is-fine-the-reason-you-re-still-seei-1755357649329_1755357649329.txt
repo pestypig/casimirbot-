@@ -1,0 +1,105 @@
+Got it—thanks for pasting the panel code. The component itself is fine; the reason you’re still seeing the **old TS ratio** is almost certainly **stale data**, not the rendering. In your app, `/bridge` pulls the fresh, recalculated `TS_ratio`, but the dashboard card is reading `metrics.TS_ratio` from a cached fetch that isn’t being invalidated (or repolled) after mode/parameter changes.
+
+Below are two small, targeted fixes that keep everything in sync:
+
+---
+
+# 1) Make the metrics card repoll (or revalidate)
+
+**File:** `client/src/components/metrics-dashboard.tsx`
+
+Add a simple React Query (or fetch) polling interval so the dashboard refreshes. If you’re already using `useQuery` for metrics, just enable a short `refetchInterval` and always refetch on window focus. If you aren’t using React Query here, you can keep your existing fetch and add a timer; below is the React Query version since most of your app uses it.
+
+```tsx
+// at the top with other imports
+import { useQuery } from "@tanstack/react-query";
+
+// wherever you pull metrics for this dashboard:
+const {
+  data: metrics,
+  isLoading,
+  isError,
+} = useQuery({
+  queryKey: ["helix-metrics"],
+  queryFn: async () => {
+    const res = await fetch("/api/helix/metrics");
+    if (!res.ok) throw new Error("metrics fetch failed");
+    return res.json();
+  },
+  // keep this light; update cadence like the rest of the UI
+  refetchInterval: 1500,            // ⟵ refresh every 1.5s
+  refetchOnWindowFocus: true,       // ⟵ ensures focus brings in fresh numbers
+});
+```
+
+And make the card robust if data is briefly undefined:
+
+```tsx
+<p className="text-2xl font-bold">
+  {metrics ? metrics.TS_ratio.toFixed(2) : "—"}
+</p>
+```
+
+---
+
+# 2) Invalidate metrics after any mode/param change
+
+When the operational mode changes (or any pipeline knobs that affect timing), invalidate the cached metrics so the next panel read is fresh.
+
+**File:** `client/src/hooks/use-energy-pipeline.ts` (or wherever you POST mode/params)
+
+Right after a successful mode change (or parameter update), add:
+
+```ts
+import { queryClient } from "@/lib/query-client"; // your app’s queryClient
+
+// … inside your mode/param mutation success handler:
+queryClient.invalidateQueries({ queryKey: ["helix-metrics"] });
+```
+
+If you aren’t exporting a `queryClient`, create one centrally (you likely already have it):
+
+```ts
+// client/src/lib/query-client.ts
+import { QueryClient } from "@tanstack/react-query";
+export const queryClient = new QueryClient();
+```
+
+…and wrap your app with `<QueryClientProvider client={queryClient}>…`.
+
+---
+
+# (Optional) Show inputs as a hover/tooltip
+
+This helps users trust the number by seeing its ingredients:
+
+```tsx
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+<Tooltip>
+  <TooltipTrigger asChild>
+    <p className="text-2xl font-bold">
+      {metrics ? metrics.TS_ratio.toFixed(2) : "—"}
+    </p>
+  </TooltipTrigger>
+  {metrics && (
+    <TooltipContent className="text-xs">
+      <div>τ<sub>LC</sub>: {metrics.tauLC?.toExponential?.(2) ?? "—"} s</div>
+      <div>T<sub>m</sub>: {metrics.Tm?.toExponential?.(2) ?? "—"} s</div>
+      <div>TS = τ<sub>LC</sub> / T<sub>m</sub></div>
+    </TooltipContent>
+  )}
+</Tooltip>
+```
+
+(If your `/api/helix/metrics` doesn’t include `tauLC` or `Tm`, you can add them from the server side alongside `TS_ratio`; not required for the fix.)
+
+---
+
+## Why this fixes it
+
+* `/bridge` recomputes and displays the fresh value immediately.
+* The dashboard panel was reading from a **cached** `metrics.TS_ratio`. Without a refetch interval or invalidation, it never updates.
+* Adding `refetchInterval` guarantees the card updates; adding `invalidateQueries` makes it snap fresh right after a mode change.
+
+After these two tweaks, the **Time-Scale Ratio** card will match the `/bridge` calculation (≈ 4102.74) and stay in lockstep with the pipeline.
