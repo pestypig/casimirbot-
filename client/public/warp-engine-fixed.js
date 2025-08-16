@@ -463,12 +463,10 @@ class WarpEngine {
         const A_vis_base = A_phys * norm;
         
         // 4) Choose instant vs average (no √duty hacks)
-        // viewAvg now handled per-vertex for mode differentiation
+        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
         const A_inst = A_vis_base * dutyInstEff;
         const A_avg = A_vis_base * dutyAvgEff;
-        const viewAvgMode = (this.uniforms && typeof this.uniforms.viewAvg === 'number') 
-            ? this.uniforms.viewAvg : 1;
-        const A_used = (viewAvgMode >= 0.5) ? A_avg : A_inst;
+        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
         const gain = (this.uniforms?.vizGain || 4.0);
@@ -529,7 +527,8 @@ class WarpEngine {
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
             const phase = 2 * Math.PI * sectors * u; // continuous phase
-            const sgn = (viewAvg >= 0.5) ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
+            const viewAvg = false; // use instantaneous view
+            const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
             
             // --- Ellipsoidal signed distance ---
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
@@ -572,72 +571,27 @@ class WarpEngine {
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- (D) Physics-consistent amplitude with mode differentiation ---
+            // --- (D) Physics-consistent amplitude (γ_geo³, not γ_geo¹) ---
             const gammaGeo = this.uniforms?.gammaGeo || 26;
             const qBurst = this.uniforms?.Qburst || this.uniforms?.cavityQ || 1e9;
             const qSpoil = this.uniforms?.deltaAOverA || this.uniforms?.qSpoilingFactor || 1;
             const gammaVdB = this.uniforms?.gammaVdB || 1;
-            const dutyCycle = this.uniforms?.dutyCycle || 0.14;
-            const sectors = this.uniforms?.sectors || 1;
-            // Single source of truth for viewAvg (0 = instantaneous, 1 = averaged)
-            const viewAvg = (this.uniforms && typeof this.uniforms.viewAvg === 'number')
-                ? this.uniforms.viewAvg : 1;
-            const betaGain = this.uniforms?.betaGain || 0.25; // Lower gain to avoid saturation
+            const A_geo = gammaGeo*gammaGeo*gammaGeo; // γ³ amplification
             
-            // 1) Effective duty: averaged vs instantaneous  
-            const effDuty = (viewAvg >= 0.5)
-              ? Math.max(1e-12, dutyCycle / Math.max(1, sectors))   // FR-style proxy
-              : 1.0;
+            let disp = gridK * betaVis * A_geo * qBurst * gammaVdB * qSpoil
+                     * wallWin * front * sgn * gaussian_local;
             
-            // 2) Physics-consistent amplitude chain
-            const A_geo = gammaGeo * gammaGeo * gammaGeo;           // γ_geo³
-            const betaInst = A_geo * qBurst * gammaVdB * qSpoil;    // instantaneous
-            const betaAvg  = betaInst * Math.sqrt(effDuty);         // averaged view (RMS)
-            const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
+            // Viewer-only visual gain
+            disp *= (this.uniforms?.vizGain || 4.0);
             
-            // 3) Visual gain tuned to avoid clamp saturation
-            const betaVis = betaUsed * betaGain;
-            
-            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
-            
-            // Mode-revealing clamp: smaller and wall-dependent
-            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% of shell; scales with wall width
-            disp = Math.max(-maxPush, Math.min(maxPush, disp));
+            // --- Soft clamp (removes the ring) ---
+            const maxPush = 0.10;           // keep same visual limit
+            const softness = 0.6;           // 0.5–0.8
+            disp = maxPush * Math.tanh(disp / (softness * maxPush));
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
             vtx[i + 2] = p[2] - n[2] * disp;
-        }
-        
-        // Accumulate saturation stats for debug overlay
-        let maxAbs = 0, clamped = 0, total = vtx.length / 3;
-        for (let i = 0; i < vtx.length; i += 3) {
-            const disp_check = Math.hypot(
-                vtx[i] - (this.originalGridVertices ? this.originalGridVertices[i] : vtx[i]),
-                vtx[i + 1] - (this.originalGridVertices ? this.originalGridVertices[i + 1] : vtx[i + 1]),
-                vtx[i + 2] - (this.originalGridVertices ? this.originalGridVertices[i + 2] : vtx[i + 2])
-            );
-            maxAbs = Math.max(maxAbs, Math.abs(disp_check));
-            if (Math.abs(disp_check) >= (Math.min(0.06, 2.5 * w_rho) - 1e-6)) clamped++;
-        }
-        
-        // One-frame debug overlay (every 60 frames)
-        if ((this._debugTick = (this._debugTick||0)+1) % 60 === 0) {
-            console.log("🧪 Warp viz debug", {
-                mode: this.uniforms?.currentMode || 'unknown',
-                dutyCycle: this.uniforms?.dutyCycle || 0,
-                sectors: this.uniforms?.sectors || 1,
-                qSpoil: this.uniforms?.deltaAOverA || 1,
-                gammaGeo: this.uniforms?.gammaGeo || 26,
-                Qburst: this.uniforms?.Qburst || 1e9,
-                gammaVdB: this.uniforms?.gammaVdB || 1,
-                viewAvg: this.uniforms?.viewAvg !== undefined ? this.uniforms.viewAvg : true,
-                effDuty: Math.max(1e-12, (this.uniforms?.dutyCycle || 0.14) / Math.max(1, this.uniforms?.sectors || 1)),
-                A_geo: Math.pow(this.uniforms?.gammaGeo || 26, 3),
-                betaGain: this.uniforms?.betaGain || 0.25,
-                maxAbsDisp: +maxAbs.toFixed(4),
-                clampPct: +(100*clamped/Math.max(1,total)).toFixed(1) + "%"
-            });
         }
         
         // Enhanced diagnostics - check for amplitude overflow

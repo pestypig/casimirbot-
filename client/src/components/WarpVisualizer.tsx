@@ -67,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=6'; // Fixed duplicate const viewAvg
+        script.src = '/warp-engine-fixed.js?v=4'; // C¹-smooth ridge fix
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -179,16 +179,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         split: phaseSplit,                               // Engine uses 'split' property for sector division
         strobeHz: num(parameters.sectorStrobing > 1 ? 2000 : 0, 0), // Strobe frequency
         
-        // Visual control - tuned to avoid saturation
-        viewAvg: true,                                   // Show GR average (mode-dependent effDuty)
-        betaGain: 0.25                                   // Lower gain to prevent clamp saturation
+        // Visual control
+        viewAvg: 1.0,                                    // Show GR average
+        betaGain: 1e-10                                  // Visual scaling factor
       });
 
       // Debug output to console
-      console.log('🎛️ uniforms-to-engine', {
-        mode, dutyFrac, sectors, g_y: parameters.g_y, cavityQ: parameters.cavityQ,
-        qSpoil: parameters.qSpoilingFactor, gammaVdB: parameters.gammaVanDenBroeck
-      });
       console.table(engineRef.current.uniforms);
     }
   }, [parameters, isLoaded]);
