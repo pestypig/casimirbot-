@@ -1,6 +1,13 @@
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
+// --- Grid defaults (scientifically scaled for needle hull) ---
+const GRID_DEFAULTS = {
+  spanPadding: 1.6,    // how much to multiply the hull span in clip space
+  minSpan: 2.6,        // never smaller than this (in clip-space units)
+  divisions: 100       // more lines so a larger grid still looks dense
+};
+
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
@@ -88,12 +95,26 @@ class WarpEngine {
         // Combined MVP matrix
         this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
     }
+    
+    _adjustCameraForSpan(span) {
+        // Gently adjust camera distance based on grid span for comfortable framing
+        const aspect = this.canvas.width / this.canvas.height;
+        const eye = [0, 0.5, -Math.max(1.8, span * 1.2)];    // Pull back based on span
+        const center = [0, -0.1, 0];   // Still looking at grid center
+        const up = [0, 1, 0];
+        
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+        
+        console.log(`📷 Camera adjusted: distance=${eye[2].toFixed(2)} for span=${span.toFixed(2)}`);
+    }
 
     _initializeGrid() {
         const gl = this.gl;
         
         // Create spacetime grid geometry
-        const gridData = this._createGrid(40000, 50);
+        // Start with default span, will be adjusted when hull params are available
+        const gridData = this._createGrid(GRID_DEFAULTS.minSpan, GRID_DEFAULTS.divisions);
         this.gridVertices = new Float32Array(gridData);
         
         // Store original vertex positions for warp calculations
@@ -110,23 +131,20 @@ class WarpEngine {
     }
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
-    _createGrid(size = 40_000, divisions = 50) {
+    _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
         const verts = [];
-        const step = size / divisions;
-        const half = size / 2;
+        const step = (span * 2) / divisions;  // Full span width divided by divisions
+        const half = span;  // Half-extent
         
         // Create a slight height variation across the grid for proper 3D visualization
         const yBase = -0.15;  // Base Y level
         const yVariation = 0.05;  // Small height variation
-        
-        // Normalize to [-0.8, 0.8] to keep grid visible within viewport
-        const norm = 0.8 / half;
 
         for (let z = 0; z <= divisions; ++z) {
-            const zPos = (-half + z * step) * norm;
+            const zPos = -half + z * step;
             for (let x = 0; x < divisions; ++x) {
-                const x0 = (-half + x * step) * norm;
-                const x1 = (-half + (x + 1) * step) * norm;
+                const x0 = -half + x * step;
+                const x1 = -half + (x + 1) * step;
                 
                 // Add slight Y variation for better 3D visibility
                 const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
@@ -136,10 +154,10 @@ class WarpEngine {
             }
         }
         for (let x = 0; x <= divisions; ++x) {
-            const xPos = (-half + x * step) * norm;
+            const xPos = -half + x * step;
             for (let z = 0; z < divisions; ++z) {
-                const z0 = (-half + z * step) * norm;
-                const z1 = (-half + (z + 1) * step) * norm;
+                const z0 = -half + z * step;
+                const z1 = -half + (z + 1) * step;
                 
                 // Add slight Y variation for better 3D visibility
                 const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
@@ -150,8 +168,7 @@ class WarpEngine {
         }
         
         console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
-        console.log(`Grid coordinate range: X=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
-        console.log(`Grid coordinate range: Z=${(-half + 0 * step) * norm} to ${(-half + divisions * step) * norm}`);
+        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${span*2})`);
         return new Float32Array(verts);
     }
 
@@ -397,6 +414,14 @@ class WarpEngine {
         // Convert wall thickness to ρ-space using harmonic mean
         const aH = 3 / (1/a + 1/b + 1/c);  // Harmonic mean of semi-axes
         const w_rho = wallWidth_m / aH;     // Dimensionless wall thickness
+        
+        // Compute a grid span that comfortably contains the whole bubble
+        const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
+        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        const targetSpan = Math.max(
+          GRID_DEFAULTS.minSpan,
+          hullMaxClip * spanPadding
+        );
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
@@ -419,6 +444,7 @@ class WarpEngine {
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
         console.log(`  Wall: ${wallWidth_m} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
+        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
         console.log(`  β_raw=${betaInst.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (gain=${betaGain})`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius`);
 
@@ -516,6 +542,26 @@ class WarpEngine {
         this.uniforms.axesClip = axesScene;
         this.uniforms.wallWidth = w_rho;
         this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
+        
+        // Regenerate grid with proper span for hull size
+        if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
+            console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
+            this.currentGridSpan = targetSpan;
+            const newGridData = this._createGrid(targetSpan, GRID_DEFAULTS.divisions);
+            
+            // Update both current and original vertices
+            this.gridVertices = newGridData;
+            this.originalGridVertices = new Float32Array(newGridData);
+            
+            // Upload new geometry to GPU
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
+            this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+            
+            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a}×${b}×${c}]m`);
+            
+            // Adjust camera framing for larger grids
+            this._adjustCameraForSpan(targetSpan);
+        }
     }
 
     _renderGridPoints() {

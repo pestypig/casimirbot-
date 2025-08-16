@@ -950,7 +950,10 @@ export default function HelixCore() {
                   wallThickness_m: 6.0
                 },
                 // Pass physical wall thickness (meters) instead of normalized value
-                wallWidth_m: (metrics && metrics.hull?.wallThickness_m) ? metrics.hull.wallThickness_m : 6.0
+                wallWidth_m: (metrics && metrics.hull?.wallThickness_m) ? metrics.hull.wallThickness_m : 6.0,
+                
+                // Optional grid scaling override (default: 1.6x hull span padding)
+                gridScale: 1.6  // Can be made configurable via UI if needed
               }}
             />
             
