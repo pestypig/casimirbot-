@@ -519,16 +519,53 @@ class WarpEngine {
 
         const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
+        // Read uniforms with sane defaults
+        const dutyCycle = this.uniforms?.dutyCycle ?? 0.14;
+        const sectors    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const split      = Math.max(0, Math.min(sectors - 1, this.uniforms?.split ?? 0));
+        const viewAvg    = this.uniforms?.viewAvg ?? true;
+
+        const gammaGeo = this.uniforms?.gammaGeo ?? 26;
+        const Qburst   = this.uniforms?.Qburst   ?? 1e9;
+        const qSpoil   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
+
+        const hullAxes = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const w_rho_meters = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
+
+        // Physics-consistent amplitude and averaged duty
+        const A_geo = gammaGeo * gammaGeo * gammaGeo; // γ_geo^3 amplification
+        const effDuty = viewAvg ? Math.max(1e-12, dutyCycle / Math.max(1, sectors)) : 1.0;
+        
+        const betaInst = A_geo * Qburst * gammaVdB * qSpoil;
+        const betaAvg  = betaInst * Math.sqrt(effDuty);
+        const betaUsed = viewAvg ? betaAvg : betaInst;
+        
+        const betaGain = this.uniforms?.betaGain ?? 0.15;
+        const betaVis  = betaUsed * betaGain;
+
+        // Debug per mode (once per 60 frames)
+        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🧪 warp-mode", {
+                mode: this.uniforms?.currentMode, dutyCycle, sectors, split, viewAvg,
+                A_geo, effDuty, betaInst: betaInst.toExponential(2), 
+                betaAvg: betaAvg.toExponential(2), betaVis: betaVis.toExponential(2)
+            });
+        }
+        
         // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
             
-            // --- (A) Smooth sector phase (replaces hard ±1) ---
+            // --- Smooth strobing sign using sectors/split (C¹) ---
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            const phase = 2 * Math.PI * sectors * u; // continuous phase
-            const viewAvg = false; // use instantaneous view
-            const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
+            const sectorIdx = Math.floor(u * sectors);
+            
+            // Distance from the split boundary in sector units
+            const dist = (sectorIdx - split + 0.5);
+            const strobeWidth = 0.75; // smooth width (tune 0.5–1.0)
+            const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
             
             // --- Ellipsoidal signed distance ---
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
@@ -571,23 +608,16 @@ class WarpEngine {
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- (D) Physics-consistent amplitude (γ_geo³, not γ_geo¹) ---
-            const gammaGeo = this.uniforms?.gammaGeo || 26;
-            const qBurst = this.uniforms?.Qburst || this.uniforms?.cavityQ || 1e9;
-            const qSpoil = this.uniforms?.deltaAOverA || this.uniforms?.qSpoilingFactor || 1;
-            const gammaVdB = this.uniforms?.gammaVdB || 1;
-            const A_geo = gammaGeo*gammaGeo*gammaGeo; // γ³ amplification
-            
-            let disp = gridK * betaVis * A_geo * qBurst * gammaVdB * qSpoil
-                     * wallWin * front * sgn * gaussian_local;
+            // --- Final displacement using physics-consistent amplitude ---
+            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
             
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
             
-            // --- Soft clamp (removes the ring) ---
-            const maxPush = 0.10;           // keep same visual limit
-            const softness = 0.6;           // 0.5–0.8
-            disp = maxPush * Math.tanh(disp / (softness * maxPush));
+            // --- Clamp tied to wall thickness to avoid uniform saturation ---
+            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% or 2.5×wall
+            if (disp >  maxPush) disp =  maxPush;
+            if (disp < -maxPush) disp = -maxPush;
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;

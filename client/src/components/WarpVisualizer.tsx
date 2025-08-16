@@ -67,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=4'; // C¹-smooth ridge fix
+        script.src = '/warp-engine-fixed.js?v=5'; // Mode reconnection fix
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -127,12 +127,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // Resolve sector count and phase split for strobing
-      const sectors = Number(parameters.sectorStrobing ?? 1);
-      const mode = parameters.currentMode || 'hover';
-      
-      // Calculate safe split index (half the sectors for static split)
-      const phaseSplit = Math.max(1, Math.floor(sectors / 2));
+      // === RECONNECT: push all mode-related uniforms ===
+      const mode = parameters.currentMode ?? "hover";
       
       // Helper to ensure numeric values
       const num = (v: any, def = 0) => {
@@ -141,47 +137,64 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       };
 
       // Duty as fraction [0..1]
-      const dutyFrac = (() => {
-        const d = String(parameters.dutyCycle ?? '').replace('%','').trim();
-        const n = Number(d);
-        if (!Number.isFinite(n)) return 0;
-        return n > 1 ? n/100 : n;
-      })();
+      const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+      
+      // Sector count (hover=1, cruise=400, etc.)
+      const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+      
+      // Optional view selection (avg vs instantaneous)
+      const viewAvg = true; // Default to averaged view
+      
+      // Smooth strobe split phase
+      const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+      
+      // DEBUG
+      console.log("🎛️ uniforms-to-engine", {
+        mode,
+        dutyFrac,
+        sectors,
+        phaseSplit,
+        g_y: parameters.g_y,
+        cavityQ: parameters.cavityQ,
+        qSpoil: parameters.qSpoilingFactor,
+        gammaVdB: parameters.gammaVanDenBroeck,
+        viewAvg
+      });
 
-      // Get hull geometry from parameters or use needle hull defaults
+      // Hull geometry from parameters or use needle hull defaults
       const hull = parameters.hull || {
         Lx_m: 1007, Ly_m: 264, Lz_m: 173,
         a: 503.5, b: 132, c: 86.5
       };
-      const wallWidth = parameters.wall?.w_norm || 0.06;
+      const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
 
-      // Fixed parameter mapping for engine consumption with numeric coercion
+      // Mode reconnection: push all mode-related uniforms
       engineRef.current.updateUniforms({
-        // Core physics parameters - all coerced to numbers
+        // Mode knobs
+        currentMode: mode,
         dutyCycle: dutyFrac,
-        gammaGeo: num(parameters.g_y),                   // Stage 1: Geometric amplification
-        Qburst: num(parameters.cavityQ),                 // Map to engine name (was Qdyn)
-        deltaAOverA: num(parameters.qSpoilingFactor, 1), // Map Q spoiling to Δa/a
-        gammaVdB: num(parameters.gammaVanDenBroeck, 1),  // Stage 4: Van den Broeck amplification
+        sectors,
+        split: phaseSplit,
+        viewAvg,
+
+        // Amplification chain
+        gammaGeo: num(parameters.g_y, 26),
+        Qburst: num(parameters.cavityQ, 1e9),
+        deltaAOverA: num(parameters.qSpoilingFactor, 1),
+        gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
+
+        // Hull / wall
+        hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+        wallWidth,
         
+        // Visual scaling
+        betaGain: 0.15,                                  // Reduced to avoid clamp saturation
+        
+        // Legacy parameters for backward compatibility
         sagDepth_nm: num(parameters.sagDepth_nm),
         powerAvg_MW: num(parameters.powerAvg_MW),
         exoticMass_kg: num(parameters.exoticMass_kg),
-        tsRatio: num(parameters.tsRatio, 4100),          // Time-scale ratio for animation scaling
-        
-        // Hull geometry for ellipsoidal bell calculation
-        hullAxes: [hull.a, hull.b, hull.c],             // Semi-axes in meters
-        wallWidth: wallWidth,                            // Normalized wall thickness
-        
-        // Strobing parameters
-        currentMode: mode,
-        sectors: sectors,                                // Number of sectors for strobing
-        split: phaseSplit,                               // Engine uses 'split' property for sector division
-        strobeHz: num(parameters.sectorStrobing > 1 ? 2000 : 0, 0), // Strobe frequency
-        
-        // Visual control
-        viewAvg: 1.0,                                    // Show GR average
-        betaGain: 1e-10                                  // Visual scaling factor
+        tsRatio: num(parameters.tsRatio, 4100)
       });
 
       // Debug output to console
