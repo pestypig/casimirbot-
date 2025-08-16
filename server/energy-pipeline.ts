@@ -121,6 +121,20 @@ export const MODE_CONFIGS = {
   }
 };
 
+/** Ellipsoid surface area via Knud–Thomsen (very good for prolate/needle shapes). 
+ *  a = Lx/2, b = Ly/2, c = Lz/2 (meters)
+ */
+function surfaceAreaEllipsoidFromHullDims(Lx_m: number, Ly_m: number, Lz_m: number): number {
+  const a = Lx_m / 2;
+  const b = Ly_m / 2;
+  const c = Lz_m / 2;
+  const p = 1.6075; // Knud–Thomsen exponent
+  const term1 = Math.pow(a * b, p);
+  const term2 = Math.pow(a * c, p);
+  const term3 = Math.pow(b * c, p);
+  return 4 * Math.PI * Math.pow((term1 + term2 + term3) / 3, 1 / p);
+}
+
 // Initialize pipeline state with defaults
 export function initializePipelineState(): EnergyPipelineState {
   return {
@@ -180,33 +194,7 @@ export function initializePipelineState(): EnergyPipelineState {
   };
 }
 
-// Calculate hull surface area based on radius
-function calculateHullArea(radius_m: number): number {
-  if (radius_m <= 10) {
-    // Small hulls: spherical approximation
-    return 4 * PI * radius_m * radius_m;
-  } else {
-    // Large hulls: ellipsoid using Knud-Thomsen formula
-    const a = 503.5 / 2;  // Semi-major axis (m)
-    const b = 132 / 2;    // Semi-minor axis 1 (m)
-    const c = 86.5 / 2;   // Semi-minor axis 2 (m)
-    
-    // Scale based on radius
-    const scale = radius_m / 86.5;
-    const a_scaled = a * scale;
-    const b_scaled = b * scale;
-    const c_scaled = c * scale;
-    
-    // Knud-Thomsen approximation
-    const p = 1.6075;
-    const term1 = Math.pow(a_scaled * b_scaled, p);
-    const term2 = Math.pow(a_scaled * c_scaled, p);
-    const term3 = Math.pow(b_scaled * c_scaled, p);
-    const area = 4 * PI * Math.pow((term1 + term2 + term3) / 3, 1 / p);
-    
-    return area;
-  }
-}
+// Legacy calculateHullArea function removed - now using surfaceAreaEllipsoidFromHullDims
 
 // Calculate static Casimir energy using corrected physics
 function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
@@ -217,24 +205,18 @@ function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
 
 // Main pipeline calculation
 export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipelineState {
-  // Calculate tile area and hull area
+  // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
-  const hullArea_m2 = calculateHullArea(state.shipRadius_m);
+
+  // If a full rectangular needle + rounded caps is added later, we can refine this.
+  // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
+  const hullArea_m2 = surfaceAreaEllipsoidFromHullDims(state.hull!.Lx_m, state.hull!.Ly_m, state.hull!.Lz_m);
   
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
-  
-  // Special case for Needle Hull research configuration
-  const isNeedleHull = Math.abs(state.shipRadius_m - 5) < 2 && 
-                       Math.abs(state.tileArea_cm2 - 25) < 5;
-  
-  if (isNeedleHull) {
-    state.N_tiles = 62800; // Research baseline
-  } else if (state.shipRadius_m >= 85) {
-    state.N_tiles = 1.12e9; // Full Needle Hull
-  } else {
-    state.N_tiles = Math.floor(hullArea_m2 / tileArea_m2);
-  }
+
+  // Derived tile count (no hard-coding; lets geometry drive it)
+  state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2));
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
