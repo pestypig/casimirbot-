@@ -393,21 +393,21 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
               <div>
                 <p className="text-sm font-medium">Power Draw</p>
                 {/* Smart unit display: MW for ≥1 MW, W for <1 MW */}
-                {metrics.P_avg >= 1 ? (
-                  <p className="text-2xl font-bold">{metrics.P_avg.toFixed(1)} MW</p>
+                {P_avg >= 1 ? (
+                  <p className="text-2xl font-bold">{f1(P_avg)} MW</p>
                 ) : (
-                  <p className="text-2xl font-bold">{(metrics.P_avg * 1e6).toFixed(1)} W</p>
+                  <p className="text-2xl font-bold">{f1(P_avg * 1e6)} W</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Peak: {metrics.P_raw.toFixed(1)} MW • Avg: {
-                    metrics.P_avg >= 1 
-                      ? `${metrics.P_avg.toFixed(3)} MW`
-                      : `${(metrics.P_avg * 1e6).toFixed(1)} W`
+                  Peak: {f1(P_raw)} MW • Avg: {
+                    P_avg >= 1 
+                      ? `${f3(P_avg)} MW`
+                      : `${f1(P_avg * 1e6)} W`
                   }
                 </p>
               </div>
-              <Badge variant={getStatus(metrics.P_avg, constraints.P_avg_max) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(metrics.P_avg, constraints.P_avg_max) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStatus(P_avg, constraints.P_avg_max) === 'pass' ? 'default' : 'destructive'}>
+                {getStatus(P_avg, constraints.P_avg_max) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -421,10 +421,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Exotic Mass</p>
-                <p className="text-2xl font-bold">{metrics.M_exotic.toFixed(0)} kg</p>
+                <p className="text-2xl font-bold">{f0(M_exotic)} kg</p>
               </div>
-              <Badge variant={getMassStatus(metrics.M_exotic, constraints.M_target, constraints.M_tolerance) === 'pass' ? 'default' : 'destructive'}>
-                {getMassStatus(metrics.M_exotic, constraints.M_target, constraints.M_tolerance) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getMassStatus(M_exotic, constraints.M_target, constraints.M_tolerance) === 'pass' ? 'default' : 'destructive'}>
+                {getMassStatus(M_exotic, constraints.M_target, constraints.M_tolerance) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -438,10 +438,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Quantum Safety ζ</p>
-                <p className="text-2xl font-bold">{metrics.zeta.toFixed(3)}</p>
+                <p className="text-2xl font-bold">{f3(zeta)}</p>
               </div>
-              <Badge variant={getStatus(metrics.zeta, constraints.zeta_max) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(metrics.zeta, constraints.zeta_max) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStatus(zeta, constraints.zeta_max) === 'pass' ? 'default' : 'destructive'}>
+                {getStatus(zeta, constraints.zeta_max) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -458,7 +458,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <p className="text-2xl font-bold cursor-help">
-                      {metrics ? metrics.timeScaleRatio.toFixed(2) : "—"}
+                      {f2(TS_ratio)}
                     </p>
                   </TooltipTrigger>
                   {metrics && (
@@ -470,8 +470,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                   )}
                 </Tooltip>
               </div>
-              <Badge variant={metrics && getStatus(metrics.timeScaleRatio, constraints.TS_min, true) === 'pass' ? 'default' : 'destructive'}>
-                {metrics && getStatus(metrics.timeScaleRatio, constraints.TS_min, true) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStatus(TS_ratio, constraints.TS_min, true) === 'pass' ? 'default' : 'destructive'}>
+                {getStatus(TS_ratio, constraints.TS_min, true) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -485,10 +485,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Raw Power</p>
-                <p className="text-2xl font-bold">{metrics.P_raw.toFixed(1)} MW</p>
+                <p className="text-2xl font-bold">{f1(P_raw)} MW</p>
               </div>
-              <Badge variant={getStatus(metrics.P_raw, constraints.P_max) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(metrics.P_raw, constraints.P_max) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStatus(P_raw, constraints.P_max) === 'pass' ? 'default' : 'destructive'}>
+                {getStatus(P_raw, constraints.P_max) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -502,10 +502,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Duty Cycle</p>
-                <p className="text-2xl font-bold">{(metrics.f_throttle * 100).toFixed(1)}%</p>
+                <p className="text-2xl font-bold">{f1(dutyFrac * 100)}%</p>
               </div>
-              <Badge variant={getStatus(metrics.f_throttle, 0.5) === 'pass' ? 'default' : 'destructive'}>
-                {getStatus(metrics.f_throttle, 0.5) === 'pass' ? '✓' : '✗'}
+              <Badge variant={getStatus(dutyFrac, 0.5) === 'pass' ? 'default' : 'destructive'}>
+                {getStatus(dutyFrac, 0.5) === 'pass' ? '✓' : '✗'}
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
