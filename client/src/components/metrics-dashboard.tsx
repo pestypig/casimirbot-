@@ -94,20 +94,34 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
   const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints("hover"));
 
-  // Convert React Query metrics to dashboard format
+  // Safe accessors to handle both old and new API field names
+  const P_avg = metrics?.P_avg ?? metrics?.energyOutput ?? 0;            // MW
+  const dutyFrac = metrics?.f_throttle ?? metrics?.dutyGlobal ?? metrics?.duty ?? 0; // 0..1
+  const M_exotic = metrics?.M_exotic ?? metrics?.exoticMass ?? 0;           // kg
+  const TS_ratio = metrics?.TS_ratio ?? metrics?.timeScaleRatio ?? 0;
+  const zeta = metrics?.zeta ?? metrics?.fordRoman?.value ?? 0;
+  const P_raw = metrics?.P_raw ?? metrics?.energyOutput ?? 0;
+
+  // Safe formatters that won't throw
+  const f0 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(0) : "—";
+  const f1 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(1) : "—";
+  const f2 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(2) : "—";
+  const f3 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(3) : "—";
+
+  // Convert to dashboard format using safe accessors
   const dashboardMetrics = React.useMemo(() => {
     if (!metrics) return null;
     
     return {
-      P_raw: metrics.energyOutput || 0,
-      f_throttle: metrics.dutyGlobal || 0,
-      P_avg: metrics.energyOutput || 0,
+      P_raw,
+      f_throttle: dutyFrac,
+      P_avg,
       U_cycle: 0, // Not needed for this conversion
-      TS_ratio: metrics.timeScaleRatio || 0,
-      zeta: metrics.fordRoman?.value || 0,
-      M_exotic: metrics.exoticMass || 0
+      TS_ratio,
+      zeta,
+      M_exotic
     };
-  }, [metrics]);
+  }, [metrics, P_avg, dutyFrac, M_exotic, TS_ratio, zeta, P_raw]);
 
   // Update constraints when parameters change
   useEffect(() => {
@@ -164,28 +178,21 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       }
     });
 
-    // Debug: Log actual vs normalized values for verification
-    console.log(`🎯 Radar Normalization Debug for ${selectedMode}:`, {
-      P_avg: `${metrics.P_avg.toFixed(1)}MW → ${normalizedData[0].toFixed(2)} (limit: ${currentConstraints.P_avg_max}MW)`,
-      duty: `${(metrics.f_throttle*100).toFixed(1)}% → ${normalizedData[1].toFixed(2)}`,
-      mass_error: `${Math.abs(metrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg → ${normalizedData[2].toFixed(2)}`,
-      zeta: `${metrics.zeta.toFixed(3)} → ${normalizedData[3].toFixed(2)} (limit: ${currentConstraints.zeta_max})`,
-      TS_ratio: `${metrics.TS_ratio.toFixed(1)} → ${normalizedData[4].toFixed(2)} (min: ${currentConstraints.TS_min})`,
-      visual_check: `TS_ratio=${metrics.TS_ratio.toFixed(0)} ≫ 100 → homogenized GR regime ✓`
-    });
+
 
     // Mode-aware safe zone boundary (green zone shows what's acceptable for current mode)
     const safeZoneBoundary = [1, 1, 1, 1, 1, 1, 1]; // All values should be ≤ 1.0 to be "safe"
 
-    console.log(`🎯 Radar Vector for ${selectedMode.toUpperCase()}: [${normalizedData.map(v => v.toFixed(2)).join(', ')}]`, {
-      breakdown: {
-        power: `${dashboardMetrics.P_avg.toFixed(1)}MW/${currentConstraints.P_avg_max}MW = ${normalizedData[0].toFixed(2)}`,
-        duty: `${(dashboardMetrics.f_throttle*100).toFixed(1)}%/50% = ${normalizedData[1].toFixed(2)}`,  
-        mass: `${Math.abs(dashboardMetrics.M_exotic - currentConstraints.M_target).toFixed(0)}kg error = ${normalizedData[2].toFixed(2)}`,
-        quantum: `${dashboardMetrics.zeta.toFixed(3)}/${currentConstraints.zeta_max} = ${normalizedData[3].toFixed(2)}`,
-        timescale: `${currentConstraints.TS_min}/${dashboardMetrics.TS_ratio.toFixed(1)} = ${normalizedData[4].toFixed(2)} (min constraint: inverted)`
-      }
-    });
+    // Debug: Log actual vs normalized values for verification (only if data is ready)
+    if (metrics && normalizedData?.length >= 5) {
+      console.log(`🎯 Radar Normalization Debug for ${selectedMode}:`, {
+        P_avg: `${f1(P_avg)}MW → ${f2(normalizedData[0])} (limit: ${currentConstraints.P_avg_max}MW)`,
+        duty: `${f1(dutyFrac * 100)}% → ${f2(normalizedData[1])}`,
+        mass_error: `${f0(Math.abs(M_exotic - currentConstraints.M_target))}kg → ${f2(normalizedData[2])}`,
+        zeta: `${f2(zeta)} → ${f2(normalizedData[3])} (limit < ${currentConstraints.zeta_max})`,
+        TS_ratio: `${f1(TS_ratio)} → ${f2(normalizedData[4])} (min: ${currentConstraints.TS_min})`,
+      });
+    }
 
     return [{
       type: 'scatterpolar',
@@ -318,28 +325,28 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_avg:</span>
                       <span className="font-semibold">
-                        {dashboardMetrics.P_avg >= 1 ? `${dashboardMetrics.P_avg.toFixed(1)} MW` : `${(dashboardMetrics.P_avg * 1e6).toFixed(1)} W`}
+                        {P_avg >= 1 ? `${f1(P_avg)} MW` : `${f1(P_avg * 1e6)} W`}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Duty:</span>
-                      <span className="font-semibold">{(dashboardMetrics.f_throttle * 100).toFixed(1)}%</span>
+                      <span className="font-semibold">{f1(dutyFrac * 100)}%</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">M_exotic:</span>
-                      <span className="font-semibold">{dashboardMetrics.M_exotic.toFixed(0)} kg</span>
+                      <span className="font-semibold">{f0(M_exotic)} kg</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ζ:</span>
-                      <span className="font-semibold">{dashboardMetrics.zeta.toFixed(3)}</span>
+                      <span className="font-semibold">{f3(zeta)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TS_ratio:</span>
-                      <span className="font-semibold">{dashboardMetrics.TS_ratio.toFixed(1)}</span>
+                      <span className="font-semibold">{f1(TS_ratio)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_raw:</span>
-                      <span className="font-semibold">{dashboardMetrics.P_raw.toFixed(1)} MW</span>
+                      <span className="font-semibold">{f1(P_raw)} MW</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">γ_geo:</span>
