@@ -463,10 +463,12 @@ class WarpEngine {
         const A_vis_base = A_phys * norm;
         
         // 4) Choose instant vs average (no √duty hacks)
-        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
+        // viewAvg now handled per-vertex for mode differentiation
         const A_inst = A_vis_base * dutyInstEff;
         const A_avg = A_vis_base * dutyAvgEff;
-        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
+        const viewAvgMode = (this.uniforms && typeof this.uniforms.viewAvg === 'number') 
+            ? this.uniforms.viewAvg : 1;
+        const A_used = (viewAvgMode >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
         const gain = (this.uniforms?.vizGain || 4.0);
@@ -527,8 +529,7 @@ class WarpEngine {
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
             const phase = 2 * Math.PI * sectors * u; // continuous phase
-            const viewAvg = false; // use instantaneous view
-            const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
+            const sgn = (viewAvg >= 0.5) ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
             
             // --- Ellipsoidal signed distance ---
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
@@ -578,11 +579,13 @@ class WarpEngine {
             const gammaVdB = this.uniforms?.gammaVdB || 1;
             const dutyCycle = this.uniforms?.dutyCycle || 0.14;
             const sectors = this.uniforms?.sectors || 1;
-            const viewAvg = this.uniforms?.viewAvg !== undefined ? this.uniforms.viewAvg : true;
+            // Single source of truth for viewAvg (0 = instantaneous, 1 = averaged)
+            const viewAvg = (this.uniforms && typeof this.uniforms.viewAvg === 'number')
+                ? this.uniforms.viewAvg : 1;
             const betaGain = this.uniforms?.betaGain || 0.25; // Lower gain to avoid saturation
             
             // 1) Effective duty: averaged vs instantaneous  
-            const effDuty = viewAvg
+            const effDuty = (viewAvg >= 0.5)
               ? Math.max(1e-12, dutyCycle / Math.max(1, sectors))   // FR-style proxy
               : 1.0;
             
@@ -590,7 +593,7 @@ class WarpEngine {
             const A_geo = gammaGeo * gammaGeo * gammaGeo;           // γ_geo³
             const betaInst = A_geo * qBurst * gammaVdB * qSpoil;    // instantaneous
             const betaAvg  = betaInst * Math.sqrt(effDuty);         // averaged view (RMS)
-            const betaUsed = viewAvg ? betaAvg : betaInst;
+            const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
             
             // 3) Visual gain tuned to avoid clamp saturation
             const betaVis = betaUsed * betaGain;
