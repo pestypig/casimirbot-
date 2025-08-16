@@ -1,0 +1,66 @@
+Awesome—here’s a drop-in replacement for the physics chain in _warpGridVertices that:
+	•	Does not redeclare sectors (uses your existing sectorsUniform).
+	•	Switches to linear duty averaging (no sqrt).
+	•	Fixes wall thickness default to 16 nm (meters).
+	•	Keeps your existing variable names (…Uniform) so nothing conflicts.
+
+Paste this exactly over the block that starts at // Physics-consistent amplitude and averaged duty and runs through the betaVis… calculations.
+
+// --- Physics-consistent amplitude and averaged duty (no duplicate consts) ---
+
+// Ensure numbers
+const dutyCycleUniform = Number(this.uniforms?.dutyCycle ?? 0.14);
+const sectorsUniform   = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+const gammaGeoUniform  = Number(this.uniforms?.gammaGeo ?? 26);
+const QburstUniform    = Number(this.uniforms?.Qburst ?? this.uniforms?.cavityQ ?? 1e9);
+const qSpoilUniform    = Number(this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0);
+const gammaVdBUniform  = Number(this.uniforms?.gammaVdB ?? 2.86e5);
+const betaGainUniform  = Number(this.uniforms?.betaGain ?? 0.15);
+
+// FIX: wall thickness default must be meters (16 nm), not 0.016 (16 mm)
+const wallWidthUniform = Number(this.uniforms?.wallWidth ?? 16e-9);
+
+// Geometric amplification γ_geo^3
+const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform;
+
+// Effective duty for averaged view (linear; cruise visibly flatter than hover)
+const effDutyUniform = Math.max(1e-12, dutyCycleUniform / sectorsUniform);
+
+// Instant vs averaged beta (use averaged unless viewAvg is explicitly false)
+const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+const betaAvgUniform  = betaInstUniform * effDutyUniform;
+const betaUsedUniform = (this.uniforms?.viewAvg ?? true) ? betaAvgUniform : betaInstUniform;
+
+// Final visual scale
+const betaVisUniform = betaUsedUniform * betaGainUniform;
+
+// Debug once per ~second
+if ((this._dbgTick = (this._dbgTick || 0) + 1) % 60 === 0) {
+  console.log("🎥 MODE VIS",
+    {
+      mode: this.uniforms?.currentMode,
+      duty: dutyCycleUniform,
+      sectors: sectorsUniform,
+      effDuty: effDutyUniform.toExponential(3),
+      A_geo: A_geoUniform.toExponential(3),
+      qBurst: QburstUniform.toExponential(3),
+      gVdB: gammaVdBUniform.toExponential(3),
+      qSpoil: qSpoilUniform,
+      betaInst: betaInstUniform.toExponential(3),
+      betaAvg: betaAvgUniform.toExponential(3),
+      betaVis: betaVisUniform.toExponential(3),
+      wallWidth_m: wallWidthUniform
+    }
+  );
+}
+
+After you paste:
+	1.	Search this file for any other accidental const sectors = … or const duty = … in the same function and remove/rename them (keep the …Uniform ones).
+	2.	Verify your React → uniforms mapping still sets:
+	•	dutyCycle, sectors, gammaGeo, Qburst (or cavityQ), deltaAOverA/qSpoilingFactor, gammaVdB, wallWidth (in meters).
+	3.	Switch modes (Hover → Cruise → Emergency) and check the debug log:
+	•	effDuty should drop by ~400× in Cruise.
+	•	betaAvg and betaVis should reflect that drop.
+	•	With wallWidth_m: 1.6e-8, the bell is narrow enough that mode differences are visually obvious.
+
+If you want, I can also give you a tiny patch for the React side to ensure wallWidth is passed as meters and viewAvg is true by default.
