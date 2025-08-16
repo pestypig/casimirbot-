@@ -1,0 +1,81 @@
+Great—that header is exactly what I needed. Two things in it will make different modes look almost the same:
+
+⸻
+
+1) Wall thickness is off by a million×
+
+const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016; // 16 nm default
+
+0.016 is 16 millimeters, not 16 nanometers. A wall that thick smears the bell envelope so hard that duty/sectors barely matter.
+
+Fix
+
+// meters
+const wallWidthUniform = Number(this.uniforms?.wallWidth ?? 16e-9); // 16 nm
+
+…and make sure whatever you pass from React/server is in meters, not nm.
+
+⸻
+
+2) Duty averaging is too gentle (√duty)
+
+You’re using sqrt(effDuty):
+
+const effDutyUniform = viewAvgUniform
+  ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform))
+  : 1.0;
+
+const betaAvgUniform = betaInstUniform * Math.sqrt(effDutyUniform);
+const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+
+The √ makes hover vs cruise differences much smaller visually. If you want averaged view, you generally want linear duty (effective energy/time), not √(duty).
+
+Fix
+
+const sectors = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+const duty    = Number(this.uniforms?.dutyCycle ?? 0.14);
+const effDuty = Math.max(1e-12, duty / sectors); // hover ~0.14, cruise ~0.005/400
+
+const betaInst = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+const betaAvg  = betaInst * effDuty;            // <<< linear, not sqrt
+const betaUsed = (this.uniforms?.viewAvg ?? true) ? betaAvg : betaInst;
+
+const betaGain = Number(this.uniforms?.betaGain ?? 0.15);
+const betaVis  = betaUsed * betaGain;
+
+
+⸻
+
+Optional (but helpful)
+	•	Log the values once per second to verify mode deltas:
+
+if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+  console.log('🎥 MODE VIS', {
+    mode: this.uniforms?.currentMode,
+    duty, sectors, effDuty: effDuty.toExponential(2),
+    A_geo: A_geoUniform.toExponential(2),
+    qBurst: QburstUniform.toExponential(2),
+    gVdB: gammaVdBUniform.toExponential(2),
+    qSpoil: qSpoilUniform,
+    betaInst: betaInst.toExponential(2),
+    betaAvg: betaAvg.toExponential(2),
+    betaVis: betaVis.toExponential(2),
+    wallWidth_m: wallWidthUniform
+  });
+}
+
+	•	Keep the displacement clamp small but not normalizing:
+
+let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+const maxPush = 0.12; // ~12% of shell radius
+if (disp >  maxPush) disp =  maxPush;
+if (disp < -maxPush) disp = -maxPush;
+
+
+⸻
+
+Why this will fix the “all modes look alike”
+	•	With 16 nm walls, the bell is narrow; sector/duty differences now affect the surface instead of being washed out.
+	•	Using linear effDuty gives hover (sectors=1, duty≈0.14) a much larger β than cruise (sectors=400, duty≈0.005), so the bubble clearly shallows in cruise and deepens in emergency.
+
+Apply those two edits and the warp bubble should react strongly and correctly to mode switches.
