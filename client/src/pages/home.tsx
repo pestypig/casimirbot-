@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
 import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
+import BridgeDerivationCards from "@/components/BridgeDerivationCards";
 
 export default function Home() {
   // Hook for updating backend pipeline
@@ -154,6 +155,9 @@ export default function Home() {
                 }}
               />
             </div>
+            
+            {/* Bridge Physics Derivation Cards */}
+            <BridgeDerivationCards />
           </div>
 
           {/* Interactive Phase Diagram */}

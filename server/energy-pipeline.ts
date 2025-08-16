@@ -56,6 +56,7 @@ export interface EnergyPipelineState {
   TS_geom?: number;         // Time-scale using geometric mean
   zeta: number;             // Quantum inequality parameter
   N_tiles: number;          // Total number of tiles
+  hullArea_m2?: number;     // Hull surface area (for Bridge display)
   
   // Sector management
   tilesPerSector: number;   // Tiles per sector
@@ -219,6 +220,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Calculate tile area and hull area
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
   const hullArea_m2 = calculateHullArea(state.shipRadius_m);
+  
+  // Store hull area for Bridge display
+  state.hullArea_m2 = hullArea_m2;
   
   // Special case for Needle Hull research configuration
   const isNeedleHull = Math.abs(state.shipRadius_m - 5) < 2 && 

@@ -541,7 +541,27 @@ export function getSystemMetrics(req: Request, res: Response) {
     timeScaleRatio: state.TS_ratio,
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
-    // hull geometry and time-scale metrics
+    // hull geometry and time-scale metrics for Bridge cards
+    hull: {
+      Lx_m: state.hull?.Lx_m ?? 1007,
+      Ly_m: state.hull?.Ly_m ?? 264,
+      Lz_m: state.hull?.Lz_m ?? 173
+    },
+    tiles: {
+      tileArea_cm2: state.tileArea_cm2,
+      hullArea_m2: state.hullArea_m2 ?? null,
+      N_tiles: state.N_tiles
+    },
+    timescales: {
+      f_m_Hz: (state.modulationFreq_GHz ?? 15) * 1e9,
+      T_m_s: 1 / ((state.modulationFreq_GHz ?? 15) * 1e9),
+      L_long_m: Math.max(state.hull?.Lx_m ?? 1007, state.hull?.Ly_m ?? 264, state.hull?.Lz_m ?? 173),
+      T_long_s: Math.max(state.hull?.Lx_m ?? 1007, state.hull?.Ly_m ?? 264, state.hull?.Lz_m ?? 173) / 299792458,
+      TS_long: state.TS_long ?? state.TS_ratio,
+      TS_geom: state.TS_geom ?? state.TS_ratio
+    },
+
+    // hull geometry (legacy field for backward compatibility)
     geometry: {
       Lx_m: state.hull?.Lx_m ?? 1007,
       Ly_m: state.hull?.Ly_m ?? 264,
