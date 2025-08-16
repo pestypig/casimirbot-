@@ -523,16 +523,12 @@ class WarpEngine {
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
             
-            // --- Sector strobing: smooth, not step ---
+            // --- (A) Smooth sector phase (replaces hard ±1) ---
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            // Map sector index to phase in [-1,1] and soften with tanh
-            const sectorIdx = Math.floor(u * sectors);
-            // Distance from current split boundary in sector units
-            const distToSplit = (sectorIdx - split + 0.5);
-            // Wider width => softer transition across boundary
-            const strobeWidth = 0.75;                 // tune: 0.5–1.0
-            const sgn = softSign(-distToSplit / strobeWidth); // smooth ±1
+            const phase = 2 * Math.PI * sectors * u; // continuous phase
+            const viewAvg = false; // use instantaneous view
+            const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
             
             // --- Ellipsoidal signed distance ---
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
@@ -543,9 +539,9 @@ class WarpEngine {
             // --- Surface normal ---
             const n = nEllipsoid(p, axesScene);
             
-            // --- Front/back asymmetry: soften projection ---
-            const proj = (n[0] * dN[0] + n[1] * dN[1] + n[2] * dN[2]);
-            const front = softSign(proj / 0.15);      // 0.1–0.2 gives gentle flip
+            // --- (B) Soft front/back polarity (replaces Math.sign) ---
+            const dot = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+            const front = Math.tanh(6*dot);                 // 6–8 is good steepness
             
             // --- Mode gains ---
             const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
@@ -570,18 +566,20 @@ class WarpEngine {
             const s_local = sd / w_rho_local;
             const gaussian_local = Math.exp(-s_local * s_local);
             
-            // Compact C² window to avoid multiplying by a hard band
-            const smooth = (A, B, x) => { 
-                const t = Math.max(0, Math.min(1, (x - A) / (B - A))); 
-                return t * t * t * (t * (t * 6 - 15) + 10); 
-            };
-            const window_local = smooth(-3, -2, s_local) * (1 - smooth(2, 3, s_local)) + smooth(-2, 2, s_local);
+            // --- (C) Soft wall window (replaces hard band gate) ---
+            const asd = Math.abs(sd), a = 2.5*w_rho_local, b = 3.5*w_rho_local;
+            const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
+                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- Final displacement: smooth, odd across wall ---
-            // Multiply by tanh(-s) to enforce smooth odd symmetry (compress/expand)
-            const odd = softSign(-s_local);
-            let disp = gridK * betaVis * modeAmp * modeViz
-                     * gaussian_local * window_local * odd * sgn * front;
+            // --- (D) Physics-consistent amplitude (γ_geo³, not γ_geo¹) ---
+            const gammaGeo = this.uniforms?.gammaGeo || 26;
+            const qBurst = this.uniforms?.Qburst || this.uniforms?.cavityQ || 1e9;
+            const qSpoil = this.uniforms?.deltaAOverA || this.uniforms?.qSpoilingFactor || 1;
+            const gammaVdB = this.uniforms?.gammaVdB || 1;
+            const A_geo = gammaGeo*gammaGeo*gammaGeo; // γ³ amplification
+            
+            let disp = gridK * betaVis * A_geo * qBurst * gammaVdB * qSpoil
+                     * wallWin * front * sgn * gaussian_local;
             
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
