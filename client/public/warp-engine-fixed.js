@@ -519,37 +519,38 @@ class WarpEngine {
 
         const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
-        // Read uniforms with sane defaults
-        const dutyCycle = this.uniforms?.dutyCycle ?? 0.14;
-        const sectors    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
-        const split      = Math.max(0, Math.min(sectors - 1, this.uniforms?.split ?? 0));
-        const viewAvg    = this.uniforms?.viewAvg ?? true;
+        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
+        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
+        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
 
-        const gammaGeo = this.uniforms?.gammaGeo ?? 26;
-        const Qburst   = this.uniforms?.Qburst   ?? 1e9;
-        const qSpoil   = this.uniforms?.deltaAOverA ?? 1.0;
-        const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
+        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
+        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
-        const hullAxes = this.uniforms?.hullAxes ?? [503.5,132,86.5];
-        const w_rho_meters = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
+        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
         // Physics-consistent amplitude and averaged duty
-        const A_geo = gammaGeo * gammaGeo * gammaGeo; // γ_geo^3 amplification
-        const effDuty = viewAvg ? Math.max(1e-12, dutyCycle / Math.max(1, sectors)) : 1.0;
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
         
-        const betaInst = A_geo * Qburst * gammaVdB * qSpoil;
-        const betaAvg  = betaInst * Math.sqrt(effDuty);
-        const betaUsed = viewAvg ? betaAvg : betaInst;
+        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
         
-        const betaGain = this.uniforms?.betaGain ?? 0.15;
-        const betaVis  = betaUsed * betaGain;
+        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
+        const betaVisUniform  = betaUsedUniform * betaGainUniform;
 
         // Debug per mode (once per 60 frames)
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
             console.log("🧪 warp-mode", {
-                mode: this.uniforms?.currentMode, dutyCycle, sectors, split, viewAvg,
-                A_geo, effDuty, betaInst: betaInst.toExponential(2), 
-                betaAvg: betaAvg.toExponential(2), betaVis: betaVis.toExponential(2)
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                betaVis: betaVisUniform.toExponential(2)
             });
         }
         
@@ -557,13 +558,13 @@ class WarpEngine {
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
             
-            // --- Smooth strobing sign using sectors/split (C¹) ---
+            // --- Smooth strobing sign using uniform sectors/split (C¹) ---
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            const sectorIdx = Math.floor(u * sectors);
+            const sectorIdx = Math.floor(u * sectorsUniform);
             
             // Distance from the split boundary in sector units
-            const dist = (sectorIdx - split + 0.5);
+            const dist = (sectorIdx - splitUniform + 0.5);
             const strobeWidth = 0.75; // smooth width (tune 0.5–1.0)
             const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
             
@@ -609,7 +610,7 @@ class WarpEngine {
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
             // --- Final displacement using physics-consistent amplitude ---
-            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+            let disp = gridK * betaVisUniform * wallWin * front * sgn * gaussian_local;
             
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
