@@ -52,29 +52,14 @@ class WarpEngine {
             exoticMass_kg: 1405
         };
 
-        // Display-only controls with safe defaults to prevent TDZ errors
+        // Display-only controls (do NOT feed these back into pipeline math)
         this.uniforms = {
-            // physics defaults
-            dutyCycle: 0.14,
-            gammaGeo: 26,
-            Qburst: 1e9,
-            deltaAOverA: 1,
-            gammaVdB: 2.86e5,
-            sectors: 1,
-            
-            // viz defaults  
-            viewAvg: 0,          // 0 = instantaneous, 1 = averaged
             vizGain: 4.0,        // how exaggerated the bend looks
-            betaGain: 0.25,      // lower gain to avoid saturation
             colorByTheta: 1.0,   // 1=York colors, 0=solid sheet color
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
-            driveDir: [1, 0, 0],
-            
-            // geometry defaults
-            hullAxes: [503.5, 132, 86.5], // semi-axes (m)
-            wallWidth: 0.06               // normalized wall thickness
+            driveDir: [1, 0, 0]
         };
         
         // Initialize rendering pipeline
@@ -478,12 +463,10 @@ class WarpEngine {
         const A_vis_base = A_phys * norm;
         
         // 4) Choose instant vs average (no √duty hacks)
-        // viewAvg now handled per-vertex for mode differentiation
+        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
         const A_inst = A_vis_base * dutyInstEff;
         const A_avg = A_vis_base * dutyAvgEff;
-        const viewAvgMode = (this.uniforms && typeof this.uniforms.viewAvg === 'number') 
-            ? this.uniforms.viewAvg : 1;
-        const A_used = (viewAvgMode >= 0.5) ? A_avg : A_inst;
+        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
         const gain = (this.uniforms?.vizGain || 4.0);
@@ -544,7 +527,8 @@ class WarpEngine {
             const theta = Math.atan2(p[2], p[0]);
             const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
             const phase = 2 * Math.PI * sectors * u; // continuous phase
-            // Note: viewAvg will be defined below in the destructuring
+            const viewAvg = false; // use instantaneous view
+            const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase); // smooth strobing
             
             // --- Ellipsoidal signed distance ---
             const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
@@ -587,27 +571,18 @@ class WarpEngine {
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- (D) Physics-consistent amplitude with safe destructuring (no TDZ) ---
-            const {
-                dutyCycle = 0.14,
-                gammaGeo = 26,
-                Qburst = 1e9,
-                cavityQ = 1e9,
-                deltaAOverA = 1,
-                qSpoilingFactor = 1,
-                gammaVdB = 2.86e5,
-                sectors = 1,
-                viewAvg = 0,
-                betaGain = 0.25,
-                hullAxes = [503.5, 132, 86.5],
-                wallWidth = 0.06
-            } = this.uniforms || {};
-            
-            const qBurst = Qburst || cavityQ;
-            const qSpoil = deltaAOverA || qSpoilingFactor;
+            // --- (D) Physics-consistent amplitude with mode differentiation ---
+            const gammaGeo = this.uniforms?.gammaGeo || 26;
+            const qBurst = this.uniforms?.Qburst || this.uniforms?.cavityQ || 1e9;
+            const qSpoil = this.uniforms?.deltaAOverA || this.uniforms?.qSpoilingFactor || 1;
+            const gammaVdB = this.uniforms?.gammaVdB || 1;
+            const dutyCycle = this.uniforms?.dutyCycle || 0.14;
+            const sectors = this.uniforms?.sectors || 1;
+            const viewAvg = this.uniforms?.viewAvg !== undefined ? this.uniforms.viewAvg : true;
+            const betaGain = this.uniforms?.betaGain || 0.25; // Lower gain to avoid saturation
             
             // 1) Effective duty: averaged vs instantaneous  
-            const effDuty = (viewAvg >= 0.5)
+            const effDuty = viewAvg
               ? Math.max(1e-12, dutyCycle / Math.max(1, sectors))   // FR-style proxy
               : 1.0;
             
@@ -615,7 +590,7 @@ class WarpEngine {
             const A_geo = gammaGeo * gammaGeo * gammaGeo;           // γ_geo³
             const betaInst = A_geo * qBurst * gammaVdB * qSpoil;    // instantaneous
             const betaAvg  = betaInst * Math.sqrt(effDuty);         // averaged view (RMS)
-            const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
+            const betaUsed = viewAvg ? betaAvg : betaInst;
             
             // 3) Visual gain tuned to avoid clamp saturation
             const betaVis = betaUsed * betaGain;
