@@ -435,28 +435,51 @@ class WarpEngine {
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
-        // Enhanced pipeline-driven beta calculation with fixed parameter mapping
-        const sectors = Math.max(1, bubbleParams.sectorCount || bubbleParams.sectorStrobing || 1);
-        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
-        const Qburst = bubbleParams.Qburst || bubbleParams.cavityQ || 1e9;
-        const deltaAOverA = bubbleParams.deltaAOverA || bubbleParams.qSpoilingFactor || 0.05;
-        const dutyCycle = bubbleParams.dutyCycle || 0.14;
-        const phaseSplit = bubbleParams.phaseSplit || (bubbleParams.currentMode === 'cruise' ? 0.65 : 0.5);
-        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
-        const betaGain = bubbleParams.betaGain || 1e-10;     // Normalize huge β to visual range
-        const gammaVdB = bubbleParams.gammaVdB || bubbleParams.gammaVanDenBroeck || 1.0;
+        // ---- Physics-accurate amplitude calculation (matches energy pipeline) ----
         
-        const betaInst = gammaGeo * Qburst * deltaAOverA * Math.pow(gammaVdB, 0.25);
-        const betaAvg = betaInst * Math.sqrt(Math.max(1e-9, dutyCycle / sectors));
-        const betaUsed = (viewAvg >= 0.5) ? betaAvg : betaInst;
-        const betaVis = betaUsed * betaGain;  // Scale to sane visual magnitude
+        // 1) Same multiplicative chain as the physics pipeline (display model):
+        //    A_total ~ (gammaGeo^3) * qSpoilingFactor * gammaVdB
+        //    (q_cavity is kept out of the display amplitude; it lives in ζ and losses)
+        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
+        const geoAmp = Math.pow(gammaGeo, 3);                               // γ_geo^3
+        const qSpoil = Math.max(1e-9, (bubbleParams.qSpoilingFactor || bubbleParams.deltaAOverA || 1)); // [0..1]
+        const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
+        
+        // 2) Duty / strobing: use the same effective definitions the server uses
+        const sectors = Math.max(1, bubbleParams.sectorStrobing || bubbleParams.sectorCount || 1);
+        
+        // Instantaneous (during a hot sector burst)
+        const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
+        const dutyInstEff = dutyBurst_fs * (1 / sectors);
+        
+        // Time-averaged (what the UI cards show next to power)
+        const dutyGlobal = Math.max(1e-12, bubbleParams.dutyCycle || 0.14);
+        const dutyAvgEff = dutyGlobal * qSpoil * (1 / sectors);
+        
+        // 3) Build an amplitude consistent with the energy-side scaling.
+        //    Keep purely visual normalization so it doesn't explode on screen.
+        const A_phys = geoAmp * qSpoil * vdbAmp;    // physics-like chain
+        const norm = (this.uniforms?.vizNorm || 1.0e-9);  // visual normalizer
+        const A_vis_base = A_phys * norm;
+        
+        // 4) Choose instant vs average (no √duty hacks)
+        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
+        const A_inst = A_vis_base * dutyInstEff;
+        const A_avg = A_vis_base * dutyAvgEff;
+        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
+        
+        // 5) Optional viewer gain (like your old betaGain) to make it legible
+        const gain = (this.uniforms?.vizGain || 4.0);
+        const betaVis = A_used * gain;
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
         console.log(`  Wall: ${wallWidth_m} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
-        console.log(`  β_raw=${betaInst.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (gain=${betaGain})`);
-        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius`);
+        console.log(`  🔬 PHYSICS SCALING: γ³=${geoAmp.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${vdbAmp.toExponential(2)}`);
+        console.log(`  📊 DUTY FACTORS: instant=${dutyInstEff.toExponential(2)}, avg=${dutyAvgEff.toExponential(2)} (sectors=${sectors})`);
+        console.log(`  β_phys=${A_phys.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (norm=${norm.toExponential(0)})`);
+        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
 
         // Ellipsoid utilities (using consistent scene-scaled axes)
         const rhoEllipsoidal = (p) => {
