@@ -299,12 +299,22 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
+        // Ensure uniforms object always exists with safe fallbacks
+        this.uniforms = this.uniforms || {};
+        
         // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
         
         // Numeric coercion helper
         const N = v => (Number.isFinite(+v) ? +v : 0);
         const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
+        
+        // Safe fallbacks for hull axes and wall width
+        const hullAxes = (Array.isArray(parameters.hullAxes) && parameters.hullAxes.length === 3)
+            ? parameters.hullAxes
+            : [503.5, 132.0, 86.5]; // Needle hull semi-axes (m)
+        
+        const wallWidth = N(parameters.wallWidth ?? 0.016); // 16 nm default
 
         // duty as fraction [0..1]
         const dutyFrac = (() => {
@@ -313,15 +323,15 @@ class WarpEngine {
           return d > 1 ? d/100 : N(d);
         })();
 
-        // Mirror pipeline fields into uniforms for diagnostics
-        this.uniforms = {
-            ...this.uniforms,
-            vizGain: 4,
-            colorByTheta: 1,
-            vShip: parameters.vShip || 1,
-            wallWidth: parameters.wallWidth || 0.06,
-            axesClip: parameters.axesClip || [0.4, 0.22, 0.22],
-            driveDir: parameters.driveDir || [1, 0, 0],
+        // Mirror pipeline fields into uniforms for diagnostics (with defensive initialization)
+        Object.assign(this.uniforms, {
+            vizGain: N(parameters.vizGain, 4),
+            colorByTheta: N(parameters.colorByTheta, 1),
+            vShip: N(parameters.vShip, 1),
+            wallWidth: wallWidth,
+            axesClip: Array.isArray(parameters.axesClip) ? parameters.axesClip : [0.4, 0.22, 0.22],
+            driveDir: Array.isArray(parameters.driveDir) ? parameters.driveDir : [1, 0, 0],
+            hullAxes: hullAxes, // Always ensure hull axes exist
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -335,7 +345,7 @@ class WarpEngine {
               parameters.phaseSplit ??
               (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
             )
-        };
+        });
         
         // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
