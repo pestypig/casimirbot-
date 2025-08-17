@@ -33,6 +33,10 @@ class WarpEngine {
         // Initialize uniform dirty flag
         this._uniformsDirty = false;
         
+        // Temporal smoothing for visual calm (canonical Natário)
+        this._dispAlpha = 0.25; // blend factor (0=no change, 1=instant)
+        this._prevDisp = [];     // per-vertex displacement history
+        
         // Grid rendering resources
         this.gridVertices = null;
         this.originalGridVertices = null; // Store original positions for warp calculations
@@ -436,6 +440,9 @@ class WarpEngine {
           GRID_DEFAULTS.minSpan,
           hullMaxClip * spanPadding
         );
+        
+        // Higher resolution for smoother canonical curvature
+        const gridDivisions = 120; // increased from default for smoother profiles
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
@@ -575,7 +582,7 @@ class WarpEngine {
             
             // Distance from the split boundary in sector units
             const dist = (sectorIdx - splitUniform + 0.5);
-            const strobeWidth = 0.75; // smooth width (tune 0.5–1.0)
+            const strobeWidth = 1.5; // wider for smoother canonical profile
             const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
             
             // --- Ellipsoidal signed distance ---
@@ -587,9 +594,9 @@ class WarpEngine {
             // --- Surface normal ---
             const n = nEllipsoid(p, axesScene);
             
-            // --- (B) Soft front/back polarity (replaces Math.sign) ---
-            const dot = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
-            const front = Math.tanh(6*dot);                 // 6–8 is good steepness
+            // --- (B) Soft front/back polarity (C¹-continuous) ---
+            const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+            const front = Math.tanh(dotND / 0.15);          // softer front polarity for canonical smoothness
             
             // --- Mode gains ---
             const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
@@ -610,14 +617,14 @@ class WarpEngine {
             const R_eff = 1.0 / Math.max(invR, 1e-6);
             const w_rho_local = wallWidth_m / R_eff;   // thickness in ρ-units
             
-            // Use local normalized coordinate instead of global w_rho
-            const s_local = sd / w_rho_local;
-            const gaussian_local = Math.exp(-s_local * s_local);
+            // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
+            // For canonical Natário bubble, disable local gaussian bumps
+            const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
             
-            // --- (C) Soft wall window (replaces hard band gate) ---
-            const asd = Math.abs(sd), a = 2.5*w_rho_local, b = 3.5*w_rho_local;
+            // --- (C) Gentler wall window for canonical smoothness ---
+            const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
-                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
+                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // gentle falloff
             
             // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
             // Pull uniforms for current mode and parameters
@@ -661,11 +668,20 @@ class WarpEngine {
                 // Normal displacement calculation with compressed amplitude
                 disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
                 
-                // Soft clamp instead of hard clip (no jaggies)
-                const localR = Math.max(1e-3, rho);         // rho is your ellipsoidal radius
-                const maxPush = 0.12;                        // allow up to 12% visually
+                // Reduced visual gain to avoid clamp flattening + higher ceiling
+                disp *= 2.0; // lower than 4.0 to avoid hitting clamp
+                
+                // Soft clamp with higher ceiling (no jaggies)
+                const maxPush = 0.15;                        // slightly higher ceiling
                 const softClamp = (x, m) => m * Math.tanh(x / m);
                 disp = softClamp(disp, maxPush);
+                
+                // Optional temporal smoothing for canonical visual calm
+                const vertIndex = i / 3;
+                const prev = this._prevDisp[vertIndex] ?? disp;
+                const blended = prev + this._dispAlpha * (disp - prev);
+                this._prevDisp[vertIndex] = blended;
+                disp = blended;
             }
             
             vtx[i] = p[0] - n[0] * disp;
@@ -693,9 +709,9 @@ class WarpEngine {
             if (y > ymax) ymax = y;
             if (y < ymin) ymin = y;
         }
-        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (amplitude-controlled shell)`);
-        console.log(`🔧 SOFT CLAMP: Applied tanh saturation instead of hard cutoff (eliminates jagged ring)`);
-        console.log(`🔧 LOCAL WALL: Direction-dependent ρ-thickness for ellipsoidal geometry`);
+        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
+        console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
+        console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
         
         // Update uniforms for scientific consistency (using scene-scaled axes)
         this.uniforms.axesClip = axesScene;
@@ -706,7 +722,7 @@ class WarpEngine {
         if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
             console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
             this.currentGridSpan = targetSpan;
-            const newGridData = this._createGrid(targetSpan, GRID_DEFAULTS.divisions);
+            const newGridData = this._createGrid(targetSpan, gridDivisions);
             
             // Update both current and original vertices
             this.gridVertices = newGridData;
