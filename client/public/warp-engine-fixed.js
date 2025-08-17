@@ -429,10 +429,15 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Get hull axes from bubbleParams first, then uniforms, with safe fallbacks (in meters)
-        const hullAxes = bubbleParams.hullAxes || 
-                        (this.uniforms && this.uniforms.hullAxes) || 
-                        [503.5, 132, 86.5]; // Semi-axes in meters
+        // Robust hull axes extraction with multiple fallback levels
+        let hullAxes;
+        try {
+            hullAxes = bubbleParams.hullAxes || 
+                      (this.uniforms && this.uniforms.hullAxes) || 
+                      [503.5, 132, 86.5]; // Semi-axes in meters
+        } catch (e) {
+            hullAxes = [503.5, 132, 86.5]; // Safe fallback on any error
+        }
         const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
         
         // Single scene scale based on long semi-axis (scientifically faithful)
@@ -541,19 +546,34 @@ class WarpEngine {
 
         const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
-        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
-        const dutyCycleUniform = (this.uniforms && this.uniforms.dutyCycle) || 0.14;
-        const sectorsUniform    = Math.max(1, Math.floor((this.uniforms && this.uniforms.sectors) || 1));
-        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, (this.uniforms && this.uniforms.split) || 0));
-        const viewAvgUniform    = (this.uniforms && this.uniforms.viewAvg !== undefined) ? this.uniforms.viewAvg : true;
+        // Read mode uniforms with sane defaults and error protection
+        let dutyCycleUniform, sectorsUniform, splitUniform, viewAvgUniform;
+        try {
+            dutyCycleUniform = (this.uniforms && this.uniforms.dutyCycle) || 0.14;
+            sectorsUniform    = Math.max(1, Math.floor((this.uniforms && this.uniforms.sectors) || 1));
+            splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, (this.uniforms && this.uniforms.split) || 0));
+            viewAvgUniform    = (this.uniforms && this.uniforms.viewAvg !== undefined) ? this.uniforms.viewAvg : true;
+        } catch (e) {
+            // Safe defaults on any access error
+            dutyCycleUniform = 0.14;
+            sectorsUniform = 1;
+            splitUniform = 0;
+            viewAvgUniform = true;
+        }
 
         const gammaGeoUniform = (this.uniforms && this.uniforms.gammaGeo) || 26;
         const QburstUniform   = (this.uniforms && this.uniforms.Qburst) || 1e9;
         const qSpoilUniform   = (this.uniforms && this.uniforms.deltaAOverA) || 1.0;
         const gammaVdBUniform = (this.uniforms && this.uniforms.gammaVdB) || 2.86e5;
 
-        const hullAxesUniform = (this.uniforms && this.uniforms.hullAxes) || [503.5,132,86.5];
-        const wallWidthUniform = (this.uniforms && this.uniforms.wallWidth) || 0.016;  // 16 nm default
+        let hullAxesUniform, wallWidthUniform;
+        try {
+            hullAxesUniform = (this.uniforms && this.uniforms.hullAxes) || [503.5,132,86.5];
+            wallWidthUniform = (this.uniforms && this.uniforms.wallWidth) || 0.016;  // 16 nm default
+        } catch (e) {
+            hullAxesUniform = [503.5,132,86.5];
+            wallWidthUniform = 0.016;
+        }
 
         // Physics amplitude (remove hidden normalization)
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ^3
