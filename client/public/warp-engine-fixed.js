@@ -59,7 +59,8 @@ class WarpEngine {
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
-            driveDir: [1, 0, 0]
+            driveDir: [1, 0, 0],
+            hullAxes: [503.5, 132.0, 86.5] // Needle hull semi-axes default (prevents undefined errors)
         };
         
         // Initialize rendering pipeline
@@ -340,7 +341,8 @@ class WarpEngine {
             Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
             deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
             gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
-            sectorCount: N(parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
+            sectors:     N(parameters.sectors ?? parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
+            sectorCount: N(parameters.sectorCount ?? parameters.sectors ?? parameters.sectorStrobing ?? 1),
             phaseSplit: N(
               parameters.phaseSplit ??
               (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
@@ -427,8 +429,10 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Get hull axes from uniforms or use needle hull defaults (in meters)
-        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
+        // Get hull axes from bubbleParams first, then uniforms, with safe fallbacks (in meters)
+        const hullAxes = bubbleParams.hullAxes || 
+                        (this.uniforms && this.uniforms.hullAxes) || 
+                        [503.5, 132, 86.5]; // Semi-axes in meters
         const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
         
         // Single scene scale based on long semi-axis (scientifically faithful)
@@ -461,7 +465,10 @@ class WarpEngine {
         const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(1, bubbleParams.sectorStrobing || bubbleParams.sectorCount || 1);
+        const sectors = Math.max(
+          1,
+          bubbleParams.sectors ?? bubbleParams.sectorStrobing ?? bubbleParams.sectorCount ?? 1
+        );
         
         // Instantaneous (during a hot sector burst)
         const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
@@ -484,7 +491,7 @@ class WarpEngine {
         const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
-        const gain = (this.uniforms?.vizGain || 4.0);
+        const gain = (this.uniforms?.vizGain || 2.0);  // Increased gain to make mode differences more visible
         const betaVis = A_used * gain;
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);

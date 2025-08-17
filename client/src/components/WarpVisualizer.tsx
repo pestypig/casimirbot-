@@ -67,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=8'; // Syntax fix + defensive initialization
+        script.src = '/warp-engine-fixed.js?v=11'; // Uniforms hullAxes initialization fix
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -194,8 +194,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         hullAxes: hullAxes,
         wallWidth: wallWidth,
         
-        // Visual scaling (no auto-normalization)
-        vizGain: 1.0,                                    // Keep true mode differences
+        // Visual scaling (no auto-normalization)  
+        vizGain: 2.0,                                    // Increased gain to highlight mode differences
         _debugHUD: true,                                 // Enable debug output
         
         // Legacy parameters for backward compatibility
