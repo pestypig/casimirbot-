@@ -330,11 +330,12 @@ class WarpEngine {
             Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
             deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
             gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
-            sectorCount: N(parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
-            phaseSplit: N(
-              parameters.phaseSplit ??
-              (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
-            )
+            sectors: Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorStrobing ?? 1))),
+            split: Math.max(0, Math.min(
+                (N(parameters.sectors ?? parameters.sectorStrobing ?? 1)) - 1,
+                Math.floor(N(parameters.split ?? ((mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50) * N(parameters.sectors ?? parameters.sectorStrobing ?? 1))))
+            )),
+            viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
         };
         
         // NEW: Map operational mode parameters to spacetime visualization
@@ -446,7 +447,7 @@ class WarpEngine {
         const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(1, bubbleParams.sectorStrobing || bubbleParams.sectorCount || 1);
+        const sectors = Math.max(1, bubbleParams.sectors || bubbleParams.sectorStrobing || 1);
         
         // Instantaneous (during a hot sector burst)
         const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs

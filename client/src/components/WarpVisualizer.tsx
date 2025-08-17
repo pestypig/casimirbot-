@@ -67,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=6'; // Variable conflict fix
+        script.src = '/warp-engine-fixed.js?v=9'; // Naming mismatch fix
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -168,14 +168,14 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       };
       const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
 
-      // Mode reconnection: push all mode-related uniforms
+      // Mode reconnection: push all mode-related uniforms with exact names
       engineRef.current.updateUniforms({
-        // Mode knobs
+        // Mode knobs (exact names the engine reads)
         currentMode: mode,
         dutyCycle: dutyFrac,
-        sectors,
+        sectors,              // ✅ exact name (NOT sectorCount)
         split: phaseSplit,
-        viewAvg,
+        viewAvg,              // ✅ exact name (NOT useAvg)
 
         // Amplification chain
         gammaGeo: num(parameters.g_y, 26),
@@ -188,7 +188,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         wallWidth,
         
         // Visual scaling
-        betaGain: 0.15,                                  // Reduced to avoid clamp saturation
+        vizGain: 1.0,
+        _debugHUD: true,
         
         // Legacy parameters for backward compatibility
         sagDepth_nm: num(parameters.sagDepth_nm),
@@ -196,6 +197,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         exoticMass_kg: num(parameters.exoticMass_kg),
         tsRatio: num(parameters.tsRatio, 4100)
       });
+
+      // IMPORTANT: force recompute on mode change
+      if (engineRef.current.requestRewarp) {
+        engineRef.current.requestRewarp();
+      }
 
       // Debug output to console
       console.table(engineRef.current.uniforms);
