@@ -1,0 +1,148 @@
+That error means the engine is trying to read this.uniforms.hullAxes before it’s been set. Two things make that happen:
+	•	updateUniforms() runs before we push hullAxes, or the caller sends { hull: {a,b,c…} } but the engine only looks for hullAxes.
+	•	_warpGridVertices() assumes uniforms.hullAxes exists and doesn’t fall back to defaults.
+
+Here’s a defensive, minimal patch that fixes both paths. It’s safe to paste in as-is.
+
+⸻
+
+1) Initialize safe defaults in the engine
+
+File: client/public/warp-engine-fixed.js
+
+Add this in the engine constructor (or right after the class is created), so we always have defaults:
+
+// --- SAFE DEFAULT UNIFORMS (needle hull + 6 cm shell in clip units) ---
+this.uniforms = {
+  // geometry defaults (meters)
+  hullAxes: [503.5, 132.0, 86.5],   // a, b, c (semi-axes)
+  wallWidth: 0.06,                  // normalized shell half-thickness (renderer units)
+
+  // mode defaults
+  sectors: 1,
+  sectorCount: 1,
+  phaseSplit: 0.5,
+  split: 0,
+
+  // physics defaults
+  gammaGeo: 26,
+  Qburst: 1e9,
+  deltaAOverA: 1,
+  gammaVdB: 2.86e5,
+  dutyCycle: 0.14
+};
+
+(If this.uniforms already exists, merge these values instead of replacing it.)
+
+⸻
+
+2) Make updateUniforms accept either hullAxes or hull
+
+Still in warp-engine-fixed.js, inside updateUniforms(params):
+
+updateUniforms(parameters = {}) {
+  if (!this.uniforms) this.uniforms = {};
+
+  // Accept sectors under any key
+  const sectors =
+    Number(parameters.sectors ??
+           parameters.sectorCount ??
+           parameters.sectorStrobing ?? 1);
+  if (!Number.isNaN(sectors)) {
+    this.uniforms.sectors = Math.max(1, sectors);
+    this.uniforms.sectorCount = this.uniforms.sectors;
+  }
+
+  // Phase split / split index
+  if (parameters.phaseSplit != null) this.uniforms.phaseSplit = Number(parameters.phaseSplit);
+  if (parameters.split != null) this.uniforms.split = Number(parameters.split);
+
+  // Physics scalars
+  if (parameters.gammaGeo != null) this.uniforms.gammaGeo = Number(parameters.gammaGeo);
+  if (parameters.Qburst != null)   this.uniforms.Qburst   = Number(parameters.Qburst);
+  if (parameters.cavityQ != null)  this.uniforms.Qburst   = Number(parameters.cavityQ);
+  if (parameters.qSpoilingFactor != null) this.uniforms.deltaAOverA = Number(parameters.qSpoilingFactor);
+  if (parameters.gammaVanDenBroeck != null) this.uniforms.gammaVdB = Number(parameters.gammaVanDenBroeck);
+  if (parameters.dutyCycle != null) this.uniforms.dutyCycle = Number(parameters.dutyCycle);
+
+  // --- Geometry: accept either explicit hullAxes or a full hull object ---
+  let axes = null;
+  if (Array.isArray(parameters.hullAxes) && parameters.hullAxes.length === 3) {
+    axes = parameters.hullAxes.map(Number);
+  } else if (parameters.hull) {
+    const h = parameters.hull;
+    const a = Number(h.a ?? h.Lx_m/2);
+    const b = Number(h.b ?? h.Ly_m/2);
+    const c = Number(h.c ?? h.Lz_m/2);
+    if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) {
+      axes = [a, b, c];
+    }
+  }
+  if (axes) this.uniforms.hullAxes = axes;
+
+  if (parameters.wallWidth != null) {
+    this.uniforms.wallWidth = Number(parameters.wallWidth);
+  }
+
+  // keep anything else for debugging
+  this.currentParams = { ...(this.currentParams||{}), ...parameters };
+}
+
+
+⸻
+
+3) Guard reads in _warpGridVertices
+
+Anywhere you build bubbleParams / read geometry, guard and fallback:
+
+const bubbleParams = {
+  ...(this.currentParams || {}),
+  ...(this.uniforms || {})
+};
+
+- const hullAxes = bubbleParams.hullAxes; // <-- breaks if undefined
++ const hullAxes = (bubbleParams.hullAxes && bubbleParams.hullAxes.length === 3)
++   ? bubbleParams.hullAxes
++   : [503.5, 132.0, 86.5];
+
+const wallWidth = Number(bubbleParams.wallWidth ?? 0.06);
+
+- const sectors = Math.max(1, bubbleParams.sectorStrobing || bubbleParams.sectorCount || 1);
++ const sectors = Math.max(1,
++   Number(bubbleParams.sectors ??
++          bubbleParams.sectorCount ??
++          bubbleParams.sectorStrobing ?? 1)
++);
+
+const phaseSplit = Number(bubbleParams.phaseSplit ?? 0.5);
+const split = Number(bubbleParams.split ??
+                     Math.floor(phaseSplit * sectors));
+
+This guarantees hullAxes always exists when the renderer runs, even if React hasn’t pushed parameters yet or pushes them as hull rather than hullAxes.
+
+⸻
+
+4) Optional: ensure the React side sends geometry
+
+Your WarpVisualizer.tsx is okay, but if you want to be extra safe, send both forms:
+
+engine.updateUniforms({
+  hullAxes: [hull.a, hull.b, hull.c],
+  hull: { a: hull.a, b: hull.b, c: hull.c, Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m },
+  wallWidth,
+  // … other uniforms
+});
+
+
+⸻
+
+After this patch
+	•	No more Cannot read properties of undefined (reading 'hullAxes').
+	•	Modes can’t get “stuck” because sectors/split/phase are always defined.
+	•	The bubble should now react to Hover (1 sector) vs Cruise (400 sectors) vs Emergency, because sectors routes correctly into the engine.
+
+If you still don’t see visual changes per mode, open the dev console and verify the live uniforms log prints different values:
+
+🛰 uniforms { sectors: 400, phaseSplit: 0.65, dutyCycle: 0.005, … }
+
+If that shows the right numbers, the visual gain may simply be small; bump vizGain to 2 temporarily to make the differences obvious.

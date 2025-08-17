@@ -60,7 +60,21 @@ class WarpEngine {
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
             driveDir: [1, 0, 0],
-            hullAxes: [503.5, 132.0, 86.5] // Needle hull semi-axes default (prevents undefined errors)
+            hullAxes: [503.5, 132.0, 86.5], // Needle hull semi-axes default (prevents undefined errors)
+            
+            // --- SAFE DEFAULT UNIFORMS (comprehensive mode/physics defaults) ---
+            // mode defaults
+            sectors: 1,
+            sectorCount: 1,
+            phaseSplit: 0.5,
+            split: 0,
+
+            // physics defaults
+            gammaGeo: 26,
+            Qburst: 1e9,
+            deltaAOverA: 1,
+            gammaVdB: 2.86e5,
+            dutyCycle: 0.14
         };
         
         // Initialize rendering pipeline
@@ -297,57 +311,52 @@ class WarpEngine {
         console.log("Grid shader program compiled successfully with York-time coloring support");
     }
 
-    updateUniforms(parameters) {
-        if (!parameters) return;
-        
-        // Ensure uniforms object always exists with safe fallbacks
-        this.uniforms = this.uniforms || {};
-        
-        // Update internal parameters with operational mode integration
-        this.currentParams = { ...this.currentParams, ...parameters };
-        
-        // Numeric coercion helper
-        const N = v => (Number.isFinite(+v) ? +v : 0);
-        const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
-        
-        // Safe fallbacks for hull axes and wall width
-        const hullAxes = (Array.isArray(parameters.hullAxes) && parameters.hullAxes.length === 3)
-            ? parameters.hullAxes
-            : [503.5, 132.0, 86.5]; // Needle hull semi-axes (m)
-        
-        const wallWidth = N(parameters.wallWidth ?? 0.016); // 16 nm default
+    updateUniforms(parameters = {}) {
+        if (!this.uniforms) this.uniforms = {};
 
-        // duty as fraction [0..1]
-        const dutyFrac = (() => {
-          const d = parameters.dutyCycle;
-          if (d == null) return N(this.currentParams.dutyCycle);
-          return d > 1 ? d/100 : N(d);
-        })();
+        // Accept sectors under any key
+        const sectors =
+            Number(parameters.sectors ??
+                   parameters.sectorCount ??
+                   parameters.sectorStrobing ?? 1);
+        if (!Number.isNaN(sectors)) {
+            this.uniforms.sectors = Math.max(1, sectors);
+            this.uniforms.sectorCount = this.uniforms.sectors;
+        }
 
-        // Mirror pipeline fields into uniforms for diagnostics (with defensive initialization)
-        Object.assign(this.uniforms, {
-            vizGain: N(parameters.vizGain, 4),
-            colorByTheta: N(parameters.colorByTheta, 1),
-            vShip: N(parameters.vShip, 1),
-            wallWidth: wallWidth,
-            axesClip: Array.isArray(parameters.axesClip) ? parameters.axesClip : [0.4, 0.22, 0.22],
-            driveDir: Array.isArray(parameters.driveDir) ? parameters.driveDir : [1, 0, 0],
-            hullAxes: hullAxes, // Always ensure hull axes exist
-            
-            // Mirror pipeline fields for diagnostics
-            currentMode: mode,
-            dutyCycle: dutyFrac,
-            gammaGeo: N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y),
-            Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
-            deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
-            gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
-            sectors:     N(parameters.sectors ?? parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
-            sectorCount: N(parameters.sectorCount ?? parameters.sectors ?? parameters.sectorStrobing ?? 1),
-            phaseSplit: N(
-              parameters.phaseSplit ??
-              (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
-            )
-        });
+        // Phase split / split index
+        if (parameters.phaseSplit != null) this.uniforms.phaseSplit = Number(parameters.phaseSplit);
+        if (parameters.split != null) this.uniforms.split = Number(parameters.split);
+
+        // Physics scalars
+        if (parameters.gammaGeo != null) this.uniforms.gammaGeo = Number(parameters.gammaGeo);
+        if (parameters.Qburst != null)   this.uniforms.Qburst   = Number(parameters.Qburst);
+        if (parameters.cavityQ != null)  this.uniforms.Qburst   = Number(parameters.cavityQ);
+        if (parameters.qSpoilingFactor != null) this.uniforms.deltaAOverA = Number(parameters.qSpoilingFactor);
+        if (parameters.gammaVanDenBroeck != null) this.uniforms.gammaVdB = Number(parameters.gammaVanDenBroeck);
+        if (parameters.dutyCycle != null) this.uniforms.dutyCycle = Number(parameters.dutyCycle);
+
+        // --- Geometry: accept either explicit hullAxes or a full hull object ---
+        let axes = null;
+        if (Array.isArray(parameters.hullAxes) && parameters.hullAxes.length === 3) {
+            axes = parameters.hullAxes.map(Number);
+        } else if (parameters.hull) {
+            const h = parameters.hull;
+            const a = Number(h.a ?? h.Lx_m/2);
+            const b = Number(h.b ?? h.Ly_m/2);
+            const c = Number(h.c ?? h.Lz_m/2);
+            if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) {
+                axes = [a, b, c];
+            }
+        }
+        if (axes) this.uniforms.hullAxes = axes;
+
+        if (parameters.wallWidth != null) {
+            this.uniforms.wallWidth = Number(parameters.wallWidth);
+        }
+
+        // keep anything else for debugging
+        this.currentParams = { ...(this.currentParams||{}), ...parameters };
         
         // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
@@ -429,16 +438,13 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Robust hull axes extraction with multiple fallback levels
-        let hullAxes;
-        try {
-            hullAxes = bubbleParams.hullAxes || 
-                      (this.uniforms && this.uniforms.hullAxes) || 
-                      [503.5, 132, 86.5]; // Semi-axes in meters
-        } catch (e) {
-            hullAxes = [503.5, 132, 86.5]; // Safe fallback on any error
-        }
-        const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
+        // Guard reads with defensive fallbacks
+        const hullAxes = (bubbleParams.hullAxes && bubbleParams.hullAxes.length === 3)
+            ? bubbleParams.hullAxes
+            : [503.5, 132.0, 86.5];
+
+        const wallWidth = Number(bubbleParams.wallWidth ?? 0.06);
+        const wallWidth_m = bubbleParams.wallWidth_m || (wallWidth * 100) || 6; // Physical wall thickness in meters
         
         // Single scene scale based on long semi-axis (scientifically faithful)
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
@@ -470,9 +476,10 @@ class WarpEngine {
         const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(
-          1,
-          bubbleParams.sectors ?? bubbleParams.sectorStrobing ?? bubbleParams.sectorCount ?? 1
+        const sectors = Math.max(1,
+            Number(bubbleParams.sectors ??
+                   bubbleParams.sectorCount ??
+                   bubbleParams.sectorStrobing ?? 1)
         );
         
         // Instantaneous (during a hot sector burst)
