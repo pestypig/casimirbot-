@@ -12,19 +12,6 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 
-// --- Wall width normalization helper ---
-function normalizeWallWidthMetersToUnit(
-  wallWidth_m: number | undefined,
-  a: number, b: number, c: number
-) {
-  // Engine expects a unit-space half-thickness.
-  // Use max semi-axis so the wall is conservative if value is missing.
-  const R = Math.max(a, b, c) || 1;
-  const meters = Number(wallWidth_m);
-  if (Number.isFinite(meters) && meters > 0) return meters / R;
-  return 0.06; // sane default in engine units
-}
-
 interface WarpVisualizerProps {
   parameters: {
     dutyCycle: number;
@@ -80,7 +67,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=23'; // GRID SCALE FIX: Bulletproof gridScale parameter handling
+        script.src = '/warp-engine-fixed.js?v=6'; // Variable conflict fix
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -174,20 +161,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         viewAvg
       });
 
-      // Pull hull/semi-axes with fallbacks
-      const hull = parameters.hull || {};
-      const a = Number(hull.a ?? hull.Lx_m / 2 ?? 503.5);
-      const b = Number(hull.b ?? hull.Ly_m / 2 ?? 132.0);
-      const c = Number(hull.c ?? hull.Lz_m / 2 ?? 86.5);
-
-      // Normalize wall width safely (meters → unit)
-      const wallWidth_norm = normalizeWallWidthMetersToUnit(
-        (parameters as any).wallWidth_m ?? hull.wallWidth_m, // may be undefined
-        a, b, c
-      );
-      
-      // Ensure hull axes are always numeric and valid
-      const hullAxes = [a, b, c];
+      // Hull geometry from parameters or use needle hull defaults
+      const hull = parameters.hull || {
+        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+        a: 503.5, b: 132, c: 86.5
+      };
+      const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
 
       // Mode reconnection: push all mode-related uniforms
       engineRef.current.updateUniforms({
@@ -196,24 +175,20 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         dutyCycle: dutyFrac,
         sectors,
         split: phaseSplit,
-        useAvg: viewAvg,
+        viewAvg,
 
-        // Physics chain (exact parameter names)
+        // Amplification chain
         gammaGeo: num(parameters.g_y, 26),
         Qburst: num(parameters.cavityQ, 1e9),
-        qSpoilingFactor: num(parameters.qSpoilingFactor, 1),
+        deltaAOverA: num(parameters.qSpoilingFactor, 1),
         gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
 
-        // Hull / wall (with safe fallbacks)
-        hullAxes: hullAxes,
-        wallWidth: wallWidth_norm,
+        // Hull / wall
+        hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+        wallWidth,
         
-        // Grid and visual scaling
-        gridScale: Number(parameters.gridScale ?? 1.6),   // safe default
-        vizGain: Number(parameters.vizGain ?? 2.0),       // lets you exaggerate visuals if needed
-        
-        // Visual scaling (no auto-normalization) - removed duplicate, using explicit vizGain above
-        _debugHUD: true,                                 // Enable debug output
+        // Visual scaling
+        betaGain: 0.15,                                  // Reduced to avoid clamp saturation
         
         // Legacy parameters for backward compatibility
         sagDepth_nm: num(parameters.sagDepth_nm),
@@ -221,9 +196,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         exoticMass_kg: num(parameters.exoticMass_kg),
         tsRatio: num(parameters.tsRatio, 4100)
       });
-      
-      // IMPORTANT: Force recompute of warp grid
-      engineRef.current.requestRewarp?.();
 
       // Debug output to console
       console.table(engineRef.current.uniforms);

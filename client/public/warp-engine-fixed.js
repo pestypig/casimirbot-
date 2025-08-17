@@ -8,24 +8,6 @@ const GRID_DEFAULTS = {
   divisions: 100       // more lines so a larger grid still looks dense
 };
 
-// ----- GLOBAL DEFAULTS (never undefined) -----
-const DEFAULT_AXES = [503.5, 132.0, 86.5];   // meters, semi-axes a,b,c
-const DEFAULT_UNIFORMS = {
-    hullAxes: DEFAULT_AXES.slice(),
-    wallWidth: 0.06,          // renderer-normalized shell half-thickness
-    sectors: 1,
-    sectorCount: 1,
-    phaseSplit: 0.5,
-    split: 0,
-    gammaGeo: 26,
-    Qburst: 1e9,
-    deltaAOverA: 1,
-    gammaVdB: 2.86e5,
-    dutyCycle: 0.14,
-    gridScale: 1.0,           // unitless visual scale for grid spacing
-    vizGain: 1.0              // purely visual displacement gain
-};
-
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
@@ -71,29 +53,14 @@ class WarpEngine {
         };
 
         // Display-only controls (do NOT feed these back into pipeline math)
-        // Defaults (extend, don't replace, if uniforms already exists)
-        this.uniforms = Object.assign({
+        this.uniforms = {
             vizGain: 4.0,        // how exaggerated the bend looks
             colorByTheta: 1.0,   // 1=York colors, 0=solid sheet color
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
-            driveDir: [1, 0, 0],
-            hullAxes: [503.5, 132.0, 86.5], // Needle hull semi-axes default (prevents undefined errors)
-            gridScale: 1.6       // unitless visual scale for grid spacing
-        }, this.uniforms || {});
-
-        // Ensure uniforms always exist with defaults
-        this.uniforms = Object.assign({}, DEFAULT_UNIFORMS, this.uniforms || {});
-        
-        // Quick verification dump
-        console.log('🛰 uniforms', {
-            hullAxes: this.uniforms.hullAxes,
-            wallWidth: this.uniforms.wallWidth,
-            sectors: this.uniforms.sectors,
-            phaseSplit: this.uniforms.phaseSplit,
-            gammaGeo: this.uniforms.gammaGeo
-        });
+            driveDir: [1, 0, 0]
+        };
         
         // Initialize rendering pipeline
         this._setupCamera();
@@ -329,52 +296,46 @@ class WarpEngine {
         console.log("Grid shader program compiled successfully with York-time coloring support");
     }
 
-    updateUniforms(parameters = {}) {
-        if (!this.uniforms) this.uniforms = Object.assign({}, DEFAULT_UNIFORMS);
+    updateUniforms(parameters) {
+        if (!parameters) return;
+        
+        // Update internal parameters with operational mode integration
+        this.currentParams = { ...this.currentParams, ...parameters };
+        
+        // Numeric coercion helper
+        const N = v => (Number.isFinite(+v) ? +v : 0);
+        const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
 
-        // Accept sectors under any key
-        const sectors =
-            Number(parameters.sectors ??
-                   parameters.sectorCount ??
-                   parameters.sectorStrobing ?? 1);
-        if (!Number.isNaN(sectors)) {
-            this.uniforms.sectors = Math.max(1, sectors);
-            this.uniforms.sectorCount = this.uniforms.sectors;
-        }
+        // duty as fraction [0..1]
+        const dutyFrac = (() => {
+          const d = parameters.dutyCycle;
+          if (d == null) return N(this.currentParams.dutyCycle);
+          return d > 1 ? d/100 : N(d);
+        })();
 
-        // Phase split / split index
-        if (parameters.phaseSplit != null) this.uniforms.phaseSplit = Number(parameters.phaseSplit);
-        if (parameters.split != null) this.uniforms.split = Number(parameters.split);
-
-        // Physics scalars
-        if (parameters.gammaGeo != null) this.uniforms.gammaGeo = Number(parameters.gammaGeo);
-        if (parameters.Qburst != null)   this.uniforms.Qburst   = Number(parameters.Qburst);
-        if (parameters.cavityQ != null)  this.uniforms.Qburst   = Number(parameters.cavityQ);
-        if (parameters.qSpoilingFactor != null) this.uniforms.deltaAOverA = Number(parameters.qSpoilingFactor);
-        if (parameters.gammaVanDenBroeck != null) this.uniforms.gammaVdB = Number(parameters.gammaVanDenBroeck);
-        if (parameters.dutyCycle != null) this.uniforms.dutyCycle = Number(parameters.dutyCycle);
-
-        // --- Geometry: accept either explicit hullAxes or a full hull object ---
-        let axes = null;
-        if (Array.isArray(parameters.hullAxes) && parameters.hullAxes.length === 3) {
-            axes = parameters.hullAxes.map(Number);
-        } else if (parameters.hull) {
-            const h = parameters.hull;
-            const a = Number(h.a ?? h.Lx_m/2);
-            const b = Number(h.b ?? h.Ly_m/2);
-            const c = Number(h.c ?? h.Lz_m/2);
-            if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) {
-                axes = [a, b, c];
-            }
-        }
-        if (axes) this.uniforms.hullAxes = axes;
-
-        if (parameters.wallWidth != null) {
-            this.uniforms.wallWidth = Number(parameters.wallWidth);
-        }
-
-        // keep anything else for debugging
-        this.currentParams = { ...(this.currentParams||{}), ...parameters };
+        // Mirror pipeline fields into uniforms for diagnostics
+        this.uniforms = {
+            ...this.uniforms,
+            vizGain: 4,
+            colorByTheta: 1,
+            vShip: parameters.vShip || 1,
+            wallWidth: parameters.wallWidth || 0.06,
+            axesClip: parameters.axesClip || [0.4, 0.22, 0.22],
+            driveDir: parameters.driveDir || [1, 0, 0],
+            
+            // Mirror pipeline fields for diagnostics
+            currentMode: mode,
+            dutyCycle: dutyFrac,
+            gammaGeo: N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y),
+            Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
+            deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
+            gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
+            sectorCount: N(parameters.sectorCount ?? parameters.sectorStrobing ?? 1),
+            phaseSplit: N(
+              parameters.phaseSplit ??
+              (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
+            )
+        };
         
         // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
@@ -395,12 +356,7 @@ class WarpEngine {
         }
         
         // Apply warp deformation to grid with mode-specific enhancements
-        this._needsRecalc = true;  // flag for recompute
         this._updateGrid();
-    }
-
-    requestRewarp() {
-        this._needsRecalc = true;
     }
     
     _calculateModeEffects(params) {
@@ -456,18 +412,9 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Never read this.uniforms.hullAxes directly. Guard and fallback:
-        const u = this.uniforms || DEFAULT_UNIFORMS;
-
-        const hullAxes = (Array.isArray(u.hullAxes) && u.hullAxes.length === 3)
-            ? u.hullAxes
-            : DEFAULT_AXES;
-
-        const wallWidth = Number(u.wallWidth ?? DEFAULT_UNIFORMS.wallWidth);
-        
-        // Compute physical wall thickness safely
-        const wall = Number.isFinite(wallWidth) && wallWidth > 0 ? wallWidth : 0.06;
-        const wallWidth_m = wall * Math.max(hullAxes[0], hullAxes[1], hullAxes[2]); // Convert back to meters for physics calc
+        // Get hull axes from uniforms or use needle hull defaults (in meters)
+        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
+        const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
         
         // Single scene scale based on long semi-axis (scientifically faithful)
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
@@ -480,14 +427,10 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        
-        // Safe gridScale access with fallback
-        const gridScale = Number(u.gridScale);
-        const GS = Number.isFinite(gridScale) && gridScale > 0 ? gridScale : 1.6;
-        
+        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
         const targetSpan = Math.max(
-          2.0,  // minimum span
-          hullMaxClip * GS
+          GRID_DEFAULTS.minSpan,
+          hullMaxClip * spanPadding
         );
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
@@ -503,13 +446,7 @@ class WarpEngine {
         const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(
-            1,
-            Number(u.sectors ?? u.sectorCount ?? u.sectorStrobing ?? 1)
-        );
-
-        const phaseSplit = Number(u.phaseSplit ?? DEFAULT_UNIFORMS.phaseSplit);
-        const split = Number(u.split ?? Math.floor(phaseSplit * sectors));
+        const sectors = Math.max(1, bubbleParams.sectorStrobing || bubbleParams.sectorCount || 1);
         
         // Instantaneous (during a hot sector burst)
         const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
@@ -522,7 +459,7 @@ class WarpEngine {
         // 3) Build an amplitude consistent with the energy-side scaling.
         //    Keep purely visual normalization so it doesn't explode on screen.
         const A_phys = geoAmp * qSpoil * vdbAmp;    // physics-like chain
-        const norm = (this.uniforms && this.uniforms.vizNorm) || 1.0e-9;  // visual normalizer
+        const norm = (this.uniforms?.vizNorm || 1.0e-9);  // visual normalizer
         const A_vis_base = A_phys * norm;
         
         // 4) Choose instant vs average (no √duty hacks)
@@ -532,7 +469,7 @@ class WarpEngine {
         const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
-        const gain = (this.uniforms && this.uniforms.vizGain) || 2.0;  // Increased gain to make mode differences more visible
+        const gain = (this.uniforms?.vizGain || 4.0);
         const betaVis = A_used * gain;
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
@@ -580,53 +517,40 @@ class WarpEngine {
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
-        // split variable calculated below to avoid duplication
+        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
-        // Read mode uniforms with sane defaults and error protection
-        let dutyCycleUniform, sectorsUniform, splitUniform, viewAvgUniform;
-        try {
-            dutyCycleUniform = (this.uniforms && this.uniforms.dutyCycle) || 0.14;
-            sectorsUniform    = Math.max(1, Math.floor((this.uniforms && this.uniforms.sectors) || 1));
-            splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, (this.uniforms && this.uniforms.split) || 0));
-            viewAvgUniform    = (this.uniforms && this.uniforms.viewAvg !== undefined) ? this.uniforms.viewAvg : true;
-        } catch (e) {
-            // Safe defaults on any access error
-            dutyCycleUniform = 0.14;
-            sectorsUniform = 1;
-            splitUniform = 0;
-            viewAvgUniform = true;
-        }
+        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
+        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
+        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
 
-        const gammaGeoUniform = (this.uniforms && this.uniforms.gammaGeo) || 26;
-        const QburstUniform   = (this.uniforms && this.uniforms.Qburst) || 1e9;
-        const qSpoilUniform   = (this.uniforms && this.uniforms.deltaAOverA) || 1.0;
-        const gammaVdBUniform = (this.uniforms && this.uniforms.gammaVdB) || 2.86e5;
+        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
+        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
-        let hullAxesUniform, wallWidthUniform;
-        try {
-            hullAxesUniform = (this.uniforms && this.uniforms.hullAxes) || [503.5,132,86.5];
-            wallWidthUniform = (this.uniforms && this.uniforms.wallWidth) || 0.016;  // 16 nm default
-        } catch (e) {
-            hullAxesUniform = [503.5,132,86.5];
-            wallWidthUniform = 0.016;
-        }
+        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
-        // Physics amplitude (remove hidden normalization)
-        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ^3
-        const dutyFacUniform = viewAvgUniform ? Math.sqrt(dutyCycleUniform / sectorsUniform) : 1.0; // √(d/sectors) or 1
-        const betaPhysUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform * dutyFacUniform;
+        // Physics-consistent amplitude and averaged duty
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
         
-        // Visual gain (NO auto-normalization - keep true mode differences)
-        const vizGainUniform = (this.uniforms && this.uniforms.vizGain) || 1.0;
-        const betaVisUniform = betaPhysUniform * vizGainUniform;
+        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+        
+        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
+        const betaVisUniform  = betaUsedUniform * betaGainUniform;
 
         // Debug per mode (once per 60 frames)
-        if (this.uniforms && this.uniforms._debugHUD && (this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
-            console.log("🛰 uniforms", {
-                mode: (this.uniforms && this.uniforms.currentMode) || 'hover',
-                duty: dutyCycleUniform, sectors: sectorsUniform, useAvg: viewAvgUniform,
-                gammaGeo: gammaGeoUniform, qBurst: QburstUniform, qSpoil: qSpoilUniform, gammaVdB: gammaVdBUniform,
-                A_geo: A_geoUniform, dutyFac: dutyFacUniform, betaPhys: betaPhysUniform.toExponential(2)
+        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🧪 warp-mode", {
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                betaVis: betaVisUniform.toExponential(2)
             });
         }
         
@@ -691,9 +615,10 @@ class WarpEngine {
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
             
-            // --- Modest clamp (5-10% of shell radius, keep mode differences) ---
-            const maxPush = 0.10; // 10% radius limit
-            disp = Math.max(-maxPush, Math.min(maxPush, disp));
+            // --- Clamp tied to wall thickness to avoid uniform saturation ---
+            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% or 2.5×wall
+            if (disp >  maxPush) disp =  maxPush;
+            if (disp < -maxPush) disp = -maxPush;
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
@@ -725,12 +650,9 @@ class WarpEngine {
         console.log(`🔧 LOCAL WALL: Direction-dependent ρ-thickness for ellipsoidal geometry`);
         
         // Update uniforms for scientific consistency (using scene-scaled axes)
-        // Defensive writes to uniforms (ensure they exist first)
-        if (this.uniforms) {
-            this.uniforms.axesClip = axesScene;
-            this.uniforms.wallWidth = w_rho;
-            this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
-        }
+        this.uniforms.axesClip = axesScene;
+        this.uniforms.wallWidth = w_rho;
+        this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
         
         // Regenerate grid with proper span for hull size
         if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
@@ -804,12 +726,6 @@ class WarpEngine {
 
     _render() {
         const gl = this.gl;
-        
-        // Check if we need to recompute warp grid
-        if (this._needsRecalc) {
-            this._warpGridVertices();
-            this._needsRecalc = false;
-        }
         
         // Clear the screen
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
