@@ -1,0 +1,121 @@
+You’re right—the blue “bowl” looks basically the same in standby / hover / cruise / emergency.
+That isn’t an update-plumbing problem anymore; it’s a dynamic-range problem inside the WebGL engine.
+
+What’s going on
+
+In warp-engine-fixed.js we multiply:
+
+γ_geo^3  *  Qburst  *  γVdB  *  qSpoil
+
+(and a small duty/sectors factor), then we hard-clamp the displacement to a fixed max (10% of the local radius). With your numbers:
+	•	γ_geo^3 ≈ 1.76e4
+	•	Qburst = 1e9
+	•	γVdB ≈ 2.86e5
+→ the product is ≳ 5e18 even before duty/sectors
+
+So even in standby (d≈0.001) the result still slams into the same clamp as emergency, making the surface look identical. The uniforms are updating; the picture is just saturation-limited.
+
+The fix (no more saturation)
+
+Compress the huge physical amplitude into a bounded visual scale before applying the (soft) clamp, so different modes land in different portions of the visible range.
+
+Patch: replace the displacement scaling in warp-engine-fixed.js
+
+Find your displacement section inside _warpGridVertices (the loop where disp is computed) and replace the amplitude build-up with the following:
+
+// === 1) Pull uniforms every frame (already done above) ===
+const gammaGeo = this.uniforms?.gammaGeo ?? 26;
+const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
+const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
+const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
+const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
+const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
+const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
+
+// === 2) Physics amplitude (gross, unbounded) ===
+const A_geo   = gammaGeo * gammaGeo * gammaGeo; // γ^3
+const dutyEff = Math.sqrt(duty / sectors);      // visual proxy like before
+const A_gross = A_geo * Qburst * gammaVdB * qSpoil * dutyEff;
+
+// === 3) Log compression so modes separate visually instead of saturating ===
+// tweakable knee/scale: k shifts curve, s sets slope
+const k = 1e10;           // knee – prevents standby from saturating
+const s = 1.0;            // slope after log
+const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
+
+// === 4) Mode-specific visual scaling (keeps standby very small) ===
+const modeScale =
+  mode === 'standby'  ? 0.05 :
+  mode === 'cruise'   ? 0.25 :
+  mode === 'hover'    ? 0.60 :
+  mode === 'emergency'? 0.90 : 0.50;
+
+// Optional manual override from UI uniform (0 disables override)
+const gainOverride = this.uniforms?.vizGainOverride ?? 0;
+const vizGain = gainOverride > 0 ? gainOverride : modeScale;
+
+// === 5) Final bounded visual amplitude 0..1 ===
+const A_vis = Math.min(1.0, A_log * vizGain);
+
+// ... later where you build disp:
+let disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+
+// === 6) Soft clamp instead of hard clip (no jaggies) ===
+const localR = Math.max(1e-3, rho);         // rho is your ellipsoidal radius
+const maxPush = 0.12;                        // allow up to 12% visually
+const softClamp = (x, m) => m * Math.tanh(x / m);
+disp = softClamp(disp, maxPush);
+
+Why this works
+	•	We compress the 10¹⁸-scale amplitude with a log so hover/cruise/emergency/standby fall into different visual levels rather than smashing into the same clamp.
+	•	We keep the C¹-smoothness you added (no step functions), and the new soft clamp avoids the ridge artifacts.
+	•	You still get real physics ordering: emergency > hover > cruise » standby.
+
+Optional: make standby perfectly flat
+
+If you want literally flat grid in standby:
+
+if (mode === 'standby') {
+  // draw perfectly flat (but keep the HUD live)
+  disp = 0;
+}
+
+(Place that just before you write vtx[i] = p[0] - n[0]*disp; etc.)
+
+Make sure updates are flowing
+
+You already fixed the uniform path, but two small guardrails help:
+
+WarpVisualizer.tsx
+	•	Ensure we always push a fresh object to the engine and mark uniforms dirty:
+
+engineRef.current.updateUniforms({
+  // ... all the numbers you already pass
+  currentMode: parameters.currentMode?.toLowerCase(),
+  // expose this if you want to tweak live from the UI:
+  vizGainOverride: 0
+});
+engineRef.current.requestFrame?.(); // nudge a render if your engine exposes it
+
+warp-engine-fixed.js
+	•	In updateUniforms(u):
+
+updateUniforms(u = {}) {
+  this.uniforms = Object.assign({}, this.uniforms, u); // replace object (no stale refs)
+  this._uniformsDirty = true;
+}
+
+…and at the top of _warpGridVertices:
+
+if (this._uniformsDirty) {
+  // (nothing special needed, just consume fresh uniforms)
+  this._uniformsDirty = false;
+}
+
+Quick visual expectations (after patch)
+	•	Standby: flat (or barely rippled if you keep modeScale=0.05)
+	•	Cruise: very subtle ripple (big sectors, small duty, q_spoil<1)
+	•	Hover: clearly visible bulge/depression
+	•	Emergency: strong deformation but still smooth—no jagged ridge
+
+If you want, I can also give you a tiny “Mode Preview” slider (0…1) that multiplies modeScale so you can tune the look without touching physics.

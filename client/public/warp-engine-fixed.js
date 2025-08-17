@@ -30,6 +30,9 @@ class WarpEngine {
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL);
         
+        // Initialize uniform dirty flag
+        this._uniformsDirty = false;
+        
         // Grid rendering resources
         this.gridVertices = null;
         this.originalGridVertices = null; // Store original positions for warp calculations
@@ -555,6 +558,12 @@ class WarpEngine {
             });
         }
         
+        // Check for uniform updates
+        if (this._uniformsDirty) {
+            // (nothing special needed, just consume fresh uniforms)
+            this._uniformsDirty = false;
+        }
+
         // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
@@ -610,16 +619,54 @@ class WarpEngine {
             const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
                            : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
             
-            // --- Final displacement using physics-consistent amplitude ---
-            let disp = gridK * betaVisUniform * wallWin * front * sgn * gaussian_local;
-            
-            // Viewer-only visual gain
-            disp *= (this.uniforms?.vizGain || 4.0);
-            
-            // --- Clamp tied to wall thickness to avoid uniform saturation ---
-            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% or 2.5×wall
-            if (disp >  maxPush) disp =  maxPush;
-            if (disp < -maxPush) disp = -maxPush;
+            // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
+            // Pull uniforms for current mode and parameters
+            const gammaGeo = this.uniforms?.gammaGeo ?? 26;
+            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
+            const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
+            const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
+            const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
+            const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
+            const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
+
+            // Physics amplitude (gross, unbounded)
+            const A_geo   = gammaGeo * gammaGeo * gammaGeo; // γ^3
+            const dutyEff = Math.sqrt(duty / sectors);      // visual proxy like before
+            const A_gross = A_geo * Qburst * gammaVdB * qSpoil * dutyEff;
+
+            // Log compression so modes separate visually instead of saturating
+            const k = 1e10;           // knee – prevents standby from saturating
+            const s = 1.0;            // slope after log
+            const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
+
+            // Mode-specific visual scaling (keeps standby very small)
+            const modeScale =
+              mode === 'standby'  ? 0.05 :
+              mode === 'cruise'   ? 0.25 :
+              mode === 'hover'    ? 0.60 :
+              mode === 'emergency'? 0.90 : 0.50;
+
+            // Optional manual override from UI uniform (0 disables override)
+            const gainOverride = this.uniforms?.vizGainOverride ?? 0;
+            const vizGain = gainOverride > 0 ? gainOverride : modeScale;
+
+            // Final bounded visual amplitude 0..1
+            const A_vis = Math.min(1.0, A_log * vizGain);
+
+            // Special case: make standby perfectly flat if desired
+            let disp;
+            if (mode === 'standby') {
+                disp = 0; // perfectly flat grid for standby mode
+            } else {
+                // Normal displacement calculation with compressed amplitude
+                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+                
+                // Soft clamp instead of hard clip (no jaggies)
+                const localR = Math.max(1e-3, rho);         // rho is your ellipsoidal radius
+                const maxPush = 0.12;                        // allow up to 12% visually
+                const softClamp = (x, m) => m * Math.tanh(x / m);
+                disp = softClamp(disp, maxPush);
+            }
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
