@@ -474,7 +474,10 @@ class WarpEngine {
             : DEFAULT_AXES;
 
         const wallWidth = Number(u.wallWidth ?? DEFAULT_UNIFORMS.wallWidth);
-        const wallWidth_m = bubbleParams.wallWidth_m || (wallWidth * 100) || 6; // Physical wall thickness in meters
+        
+        // Compute physical wall thickness safely
+        const wall = Number.isFinite(wallWidth) && wallWidth > 0 ? wallWidth : 0.06;
+        const wallWidth_m = wall * Math.max(hullAxes[0], hullAxes[1], hullAxes[2]); // Convert back to meters for physics calc
         
         // Single scene scale based on long semi-axis (scientifically faithful)
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];

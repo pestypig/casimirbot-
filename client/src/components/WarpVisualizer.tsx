@@ -12,6 +12,19 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 
+// --- Wall width normalization helper ---
+function normalizeWallWidthMetersToUnit(
+  wallWidth_m: number | undefined,
+  a: number, b: number, c: number
+) {
+  // Engine expects a unit-space half-thickness.
+  // Use max semi-axis so the wall is conservative if value is missing.
+  const R = Math.max(a, b, c) || 1;
+  const meters = Number(wallWidth_m);
+  if (Number.isFinite(meters) && meters > 0) return meters / R;
+  return 0.06; // sane default in engine units
+}
+
 interface WarpVisualizerProps {
   parameters: {
     dutyCycle: number;
@@ -67,7 +80,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=21'; // SYNTAX FIX: Resolved duplicate split variable declaration
+        script.src = '/warp-engine-fixed.js?v=22'; // WALL WIDTH FIX: Bulletproof wall thickness handling
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -161,19 +174,20 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         viewAvg
       });
 
-      // Hull geometry from parameters or use needle hull defaults
-      const hull = parameters.hull || {
-        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-        a: 503.5, b: 132, c: 86.5
-      };
-      const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
+      // Pull hull/semi-axes with fallbacks
+      const hull = parameters.hull || {};
+      const a = Number(hull.a ?? hull.Lx_m / 2 ?? 503.5);
+      const b = Number(hull.b ?? hull.Ly_m / 2 ?? 132.0);
+      const c = Number(hull.c ?? hull.Lz_m / 2 ?? 86.5);
+
+      // Normalize wall width safely (meters → unit)
+      const wallWidth_norm = normalizeWallWidthMetersToUnit(
+        (parameters as any).wallWidth_m ?? hull.wallWidth_m, // may be undefined
+        a, b, c
+      );
       
       // Ensure hull axes are always numeric and valid
-      const hullAxes = [
-        num(hull.a, 503.5), 
-        num(hull.b, 132.0), 
-        num(hull.c, 86.5)
-      ];
+      const hullAxes = [a, b, c];
 
       // Mode reconnection: push all mode-related uniforms
       engineRef.current.updateUniforms({
@@ -192,7 +206,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Hull / wall (with safe fallbacks)
         hullAxes: hullAxes,
-        wallWidth: wallWidth,
+        wallWidth: wallWidth_norm,
         
         // Visual scaling (no auto-normalization)  
         vizGain: 2.0,                                    // Increased gain to highlight mode differences

@@ -1,0 +1,97 @@
+That error means somewhere we’re doing something like:
+
+const w = parameters.hull.wallWidth_m; // ❌ hull undefined → crash
+
+or hull exists but wallWidth_m does not. Fix is to (a) never read through hull.wallWidth_m without guarding, and (b) always compute a normalized wallWidth that the engine understands even if nothing came from the server.
+
+Below are two tiny, safe patches that eliminate the crash and make the bubble respond again.
+
+⸻
+
+1) Guard & normalize in WarpVisualizer.tsx
+
+Add a helper and use it where you build the uniforms for engine.updateUniforms(...).
+
+// --- Add near the top of the component file ---
+function normalizeWallWidthMetersToUnit(
+  wallWidth_m: number | undefined,
+  a: number, b: number, c: number
+) {
+  // Engine expects a unit-space half-thickness.
+  // Use max semi-axis so the wall is conservative if value is missing.
+  const R = Math.max(a, b, c) || 1;
+  const meters = Number(wallWidth_m);
+  if (Number.isFinite(meters) && meters > 0) return meters / R;
+  return 0.06; // sane default in engine units
+}
+
+Then, where you currently prepare geometry for updateUniforms (the block that sets hullAxes, wallWidth, etc.), replace any direct parameters.hull.wallWidth_m reads with:
+
+// Pull hull/semi-axes with fallbacks
+const hull = parameters.hull || {};
+const a = Number(hull.a ?? hull.Lx_m / 2 ?? 503.5);
+const b = Number(hull.b ?? hull.Ly_m / 2 ?? 132.0);
+const c = Number(hull.c ?? hull.Lz_m / 2 ?? 86.5);
+
+// Normalize wall width safely (meters → unit)
+const wallWidth_norm = normalizeWallWidthMetersToUnit(
+  (parameters as any).wallWidth_m ?? hull.wallWidth_m, // may be undefined
+  a, b, c
+);
+
+// … later in updateUniforms:
+engineRef.current.updateUniforms({
+  // geometry
+  hullAxes: [a, b, c],
+  wallWidth: wallWidth_norm,
+
+  // physics & mode (unchanged)
+  dutyCycle: dutyFrac,
+  gammaGeo: num(parameters.g_y),
+  Qburst: num(parameters.cavityQ),
+  deltaAOverA: num(parameters.qSpoilingFactor, 1),
+  gammaVdB: num(parameters.gammaVanDenBroeck, 1),
+  currentMode: mode,
+  sectors,
+  phaseSplit,
+  split: Math.floor(phaseSplit * sectors),
+  // …
+});
+
+This guarantees we never dereference hull.wallWidth_m and the engine always receives a valid wallWidth.
+
+⸻
+
+2) Double-lock default inside the engine
+
+You already added defaults, but make the read path bulletproof in client/public/warp-engine-fixed.js:
+
+// when assembling bubble params
+const bubble = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+
+// geometry with hard fallback
+const hullAxes = (Array.isArray(bubble.hullAxes) && bubble.hullAxes.length === 3)
+  ? bubble.hullAxes.map(Number)
+  : [503.5, 132.0, 86.5];
+
+const wallWidth = Number(bubble.wallWidth);
+const wall = Number.isFinite(wallWidth) && wallWidth > 0 ? wallWidth : 0.06;
+
+Then use hullAxes and wall in the displacement code.
+
+⸻
+
+Why this fixes it
+	•	We stop reading parameters.hull.wallWidth_m when hull is undefined.
+	•	We always pass a normalized wallWidth to the engine, even if the server doesn’t provide a physical thickness.
+	•	The engine still has its own fallback (0.06) so visuals won’t break if React loads slower than the script.
+
+If you still don’t see mode changes after this, open the console and verify uniforms change per mode:
+
+🛰 uniforms { sectors: 400, phaseSplit: 0.65, dutyCycle: 0.005, deltaAOverA: 0.625, … }
+
+If they do, but the visual looks similar, temporarily increase the visualization gain (only for display):
+
+this.uniforms.vizGain = 2.0; // or expose it from React for quick checks
+
+That will make hover (1 sector) vs cruise (400) differences obvious while we keep the physics untouched.
