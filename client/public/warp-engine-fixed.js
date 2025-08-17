@@ -8,6 +8,22 @@ const GRID_DEFAULTS = {
   divisions: 100       // more lines so a larger grid still looks dense
 };
 
+// ----- GLOBAL DEFAULTS (never undefined) -----
+const DEFAULT_AXES = [503.5, 132.0, 86.5];   // meters, semi-axes a,b,c
+const DEFAULT_UNIFORMS = {
+    hullAxes: DEFAULT_AXES.slice(),
+    wallWidth: 0.06,          // renderer-normalized shell half-thickness
+    sectors: 1,
+    sectorCount: 1,
+    phaseSplit: 0.5,
+    split: 0,
+    gammaGeo: 26,
+    Qburst: 1e9,
+    deltaAOverA: 1,
+    gammaVdB: 2.86e5,
+    dutyCycle: 0.14
+};
+
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
@@ -76,6 +92,18 @@ class WarpEngine {
             gammaVdB: 2.86e5,
             dutyCycle: 0.14
         };
+
+        // Ensure uniforms always exist with defaults
+        this.uniforms = Object.assign({}, DEFAULT_UNIFORMS, this.uniforms || {});
+        
+        // Quick verification dump
+        console.log('🛰 uniforms', {
+            hullAxes: this.uniforms.hullAxes,
+            wallWidth: this.uniforms.wallWidth,
+            sectors: this.uniforms.sectors,
+            phaseSplit: this.uniforms.phaseSplit,
+            gammaGeo: this.uniforms.gammaGeo
+        });
         
         // Initialize rendering pipeline
         this._setupCamera();
@@ -312,7 +340,7 @@ class WarpEngine {
     }
 
     updateUniforms(parameters = {}) {
-        if (!this.uniforms) this.uniforms = {};
+        if (!this.uniforms) this.uniforms = Object.assign({}, DEFAULT_UNIFORMS);
 
         // Accept sectors under any key
         const sectors =
@@ -438,12 +466,14 @@ class WarpEngine {
 
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Guard reads with defensive fallbacks
-        const hullAxes = (bubbleParams.hullAxes && bubbleParams.hullAxes.length === 3)
-            ? bubbleParams.hullAxes
-            : [503.5, 132.0, 86.5];
+        // Never read this.uniforms.hullAxes directly. Guard and fallback:
+        const u = this.uniforms || DEFAULT_UNIFORMS;
 
-        const wallWidth = Number(bubbleParams.wallWidth ?? 0.06);
+        const hullAxes = (Array.isArray(u.hullAxes) && u.hullAxes.length === 3)
+            ? u.hullAxes
+            : DEFAULT_AXES;
+
+        const wallWidth = Number(u.wallWidth ?? DEFAULT_UNIFORMS.wallWidth);
         const wallWidth_m = bubbleParams.wallWidth_m || (wallWidth * 100) || 6; // Physical wall thickness in meters
         
         // Single scene scale based on long semi-axis (scientifically faithful)
@@ -476,11 +506,13 @@ class WarpEngine {
         const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(1,
-            Number(bubbleParams.sectors ??
-                   bubbleParams.sectorCount ??
-                   bubbleParams.sectorStrobing ?? 1)
+        const sectors = Math.max(
+            1,
+            Number(u.sectors ?? u.sectorCount ?? u.sectorStrobing ?? 1)
         );
+
+        const phaseSplit = Number(u.phaseSplit ?? DEFAULT_UNIFORMS.phaseSplit);
+        const split = Number(u.split ?? Math.floor(phaseSplit * sectors));
         
         // Instantaneous (during a hot sector burst)
         const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
@@ -551,7 +583,7 @@ class WarpEngine {
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
-        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
+        // split variable calculated below to avoid duplication
         
         // Read mode uniforms with sane defaults and error protection
         let dutyCycleUniform, sectorsUniform, splitUniform, viewAvgUniform;
