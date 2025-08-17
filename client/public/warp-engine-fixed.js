@@ -21,7 +21,9 @@ const DEFAULT_UNIFORMS = {
     Qburst: 1e9,
     deltaAOverA: 1,
     gammaVdB: 2.86e5,
-    dutyCycle: 0.14
+    dutyCycle: 0.14,
+    gridScale: 1.0,           // unitless visual scale for grid spacing
+    vizGain: 1.0              // purely visual displacement gain
 };
 
 class WarpEngine {
@@ -69,7 +71,8 @@ class WarpEngine {
         };
 
         // Display-only controls (do NOT feed these back into pipeline math)
-        this.uniforms = {
+        // Defaults (extend, don't replace, if uniforms already exists)
+        this.uniforms = Object.assign({
             vizGain: 4.0,        // how exaggerated the bend looks
             colorByTheta: 1.0,   // 1=York colors, 0=solid sheet color
             vShip: 1.0,          // ship-frame speed scale for θ
@@ -77,21 +80,8 @@ class WarpEngine {
             axesClip: [0.40, 0.22, 0.22],
             driveDir: [1, 0, 0],
             hullAxes: [503.5, 132.0, 86.5], // Needle hull semi-axes default (prevents undefined errors)
-            
-            // --- SAFE DEFAULT UNIFORMS (comprehensive mode/physics defaults) ---
-            // mode defaults
-            sectors: 1,
-            sectorCount: 1,
-            phaseSplit: 0.5,
-            split: 0,
-
-            // physics defaults
-            gammaGeo: 26,
-            Qburst: 1e9,
-            deltaAOverA: 1,
-            gammaVdB: 2.86e5,
-            dutyCycle: 0.14
-        };
+            gridScale: 1.6       // unitless visual scale for grid spacing
+        }, this.uniforms || {});
 
         // Ensure uniforms always exist with defaults
         this.uniforms = Object.assign({}, DEFAULT_UNIFORMS, this.uniforms || {});
@@ -490,10 +480,14 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        
+        // Safe gridScale access with fallback
+        const gridScale = Number(u.gridScale);
+        const GS = Number.isFinite(gridScale) && gridScale > 0 ? gridScale : 1.6;
+        
         const targetSpan = Math.max(
-          GRID_DEFAULTS.minSpan,
-          hullMaxClip * spanPadding
+          2.0,  // minimum span
+          hullMaxClip * GS
         );
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
