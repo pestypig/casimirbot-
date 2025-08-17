@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Grid3X3, Gauge, Brain, Calendar, Terminal, Atom, Cpu, Send, AlertCircle, CheckCircle2, Zap, Database, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
-import { Tooltip } from "@/components/ui/Tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 
@@ -144,7 +144,7 @@ export default function HelixCore() {
   }, []);
   
   // Get metrics data for hull geometry
-  const { metrics } = useMetrics();
+  const { metrics: hullMetrics } = useMetrics();
   
   // Update solar system positions periodically
   useEffect(() => {
@@ -182,6 +182,9 @@ export default function HelixCore() {
     queryKey: ['/api/helix/metrics'],
     refetchInterval: 5000 // Update every 5 seconds
   });
+
+  // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
+  const [modeVersion, setModeVersion] = useState(0);
   
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -927,8 +930,9 @@ export default function HelixCore() {
               </CardContent>
             </Card>
 
-            {/* Natário Warp Bubble Visualizer */}
+            {/* Natário Warp Bubble Visualizer with Mode Tracking */}
             <WarpVisualizer
+              key={`mode-${pipelineState?.currentMode || 'hover'}-${pipelineState?.sectorStrobing || 1}-${pipelineState?.dutyCycle || 0.14}-v${modeVersion}`}
               parameters={{
                 dutyCycle: pipelineState?.dutyCycle || 0.14,
                 g_y: pipelineState?.gammaGeo || 26,
@@ -943,18 +947,18 @@ export default function HelixCore() {
                 qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
                 gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7,
                 // Hull geometry for ellipsoidal bell calculation (scientifically faithful)
-                hull: (metrics && metrics.hull) ? {
-                  ...metrics.hull,
-                  a: metrics.hull.a ?? metrics.hull.Lx_m / 2,
-                  b: metrics.hull.b ?? metrics.hull.Ly_m / 2,
-                  c: metrics.hull.c ?? metrics.hull.Lz_m / 2
+                hull: (hullMetrics && hullMetrics.hull) ? {
+                  ...hullMetrics.hull,
+                  a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                  b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                  c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
                 } : {
                   Lx_m: 1007, Ly_m: 264, Lz_m: 173,
                   a: 503.5, b: 132, c: 86.5,
                   wallThickness_m: 6.0
                 },
                 // Pass physical wall thickness (meters) instead of normalized value
-                wallWidth_m: (metrics && metrics.hull?.wallThickness_m) ? metrics.hull.wallThickness_m : 6.0,
+                wall: { w_norm: 0.016 },
                 
                 // Optional grid scaling override (default: 1.6x hull span padding)
                 gridScale: 1.6  // Can be made configurable via UI if needed
@@ -994,7 +998,9 @@ export default function HelixCore() {
               })}
               setMode={(mode) => {
                 if (switchMode) {
-                  switchMode(mode as any);
+                  switchMode.mutate(mode as any);
+                  // Bump mode version to force WarpVisualizer remount
+                  setModeVersion(v => v + 1);
                   // Luma whisper on mode change
                   const whispers = {
                     'Hover': "Form first. Speed follows.",

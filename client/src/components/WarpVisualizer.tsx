@@ -127,7 +127,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // === RECONNECT: push all mode-related uniforms ===
+      // === COMPREHENSIVE MODE TRACKING: push all mode-related uniforms ===
       const mode = parameters.currentMode ?? "hover";
       
       // Helper to ensure numeric values
@@ -148,17 +148,17 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Smooth strobe split phase
       const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
       
-      // DEBUG
-      console.log("🎛️ uniforms-to-engine", {
+      // DEBUG: Show the exact values being passed
+      console.log("🎛️ uniforms-to-engine (v9 naming fix)", {
         mode,
         dutyFrac,
-        sectors,
+        sectors,     // ✅ NOT sectorCount 
         phaseSplit,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         qSpoil: parameters.qSpoilingFactor,
         gammaVdB: parameters.gammaVanDenBroeck,
-        viewAvg
+        viewAvg      // ✅ NOT useAvg
       });
 
       // Hull geometry from parameters or use needle hull defaults
@@ -168,7 +168,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       };
       const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
 
-      // Mode reconnection: push all mode-related uniforms with exact names
+      // Enhanced mode reconnection: push all mode-related uniforms with exact names
       engineRef.current.updateUniforms({
         // Mode knobs (exact names the engine reads)
         currentMode: mode,
@@ -187,8 +187,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
         wallWidth,
         
-        // Visual scaling
-        vizGain: 1.0,
+        // Visual scaling for clear mode differences
+        vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
@@ -198,8 +198,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         tsRatio: num(parameters.tsRatio, 4100)
       });
 
-      // IMPORTANT: force recompute on mode change
+      // CRITICAL: force immediate visual update on parameter change
       if (engineRef.current.requestRewarp) {
+        console.log('🔄 Forcing rewarp after uniform update');
         engineRef.current.requestRewarp();
       }
 
