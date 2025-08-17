@@ -481,7 +481,7 @@ class WarpEngine {
         // 3) Build an amplitude consistent with the energy-side scaling.
         //    Keep purely visual normalization so it doesn't explode on screen.
         const A_phys = geoAmp * qSpoil * vdbAmp;    // physics-like chain
-        const norm = (this.uniforms?.vizNorm || 1.0e-9);  // visual normalizer
+        const norm = (this.uniforms && this.uniforms.vizNorm) || 1.0e-9;  // visual normalizer
         const A_vis_base = A_phys * norm;
         
         // 4) Choose instant vs average (no √duty hacks)
@@ -491,7 +491,7 @@ class WarpEngine {
         const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
         
         // 5) Optional viewer gain (like your old betaGain) to make it legible
-        const gain = (this.uniforms?.vizGain || 2.0);  // Increased gain to make mode differences more visible
+        const gain = (this.uniforms && this.uniforms.vizGain) || 2.0;  // Increased gain to make mode differences more visible
         const betaVis = A_used * gain;
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
@@ -542,18 +542,18 @@ class WarpEngine {
         const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
         
         // Read mode uniforms with sane defaults (renamed to avoid conflicts)
-        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
-        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
-        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
-        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
+        const dutyCycleUniform = (this.uniforms && this.uniforms.dutyCycle) || 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor((this.uniforms && this.uniforms.sectors) || 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, (this.uniforms && this.uniforms.split) || 0));
+        const viewAvgUniform    = (this.uniforms && this.uniforms.viewAvg !== undefined) ? this.uniforms.viewAvg : true;
 
-        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
-        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
-        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
-        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
+        const gammaGeoUniform = (this.uniforms && this.uniforms.gammaGeo) || 26;
+        const QburstUniform   = (this.uniforms && this.uniforms.Qburst) || 1e9;
+        const qSpoilUniform   = (this.uniforms && this.uniforms.deltaAOverA) || 1.0;
+        const gammaVdBUniform = (this.uniforms && this.uniforms.gammaVdB) || 2.86e5;
 
-        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
-        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
+        const hullAxesUniform = (this.uniforms && this.uniforms.hullAxes) || [503.5,132,86.5];
+        const wallWidthUniform = (this.uniforms && this.uniforms.wallWidth) || 0.016;  // 16 nm default
 
         // Physics amplitude (remove hidden normalization)
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ^3
@@ -561,13 +561,13 @@ class WarpEngine {
         const betaPhysUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform * dutyFacUniform;
         
         // Visual gain (NO auto-normalization - keep true mode differences)
-        const vizGainUniform = this.uniforms?.vizGain ?? 1.0;
+        const vizGainUniform = (this.uniforms && this.uniforms.vizGain) || 1.0;
         const betaVisUniform = betaPhysUniform * vizGainUniform;
 
         // Debug per mode (once per 60 frames)
-        if (this.uniforms?._debugHUD && (this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+        if (this.uniforms && this.uniforms._debugHUD && (this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
             console.log("🛰 uniforms", {
-                mode: this.uniforms?.currentMode,
+                mode: (this.uniforms && this.uniforms.currentMode) || 'hover',
                 duty: dutyCycleUniform, sectors: sectorsUniform, useAvg: viewAvgUniform,
                 gammaGeo: gammaGeoUniform, qBurst: QburstUniform, qSpoil: qSpoilUniform, gammaVdB: gammaVdBUniform,
                 A_geo: A_geoUniform, dutyFac: dutyFacUniform, betaPhys: betaPhysUniform.toExponential(2)
@@ -669,9 +669,12 @@ class WarpEngine {
         console.log(`🔧 LOCAL WALL: Direction-dependent ρ-thickness for ellipsoidal geometry`);
         
         // Update uniforms for scientific consistency (using scene-scaled axes)
-        this.uniforms.axesClip = axesScene;
-        this.uniforms.wallWidth = w_rho;
-        this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
+        // Defensive writes to uniforms (ensure they exist first)
+        if (this.uniforms) {
+            this.uniforms.axesClip = axesScene;
+            this.uniforms.wallWidth = w_rho;
+            this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
+        }
         
         // Regenerate grid with proper span for hull size
         if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
