@@ -356,7 +356,12 @@ class WarpEngine {
         }
         
         // Apply warp deformation to grid with mode-specific enhancements
+        this._needsRecalc = true;  // flag for recompute
         this._updateGrid();
+    }
+
+    requestRewarp() {
+        this._needsRecalc = true;
     }
     
     _calculateModeEffects(params) {
@@ -533,24 +538,22 @@ class WarpEngine {
         const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
         const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
-        // Physics-consistent amplitude and averaged duty
-        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
-        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
+        // Physics amplitude (remove hidden normalization)
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ^3
+        const dutyFacUniform = viewAvgUniform ? Math.sqrt(dutyCycleUniform / sectorsUniform) : 1.0; // √(d/sectors) or 1
+        const betaPhysUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform * dutyFacUniform;
         
-        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
-        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-        
-        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
-        const betaVisUniform  = betaUsedUniform * betaGainUniform;
+        // Visual gain (NO auto-normalization - keep true mode differences)
+        const vizGainUniform = this.uniforms?.vizGain ?? 1.0;
+        const betaVisUniform = betaPhysUniform * vizGainUniform;
 
         // Debug per mode (once per 60 frames)
-        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
-            console.log("🧪 warp-mode", {
-                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
-                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
-                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
-                betaVis: betaVisUniform.toExponential(2)
+        if (this.uniforms?._debugHUD && (this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🛰 uniforms", {
+                mode: this.uniforms?.currentMode,
+                duty: dutyCycleUniform, sectors: sectorsUniform, useAvg: viewAvgUniform,
+                gammaGeo: gammaGeoUniform, qBurst: QburstUniform, qSpoil: qSpoilUniform, gammaVdB: gammaVdBUniform,
+                A_geo: A_geoUniform, dutyFac: dutyFacUniform, betaPhys: betaPhysUniform.toExponential(2)
             });
         }
         
@@ -615,10 +618,9 @@ class WarpEngine {
             // Viewer-only visual gain
             disp *= (this.uniforms?.vizGain || 4.0);
             
-            // --- Clamp tied to wall thickness to avoid uniform saturation ---
-            const maxPush = Math.min(0.06, 2.5 * w_rho_local); // ≤6% or 2.5×wall
-            if (disp >  maxPush) disp =  maxPush;
-            if (disp < -maxPush) disp = -maxPush;
+            // --- Modest clamp (5-10% of shell radius, keep mode differences) ---
+            const maxPush = 0.10; // 10% radius limit
+            disp = Math.max(-maxPush, Math.min(maxPush, disp));
             
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
@@ -726,6 +728,12 @@ class WarpEngine {
 
     _render() {
         const gl = this.gl;
+        
+        // Check if we need to recompute warp grid
+        if (this._needsRecalc) {
+            this._warpGridVertices();
+            this._needsRecalc = false;
+        }
         
         // Clear the screen
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

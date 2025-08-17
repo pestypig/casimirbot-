@@ -175,20 +175,21 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         dutyCycle: dutyFrac,
         sectors,
         split: phaseSplit,
-        viewAvg,
+        useAvg: viewAvg,
 
-        // Amplification chain
+        // Physics chain (exact parameter names)
         gammaGeo: num(parameters.g_y, 26),
         Qburst: num(parameters.cavityQ, 1e9),
-        deltaAOverA: num(parameters.qSpoilingFactor, 1),
+        qSpoilingFactor: num(parameters.qSpoilingFactor, 1),
         gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
 
         // Hull / wall
         hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
         wallWidth,
         
-        // Visual scaling
-        betaGain: 0.15,                                  // Reduced to avoid clamp saturation
+        // Visual scaling (no auto-normalization)
+        vizGain: 1.0,                                    // Keep true mode differences
+        _debugHUD: true,                                 // Enable debug output
         
         // Legacy parameters for backward compatibility
         sagDepth_nm: num(parameters.sagDepth_nm),
@@ -196,6 +197,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         exoticMass_kg: num(parameters.exoticMass_kg),
         tsRatio: num(parameters.tsRatio, 4100)
       });
+      
+      // IMPORTANT: Force recompute of warp grid
+      engineRef.current.requestRewarp?.();
 
       // Debug output to console
       console.table(engineRef.current.uniforms);
