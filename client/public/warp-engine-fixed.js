@@ -335,7 +335,6 @@ class WarpEngine {
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: N(parameters.epsilonTilt || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
-            tiltVizGain: N(parameters.tiltVizGain || 0),
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -694,34 +693,34 @@ class WarpEngine {
                 disp = blended;
             }
             
-            // ---------- Interior gravity (shift-vector) visualization ----------
-            const epsTilt   = this.uniforms?.epsilonTilt || 0.0;
-            const tiltGain  = this.uniforms?.tiltVizGain || 0.0;
-            const betaTilt  = this.uniforms?.betaTiltVec || [0,-1,0];
-            
-            if (epsTilt > 0 && tiltGain > 0) {
-              // Smooth interior mask: 1 deep inside, 0 outside the wall
-              // (w_rho is your normalized wall thickness around rho≈1)
-              const maskInterior = (() => {
-                const inner = 1.0 - 3.0*w_rho;   // well inside bubble
-                const outer = 1.0 - 0.8*w_rho;   // near inner wall
-                // smoothstep(inner, outer, rho) gives 0→1; invert so 1 inside
-                const t = Math.max(0, Math.min(1, (rho - inner) / (outer - inner)));
-                return 1.0 - (t*t*(3 - 2*t));    // smoothstep inverted
+            // --- Gentle interior "shift vector" tilt for artificial gravity ---
+            // uniforms: epsilonTilt (small, dimensionless), betaTiltVec = [dx,dy,dz] ("down" dir)
+            const epsTilt = Math.max(0, (this.uniforms?.epsilonTilt ?? 0));
+            if (epsTilt > 0) {
+              // Normalize tilt direction
+              const b = this.uniforms?.betaTiltVec || [0, -1, 0];
+              const bLen = Math.hypot(b[0], b[1], b[2]) || 1;
+              const bHat = [b[0] / bLen, b[1] / bLen, b[2] / bLen];
+
+              // Smooth interior window: 1 deep inside, 0 outside wall (C¹)
+              // Centered at ρ=1 with width ≈ 3 w_rho
+              const wIn = (() => {
+                const a = Math.max(1e-6, 1.0 - 2.5 * w_rho);  // start of roll-off (inside)
+                const bnd = Math.min(2.0, 1.0 + 2.5 * w_rho); // end near exterior
+                // smoothstep reversed so it is near 1 inside and fades to 0 across wall
+                const t = Math.min(1, Math.max(0, (rho - a) / (bnd - a)));
+                return 1.0 - (t * t * (3 - 2 * t)); // 1 - smoothstep(a,bnd,ρ)
               })();
 
-              // Direction for "down" (normalize once)
-              const bLen = Math.hypot(betaTilt[0], betaTilt[1], betaTilt[2]) || 1.0;
-              const bDir = [betaTilt[0]/bLen, betaTilt[1]/bLen, betaTilt[2]/bLen];
+              // Use fore–aft coordinate to create a *slope* (constant β-gradient) inside.
+              // Project point onto drive direction (+x in scene units) and scale gently.
+              const xSlope = (p[0] / axesScene[0]);         // normalized fore–aft coordinate
+              const tiltMag = epsTilt * xSlope * wIn;       // small, smooth gradient inside
 
-              // We add a *planar* offset along bDir to make the cabin look gently tilted.
-              // Scale = epsTilt * tiltVizGain, masked to interior.
-              const tiltMag = epsTilt * tiltGain * maskInterior;
-
-              // Apply directly in world/scene coords so it's obvious in the central deck
-              vtx[i    ] += bDir[0] * tiltMag;
-              vtx[i + 1] += bDir[1] * tiltMag;
-              vtx[i + 2] += bDir[2] * tiltMag;
+              // Apply the interior tilt as a displacement in the "down" direction bHat
+              vtx[i]     += bHat[0] * tiltMag;
+              vtx[i + 1] += bHat[1] * tiltMag;
+              vtx[i + 2] += bHat[2] * tiltMag;
             }
 
             // Canonical Natário wall displacement (unchanged)
