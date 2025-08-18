@@ -1,0 +1,128 @@
+Great news: the patch you have in place **is wired correctly** from React → WebGL:
+
+* In `WarpVisualizer.tsx` you already send `epsilonTilt` and `betaTiltVec` inside `engineRef.current.updateUniforms({...})` (see the “🎛️ uniforms-to-engine (v9…)” log).&#x20;
+* The part that makes the middle look unchanged is simply scale: the *physically correct* value you’re sending is tiny:
+
+$$
+\varepsilon_{\text{tilt}}=\frac{g_{\text{target}}\,R_{\text{geom}}}{c^2}\approx 
+\frac{(0.5\sim 3)\,\mathrm{m/s^2}\times 179\,\mathrm{m}}{(3\times10^8)^2}
+\sim 10^{-15}
+$$
+
+That’s perfect for math, but visually it disappears next to the other (greatly magnified-for-display) curvature terms.
+
+Below is a **minimal, safe patch** that adds a **separate visualization gain** for the shift-vector tilt, and applies it only inside the bubble with a smooth falloff. This keeps the physics number honest while letting you *see* the effect at the same scale as the other deformations.
+
+---
+
+## 1) `WarpVisualizer.tsx` — pass a visual gain
+
+Add a `tiltVizGain` uniform (pick 1e14–1e15 to start; you can tune by mode).
+
+```diff
+// inside the big updateUniforms({...}) call
+   engineRef.current.updateUniforms({
+     // ...existing uniforms...
+
++    // ← purely visual multiplier so ε_tilt (≈1e-15) becomes visible
++    tiltVizGain: (parameters.currentMode === 'emergency')
++      ? 1e15
++      : (parameters.currentMode === 'hover')
++      ? 6e14
++      : (parameters.currentMode === 'cruise')
++      ? 4e14
++      : 0, // standby: no tilt
+   });
+```
+
+(You can also surface this as a slider later.)
+
+
+
+---
+
+## 2) `client/public/warp-engine-fixed.js` — consume the gain and warp the **interior** plane
+
+### (a) Accept the new uniform
+
+Find your `updateUniforms(params)` and extend the merge:
+
+```diff
+updateUniforms(params = {}) {
+  this.uniforms = Object.assign({}, this.uniforms, {
+     // existing…
+     epsilonTilt: this._num(params.epsilonTilt, this.uniforms.epsilonTilt || 0),
+     betaTiltVec: (Array.isArray(params.betaTiltVec) ? params.betaTiltVec : this.uniforms.betaTiltVec || [0,-1,0]),
++    tiltVizGain: this._num(params.tiltVizGain, this.uniforms.tiltVizGain || 0),
+  }, params);
+  this.requestRewarp && this.requestRewarp();
+}
+```
+
+### (b) Apply a smooth, interior-only tilt
+
+Inside your grid warping loop (the place you compute `rho`, `n`, the bell, etc.), add this *after* the Natário displacement is computed:
+
+```diff
+// existing Natário displacement has already moved (vtx[i..i+2])
+
+// ---------- Interior gravity (shift-vector) visualization ----------
+const epsTilt   = this.uniforms.epsilonTilt || 0.0;
+const tiltGain  = this.uniforms.tiltVizGain || 0.0;
+const betaTilt  = this.uniforms.betaTiltVec || [0,-1,0];
+
+// Smooth interior mask: 1 deep inside, 0 outside the wall
+// (w_rho is your normalized wall thickness around rho≈1)
+const maskInterior = (() => {
+  const inner = 1.0 - 3.0*w_rho;   // well inside bubble
+  const outer = 1.0 - 0.8*w_rho;   // near inner wall
+  // smoothstep(inner, outer, rho) gives 0→1; invert so 1 inside
+  const t = Math.max(0, Math.min(1, (rho - inner) / (outer - inner)));
+  return 1.0 - (t*t*(3 - 2*t));    // smoothstep inverted
+})();
+
+// Direction for "down" (normalize once)
+const bLen = Math.hypot(betaTilt[0], betaTilt[1], betaTilt[2]) || 1.0;
+const bDir = [betaTilt[0]/bLen, betaTilt[1]/bLen, betaTilt[2]/bLen];
+
+// We add a *planar* offset along bDir to make the cabin look gently tilted.
+// Scale = epsTilt * tiltVizGain, masked to interior.
+const tiltMag = epsTilt * tiltGain * maskInterior;
+
+// Apply directly in world/scene coords so it’s obvious in the central deck
+vtx[i    ] += bDir[0] * tiltMag;
+vtx[i + 1] += bDir[1] * tiltMag;
+vtx[i + 2] += bDir[2] * tiltMag;
+```
+
+**Why planar (not along the ellipsoid normal)?**
+Your Natário bulge already displaces along the shell’s normal. The shift-vector “interior gravity” we want to *see* as a gentle cabin-down bias. An additive planar bias along `β_tilt` makes the **middle** visibly slope without dragging the outer field—exactly what your screenshot suggested.
+
+---
+
+## 3) How to scale it “as much as the other curvatures”
+
+* Keep the **physics value** from the panel (`ε_tilt ≈ 10⁻¹⁵`) intact.
+* Use **`tiltVizGain`** as the only knob for visibility:
+
+  * Start `4e14` (cruise), `6e14` (hover), `1e15` (emergency), `0` (standby).
+  * If it’s still subtle, bump by a factor of 2 until you can clearly see the cabin slope while the outside stays almost unchanged.
+* The interior mask ensures the tilt fades out before the wall so you don’t get weird edges.
+
+---
+
+## 4) Quick sanity checklist
+
+1. Open DevTools console on `/helix-core`. You should see:
+
+```
+🎛️ uniforms-to-engine ... epsilonTilt: ~1e-15, tiltVizGain: 6e14, betaTiltVec: [0,-1,0]
+```
+
+2. After mode changes, confirm `engineRef.current.uniforms.tiltVizGain` updates (you already `console.table` the uniforms).
+
+3. In **Standby** the tilt should be completely gone (gain = 0). In **Hover/Emergency** the deck should look slightly “downhill” toward `β_tilt`.
+
+---
+
+If you’d like, I can also add a tiny “Tilt gain” slider under the Shift Vector panel so you can dial it live without touching code.

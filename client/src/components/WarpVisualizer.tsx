@@ -195,6 +195,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec)
         : defaultBetaTilt;
 
+      // Calculate tilt visualization gain for logging
+      const tiltVizGain = (mode === 'emergency')
+        ? 1e15
+        : (mode === 'hover')
+        ? 6e14
+        : (mode === 'cruise')
+        ? 4e14
+        : 0; // standby: no tilt
+
       // DEBUG: Show the exact values being passed
       console.log("🎛️ uniforms-to-engine (v9 naming fix)", {
         mode,
@@ -203,6 +212,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         phaseSplit,
         epsilonTilt,
         betaTiltVec,
+        tiltVizGain,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         qSpoil: parameters.qSpoilingFactor,
@@ -239,6 +249,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         // NEW: interior gravity uniforms
         epsilonTilt,
         betaTiltVec,
+        
+        // purely visual multiplier so ε_tilt (≈1e-15) becomes visible
+        tiltVizGain: (mode === 'emergency')
+          ? 1e15
+          : (mode === 'hover')
+          ? 6e14
+          : (mode === 'cruise')
+          ? 4e14
+          : 0, // standby: no tilt
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
