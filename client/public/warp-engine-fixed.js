@@ -332,6 +332,9 @@ class WarpEngine {
             wallWidth: parameters.wallWidth || 0.06,
             axesClip: parameters.axesClip || [0.4, 0.22, 0.22],
             driveDir: parameters.driveDir || [1, 0, 0],
+            // NEW: Artificial gravity tilt parameters
+            epsilonTilt: N(parameters.epsilonTilt || 0),
+            betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -425,7 +428,10 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
-        const wallWidth_m = bubbleParams.wallWidth_m || (bubbleParams.wallWidth * 100) || 6; // Physical wall thickness in meters
+        // Enhanced wall thickness handling (meters vs normalized)
+        const wallWidth_m = (bubbleParams.wallWidth_m ?? null) != null
+            ? bubbleParams.wallWidth_m
+            : (bubbleParams.wallWidth ?? 0.06) * 100; // Convert normalized to meters if needed
         
         // Single scene scale based on long semi-axis (scientifically faithful)
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];

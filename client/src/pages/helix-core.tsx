@@ -983,7 +983,7 @@ export default function HelixCore() {
                 currentMode: pipeline?.currentMode || 'hover',
                 sectorStrobing: pipeline?.sectorStrobing || 1,
                 qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
-                gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 6.57e7,
+                gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
                 // Hull geometry for ellipsoidal bell calculation (scientifically faithful)
                 hull: (hullMetrics && hullMetrics.hull) ? {
                   ...hullMetrics.hull,
