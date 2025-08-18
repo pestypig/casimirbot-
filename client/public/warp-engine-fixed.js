@@ -69,7 +69,9 @@ class WarpEngine {
             driveDir: [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
-            betaTiltVec: [0, -1, 0]  // tilt direction vector (default: -Y = "down")
+            betaTiltVec: [0, -1, 0],  // tilt direction vector (default: -Y = "down")
+            tiltVizGain: 0,      // visualization multiplier for epsilonTilt
+            tiltMaxMeters: 0.0   // hard cap on tilt displacement in meters
         };
         
         // Initialize rendering pipeline
@@ -335,6 +337,8 @@ class WarpEngine {
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: N(parameters.epsilonTilt || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
+            tiltVizGain: N(parameters.tiltVizGain || 0),
+            tiltMaxMeters: N(parameters.tiltMaxMeters || 0.0),
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -694,34 +698,51 @@ class WarpEngine {
             }
             
             // --- Gentle interior "shift vector" tilt for artificial gravity ---
-            // uniforms: epsilonTilt (small, dimensionless), betaTiltVec = [dx,dy,dz] ("down" dir)
-            const epsTilt = Math.max(0, (this.uniforms?.epsilonTilt ?? 0));
-            if (epsTilt > 0) {
-              // Normalize tilt direction
-              const b = this.uniforms?.betaTiltVec || [0, -1, 0];
-              const bLen = Math.hypot(b[0], b[1], b[2]) || 1;
-              const bHat = [b[0] / bLen, b[1] / bLen, b[2] / bLen];
+            // ---------- Interior gravity (shift-vector) visualization ----------
+            const epsTilt  = this.uniforms.epsilonTilt || 0.0;
+            const gain     = this.uniforms.tiltVizGain || 0.0;
+            const capM     = this.uniforms.tiltMaxMeters ?? 0.0;
+            const bTilt    = this.uniforms.betaTiltVec || [0,-1,0];
 
-              // Smooth interior window: 1 deep inside, 0 outside wall (C¹)
-              // Centered at ρ=1 with width ≈ 3 w_rho
-              const wIn = (() => {
-                const a = Math.max(1e-6, 1.0 - 2.5 * w_rho);  // start of roll-off (inside)
-                const bnd = Math.min(2.0, 1.0 + 2.5 * w_rho); // end near exterior
-                // smoothstep reversed so it is near 1 inside and fades to 0 across wall
-                const t = Math.min(1, Math.max(0, (rho - a) / (bnd - a)));
-                return 1.0 - (t * t * (3 - 2 * t)); // 1 - smoothstep(a,bnd,ρ)
-              })();
+            // Normalize tilt direction
+            const bL = Math.hypot(bTilt[0], bTilt[1], bTilt[2]) || 1.0;
+            const bDir = [bTilt[0]/bL, bTilt[1]/bL, bTilt[2]/bL];
 
-              // Use fore–aft coordinate to create a *slope* (constant β-gradient) inside.
-              // Project point onto drive direction (+x in scene units) and scale gently.
-              const xSlope = (p[0] / axesScene[0]);         // normalized fore–aft coordinate
-              const tiltMag = epsTilt * xSlope * wIn;       // small, smooth gradient inside
+            /**
+             * Masks:
+             *  - maskInterior: 1 well inside bubble, 0 near/after wall (ρ≈1).
+             *  - maskCenter: emphasizes cabin center, fades toward inner wall.
+             */
+            const maskInterior = (() => {
+              const inner = 1.0 - 3.0*w_rho;  // well inside wall
+              const outer = 1.0 - 0.8*w_rho;  // near wall
+              const t = Math.max(0, Math.min(1, (rho - inner) / (outer - inner)));
+              const smooth = t*t*(3 - 2*t);   // smoothstep
+              return 1.0 - smooth;            // 1 inside, 0 near wall
+            })();
 
-              // Apply the interior tilt as a displacement in the "down" direction bHat
-              vtx[i]     += bHat[0] * tiltMag;
-              vtx[i + 1] += bHat[1] * tiltMag;
-              vtx[i + 2] += bHat[2] * tiltMag;
+            const maskCenter = (() => {
+              // fade from center (ρ≈0) to mid-interior; stronger at center
+              const t = Math.max(0, Math.min(1, (rho - 0.30) / (0.90 - 0.30)));
+              const smooth = t*t*(3 - 2*t);
+              return 1.0 - 0.8*smooth;        // ~1 at center, ~0.2 approaching wall
+            })();
+
+            const mask = maskInterior * maskCenter;
+
+            // Raw visual magnitude (meters). ε_tilt (~1e-15) × gain (1e11…1e12) ⇒ 1e-4…1e-3 m
+            let tiltMag = epsTilt * gain * mask;
+
+            // Hard cap for sanity (meters)
+            if (capM > 0) {
+              if (tiltMag >  capM) tiltMag =  capM;
+              if (tiltMag < -capM) tiltMag = -capM;
             }
+
+            // Apply as a planar bias so the deck visibly slopes "down" inside the bubble.
+            vtx[i    ] += bDir[0] * tiltMag;
+            vtx[i + 1] += bDir[1] * tiltMag;
+            vtx[i + 2] += bDir[2] * tiltMag;
 
             // Canonical Natário wall displacement (unchanged)
             vtx[i]     = vtx[i]     - n[0] * disp;
