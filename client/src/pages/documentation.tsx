@@ -203,31 +203,31 @@ export default function Documentation() {
                 </CardContent>
               </Card>
 
-              {/* Template for New Document */}
-              {/* 
+              {/* Artificial Gravity Paper */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Your Document Title Here
+                    A Gentle "Tilt" Inside Natário Bubble
                   </CardTitle>
                   <CardDescription>
-                    Brief description of what this document covers
+                    Artificial gravity implementation through ultra-small linear β-gradients (0.1g-0.5g)
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     <p><strong>Key Topics:</strong></p>
                     <ul className="list-disc list-inside space-y-1 mt-2">
-                      <li>Key topic 1</li>
-                      <li>Key topic 2</li>
-                      <li>Key topic 3</li>
-                      <li>Key topic 4</li>
+                      <li>Programmable phase array symmetry breaking</li>
+                      <li>Linear β-gradient across cabin interior</li>
+                      <li>Ford-Roman quantum inequality compliance</li>
+                      <li>Comfort ceiling (0.1g) vs QI ceiling (0.5g) limits</li>
+                      <li>Structural stress analysis and navigation considerations</li>
                     </ul>
                   </div>
                   <div className="flex gap-2">
                     <Button 
-                      onClick={() => window.open('/attached_assets/your-filename.pdf', '_blank')}
+                      onClick={() => window.open('/attached_assets/A gentle tilt inside Natário bubble a whisper of artificial gravity 0.5g_1755482720186.pdf', '_blank')}
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function Documentation() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => window.open('/attached_assets/your-filename.pdf', '_blank')}
+                      onClick={() => window.open('/attached_assets/A gentle tilt inside Natário bubble a whisper of artificial gravity 0.5g_1755482720186.pdf', '_blank')}
                       className="flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />
@@ -244,7 +244,6 @@ export default function Documentation() {
                   </div>
                 </CardContent>
               </Card>
-              */}
             </div>
           </TabsContent>
 
