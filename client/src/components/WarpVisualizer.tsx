@@ -195,38 +195,37 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         hover:     0.35,
         emergency: 0.55,
       };
-      const tiltGain = typeof (parameters as any).tiltGain === 'number'
-        ? (parameters as any).tiltGain
-        : (tiltGains[mode] ?? 0.55);
+      // Visual scaling (can be given by panel; otherwise per-mode)
+      const tiltGain =
+        typeof (parameters as any).tiltGain === 'number'
+          ? Number((parameters as any).tiltGain)
+          : Number(tiltGains[mode] ?? 0.35);
       
-      // Mode-specific tilt defaults (replace physics values)
+      // --- Resolve interior tilt from Shift panel OR per-mode default ---
+      const epsFromPanel = Number(
+        (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt)
+      );
+      const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
+
+      // Per-mode demo defaults (used only if panel isn't supplying a usable value)
       const modeTiltDefaults: Record<string, number> = {
         emergency: 0.035,
         hover:     0.020,
         cruise:    0.012,
         standby:   0.000,
       };
-      
-      // Resolve mode + tilt uniforms with mode-specific defaults
-      const epsilonTilt = modeTiltDefaults[mode] ?? 0;
+
+      const epsilonTilt = hasGoodPanelEps
+        ? epsFromPanel
+        : (modeTiltDefaults[mode] ?? 0.0);
+
+      // Direction
       const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
-        ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+        ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
         : defaultBetaTilt;
 
-      // DEBUG: Show the exact values being passed
-      console.log("🎛️ uniforms-to-engine (v9 naming fix)", {
-        mode,
-        dutyFrac,
-        sectors,     // ✅ NOT sectorCount 
-        phaseSplit,
-        epsilonTilt,
-        betaTiltVec,
-        tiltGain,
-        g_y: parameters.g_y,
-        cavityQ: parameters.cavityQ,
-        qSpoil: parameters.qSpoilingFactor,
-        gammaVdB: parameters.gammaVanDenBroeck,
-        viewAvg      // ✅ NOT useAvg
+      console.log("🎛️ uniforms-to-engine (tilt resolve)", {
+        mode, epsilonTilt, tiltGain, betaTiltVec, fromPanel: hasGoodPanelEps
       });
 
       // Hull geometry from parameters or use needle hull defaults

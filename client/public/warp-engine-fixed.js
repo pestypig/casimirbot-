@@ -335,6 +335,7 @@ class WarpEngine {
             driveDir: parameters.driveDir || [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: N(parameters.epsilonTilt || 0),
+            epsilonTiltFloor: N(parameters.epsilonTiltFloor || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
             tiltGain: N(parameters.tiltGain || 0.55),
             
@@ -696,10 +697,14 @@ class WarpEngine {
             }
             
             // ----- Interior gravity (shift vector "tilt") -----
-            // inputs
-            const eps   = Math.max(0, this.uniforms?.epsilonTilt || 0);   // dimensionless
-            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];       // "down" dir
-            const gtilt = this.uniforms?.tiltGain ?? 0.35;                // visual knob
+            const eps = Math.max(
+              0,
+              (this.uniforms?.epsilonTilt || 0),
+              (this.uniforms?.epsilonTiltFloor || 0)
+            ); // dimensionless
+
+            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];    // "down"
+            const gtilt = this.uniforms?.tiltGain ?? 0.35;             // visual knob
 
             // unit "down" vector
             const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;

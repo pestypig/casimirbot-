@@ -1,0 +1,137 @@
+Great catch — the “no-tilt” look you’re seeing is coming from how `epsilonTilt` is being chosen and forwarded. In the current code the Visualizer always falls back to tiny/zero values (or ignores the Shift panel), so by the time the WebGL engine runs, the tilt multiplier is effectively 0 even though the wall curvature is visible.
+
+Below are two **small, surgical patches** that (a) actually pass the Shift-panel value when it exists, and (b) still give you readable defaults per mode if it doesn’t. They also give you a simple knob to scale the effect.
+
+---
+
+## 1) Forward the right `epsilonTilt` from the Visualizer
+
+**File:** `client/src/components/WarpVisualizer.tsx`
+**What:** prefer physics/Shift panel value when it’s present and reasonable; otherwise use per-mode demo defaults. Also forward `tiltGain`.
+
+Replace the block where `epsilonTilt`/`tiltGain` are resolved (inside the big `useEffect` that calls `updateUniforms`) with this:
+
+```ts
+// --- Resolve interior tilt from Shift panel OR per-mode default ---
+const epsFromPanel = Number(
+  (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt)
+);
+const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
+
+// Per-mode demo defaults (used only if panel isn't supplying a usable value)
+const modeTiltDefaults: Record<string, number> = {
+  emergency: 0.035,
+  hover:     0.020,
+  cruise:    0.012,
+  standby:   0.000,
+};
+
+const epsilonTilt = hasGoodPanelEps
+  ? epsFromPanel
+  : (modeTiltDefaults[mode] ?? 0.0);
+
+// Visual scaling (can be given by panel; otherwise per-mode)
+const tiltGains: Record<string, number> = {
+  standby:   0.00,
+  cruise:    0.20,
+  hover:     0.35,
+  emergency: 0.55,
+};
+const tiltGain =
+  typeof (parameters as any).tiltGain === 'number'
+    ? Number((parameters as any).tiltGain)
+    : Number(parameters.shift?.tiltGain ?? tiltGains[mode] ?? 0.35);
+
+// Direction
+const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+  ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+  : defaultBetaTilt;
+
+console.log("🎛️ uniforms-to-engine (tilt resolve)", {
+  mode, epsilonTilt, tiltGain, betaTiltVec, fromPanel: hasGoodPanelEps
+});
+```
+
+…and keep the `updateUniforms({ ... })` call **unchanged** except ensure it includes:
+
+```ts
+epsilonTilt: epsilonTilt,
+betaTiltVec: betaTiltVec,
+tiltGain:    tiltGain,
+```
+
+This guarantees the Shift Vector panel’s `ε_tilt` wins when it’s present, but you still get a visible tilt by mode when it’s not. (You can remove the per-mode defaults later if you prefer pure physics values.)
+
+Source context for where this lives: the Visualizer is already pushing these uniforms to the engine; we’re just fixing how they’re resolved.&#x20;
+
+---
+
+## 2) Make the engine honor the incoming tilt robustly
+
+**File:** `client/public/warp-engine-fixed.js`
+**What:** use the forwarded `epsilonTilt` with a floor and the provided `tiltGain`. (The core interior windowing is already correct.)
+
+Near the **top defaults** where other uniforms are defined, add a floor (optional):
+
+```js
+// NEW (optional): minimum visible epsilon if panel sends extremely small numbers
+epsilonTilt: 0.0,
+epsilonTiltFloor: 0.0,   // set to e.g. 0.005 if you want a guaranteed minimum
+betaTiltVec: [0, -1, 0],
+tiltGain: 0.35
+```
+
+In `_warpGridVertices` where the interior gravity is applied, replace the inputs/readout with:
+
+```js
+// ----- Interior gravity (shift vector "tilt") -----
+const eps = Math.max(
+  0,
+  (this.uniforms?.epsilonTilt || 0),
+  (this.uniforms?.epsilonTiltFloor || 0)
+); // dimensionless
+
+const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];    // "down"
+const gtilt = this.uniforms?.tiltGain ?? 0.35;             // visual knob
+```
+
+…and keep the rest of the interior tilt code as-is:
+
+```js
+const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;
+const bhat = [btilt[0]/bmag, btilt[1]/bmag, btilt[2]/bmag];
+
+const w   = Math.max(1e-6, w_rho_local);
+const t   = (1.0 + 2.0*w - rho) / (4.0*w);
+const winInterior = Math.max(0.0, Math.min(1.0, t));
+const winSmooth   = winInterior * winInterior * (3.0 - 2.0 * winInterior);
+
+// Tie tilt to wall amplitude so modes scale together
+const A_tilt   = A_vis;
+const dispTilt = A_tilt * eps * gtilt * winSmooth;
+
+vtx[i    ] += bhat[0] * dispTilt;
+vtx[i + 1] += bhat[1] * dispTilt;
+vtx[i + 2] += bhat[2] * dispTilt;
+```
+
+This engine already computes the interior window (`winSmooth`) correctly and ties tilt scaling to the same `A_vis` you use for the wall, so once `epsilonTilt` and `tiltGain` arrive properly you’ll see the cabin slope in the **middle** of the bubble, not just at the edges.&#x20;
+
+---
+
+## How to make it “as visible as the other curvatures”
+
+* Use the **mode defaults** when you’re demoing (e.g., hover `ε≈0.02`, cruise `ε≈0.012`, emergency `ε≈0.035`).
+* When you switch to strict physics (panel values like `~1e-15`), keep them physically correct but raise **only** `tiltGain` (e.g., `0.4 – 0.8`) so it’s still visible without falsifying `ε_tilt`.
+
+If you want a guaranteed minimum for demos, set `epsilonTiltFloor` to something small (e.g., `0.005`) in the Visualizer’s `updateUniforms`, and the engine will apply it.
+
+---
+
+### Quick checklist
+
+* [x] Visualizer forwards `epsilonTilt` from Shift panel when present; else per-mode defaults.&#x20;
+* [x] Visualizer forwards `tiltGain` and `betaTiltVec`.&#x20;
+* [x] Engine reads `epsilonTilt` (with optional floor) and multiplies by `A_vis * tiltGain * winSmooth`.&#x20;
+
+Apply these two small edits and you should immediately see the mid-cabin slope track the operational mode — and also respond when your Shift panel sends real physics values.
