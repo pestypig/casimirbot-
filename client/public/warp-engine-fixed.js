@@ -697,21 +697,26 @@ class WarpEngine {
             
             // ----- Interior gravity (shift vector "tilt") -----
             // inputs
-            const eps   = Math.max(0, this.uniforms?.epsilonTilt || 0); // ≪ 1e-6
-            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];
-            const gtilt = this.uniforms?.tiltGain || 0.55;
+            const eps   = Math.max(0, this.uniforms?.epsilonTilt || 0);   // dimensionless
+            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];       // "down" dir
+            const gtilt = this.uniforms?.tiltGain ?? 0.35;                // visual knob
 
-            // soft window that is ~1 inside and ~0 outside the shell
-            const w = Math.max(1e-6, w_rho_local);                 // same wall scale you use for bell
-            const t = Math.min(1, Math.max(0, (1.0 + w - rho) / (2.0 * w))); // linear window
-            const winInterior = t*t*(3 - 2*t);               // smoothstep(t)
-
-            // project point onto tilt direction (unit)
+            // unit "down" vector
             const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;
             const bhat = [btilt[0]/bmag, btilt[1]/bmag, btilt[2]/bmag];
 
-            // gentle displacement, bounded; factor 0.12 keeps it subtle
-            const dispTilt = eps * gtilt * winInterior * 0.12;
+            // smooth interior window (≈1 well inside, 0 outside) using local wall thickness
+            const w   = Math.max(1e-6, w_rho_local);
+            const t   = (1.0 + 2.0*w - rho) / (4.0*w);        // maps [1-2w, 1+2w] → [1,0]
+            const winInterior = Math.max(0.0, Math.min(1.0, t)); 
+            const winSmooth   = winInterior * winInterior * (3.0 - 2.0 * winInterior); // smoothstep
+
+            // tie tilt strength to the same visual amplitude used for the wall
+            // so modes scale naturally (standby≈0, cruise<hover<emergency)
+            const A_tilt = A_vis;   // <- already computed above
+
+            // final, bounded tilt displacement
+            const dispTilt = A_tilt * eps * gtilt * winSmooth;
 
             // nudge the vertex along the cabin "down" direction
             vtx[i    ] += bhat[0] * dispTilt;
