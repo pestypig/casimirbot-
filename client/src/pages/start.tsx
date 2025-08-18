@@ -118,7 +118,7 @@ export default function StartPortal() {
                   <div className="mt-4 flex gap-2">
                     <button
                       className="px-3.5 py-2 rounded-lg bg-sky-500/90 hover:bg-sky-500 text-white text-sm font-medium"
-                      onClick={() => setLocation(`/station/${selected}`)}
+                      onClick={() => setLocation('/helix-core')}
                     >
                       Enter Station
                     </button>
