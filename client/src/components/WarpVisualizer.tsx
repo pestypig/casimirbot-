@@ -188,12 +188,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Smooth strobe split phase
       const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
       
-      // per-mode visual tilt gain (not physics) - gentler defaults
+      // Visual scaling (tilt strength per mode)
+      // Raised slightly from previous values for better visibility
       const tiltGains: Record<string, number> = {
-        standby:   0.00,
-        cruise:    0.20,
-        hover:     0.35,
-        emergency: 0.55,
+        standby:   0.00,  // still flat
+        cruise:    0.35,  // was 0.20
+        hover:     0.45,  // was 0.35
+        emergency: 0.65,  // was 0.55
       };
       // Visual scaling (can be given by panel; otherwise per-mode)
       const tiltGain =
