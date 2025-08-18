@@ -203,49 +203,6 @@ export default function Documentation() {
                 </CardContent>
               </Card>
 
-              {/* Artificial Gravity in Natário Bubble Paper */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Artificial Gravity in Natário Bubbles
-                  </CardTitle>
-                  <CardDescription>
-                    A gentle "tilt" inside Natário bubble: whisper of artificial gravity (0.1-0.5g)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="text-sm text-muted-foreground">
-                    <p><strong>Key Topics:</strong></p>
-                    <ul className="list-disc list-inside space-y-1 mt-2">
-                      <li>Ultra-small linear β-gradient for artificial gravity</li>
-                      <li>Programmable phase array manipulation</li>
-                      <li>Ford-Roman quantum inequality preservation</li>
-                      <li>Comfort ceiling: 0.1g for fluid settling and orientation</li>
-                      <li>QI ceiling: up to 0.5g before safety margin depletion</li>
-                      <li>Navigation considerations with geometry-fixed gravity</li>
-                    </ul>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={() => window.open('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755482491955.pdf', '_blank')}
-                      className="flex items-center gap-2"
-                    >
-                      <Download className="w-4 h-4" />
-                      Download PDF
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => window.open('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755482491955.pdf', '_blank')}
-                      className="flex items-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      View Online
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
               {/* Template for New Document */}
               {/* 
               <Card>
