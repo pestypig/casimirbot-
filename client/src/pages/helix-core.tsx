@@ -177,6 +177,9 @@ export default function HelixCore() {
   const { data: pipelineState } = useEnergyPipeline();
   const switchMode = useSwitchMode();
   
+  // Type-safe access to pipeline state
+  const pipeline = pipelineState as EnergyPipelineState;
+  
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
     queryKey: ['/api/helix/metrics'],
@@ -549,7 +552,7 @@ export default function HelixCore() {
                   <div className="space-y-2">
                     <Label className="text-slate-200">Operational Mode</Label>
                     <Select 
-                      value={pipelineState?.currentMode || 'hover'}
+                      value={pipeline?.currentMode || 'hover'}
                       onValueChange={(mode) => {
                         switchMode.mutate(mode as any);
                         setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
@@ -569,8 +572,8 @@ export default function HelixCore() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {pipelineState && (
-                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
+                    {pipeline && (
+                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipeline.currentMode]?.description}</p>
                     )}
                   </div>
 
@@ -586,29 +589,29 @@ export default function HelixCore() {
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Energy Output</p>
-                      <p className="text-lg font-mono text-yellow-400">{pipelineState?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
+                      <p className="text-lg font-mono text-yellow-400">{pipeline?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">Exotic Mass</p>
-                      <p className="text-lg font-mono text-purple-400">{pipelineState?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
+                      <p className="text-lg font-mono text-purple-400">{pipeline?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
                     </div>
                     <div className="p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400">System Status</p>
-                      <p className="text-lg font-mono text-green-400">{pipelineState?.overallStatus || systemMetrics?.overallStatus || 'NOMINAL'}</p>
+                      <p className="text-lg font-mono text-green-400">{pipeline?.overallStatus || systemMetrics?.overallStatus || 'NOMINAL'}</p>
                     </div>
                   </div>
 
                   {/* Show current pipeline parameters */}
-                  {pipelineState && (
+                  {pipeline && (
                     <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                       <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                       <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                        <div>Duty: {((pipelineState as any).dutyCycle * 100).toFixed(1)}%</div>
-                        <div>Sectors: {(pipelineState as any).sectorStrobing}</div>
-                        <div>Q-Spoil: {(pipelineState as any).qSpoilingFactor?.toFixed(3)}</div>
+                        <div>Duty: {(pipeline.dutyCycle * 100).toFixed(1)}%</div>
+                        <div>Sectors: {pipeline.sectorStrobing}</div>
+                        <div>Q-Spoil: {pipeline.qSpoilingFactor?.toFixed(3)}</div>
                         <Tooltip
                           label={
                             <div className="space-y-1">
@@ -931,21 +934,56 @@ export default function HelixCore() {
             </Card>
 
             {/* Natário Warp Bubble Visualizer with Mode Tracking */}
-            <WarpVisualizer
-              key={`mode-${pipelineState?.currentMode || 'hover'}-${pipelineState?.sectorStrobing || 1}-${pipelineState?.dutyCycle || 0.14}-v${modeVersion}`}
-              parameters={{
-                dutyCycle: pipelineState?.dutyCycle || 0.14,
-                g_y: pipelineState?.gammaGeo || 26,
-                cavityQ: pipelineState?.qCavity || 1e9,
-                sagDepth_nm: pipelineState?.sag_nm || 16,
-                tsRatio: pipelineState?.TS_ratio || 4102.74,
-                powerAvg_MW: pipelineState?.P_avg || 83.3,
-                exoticMass_kg: pipelineState?.M_exotic || 1405,
+            {/* Calculate artificial gravity tilt parameters */}
+            {(() => {
+              // --- Tilt mapping (interior artificial gravity) ---
+              const G = 9.80665;            // m/s^2
+              const c = 299792458;          // m/s (match server constant)
+              const hull = (hullMetrics && hullMetrics.hull) ? {
+                ...hullMetrics.hull,
+                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+              } : {
+                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                a: 503.5, b: 132, c: 86.5
+              };
+
+              // choose target-g by operational mode (feel free to tune)
+              const gTargets: Record<string, number> = {
+                hover:     0.10 * G,
+                cruise:    0.05 * G,
+                emergency: 0.30 * G,
+                standby:   0.00 * G,
+              };
+              const mode = (pipeline?.currentMode ?? 'hover').toLowerCase();
+              const gTarget = gTargets[mode] ?? 0;
+
+              // conservative interior length scale: geometric mean radius
+              const R_geom = Math.cbrt(hull.a * hull.b * hull.c); // meters
+
+              // Natário "whisper" tilt strength: ε ≈ (g_target * R) / c^2  (kept << 1e-6)
+              const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+
+              // "Down" inside cabin: default along -Y in scene space
+              const betaTiltVec = [0, -1, 0]; // unit vector
+
+              return (
+                <WarpVisualizer
+                  key={`mode-${pipeline?.currentMode || 'hover'}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
+                  parameters={{
+                dutyCycle: pipeline?.dutyCycle || 0.14,
+                g_y: pipeline?.gammaGeo || 26,
+                cavityQ: pipeline?.qCavity || 1e9,
+                sagDepth_nm: pipeline?.sag_nm || 16,
+                tsRatio: pipeline?.TS_ratio || 4102.74,
+                powerAvg_MW: pipeline?.P_avg || 83.3,
+                exoticMass_kg: pipeline?.M_exotic || 1405,
                 // Operational mode parameters for authentic Natário computations
-                currentMode: pipelineState?.currentMode || 'hover',
-                sectorStrobing: pipelineState?.sectorStrobing || 1,
-                qSpoilingFactor: pipelineState?.qSpoilingFactor || 1,
-                gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || 6.57e7,
+                currentMode: pipeline?.currentMode || 'hover',
+                sectorStrobing: pipeline?.sectorStrobing || 1,
+                qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
+                gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 6.57e7,
                 // Hull geometry for ellipsoidal bell calculation (scientifically faithful)
                 hull: (hullMetrics && hullMetrics.hull) ? {
                   ...hullMetrics.hull,
@@ -961,9 +999,16 @@ export default function HelixCore() {
                 wall: { w_norm: 0.016 },
                 
                 // Optional grid scaling override (default: 1.6x hull span padding)
-                gridScale: 1.6  // Can be made configurable via UI if needed
+                gridScale: 1.6,  // Can be made configurable via UI if needed
+                
+                // NEW: Artificial gravity tilt parameters
+                epsilonTilt: epsilonTilt,
+                betaTiltVec: betaTiltVec,
+                wallWidth_m: 6.0
               }}
-            />
+                />
+              );
+            })()}
             
             {/* Mission Fuel / Range Gauge */}
             <FuelGauge

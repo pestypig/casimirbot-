@@ -38,6 +38,12 @@ interface WarpVisualizerProps {
     wall?: {
       w_norm: number;
     };
+    // Grid scaling
+    gridScale?: number;
+    // NEW: Artificial gravity tilt parameters
+    epsilonTilt?: number;
+    betaTiltVec?: number[];
+    wallWidth_m?: number;
   };
 }
 
@@ -195,7 +201,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sagDepth_nm: num(parameters.sagDepth_nm),
         powerAvg_MW: num(parameters.powerAvg_MW),
         exoticMass_kg: num(parameters.exoticMass_kg),
-        tsRatio: num(parameters.tsRatio, 4100)
+        tsRatio: num(parameters.tsRatio, 4100),
+        
+        // NEW: Artificial gravity tilt parameters
+        epsilonTilt: num(parameters.epsilonTilt, 0),
+        betaTiltVec: parameters.betaTiltVec || [0, -1, 0]
       });
 
       // CRITICAL: force immediate visual update on parameter change

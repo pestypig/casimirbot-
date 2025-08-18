@@ -1,0 +1,146 @@
+Awesome—the “gentle tilt” is exactly the right next feature. Here’s a crisp, drop-in patch plan that makes the warp bubble visualize a tiny, mode-controlled β-gradient (interior “down”) without breaking the current pipeline.
+
+I’m giving you three minimal edits:
+
+---
+
+# 1) Add tilt parameters to the physics → UI bridge
+
+*(helix-core.tsx — where you already assemble parameters for the visualizer)*
+
+* Compute a tiny interior-gravity target per mode (0 for Standby; 0.05–0.1 g for Hover/ Cruise; ≤0.5 g ceiling for Emergency).
+* Map that to a dimensionless tilt strength `epsilonTilt` and a **direction** `betaTiltVec` (unit vector in ship/body frame; default “+Y is up”, so down is −Y).
+
+Add right after you fetch `metrics`/`pipelineState`, when you compose props for `<WarpVisualizer …/>`:
+
+```ts
+// --- Tilt mapping (interior artificial gravity) ---
+const G = 9.80665;            // m/s^2
+const c = 299792458;          // m/s (match server constant)
+const hull = metrics?.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+
+// choose target-g by operational mode (feel free to tune)
+const gTargets: Record<string, number> = {
+  hover:     0.10 * G,
+  cruise:    0.05 * G,
+  emergency: 0.30 * G,
+  standby:   0.00 * G,
+};
+const mode = (pipelineState?.currentMode ?? 'hover').toLowerCase();
+const gTarget = gTargets[mode] ?? 0;
+
+// conservative interior length scale: geometric mean radius
+const R_geom = Math.cbrt(hull.a * hull.b * hull.c); // meters
+
+// Natário “whisper” tilt strength: ε ≈ (g_target * R) / c^2  (kept << 1e-6)
+const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+
+// “Down” inside cabin: default along -Y in scene space
+const betaTiltVec = [0, -1, 0]; // unit vector
+
+// pass to visualizer
+const vizParams = {
+  // ...existing uniforms you already pass...
+  hull,                               // {Lx_m,Ly_m,Lz_m,a,b,c}
+  wallWidth_m: 6.0,                   // or your current wall thickness
+  epsilonTilt,                        // NEW
+  betaTiltVec,                        // NEW
+};
+```
+
+*(This lives alongside the props where you already pass γ\_geo, Q, sectors, etc., in the same config object you hand to `<WarpVisualizer />`.)*&#x20;
+
+Why this mapping? It’s the “whisper” regime from your tilt memo: keep ε tiny so the added curvature is parts-per-million of the existing wall term—QI-safe and visually gentle.&#x20;
+
+---
+
+# 2) Teach the WebGL engine to apply the tilt
+
+*(client/public/warp-engine-fixed.js)*
+
+Add two uniforms and blend the tilt into the existing displacement. Search for your uniform block and extend it:
+
+```js
+// defaults
+this.uniforms.epsilonTilt = this.uniforms.epsilonTilt ?? 0.0;
+this.uniforms.betaTiltVec = this.uniforms.betaTiltVec ?? [0, -1, 0];
+```
+
+In your `updateUniforms(params)` mapper, accept them:
+
+```js
+if (params.epsilonTilt !== undefined) this.uniforms.epsilonTilt = +params.epsilonTilt;
+if (params.betaTiltVec) this.uniforms.betaTiltVec = params.betaTiltVec.map(Number);
+```
+
+Inside `_warpGridVertices` (where you already compute `rho`, `sd`, `ring`, `n`, and `disp`), blend a *linear* interior term **only** for interior points (ρ≤1) using a smooth window so it’s C¹-continuous at the wall:
+
+```js
+// --- interior tilt (Natário “gentle” β-gradient) ---
+const eps = this.uniforms.epsilonTilt || 0.0;
+if (eps > 0) {
+  // signed interior coordinate along "down" axis
+  const b = this.uniforms.betaTiltVec || [0,-1,0];
+  const interior = Math.max(0, 1.0 - rho);   // 0 at wall, 1 at center (C0)
+  // smooth it (C1): s(t)=3t^2-2t^3 with t = clamp(interior,0,1)
+  const t = Math.min(1, interior);
+  const s = t*t*(3 - 2*t);
+
+  // small linear shift along tilt direction (viewer-scale, not wall normal)
+  // scale by local shell radius (~1 in normalized coords) and vizGain
+  const tiltMag = eps * (this.uniforms.vizGain || 4.0) * s;
+
+  // displace toward "down" (adds a uniform interior sag)
+  vtx[i    ] += b[0] * tiltMag;
+  vtx[i + 1] += b[1] * tiltMag;
+  vtx[i + 2] += b[2] * tiltMag;
+}
+```
+
+Result:
+
+* Outside/wall behavior unchanged;
+* Interior gently “leans” toward `betaTiltVec`, magnitude tied to `epsilonTilt`;
+* Smooth across the wall so no ridges.
+
+---
+
+# 3) Make modes actually drive the tilt live
+
+*(client/src/components/WarpVisualizer.tsx)*
+
+Right where you call `engineRef.current.updateUniforms({...})`, include the two new fields from props:
+
+```ts
+engineRef.current.updateUniforms({
+  // ...existing uniforms...
+  hullAxes: [hull.a, hull.b, hull.c],
+  wallWidth: wallWidth,               // your existing pixel/scene wall width
+  epsilonTilt: parameters.epsilonTilt ?? 0,
+  betaTiltVec: parameters.betaTiltVec ?? [0,-1,0],
+});
+```
+
+And in your “mode changed” effect, ensure you call `updateUniforms` again so Standby zeroes the tilt immediately and Emergency raises it (per mapping in step 1). That’s the live link that makes the visual change as you switch modes.
+
+---
+
+## What you’ll see (and why it’s faithful)
+
+* **Hover / Cruise:** a subtle, uniform “down”—fluids would settle; crew feel a whisper of weight—without visible distortions at the wall.
+* **Emergency:** bigger ε (still tiny) pushes the interior a hair more—use sparingly.
+* **Standby:** ε→0, bubble returns to symmetric weightlessness.
+
+The mapping `ε ≈ g_target·R/c²` keeps the addition *many orders of magnitude* below the wall’s ∇β scale, just as the memo argues (added stress is ppm-level; QI headroom unchanged for ε≲10⁻⁶).&#x20;
+
+---
+
+## Quick sanity checks
+
+1. Toggle Standby ↔ Hover: the interior lean should appear/disappear; the wall rim stays smooth (no new ridges).
+2. Flip tilt axis: set `betaTiltVec` to `[1,0,0]` → “down” points toward +X; the visual should rotate accordingly.
+3. Perf: `epsilonTilt` only adds a few ops per vertex; no frame-rate change expected.
+
+If you want a tiny HUD cue, render a faint arrow glyph inside the bubble from `betaTiltVec` so users can *see* where “down” is pointing—pure UI, no physics change.
+
+This keeps your renderer clean, preserves the Natário bell, and matches the “whisper of gravity” regime in your doc, while wiring cleanly through the same parameter path the visualizer already uses.&#x20;

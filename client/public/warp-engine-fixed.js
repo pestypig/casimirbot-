@@ -66,7 +66,10 @@ class WarpEngine {
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
-            driveDir: [1, 0, 0]
+            driveDir: [1, 0, 0],
+            // NEW: Artificial gravity tilt parameters
+            epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
+            betaTiltVec: [0, -1, 0]  // tilt direction vector (default: -Y = "down")
         };
         
         // Initialize rendering pipeline
@@ -684,9 +687,25 @@ class WarpEngine {
                 disp = blended;
             }
             
+            // Apply main Natário displacement
             vtx[i] = p[0] - n[0] * disp;
             vtx[i + 1] = p[1] - n[1] * disp;
             vtx[i + 2] = p[2] - n[2] * disp;
+            
+            // NEW: Apply artificial gravity tilt (gentle interior gravity effects)
+            const epsilonTilt = this.uniforms.epsilonTilt || 0;
+            if (epsilonTilt > 0) {
+                const betaTiltVec = this.uniforms.betaTiltVec || [0, -1, 0];
+                
+                // Interior tilt applies a gentle β-gradient proportional to position
+                // This creates a subtle "down" direction inside the warp bubble
+                const tiltDisp = epsilonTilt * (p[0] * betaTiltVec[0] + p[1] * betaTiltVec[1] + p[2] * betaTiltVec[2]);
+                
+                // Apply tilt displacement along the tilt direction
+                vtx[i] += tiltDisp * betaTiltVec[0];
+                vtx[i + 1] += tiltDisp * betaTiltVec[1];
+                vtx[i + 2] += tiltDisp * betaTiltVec[2];
+            }
         }
         
         // Enhanced diagnostics - check for amplitude overflow
