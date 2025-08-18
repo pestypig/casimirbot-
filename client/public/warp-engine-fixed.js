@@ -693,42 +693,40 @@ class WarpEngine {
                 disp = blended;
             }
             
-            // Apply main Natário displacement
-            vtx[i] = p[0] - n[0] * disp;
-            vtx[i + 1] = p[1] - n[1] * disp;
-            vtx[i + 2] = p[2] - n[2] * disp;
-            
-            // ===== NEW: Gentle interior tilt (shift-vector "gravity") =====
-            const eps = (this.uniforms?.epsilonTilt || 0.0);
-            if (eps > 0.0) {
-                // unit tilt direction in scene space
-                const b = this.uniforms?.betaTiltVec || [0, -1, 0];
-                const bm = Math.hypot(b[0], b[1], b[2]) || 1;
-                const bhat = [b[0]/bm, b[1]/bm, b[2]/bm];
+            // --- Gentle interior "shift vector" tilt for artificial gravity ---
+            // uniforms: epsilonTilt (small, dimensionless), betaTiltVec = [dx,dy,dz] ("down" dir)
+            const epsTilt = Math.max(0, (this.uniforms?.epsilonTilt ?? 0));
+            if (epsTilt > 0) {
+              // Normalize tilt direction
+              const b = this.uniforms?.betaTiltVec || [0, -1, 0];
+              const bLen = Math.hypot(b[0], b[1], b[2]) || 1;
+              const bHat = [b[0] / bLen, b[1] / bLen, b[2] / bLen];
 
-                // interior window: only acts inside the wall, smooth to 0 at the wall
-                // use a C² envelope so there's no ridge at the boundary
-                const innerA = -3.0 * w_rho_local;
-                const innerB = -0.5 * w_rho_local;
-                const tInterior = (sd < 0.0)
-                    ? (function smootherstep(a,b,x){const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*t*(t*(t*6-15)+10);} (innerA, innerB, sd))
-                    : 0.0;
+              // Smooth interior window: 1 deep inside, 0 outside wall (C¹)
+              // Centered at ρ=1 with width ≈ 3 w_rho
+              const wIn = (() => {
+                const a = Math.max(1e-6, 1.0 - 2.5 * w_rho);  // start of roll-off (inside)
+                const bnd = Math.min(2.0, 1.0 + 2.5 * w_rho); // end near exterior
+                // smoothstep reversed so it is near 1 inside and fades to 0 across wall
+                const t = Math.min(1, Math.max(0, (rho - a) / (bnd - a)));
+                return 1.0 - (t * t * (3 - 2 * t)); // 1 - smoothstep(a,bnd,ρ)
+              })();
 
-                // project surface normal onto "down" to bias the wall in that direction
-                const nDotDown = n[0]*bhat[0] + n[1]*bhat[1] + n[2]*bhat[2];
+              // Use fore–aft coordinate to create a *slope* (constant β-gradient) inside.
+              // Project point onto drive direction (+x in scene units) and scale gently.
+              const xSlope = (p[0] / axesScene[0]);         // normalized fore–aft coordinate
+              const tiltMag = epsTilt * xSlope * wIn;       // small, smooth gradient inside
 
-                // couple tilt to the canonical bell & wall window so it's physical and gentle
-                const tiltPush = eps * nDotDown * gaussian_local * wallWin * tInterior;
-
-                // add the interior tilt to the main displacement
-                disp += tiltPush;
-                
-                // Apply updated displacement with tilt
-                vtx[i] = p[0] - n[0] * disp;
-                vtx[i + 1] = p[1] - n[1] * disp;
-                vtx[i + 2] = p[2] - n[2] * disp;
+              // Apply the interior tilt as a displacement in the "down" direction bHat
+              vtx[i]     += bHat[0] * tiltMag;
+              vtx[i + 1] += bHat[1] * tiltMag;
+              vtx[i + 2] += bHat[2] * tiltMag;
             }
-            // ===== END NEW =====
+
+            // Canonical Natário wall displacement (unchanged)
+            vtx[i]     = vtx[i]     - n[0] * disp;
+            vtx[i + 1] = vtx[i + 1] - n[1] * disp;
+            vtx[i + 2] = vtx[i + 2] - n[2] * disp;
         }
         
         // Enhanced diagnostics - check for amplitude overflow

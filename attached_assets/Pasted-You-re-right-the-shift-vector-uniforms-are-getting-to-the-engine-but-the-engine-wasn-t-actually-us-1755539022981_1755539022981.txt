@@ -1,0 +1,84 @@
+You’re right—the shift-vector uniforms are getting to the engine, but the engine wasn’t actually *using* them to create a cabin-only, gentle plane tilt inside the bubble. That’s why the grid through the ship stayed coplanar with the exterior field.
+
+Below is a small, safe patch that makes the tilt visible and constrained to the *interior* (ρ≲1) with a smooth C¹ envelope, so you’ll see a shallow slope through the cabin while the exterior sheet remains basically unchanged.
+
+---
+
+# 1) Feed the uniforms (already OK)
+
+Your `WarpVisualizer` is already pushing `epsilonTilt` and `betaTiltVec` to the engine and calling `requestRewarp()` after updates , so you don’t need to change that part.
+
+# 2) Apply the tilt in the engine (interior only)
+
+Edit **`client/public/warp-engine-fixed.js`** in the `_warpGridVertices` loop and add the “interior tilt” term. The engine already computes `rho`, `w_rho`, normals, etc.; we’ll just add a smooth interior envelope and offset the vertex **along the tilt direction** inside the wall.
+
+Search for the loop that updates each vertex inside `_warpGridVertices(...)` (where you already compute `rho`, `sd`, `ring`, `n`, etc.) and add the marked block:
+
+```diff
+@@
+-    // Base displacement with mode scaling
+-    let disp = gridK * betaVis * modeAmp * modeViz * ring * band * sgn * front;
++    // Base displacement with mode scaling
++    let disp = gridK * betaVis * modeAmp * modeViz * ring * band * sgn * front;
+@@
+-    vtx[i]     = p[0] - n[0] * disp;
+-    vtx[i + 1] = p[1] - n[1] * disp;
+-    vtx[i + 2] = p[2] - n[2] * disp;
++    // --- Gentle interior "shift vector" tilt for artificial gravity ---
++    // uniforms: epsilonTilt (small, dimensionless), betaTiltVec = [dx,dy,dz] ("down" dir)
++    const epsTilt = Math.max(0, (this.uniforms?.epsilonTilt ?? 0));
++    if (epsTilt > 0) {
++      // Normalize tilt direction
++      const b = this.uniforms?.betaTiltVec || [0, -1, 0];
++      const bLen = Math.hypot(b[0], b[1], b[2]) || 1;
++      const bHat = [b[0] / bLen, b[1] / bLen, b[2] / bLen];
++
++      // Smooth interior window: 1 deep inside, 0 outside wall (C¹)
++      // Centered at ρ=1 with width ≈ 3 w_rho
++      const wIn = (() => {
++        const a = Math.max(1e-6, 1.0 - 2.5 * w_rho);  // start of roll-off (inside)
++        const bnd = Math.min(2.0, 1.0 + 2.5 * w_rho); // end near exterior
++        // smoothstep reversed so it is near 1 inside and fades to 0 across wall
++        const t = Math.min(1, Math.max(0, (rho - a) / (bnd - a)));
++        return 1.0 - (t * t * (3 - 2 * t)); // 1 - smoothstep(a,bnd,ρ)
++      })();
++
++      // Use fore–aft coordinate to create a *slope* (constant β-gradient) inside.
++      // Project point onto drive direction (+x in scene units) and scale gently.
++      const xSlope = (p[0] / axesScene[0]);         // normalized fore–aft coordinate
++      const tiltMag = epsTilt * xSlope * wIn;       // small, smooth gradient inside
++
++      // Apply the interior tilt as a displacement in the "down" direction bHat
++      vtx[i]     += bHat[0] * tiltMag;
++      vtx[i + 1] += bHat[1] * tiltMag;
++      vtx[i + 2] += bHat[2] * tiltMag;
++    }
++
++    // Canonical Natário wall displacement (unchanged)
++    vtx[i]     = vtx[i]     - n[0] * disp;
++    vtx[i + 1] = vtx[i + 1] - n[1] * disp;
++    vtx[i + 2] = vtx[i + 2] - n[2] * disp;
+```
+
+**What this does**
+
+* `wIn` is a smooth “inside-only” window; it’s \~1 well inside (ρ≲1−2.5w) and fades to 0 across the wall so the tilt never creases the exterior sheet.
+* `xSlope` gives you a gentle *linear* gradient along the ship’s fore–aft axis (you can swap to a different axis by changing the projection).
+* `tiltMag = ε * xSlope * wIn` is small and smooth; it’s applied **along `betaTiltVec`** (your “down” vector), so “down” always points where you want regardless of camera.
+* The standard Natário displacement remains intact; we add the tilt before we subtract the wall normal displacement.
+
+> Tip: If you want the tilt to be uniform in the entire interior (instead of sloped along fore–aft), replace `xSlope` with `1.0` to get a constant offset inside.
+
+# 3) Make sure uniforms are set (already done)
+
+`WarpVisualizer` pushes `epsilonTilt` & `betaTiltVec`, hull axes, `wallWidth`, and calls `requestRewarp()` after updates . The engine reads those uniforms and uses `wallWidth`/axes to compute the ρ-window, so the tilt stays strictly interior.
+
+# 4) Why this fixes the mid-ship plane
+
+Previously the engine never deformed the *interior* with the tilt—only the wall bell did work—so the sheet through the ship stayed level. The new interior term is (a) **C¹ smooth**, (b) **confined to ρ≲1**, and (c) **small and linear**—exactly the “gentle Natário tilt” discussed in your panel—so you’ll now see a shallow slope through the cabin while the outside grid still rides the same plane.
+
+---
+
+If you want the tilt strength to follow your panel’s numbers automatically, continue feeding `epsilonTilt = g_target·R_geom/c²` and the `[0,−1,0]` direction from the panel—your `WarpVisualizer` is already wired to pass `parameters.shift?.epsilonTilt` and `parameters.shift?.betaTiltVec` straight to the engine .
+
+Finally, with this patch in place, flip through **Standby / Cruise / Hover / Emergency** and nudge `ε_tilt` to confirm the cabin plane now responds independently of the exterior sheet.
