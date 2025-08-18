@@ -34,13 +34,14 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
   const fallbackBetaTiltVec = [0, -1, 0];
   const fallbackGEffCheck = (fallbackEpsilonTilt * c * c) / fallbackRGeom;
 
-  // Use real data if available, otherwise fallback calculations
-  const displayShift = shift ?? {
-    gTarget: fallbackGTarget,
-    R_geom: fallbackRGeom,
-    epsilonTilt: fallbackEpsilonTilt,
-    betaTiltVec: fallbackBetaTiltVec as [number, number, number],
-    gEff_check: fallbackGEffCheck
+  // Use real data if available, otherwise fallback calculations (per-field merge)
+  const s = shift ?? {};
+  const displayShift = {
+    gTarget: (s as any).gTarget ?? fallbackGTarget,
+    R_geom: (s as any).R_geom ?? fallbackRGeom,
+    epsilonTilt: (s as any).epsilonTilt ?? fallbackEpsilonTilt,
+    betaTiltVec: ((s as any).betaTiltVec ?? fallbackBetaTiltVec) as [number, number, number],
+    gEff_check: (s as any).gEff_check ?? fallbackGEffCheck,
   };
   
   const ok = !!(shift || fallbackGTarget > 0); // Show panel if we have data or computed fallbacks
