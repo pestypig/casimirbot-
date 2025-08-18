@@ -200,8 +200,10 @@ export function LiveEnergyPipeline({
     U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
   }
   
+  // Drive frequency (prefer server metrics if present)
+  const f_m = (metrics as any)?.T_m ? (1 / (metrics as any).T_m) : 15e9;  // Hz (fallback 15 GHz)
   // Step 6: Raw Power Loss (Equation 3 from PDF)
-  const omega = 2 * pi * 15e9; // 15 GHz modulation frequency
+  const omega = 2 * pi * f_m; // rad/s
   const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
   
   // Step 7: Dynamic Power Throttling (Based on selected mode)
@@ -233,9 +235,9 @@ export function LiveEnergyPipeline({
   console.log(`  P_avg (throttled): ${P_avg_W} W`);
   console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
   // Step 6 view values from the server (authoritative)
-  const tauLC = metrics?.tauLC;     // s
-  const T_m   = metrics?.T_m;       // s
-  const TS_ratio = metrics?.timeScaleRatio; // dimensionless
+  const tauLC = (metrics as any)?.tauLC ?? NaN;     // s
+  const T_m   = (metrics as any)?.T_m ?? NaN;       // s  
+  const TS_ratio = metrics?.timeScaleRatio ?? NaN; // dimensionless
   
   // Step 10: Total Exotic Mass (Equation 5 from PDF)  
   const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
