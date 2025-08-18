@@ -309,6 +309,22 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     return () => { if (engineRef.current) engineRef.current.onDiagnostics = null; };
   }, [isLoaded]);
 
+  // Keyboard controls for live tilt tuning
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!engineRef.current) return;
+      if (e.key === ']') {
+        engineRef.current.uniforms.tiltGain = (engineRef.current.uniforms.tiltGain ?? 0.25) * 1.25;
+        engineRef.current.requestRewarp?.();
+      } else if (e.key === '[') {
+        engineRef.current.uniforms.tiltGain = (engineRef.current.uniforms.tiltGain ?? 0.25) / 1.25;
+        engineRef.current.requestRewarp?.();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isLoaded]);
+
   const toggleAnimation = () => {
     setIsRunning(!isRunning);
     if (engineRef.current) {
@@ -326,10 +342,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   };
 
   const resetView = () => {
-    if (engineRef.current) {
-      // Reset any view parameters if needed
-      engineRef.current.updateUniforms(parameters);
-    }
+    if (!engineRef.current) return;
+    // Reapply the exact uniforms we computed in the last update, not the bare props.
+    const u = engineRef.current.uniforms || {};
+    engineRef.current.updateUniforms({ ...u });
+    if (engineRef.current.requestRewarp) engineRef.current.requestRewarp();
   };
 
   return (

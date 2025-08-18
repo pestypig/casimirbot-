@@ -372,6 +372,15 @@ class WarpEngine {
             this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
         }
         
+        // Log tilt uniforms for diagnostics
+        if (this._diagEnabled || true) {  // Always log for now
+          console.log('🎛️ Tilt uniforms:', {
+            epsilonTilt: this.uniforms?.epsilonTilt,
+            tiltGain: this.uniforms?.tiltGain,
+            betaTiltVec: this.uniforms?.betaTiltVec,
+          });
+        }
+        
         // Apply warp deformation to grid with mode-specific enhancements
         this._updateGrid();
     }
@@ -697,42 +706,32 @@ class WarpEngine {
             }
             
             // ----- Interior gravity (shift vector "tilt") -----
-            const eps = Math.max(
-              0,
-              (this.uniforms?.epsilonTilt || 0),
-              (this.uniforms?.epsilonTiltFloor || 0)
-            ); // dimensionless
+            // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
+            const w_int = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // ~few cm in normalized space
+            const interior = (() => {
+              // 1 inside the cabin (rho <= 1 - w_int), 0 outside; smooth edge within w_int
+              const t = (1.0 - rho) / Math.max(w_int, 1e-6);
+              // smoothstep(0→1): 3t² − 2t³, clamped
+              const s = Math.max(0, Math.min(1, t));
+              return s * s * (3 - 2 * s);
+            })();
 
-            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];    // "down"
-            const gtilt = this.uniforms?.tiltGain ?? 0.35;             // visual knob
-
-            // unit "down" vector
-            const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;
-            const bhat = [btilt[0]/bmag, btilt[1]/bmag, btilt[2]/bmag];
-
-            // smooth interior window (≈1 well inside, 0 outside) using local wall thickness
-            const w   = Math.max(1e-6, w_rho_local);
-            const t   = (1.0 + 2.0*w - rho) / (4.0*w);        // maps [1-2w, 1+2w] → [1,0]
-            const winInterior = Math.max(0.0, Math.min(1.0, t)); 
-            const winSmooth   = winInterior * winInterior * (3.0 - 2.0 * winInterior); // smoothstep
-
-            // tie tilt strength to the same visual amplitude used for the wall
-            // so modes scale naturally (standby≈0, cruise<hover<emergency)
-            const A_tilt = A_vis;   // <- already computed above
-
-            // final, bounded tilt displacement
-            const dispTilt = A_tilt * eps * gtilt * winSmooth;
-
-            // nudge the vertex along the cabin "down" direction
-            vtx[i    ] += bhat[0] * dispTilt;
-            vtx[i + 1] += bhat[1] * dispTilt;
-            vtx[i + 2] += bhat[2] * dispTilt;
+            // NEW: interior tilt displacement — do NOT multiply by 'ring'
+            const epsTilt   = this.uniforms?.epsilonTilt ?? 0.0;
+            const tiltGain  = this.uniforms?.tiltGain ?? 0.25;     // gentle default
+            const betaTilt  = this.uniforms?.betaTiltVec || [0, -1, 0];
+            // project normal onto "down" and keep sign stable
+            const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
+            // scale small, interior-only, soft-clamped
+            let dispTilt = epsTilt * tiltGain * interior * downDot;
+            const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
+            dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
             // ----- end interior gravity -----
 
-            // Canonical Natário wall displacement (unchanged)
-            vtx[i]     = vtx[i]     - n[0] * disp;
-            vtx[i + 1] = vtx[i + 1] - n[1] * disp;
-            vtx[i + 2] = vtx[i + 2] - n[2] * disp;
+            // apply both curvature and tilt
+            vtx[i]     = p[0] - n[0] * (disp + dispTilt);
+            vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
+            vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
         }
         
         // Enhanced diagnostics - check for amplitude overflow
