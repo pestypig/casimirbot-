@@ -36,6 +36,7 @@ import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 import { Tooltip } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
+import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -780,6 +781,12 @@ export default function HelixCore() {
 
             {/* Amplification Panel */}
             <AmplificationPanel />
+
+            {/* Shift Vector • Interior Gravity */}
+            <ShiftVectorPanel
+              mode={pipelineState?.currentMode || "hover"}
+              shift={systemMetrics?.shiftVector}
+            />
 
             {/* Resonance Scheduler */}
             <Card className="bg-slate-900/50 border-slate-800">

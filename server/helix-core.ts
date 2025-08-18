@@ -508,6 +508,27 @@ export function getSystemMetrics(req: Request, res: Response) {
   const L_long = Math.max(Lx_m, Ly_m, Lz_m);
   const tauLC = L_long / 299_792_458;               // s
 
+  // Calculate shift vector parameters (artificial gravity tilt)
+  const c = 299_792_458;  // m/s
+  const hull = state.hull ?? { a: 503.5, b: 132, c: 86.5, Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);  // Geometric mean radius
+
+  // Per-mode gravity targets (matching WarpVisualizer)
+  const G = 9.80665;
+  const gTargets: Record<string, number> = {
+    hover:     0.10 * G,
+    cruise:    0.05 * G,
+    emergency: 0.30 * G,
+    standby:   0.00 * G,
+  };
+  const mode = (state.currentMode ?? 'hover').toLowerCase();
+  const gTarget = gTargets[mode] ?? 0;
+
+  // Calculate tilt parameters (identical to visualizer)
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+  const betaTiltVec: [number, number, number] = [0, -1, 0]; // default "down"
+  const gEff_check = epsilonTilt * (c * c) / R_geom;
+
   res.json({
     // tile/sector truth (these are what your Tile Grid should use)
     totalTiles: Math.floor(state.N_tiles),
@@ -522,6 +543,18 @@ export function getSystemMetrics(req: Request, res: Response) {
     // timing (optional but nice for the HUD)
     strobeHz: state.modulationFreq_GHz * 1e9 / sec.TOTAL_SECTORS,        // per sector sweep rate
     sectorPeriod_ms: 1000 * sec.TOTAL_SECTORS / (state.modulationFreq_GHz * 1e9),
+
+    // hull geometry
+    hull,
+
+    // shift vector for artificial gravity tilt
+    shiftVector: {
+      epsilonTilt,
+      betaTiltVec,
+      gTarget,
+      R_geom,
+      gEff_check
+    },
 
     // core outputs
     energyOutput: state.P_avg,                 // MW (your calibrated target)

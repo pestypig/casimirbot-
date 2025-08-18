@@ -1,5 +1,13 @@
 import * as React from "react";
 
+export interface ShiftVectorMetrics {
+  epsilonTilt: number;
+  betaTiltVec: [number, number, number];
+  gTarget: number;
+  R_geom: number;
+  gEff_check: number;
+}
+
 export type HelixMetrics = {
   energyOutput: number;          // MW
   exoticMass: number;            // kg
@@ -16,7 +24,11 @@ export type HelixMetrics = {
     Lx_m: number;                // Hull length
     Ly_m: number;                // Hull width  
     Lz_m: number;                // Hull height
+    a?: number;                  // Semi-axis a
+    b?: number;                  // Semi-axis b
+    c?: number;                  // Semi-axis c
   };
+  shiftVector?: ShiftVectorMetrics;
   tiles?: {
     tileArea_cm2: number;        // Tile area
     hullArea_m2: number | null;  // Hull surface area
