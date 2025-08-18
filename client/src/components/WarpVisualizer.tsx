@@ -203,8 +203,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         phaseSplit,
         epsilonTilt,
         betaTiltVec,
-        tiltVizGain: mode === 'emergency' ? 8e11 : mode === 'hover' ? 4e11 : mode === 'cruise' ? 2e11 : 0,
-        tiltMaxMeters: mode === 'emergency' ? 0.25 : mode === 'hover' ? 0.18 : mode === 'cruise' ? 0.12 : 0.0,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         qSpoil: parameters.qSpoilingFactor,
@@ -241,18 +239,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         // NEW: interior gravity uniforms
         epsilonTilt,
         betaTiltVec,
-
-        // Purely visual scale for ε_tilt (~1e-15). Much smaller now.
-        tiltVizGain:
-          mode === 'emergency' ? 8e11 :
-          mode === 'hover'     ? 4e11 :
-          mode === 'cruise'    ? 2e11 : 0,
-
-        // Absolute displacement cap for the tilt contribution (meters)
-        tiltMaxMeters:
-          mode === 'emergency' ? 0.25 :
-          mode === 'hover'     ? 0.18 :
-          mode === 'cruise'    ? 0.12 : 0.0,
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
