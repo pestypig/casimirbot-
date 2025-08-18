@@ -203,31 +203,31 @@ export default function Documentation() {
                 </CardContent>
               </Card>
 
-              {/* NEW PAPER - Replace this template with your actual paper */}
+              {/* Artificial Gravity in Natário Bubble Paper */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileText className="w-5 h-5" />
-                    Your New Paper Title Here
+                    A Gentle "Tilt" Inside Natário Bubble
                   </CardTitle>
                   <CardDescription>
-                    Brief description of what this new paper covers
+                    Artificial gravity implementation (0.1g-0.5g) through controlled β-gradient manipulation
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     <p><strong>Key Topics:</strong></p>
                     <ul className="list-disc list-inside space-y-1 mt-2">
-                      <li>Key finding or topic 1</li>
-                      <li>Key finding or topic 2</li>
-                      <li>Key finding or topic 3</li>
-                      <li>Key finding or topic 4</li>
-                      <li>Key finding or topic 5</li>
+                      <li>Ultra-small linear β-gradient for artificial gravity generation</li>
+                      <li>Ford-Roman quantum inequality compliance with gravity tilt</li>
+                      <li>Programmable phase array implementation via Casimir shell</li>
+                      <li>Practical limits: comfort, QI, and structural ceilings</li>
+                      <li>Navigation considerations for bubble-fixed gravity vectors</li>
                     </ul>
                   </div>
                   <div className="flex gap-2">
                     <Button 
-                      onClick={() => window.open('/attached_assets/your-paper-filename.pdf', '_blank')}
+                      onClick={() => window.open('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755481905632.pdf', '_blank')}
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function Documentation() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => window.open('/attached_assets/your-paper-filename.pdf', '_blank')}
+                      onClick={() => window.open('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755481905632.pdf', '_blank')}
                       className="flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />
