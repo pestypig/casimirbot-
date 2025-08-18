@@ -227,7 +227,7 @@ export default function Documentation() {
                   </div>
                   <div className="flex gap-2">
                     <Button 
-                      onClick={() => window.open(encodeURI('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755481905632.pdf'), '_blank')}
+                      onClick={() => window.open("/attached_assets/A%20gentle%20%22tilt%22%20inside%20Nat%C3%A1rio%20bubble%20a%20whisper%20of%20artificial%20gravity%200.5g_1755481905632.pdf", '_blank')}
                       className="flex items-center gap-2"
                     >
                       <Download className="w-4 h-4" />
@@ -235,7 +235,7 @@ export default function Documentation() {
                     </Button>
                     <Button 
                       variant="outline" 
-                      onClick={() => window.open(encodeURI('/attached_assets/A gentle "tilt" inside Natário bubble a whisper of artificial gravity 0.5g_1755481905632.pdf'), '_blank')}
+                      onClick={() => window.open("/attached_assets/A%20gentle%20%22tilt%22%20inside%20Nat%C3%A1rio%20bubble%20a%20whisper%20of%20artificial%20gravity%200.5g_1755481905632.pdf", '_blank')}
                       className="flex items-center gap-2"
                     >
                       <ExternalLink className="w-4 h-4" />
