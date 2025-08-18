@@ -73,6 +73,22 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [diag, setDiag] = useState<any|null>(null);
 
+  // --- Simple per-mode defaults for interior tilt (demo-friendly) ---
+  // You can later replace this with the exact value from the Shift Vector panel
+  // (epsilonTilt = g_target * R_geom / c^2) and pass it via props.parameters.epsilonTilt.
+  const modeEpsilonTilt = (mode: string | undefined) => {
+    switch ((mode || 'hover').toLowerCase()) {
+      case 'standby':   return 0.000; // perfectly flat
+      case 'cruise':    return 0.012; // subtle
+      case 'hover':     return 0.020; // noticeable
+      case 'emergency': return 0.035; // stronger
+      default:          return 0.015;
+    }
+  };
+
+  // Default cabin "down" (can be overridden via props.parameters.betaTiltVec)
+  const defaultBetaTilt: [number, number, number] = [0, -1, 0];
+
   useEffect(() => {
     const initializeEngine = async () => {
       if (!canvasRef.current) return;
@@ -91,7 +107,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=9'; // Naming mismatch fix
+        script.src = '/warp-engine-fixed.js?v=9'; // bump query to force cache-bust after engine changes
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -172,12 +188,21 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Smooth strobe split phase
       const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
       
+      // Resolve mode + tilt uniforms
+      const epsilonTilt = 
+        num(parameters.shift?.epsilonTilt || parameters.epsilonTilt, modeEpsilonTilt(mode));
+      const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+        ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+        : defaultBetaTilt;
+
       // DEBUG: Show the exact values being passed
       console.log("🎛️ uniforms-to-engine (v9 naming fix)", {
         mode,
         dutyFrac,
         sectors,     // ✅ NOT sectorCount 
         phaseSplit,
+        epsilonTilt,
+        betaTiltVec,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         qSpoil: parameters.qSpoilingFactor,
@@ -211,9 +236,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
         wallWidth,
 
-        // NEW: Gentle interior-gravity tilt uniforms  
-        epsilonTilt: num(parameters.shift?.epsilonTilt || parameters.epsilonTilt, 0),
-        betaTiltVec: arr3(parameters.shift?.betaTiltVec || parameters.betaTiltVec, [0, -1, 0]),
+        // NEW: interior gravity uniforms
+        epsilonTilt,
+        betaTiltVec,
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
