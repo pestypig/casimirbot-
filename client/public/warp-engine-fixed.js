@@ -69,7 +69,8 @@ class WarpEngine {
             driveDir: [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
-            betaTiltVec: [0, -1, 0]  // tilt direction vector (default: -Y = "down")
+            betaTiltVec: [0, -1, 0],  // tilt direction vector (default: -Y = "down")
+            tiltGain: 0.55       // gentle visual scaling
         };
         
         // Initialize rendering pipeline
@@ -335,6 +336,7 @@ class WarpEngine {
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: N(parameters.epsilonTilt || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
+            tiltGain: N(parameters.tiltGain || 0.55),
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -693,35 +695,29 @@ class WarpEngine {
                 disp = blended;
             }
             
-            // --- Gentle interior "shift vector" tilt for artificial gravity ---
-            // uniforms: epsilonTilt (small, dimensionless), betaTiltVec = [dx,dy,dz] ("down" dir)
-            const epsTilt = Math.max(0, (this.uniforms?.epsilonTilt ?? 0));
-            if (epsTilt > 0) {
-              // Normalize tilt direction
-              const b = this.uniforms?.betaTiltVec || [0, -1, 0];
-              const bLen = Math.hypot(b[0], b[1], b[2]) || 1;
-              const bHat = [b[0] / bLen, b[1] / bLen, b[2] / bLen];
+            // ----- Interior gravity (shift vector "tilt") -----
+            // inputs
+            const eps   = Math.max(0, this.uniforms?.epsilonTilt || 0); // ≪ 1e-6
+            const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];
+            const gtilt = this.uniforms?.tiltGain || 0.55;
 
-              // Smooth interior window: 1 deep inside, 0 outside wall (C¹)
-              // Centered at ρ=1 with width ≈ 3 w_rho
-              const wIn = (() => {
-                const a = Math.max(1e-6, 1.0 - 2.5 * w_rho);  // start of roll-off (inside)
-                const bnd = Math.min(2.0, 1.0 + 2.5 * w_rho); // end near exterior
-                // smoothstep reversed so it is near 1 inside and fades to 0 across wall
-                const t = Math.min(1, Math.max(0, (rho - a) / (bnd - a)));
-                return 1.0 - (t * t * (3 - 2 * t)); // 1 - smoothstep(a,bnd,ρ)
-              })();
+            // soft window that is ~1 inside and ~0 outside the shell
+            const w = Math.max(1e-6, w_rho_local);                 // same wall scale you use for bell
+            const t = Math.min(1, Math.max(0, (1.0 + w - rho) / (2.0 * w))); // linear window
+            const winInterior = t*t*(3 - 2*t);               // smoothstep(t)
 
-              // Use fore–aft coordinate to create a *slope* (constant β-gradient) inside.
-              // Project point onto drive direction (+x in scene units) and scale gently.
-              const xSlope = (p[0] / axesScene[0]);         // normalized fore–aft coordinate
-              const tiltMag = epsTilt * xSlope * wIn;       // small, smooth gradient inside
+            // project point onto tilt direction (unit)
+            const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;
+            const bhat = [btilt[0]/bmag, btilt[1]/bmag, btilt[2]/bmag];
 
-              // Apply the interior tilt as a displacement in the "down" direction bHat
-              vtx[i]     += bHat[0] * tiltMag;
-              vtx[i + 1] += bHat[1] * tiltMag;
-              vtx[i + 2] += bHat[2] * tiltMag;
-            }
+            // gentle displacement, bounded; factor 0.12 keeps it subtle
+            const dispTilt = eps * gtilt * winInterior * 0.12;
+
+            // nudge the vertex along the cabin "down" direction
+            vtx[i    ] += bhat[0] * dispTilt;
+            vtx[i + 1] += bhat[1] * dispTilt;
+            vtx[i + 2] += bhat[2] * dispTilt;
+            // ----- end interior gravity -----
 
             // Canonical Natário wall displacement (unchanged)
             vtx[i]     = vtx[i]     - n[0] * disp;

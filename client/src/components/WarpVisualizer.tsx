@@ -107,7 +107,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
         // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
         const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=9'; // bump query to force cache-bust after engine changes
+        script.src = '/warp-engine-fixed.js?v=tilt2'; // cache-bust for tilt implementation
         console.log('Loading 3D WarpEngine from:', script.src);
         script.onload = () => {
           console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
@@ -188,9 +188,27 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Smooth strobe split phase
       const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
       
-      // Resolve mode + tilt uniforms
-      const epsilonTilt = 
-        num(parameters.shift?.epsilonTilt || parameters.epsilonTilt, modeEpsilonTilt(mode));
+      // choose a gentle visual gain per mode (not physics)
+      const tiltGains: Record<string, number> = {
+        standby:   0.00,
+        cruise:    0.35,
+        hover:     0.55,
+        emergency: 0.80,
+      };
+      const tiltGain = typeof (parameters as any).tiltGain === 'number'
+        ? (parameters as any).tiltGain
+        : (tiltGains[mode] ?? 0.55);
+      
+      // Mode-specific tilt defaults (replace physics values)
+      const modeTiltDefaults: Record<string, number> = {
+        emergency: 0.035,
+        hover:     0.020,
+        cruise:    0.012,
+        standby:   0.000,
+      };
+      
+      // Resolve mode + tilt uniforms with mode-specific defaults
+      const epsilonTilt = modeTiltDefaults[mode] ?? 0;
       const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
         ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec)
         : defaultBetaTilt;
@@ -203,6 +221,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         phaseSplit,
         epsilonTilt,
         betaTiltVec,
+        tiltGain,
         g_y: parameters.g_y,
         cavityQ: parameters.cavityQ,
         qSpoil: parameters.qSpoilingFactor,
@@ -237,8 +256,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         wallWidth,
 
         // NEW: interior gravity uniforms
-        epsilonTilt,
-        betaTiltVec,
+        epsilonTilt: Number(epsilonTilt || 0),     // dimensionless (≪ 1e-6)
+        betaTiltVec: betaTiltVec || [0, -1, 0],    // unit direction for "down"
+        tiltGain,                                  // gentle visual scaling
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
