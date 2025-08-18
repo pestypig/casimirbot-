@@ -12,6 +12,22 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 
+// Helper functions for safe parameter extraction
+const num = (v: any, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
+const arr3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
+  Array.isArray(v) && v.length === 3 && v.every(x => typeof x === "number" && isFinite(x))
+    ? (v as [number, number, number])
+    : d;
+
+// Shift/tilt parameters for gentle interior gravity
+type ShiftParams = {
+  epsilonTilt?: number;                    // dimensionless ε_tilt
+  betaTiltVec?: [number, number, number];  // unit-ish direction for "down"
+  gTarget?: number;
+  R_geom?: number;
+  gEff_check?: number;
+};
+
 interface WarpVisualizerProps {
   parameters: {
     dutyCycle: number;
@@ -40,10 +56,12 @@ interface WarpVisualizerProps {
     };
     // Grid scaling
     gridScale?: number;
-    // NEW: Artificial gravity tilt parameters
+    // NEW: Artificial gravity tilt parameters (legacy format)
     epsilonTilt?: number;
     betaTiltVec?: number[];
     wallWidth_m?: number;
+    // NEW: Shift parameters (structured format)
+    shift?: ShiftParams;
   };
 }
 
@@ -192,6 +210,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         // Hull / wall
         hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
         wallWidth,
+
+        // NEW: Gentle interior-gravity tilt uniforms  
+        epsilonTilt: num(parameters.shift?.epsilonTilt || parameters.epsilonTilt, 0),
+        betaTiltVec: arr3(parameters.shift?.betaTiltVec || parameters.betaTiltVec, [0, -1, 0]),
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
@@ -201,11 +223,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sagDepth_nm: num(parameters.sagDepth_nm),
         powerAvg_MW: num(parameters.powerAvg_MW),
         exoticMass_kg: num(parameters.exoticMass_kg),
-        tsRatio: num(parameters.tsRatio, 4100),
-        
-        // NEW: Artificial gravity tilt parameters
-        epsilonTilt: num(parameters.epsilonTilt, 0),
-        betaTiltVec: parameters.betaTiltVec || [0, -1, 0]
+        tsRatio: num(parameters.tsRatio, 4100)
       });
 
       // CRITICAL: force immediate visual update on parameter change

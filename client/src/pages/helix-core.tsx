@@ -1011,7 +1011,16 @@ export default function HelixCore() {
                 // NEW: Artificial gravity tilt parameters (use metrics if available, fallback to computed)
                 epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                 betaTiltVec: systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec,
-                wallWidth_m: 6.0
+                wallWidth_m: 6.0,
+                
+                // Structured shift data 
+                shift: {
+                  epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                  betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
+                  gTarget,
+                  R_geom,
+                  gEff_check: (epsilonTilt * c * c) / R_geom
+                }
               }}
                 />
               );
