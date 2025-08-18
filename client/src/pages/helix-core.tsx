@@ -1008,9 +1008,9 @@ export default function HelixCore() {
                 // Optional grid scaling override (default: 1.6x hull span padding)
                 gridScale: 1.6,  // Can be made configurable via UI if needed
                 
-                // NEW: Artificial gravity tilt parameters
-                epsilonTilt: epsilonTilt,
-                betaTiltVec: betaTiltVec,
+                // NEW: Artificial gravity tilt parameters (use metrics if available, fallback to computed)
+                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                betaTiltVec: systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec,
                 wallWidth_m: 6.0
               }}
                 />

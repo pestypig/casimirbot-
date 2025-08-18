@@ -698,20 +698,37 @@ class WarpEngine {
             vtx[i + 1] = p[1] - n[1] * disp;
             vtx[i + 2] = p[2] - n[2] * disp;
             
-            // NEW: Apply artificial gravity tilt (gentle interior gravity effects)
-            const epsilonTilt = this.uniforms.epsilonTilt || 0;
-            if (epsilonTilt > 0) {
-                const betaTiltVec = this.uniforms.betaTiltVec || [0, -1, 0];
+            // ===== NEW: Gentle interior tilt (shift-vector "gravity") =====
+            const eps = (this.uniforms?.epsilonTilt || 0.0);
+            if (eps > 0.0) {
+                // unit tilt direction in scene space
+                const b = this.uniforms?.betaTiltVec || [0, -1, 0];
+                const bm = Math.hypot(b[0], b[1], b[2]) || 1;
+                const bhat = [b[0]/bm, b[1]/bm, b[2]/bm];
+
+                // interior window: only acts inside the wall, smooth to 0 at the wall
+                // use a C² envelope so there's no ridge at the boundary
+                const innerA = -3.0 * w_rho_local;
+                const innerB = -0.5 * w_rho_local;
+                const tInterior = (sd < 0.0)
+                    ? (function smootherstep(a,b,x){const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*t*(t*(t*6-15)+10);} (innerA, innerB, sd))
+                    : 0.0;
+
+                // project surface normal onto "down" to bias the wall in that direction
+                const nDotDown = n[0]*bhat[0] + n[1]*bhat[1] + n[2]*bhat[2];
+
+                // couple tilt to the canonical bell & wall window so it's physical and gentle
+                const tiltPush = eps * nDotDown * gaussian_local * wallWin * tInterior;
+
+                // add the interior tilt to the main displacement
+                disp += tiltPush;
                 
-                // Interior tilt applies a gentle β-gradient proportional to position
-                // This creates a subtle "down" direction inside the warp bubble
-                const tiltDisp = epsilonTilt * (p[0] * betaTiltVec[0] + p[1] * betaTiltVec[1] + p[2] * betaTiltVec[2]);
-                
-                // Apply tilt displacement along the tilt direction
-                vtx[i] += tiltDisp * betaTiltVec[0];
-                vtx[i + 1] += tiltDisp * betaTiltVec[1];
-                vtx[i + 2] += tiltDisp * betaTiltVec[2];
+                // Apply updated displacement with tilt
+                vtx[i] = p[0] - n[0] * disp;
+                vtx[i + 1] = p[1] - n[1] * disp;
+                vtx[i + 2] = p[2] - n[2] * disp;
             }
+            // ===== END NEW =====
         }
         
         // Enhanced diagnostics - check for amplitude overflow

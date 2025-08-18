@@ -17,7 +17,33 @@ const fmt = (x: number, d = 3) => Number.isFinite(x) ? x.toExponential(d) : "—
 const fstd = (x: number, d = 3) => Number.isFinite(x) ? x.toFixed(d) : "—";
 
 export function ShiftVectorPanel({ mode, shift }: Props) {
-  const ok = !!shift;
+  // Compute fallback values based on mode and hull geometry (for when metrics aren't loaded yet)
+  const G = 9.80665; // m/s²
+  const c = 299792458; // m/s
+  
+  const gTargets: Record<string, number> = {
+    hover: 0.10 * G,
+    cruise: 0.05 * G,
+    emergency: 0.30 * G,
+    standby: 0.00 * G,
+  };
+  
+  const fallbackGTarget = gTargets[mode?.toLowerCase()] ?? 0;
+  const fallbackRGeom = Math.cbrt(503.5 * 132.0 * 86.5); // ∛(a·b·c)
+  const fallbackEpsilonTilt = Math.min(5e-7, Math.max(0, (fallbackGTarget * fallbackRGeom) / (c * c)));
+  const fallbackBetaTiltVec = [0, -1, 0];
+  const fallbackGEffCheck = (fallbackEpsilonTilt * c * c) / fallbackRGeom;
+
+  // Use real data if available, otherwise fallback calculations
+  const displayShift = shift ?? {
+    gTarget: fallbackGTarget,
+    R_geom: fallbackRGeom,
+    epsilonTilt: fallbackEpsilonTilt,
+    betaTiltVec: fallbackBetaTiltVec as [number, number, number],
+    gEff_check: fallbackGEffCheck
+  };
+  
+  const ok = !!(shift || fallbackGTarget > 0); // Show panel if we have data or computed fallbacks
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -28,7 +54,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
         <CardDescription>Gentle Natário tilt (β-gradient) for cabin "down".</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        {!ok && <div className="text-slate-400">No shift-vector data (standby or unavailable).</div>}
+        {!ok && <div className="text-slate-400">No shift-vector data (standby mode).</div>}
 
         {ok && (
           <>
@@ -44,18 +70,21 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
             <div className="grid grid-cols-2 gap-3 font-mono">
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>target</sub></div>
-                <div className="text-cyan-300">{fstd(shift!.gTarget, 3)} m/s²</div>
+                <div className="text-cyan-300">{fstd(displayShift.gTarget, 3)} m/s²</div>
+                {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">R<sub>geom</sub></div>
-                <div className="text-cyan-300">{fstd(shift!.R_geom, 1)} m</div>
+                <div className="text-cyan-300">{fstd(displayShift.R_geom, 1)} m</div>
+                {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger className="text-left">
                       <div className="text-slate-400">ε<sub>tilt</sub> (dimensionless)</div>
-                      <div className="text-purple-300">{fmt(shift!.epsilonTilt, 3)}</div>
+                      <div className="text-purple-300">{fmt(displayShift.epsilonTilt, 3)}</div>
+                      {!shift && <div className="text-xs text-slate-500">computed</div>}
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
                       Kept ≪ 1e-6 ("whisper" regime) to preserve QI headroom and keep tilt visual-only inside.
@@ -65,11 +94,13 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">β⃗<sub>tilt</sub></div>
-                <div className="text-emerald-300">[{shift!.betaTiltVec.join(", ")}]</div>
+                <div className="text-emerald-300">[{displayShift.betaTiltVec.join(", ")}]</div>
+                {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
               <div className="col-span-2 p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>eff</sub> (check)</div>
-                <div className="text-amber-300">{fstd(shift!.gEff_check, 3)} m/s²</div>
+                <div className="text-amber-300">{fstd(displayShift.gEff_check, 3)} m/s²</div>
+                {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
             </div>
 
