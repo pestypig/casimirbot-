@@ -1159,16 +1159,26 @@ export default function HelixCore() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {mapMode === "solar" ? (
-                  <SolarMap
-                    width={800}
-                    height={400}
-                    routeIds={route}
-                    centerOnId="EARTH"
-                    onPickBody={(id) => {
-                      setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
-                      publish("luma:whisper", { text: "Waypoint selected. Route updated." });
-                    }}
-                  />
+                  <div className="w-full overflow-hidden rounded-md bg-slate-950 border border-slate-800">
+                    {/* Constrained container so the canvas can't blow past its panel */}
+                    <div className="mx-auto max-w-[720px]">
+                      <SolarMap
+                        /* Slightly smaller, stable aspect to fit the panel */
+                        width={720}
+                        height={360}
+                        routeIds={route}
+                        /* Prefer exact midpoint between Earth & Saturn if supported (see SolarMap patch).
+                           If you don't want to patch SolarMap, comment the next line and use centerOnId="JUPITER" instead. */
+                        centerBetweenIds={["EARTH","SATURN"]}
+                        /* Fallback (no SolarMap change): centerOnId="JUPITER" */
+                        centerOnId="EARTH"
+                        onPickBody={(id) => {
+                          setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                          publish("luma:whisper", { text: "Waypoint selected. Route updated." });
+                        }}
+                      />
+                    </div>
+                  </div>
                 ) : !galaxyCalibration ? (
                   <div className="h-40 grid place-items-center text-xs text-slate-400">
                     Loading galactic coordinate system…
@@ -1212,6 +1222,41 @@ export default function HelixCore() {
                     height={400}
                   />
                 )}
+                {/* Removable route chips */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {route.map((id, idx) => (
+                    <span
+                      key={`${id}-${idx}`}
+                      className="inline-flex items-center gap-2 px-2 py-1 rounded bg-slate-800 text-slate-100 text-xs"
+                    >
+                      {id}
+                      {/* Protect start/end if you want (optional): e.g., idx>0 && idx<route.length-1 */}
+                      <button
+                        className="ml-1 rounded px-1 text-slate-300 hover:text-red-300 hover:bg-slate-700"
+                        onClick={() => {
+                          setRoute(r => {
+                            const copy = r.slice();
+                            copy.splice(idx, 1);
+                            // If last node removed, keep SUN as terminus by convention (optional)
+                            if (copy.length === 0) return ["SUN"];
+                            return copy;
+                          });
+                          publish("luma:whisper", { text: `Removed waypoint: ${id}` });
+                        }}
+                        aria-label={`Remove ${id}`}
+                        title={`Remove ${id}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {route.length === 0 && (
+                    <span className="text-xs text-slate-500">
+                      No waypoints yet — tap bodies on the map to add them.
+                    </span>
+                  )}
+                </div>
+
                 <RouteSteps 
                   bodies={mapMode === "solar" ? solarBodiesForRoutes : BODIES}
                   plan={{ waypoints: route }}

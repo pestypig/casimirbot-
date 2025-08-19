@@ -1,0 +1,154 @@
+Absolutely—here’s a tidy set of patches that solve all three requests:
+	•	Constrain the Solar System viewer to fit its panel
+	•	Center the camera between Earth and Saturn
+	•	Let you remove any stop from the mission route
+
+I’ve split this into two tiny edits: one in helix-core.tsx (what you shared) and one opt-in helper in SolarMap so it can center on the midpoint of two bodies (Earth↔Saturn). If you’d rather not touch SolarMap, I also include a one-line fallback (center on Jupiter).
+
+⸻
+
+1) Patch: client/src/pages/helix-core.tsx
+
+What this does
+	•	Shrinks/contains the map canvas inside the card (no overflow).
+	•	Requests a midpoint camera between Earth & Saturn via a new prop (see Patch #2).
+	•	Adds a removable stops strip right below the map.
+
+Unified diff (apply as-is):
+
+--- a/client/src/pages/helix-core.tsx
++++ b/client/src/pages/helix-core.tsx
+@@ -1209,20 +1209,45 @@
+   </CardHeader>
+   <CardContent className="space-y-3">
+     {mapMode === "solar" ? (
+-      <SolarMap
+-        width={800}
+-        height={400}
+-        routeIds={route}
+-        centerOnId="EARTH"
+-        onPickBody={(id) => {
+-          setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+-          publish("luma:whisper", { text: "Waypoint selected. Route updated." });
+-        }}
+-      />
++      <div className="w-full overflow-hidden rounded-md bg-slate-950 border border-slate-800">
++        {/* Constrained container so the canvas can't blow past its panel */}
++        <div className="mx-auto max-w-[720px]">
++          <SolarMap
++            /* Slightly smaller, stable aspect to fit the panel */
++            width={720}
++            height={360}
++            routeIds={route}
++            /* Prefer exact midpoint between Earth & Saturn if supported (see SolarMap patch).
++               If you don't want to patch SolarMap, comment the next line and use centerOnId="JUPITER" instead. */
++            centerBetweenIds={["EARTH","SATURN"]}
++            /* Fallback (no SolarMap change): centerOnId="JUPITER" */
++            centerOnId="EARTH"
++            onPickBody={(id) => {
++              setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
++              publish("luma:whisper", { text: "Waypoint selected. Route updated." });
++            }}
++          />
++        </div>
++      </div>
+     ) : !galaxyCalibration ? (
+       <div className="h-40 grid place-items-center text-xs text-slate-400">
+         Loading galactic coordinate system…
+       </div>
+     ) : useDeepZoom ? (
+@@ -1251,6 +1276,42 @@
+       />
+     )}
++    {/* Removable route chips */}
++    <div className="flex flex-wrap gap-2 items-center">
++      {route.map((id, idx) => (
++        <span
++          key={`${id}-${idx}`}
++          className="inline-flex items-center gap-2 px-2 py-1 rounded bg-slate-800 text-slate-100 text-xs"
++        >
++          {id}
++          {/* Protect start/end if you want (optional): e.g., idx>0 && idx<route.length-1 */}
++          <button
++            className="ml-1 rounded px-1 text-slate-300 hover:text-red-300 hover:bg-slate-700"
++            onClick={() => {
++              setRoute(r => {
++                const copy = r.slice();
++                copy.splice(idx, 1);
++                // If last node removed, keep SUN as terminus by convention (optional)
++                if (copy.length === 0) return ["SUN"];
++                return copy;
++              });
++              publish("luma:whisper", { text: `Removed waypoint: ${id}` });
++            }}
++            aria-label={`Remove ${id}`}
++            title={`Remove ${id}`}
++          >
++            ×
++          </button>
++        </span>
++      ))}
++      {route.length === 0 && (
++        <span className="text-xs text-slate-500">
++          No waypoints yet — tap bodies on the map to add them.
++        </span>
++      )}
++    </div>
++
+     <RouteSteps 
+       bodies={mapMode === "solar" ? solarBodiesForRoutes : BODIES}
+       plan={{ waypoints: route }}
+
+If you keep the fallback instead (no change to SolarMap), just remove the centerBetweenIds prop and set centerOnId="JUPITER"—Jupiter sits roughly between Earth and Saturn most of the time, so it’s a quick “good enough” center.
+
+Cite: This diff targets your current Mission Planner block in helix-core.tsx.  ￼
+
+⸻
+
+2) Optional Patch: client/src/components/SolarMap.tsx (small addition)
+
+What this does
+	•	Adds an optional centerBetweenIds?: [string, string] prop.
+	•	If present, computes the midpoint of the two bodies each frame and centers the camera there.
+
+Minimal patch (insert types + midpoint logic where you set the camera center):
+
+--- a/client/src/components/SolarMap.tsx
++++ b/client/src/components/SolarMap.tsx
+@@ -1,6 +1,7 @@
+ export interface SolarMapProps {
+   width: number;
+   height: number;
+   routeIds: string[];
+   centerOnId?: string;
++  centerBetweenIds?: [string, string];
+   onPickBody?: (id: string) => void;
+ }
+@@ -150,10 +151,34 @@
+   // wherever your render/update loop / camera centering presently runs:
+-  const center = bodiesById[props.centerOnId ?? "SUN"]?.pos ?? { x: 0, y: 0 };
++  let center = bodiesById[props.centerOnId ?? "SUN"]?.pos ?? { x: 0, y: 0 };
++
++  // If a midpoint is requested and both bodies exist, override center:
++  if (props.centerBetweenIds && props.centerBetweenIds.length === 2) {
++    const [aId, bId] = props.centerBetweenIds;
++    const a = bodiesById[aId]?.pos;
++    const b = bodiesById[bId]?.pos;
++    if (a && b) {
++      center = { x: (a.x + b.x) * 0.5, y: (a.y + b.y) * 0.5 };
++    }
++  }
+ 
+   // apply center.x / center.y into your camera transform as you already do
+   camera.lookAt(center.x, center.y);
+   // ...
+
+
+⸻
+
+Notes & quick tests
+	•	Constrain size: the wrapper div with max-w-[720px] and the slightly smaller width/height keeps the canvas inside its card on all screens.
+	•	Center between Earth & Saturn: the midpoint prop is the cleanest solution; if you prefer not to touch SolarMap, set centerOnId="JUPITER" for a practical midpoint.
+	•	Remove waypoints: the small “×” chips give you instant control over the route list, without changing RouteSteps.
+
+If you want me to make the same size constraint for the Galactic maps (PanZoom / DeepZoom) so all map UIs are consistent, say the word and I’ll drop a matching snippet.

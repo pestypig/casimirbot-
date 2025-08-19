@@ -8,6 +8,7 @@ type Props = {
   routeIds?: string[];
   onPickBody?: (id: string) => void;
   centerOnId?: string;
+  centerBetweenIds?: [string, string];
 };
 
 export function SolarMap({
@@ -15,7 +16,8 @@ export function SolarMap({
   height = 400,
   routeIds = [],
   onPickBody,
-  centerOnId = "EARTH"
+  centerOnId = "EARTH",
+  centerBetweenIds
 }: Props) {
   const [zoom, setZoom] = React.useState(80); // pixels per AU
   const [offset, setOffset] = React.useState({ x: width / 2, y: height / 2 });
@@ -33,17 +35,43 @@ export function SolarMap({
     return () => clearInterval(id);
   }, []);
 
-  // Auto-center on specified body once when positions load
+  // Auto-center on specified body or midpoint between two bodies
   React.useEffect(() => {
-    const targetBody = points.find(p => p.id === centerOnId);
-    if (targetBody && points.length > 0) {
-      setOffset({ 
-        x: width / 2 - targetBody.x_au * zoom, 
-        y: height / 2 + targetBody.y_au * zoom 
-      });
+    if (points.length === 0) return;
+    
+    let centerPoint = { x_au: 0, y_au: 0 };
+    
+    // If a midpoint is requested and both bodies exist, use midpoint:
+    if (centerBetweenIds && centerBetweenIds.length === 2) {
+      const [aId, bId] = centerBetweenIds;
+      const bodyA = points.find(p => p.id === aId);
+      const bodyB = points.find(p => p.id === bId);
+      if (bodyA && bodyB) {
+        centerPoint = { 
+          x_au: (bodyA.x_au + bodyB.x_au) * 0.5, 
+          y_au: (bodyA.y_au + bodyB.y_au) * 0.5 
+        };
+      } else {
+        // Fallback to single body if midpoint fails
+        const targetBody = points.find(p => p.id === centerOnId);
+        if (targetBody) {
+          centerPoint = { x_au: targetBody.x_au, y_au: targetBody.y_au };
+        }
+      }
+    } else {
+      // Standard single body centering
+      const targetBody = points.find(p => p.id === centerOnId);
+      if (targetBody) {
+        centerPoint = { x_au: targetBody.x_au, y_au: targetBody.y_au };
+      }
     }
+    
+    setOffset({ 
+      x: width / 2 - centerPoint.x_au * zoom, 
+      y: height / 2 + centerPoint.y_au * zoom 
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [points.length > 0]); // Run once when points first populate
+  }, [centerOnId, centerBetweenIds, points, zoom, width, height]);
 
   // Drawing
   React.useEffect(() => {
