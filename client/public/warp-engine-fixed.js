@@ -39,6 +39,10 @@ class WarpEngine {
         this._lastAxesScene = null;
         this._gridSpan = null;
         
+        // Camera system
+        this.cameraMode = 'overhead';         // single source of truth for camera pose
+        this._lastFittedR = 1;                // cache last fit radius for stability
+        
         // Temporal smoothing for visual calm (canonical Natário)
         this._dispAlpha = 0.25; // blend factor (0=no change, 1=instant)
         this._prevDisp = [];     // per-vertex displacement history
@@ -98,16 +102,37 @@ class WarpEngine {
         this._renderLoop();
     }
 
-    _setupCamera() {
+    // --- central overhead camera (single place to change the pose) ---
+    _applyOverheadCamera(opts = {}) {
+        const gl = this.gl;
+        if (!gl) return;
         const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-        const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
-        const span = this._gridSpan || 1;
+        const fov = this._fitFovForAspect(aspect);      // existing helper
 
-        // Use the responsive fitter immediately (no interim low camera)
-        // _fitCameraToBubble also sets the projection
-        this._fitCameraToBubble(axes, span);
-        // …and gently bias the view a bit higher until uniforms arrive
-        this._adjustCameraForSpan(span);
+        // bubble radius in scene units
+        const axes = this.uniforms?.axesScene || this._lastAxesScene || [1,1,1];
+        const R = Math.max(axes[0], axes[1], axes[2], opts.spanHint || 1);
+        this._lastFittedR = R;
+
+        const baseMargin = 1.22;
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // ↑ raise camera; ↓ look slightly down so bubble isn't on the horizon
+        const eye    = [0, 0.45 * R, -dist];
+        const center = [0, -0.08 * R, 0];
+        const up     = [0, 1, 0];
+
+        this._perspective(this.projMatrix, fov, aspect, 0.08, 100.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+        
+        console.log(`📷 Overhead fit: R=${R.toFixed(2)}, eye=[${eye.map(v=>v.toFixed(2)).join(',')}], center=[${center.map(v=>v.toFixed(2)).join(',')}]`);
+    }
+
+    _setupCamera() {
+        // always start in the overhead fitted view
+        this._applyOverheadCamera();
     }
 
     _resizeCanvasToDisplaySize() {
@@ -124,35 +149,25 @@ class WarpEngine {
             this.canvas.height = height;
             this.gl.viewport(0, 0, width, height);
 
-            const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
-            this._fitCameraToBubble(axes, this._gridSpan || 1);
+            // after resize, reapply overhead fit (no low pose flash)
+            this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
         }
     }
     
     _adjustCameraForSpan(span) {
-        // Respect a manual override if provided
+        // prefer overhead fit unless the user explicitly set cameraZ
         if (Number.isFinite(this.currentParams?.cameraZ)) {
-            const aspect = this.canvas.width / this.canvas.height;
-            const eye = [0, 0.50, -this.currentParams.cameraZ];  // ↑ higher
-            const center = [0, -0.08, 0];                         // ↓ deeper look
+            const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+            const eye = [0, 0.50, -this.currentParams.cameraZ];
+            const center = [0, -0.08, 0];
             const up = [0, 1, 0];
+            this._perspective(this.projMatrix, this._fitFovForAspect(aspect), aspect, 0.08, 100.0);
             this._lookAt(this.viewMatrix, eye, center, up);
             this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
             console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
-            return;
+        } else {
+            this._applyOverheadCamera({ spanHint: span });
         }
-
-        // Otherwise, adapt but keep the view closer than before
-        const aspect = this.canvas.width / this.canvas.height;
-        const desired = Math.max(1.20, span * 0.90);
-        const eye = [0, 0.50, -desired];   // ↑ higher overhead by default
-        const center = [0, -0.08, 0];
-        const up = [0, 1, 0];
-
-        this._lookAt(this.viewMatrix, eye, center, up);
-        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
-        
-        console.log(`📷 Camera adjusted: distance=${eye[2].toFixed(2)} for span=${span.toFixed(2)}`);
     }
 
     _initializeGrid() {
@@ -478,6 +493,13 @@ class WarpEngine {
         
         // Apply warp deformation to grid with mode-specific enhancements
         this._updateGrid();
+        
+        // Apply camera positioning - prefer overhead fit unless explicit cameraZ provided
+        if (Number.isFinite(this.currentParams?.cameraZ)) {
+            this._adjustCameraForSpan(this._gridSpan || this._lastFittedR || 1.0);
+        } else {
+            this._applyOverheadCamera({ spanHint: this._gridSpan || this._lastFittedR || 1.0 });
+        }
     }
     
     _calculateModeEffects(params) {
@@ -1120,11 +1142,17 @@ class WarpEngine {
 
     // --- Bootstrap: set uniforms & fit camera before first frame ---------------
     bootstrap(initialParams = {}) {
+        this.currentParams = Object.assign({}, initialParams);
         // Ensure canvas size is correct before we compute FOV/dist
         this._resizeCanvasToDisplaySize();
 
         // Let updateUniforms compute/remember axesScene & span, then fit
         this.updateUniforms(initialParams);
+        
+        // sets overhead once
+        this._setupCamera();
+        // and again after uniforms are in
+        this._applyOverheadCamera();
 
         // Mark so we don't rely on any legacy default camera
         this._bootstrapped = true;
