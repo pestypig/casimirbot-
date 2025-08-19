@@ -98,6 +98,45 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         if (window.WarpEngine) {
           try {
             engineRef.current = new window.WarpEngine(canvasRef.current);
+            
+            // Build initial uniforms from current props/metrics
+            const mode = (parameters.currentMode || 'hover').toLowerCase();
+            const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+            const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+            const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+            const hull = parameters.hull || {
+              Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+              a: 503.5, b: 132, c: 86.5
+            };
+            const wallWidth = num(parameters.wall?.w_norm, 0.016);
+            const epsilonTilt = num(
+              (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt),
+              modeEpsilonTilt(mode)
+            );
+            const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+              ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+              : defaultBetaTilt;
+            
+            const initialUniforms = {
+              dutyCycle: dutyFrac,
+              gammaGeo: Number(parameters.g_y ?? 26),
+              Qburst: Number(parameters.cavityQ ?? 1e9),
+              deltaAOverA: Number(parameters.qSpoilingFactor ?? 1),
+              gammaVdB: Number(parameters.gammaVanDenBroeck ?? 1),
+              currentMode: mode,
+              sectors,
+              split: phaseSplit,
+              axesScene: parameters.axesScene,
+              hullAxes: [hull.a, hull.b, hull.c],
+              wallWidth: wallWidth,
+              gridSpan: parameters.gridSpan,
+              epsilonTilt: Number(epsilonTilt || 0),
+              betaTiltVec: betaTiltVec || [0, -1, 0],
+              tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
+            };
+
+            // Bootstrap before first draw to prevent camera jump
+            engineRef.current.bootstrap(initialUniforms);
             setIsLoaded(true);
           } catch (error) {
             console.error('Failed to initialize existing WarpEngine:', error);
@@ -115,6 +154,48 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             try {
               console.log('Creating WarpEngine instance...');
               engineRef.current = new window.WarpEngine(canvasRef.current);
+              
+              // Build initial uniforms from current props/metrics (same data you pass into updateUniforms)
+              const mode = (parameters.currentMode || 'hover').toLowerCase();
+              const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+              const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+              const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+              const hull = parameters.hull || {
+                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                a: 503.5, b: 132, c: 86.5
+              };
+              const wallWidth = num(parameters.wall?.w_norm, 0.016);
+              const epsilonTilt = num(
+                (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt),
+                modeEpsilonTilt(mode)
+              );
+              const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+                ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+                : defaultBetaTilt;
+              
+              const initialUniforms = {
+                dutyCycle: dutyFrac,
+                gammaGeo: Number(parameters.g_y ?? 26),
+                Qburst: Number(parameters.cavityQ ?? 1e9),
+                deltaAOverA: Number(parameters.qSpoilingFactor ?? 1),
+                gammaVdB: Number(parameters.gammaVanDenBroeck ?? 1),
+                currentMode: mode,
+                sectors,
+                split: phaseSplit,
+                // Prefer already-computed scene axes if you have them;
+                // otherwise pass hull in meters and the engine will convert.
+                axesScene: parameters.axesScene,         // optional, if you compute it
+                hullAxes: [hull.a, hull.b, hull.c],      // fallback if axesScene not present
+                wallWidth: wallWidth,
+                gridSpan: parameters.gridSpan,           // optional if you compute it
+                epsilonTilt: Number(epsilonTilt || 0),
+                betaTiltVec: betaTiltVec || [0, -1, 0],
+                tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
+              };
+
+              // 1) Bootstrap (fits camera + sets uniforms) BEFORE first draw
+              engineRef.current.bootstrap(initialUniforms);
+              
               console.log('WarpEngine instance created successfully - checking mode:', engineRef.current.isWebGLFallback ? 'FALLBACK' : 'WEBGL');
               setIsLoaded(true);
             } catch (error) {

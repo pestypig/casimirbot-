@@ -97,9 +97,13 @@ class WarpEngine {
     }
 
     _setupCamera() {
-        // Use responsive auto-framing instead of fixed camera
-        const axes = this.uniforms?.axesClip || this._lastAxesScene || [0.4, 0.22, 0.22];
-        this._fitCameraToBubble(axes, this._gridSpan || 1);
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
+        const span = this._gridSpan || 1;
+
+        // Use the responsive fitter immediately (no interim low camera)
+        // _fitCameraToBubble also sets the projection
+        this._fitCameraToBubble(axes, span);
     }
 
     _resizeCanvasToDisplaySize() {
@@ -116,7 +120,7 @@ class WarpEngine {
             this.canvas.height = height;
             this.gl.viewport(0, 0, width, height);
 
-            const axes = this.uniforms?.axesClip || this._lastAxesScene || [0.4, 0.22, 0.22];
+            const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
             this._fitCameraToBubble(axes, this._gridSpan || 1);
         }
     }
@@ -1096,9 +1100,10 @@ class WarpEngine {
         // Distance along -Z so bubble fits vertically
         const dist = (margin * R) / Math.tan(fov * 0.5);
 
-        // Lightly raise the camera with bubble size so horizon stays pleasing
-        const eye = [0, 0.22 * R, -dist];
-        const center = [0, -0.05 * R, 0];
+        // ↑ raised from ~0.22R to 0.32R for more overhead
+        const eye = [0, 0.32 * R, -dist];
+        // look slightly down so the deck plane reads clearly
+        const center = [0, -0.06 * R, 0];
         const up = [0, 1, 0];
 
         // Update projection & view
@@ -1107,6 +1112,18 @@ class WarpEngine {
         this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
         
         console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
+    }
+
+    // --- Bootstrap: set uniforms & fit camera before first frame ---------------
+    bootstrap(initialParams = {}) {
+        // Ensure canvas size is correct before we compute FOV/dist
+        this._resizeCanvasToDisplaySize();
+
+        // Let updateUniforms compute/remember axesScene & span, then fit
+        this.updateUniforms(initialParams);
+
+        // Mark so we don't rely on any legacy default camera
+        this._bootstrapped = true;
     }
 
     // === Natário Diagnostics (viewer-only, does not affect physics) ===
