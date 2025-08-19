@@ -38,6 +38,7 @@ import AmplificationPanel from "@/components/AmplificationPanel";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
+import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -487,6 +488,38 @@ export default function HelixCore() {
                 </div>
               );
             })()}
+          </CardContent>
+        </Card>
+
+        {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">
+              Warp Bubble • Shell Outline (ρ=1±Δ)
+            </CardTitle>
+            <CardDescription>
+              Wireframe of inner/center/outer Natário wall (ellipsoidal), with interior shift vector.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ShellOutlineVisualizer
+              params={{
+                hull: (hullMetrics && hullMetrics.hull) ? {
+                  ...hullMetrics.hull,
+                  a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                  b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                  c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+                } : {
+                  Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                  a: 503.5, b: 132, c: 86.5
+                },
+                wallWidth_m: 6.0,
+                showInner: true,
+                showCenter: true,
+                showOuter: true,
+                showShiftArrow: true
+              }}
+            />
           </CardContent>
         </Card>
 
