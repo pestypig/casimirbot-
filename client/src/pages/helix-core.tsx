@@ -414,58 +414,7 @@ export default function HelixCore() {
         {/* Mode Selector */}
         <div className="mb-6">
           <div className="flex gap-2">
-            <Button 
-              variant={activeMode === "auto" ? "default" : "outline"}
-              onClick={async () => {
-                setActiveMode("auto");
-                setIsProcessing(true);
-                try {
-                  const command = "Execute auto-duty pulse sequence across all 400 sectors";
-                  const userMessage: ChatMessage = {
-                    role: 'user',
-                    content: command,
-                    timestamp: new Date()
-                  };
-                  setChatMessages(prev => [...prev, userMessage]);
-                  
-                  const response = await apiRequest('POST', '/api/helix/command', {
-                    messages: chatMessages.concat({ role: 'user', content: command })
-                  });
-                  
-                  const responseData = await response.json();
-                  const assistantMessage: ChatMessage = {
-                    role: 'assistant',
-                    content: responseData.message.content,
-                    timestamp: new Date()
-                  };
-                  
-                  if (responseData.functionResult) {
-                    assistantMessage.functionCall = {
-                      name: responseData.message.function_call.name,
-                      result: responseData.functionResult
-                    };
-                    setMainframeLog(prev => [...prev, 
-                      `[AUTO-DUTY] ${responseData.functionResult.log || 'Sequence initiated'}`
-                    ]);
-                    refetchMetrics();
-                  }
-                  
-                  setChatMessages(prev => [...prev, assistantMessage]);
-                } catch (error) {
-                  toast({
-                    title: "Auto-Duty Error",
-                    description: error instanceof Error ? error.message : "Failed to execute",
-                    variant: "destructive"
-                  });
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <Brain className="w-4 h-4" />
-              Auto-Duty Mode
-            </Button>
+            {/* ⬇️ KEEP ONLY MANUAL PULSE MODE UP HERE */}
             <Button 
               variant={activeMode === "manual" ? "default" : "outline"}
               onClick={() => setActiveMode("manual")}
@@ -473,71 +422,6 @@ export default function HelixCore() {
             >
               <Grid3X3 className="w-4 h-4" />
               Manual Pulse Mode
-            </Button>
-            <Button 
-              variant={activeMode === "diagnostics" ? "default" : "outline"}
-              onClick={async () => {
-                setActiveMode("diagnostics");
-                setIsProcessing(true);
-                try {
-                  const command = "Run comprehensive diagnostics scan on all tile sectors";
-                  const userMessage: ChatMessage = {
-                    role: 'user',
-                    content: command,
-                    timestamp: new Date()
-                  };
-                  setChatMessages(prev => [...prev, userMessage]);
-                  
-                  const response = await apiRequest('POST', '/api/helix/command', {
-                    messages: chatMessages.concat({ role: 'user', content: command })
-                  });
-                  
-                  const responseData = await response.json();
-                  const assistantMessage: ChatMessage = {
-                    role: 'assistant',
-                    content: responseData.message.content,
-                    timestamp: new Date()
-                  };
-                  
-                  if (responseData.functionResult) {
-                    assistantMessage.functionCall = {
-                      name: responseData.message.function_call.name,
-                      result: responseData.functionResult
-                    };
-                    setMainframeLog(prev => [...prev, 
-                      `[DIAGNOSTICS] System Health: ${responseData.functionResult.systemHealth}`
-                    ]);
-                  }
-                  
-                  setChatMessages(prev => [...prev, assistantMessage]);
-                } catch (error) {
-                  toast({
-                    title: "Diagnostics Error",
-                    description: error instanceof Error ? error.message : "Failed to run scan",
-                    variant: "destructive"
-                  });
-                } finally {
-                  setIsProcessing(false);
-                }
-              }}
-              className="flex items-center gap-2"
-            >
-              <Gauge className="w-4 h-4" />
-              Diagnostics Mode
-            </Button>
-            <Button 
-              variant={activeMode === "theory" ? "default" : "outline"}
-              onClick={() => {
-                setActiveMode("theory");
-                // Theory playback would load PDFs - placeholder for now
-                setMainframeLog(prev => [...prev, 
-                  "[THEORY] Loading Needle Hull Mark 1 documentation..."
-                ]);
-              }}
-              className="flex items-center gap-2"
-            >
-              <Atom className="w-4 h-4" />
-              Theory Playback
             </Button>
           </div>
         </div>
@@ -1127,6 +1011,149 @@ export default function HelixCore() {
                     </ScrollArea>
                   </TabsContent>
                 </Tabs>
+              </CardContent>
+            </Card>
+
+            {/* Operations Toolbar (moved here) */}
+            <Card className="bg-slate-900/50 border-slate-800">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-cyan-400" />
+                  Operations Toolbar
+                </CardTitle>
+                <CardDescription>
+                  Quick actions: auto-duty sequence, diagnostics sweep, and theory playback.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {/* Auto-Duty Mode */}
+                  <Button 
+                    variant={activeMode === "auto" ? "default" : "outline"}
+                    onClick={async () => {
+                      setActiveMode("auto");
+                      setIsProcessing(true);
+                      try {
+                        const command = "Execute auto-duty pulse sequence across all 400 sectors";
+                        const userMessage: ChatMessage = {
+                          role: 'user',
+                          content: command,
+                          timestamp: new Date()
+                        };
+                        setChatMessages(prev => [...prev, userMessage]);
+
+                        const response = await apiRequest('POST', '/api/helix/command', {
+                          messages: chatMessages.concat({ role: 'user', content: command })
+                        });
+                        const responseData = await response.json();
+
+                        const assistantMessage: ChatMessage = {
+                          role: 'assistant',
+                          content: responseData.message.content,
+                          timestamp: new Date()
+                        };
+
+                        if (responseData.functionResult) {
+                          assistantMessage.functionCall = {
+                            name: responseData.message.function_call?.name ?? 'auto_duty',
+                            result: responseData.functionResult
+                          };
+                          setMainframeLog(prev => [...prev, 
+                            `[AUTO-DUTY] ${responseData.functionResult.log || 'Sequence initiated'}`
+                          ]);
+                          // refresh metrics so the whole page updates
+                          refetchMetrics();
+                        }
+
+                        setChatMessages(prev => [...prev, assistantMessage]);
+                      } catch (error) {
+                        toast({
+                          title: "Auto-Duty Error",
+                          description: error instanceof Error ? error.message : "Failed to execute",
+                          variant: "destructive"
+                        });
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                    disabled={isProcessing}
+                  >
+                    <Brain className="w-4 h-4" />
+                    Auto-Duty Mode
+                  </Button>
+
+                  {/* Diagnostics Mode */}
+                  <Button 
+                    variant={activeMode === "diagnostics" ? "default" : "outline"}
+                    onClick={async () => {
+                      setActiveMode("diagnostics");
+                      setIsProcessing(true);
+                      try {
+                        const command = "Run comprehensive diagnostics scan on all tile sectors";
+                        const userMessage: ChatMessage = {
+                          role: 'user',
+                          content: command,
+                          timestamp: new Date()
+                        };
+                        setChatMessages(prev => [...prev, userMessage]);
+
+                        const response = await apiRequest('POST', '/api/helix/command', {
+                          messages: chatMessages.concat({ role: 'user', content: command })
+                        });
+                        const responseData = await response.json();
+
+                        const assistantMessage: ChatMessage = {
+                          role: 'assistant',
+                          content: responseData.message.content,
+                          timestamp: new Date()
+                        };
+
+                        if (responseData.functionResult) {
+                          assistantMessage.functionCall = {
+                            name: responseData.message.function_call?.name ?? 'diagnostics',
+                            result: responseData.functionResult
+                          };
+                          setMainframeLog(prev => [...prev, 
+                            `[DIAGNOSTICS] System Health: ${responseData.functionResult.systemHealth ?? 'OK'}`
+                          ]);
+                          // optional: refresh metrics
+                          refetchMetrics();
+                        }
+
+                        setChatMessages(prev => [...prev, assistantMessage]);
+                      } catch (error) {
+                        toast({
+                          title: "Diagnostics Error",
+                          description: error instanceof Error ? error.message : "Failed to run scan",
+                          variant: "destructive"
+                        });
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    }}
+                    className="flex items-center gap-2"
+                    disabled={isProcessing}
+                  >
+                    <Gauge className="w-4 h-4" />
+                    Diagnostics
+                  </Button>
+
+                  {/* Theory Playback */}
+                  <Button 
+                    variant={activeMode === "theory" ? "default" : "outline"}
+                    onClick={() => {
+                      setActiveMode("theory");
+                      setMainframeLog(prev => [...prev, 
+                        "[THEORY] Loading Needle Hull Mark 1 documentation..."
+                      ]);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <Atom className="w-4 h-4" />
+                    Theory Playback
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
