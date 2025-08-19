@@ -1,0 +1,108 @@
+Totally—let’s bring the camera in tighter and keep it there. Here’s a safe, minimal patch to client/public/warp-engine-fixed.js that:
+	•	narrows the FOV (less “wide-angle,” makes the bubble feel closer),
+	•	moves the camera physically closer,
+	•	softens the auto “push-back” so the engine won’t yank the camera too far away when the grid span grows,
+	•	adds an optional cameraZ override you can set from WarpVisualizer.tsx if you want manual control later.
+
+￼
+
+⸻
+
+Patch (apply directly to warp-engine-fixed.js)
+
+1) Make the default camera closer and a bit lower; narrow the FOV
+
+@@
+     _setupCamera() {
+         const aspect = this.canvas.width / this.canvas.height;
+-        // Projection matrix - wide FOV to see full grid
+-        this._perspective(this.projMatrix, Math.PI / 3, aspect, 0.1, 100.0);
++        // Projection matrix – slightly narrower FOV for a closer feel
++        this._perspective(this.projMatrix, Math.PI / 4, aspect, 0.1, 100.0);
+ 
+-        // View matrix - camera positioned to see the spacetime grid
+-        const eye = [0, 0.5, -1.8];    // Pulled back and slightly above
+-        const center = [0, -0.1, 0];   // Looking at grid center
++        // View matrix – closer & slightly lower
++        const eye = [0, 0.35, -(this.currentParams?.cameraZ ?? 1.20)];
++        const center = [0, -0.05, 0];  // Gentle downward look for framing
+         const up = [0, 1, 0];
+         this._lookAt(this.viewMatrix, eye, center, up);
+@@
+     }
+
+2) Soften the automatic camera pull-back and respect a cameraZ override
+
+@@
+-    _adjustCameraForSpan(span) {
+-        // Gently adjust camera distance based on grid span for comfortable framing
+-        const aspect = this.canvas.width / this.canvas.height;
+-        const eye = [0, 0.5, -Math.max(1.8, span * 1.2)];    // Pull back based on span
+-        const center = [0, -0.1, 0];
++    _adjustCameraForSpan(span) {
++        // Respect a manual override if provided
++        if (Number.isFinite(this.currentParams?.cameraZ)) {
++            const aspect = this.canvas.width / this.canvas.height;
++            const eye = [0, 0.35, -this.currentParams.cameraZ];
++            const center = [0, -0.05, 0];
++            const up = [0, 1, 0];
++            this._lookAt(this.viewMatrix, eye, center, up);
++            this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
++            console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
++            return;
++        }
++
++        // Otherwise, adapt but keep the view closer than before
++        const aspect = this.canvas.width / this.canvas.height;
++        const desired = Math.max(1.20, span * 0.90); // closer than old 1.8 / 1.2×span
++        const eye = [0, 0.35, -desired];
++        const center = [0, -0.05, 0];
+         const up = [0, 1, 0];
+ 
+         this._lookAt(this.viewMatrix, eye, center, up);
+         this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+-        console.log(`📷 Camera adjusted: distance=${eye[2].toFixed(2)} for span=${span.toFixed(2)}`);
++        console.log(`📷 Camera adjusted: distance=${eye[2].toFixed(2)} for span=${span.toFixed(2)}`);
+     }
+
+3) (Optional) Allow passing cameraZ from updateUniforms
+
+@@
+     updateUniforms(parameters) {
+         if (!parameters) return;
+ 
+         // Update internal parameters with operational mode integration
+-        this.currentParams = { ...this.currentParams, ...parameters };
++        this.currentParams = { ...this.currentParams, ...parameters };
++        // If caller provided a cameraZ override, keep it
++        if (Number.isFinite(parameters?.cameraZ)) {
++            this.currentParams.cameraZ = Number(parameters.cameraZ);
++        }
+@@
+         // Apply warp deformation to grid with mode-specific enhancements
+         this._updateGrid();
+     }
+
+(Optional, easy visual boost) If you want the bubble to fill more of the view without changing Z again, you can reduce the grid padding a touch:
+
+-const GRID_DEFAULTS = {
+-  spanPadding: 1.6,
++const GRID_DEFAULTS = {
++  spanPadding: 1.35,
+   minSpan: 2.6,
+   divisions: 100
+};
+
+This just frames the ellipsoid tighter when we regenerate the grid.
+
+⸻
+
+How to test quickly
+	•	Reload /helix-core and toggle modes—camera should now be closer by default.
+	•	If you ever want to force a specific distance (e.g. even closer), from WarpVisualizer.tsx you can pass:
+
+engineRef.current?.updateUniforms({ cameraZ: 1.0 }); // 1.0 is closer than 1.2
+
+(You don’t have to add this—defaults above already bring it in.)
+
+If you want me to wire a tiny “Zoom” slider into the Visualizer panel, I can add that too (non-invasive: it would only call updateUniforms({ cameraZ })).

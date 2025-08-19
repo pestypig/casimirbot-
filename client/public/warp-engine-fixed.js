@@ -3,7 +3,7 @@
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 const GRID_DEFAULTS = {
-  spanPadding: 1.6,    // how much to multiply the hull span in clip space
+  spanPadding: 1.35,   // tighter framing for closer view
   minSpan: 2.6,        // never smaller than this (in clip-space units)
   divisions: 100       // more lines so a larger grid still looks dense
 };
@@ -94,12 +94,12 @@ class WarpEngine {
     _setupCamera() {
         const aspect = this.canvas.width / this.canvas.height;
         
-        // Projection matrix - wide FOV to see full grid
-        this._perspective(this.projMatrix, Math.PI / 3, aspect, 0.1, 100.0);
+        // Projection matrix – slightly narrower FOV for a closer feel
+        this._perspective(this.projMatrix, Math.PI / 4, aspect, 0.1, 100.0);
         
-        // View matrix - camera positioned to see the spacetime grid
-        const eye = [0, 0.5, -1.8];    // Pulled back and slightly above
-        const center = [0, -0.1, 0];   // Looking at grid center
+        // View matrix – closer & slightly lower
+        const eye = [0, 0.35, -(this.currentParams?.cameraZ ?? 1.20)];
+        const center = [0, -0.05, 0];  // Gentle downward look for framing
         const up = [0, 1, 0];
         this._lookAt(this.viewMatrix, eye, center, up);
         
@@ -108,12 +108,25 @@ class WarpEngine {
     }
     
     _adjustCameraForSpan(span) {
-        // Gently adjust camera distance based on grid span for comfortable framing
+        // Respect a manual override if provided
+        if (Number.isFinite(this.currentParams?.cameraZ)) {
+            const aspect = this.canvas.width / this.canvas.height;
+            const eye = [0, 0.35, -this.currentParams.cameraZ];
+            const center = [0, -0.05, 0];
+            const up = [0, 1, 0];
+            this._lookAt(this.viewMatrix, eye, center, up);
+            this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+            console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
+            return;
+        }
+
+        // Otherwise, adapt but keep the view closer than before
         const aspect = this.canvas.width / this.canvas.height;
-        const eye = [0, 0.5, -Math.max(1.8, span * 1.2)];    // Pull back based on span
-        const center = [0, -0.1, 0];   // Still looking at grid center
+        const desired = Math.max(1.20, span * 0.90); // closer than old 1.8 / 1.2×span
+        const eye = [0, 0.35, -desired];
+        const center = [0, -0.05, 0];
         const up = [0, 1, 0];
-        
+
         this._lookAt(this.viewMatrix, eye, center, up);
         this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
         
@@ -339,6 +352,10 @@ class WarpEngine {
         
         // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
+        // If caller provided a cameraZ override, keep it
+        if (Number.isFinite(parameters?.cameraZ)) {
+            this.currentParams.cameraZ = Number(parameters.cameraZ);
+        }
         
         // Numeric coercion helper
         const N = v => (Number.isFinite(+v) ? +v : 0);
