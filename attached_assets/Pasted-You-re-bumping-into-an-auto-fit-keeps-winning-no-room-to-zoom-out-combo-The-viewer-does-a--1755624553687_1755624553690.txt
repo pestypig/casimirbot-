@@ -1,0 +1,157 @@
+You’re bumping into an “auto-fit keeps winning” + “no room to zoom out” combo.
+	•	The viewer does a priority fitToIds right after layout.
+	•	When you try to zoom out, the same fit re-applies (or the lower bound equals the fit zoom), so you can’t get any farther out.
+	•	On mobile the controls are there, but your - doesn’t change the view because zoom is clamped or the RAF fit is running again.
+
+Below is a small, self-contained patch that:
+	1.	Fits to the IDs once (or when size / fit list changes), then stops refitting after the user interacts.
+	2.	Remembers the base fit and lets you zoom out to ~35% of that fit.
+	3.	Adds a Reset button to restore the base fit any time.
+
+⸻
+
+Patch — client/src/components/SolarMap.tsx
+
+@@
+ export interface SolarMapProps {
+   width: number;
+   height: number;
+   routeIds: string[];
+   centerOnId?: string;
+   fitToIds?: string[];
+   fitMarginPx?: number;
+   onPickBody?: (id: string) => void;
+ }
+ 
+@@
+ // local state (assumed existing in your component)
+-const [zoom, setZoom] = React.useState(1);
+-const [offset, setOff] = React.useState({ x: 0, y: 0 });
++const [zoom, setZoom] = React.useState(1);
++const [offset, setOff] = React.useState({ x: 0, y: 0 });
++// keep the initial fit so we can reset, and derive a minZoom below it
++const [baseFit, setBaseFit] = React.useState<{ zoom:number; offset:{x:number;y:number} } | null>(null);
++// once the user changes zoom/pan, we stop auto-fit from running again
++const userInteractedRef = React.useRef(false);
+ 
+ // You likely already have a bodiesById map
+ // const bodiesById = ...
+ 
+ function fitToBBox(
+   bbox: {minX:number; minY:number; maxX:number; maxY:number},
+   viewW: number, viewH: number, margin: number
+ ) {
+   const w = Math.max(1e-9, bbox.maxX - bbox.minX);
+   const h = Math.max(1e-9, bbox.maxY - bbox.minY);
+   const zx = (viewW - 2*margin) / w;
+   const zy = (viewH - 2*margin) / h;
+   const newZoom = Math.max(0.0001, Math.min(zx, zy));
+   const cx = (bbox.minX + bbox.maxX) * 0.5;
+   const cy = (bbox.minY + bbox.maxY) * 0.5;
+   const offX = viewW*0.5 - cx*newZoom;
+   const offY = viewH*0.5 - cy*newZoom;
+   return { zoom: newZoom, offset: { x: offX, y: offY } };
+ }
+ 
+-const didPriorityFit = React.useRef(false);
++const didPriorityFit = React.useRef(false);
+ 
+ // DEFAULT FIT — skip when fitToIds is present
+ React.useEffect(() => {
+   if (props.fitToIds && props.fitToIds.length > 0) return;
+   // your existing default-fit here…
+   // setZoom(fitZoom); setOff({x:fitX, y:fitY});
+ }, [props.fitToIds?.length, props.width, props.height /*…*/]);
+ 
+ // PRIORITY FIT-TO-IDS — runs after layout so it wins
+ React.useLayoutEffect(() => {
+   if (!props.fitToIds || props.fitToIds.length === 0) return;
++  // If the user has already interacted, don't refit unless the inputs changed
++  // This effect only depends on width/height and the list of ids,
++  // so toggling zoom/pan won't retrigger it.
+   const pts = props.fitToIds
+     .map(id => bodiesById[id]?.pos)
+     .filter(Boolean) as {x:number;y:number}[];
+   if (pts.length === 0) return;
+   const raf = requestAnimationFrame(() => {
+     const minX = Math.min(...pts.map(p=>p.x));
+     const maxX = Math.max(...pts.map(p=>p.x));
+     const minY = Math.min(...pts.map(p=>p.y));
+     const maxY = Math.max(...pts.map(p=>p.y));
+     const margin = Number.isFinite(props.fitMarginPx) ? (props.fitMarginPx as number) : 24;
+     const next = fitToBBox({minX,minY,maxX,maxY}, props.width, props.height, margin);
+     setZoom(next.zoom);
+     setOff(next.offset);
++    setBaseFit(next);
+     didPriorityFit.current = true;
++    userInteractedRef.current = false; // fresh fit; allow reset/zoom range from here
+   });
+   return () => cancelAnimationFrame(raf);
+ }, [props.width, props.height, props.fitToIds?.join(',')]);
+ 
++// derive a friendly minZoom (≈ 35% of base fit) so you can zoom OUT
++const minZoom = React.useMemo(() => {
++  return baseFit ? Math.max(0.00005, baseFit.zoom * 0.35) : 0.00005;
++}, [baseFit]);
++const maxZoom = 50; // keep a reasonable upper bound
+ 
+ // hook up UI buttons (ensure these exist in your JSX)
+-const handleZoomIn = () => setZoom(z => z * 1.2);
+-const handleZoomOut = () => setZoom(z => z / 1.2);
++const handleZoomIn = () => {
++  userInteractedRef.current = true;
++  setZoom(z => Math.min(maxZoom, z * 1.2));
++};
++const handleZoomOut = () => {
++  userInteractedRef.current = true;
++  setZoom(z => Math.max(minZoom, z / 1.2));
++};
++const handleResetView = () => {
++  if (!baseFit) return;
++  userInteractedRef.current = false;
++  setZoom(baseFit.zoom);
++  setOff(baseFit.offset);
++};
+ 
+ // if you support wheel/pinch, clamp there too
+ const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+   e.preventDefault();
+-  setZoom(z => (e.deltaY < 0 ? z*1.1 : z/1.1));
++  userInteractedRef.current = true;
++  setZoom(z => {
++    const nz = e.deltaY < 0 ? z*1.1 : z/1.1;
++    return Math.min(maxZoom, Math.max(minZoom, nz));
++  });
+ };
+ 
+ return (
+   <div className="relative overflow-hidden" style={{ width: props.width, height: props.height }}>
+     <canvas
+       ref={canvasRef}
+       width={props.width}
+       height={props.height}
+       className="block touch-pan-y"
+       onWheel={onWheel}
+     />
+-    <div className="absolute right-3 top-3 z-20 pointer-events-auto">
+-      <button className="px-2 py-1 bg-white/10 rounded mr-1" onClick={() => setZoom(z=>z*1.2)}>+</button>
+-      <button className="px-2 py-1 bg-white/10 rounded" onClick={() => setZoom(z=>z/1.2)}>−</button>
+-    </div>
++    <div className="absolute right-3 top-3 z-20 pointer-events-auto flex gap-1">
++      <button className="px-2 py-1 bg-white/10 rounded" onClick={handleZoomOut}>−</button>
++      <button className="px-2 py-1 bg-white/10 rounded" onClick={handleZoomIn}>+</button>
++      <button className="px-2 py-1 bg-white/10 rounded" onClick={handleResetView}>⟲</button>
++    </div>
+   </div>
+ );
+
+What this fixes
+	•	You still get the correct initial Earth↔Saturn framing.
+	•	You can zoom out (down to ~35% of that fit) to see the rest of the system.
+	•	Auto-fit will not “snap back” after you interact, but you can restore it with ⟲.
+
+No changes are needed in helix-core.tsx for this; your existing props with fitToIds={["EARTH","SATURN"]} will continue to work.
+
+If you want pinch-to-zoom on mobile, add your pointer handlers to set userInteractedRef.current = true and clamp via minZoom/maxZoom the same way.
+
+Want me to mirror this behavior on the galactic map too so both viewers feel identical?

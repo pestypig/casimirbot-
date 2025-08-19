@@ -29,6 +29,10 @@ export function SolarMap({
   const [offset, setOffset] = React.useState({ x: width / 2, y: height / 2 });
   const [points, setPoints] = React.useState<SolarPoint[]>([]);
   const [dragging, setDragging] = React.useState<{ x: number; y: number } | null>(null);
+  // keep the initial fit so we can reset, and derive a minZoom below it
+  const [baseFit, setBaseFit] = React.useState<{ zoom:number; offset:{x:number;y:number} } | null>(null);
+  // once the user changes zoom/pan, we stop auto-fit from running again
+  const userInteractedRef = React.useRef(false);
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
@@ -121,15 +125,23 @@ export function SolarMap({
       const maxY = Math.max(...pts.map(p => p.y));
       const margin = Number.isFinite(fitMarginPx) ? (fitMarginPx as number) : 24;
       
-      const { zoom: z, offset: off } = fitToBBox({minX, minY, maxX, maxY}, width, height, margin);
-      setZoom(z);
-      setOffset(off);
+      const next = fitToBBox({minX, minY, maxX, maxY}, width, height, margin);
+      setZoom(next.zoom);
+      setOffset(next.offset);
+      setBaseFit(next);
       didPriorityFit.current = true;
+      userInteractedRef.current = false; // fresh fit; allow reset/zoom range from here
     });
     
     return () => cancelAnimationFrame(raf);
     // include bodies + dimensions so we refit on resize/ephemeris tick
   }, [width, height, fitToIds?.join(','), points, fitMarginPx, fitToBBox]);
+
+  // derive a friendly minZoom (≈ 35% of base fit) so you can zoom OUT
+  const minZoom = React.useMemo(() => {
+    return baseFit ? Math.max(0.00005, baseFit.zoom * 0.35) : 10;
+  }, [baseFit]);
+  const maxZoom = 500; // keep a reasonable upper bound
 
   // Drawing
   React.useEffect(() => {
@@ -228,6 +240,7 @@ export function SolarMap({
   const handleMouseDown = (e: React.MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
+    userInteractedRef.current = true;
     setDragging({ x: e.clientX - offset.x, y: e.clientY - offset.y });
   };
 
@@ -242,13 +255,14 @@ export function SolarMap({
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
+    userInteractedRef.current = true;
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
     
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
     const dz = Math.exp(-e.deltaY * 0.001);
-    const newZoom = Math.max(10, Math.min(500, zoom * dz));
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom * dz));
     
     // Keep point under mouse stable
     const sx = (mx - offset.x) / zoom;
@@ -313,15 +327,32 @@ export function SolarMap({
       <div className="absolute top-3 right-3 z-20 pointer-events-auto flex gap-1">
         <button 
           className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
-          onClick={() => setZoom(z => Math.min(500, z * 1.2))}
+          onClick={() => {
+            userInteractedRef.current = true;
+            setZoom(z => Math.max(minZoom, z / 1.2));
+          }}
+        >
+          −
+        </button>
+        <button 
+          className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+          onClick={() => {
+            userInteractedRef.current = true;
+            setZoom(z => Math.min(maxZoom, z * 1.2));
+          }}
         >
           +
         </button>
         <button 
           className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
-          onClick={() => setZoom(z => Math.max(10, z / 1.2))}
+          onClick={() => {
+            if (!baseFit) return;
+            userInteractedRef.current = false;
+            setZoom(baseFit.zoom);
+            setOffset(baseFit.offset);
+          }}
         >
-          −
+          ⟲
         </button>
       </div>
       
