@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
-import { zenLongToast } from '../lib/zen-long-toasts';
+import { zenLongToast } from '../lib/zen-toasts';
 
 // Define ShiftParams interface
 interface ShiftParams {
@@ -47,7 +47,7 @@ interface WarpVisualizerProps {
   showReadouts?: boolean;
 }
 
-export function WarpVisualizer({ parameters, showReadouts = true }: WarpVisualizerProps) {
+export function WarpVisualizerFixed({ parameters, showReadouts = true }: WarpVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<any>(null);
   const animationRef = useRef<number>();
