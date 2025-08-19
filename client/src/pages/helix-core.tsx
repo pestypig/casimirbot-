@@ -754,6 +754,90 @@ export default function HelixCore() {
           </CardContent>
         </Card>
 
+        {/* ====== WARP BUBBLE PARAMETERS (split from visualizer) ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Atom className="w-5 h-5 text-cyan-400" />
+              Warp Bubble Parameters
+            </CardTitle>
+            <CardDescription>
+              Mode-coupled readouts (γ's, Q's, duty, sag, TS) from the live pipeline
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              const G = 9.80665, c = 299792458;
+              const mode = (pipelineState?.currentMode ?? 'hover').toLowerCase();
+              const duty = pipelineState?.dutyCycle ?? 0.14;
+              const sectors = pipelineState?.sectorStrobing ?? 1;
+              const sag_nm = pipelineState?.sag_nm ?? 16;
+              const gammaGeo = pipelineState?.gammaGeo ?? 26;
+              const gammaVdB = (pipelineState as any)?.gammaVanDenBroeck ?? 2.86e5;
+              const qCavity = pipelineState?.qCavity ?? 1e9;
+              const qSpoil = pipelineState?.qSpoilingFactor ?? 1.0;
+              const TS = pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio ?? 4102.74;
+              const Pavg = pipelineState?.P_avg ?? systemMetrics?.energyOutput ?? 83.3;
+              const Mexotic = pipelineState?.M_exotic ?? systemMetrics?.exoticMass ?? 1405;
+              const zeta = pipelineState?.zeta ?? systemMetrics?.fordRoman?.value ?? 0.032;
+
+              // Optional: show geometric (a,b,c) if present
+              const hull = (systemMetrics as any)?.hull || undefined;
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="p-3 bg-slate-950 rounded-lg space-y-1">
+                    <div className="text-xs text-slate-400">Operational Mode</div>
+                    <div className="font-mono">{mode}</div>
+                    <div className="text-xs text-slate-400 mt-2">Duty Cycle</div>
+                    <div className="font-mono">{(duty*100).toFixed(2)}%</div>
+                    <div className="text-xs text-slate-400 mt-2">Sectors</div>
+                    <div className="font-mono">{sectors}</div>
+                    <div className="text-xs text-slate-400 mt-2">Sag Depth</div>
+                    <div className="font-mono">{sag_nm.toFixed(1)} nm</div>
+                  </div>
+
+                  <div className="p-3 bg-slate-950 rounded-lg space-y-1">
+                    <div className="text-xs text-slate-400">γ<sub>geo</sub></div>
+                    <div className="font-mono">{gammaGeo.toFixed(0)}</div>
+                    <div className="text-xs text-slate-400 mt-2">γ<sub>VdB</sub></div>
+                    <div className="font-mono">{Number(gammaVdB).toExponential(1)}</div>
+                    <div className="text-xs text-slate-400 mt-2">Q<sub>cavity</sub></div>
+                    <div className="font-mono">{qCavity.toExponential(1)}</div>
+                    <div className="text-xs text-slate-400 mt-2">Q-spoiling</div>
+                    <div className="font-mono">{qSpoil.toFixed(3)}</div>
+                  </div>
+
+                  <div className="p-3 bg-slate-950 rounded-lg space-y-1">
+                    <div className="text-xs text-slate-400">Time-Scale Ratio</div>
+                    <div className="font-mono">{TS.toFixed(1)}</div>
+                    <div className="text-xs text-slate-400 mt-2">Power (avg)</div>
+                    <div className="font-mono">{Pavg.toFixed(3)} MW</div>
+                    <div className="text-xs text-slate-400 mt-2">Exotic Mass</div>
+                    <div className="font-mono">{Math.round(Mexotic).toLocaleString()} kg</div>
+                    <div className="text-xs text-slate-400 mt-2">Ford-Roman ζ</div>
+                    <div className="font-mono">{zeta.toExponential(2)}</div>
+                  </div>
+
+                  {hull && (
+                    <div className="md:col-span-3 p-3 bg-slate-950 rounded-lg">
+                      <div className="text-xs text-slate-400 mb-2">Hull (Needle) Geometry</div>
+                      <div className="font-mono text-xs text-slate-300 flex flex-wrap gap-x-8 gap-y-1">
+                        <span>Lx={hull.Lx_m?.toFixed?.(0) ?? hull.Lx_m} m</span>
+                        <span>Ly={hull.Ly_m?.toFixed?.(0) ?? hull.Ly_m} m</span>
+                        <span>Lz={hull.Lz_m?.toFixed?.(0) ?? hull.Lz_m} m</span>
+                        <span>a={hull.a ?? (hull.Lx_m/2)} m</span>
+                        <span>b={hull.b ?? (hull.Ly_m/2)} m</span>
+                        <span>c={hull.c ?? (hull.Lz_m/2)} m</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
         {/* ====== SECONDARY GRID (rest of the panels) ====== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Left column: Compliance, Amplification, Shift Vector */}
