@@ -70,12 +70,15 @@ class WarpEngine {
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
             betaTiltVec: [0, -1, 0],  // tilt direction vector (default: -Y = "down")
-            tiltGain: 0.55       // gentle visual scaling
+            tiltGain: 0.55,      // gentle visual scaling
+            // Shift-vector (interior gravity) uniforms
+            u_shiftVectorColor: { r: 0.54, g: 0.17, b: 0.89 } // ~#8A2BE2 violet
         };
         
         // Initialize rendering pipeline
         this._setupCamera();
         this._initializeGrid();
+        this._initShiftArrow();
         
         // Expose strobing sync function globally
         window.setStrobingState = ({ sectorCount, currentSector }) => {
@@ -139,6 +142,9 @@ class WarpEngine {
         
         // Compile grid shader program
         this._compileGridShaders();
+        
+        // Initialize shift vector arrow
+        this._initShiftArrow();
     }
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
@@ -307,6 +313,104 @@ class WarpEngine {
         console.log("Grid shader program compiled successfully with York-time coloring support");
     }
 
+    _initShiftArrow() {
+        // Initialize shift vector arrow state
+        this._shiftArrow = null;
+        this._arrowNeedsUpdate = true;
+    }
+
+    _createArrowGeometry(direction, length, color) {
+        // Create simple arrow geometry as line segments
+        const verts = [];
+        
+        // Arrow shaft (main line)
+        const shaft = [
+            0, 0, 0,
+            direction[0] * length * 0.8, direction[1] * length * 0.8, direction[2] * length * 0.8
+        ];
+        verts.push(...shaft);
+        
+        // Arrow head (simple cross at tip)
+        const tipX = direction[0] * length;
+        const tipY = direction[1] * length;
+        const tipZ = direction[2] * length;
+        
+        const headSize = length * 0.15;
+        const perpX = direction[2] !== 0 ? 1 : 0;
+        const perpY = direction[2] === 0 && direction[0] !== 0 ? 0 : 1;
+        const perpZ = direction[2] === 0 ? 0 : -direction[0];
+        
+        // Cross lines for arrowhead
+        verts.push(
+            tipX - perpX * headSize, tipY - perpY * headSize, tipZ - perpZ * headSize,
+            tipX + perpX * headSize, tipY + perpY * headSize, tipZ + perpZ * headSize,
+            tipX - perpY * headSize, tipY + perpX * headSize, tipZ,
+            tipX + perpY * headSize, tipY - perpX * headSize, tipZ
+        );
+        
+        return new Float32Array(verts);
+    }
+
+    _updateShiftArrow() {
+        if (!this._arrowNeedsUpdate) return;
+        
+        try {
+            // Get tilt parameters
+            const betaTiltVec = this.uniforms?.betaTiltVec || [0, -1, 0];
+            const epsilonTilt = Math.max(0, Math.min(1e-3, this.uniforms?.epsilonTilt || 0));
+            
+            // Calculate arrow properties
+            const direction = [
+                betaTiltVec[0],
+                betaTiltVec[1], 
+                betaTiltVec[2]
+            ];
+            
+            // Normalize direction
+            const mag = Math.sqrt(direction[0]**2 + direction[1]**2 + direction[2]**2);
+            if (mag > 0) {
+                direction[0] /= mag;
+                direction[1] /= mag;
+                direction[2] /= mag;
+            }
+            
+            // Scale length based on epsilon tilt
+            const hullAxes = this.uniforms?.hullAxes || [503.5, 132, 86.5];
+            const baseLen = Math.max(hullAxes[1], hullAxes[2]) * 0.0003; // Scale to clip space
+            const length = baseLen * (1 + (epsilonTilt * 5e3));
+            
+            // Update arrow geometry
+            const color = this.uniforms?.u_shiftVectorColor || { r: 0.54, g: 0.17, b: 0.89 };
+            
+            // Debug logging for arrow updates (remove once stable)
+            if (epsilonTilt > 0) {
+                console.log("🟢 Shift arrow update:", {
+                    epsilonTilt: epsilonTilt.toExponential(3),
+                    direction: direction,
+                    length: length.toFixed(4),
+                    color: `rgb(${Math.round(color.r*255)}, ${Math.round(color.g*255)}, ${Math.round(color.b*255)})`
+                });
+            }
+            
+            if (!this._shiftArrow) {
+                this._shiftArrow = {
+                    geometry: this._createArrowGeometry(direction, length, color),
+                    color: [color.r, color.g, color.b],
+                    vbo: this.gl.createBuffer(),
+                    needsUpdate: true
+                };
+            } else {
+                this._shiftArrow.geometry = this._createArrowGeometry(direction, length, color);
+                this._shiftArrow.color = [color.r, color.g, color.b];
+                this._shiftArrow.needsUpdate = true;
+            }
+            
+            this._arrowNeedsUpdate = false;
+        } catch (error) {
+            console.warn("Failed to update shift arrow:", error);
+        }
+    }
+
     updateUniforms(parameters) {
         if (!parameters) return;
         
@@ -381,6 +485,11 @@ class WarpEngine {
           });
         }
         
+        // Mark arrow for update when tilt parameters change
+        if (parameters.epsilonTilt !== undefined || parameters.betaTiltVec !== undefined) {
+            this._arrowNeedsUpdate = true;
+        }
+        
         // Apply warp deformation to grid with mode-specific enhancements
         this._updateGrid();
     }
@@ -434,6 +543,9 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
         console.log("Grid vertices updated and uploaded to GPU");
+        
+        // Update shift vector arrow
+        this._updateShiftArrow();
     }
 
     // Authentic Natário spacetime curvature implementation
@@ -828,6 +940,55 @@ class WarpEngine {
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
+    _renderShiftArrow() {
+        if (!this._shiftArrow || !this.gridProgram) return;
+        
+        const gl = this.gl;
+        
+        // Update arrow VBO if needed
+        if (this._shiftArrow.needsUpdate) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._shiftArrow.vbo);
+            gl.bufferData(gl.ARRAY_BUFFER, this._shiftArrow.geometry, gl.STATIC_DRAW);
+            this._shiftArrow.needsUpdate = false;
+        }
+        
+        try {
+            // Use the same shader program as the grid for simplicity
+            gl.useProgram(this.gridProgram);
+            
+            // Bind arrow geometry
+            gl.bindBuffer(gl.ARRAY_BUFFER, this._shiftArrow.vbo);
+            
+            const positionLocation = gl.getAttribLocation(this.gridProgram, 'a_position');
+            gl.enableVertexAttribArray(positionLocation);
+            gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+            
+            // Set uniforms (violet color and no time coloring)
+            gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+            gl.uniform1f(this.gridUniforms.colorByTheta, 0.0); // Use solid color
+            gl.uniform3f(this.gridUniforms.sheetColor, 
+                this._shiftArrow.color[0], 
+                this._shiftArrow.color[1], 
+                this._shiftArrow.color[2]); // violet
+            gl.uniform3f(this.gridUniforms.axes, 1.0, 1.0, 1.0);
+            gl.uniform3f(this.gridUniforms.driveDir, 1.0, 0.0, 0.0);
+            gl.uniform1f(this.gridUniforms.wallWidth, 0.1);
+            gl.uniform1f(this.gridUniforms.vShip, 1.0);
+            
+            // Render arrow as lines
+            const vertexCount = this._shiftArrow.geometry.length / 3;
+            gl.drawArrays(gl.LINES, 0, vertexCount);
+            
+            // Clean up
+            gl.disableVertexAttribArray(positionLocation);
+            
+        } catch (error) {
+            console.warn("Failed to render shift arrow:", error);
+        }
+        
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
     _renderLoop() {
         this._render();
         requestAnimationFrame(() => this._renderLoop());
@@ -841,6 +1002,9 @@ class WarpEngine {
         
         // Render the spacetime grid
         this._renderGridPoints();
+        
+        // Render shift vector arrow
+        this._renderShiftArrow();
         
         // Emit diagnostics for proof panel
         if (this.onDiagnostics) {

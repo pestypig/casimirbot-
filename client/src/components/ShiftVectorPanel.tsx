@@ -59,6 +59,21 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
 
         {ok && (
           <>
+            {/* Color Key */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full bg-blue-400/80" />
+                <span className="text-muted-foreground">Contraction</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full bg-orange-400/80" />
+                <span className="text-muted-foreground">Expansion</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 rounded-full" style={{backgroundColor:'#8A2BE2'}} />
+                <span className="text-muted-foreground">Shift Vector (tilt)</span>
+              </div>
+            </div>
             <div className="p-3 bg-slate-950 rounded-lg font-mono">
               <div className="text-slate-300">Equations</div>
               <div className="text-slate-400 mt-1">
