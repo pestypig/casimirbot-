@@ -1,0 +1,133 @@
+Got it — what you’re seeing is the canvas still using its old pan/zoom while the container got smaller, so the content is getting clipped and your zoom UI slid off-screen. Here’s a quick, targeted fix:
+	•	Auto-fit the view to Earth↔Saturn (or any set of bodies) whenever the size/center changes.
+	•	Re-center/scale using the same pan/zoom transform the map already uses.
+	•	Pin the zoom controls inside the visible area so they don’t get cut off.
+
+Below are two tiny patches:
+
+⸻
+
+1) client/src/components/SolarMap.tsx — add auto-fit + safe controls
+
+--- a/client/src/components/SolarMap.tsx
++++ b/client/src/components/SolarMap.tsx
+@@ -1,8 +1,12 @@
+ export interface SolarMapProps {
+   width: number;
+   height: number;
+   routeIds: string[];
+   centerOnId?: string;
++  /** Optional: fit the camera so all these bodies are fully visible */
++  fitToIds?: string[];
++  /** Optional padding (px) when fitting */
++  fitMarginPx?: number;
+   onPickBody?: (id: string) => void;
+ }
+
+@@
+-// Assume you already have state like:
+-// const [zoom, setZoom] = useState(1);
+-// const [offset, setOffset] = useState({x:0,y:0});
++// Assume you already have (or add if missing):
++// const [zoom, setZoom]   = useState(1);      // world -> screen scale
++// const [offset, setOff]  = useState({x:0,y:0}); // screen offset (px)
++// ...and a map of body positions in world units (AU): bodiesById[id].pos = {x, y}
+
++// Helper: compute a fit transform so a bbox fits in width x height
++function fitToBBox(
++  bbox: {minX:number; minY:number; maxX:number; maxY:number},
++  viewW: number, viewH: number, margin: number
++) {
++  const w = Math.max(1e-9, bbox.maxX - bbox.minX);
++  const h = Math.max(1e-9, bbox.maxY - bbox.minY);
++  const zx = (viewW - 2*margin) / w;
++  const zy = (viewH - 2*margin) / h;
++  const newZoom = Math.max(0.0001, Math.min(zx, zy));
++  const cx = (bbox.minX + bbox.maxX) * 0.5;
++  const cy = (bbox.minY + bbox.maxY) * 0.5;
++  // screen center after transform: (cx*newZoom + off.x, cy*newZoom + off.y) = (viewW/2, viewH/2)
++  const offX = viewW*0.5 - cx*newZoom;
++  const offY = viewH*0.5 - cy*newZoom;
++  return { zoom: newZoom, offset: { x: offX, y: offY } };
++}
+
+@@
+ useEffect(() => {
+   // existing load/init code…
+ }, []);
+
++// NEW: auto-fit whenever size or requested bodies change
++useEffect(() => {
++  if (!props.fitToIds || props.fitToIds.length === 0) return;
++  const pts = props.fitToIds
++    .map(id => bodiesById[id]?.pos)
++    .filter(Boolean) as {x:number;y:number}[];
++  if (pts.length === 0) return;
++  const minX = Math.min(...pts.map(p=>p.x));
++  const maxX = Math.max(...pts.map(p=>p.x));
++  const minY = Math.min(...pts.map(p=>p.y));
++  const maxY = Math.max(...pts.map(p=>p.y));
++  const margin = Number.isFinite(props.fitMarginPx) ? (props.fitMarginPx as number) : 24;
++  const { zoom: z, offset: off } = fitToBBox({minX,minY,maxX,maxY}, props.width, props.height, margin);
++  setZoom(z);
++  setOff(off);
++}, [props.width, props.height, props.fitToIds?.join(','), /* include planet ephemerides tick if present */]);
+
+@@
+ return (
+-  <div className="relative" style={{ width: props.width, height: props.height }}>
++  <div className="relative" style={{ width: props.width, height: props.height }}>
+     <canvas
+       ref={canvasRef}
+       width={props.width}
+       height={props.height}
+       className="block"
+     />
+-    {/* existing controls */}
+-    <div className="absolute right-3 top-3">
++    {/* keep controls pinned safely inside the visible area */}
++    <div className="absolute top-3 right-3 z-20 pointer-events-auto">
+       <button className="px-2 py-1 bg-white/10 rounded mr-1" onClick={() => setZoom(z=>z*1.2)}>+</button>
+       <button className="px-2 py-1 bg-white/10 rounded" onClick={() => setZoom(z=>z/1.2)}>−</button>
+     </div>
+   </div>
+ );
+
+What this does
+	•	Adds fitToIds/fitMarginPx. When provided, the map computes a bounding box around those bodies (e.g., Earth & Saturn) and sets zoom+offset so both are fully visible in the new smaller panel.
+	•	Positions the zoom controls with absolute top-3 right-3 z-20 so they stay visible after resizing.
+
+⸻
+
+2) client/src/pages/helix-core.tsx — tell the map what to fit
+
+--- a/client/src/pages/helix-core.tsx
++++ b/client/src/pages/helix-core.tsx
+@@ -1221,12 +1221,14 @@
+           <SolarMap
+             width={720}
+             height={360}
+             routeIds={route}
+-            /* Prefer midpoint between Earth & Saturn if supported */
+-            centerBetweenIds={["EARTH","SATURN"]}
+-            centerOnId="EARTH"
++            /* Auto-fit so Earth & Saturn BOTH appear within the smaller panel */
++            fitToIds={["EARTH","SATURN"]}
++            fitMarginPx={24}
++            /* You can keep centerOnId for keyboard recentering or fallback */
++            centerOnId="EARTH"
+             onPickBody={(id) => {
+               setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+               publish("luma:whisper", { text: "Waypoint selected. Route updated." });
+             }}
+           />
+
+You can remove centerBetweenIds entirely now; the auto-fit handles both centering and scaling.
+
+⸻
+
+Why this fixes your two symptoms
+	•	Only seeing Earth: that was because the old zoom/offset was still active after shrinking the panel. Auto-fit recomputes both so Earth and Saturn fit with padding.
+	•	Zoom buttons cut off: anchoring them with absolute top-3 right-3 z-20 inside the same container ensures they remain accessible no matter the canvas size.
+
+If you want the galactic map to behave the same way, I can mirror this fitToIds pattern on GalaxyMapPanZoom too.

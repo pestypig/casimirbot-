@@ -1167,10 +1167,10 @@ export default function HelixCore() {
                         width={720}
                         height={360}
                         routeIds={route}
-                        /* Prefer exact midpoint between Earth & Saturn if supported (see SolarMap patch).
-                           If you don't want to patch SolarMap, comment the next line and use centerOnId="JUPITER" instead. */
-                        centerBetweenIds={["EARTH","SATURN"]}
-                        /* Fallback (no SolarMap change): centerOnId="JUPITER" */
+                        /* Auto-fit so Earth & Saturn BOTH appear within the smaller panel */
+                        fitToIds={["EARTH","SATURN"]}
+                        fitMarginPx={24}
+                        /* You can keep centerOnId for keyboard recentering or fallback */
                         centerOnId="EARTH"
                         onPickBody={(id) => {
                           setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);

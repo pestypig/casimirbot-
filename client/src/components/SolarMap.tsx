@@ -9,6 +9,10 @@ type Props = {
   onPickBody?: (id: string) => void;
   centerOnId?: string;
   centerBetweenIds?: [string, string];
+  /** Optional: fit the camera so all these bodies are fully visible */
+  fitToIds?: string[];
+  /** Optional padding (px) when fitting */
+  fitMarginPx?: number;
 };
 
 export function SolarMap({
@@ -17,7 +21,9 @@ export function SolarMap({
   routeIds = [],
   onPickBody,
   centerOnId = "EARTH",
-  centerBetweenIds
+  centerBetweenIds,
+  fitToIds,
+  fitMarginPx
 }: Props) {
   const [zoom, setZoom] = React.useState(80); // pixels per AU
   const [offset, setOffset] = React.useState({ x: width / 2, y: height / 2 });
@@ -26,6 +32,24 @@ export function SolarMap({
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  // Helper: compute a fit transform so a bbox fits in width x height
+  const fitToBBox = React.useCallback((
+    bbox: {minX:number; minY:number; maxX:number; maxY:number},
+    viewW: number, viewH: number, margin: number
+  ) => {
+    const w = Math.max(1e-9, bbox.maxX - bbox.minX);
+    const h = Math.max(1e-9, bbox.maxY - bbox.minY);
+    const zx = (viewW - 2*margin) / w;
+    const zy = (viewH - 2*margin) / h;
+    const newZoom = Math.max(0.0001, Math.min(zx, zy));
+    const cx = (bbox.minX + bbox.maxX) * 0.5;
+    const cy = (bbox.minY + bbox.maxY) * 0.5;
+    // screen center after transform: (cx*newZoom + off.x, cy*newZoom + off.y) = (viewW/2, viewH/2)
+    const offX = viewW*0.5 - cx*newZoom;
+    const offY = viewH*0.5 - cy*newZoom;
+    return { zoom: newZoom, offset: { x: offX, y: offY } };
+  }, []);
 
   // Update planetary positions every 30 seconds
   React.useEffect(() => {
@@ -72,6 +96,28 @@ export function SolarMap({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [centerOnId, centerBetweenIds, points, zoom, width, height]);
+
+  // NEW: auto-fit whenever size or requested bodies change
+  React.useEffect(() => {
+    if (!fitToIds || fitToIds.length === 0 || points.length === 0) return;
+    
+    const pts = fitToIds
+      .map(id => points.find(p => p.id === id))
+      .filter(Boolean)
+      .map(p => ({ x: p!.x_au, y: p!.y_au }));
+    
+    if (pts.length === 0) return;
+    
+    const minX = Math.min(...pts.map(p => p.x));
+    const maxX = Math.max(...pts.map(p => p.x));
+    const minY = Math.min(...pts.map(p => p.y));
+    const maxY = Math.max(...pts.map(p => p.y));
+    const margin = Number.isFinite(fitMarginPx) ? (fitMarginPx as number) : 24;
+    
+    const { zoom: z, offset: off } = fitToBBox({minX, minY, maxX, maxY}, width, height, margin);
+    setZoom(z);
+    setOffset(off);
+  }, [width, height, fitToIds?.join(','), points, fitMarginPx, fitToBBox]);
 
   // Drawing
   React.useEffect(() => {
@@ -251,8 +297,8 @@ export function SolarMap({
         Scale: {Math.round(zoom)} px/AU
       </div>
       
-      {/* Zoom controls */}
-      <div className="absolute right-3 top-3 flex gap-1">
+      {/* keep controls pinned safely inside the visible area */}
+      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex gap-1">
         <button 
           className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
           onClick={() => setZoom(z => Math.min(500, z * 1.2))}
