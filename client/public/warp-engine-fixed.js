@@ -119,8 +119,8 @@ class WarpEngine {
         const dist = (margin * R) / Math.tan(fov * 0.5);
 
         // ↑ raise camera; ↓ look slightly down so bubble isn't on the horizon
-        const eye    = [0, 0.45 * R, -dist];
-        const center = [0, -0.08 * R, 0];
+        const eye    = [0, 0.62 * R, -dist];   // higher overhead
+        const center = [0, -0.12 * R, 0];      // look further down
         const up     = [0, 1, 0];
 
         this._perspective(this.projMatrix, fov, aspect, 0.08, 100.0);
@@ -978,15 +978,7 @@ class WarpEngine {
         }
     }
 
-    _resize() {
-        const canvas = this.canvas;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * window.devicePixelRatio;
-        canvas.height = rect.height * window.devicePixelRatio;
-        
-        this.gl.viewport(0, 0, canvas.width, canvas.height);
-        this._setupCamera();
-    }
+
 
     // Matrix math utilities
     _createShaderProgram(vertexSource, fragmentSource) {
@@ -1105,8 +1097,8 @@ class WarpEngine {
     // === Responsive camera helpers =============================================
     _fitFovForAspect(aspect) {
         // Wider FOV when the canvas is tall (phones/portrait)
-        // desktop ~60°, phone ~68°
-        const fovDesktop = Math.PI / 3;      // 60°
+        // desktop ~55°, phone ~68°
+        const fovDesktop = Math.PI / 3.272;  // ~55°
         const fovPortrait = Math.PI / 2.65;  // ~68°
         const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
         return fovDesktop * (1 - t) + fovPortrait * t;
@@ -1127,9 +1119,9 @@ class WarpEngine {
         const dist = (margin * R) / Math.tan(fov * 0.5);
 
         // Higher overhead perspective for better visualization
-        const eye = [0, 0.45 * R, -dist];               // ↑ higher overhead
+        const eye = [0, 0.62 * R, -dist];      // match overhead height
         // look further down to clearly show deck plane and interior effects
-        const center = [0, -0.08 * R, 0];               // ↓ look a bit further down
+        const center = [0, -0.12 * R, 0];      // match overhead look-down
         const up = [0, 1, 0];
 
         // Update projection & view
