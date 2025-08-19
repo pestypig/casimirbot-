@@ -10,6 +10,7 @@ import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
 import HelixCore from "@/pages/helix-core";
+import Why from "@/pages/why";
 import StartPortal from "@/pages/start";
 import StationPage from "@/pages/station";
 import NotFound from "@/pages/not-found";
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
+      <Route path="/why" component={Why} />
       <Route path="/station/:role" component={StationPage} />
       <Route path="/optimist-station" component={StationPage} />
       <Route path="/engineer-station" component={StationPage} />

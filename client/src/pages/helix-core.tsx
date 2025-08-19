@@ -368,10 +368,12 @@ export default function HelixCore() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Badge variant="outline" className="border-green-400 text-green-400">
-              <Activity className="w-3 h-3 mr-1" />
-              ONLINE
-            </Badge>
+            <Link href="/why">
+              <Badge variant="outline" className="cursor-pointer border-green-400 text-green-400 hover:bg-green-400 hover:text-black transition-colors">
+                <Activity className="w-3 h-3 mr-1" />
+                Why
+              </Badge>
+            </Link>
             <Link href="/bridge">
               <Button variant="outline" className="flex items-center gap-2">
                 <Home className="w-4 h-4" />
