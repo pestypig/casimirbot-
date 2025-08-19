@@ -411,21 +411,6 @@ export default function HelixCore() {
           </div>
         </div>
 
-        {/* Mode Selector */}
-        <div className="mb-6">
-          <div className="flex gap-2">
-            {/* ⬇️ KEEP ONLY MANUAL PULSE MODE UP HERE */}
-            <Button 
-              variant={activeMode === "manual" ? "default" : "outline"}
-              onClick={() => setActiveMode("manual")}
-              className="flex items-center gap-2"
-            >
-              <Grid3X3 className="w-4 h-4" />
-              Manual Pulse Mode
-            </Button>
-          </div>
-        </div>
-
         {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
           <CardHeader>
