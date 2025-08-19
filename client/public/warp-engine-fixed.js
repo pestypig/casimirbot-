@@ -442,6 +442,7 @@ class WarpEngine {
             epsilonTiltFloor: N(parameters.epsilonTiltFloor || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
             tiltGain: N(parameters.tiltGain || 0.55),
+            hullAxes: parameters.hullAxes || [503.5, 132, 86.5],
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -726,6 +727,51 @@ class WarpEngine {
             
             // --- Surface normal ---
             const n = nEllipsoid(p, axesScene);
+
+            // ===========================
+            //  INTERIOR TILT (SHIFT VECTOR)
+            //  Adds a gentle plane-like slope to all points with rho < 1,
+            //  smoothly blended to zero at the wall.
+            // ===========================
+            // Uniforms (with safe fallbacks)
+            const tiltVecArr = (this.uniforms?.betaTiltVec) || [0, -1, 0];
+            // Normalize direction
+            let tLen = Math.hypot(tiltVecArr[0], tiltVecArr[1], tiltVecArr[2]) || 1;
+            const tHat = [tiltVecArr[0]/tLen, tiltVecArr[1]/tLen, tiltVecArr[2]/tLen];
+            // Small dimensionless slope (ε_tilt), e.g. 1e-7 … 5e-7
+            const epsTilt = Math.max(0, this.uniforms?.epsilonTilt || 0);
+            // Visual gain so it's visible but still gentle
+            const tiltGain = (typeof this.uniforms?.tiltGain === 'number') ? this.uniforms.tiltGain : 1.0;
+            // Scene-unit <-> meter scale: use x-axis scale as proxy
+            const axesMeters = this.uniforms?.hullAxes || [503.5,132,86.5];
+            const meterToScene =
+              (axesMeters[0] > 0) ? (axesScene[0] / axesMeters[0]) : 1.0;
+            // Effective geometric radius in meters for scaling the slope height
+            const Rgeom_m = Math.cbrt(axesMeters[0]*axesMeters[1]*axesMeters[2]);
+            // Desired height change across one Rgeom (scene units)
+            const tiltHeightScene = epsTilt * Rgeom_m * meterToScene * tiltGain;
+            // Smooth interior mask: 1 deep inside, 0 at/after wall
+            // Blend from rho=0.95→1.05 (tune with w_rho if you like)
+            const smoothstep = (a,b,x)=> {
+              const t = Math.min(1, Math.max(0, (x - a)/(b - a)));
+              return t*t*(3 - 2*t);
+            };
+            const interiorMask = 1.0 - smoothstep(0.98, 1.02, rho);
+            // Project position onto tilt direction to get signed distance along tHat.
+            // (This makes a plane-like slope through the interior.)
+            const sAlongTilt = p[0]*tHat[0] + p[1]*tHat[1] + p[2]*tHat[2];
+            // Apply bias along tHat, scaled by interior mask and by normalized radius
+            // (divide by a nominal interior radius so the slope is modest)
+            const nominalR = Math.max(1e-6, 0.5*(axesScene[1] + axesScene[2]));
+            const tiltBias = (sAlongTilt/nominalR) * tiltHeightScene * interiorMask;
+            // Add interior tilt (plane) before Natário normal push
+            const pTilted = [
+              p[0] + tHat[0]*tiltBias,
+              p[1] + tHat[1]*tiltBias,
+              p[2] + tHat[2]*tiltBias
+            ];
+            // Continue from the tilted position
+            const pUsed = pTilted;
             
             // --- (B) Soft front/back polarity (C¹-continuous) ---
             const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
@@ -817,33 +863,15 @@ class WarpEngine {
                 disp = blended;
             }
             
-            // ----- Interior gravity (shift vector "tilt") -----
-            // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
-            const w_int = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // ~few cm in normalized space
-            const interior = (() => {
-              // 1 inside the cabin (rho <= 1 - w_int), 0 outside; smooth edge within w_int
-              const t = (1.0 - rho) / Math.max(w_int, 1e-6);
-              // smoothstep(0→1): 3t² − 2t³, clamped
-              const s = Math.max(0, Math.min(1, t));
-              return s * s * (3 - 2 * s);
-            })();
-
-            // NEW: interior tilt displacement — do NOT multiply by 'ring'
-            const epsTilt   = this.uniforms?.epsilonTilt ?? 0.0;
-            const tiltGain  = this.uniforms?.tiltGain ?? 0.25;     // gentle default
-            const betaTilt  = this.uniforms?.betaTiltVec || [0, -1, 0];
-            // project normal onto "down" and keep sign stable
-            const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
-            // scale small, interior-only, soft-clamped
-            let dispTilt = epsTilt * tiltGain * interior * downDot;
-            const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
-            dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
-            // ----- end interior gravity -----
-
-            // apply both curvature and tilt
-            vtx[i]     = p[0] - n[0] * (disp + dispTilt);
-            vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
-            vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
+            // Apply Natário normal displacement from tilted position
+            vtx[i]     = pUsed[0] - n[0] * disp;
+            vtx[i + 1] = pUsed[1] - n[1] * disp;
+            vtx[i + 2] = pUsed[2] - n[2] * disp;
+            
+            // Debug tilt bias on first few vertices
+            if (i < 30 && Math.abs(tiltBias) > 1e-6) {
+                console.log(`🔄 Interior tilt bias: vertex=${i/3}, rho=${rho.toFixed(3)}, mask=${interiorMask.toFixed(3)}, bias=${tiltBias.toExponential(2)}`);
+            }
         }
         
         // Enhanced diagnostics - check for amplitude overflow
