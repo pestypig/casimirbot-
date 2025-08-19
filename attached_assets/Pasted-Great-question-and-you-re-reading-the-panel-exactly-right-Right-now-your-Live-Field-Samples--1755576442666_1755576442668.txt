@@ -1,0 +1,112 @@
+Great question — and you’re reading the panel exactly right.
+
+Right now your “Live β Field Samples” in the WarpVisualizer are computed from the canonical Natário bell profile only:
+
+β(s) = β₀ · s · exp(−s²) with β₀ = duty · γ_geo
+
+Because of that s factor, the Center (s=0) sample is always 0, no matter the mode. That’s mathematically correct for the bell alone, but it hides your interior tilt contribution (ε_tilt), which is what should make the center gently non-zero when artificial gravity is on.
+
+Below is a tiny patch that (1) routes the shift/tilt parameters you already compute into the samples, and (2) shows Bell, Tilt, and Total so you can see what each part contributes — including a non-zero center when ε_tilt > 0.
+
+⸻
+
+Why the center is 0 today
+
+In your current WarpVisualizer, the sampling section derives β like this (bell only):
+
+betaValue = beta0 * s * Math.exp(-s*s) (see the Live β Field Samples map)  ￼
+
+And in the Shift Vector panel you correctly compute
+
+ε_tilt = (g_target · R_geom)/c² with mode defaults and a downward β⃗_tilt (0, −1, 0).  ￼
+
+So the fix is simply: add the tilt term to the sampled β (and show both).
+
+⸻
+
+Minimal patch (drop-in)
+
+File: client/src/components/WarpVisualizer.tsx
+Patch 1 — hoist resolved tilt right above the sampling block (you already resolve it for uniforms; reuse the same values for display):
+
+// …keep existing code above…
+
+// === resolve tilt exactly once (reuse the same numbers you push to the engine) ===
+const mode = parameters.currentMode ?? "hover";
+const epsFromPanel = Number(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 0);
+const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
+const modeTiltDefaults: Record<string, number> = { emergency: 0.035, hover: 0.020, cruise: 0.012, standby: 0.000 };
+const epsilonTilt = hasGoodPanelEps ? epsFromPanel : (modeTiltDefaults[mode] ?? 0.0);
+const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+  ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+  : [0, -1, 0];  // default "down"
+
+(These are the same fields you already send to the WebGL uniforms block: epsilonTilt and betaTiltVec.)  ￼
+
+Patch 2 — replace the current “Live β Field Samples” map with Bell + Tilt + Total
+
+{/* Live β Sampling */}
+<div className="space-y-2">
+  <div className="text-cyan-300 font-semibold">Live β Field Samples:</div>
+  {[
+    { name: 'Center', s: 0.00, color: 'text-white' },
+    { name: 'R/2',    s: 0.50, color: 'text-green-300' },
+    { name: 'R',      s: 1.00, color: 'text-yellow-300' },
+    { name: 'Edge',   s: 2.00, color: 'text-red-300' }
+  ].map(point => {
+    // Canonical Natário bell
+    const beta0 = parameters.dutyCycle * parameters.g_y; // β0 = duty·γ_geo
+    const betaBell = beta0 * point.s * Math.exp(-point.s * point.s);
+
+    // Interior tilt contribution:
+    // - use ε_tilt directly as a very small, nearly uniform interior offset
+    // - modulate by a soft interior envelope so it fades out near the wall
+    const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2)); // ~1 at center → 0 near wall
+    const tiltMagnitude = epsilonTilt; // already ≪ 1e-6
+    // project onto "down" (use |y|-component as a simple proxy for display)
+    const tiltProj = Math.abs(betaTiltVec[1] ?? 1);
+    const betaTilt = tiltMagnitude * tiltProj * interiorEnv;
+
+    const betaTotal = betaBell + betaTilt;
+
+    return (
+      <div key={point.name} className={`${point.color} space-y-0.5 font-mono`}>
+        <div className="flex justify-between">
+          <span>{point.name} (s={point.s.toFixed(2)}):</span>
+          <span>β_total = {betaTotal.toExponential(2)}</span>
+        </div>
+        <div className="text-xs text-slate-400 flex justify-between">
+          <span>• β_bell</span><span>{betaBell.toExponential(2)}</span>
+        </div>
+        <div className="text-xs text-slate-400 flex justify-between">
+          <span>• β_tilt</span><span>{betaTilt.toExponential(2)}</span>
+        </div>
+      </div>
+    );
+  })}
+</div>
+
+This keeps the physics story clean:
+	•	Bell term gives the familiar ring (zero at center).
+	•	Tilt term is a tiny interior offset (non-zero at center) controlled by your Shift Vector panel.
+	•	Total shows the combined effect that the WebGL engine is visualizing.
+
+⸻
+
+Quick sanity checks
+	1.	Center should no longer be 0 (unless Standby):
+Switch to Hover or Emergency and confirm “Center (s=0.00)” shows a small non-zero β_tilt and therefore a non-zero β_total.
+	2.	Shift Vector panel drives it:
+Changing mode in the Shift Vector panel (or its g-target presets) updates ε_tilt, which updates both the uniforms sent to the engine and the numeric β_tilt term displayed in the samples. (That panel computes ε_tilt from g_target and R_geom already.  ￼)
+	3.	Visualizer and numbers match:
+The bubble’s interior should show a gentle, mode-scaled “down” slope while your numeric β_tilt reports a consistent, tiny value (≪1e-6 scale), exactly as you intend for the “whisper” regime.
+
+If you want the center tilt to be a touch more visible numerically (without cranking the actual physics), scale display only by 3–5× in the sampling block (leave the WebGL uniforms as-is). For example, change:
+
+const tiltMagnitude = epsilonTilt; 
+
+to
+
+const tiltMagnitude = 3 * epsilonTilt; // display-only gain
+
+Happy to tweak the envelope or projection if you want the tilt to “peak” at R/2 instead of center, but this version gives you exactly what you asked: a clearly non-zero center when interior gravity is engaged, without touching your engine math.

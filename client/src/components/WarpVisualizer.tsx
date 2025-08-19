@@ -513,21 +513,54 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             {/* Live β Sampling */}
             <div className="space-y-2">
               <div className="text-cyan-300 font-semibold">Live β Field Samples:</div>
-              {[
-                { name: 'Center', s: 0, color: 'text-white' },
-                { name: 'R/2', s: 0.5, color: 'text-green-300' },
-                { name: 'R', s: 1.0, color: 'text-yellow-300' },
-                { name: 'Edge', s: 2.0, color: 'text-red-300' }
-              ].map(point => {
-                const beta0 = parameters.dutyCycle * parameters.g_y;
-                const betaValue = beta0 * point.s * Math.exp(-point.s * point.s);
-                return (
-                  <div key={point.name} className={`${point.color} flex justify-between`}>
-                    <span>{point.name} (s={point.s.toFixed(2)}):</span>
-                    <span>β = {betaValue.toExponential(2)}</span>
-                  </div>
-                );
-              })}
+              {(() => {
+                // === resolve tilt exactly once (reuse the same numbers we push to the engine) ===
+                const mode = parameters.currentMode ?? "hover";
+                const epsFromPanel = Number(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 0);
+                const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
+                const modeTiltDefaults: Record<string, number> = { emergency: 0.035, hover: 0.020, cruise: 0.012, standby: 0.000 };
+                const epsilonTilt = hasGoodPanelEps ? epsFromPanel : (modeTiltDefaults[mode] ?? 0.0);
+                const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
+                  ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+                  : [0, -1, 0];  // default "down"
+
+                return [
+                  { name: 'Center', s: 0.00, color: 'text-white' },
+                  { name: 'R/2',    s: 0.50, color: 'text-green-300' },
+                  { name: 'R',      s: 1.00, color: 'text-yellow-300' },
+                  { name: 'Edge',   s: 2.00, color: 'text-red-300' }
+                ].map(point => {
+                  // Canonical Natário bell
+                  const beta0 = parameters.dutyCycle * parameters.g_y; // β0 = duty·γ_geo
+                  const betaBell = beta0 * point.s * Math.exp(-point.s * point.s);
+
+                  // Interior tilt contribution:
+                  // - use ε_tilt directly as a very small, nearly uniform interior offset
+                  // - modulate by a soft interior envelope so it fades out near the wall
+                  const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2)); // ~1 at center → 0 near wall
+                  const tiltMagnitude = epsilonTilt; // already ≪ 1e-6
+                  // project onto "down" (use |y|-component as a simple proxy for display)
+                  const tiltProj = Math.abs(betaTiltVec[1] ?? 1);
+                  const betaTilt = tiltMagnitude * tiltProj * interiorEnv;
+
+                  const betaTotal = betaBell + betaTilt;
+
+                  return (
+                    <div key={point.name} className={`${point.color} space-y-0.5 font-mono`}>
+                      <div className="flex justify-between">
+                        <span>{point.name} (s={point.s.toFixed(2)}):</span>
+                        <span>β_total = {betaTotal.toExponential(2)}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 flex justify-between">
+                        <span>• β_bell</span><span>{betaBell.toExponential(2)}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 flex justify-between">
+                        <span>• β_tilt</span><span>{betaTilt.toExponential(2)}</span>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
               
               {/* Live Parameters */}
               <div className="mt-4 pt-3 border-t border-cyan-500/20">
