@@ -1169,7 +1169,7 @@ export default function HelixCore() {
                         routeIds={route}
                         /* Auto-fit so Earth & Saturn BOTH appear within the smaller panel */
                         fitToIds={["EARTH","SATURN"]}
-                        fitMarginPx={24}
+                        fitMarginPx={28}
                         /* You can keep centerOnId for keyboard recentering or fallback */
                         centerOnId="EARTH"
                         onPickBody={(id) => {

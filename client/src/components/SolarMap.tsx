@@ -32,6 +32,7 @@ export function SolarMap({
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const didPriorityFit = React.useRef(false);
 
   // Helper: compute a fit transform so a bbox fits in width x height
   const fitToBBox = React.useCallback((
@@ -59,8 +60,10 @@ export function SolarMap({
     return () => clearInterval(id);
   }, []);
 
-  // Auto-center on specified body or midpoint between two bodies
+  // DEFAULT FIT - Skip when fitToIds is provided
   React.useEffect(() => {
+    // If caller wants an explicit fit to bodies, skip the default-fit.
+    if (fitToIds && fitToIds.length > 0) return;
     if (points.length === 0) return;
     
     let centerPoint = { x_au: 0, y_au: 0 };
@@ -95,12 +98,14 @@ export function SolarMap({
       y: height / 2 + centerPoint.y_au * zoom 
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [centerOnId, centerBetweenIds, points, zoom, width, height]);
+  }, [fitToIds?.length, centerOnId, centerBetweenIds, points, zoom, width, height]);
 
-  // NEW: auto-fit whenever size or requested bodies change
-  React.useEffect(() => {
-    if (!fitToIds || fitToIds.length === 0 || points.length === 0) return;
+  // PRIORITY FIT-TO-IDS (runs after layout so it wins over defaults)
+  React.useLayoutEffect(() => {
+    if (!fitToIds || fitToIds.length === 0) return;
+    if (points.length === 0) return;
     
+    // Gather target points from bodies
     const pts = fitToIds
       .map(id => points.find(p => p.id === id))
       .filter(Boolean)
@@ -108,15 +113,22 @@ export function SolarMap({
     
     if (pts.length === 0) return;
     
-    const minX = Math.min(...pts.map(p => p.x));
-    const maxX = Math.max(...pts.map(p => p.x));
-    const minY = Math.min(...pts.map(p => p.y));
-    const maxY = Math.max(...pts.map(p => p.y));
-    const margin = Number.isFinite(fitMarginPx) ? (fitMarginPx as number) : 24;
+    // Defer to next frame to ensure any default sizing has applied
+    const raf = requestAnimationFrame(() => {
+      const minX = Math.min(...pts.map(p => p.x));
+      const maxX = Math.max(...pts.map(p => p.x));
+      const minY = Math.min(...pts.map(p => p.y));
+      const maxY = Math.max(...pts.map(p => p.y));
+      const margin = Number.isFinite(fitMarginPx) ? (fitMarginPx as number) : 24;
+      
+      const { zoom: z, offset: off } = fitToBBox({minX, minY, maxX, maxY}, width, height, margin);
+      setZoom(z);
+      setOffset(off);
+      didPriorityFit.current = true;
+    });
     
-    const { zoom: z, offset: off } = fitToBBox({minX, minY, maxX, maxY}, width, height, margin);
-    setZoom(z);
-    setOffset(off);
+    return () => cancelAnimationFrame(raf);
+    // include bodies + dimensions so we refit on resize/ephemeris tick
   }, [width, height, fitToIds?.join(','), points, fitMarginPx, fitToBBox]);
 
   // Drawing
@@ -276,7 +288,7 @@ export function SolarMap({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-lg border bg-black cursor-grab active:cursor-grabbing"
+      className="relative overflow-hidden rounded-lg border bg-black cursor-grab active:cursor-grabbing"
       style={{ width, height }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
