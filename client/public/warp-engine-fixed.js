@@ -33,6 +33,10 @@ class WarpEngine {
         // Initialize uniform dirty flag
         this._uniformsDirty = false;
         
+        // Cache for responsive camera
+        this._lastAxesScene = null;
+        this._gridSpan = null;
+        
         // Temporal smoothing for visual calm (canonical Natário)
         this._dispAlpha = 0.25; // blend factor (0=no change, 1=instant)
         this._prevDisp = [];     // per-vertex displacement history
@@ -83,28 +87,38 @@ class WarpEngine {
             this.strobingState.currentSector = currentSector;
         };
         
-        // Bind resize handler
-        this._resize = this._resize.bind(this);
+        // Bind responsive resize handler
+        this._resize = () => this._resizeCanvasToDisplaySize();
         window.addEventListener('resize', this._resize);
+        this._resizeCanvasToDisplaySize(); // Initial setup
         
         // Start render loop
         this._renderLoop();
     }
 
     _setupCamera() {
-        const aspect = this.canvas.width / this.canvas.height;
-        
-        // Projection matrix – slightly narrower FOV for a closer feel
-        this._perspective(this.projMatrix, Math.PI / 4, aspect, 0.1, 100.0);
-        
-        // View matrix – closer & slightly lower
-        const eye = [0, 0.35, -(this.currentParams?.cameraZ ?? 1.20)];
-        const center = [0, -0.05, 0];  // Gentle downward look for framing
-        const up = [0, 1, 0];
-        this._lookAt(this.viewMatrix, eye, center, up);
-        
-        // Combined MVP matrix
-        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+        // Use responsive auto-framing instead of fixed camera
+        const axes = this.uniforms?.axesClip || this._lastAxesScene || [0.4, 0.22, 0.22];
+        this._fitCameraToBubble(axes, this._gridSpan || 1);
+    }
+
+    _resizeCanvasToDisplaySize() {
+        // Cap DPR on phones so we don't oversample and "zoom in"
+        const dprCap = (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) ? 1.5 : 2.0;
+        const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
+
+        const { clientWidth, clientHeight } = this.canvas;
+        const width  = Math.max(1, Math.floor(clientWidth  * dpr));
+        const height = Math.max(1, Math.floor(clientHeight * dpr));
+
+        if (this.canvas.width !== width || this.canvas.height !== height) {
+            this.canvas.width  = width;
+            this.canvas.height = height;
+            this.gl.viewport(0, 0, width, height);
+
+            const axes = this.uniforms?.axesClip || this._lastAxesScene || [0.4, 0.22, 0.22];
+            this._fitCameraToBubble(axes, this._gridSpan || 1);
+        }
     }
     
     _adjustCameraForSpan(span) {
@@ -368,6 +382,23 @@ class WarpEngine {
           return d > 1 ? d/100 : N(d);
         })();
 
+        // Derive scene axes used by the renderer
+        const axesScene =
+            parameters.axesScene ||
+            parameters.axesClip ||
+            this.uniforms?.axesClip ||
+            (function resolveFromHull(p) {
+                if (!p) return null;
+                const a = (p.hullAxes?.[0] ?? p.hull?.a) || 503.5;
+                const b = (p.hullAxes?.[1] ?? p.hull?.b) || 132.0;
+                const c = (p.hullAxes?.[2] ?? p.hull?.c) || 86.5;
+                // Convert meters → scene (using standard scale)
+                const s = 1.0 / 1200.0;
+                return [a * s, b * s, c * s];
+            })(parameters) ||
+            this._lastAxesScene ||
+            [0.4, 0.22, 0.22];
+
         // Mirror pipeline fields into uniforms for diagnostics
         this.uniforms = {
             ...this.uniforms,
@@ -375,7 +406,7 @@ class WarpEngine {
             colorByTheta: 1,
             vShip: parameters.vShip || 1,
             wallWidth: parameters.wallWidth || 0.06,
-            axesClip: parameters.axesClip || [0.4, 0.22, 0.22],
+            axesClip: axesScene,
             driveDir: parameters.driveDir || [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: N(parameters.epsilonTilt || 0),
@@ -397,6 +428,18 @@ class WarpEngine {
             )),
             viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
         };
+
+        // Update cached axes and refit camera if changed
+        if (axesScene) {
+            this._lastAxesScene = axesScene;
+            this._fitCameraToBubble(axesScene, this._gridSpan || 1);
+        }
+
+        // If grid span provided, cache it and refit
+        if (typeof parameters.gridSpan === 'number') {
+            this._gridSpan = Math.max(0.5, parameters.gridSpan);
+            this._fitCameraToBubble(this._lastAxesScene || axesScene, this._gridSpan);
+        }
         
         // NEW: Map operational mode parameters to spacetime visualization
         if (parameters.currentMode) {
@@ -1027,6 +1070,43 @@ class WarpEngine {
         out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
         out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
         out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    }
+
+    // === Responsive camera helpers =============================================
+    _fitFovForAspect(aspect) {
+        // Wider FOV when the canvas is tall (phones/portrait)
+        // desktop ~60°, phone ~68°
+        const fovDesktop = Math.PI / 3;      // 60°
+        const fovPortrait = Math.PI / 2.65;  // ~68°
+        const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
+        return fovDesktop * (1 - t) + fovPortrait * t;
+    }
+
+    // axesScene is the ellipsoid semi-axes in scene units (what the renderer already uses)
+    // spanHint is optional fallback (grid span in scene units)
+    _fitCameraToBubble(axesScene, spanHint) {
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const fov = this._fitFovForAspect(aspect);
+
+        // Bounding sphere radius of the ellipsoid (in scene units)
+        const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+        const baseMargin = 1.2;
+        const margin = baseMargin * (aspect < 1 ? 1.1 : 1.0); // more air on mobile
+
+        // Distance along -Z so bubble fits vertically
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // Lightly raise the camera with bubble size so horizon stays pleasing
+        const eye = [0, 0.22 * R, -dist];
+        const center = [0, -0.05 * R, 0];
+        const up = [0, 1, 0];
+
+        // Update projection & view
+        this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+        
+        console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
     }
 
     // === Natário Diagnostics (viewer-only, does not affect physics) ===

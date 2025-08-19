@@ -402,10 +402,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="relative w-full h-64 bg-slate-900 rounded-lg overflow-hidden border border-slate-700">
+        <div 
+          className="relative w-full bg-slate-900 rounded-lg overflow-hidden border border-slate-700"
+          style={{ height: 'min(56vh, 520px)' }}
+        >
           <canvas
             ref={canvasRef}
-            className="w-full h-full"
+            className="w-full h-full block"
             width={512}
             height={256}
             data-testid="canvas-warp-bubble"
