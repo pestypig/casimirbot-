@@ -37,6 +37,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
+import { CurvatureKey } from "@/components/CurvatureKey";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -731,6 +732,9 @@ export default function HelixCore() {
 
             {/* Amplification Panel */}
             <AmplificationPanel />
+
+            {/* Curvature Key */}
+            <CurvatureKey />
 
             {/* Shift Vector • Interior Gravity */}
             <ShiftVectorPanel

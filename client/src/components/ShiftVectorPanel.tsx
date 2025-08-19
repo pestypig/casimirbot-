@@ -71,7 +71,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
             <div className="grid grid-cols-2 gap-3 font-mono">
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>target</sub></div>
-                <div className="text-cyan-300">{fstd(displayShift.gTarget, 3)} m/s²</div>
+                <div className="text-violet-400">{fstd(displayShift.gTarget, 3)} m/s²</div>
                 {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
               <div className="p-3 bg-slate-950 rounded">
@@ -84,7 +84,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
                   <Tooltip>
                     <TooltipTrigger className="text-left">
                       <div className="text-slate-400">ε<sub>tilt</sub> (dimensionless)</div>
-                      <div className="text-purple-300">{fmt(displayShift.epsilonTilt, 3)}</div>
+                      <div className="text-violet-400">{fmt(displayShift.epsilonTilt, 3)}</div>
                       {!shift && <div className="text-xs text-slate-500">computed</div>}
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
@@ -95,7 +95,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">β⃗<sub>tilt</sub></div>
-                <div className="text-emerald-300">[{displayShift.betaTiltVec.join(", ")}]</div>
+                <div className="text-violet-400">[{displayShift.betaTiltVec.join(", ")}]</div>
                 {!shift && <div className="text-xs text-slate-500">computed</div>}
               </div>
               <div className="col-span-2 p-3 bg-slate-950 rounded">

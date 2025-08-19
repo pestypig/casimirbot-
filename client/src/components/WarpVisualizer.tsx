@@ -525,37 +525,43 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   : [0, -1, 0];  // default "down"
 
                 return [
-                  { name: 'Center', s: 0.00, color: 'text-white' },
-                  { name: 'R/2',    s: 0.50, color: 'text-green-300' },
-                  { name: 'R',      s: 1.00, color: 'text-yellow-300' },
-                  { name: 'Edge',   s: 2.00, color: 'text-red-300' }
+                  { name: 'Center', s: 0.00 },
+                  { name: 'R/2',    s: 0.50 },
+                  { name: 'R',      s: 1.00 },
+                  { name: 'Edge',   s: 2.00 }
                 ].map(point => {
                   // Canonical Natário bell
-                  const beta0 = parameters.dutyCycle * parameters.g_y; // β0 = duty·γ_geo
-                  const betaBell = beta0 * point.s * Math.exp(-point.s * point.s);
+                  const beta0 = parameters.dutyCycle * parameters.g_y;       // β0 = duty·γ_geo
+                  const betaBell = beta0 * point.s * Math.exp(-(point.s ** 2));
 
-                  // Interior tilt contribution:
-                  // - use ε_tilt directly as a very small, nearly uniform interior offset
-                  // - modulate by a soft interior envelope so it fades out near the wall
-                  const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2)); // ~1 at center → 0 near wall
-                  const tiltMagnitude = epsilonTilt; // already ≪ 1e-6
-                  // project onto "down" (use |y|-component as a simple proxy for display)
-                  const tiltProj = Math.abs(betaTiltVec[1] ?? 1);
+                  // Interior tilt (small, interior-weighted)
+                  const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2)); // 1 at center → 0 near wall
+                  const tiltMagnitude = epsilonTilt;                         // resolved above in your code
+                  const tiltProj = Math.abs(betaTiltVec?.[1] ?? 1);          // project roughly on "down"
                   const betaTilt = tiltMagnitude * tiltProj * interiorEnv;
 
                   const betaTotal = betaBell + betaTilt;
 
+                  // Color by sign for total: −β=blue, +β=orange
+                  const totalClass = betaTotal >= 0 ? "text-orange-400" : "text-sky-400";
+
                   return (
-                    <div key={point.name} className={`${point.color} space-y-0.5 font-mono`}>
-                      <div className="flex justify-between">
+                    <div key={point.name} className="font-mono space-y-0.5">
+                      <div className={`flex justify-between ${totalClass}`}>
                         <span>{point.name} (s={point.s.toFixed(2)}):</span>
                         <span>β_total = {betaTotal.toExponential(2)}</span>
                       </div>
                       <div className="text-xs text-slate-400 flex justify-between">
-                        <span>• β_bell</span><span>{betaBell.toExponential(2)}</span>
+                        <span>• β_bell</span>
+                        <span className={betaBell >= 0 ? "text-orange-400" : "text-sky-400"}>
+                          {betaBell.toExponential(2)}
+                        </span>
                       </div>
                       <div className="text-xs text-slate-400 flex justify-between">
-                        <span>• β_tilt</span><span>{betaTilt.toExponential(2)}</span>
+                        <span>• β_tilt</span>
+                        <span className="text-violet-400">
+                          {betaTilt.toExponential(2)}
+                        </span>
                       </div>
                     </div>
                   );
