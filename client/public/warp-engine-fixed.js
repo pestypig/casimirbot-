@@ -133,8 +133,8 @@ class WarpEngine {
         // Respect a manual override if provided
         if (Number.isFinite(this.currentParams?.cameraZ)) {
             const aspect = this.canvas.width / this.canvas.height;
-            const eye = [0, 0.50, -this.currentParams.cameraZ];   // raised for better overhead view
-            const center = [0, -0.10, 0];      // look slightly further down for clearer deck plane
+            const eye = [0, 0.50, -this.currentParams.cameraZ];  // ↑ higher
+            const center = [0, -0.08, 0];                         // ↓ deeper look
             const up = [0, 1, 0];
             this._lookAt(this.viewMatrix, eye, center, up);
             this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
@@ -144,9 +144,9 @@ class WarpEngine {
 
         // Otherwise, adapt but keep the view closer than before
         const aspect = this.canvas.width / this.canvas.height;
-        const desired = Math.max(1.20, span * 0.90); // closer than old 1.8 / 1.2×span
-        const eye = [0, 0.50, -desired];   // raised for better overhead view
-        const center = [0, -0.10, 0];      // look slightly further down for clearer deck plane
+        const desired = Math.max(1.20, span * 0.90);
+        const eye = [0, 0.50, -desired];   // ↑ higher overhead by default
+        const center = [0, -0.08, 0];
         const up = [0, 1, 0];
 
         this._lookAt(this.viewMatrix, eye, center, up);
@@ -1098,16 +1098,16 @@ class WarpEngine {
 
         // Bounding sphere radius of the ellipsoid (in scene units)
         const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
-        const baseMargin = 1.2;
-        const margin = baseMargin * (aspect < 1 ? 1.1 : 1.0); // more air on mobile
+        const baseMargin = 1.22;                        // a hair more breathing room
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
 
         // Distance along -Z so bubble fits vertically
         const dist = (margin * R) / Math.tan(fov * 0.5);
 
-        // ↑ raised from ~0.22R to 0.32R for more overhead
-        const eye = [0, 0.32 * R, -dist];
-        // look slightly down so the deck plane reads clearly
-        const center = [0, -0.06 * R, 0];
+        // Higher overhead perspective for better visualization
+        const eye = [0, 0.45 * R, -dist];               // ↑ higher overhead
+        // look further down to clearly show deck plane and interior effects
+        const center = [0, -0.08 * R, 0];               // ↓ look a bit further down
         const up = [0, 1, 0];
 
         // Update projection & view

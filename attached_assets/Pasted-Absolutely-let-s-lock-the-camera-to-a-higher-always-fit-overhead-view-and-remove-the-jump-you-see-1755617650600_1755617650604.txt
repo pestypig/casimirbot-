@@ -1,0 +1,112 @@
+Absolutely—let’s lock the camera to a higher, always-fit overhead view and remove the “jump” you see on first paint.
+
+Below is a surgical patch for the two files you shared. It (1) raises the camera height and look-down angle, (2) fits on the first frame (no interim low pose), and (3) fades the canvas in only after the engine has fitted the view so you don’t perceive a reposition.
+
+⸻
+
+1) client/public/warp-engine-fixed.js
+
+What changes
+	•	Use the responsive fitter immediately in _setupCamera (you already call it; this keeps it).
+	•	Raise the eye height and slightly lower the look target in _fitCameraToBubble.
+	•	Raise height for span adjustments in _adjustCameraForSpan.
+	•	Keep mobile/portrait FOV a touch wider, but now we compute distance for the new higher eye.
+
+Patch
+
+@@
+-  _fitCameraToBubble(axesScene, spanHint) {
++  _fitCameraToBubble(axesScene, spanHint) {
+     const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+     const fov = this._fitFovForAspect(aspect);
+-    const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+-    const baseMargin = 1.2;
+-    const margin = baseMargin * (aspect < 1 ? 1.1 : 1.0);
+-    const dist = (margin * R) / Math.tan(fov * 0.5);
+-    const eye = [0, 0.32 * R, -dist];
+-    const center = [0, -0.06 * R, 0];
++    const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
++    const baseMargin = 1.22;                        // a hair more breathing room
++    const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
++    const dist = (margin * R) / Math.tan(fov * 0.5);
++    const eye = [0, 0.45 * R, -dist];               // ↑ higher overhead
++    const center = [0, -0.08 * R, 0];               // ↓ look a bit further down
+     const up = [0, 1, 0];
+     this._perspective(this.projMatrix, fov, aspect, 0.08, 100.0);
+     this._lookAt(this.viewMatrix, eye, center, up);
+     this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+   }
+@@
+-  _adjustCameraForSpan(span) {
++  _adjustCameraForSpan(span) {
+     // Respect a manual override if provided
+     if (Number.isFinite(this.currentParams?.cameraZ)) {
+       const aspect = this.canvas.width / this.canvas.height;
+-      const eye = [0, 0.35, -this.currentParams.cameraZ];
+-      const center = [0, -0.05, 0];
++      const eye = [0, 0.50, -this.currentParams.cameraZ];  // ↑ higher
++      const center = [0, -0.08, 0];                         // ↓ deeper look
+       const up = [0, 1, 0];
+       this._lookAt(this.viewMatrix, eye, center, up);
+       this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+       return;
+     }
+ 
+     // Otherwise, adapt but keep the view closer than before
+     const aspect = this.canvas.width / this.canvas.height;
+-    const desired = Math.max(1.20, span * 0.90);
+-    const eye = [0, 0.35, -desired];
+-    const center = [0, -0.05, 0];
++    const desired = Math.max(1.20, span * 0.90);
++    const eye = [0, 0.50, -desired];   // ↑ higher overhead by default
++    const center = [0, -0.08, 0];
+     const up = [0, 1, 0];
+ 
+     this._lookAt(this.viewMatrix, eye, center, up);
+     this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+   }
+
+Why this works: your engine already routes first-paint through _setupCamera() and then refits on resize/updates; using a higher eye.y and slightly lower center.y produces a stable overhead view with the bubble well clear of the horizon. The fitter is already called on setup and resize in your file, so no extra calls are needed.  ￼
+
+⸻
+
+2) client/src/components/WarpVisualizer.tsx
+
+What changes
+	•	Fade the canvas in only after the engine has bootstrapped, eliminating the visible reposition.
+	•	(Optional) pass a gentle cameraZ override if you want a fixed distance; otherwise the fitter rules.
+
+Patch
+
+@@
+-        <div 
+-          className="relative w-full bg-slate-900 rounded-lg overflow-hidden border border-slate-700"
+-          style={{ height: 'min(56vh, 520px)' }}
+-        >
++        <div 
++          className="relative w-full bg-slate-900 rounded-lg overflow-hidden border border-slate-700"
++          style={{ height: 'min(56vh, 520px)' }}
++        >
+           <canvas
+             ref={canvasRef}
+-            className="w-full h-full block"
++            className="w-full h-full block transition-opacity duration-200"
++            style={{ opacity: isLoaded ? 1 : 0 }}   // no “jump” while fitting
+             width={512}
+             height={256}
+             data-testid="canvas-warp-bubble"
+           />
+
+Your component already bootstraps the engine before the first draw (bootstrap(initialUniforms)), which computes the fit and avoids an early low pose; the fade-in makes any remaining layout adjustment imperceptible.  ￼
+
+⸻
+
+Notes & knobs you can still tune
+	•	If you’d like even more overhead, bump eye = [0, 0.50 * R, -dist] to 0.55 * R.
+	•	If mobile still feels tight, raise baseMargin to 1.26 inside _fitCameraToBubble.
+	•	You can force a fixed distance (ignoring auto-fit) by sending {cameraZ: <number>} via updateUniforms; the override path is already implemented and will be respected.  ￼
+
+Apply these diffs and you should see:
+	•	No initial “low” camera—first frame comes in already fitted.
+	•	A clearly higher, more top-down view across desktop and mobile.
+	•	Smooth perception thanks to the one-line fade-in.

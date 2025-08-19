@@ -491,7 +491,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         >
           <canvas
             ref={canvasRef}
-            className="w-full h-full block"
+            className="w-full h-full block transition-opacity duration-200"
+            style={{ opacity: isLoaded ? 1 : 0 }}   // no "jump" while fitting
             width={512}
             height={256}
             data-testid="canvas-warp-bubble"
