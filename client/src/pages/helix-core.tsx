@@ -1163,6 +1163,7 @@ export default function HelixCore() {
                     {/* Constrained container so the canvas can't blow past its panel */}
                     <div className="mx-auto max-w-[720px]">
                       <SolarMap
+                        key={`solar-${720}x${360}`}   // force a single mounted instance
                         /* Slightly smaller, stable aspect to fit the panel */
                         width={720}
                         height={360}
@@ -1170,8 +1171,9 @@ export default function HelixCore() {
                         /* Auto-fit so Earth & Saturn BOTH appear within the smaller panel */
                         fitToIds={["EARTH","SATURN"]}
                         fitMarginPx={28}
-                        /* You can keep centerOnId for keyboard recentering or fallback */
-                        centerOnId="EARTH"
+                        /* Clean props to avoid conflicts */
+                        centerOnId={undefined}
+                        centerBetweenIds={undefined}
                         onPickBody={(id) => {
                           setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
                           publish("luma:whisper", { text: "Waypoint selected. Route updated." });

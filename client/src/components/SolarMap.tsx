@@ -25,6 +25,13 @@ export function SolarMap({
   fitToIds,
   fitMarginPx
 }: Props) {
+  // --- mount diagnostics (to confirm single instance) ---
+  const instanceId = React.useRef(Math.random().toString(36).slice(2));
+  React.useEffect(() => {
+    console.count(`[SolarMap] mounted id=${instanceId.current}`);
+    return () => console.log(`[SolarMap] unmounted id=${instanceId.current}`);
+  }, []);
+
   const [zoom, setZoom] = React.useState(80); // pixels per AU
   const [offset, setOffset] = React.useState({ x: width / 2, y: height / 2 });
   const [points, setPoints] = React.useState<SolarPoint[]>([]);
@@ -302,7 +309,7 @@ export function SolarMap({
   return (
     <div
       ref={containerRef}
-      className="relative overflow-hidden rounded-lg border bg-black cursor-grab active:cursor-grabbing"
+      className="relative rounded-lg overflow-hidden border border-white/10"
       style={{ width, height }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -315,7 +322,8 @@ export function SolarMap({
         ref={canvasRef}
         width={width}
         height={height}
-        className="absolute inset-0"
+        style={{ width, height, display: 'block', touchAction: 'none' }}
+        className="bg-black cursor-grab active:cursor-grabbing"
       />
       
       {/* Info overlay - moved to avoid footer conflict */}
