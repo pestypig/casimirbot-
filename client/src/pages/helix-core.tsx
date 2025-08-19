@@ -546,7 +546,6 @@ export default function HelixCore() {
                 <div className="rounded-lg overflow-hidden bg-slate-950">
                   <WarpVisualizer
                     key={`mode-${pipeline?.currentMode || 'hover'}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
-                    showReadouts={false}
                     parameters={{
                       dutyCycle: pipeline?.dutyCycle || 0.14,
                       g_y: pipeline?.gammaGeo || 26,
@@ -834,73 +833,6 @@ export default function HelixCore() {
                     </div>
                   )}
                 </div>
-              );
-            })()}
-          </CardContent>
-        </Card>
-
-        {/* ====== WARP BUBBLE PARAMETERS CARD ====== */}
-        <Card className="bg-slate-900/50 border-slate-800 mb-4">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Atom className="w-5 h-5 text-cyan-400" />
-              Warp Bubble Parameters
-            </CardTitle>
-            <CardDescription>
-              Live parameter readouts and physics calculations for the Natário bubble
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {(() => {
-              const G = 9.80665, c = 299792458;
-              const hull = (hullMetrics && hullMetrics.hull) ? {
-                ...hullMetrics.hull,
-                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-              } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
-
-              const gTargets: Record<string, number> = {
-                hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
-              };
-              const mode = (pipeline?.currentMode ?? 'hover').toLowerCase();
-              const gTarget = gTargets[mode] ?? 0;
-              const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
-              const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
-              const betaTiltVec = [0, -1, 0] as [number, number, number];
-
-              return (
-                <WarpVisualizer
-                  key={`params-${pipeline?.currentMode || 'hover'}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
-                  showReadouts={true}
-                  parameters={{
-                    dutyCycle: pipeline?.dutyCycle || 0.14,
-                    g_y: pipeline?.gammaGeo || 26,
-                    cavityQ: pipeline?.qCavity || 1e9,
-                    sagDepth_nm: pipeline?.sag_nm || 16,
-                    tsRatio: pipeline?.TS_ratio || 4102.74,
-                    powerAvg_MW: pipeline?.P_avg || 83.3,
-                    exoticMass_kg: pipeline?.M_exotic || 1405,
-                    currentMode: pipeline?.currentMode || 'hover',
-                    sectorStrobing: pipeline?.sectorStrobing || 1,
-                    qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
-                    gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
-                    hull,
-                    wall: {
-                      w_norm: pipeline?.w_norm || 1.0
-                    },
-                    gridScale: 0.8,
-                    epsilonTilt,
-                    betaTiltVec,
-                    wallWidth_m: pipeline?.wallWidth_m || 1.0,
-                    shift: {
-                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
-                      gTarget, R_geom,
-                      gEff_check: (epsilonTilt * c * c) / R_geom
-                    }
-                  }}
-                />
               );
             })()}
           </CardContent>
