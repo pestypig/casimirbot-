@@ -64,8 +64,8 @@ export function SolarMap({
     return () => clearInterval(id);
   }, []);
 
-  // DEFAULT FIT - Skip when fitToIds is provided
-  React.useEffect(() => {
+  // DEFAULT FIT - Skip when fitToIds is provided, use useLayoutEffect to prevent jump
+  React.useLayoutEffect(() => {
     // If caller wants an explicit fit to bodies, skip the default-fit.
     if (fitToIds && fitToIds.length > 0) return;
     if (points.length === 0) return;
@@ -318,48 +318,95 @@ export function SolarMap({
         className="absolute inset-0"
       />
       
-      {/* Info overlay */}
-      <div className="absolute left-3 top-3 text-xs bg-black/60 rounded px-2 py-1 text-white">
-        Scale: {Math.round(zoom)} px/AU
+      {/* Info overlay - moved to avoid footer conflict */}
+      <div className="absolute left-2 top-2 text-xs bg-black/60 rounded px-2 py-1 text-white">
+        {new Date().toLocaleString()}
       </div>
       
-      {/* keep controls pinned safely inside the visible area */}
-      <div className="absolute top-3 right-3 z-20 pointer-events-auto flex gap-1">
+      {/* Enhanced top-right overlay with better visibility */}
+      <div className="absolute top-2 right-2 z-50 pointer-events-auto flex gap-1">
         <button 
-          className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+          className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
           onClick={() => {
             userInteractedRef.current = true;
             setZoom(z => Math.max(minZoom, z / 1.2));
           }}
+          aria-label="Zoom out"
+          title="Zoom out"
         >
           −
         </button>
         <button 
-          className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+          className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
           onClick={() => {
             userInteractedRef.current = true;
             setZoom(z => Math.min(maxZoom, z * 1.2));
           }}
+          aria-label="Zoom in"
+          title="Zoom in"
         >
           +
         </button>
         <button 
-          className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+          className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
           onClick={() => {
             if (!baseFit) return;
             userInteractedRef.current = false;
             setZoom(baseFit.zoom);
             setOffset(baseFit.offset);
           }}
+          aria-label="Reset view"
+          title="Reset view"
         >
           ⟲
         </button>
       </div>
       
-      {/* Date/time info */}
-      <div className="absolute left-3 bottom-3 text-xs bg-black/60 rounded px-2 py-1 text-white">
-        {new Date().toLocaleString()}
+      {/* Always-visible footer toolbar */}
+      <div className="absolute inset-x-0 bottom-0 p-2 flex justify-between items-center text-xs bg-gradient-to-t from-black/60 to-transparent">
+        <div className="text-white/80">
+          Scale: {Math.round(zoom)} px/AU
+        </div>
+        <div className="flex gap-1">
+          <button 
+            className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+            onClick={() => {
+              userInteractedRef.current = true;
+              setZoom(z => Math.max(minZoom, z / 1.2));
+            }}
+            aria-label="Zoom out"
+            title="Zoom out"
+          >
+            −
+          </button>
+          <button 
+            className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+            onClick={() => {
+              userInteractedRef.current = true;
+              setZoom(z => Math.min(maxZoom, z * 1.2));
+            }}
+            aria-label="Zoom in"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <button 
+            className="px-2 py-1 bg-white/10 rounded text-white hover:bg-white/20"
+            onClick={() => {
+              if (!baseFit) return;
+              userInteractedRef.current = false;
+              setZoom(baseFit.zoom);
+              setOffset(baseFit.offset);
+            }}
+            aria-label="Reset view"
+            title="Reset view"
+          >
+            ⟲
+          </button>
+        </div>
       </div>
+      
+
     </div>
   );
 }
