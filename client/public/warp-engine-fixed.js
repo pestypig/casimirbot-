@@ -225,6 +225,9 @@ class WarpEngine {
             "uniform vec3 u_driveDir;\n" +
             "uniform float u_wallWidth;\n" +
             "uniform float u_vShip;\n" +
+            "uniform float u_epsTilt;\n" +      // ε_tilt (dimensionless)
+            "uniform float u_intWidth;\n" +     // interior window width in ρ-units
+            "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -249,6 +252,15 @@ class WarpEngine {
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
+            "    // ----- interior tilt violet blend (visual only) -----\n" +
+            "    vec3 pN_int = v_pos / u_axes;\n" +
+            "    float rs_int = length(pN_int) + 1e-6;\n" +
+            "    float wInt = max(1e-4, u_intWidth);\n" +
+            "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
+            "    float interior = s*s*(3.0 - 2.0*s);          // C¹ smoothstep\n" +
+            "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
+            "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
+            "    col = mix(col, violet, blendAmt);\n" +
             "    frag = vec4(col, 0.9);\n" +
             "}"
             :
@@ -259,6 +271,9 @@ class WarpEngine {
             "uniform vec3 u_driveDir;\n" +
             "uniform float u_wallWidth;\n" +
             "uniform float u_vShip;\n" +
+            "uniform float u_epsTilt;\n" +
+            "uniform float u_intWidth;\n" +
+            "uniform float u_tiltViz;\n" +
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -282,6 +297,15 @@ class WarpEngine {
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
+            "    // ----- interior tilt violet blend (visual only) -----\n" +
+            "    vec3 pN_int = v_pos / u_axes;\n" +
+            "    float rs_int = length(pN_int) + 1e-6;\n" +
+            "    float wInt = max(1e-4, u_intWidth);\n" +
+            "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
+            "    float interior = s*s*(3.0 - 2.0*s);\n" +
+            "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
+            "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
+            "    col = mix(col, violet, blendAmt);\n" +
             "    gl_FragColor = vec4(col, 0.9);\n" +
             "}";
 
@@ -301,7 +325,10 @@ class WarpEngine {
             axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
             driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
             wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
-            vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip')
+            vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip'),
+            epsTilt: gl.getUniformLocation(this.gridProgram, 'u_epsTilt'),
+            intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
+            tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz')
         };
         
         console.log("Grid shader program compiled successfully with York-time coloring support");
@@ -816,6 +843,14 @@ class WarpEngine {
             this.uniforms?.driveDir[2] || 0.0);
         gl.uniform1f(this.gridUniforms.wallWidth, this.uniforms?.wallWidth || 0.06);
         gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
+        
+        // Violet interior tilt tint (visual-only)
+        const epsTilt = (this.uniforms?.epsilonTilt || 0) * (this.uniforms?.tiltGain || 0);
+        const wInt = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // same window as geometry
+        const tintViz = 8.0;  // purely visual: raise/lower if you want the violet to pop more/less
+        gl.uniform1f(this.gridUniforms.epsTilt, epsTilt);
+        gl.uniform1f(this.gridUniforms.intWidth, wInt);
+        gl.uniform1f(this.gridUniforms.tiltViz, tintViz);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;

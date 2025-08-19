@@ -1,0 +1,117 @@
+Absolutely—let’s make the interior tilt show up as a violet-tinted region of the white grid (instead of a single purple arrow/strand), by tint-blending inside the bubble wherever the tilt window is active.
+
+Below is a minimal, surgical patch for your current client/public/warp-engine-fixed.js. It:
+	1.	Adds three uniforms to the fragment shader:
+	•	u_epsTilt (ε tilt strength),
+	•	u_intWidth (interior window width),
+	•	u_tiltViz (a visual gain for the violet tint only; doesn’t affect geometry).
+	2.	Computes the same interior window in the shader you use in JS (C¹ smoothstep around ρ≈1).
+	3.	Blends York-time color with violet by an interior factor proportional to tilt.
+
+It does not change your displacement math (the slope stays as you already implemented); it only colors the affected interior region.
+
+⸻
+
+Patch — violet interior tint for shift vector
+
+File: client/public/warp-engine-fixed.js
+
+1) Extend shader sources (both WebGL2 & WebGL1 branches)
+
+Find _compileGridShaders() and in both gridFs strings add the new uniforms and the blend just before writing the final frag/gl_FragColor.
+
+WebGL2 fragment shader branch (#version 300 es)
+add these uniforms at the top:
+
+ "precision highp float;\n" +
+ "uniform float u_colorByTheta;\n" +
+ "uniform vec3 u_sheetColor;\n" +
+ "uniform vec3 u_axes;\n" +
+ "uniform vec3 u_driveDir;\n" +
+ "uniform float u_wallWidth;\n" +
+ "uniform float u_vShip;\n" +
++ "uniform float u_epsTilt;\n" +      // ε_tilt (dimensionless)
++ "uniform float u_intWidth;\n" +     // interior window width in ρ-units
++ "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
+ "in vec3 v_pos;\n" +
+ "out vec4 frag;\n" +
+
+now, just before frag = vec4(col, 0.9);, insert the interior tint blend:
+
+   "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+   "    vec3 col = diverge(tVis);\n" +
++  // ----- interior tilt violet blend (visual only) -----
++  "    vec3 pN_int = v_pos / u_axes;\n" +
++  "    float rs_int = length(pN_int) + 1e-6;\n" +
++  "    float wInt = max(1e-4, u_intWidth);\n" +
++  "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
++  "    float interior = s*s*(3.0 - 2.0*s);          // C¹ smoothstep\n" +
++  "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
++  "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
++  "    col = mix(col, violet, blendAmt);\n" +
+   "    frag = vec4(col, 0.9);\n" +
+
+WebGL1 fragment shader branch
+add uniforms:
+
+ "precision highp float;\n" +
+ "uniform float u_colorByTheta;\n" +
+ "uniform vec3 u_sheetColor;\n" +
+ "uniform vec3 u_axes;\n" +
+ "uniform vec3 u_driveDir;\n" +
+ "uniform float u_wallWidth;\n" +
+ "uniform float u_vShip;\n" +
++ "uniform float u_epsTilt;\n" +
++ "uniform float u_intWidth;\n" +
++ "uniform float u_tiltViz;\n" +
+ "varying vec3 v_pos;\n" +
+
+insert the blend just before gl_FragColor = vec4(col, 0.9);:
+
+   "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+   "    vec3 col = diverge(tVis);\n" +
++  // ----- interior tilt violet blend (visual only) -----
++  "    vec3 pN_int = v_pos / u_axes;\n" +
++  "    float rs_int = length(pN_int) + 1e-6;\n" +
++  "    float wInt = max(1e-4, u_intWidth);\n" +
++  "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
++  "    float interior = s*s*(3.0 - 2.0*s);\n" +
++  "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
++  "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
++  "    col = mix(col, violet, blendAmt);\n" +
+   "    gl_FragColor = vec4(col, 0.9);\n" +
+
+2) Cache the new uniform locations
+
+Still inside _compileGridShaders(), after vShip: gl.getUniformLocation(...) add:
+
+   vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip')
++ ,epsTilt:   gl.getUniformLocation(this.gridProgram, 'u_epsTilt')
++ ,intWidth:  gl.getUniformLocation(this.gridProgram, 'u_intWidth')
++ ,tiltViz:   gl.getUniformLocation(this.gridProgram, 'u_tiltViz')
+
+3) Send the new uniforms every frame
+
+In _renderGridPoints(), after you set the existing uniforms, add:
+
+   gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
++  // Violet interior tilt tint (visual-only)
++  const epsTilt = (this.uniforms?.epsilonTilt || 0) * (this.uniforms?.tiltGain || 0);
++  const wInt    = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // same window as geometry
++  const tintViz = 8.0;  // purely visual: raise/lower if you want the violet to pop more/less
++  gl.uniform1f(this.gridUniforms.epsTilt,  epsTilt);
++  gl.uniform1f(this.gridUniforms.intWidth, wInt);
++  gl.uniform1f(this.gridUniforms.tiltViz,  tintViz);
+
+Notes:
+	•	tintViz is a visual-only gain. If the violet looks too faint, bump it (e.g., 12–16). If it’s too strong, drop it (4–6).
+	•	We use the same interior window as your geometry (wInt ≈ 3×wallWidth, min 0.02 in normalized space) so color and slope match.
+
+⸻
+
+What you’ll see
+	•	The entire interior floor of the bubble subtly tints violet where the artificial gravity tilt applies, instead of a single purple line.
+	•	Changing mode (hence epsilonTilt via your panel) will increase/decrease the violet area/intensity together with the interior slant already in place.
+	•	This is purely a color overlay—no changes to the displacement math you validated.
+
+If you want me to also add a small legend panel (“Blue = contraction, Orange = expansion, Violet = interior tilt”) as a UI component, say the word and I’ll drop in a compact <ColorKeyCard /> you can place under the visualizer.
