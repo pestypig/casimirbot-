@@ -380,6 +380,37 @@ export default function HelixCore() {
           </div>
         </div>
 
+        {/* === Quick Operational Mode Switch (global) === */}
+        <div className="mb-4">
+          <div className="flex flex-wrap items-center gap-2">
+            {([
+              { key: 'standby',   label: 'Standby',   hint: 'Field idle' },
+              { key: 'hover',     label: 'Hover',     hint: 'Gentle bulge' },
+              { key: 'cruise',    label: 'Cruise',    hint: 'Coherent 400× strobe' },
+              { key: 'emergency', label: 'Emergency', hint: 'Max response' },
+            ] as const).map(m => {
+              const isActive = (pipeline?.currentMode || 'hover') === m.key;
+              return (
+                <Button
+                  key={m.key}
+                  variant={isActive ? 'default' : 'outline'}
+                  className={`font-mono ${isActive ? 'bg-cyan-600 text-white' : 'bg-slate-900'}`}
+                  onClick={() => {
+                    if (!isActive) {
+                      switchMode.mutate(m.key as any);
+                      setModeVersion(v => v + 1); // force visualizer remount for instant change
+                      setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
+                    }
+                  }}
+                >
+                  {m.label}
+                  <span className="ml-2 text-xs opacity-70">{m.hint}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Mode Selector */}
         <div className="mb-6">
           <div className="flex gap-2">
