@@ -56,6 +56,8 @@ interface WarpVisualizerProps {
     };
     // Grid scaling
     gridScale?: number;
+    gridSpan?: number;
+    axesScene?: [number, number, number];
     // NEW: Artificial gravity tilt parameters (legacy format)
     epsilonTilt?: number;
     betaTiltVec?: number[];

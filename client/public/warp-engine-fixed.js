@@ -3,7 +3,9 @@
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 const GRID_DEFAULTS = {
-  spanPadding: 1.35,   // tighter framing for closer view
+  spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
+    ? 1.45   // a touch more padding on phones so the first fit is perfect
+    : 1.35,  // tighter framing for closer view on desktop
   minSpan: 2.6,        // never smaller than this (in clip-space units)
   divisions: 100       // more lines so a larger grid still looks dense
 };
@@ -104,6 +106,8 @@ class WarpEngine {
         // Use the responsive fitter immediately (no interim low camera)
         // _fitCameraToBubble also sets the projection
         this._fitCameraToBubble(axes, span);
+        // …and gently bias the view a bit higher until uniforms arrive
+        this._adjustCameraForSpan(span);
     }
 
     _resizeCanvasToDisplaySize() {
@@ -129,8 +133,8 @@ class WarpEngine {
         // Respect a manual override if provided
         if (Number.isFinite(this.currentParams?.cameraZ)) {
             const aspect = this.canvas.width / this.canvas.height;
-            const eye = [0, 0.35, -this.currentParams.cameraZ];
-            const center = [0, -0.05, 0];
+            const eye = [0, 0.50, -this.currentParams.cameraZ];   // raised for better overhead view
+            const center = [0, -0.10, 0];      // look slightly further down for clearer deck plane
             const up = [0, 1, 0];
             this._lookAt(this.viewMatrix, eye, center, up);
             this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
@@ -141,8 +145,8 @@ class WarpEngine {
         // Otherwise, adapt but keep the view closer than before
         const aspect = this.canvas.width / this.canvas.height;
         const desired = Math.max(1.20, span * 0.90); // closer than old 1.8 / 1.2×span
-        const eye = [0, 0.35, -desired];
-        const center = [0, -0.05, 0];
+        const eye = [0, 0.50, -desired];   // raised for better overhead view
+        const center = [0, -0.10, 0];      // look slightly further down for clearer deck plane
         const up = [0, 1, 0];
 
         this._lookAt(this.viewMatrix, eye, center, up);
