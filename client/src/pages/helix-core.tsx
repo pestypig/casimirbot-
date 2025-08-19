@@ -511,202 +511,252 @@ export default function HelixCore() {
           </div>
         </div>
 
-        {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Left Column - Tile Grid & Energy */}
-          <div className="space-y-4">
-            {/* Casimir Tile Grid - New Canvas Component */}
-            {systemMetrics && (
-              <CasimirTileGridPanel
-                metrics={{
-                  totalTiles: systemMetrics.totalTiles,
-                  sectorStrobing: systemMetrics.sectorStrobing,
-                  totalSectors: systemMetrics.totalSectors,
-                  tilesPerSector: systemMetrics.tilesPerSector,
-                  currentSector: systemMetrics.currentSector,
-                  strobeHz: systemMetrics.strobeHz,
-                  sectorPeriod_ms: systemMetrics.sectorPeriod_ms,
-                  overallStatus: systemMetrics.overallStatus as any,
-                }}
-                width={320}
-                height={170}
-              />
-            )}
+        {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Atom className="w-5 h-5 text-cyan-400" />
+              {MAINFRAME_ZONES.WARP_VISUALIZER}
+            </CardTitle>
+            <CardDescription>
+              3D spacetime curvature — live, mode-aware, and physically grounded
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {/* Natário Warp Bubble Visualizer */}
+            {(() => {
+              const G = 9.80665, c = 299792458;
+              const hull = (hullMetrics && hullMetrics.hull) ? {
+                ...hullMetrics.hull,
+                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+              } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
 
-            {/* Physics Field Sampler for Validation */}
-            <PhysicsFieldSampler />
+              const gTargets: Record<string, number> = {
+                hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
+              };
+              const mode = (pipeline?.currentMode ?? 'hover').toLowerCase();
+              const gTarget = gTargets[mode] ?? 0;
+              const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+              const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
+              const betaTiltVec = [0, -1, 0] as [number, number, number];
 
-            {/* Energy Control Panel */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-yellow-400" />
-                  {MAINFRAME_ZONES.ENERGY_PANEL}
-                </CardTitle>
-                <CardDescription>
-                  Live Casimir energy output monitoring
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Operational Mode Selector */}
-                  <div className="space-y-2">
-                    <Label className="text-slate-200">Operational Mode</Label>
-                    <Select 
-                      value={pipeline?.currentMode || 'hover'}
-                      onValueChange={(mode) => {
-                        switchMode.mutate(mode as any);
-                        setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
-                      }}
-                    >
-                      <SelectTrigger className="bg-slate-950 border-slate-700">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(MODE_CONFIGS).map(([mode, config]) => (
-                          <SelectItem key={mode} value={mode}>
-                            <div className="flex items-center gap-2">
-                              <span className={config.color}>{config.name}</span>
-                              <span className="text-xs text-slate-500">({config.powerTarget} MW)</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {pipeline && (
-                      <p className="text-xs text-slate-400">{MODE_CONFIGS[pipeline.currentMode]?.description}</p>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
-                      <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles.toLocaleString() || '2,800,000'}</p>
-                      {systemMetrics?.sectorStrobing && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {systemMetrics.sectorStrobing} sectors strobing
-                        </p>
-                      )}
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400">Energy Output</p>
-                      <p className="text-lg font-mono text-yellow-400">{pipeline?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400">Exotic Mass</p>
-                      <p className="text-lg font-mono text-purple-400">{pipeline?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400">System Status</p>
-                      <p className="text-lg font-mono text-green-400">{pipeline?.overallStatus || systemMetrics?.overallStatus || 'NOMINAL'}</p>
-                    </div>
-                  </div>
-
-                  {/* Show current pipeline parameters */}
-                  {pipeline && (
-                    <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
-                      <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
-                      <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                        <div>Duty: {(pipeline.dutyCycle * 100).toFixed(1)}%</div>
-                        <div>Sectors: {pipeline.sectorStrobing}</div>
-                        <div>Q-Spoil: {pipeline.qSpoilingFactor?.toFixed(3)}</div>
-                        <Tooltip
-                          label={
-                            <div className="space-y-1">
-                              <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
-                              <p>
-                                From Alcubierre's metric modified by Van den Broeck — the "folded pocket"
-                                lets a meter-scale cabin sit inside a kilometer-scale effective bubble
-                                without paying the bubble's full energy cost.
-                              </p>
-                              <p className="opacity-80">
-                                This is a geometry selection, not an operational setting. It doesn't vary
-                                with duty cycle or strobing sectors.
-                              </p>
-                            </div>
-                          }
-                        >
-                          <span className="cursor-help underline decoration-dotted">
-                            γ<sub>VdB</sub>: {((pipelineState as any).gammaVanDenBroeck || 286000).toExponential(1)}
-                          </span>
-                        </Tooltip>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        id="modulation"
-                        type="number" 
-                        value={modulationFrequency}
-                        onChange={(e) => setModulationFrequency(Number(e.target.value))}
-                        className="bg-slate-950 border-slate-700 text-slate-100"
-                      />
-                      <span className="flex items-center text-sm text-slate-400">GHz</span>
-                    </div>
-                  </div>
-
-                  <Button 
-                    className="w-full bg-gradient-to-r from-cyan-600 to-blue-600"
-                    onClick={async () => {
-                      setIsProcessing(true);
-                      try {
-                        const command = `Simulate a full pulse cycle at ${modulationFrequency} GHz`;
-                        const userMessage: ChatMessage = {
-                          role: 'user',
-                          content: command,
-                          timestamp: new Date()
-                        };
-                        setChatMessages(prev => [...prev, userMessage]);
-                        
-                        const response = await apiRequest('POST', '/api/helix/command', {
-                          messages: chatMessages.concat({ role: 'user', content: command })
-                        });
-                        
-                        const responseData = await response.json();
-                        const assistantMessage: ChatMessage = {
-                          role: 'assistant',
-                          content: responseData.message.content,
-                          timestamp: new Date()
-                        };
-                        
-                        if (responseData.functionResult) {
-                          assistantMessage.functionCall = {
-                            name: responseData.message.function_call.name,
-                            result: responseData.functionResult
-                          };
-                          setMainframeLog(prev => [...prev, 
-                            `[PULSE] ${responseData.functionResult.log || 'Cycle complete'}`
-                          ]);
-                          refetchMetrics();
-                        }
-                        
-                        setChatMessages(prev => [...prev, assistantMessage]);
-                      } catch (error) {
-                        toast({
-                          title: "Pulse Sequence Error",
-                          description: error instanceof Error ? error.message : "Failed to execute",
-                          variant: "destructive"
-                        });
-                      } finally {
-                        setIsProcessing(false);
+              return (
+                <div className="rounded-lg overflow-hidden bg-slate-950">
+                  <WarpVisualizer
+                    key={`mode-${pipeline?.currentMode || 'hover'}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
+                    parameters={{
+                      dutyCycle: pipeline?.dutyCycle || 0.14,
+                      g_y: pipeline?.gammaGeo || 26,
+                      cavityQ: pipeline?.qCavity || 1e9,
+                      sagDepth_nm: pipeline?.sag_nm || 16,
+                      tsRatio: pipeline?.TS_ratio || 4102.74,
+                      powerAvg_MW: pipeline?.P_avg || 83.3,
+                      exoticMass_kg: pipeline?.M_exotic || 1405,
+                      currentMode: pipeline?.currentMode || 'hover',
+                      sectorStrobing: pipeline?.sectorStrobing || 1,
+                      qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
+                      gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
+                      hull: (hullMetrics && hullMetrics.hull) ? {
+                        ...hullMetrics.hull,
+                        a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                        b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                        c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+                      } : {
+                        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                        a: 503.5, b: 132, c: 86.5,
+                        wallThickness_m: 6.0
+                      },
+                      wall: { w_norm: 0.016 },
+                      gridScale: 1.6,
+                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
+                      wallWidth_m: 6.0,
+                      shift: {
+                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                        betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
+                        gTarget, R_geom,
+                        gEff_check: (epsilonTilt * c * c) / R_geom
                       }
                     }}
-                    disabled={isProcessing}
-                  >
-                    Execute Pulse Sequence
-                  </Button>
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
 
-          {/* Center Column - Compliance & Phase Diagram */}
+        {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-yellow-400" />
+              {MAINFRAME_ZONES.ENERGY_PANEL}
+            </CardTitle>
+            <CardDescription>Live mode switch + power, mass & status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Operational Mode Selector */}
+              <div className="space-y-2">
+                <Label className="text-slate-200">Operational Mode</Label>
+                <Select 
+                  value={pipeline?.currentMode || 'hover'}
+                  onValueChange={(mode) => {
+                    switchMode.mutate(mode as any);
+                    setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
+                  }}
+                >
+                  <SelectTrigger className="bg-slate-950 border-slate-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(MODE_CONFIGS).map(([mode, config]) => (
+                      <SelectItem key={mode} value={mode}>
+                        <div className="flex items-center gap-2">
+                          <span className={config.color}>{config.name}</span>
+                          <span className="text-xs text-slate-500">({config.powerTarget} MW)</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {pipeline && (
+                  <p className="text-xs text-slate-400">{MODE_CONFIGS[pipeline.currentMode]?.description}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-950 rounded-lg">
+                  <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
+                  <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles.toLocaleString() || '2,800,000'}</p>
+                  {systemMetrics?.sectorStrobing && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {systemMetrics.sectorStrobing} sectors strobing
+                    </p>
+                  )}
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg">
+                  <p className="text-xs text-slate-400">Energy Output</p>
+                  <p className="text-lg font-mono text-yellow-400">{pipeline?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-950 rounded-lg">
+                  <p className="text-xs text-slate-400">Exotic Mass</p>
+                  <p className="text-lg font-mono text-purple-400">{pipeline?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
+                </div>
+                <div className="p-3 bg-slate-950 rounded-lg">
+                  <p className="text-xs text-slate-400">System Status</p>
+                  <p className="text-lg font-mono text-green-400">{pipeline?.overallStatus || systemMetrics?.overallStatus || 'NOMINAL'}</p>
+                </div>
+              </div>
+
+              {/* Show current pipeline parameters */}
+              {pipeline && (
+                <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
+                  <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
+                  <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                    <div>Duty: {(pipeline.dutyCycle * 100).toFixed(1)}%</div>
+                    <div>Sectors: {pipeline.sectorStrobing}</div>
+                    <div>Q-Spoil: {pipeline.qSpoilingFactor?.toFixed(3)}</div>
+                    <Tooltip
+                      label={
+                        <div className="space-y-1">
+                          <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
+                          <p>
+                            From Alcubierre's metric modified by Van den Broeck — the "folded pocket"
+                            lets a meter-scale cabin sit inside a kilometer-scale effective bubble
+                            without paying the bubble's full energy cost.
+                          </p>
+                          <p className="opacity-80">
+                            This is a geometry selection, not an operational setting. It doesn't vary
+                            with duty cycle or strobing sectors.
+                          </p>
+                        </div>
+                      }
+                    >
+                      <span className="cursor-help underline decoration-dotted">
+                        γ<sub>VdB</sub>: {((pipelineState as any).gammaVanDenBroeck || 286000).toExponential(1)}
+                      </span>
+                    </Tooltip>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="modulation"
+                    type="number" 
+                    value={modulationFrequency}
+                    onChange={(e) => setModulationFrequency(Number(e.target.value))}
+                    className="bg-slate-950 border-slate-700 text-slate-100"
+                  />
+                  <span className="flex items-center text-sm text-slate-400">GHz</span>
+                </div>
+              </div>
+
+              <Button 
+                className="w-full bg-gradient-to-r from-cyan-600 to-blue-600"
+                onClick={async () => {
+                  setIsProcessing(true);
+                  try {
+                    const command = `Simulate a full pulse cycle at ${modulationFrequency} GHz`;
+                    const userMessage: ChatMessage = {
+                      role: 'user',
+                      content: command,
+                      timestamp: new Date()
+                    };
+                    setChatMessages(prev => [...prev, userMessage]);
+                    
+                    const response = await apiRequest('POST', '/api/helix/command', {
+                      messages: chatMessages.concat({ role: 'user', content: command })
+                    });
+                    
+                    const responseData = await response.json();
+                    const assistantMessage: ChatMessage = {
+                      role: 'assistant',
+                      content: responseData.message.content,
+                      timestamp: new Date()
+                    };
+                    
+                    if (responseData.functionResult) {
+                      assistantMessage.functionCall = {
+                        name: responseData.message.function_call.name,
+                        result: responseData.functionResult
+                      };
+                      setMainframeLog(prev => [...prev, 
+                        `[PULSE] ${responseData.functionResult.log || 'Cycle complete'}`
+                      ]);
+                      refetchMetrics();
+                    }
+                    
+                    setChatMessages(prev => [...prev, assistantMessage]);
+                  } catch (error) {
+                    toast({
+                      title: "Pulse Sequence Error",
+                      description: error instanceof Error ? error.message : "Failed to execute",
+                      variant: "destructive"
+                    });
+                  } finally {
+                    setIsProcessing(false);
+                  }
+                }}
+                disabled={isProcessing}
+              >
+                Execute Pulse Sequence
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ====== SECONDARY GRID (rest of the panels) ====== */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Left column: Compliance, Amplification, Shift Vector */}
           <div className="space-y-4">
             {/* Metric Compliance HUD */}
             <Card className="bg-slate-900/50 border-slate-800">
@@ -787,6 +837,31 @@ export default function HelixCore() {
               mode={pipelineState?.currentMode || "hover"}
               shift={systemMetrics?.shiftVector}
             />
+
+          </div>
+
+          {/* Middle Column - Casimir Tile Grid & Physics Field */}
+          <div className="space-y-4">
+            {/* Casimir Tile Grid - Canvas Component */}
+            {systemMetrics && (
+              <CasimirTileGridPanel
+                metrics={{
+                  totalTiles: systemMetrics.totalTiles,
+                  sectorStrobing: systemMetrics.sectorStrobing,
+                  totalSectors: systemMetrics.totalSectors,
+                  tilesPerSector: systemMetrics.tilesPerSector,
+                  currentSector: systemMetrics.currentSector,
+                  strobeHz: systemMetrics.strobeHz,
+                  sectorPeriod_ms: systemMetrics.sectorPeriod_ms,
+                  overallStatus: systemMetrics.overallStatus as any,
+                }}
+                width={320}
+                height={170}
+              />
+            )}
+
+            {/* Physics Field Sampler for Validation */}
+            <PhysicsFieldSampler />
 
             {/* Resonance Scheduler */}
             <Card className="bg-slate-900/50 border-slate-800">
