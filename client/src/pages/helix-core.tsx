@@ -53,6 +53,28 @@ const MAINFRAME_ZONES = {
 
 
 
+interface EnergyPipelineState {
+  currentMode?: string;
+  dutyCycle?: number;
+  sectorStrobing?: number;
+  gammaGeo?: number;
+  qSpoilingFactor?: number;
+  qCavity?: number;
+  P_avg?: number;
+  zeta?: number;
+  TS_ratio?: number;
+  fordRomanCompliance?: string;
+  natarioConstraint?: string;
+  curvatureLimit?: string;
+  U_cycle?: number;
+  U_static?: number;
+  U_geo?: number;
+  U_Q?: number;
+  P_loss_raw?: number;
+  N_tiles?: number;
+  modulationFreq_GHz?: number;
+}
+
 interface SystemMetrics {
   activeSectors: number;     // NEW: active sectors (1, 400, etc.)
   totalSectors: number;      // NEW: total sectors (400)
@@ -77,6 +99,10 @@ interface SystemMetrics {
   curvatureMax: number;
   timeScaleRatio: number;
   overallStatus: string;
+  shiftVector?: {
+    epsilonTilt: number;
+    betaTiltVec: [number, number, number];
+  };
 }
 
 interface ChatMessage {
@@ -189,6 +215,13 @@ export default function HelixCore() {
     refetchInterval: 5000 // Update every 5 seconds
   });
 
+  // Unified, defensive mode fallback for the whole page
+  const effectiveMode = (
+    pipeline?.currentMode ??
+    (systemMetrics as any)?.currentMode ??
+    'hover'
+  ) as 'standby' | 'hover' | 'cruise' | 'emergency';
+
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
   
@@ -218,7 +251,11 @@ export default function HelixCore() {
         messages: chatMessages.map(msg => ({
           role: msg.role,
           content: msg.content
-        })).concat({ role: 'user', content: commandInput })
+        })).concat([{ 
+          role: 'user' as const, 
+          content: commandInput,
+          timestamp: new Date()
+        }])
       });
       
       const responseData = await response.json();
@@ -393,7 +430,7 @@ export default function HelixCore() {
               { key: 'cruise',    label: 'Cruise',    hint: 'Coherent 400× strobe' },
               { key: 'emergency', label: 'Emergency', hint: 'Max response' },
             ] as const).map(m => {
-              const isActive = (pipeline?.currentMode || 'hover') === m.key;
+              const isActive = effectiveMode === m.key;
               return (
                 <Button
                   key={m.key}
@@ -449,7 +486,7 @@ export default function HelixCore() {
               return (
                 <div className="rounded-lg overflow-hidden bg-slate-950">
                   <WarpVisualizer
-                    key={`mode-${pipeline?.currentMode || 'hover'}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
+                    key={`mode-${effectiveMode}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
                     parameters={{
                       dutyCycle: pipeline?.dutyCycle || 0.14,
                       g_y: pipeline?.gammaGeo || 26,
@@ -458,7 +495,7 @@ export default function HelixCore() {
                       tsRatio: pipeline?.TS_ratio || 4102.74,
                       powerAvg_MW: pipeline?.P_avg || 83.3,
                       exoticMass_kg: pipeline?.M_exotic || 1405,
-                      currentMode: pipeline?.currentMode || 'hover',
+                      currentMode: effectiveMode,
                       sectorStrobing: pipeline?.sectorStrobing || 1,
                       qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
                       gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
@@ -474,14 +511,14 @@ export default function HelixCore() {
                       },
                       wall: { w_norm: 0.016 },
                       gridScale: 1.6,
-                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
+                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                       wallWidth_m: 6.0,
                       shift: {
-                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                        betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? betaTiltVec) as [number, number, number],
-                        gTarget, R_geom,
-                        gEff_check: (epsilonTilt * c * c) / R_geom
+                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                        betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                        gTarget: 0.5, R_geom: 86.5,
+                        gEff_check: ((systemMetrics?.shiftVector?.epsilonTilt ?? 0.012) * 86.5 * 86.5) / 86.5
                       }
                     }}
                   />
@@ -515,12 +552,12 @@ export default function HelixCore() {
                 epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
                 // NEW: mode coupling from live pipeline data
-                mode: currentMode,
-                dutyCycle: pipelineData?.dutyCycle ?? 0.14,
-                sectors: pipelineData?.sectorStrobing ?? 1,
-                gammaGeo: pipelineData?.gammaGeo ?? 26,
-                qSpoil: pipelineData?.qSpoilingFactor ?? 1.0,
-                qCavity: pipelineData?.qCavity ?? 1e9,
+                mode: effectiveMode,
+                dutyCycle: pipeline?.dutyCycle ?? 0.14,
+                sectors: pipeline?.sectorStrobing ?? 1,
+                gammaGeo: pipeline?.gammaGeo ?? 26,
+                qSpoil: pipeline?.qSpoilingFactor ?? 1.0,
+                qCavity: pipeline?.qCavity ?? 1e9,
               }}
             />
           </CardContent>
