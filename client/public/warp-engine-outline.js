@@ -39,7 +39,14 @@
       hullAxes: [0.42, 0.11, 0.09], // scene units
       wallWidth: 0.06,              // normalized Δρ thickness
       epsilonTilt: 0.0,
-      betaTiltVec: [0, -1, 0]
+      betaTiltVec: [0, -1, 0],
+      // NEW: mode coupling
+      mode: 'hover',
+      dutyCycle: 0.14,
+      sectors: 1,
+      gammaGeo: 26,
+      qSpoil: 1.0,
+      qCavity: 1e9
     };
     this._needsFrame = false;
     this._resize = this._resize.bind(this);
@@ -127,26 +134,48 @@
 
     const cam = this._camera();
 
-    // Colors (match main viz semantics)
-    const colOuter  = '#1e90ff'; // expansion (blue)
-    const colInner  = '#ff9b3a'; // compression (orange)
-    const colCenter = '#cccccc'; // mid
-    const colShift  = '#9b5cff'; // shift vector violet
+    // Visual "curvature gain" proxy (purely presentational)
+    const gamma3   = Math.pow(p.gammaGeo ?? 26, 3);
+    const dutyEff  = Math.max(1e-6, (p.dutyCycle ?? 0.14) / Math.max(1, p.sectors ?? 1));
+    const qspoil   = Math.max(1e-3, p.qSpoil ?? 1.0);
+    const gainVis  = Math.pow(gamma3 * qspoil * dutyEff, 0.25); // gentle 1/4 power so it doesn't blow up
+
+    // Mode tint/alpha
+    const modeAlpha =
+      p.mode === 'standby'   ? 0.40 :
+      p.mode === 'cruise'    ? 0.55 :
+      p.mode === 'hover'     ? 0.70 :
+      p.mode === 'emergency' ? 0.85 : 0.65;
+
+    // Add subtle breathing effect
+    const t = (performance.now() * 0.001) % (Math.PI * 2);
+    const breathe = 0.07 * Math.sin(t * 0.8); // ±7%
+    const finalAlpha = (0.9 + breathe) * modeAlpha;
+
+    // Shell styling that responds to mode/gain
+    const baseInner = `rgba(255,176,176,${0.60 * finalAlpha})`; // red-ish (compression)
+    const baseCenter= `rgba(200,208,220,${0.45 * finalAlpha})`;
+    const baseOuter = `rgba(176,208,255,${0.60 * finalAlpha})`; // blue-ish (expansion)
+    const colShift  = `rgba(180,120,255,${0.90})`;              // violet (shift vector)
+
+    const innerWidth  = 1.0 + 0.75 * gainVis;
+    const centerWidth = 0.8 + 0.50 * gainVis;
+    const outerWidth  = 1.0 + 0.75 * gainVis;
 
     const a0 = p.hullAxes[0], b0 = p.hullAxes[1], c0 = p.hullAxes[2];
     const dRho = clamp(p.wallWidth, 0.005, 0.40);
 
     const shells = [
-      { scale: 1 - dRho, color: colInner,  line: 1.5 },
-      { scale: 1.00,     color: colCenter, line: 1.0 },
-      { scale: 1 + dRho, color: colOuter,  line: 1.5 },
+      { scale: 1 - dRho, color: baseInner,  line: innerWidth },
+      { scale: 1.00,     color: baseCenter, line: centerWidth },
+      { scale: 1 + dRho, color: baseOuter,  line: outerWidth  },
     ];
 
     const Nθ = 96, Nφ = 40;
 
     shells.forEach(s => {
       const a = a0 * s.scale, b = b0 * s.scale, c = c0 * s.scale;
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = finalAlpha;
       ctx.strokeStyle = s.color;
       ctx.lineWidth   = s.line;
 
@@ -177,10 +206,10 @@
       }
     });
 
-    // Shift vector arrow
+    // Shift vector arrow with mode-responsive scaling
     if (p.epsilonTilt > 0) {
       const R = Math.max(a0, b0, c0);
-      const head = p.epsilonTilt * 1.2 * R;
+      const head = Math.min(0.35 * R, (p.epsilonTilt * gainVis * 1.2) * R);
       const base = [0, 0, 0];
       const tip  = [
         base[0] + p.betaTiltVec[0] * head,
@@ -207,17 +236,20 @@
       ctx.fill();
     }
 
-    // Mini legend
+    // Mini legend with mode indicator
     ctx.globalAlpha = 0.9;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(12, 12, 220, 56);
+    ctx.fillRect(12, 12, 240, 76);
     ctx.fillStyle = '#fff';
     ctx.font = '12px ui-sans-serif, system-ui, -apple-system';
-    ctx.fillText('Shell Outline • ρ-surfaces (inner/center/outer)', 18, 28);
-    ctx.fillStyle = colInner;  ctx.fillRect(18, 36, 10, 10); ctx.fillStyle = '#b0b8c0'; ctx.fillText('Compression (inner)', 34, 45);
-    ctx.fillStyle = colOuter;  ctx.fillRect(138, 36, 10, 10); ctx.fillStyle = '#b0b8c0'; ctx.fillText('Expansion (outer)',   154, 45);
+    ctx.fillText(`Shell Outline • ${p.mode?.toUpperCase() || 'HOVER'} mode`, 18, 28);
+    ctx.fillStyle = baseInner;  ctx.fillRect(18, 36, 10, 10); ctx.fillStyle = '#b0b8c0'; ctx.fillText('Compression (inner)', 34, 45);
+    ctx.fillStyle = baseOuter;  ctx.fillRect(138, 36, 10, 10); ctx.fillStyle = '#b0b8c0'; ctx.fillText('Expansion (outer)',   154, 45);
     ctx.fillStyle = '#b0b8c0';
-    ctx.fillText('Shift vector shown in violet', 18, 60);
+    ctx.fillText('Shift vector (violet) • Live physics coupling', 18, 60);
+    ctx.fillStyle = '#888';
+    ctx.font = '10px ui-sans-serif, system-ui, -apple-system';
+    ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty=${(dutyEff*100).toFixed(2)}% • q=${qspoil.toFixed(2)}`, 18, 74);
   };
 
   // expose

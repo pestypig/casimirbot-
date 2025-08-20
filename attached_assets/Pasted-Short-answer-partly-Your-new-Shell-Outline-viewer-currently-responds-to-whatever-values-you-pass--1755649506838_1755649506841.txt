@@ -1,0 +1,97 @@
+Short answer: partly.
+
+Your new Shell Outline viewer currently responds to whatever values you pass in as:
+	•	hullAxes (a,b,c)
+	•	wallWidth
+	•	epsilonTilt and betaTiltVec (the interior-gravity tilt)
+
+If your operational modes (Standby/Hover/Cruise/Emergency) change epsilonTilt (or you feed the panel’s computed value through), the violet shift arrow will change with the mode. But the wireframe shells (inner/center/outer) don’t yet respond to mode—things like duty, sectors, γ_geo, Q, etc. are not wired in.
+
+⸻
+
+Make it mode-aware (small patch)
+
+1) Pass mode + pipeline scalars from the page
+
+In ShellOutlineVisualizer.tsx, when you bootstrap the viewer, add these props (pull from pipelineState/systemMetrics the same way the WarpVisualizer does):
+
+engineRef.current?.setParams({
+  hullAxes: [a, b, c],
+  wallWidth: wallWidth_m,
+  epsilonTilt: resolvedEpsilonTilt,         // from ShiftVectorPanel or per-mode default
+  betaTiltVec: resolvedBetaTiltVec,         // [0, -1, 0] etc.
+
+  // NEW: mode coupling
+  mode: currentMode,                        // 'standby' | 'hover' | 'cruise' | 'emergency'
+  dutyCycle: pipeline?.dutyCycle ?? 0.14,   // 0..1
+  sectors: pipeline?.sectorStrobing ?? 1,   // e.g. 1 or 400
+  gammaGeo: pipeline?.gammaGeo ?? 26,       // γ_geo
+  qSpoil: pipeline?.qSpoilingFactor ?? 1.0, // 0..1
+  qCavity: pipeline?.qCavity ?? 1e9,        // Q
+});
+
+Call setParams again whenever those inputs change (you likely already do this for the basics).
+
+2) Use those in the outline renderer
+
+In warp-engine-outline.js, read the new fields and modulate the look (alpha/line width/arrow length) so modes are visible:
+
+// inside draw()
+const p = this.params;
+
+// Visual “curvature gain” proxy (purely presentational)
+const gamma3   = Math.pow(p.gammaGeo ?? 26, 3);
+const dutyEff  = Math.max(1e-6, (p.dutyCycle ?? 0.14) / Math.max(1, p.sectors ?? 1));
+const qspoil   = Math.max(1e-3, p.qSpoil ?? 1.0);
+const gainVis  = Math.pow(gamma3 * qspoil * dutyEff, 0.25); // gentle 1/4 power so it doesn’t blow up
+
+// Mode tint/alpha
+const modeAlpha =
+  p.mode === 'standby'   ? 0.40 :
+  p.mode === 'cruise'    ? 0.55 :
+  p.mode === 'hover'     ? 0.70 :
+  p.mode === 'emergency' ? 0.85 : 0.65;
+
+// Shell styling that responds to mode/gain
+const baseInner = `rgba(255,176,176,${0.60 * modeAlpha})`; // red-ish (compression)
+const baseCenter= `rgba(200,208,220,${0.45 * modeAlpha})`;
+const baseOuter = `rgba(176,208,255,${0.60 * modeAlpha})`; // blue-ish (expansion)
+const colShift  = `rgba(180,120,255,${0.90})`;              // violet (shift vector)
+
+const innerWidth  = 1.0 + 0.75 * gainVis;
+const centerWidth = 0.8 + 0.50 * gainVis;
+const outerWidth  = 1.0 + 0.75 * gainVis;
+
+// ...later, when you build shells:
+const shells = [
+  { scale: 1 - dRho, color: baseInner,  line: innerWidth },
+  { scale: 1.00,     color: baseCenter, line: centerWidth },
+  { scale: 1 + dRho, color: baseOuter,  line: outerWidth  },
+];
+
+// Shift vector arrow length also scaled (but clamped)
+if ((p.epsilonTilt ?? 0) > 0) {
+  const R = Math.max(a0, b0, c0);
+  const head = Math.min(0.35 * R, (p.epsilonTilt * gainVis * 1.2) * R);
+  // ...draw arrow with `colShift` as you already do
+}
+
+This keeps the outline physically agnostic (no fake geometry), but lets viewers see the mode: Standby looks subdued, Emergency looks bolder, and Cruise is lighter than Hover. The arrow grows subtly with effective drive.
+
+⸻
+
+What changes with modes after this patch
+	•	Standby: pale outlines, tiny/zero tilt arrow.
+	•	Hover: medium outlines, visible tilt.
+	•	Cruise: slimmer lines (many sectors, tiny duty), subtle tilt.
+	•	Emergency: bold lines, strongest tilt arrow.
+
+(All purely visual—your actual physics remain unchanged.)
+
+If you want the outline to also “breathe” with duty (e.g., a slow pulse), you can modulate globalAlpha with a small time-varying factor using your existing animation clock:
+
+const t = (performance.now() * 0.001) % TAU;
+const breathe = 0.07 * Math.sin(t * 0.8); // ±7%
+ctx.globalAlpha = (0.9 + breathe) * modeAlpha;
+
+That’s it—wire those few fields in, and the Shell Outline will respond to modes consistently with the main WarpVisualizer.

@@ -513,7 +513,14 @@ export default function HelixCore() {
                 },
                 wallWidth: 0.06,
                 epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
-                betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number]
+                betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
+                // NEW: mode coupling from live pipeline data
+                mode: currentMode,
+                dutyCycle: pipelineData?.dutyCycle ?? 0.14,
+                sectors: pipelineData?.sectorStrobing ?? 1,
+                gammaGeo: pipelineData?.gammaGeo ?? 26,
+                qSpoil: pipelineData?.qSpoilingFactor ?? 1.0,
+                qCavity: pipelineData?.qCavity ?? 1e9,
               }}
             />
           </CardContent>
