@@ -591,13 +591,13 @@ class WarpEngine {
         const gridK = 0.12;                       // deformation gain
         
         // ---- Paper-correct amplitude chain: γ³·qSpoil·γ_VdB·d_eff ----
-        const gammaGeo    = bubbleParams.gammaGeo || 26;
-        const geoAmp      = Math.pow(gammaGeo, 3);
-        const qSpoil      = bubbleParams.qSpoilingFactor || 1;
-        const vdbAmp      = bubbleParams.gammaVanDenBroeck || GAMMA_VDB;
+        const gammaGeo = bubbleParams.gammaGeo || 26;
+        const geoAmp = Math.pow(gammaGeo, 3);
+        const qSpoil = bubbleParams.qSpoilingFactor || 1;
+        const vdbAmp = bubbleParams.gammaVanDenBroeck || GAMMA_VDB;
         const activeSectors = bubbleParams.sectorStrobing || 1;
-        const d_eff       = BURST_DUTY_LOCAL * (activeSectors / TOTAL_SECTORS);
-        const betaVis     = geoAmp * qSpoil * vdbAmp * d_eff;
+        const d_eff = BURST_DUTY_LOCAL * (activeSectors / TOTAL_SECTORS);
+        const betaVis = geoAmp * qSpoil * vdbAmp * d_eff;
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
@@ -605,7 +605,7 @@ class WarpEngine {
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
         console.log(`  🔬 PHYSICS SCALING: γ³=${geoAmp.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${vdbAmp.toExponential(2)}`);
         console.log(`  📊 DUTY FACTORS: d_eff=${d_eff.toExponential(2)} (sectors=${activeSectors}/${TOTAL_SECTORS})`);
-        console.log(`  β_vis=${betaVis.toExponential(2)} (paper-correct chain)`);
+        console.log(`  β_vis=${betaVis.toExponential(2)} (paper-correct: γ³×qSpoil×γVdB×d_eff)`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
 
         // Ellipsoid utilities (using consistent scene-scaled axes)
@@ -776,29 +776,18 @@ class WarpEngine {
             // Final bounded visual amplitude 0..1
             const A_vis = Math.min(1.0, A_log * vizGain);
 
-            // Special case: make standby perfectly flat if desired
-            let disp;
-            if (mode === 'standby') {
-                disp = 0; // perfectly flat grid for standby mode
-            } else {
-                // Normal displacement calculation with compressed amplitude
-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
-                
-                // Reduced visual gain to avoid clamp flattening + higher ceiling
-                disp *= 2.0; // lower than 4.0 to avoid hitting clamp
-                
-                // Soft clamp with higher ceiling (no jaggies)
-                const maxPush = 0.15;                        // slightly higher ceiling
-                const softClamp = (x, m) => m * Math.tanh(x / m);
-                disp = softClamp(disp, maxPush);
-                
-                // Optional temporal smoothing for canonical visual calm
-                const vertIndex = i / 3;
-                const prev = this._prevDisp[vertIndex] ?? disp;
-                const blended = prev + this._dispAlpha * (disp - prev);
-                this._prevDisp[vertIndex] = blended;
-                disp = blended;
-            }
+            // apply curvature only
+            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+            
+            // clamp at 10% of radius
+            const maxPush = 0.10;
+            disp = maxPush * Math.tanh(disp / maxPush);
+            
+            // temporal smoothing
+            const idx = i / 3;
+            const prev = this._prevDisp[idx] || disp;
+            disp = prev + this._dispAlpha * (disp - prev);
+            this._prevDisp[idx] = disp;
             
             // ----- Interior gravity (shift vector "tilt") -----
             // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
