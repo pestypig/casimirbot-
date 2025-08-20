@@ -372,7 +372,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // ----- Sector model (consistent across modes) -----
   const TOTAL_SECTORS_DERIVED = 400;                   // Fixed logical partitioning
   const activeSectors = Math.max(1, state.sectorStrobing);
-  const activeFraction = activeSectors / TOTAL_SECTORS_DERIVED;
+  const activeFraction = Math.min(1, activeSectors / TOTAL_SECTORS_DERIVED);
   const tilesPerSector = Math.floor(state.N_tiles / TOTAL_SECTORS_DERIVED);
   const activeTiles = tilesPerSector * activeSectors;
 
