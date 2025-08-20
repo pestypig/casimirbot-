@@ -279,10 +279,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.sectorStrobing = modeConfig.sectorStrobing;
   state.qSpoilingFactor = modeConfig.qSpoilingFactor;
   
-  // Step 5: γ_VdB (server-authoritative, paper-consistent)
-  const realisticGammaVdB = 2.86e5; // paper-consistent value
-  const massScaling = (state.exoticMassTarget_kg ?? 1405) / 1405;
-  state.gammaVanDenBroeck = realisticGammaVdB * massScaling;
+  // Step 5: γ_VdB (paper-authentic value, no target scaling)
+  const GAMMA_VDB = 1e11; // authentic paper value
+  state.gammaVanDenBroeck = GAMMA_VDB; // no dependence on mass target
   
   // Step 6: Duty-cycled energy (physics calculation)
   state.U_cycle = state.U_Q * state.dutyCycle;
