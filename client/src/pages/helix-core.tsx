@@ -39,6 +39,7 @@ import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
+import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -560,6 +561,19 @@ export default function HelixCore() {
                 qCavity: pipeline?.qCavity ?? 1e9,
               }}
             />
+          </CardContent>
+        </Card>
+
+        {/* ====== Light Speed vs Strobing Scale ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">c vs Strobing Timeline</CardTitle>
+            <CardDescription>
+              Visual comparison of light-crossing time vs modulation frequencies and sector dwell times.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <LightSpeedStrobeScale />
           </CardContent>
         </Card>
 

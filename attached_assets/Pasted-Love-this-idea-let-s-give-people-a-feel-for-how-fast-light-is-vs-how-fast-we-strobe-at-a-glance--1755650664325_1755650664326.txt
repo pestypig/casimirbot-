@@ -1,0 +1,204 @@
+Love this idea—let’s give people a *feel* for “how fast light is vs how fast we strobe” at a glance. Here’s a small, self-contained panel that plugs into your existing data and renders a horizontal timeline comparing:
+
+* **Light-crossing time** of the hull (τₗc)
+* **Modulation period** (Tₘ = 1/fₘ)
+* **Sector dwell** per slice (Tₛₑc)
+* **Effective duty** proxy (dutyEffectiveFR)
+
+It also includes a tiny animation (a dot sliding along the bar) so the scale feels alive.
+
+---
+
+## 1) New component: `LightSpeedStrobeScale.tsx`
+
+Create `client/src/components/LightSpeedStrobeScale.tsx`:
+
+```tsx
+import * as React from "react";
+import { useMetrics } from "@/hooks/use-metrics";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+
+function fmtSI(t: number) {
+  if (!Number.isFinite(t)) return "—";
+  if (t >= 1) return `${t.toFixed(2)} s`;
+  if (t >= 1e-3) return `${(t*1e3).toFixed(2)} ms`;
+  if (t >= 1e-6) return `${(t*1e6).toFixed(2)} µs`;
+  if (t >= 1e-9) return `${(t*1e9).toFixed(2)} ns`;
+  return `${(t*1e12).toFixed(2)} ps`;
+}
+
+// linear map [0,max] -> [0,100%]
+function pct(v: number, max: number) {
+  return `${Math.min(100, Math.max(0, (v / max) * 100)).toFixed(3)}%`;
+}
+
+export default function LightSpeedStrobeScale() {
+  const { data: metrics } = useMetrics();
+  const { data: pipeline } = useEnergyPipeline();
+
+  // --- Inputs with graceful fallbacks ---
+  const fGHz = pipeline?.modulationFreq_GHz ?? 15.0;              // 15 GHz default
+  const Tm   = 1 / (fGHz * 1e9);                                   // s
+  const TS   = metrics?.TS_ratio ?? 1;                              // τlc / Tm
+  const tauLC = TS * Tm;                                            // s (conservative long axis)
+  // Sector dwell (per active slice)
+  const sectorPeriod_ms = metrics?.sectorPeriod_ms;                 // ms if provided
+  // If not provided, estimate from sectors & a sweep-rate hint (strobeHz)
+  const sectors = metrics?.sectorStrobing ?? pipeline?.sectorStrobing ?? 1;
+  const strobeHz = metrics?.strobeHz ?? 2000;                       // Hz sweep (fallback)
+  const Tsec = Number.isFinite(sectorPeriod_ms)
+    ? (sectorPeriod_ms! / 1000)
+    : 1 / Math.max(1, strobeHz) / Math.max(1, sectors);             // s per sector (est.)
+
+  // Duty proxy the Ford–Roman way (instantaneous, not averaged)
+  const dutyFR = metrics?.dutyEffectiveFR ?? (pipeline?.dutyCycle ?? 0.14);
+
+  // pick a shared max for the bar
+  const tMax = Math.max(tauLC, Tm, Tsec) || 1;
+
+  // tiny animation 0..1 on ~2 second cycle (doesn’t affect physics)
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    let raf = 0;
+    let t0 = performance.now();
+    const loop = (t: number) => {
+      const dt = (t - t0) / 2000; // 2s
+      setTick((dt % 1 + 1) % 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Mode tint
+  const mode = (pipeline?.currentMode ?? "hover").toLowerCase();
+  const modeTint =
+    mode === "standby"   ? "from-slate-700/40 to-slate-800/40" :
+    mode === "cruise"    ? "from-cyan-700/30 to-slate-800/40"  :
+    mode === "hover"     ? "from-sky-700/30 to-slate-800/40"   :
+    mode === "emergency" ? "from-rose-700/30 to-slate-800/40"  :
+                           "from-slate-700/40 to-slate-800/40";
+
+  return (
+    <div className={`rounded-lg border bg-gradient-to-br ${modeTint} p-4`}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-semibold text-sm">Light-Speed vs Strobing Scale</div>
+        <div className="text-xs text-slate-400">
+          Mode: <span className="uppercase">{pipeline?.currentMode ?? "—"}</span>
+        </div>
+      </div>
+
+      {/* Ruler */}
+      <div className="relative h-16 rounded-md bg-black/40 border border-white/10 overflow-hidden">
+        {/* base track */}
+        <div className="absolute inset-y-0 left-0 right-0">
+          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white/10" />
+        </div>
+
+        {/* τ_LC marker (gold dot + label) */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: pct(tauLC, tMax) }}
+        >
+          <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
+          <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-yellow-300">
+            τₗc {fmtSI(tauLC)}
+          </div>
+        </div>
+
+        {/* T_m marker (cyan) */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: pct(Tm, tMax) }}
+        >
+          <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+          <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-cyan-300">
+            Tₘ {fmtSI(Tm)}
+          </div>
+        </div>
+
+        {/* T_sec marker (violet) */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: pct(Tsec, tMax) }}
+        >
+          <div className="w-2 h-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
+          <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-violet-300">
+            Tₛₑc {fmtSI(Tsec)}
+          </div>
+        </div>
+
+        {/* animated tracer along the ruler */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2"
+          style={{ left: `${tick * 100}%` }}
+        >
+          <div className="w-[6px] h-[6px] rounded-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />
+          τₗc: light-crossing time (long axis)
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-cyan-400" />
+          Tₘ: modulation period (1/fₘ)
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-violet-400" />
+          Tₛₑc: per-sector dwell
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-white/70" />
+          Duty (FR proxy): {(dutyFR*100).toFixed(3)}%
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+**What this uses (already in your app):**
+
+* `useMetrics()` → `TS_ratio`, `strobeHz`, `sectorPeriod_ms`, `sectorStrobing`, `dutyEffectiveFR`
+* `useEnergyPipeline()` → `modulationFreq_GHz`, `currentMode` (fallbacks included)
+
+---
+
+## 2) Drop it onto **/helix-core**
+
+In `client/src/pages/helix-core.tsx`, import and place it wherever you want (e.g., under the Warp Bubble visual or in the center column near Compliance HUD):
+
+```tsx
+import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
+
+// ... inside your grid:
+<Card>
+  <CardHeader>
+    <CardTitle className="text-sm font-semibold">c vs Strobing</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <LightSpeedStrobeScale />
+  </CardContent>
+</Card>
+```
+
+---
+
+## 3) (Optional) Tiny HUD on the **visualizers**
+
+If you want a subtle HUD overlay **inside** the WarpVisualizer or Shell Outline, reuse the same math but draw a small 1-line indicator at the top-right of the canvas (no physics change). I can give you that snippet next if you want it in-engine.
+
+---
+
+### What users will see
+
+* In **Standby**, cyan (Tₘ) is present, τₗc is far to the right (long), **violet** Tₛₑc shows almost no activity.
+* In **Hover**, duty proxy rises; **violet** marker shows stronger per-sector dwell; the relative positions make it obvious that *light crosses the cabin far faster than we rotate sectors* (good GR regime).
+* In **Cruise**, sectors ↑ so **violet** Tₛₑc shifts right (slower per-slice), visually reinforcing the safety margin.
+* In **Emergency**, the whole scale grows bolder (mode tint), with duty proxy clearly larger, but τₗc still well beyond Tₛₑc.
+
+This keeps the story tight: “light is still faster than our strobing slices,” visible across modes.
