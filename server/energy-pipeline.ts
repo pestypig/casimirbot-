@@ -362,9 +362,10 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     const scaleP = P_target_W / Math.max(P_total_W, 1e-30);
     state.qMechanical *= scaleP;
     
-    // Recompute power with boosted stored energy
-    const U_geo_boost = U_geo * state.qMechanical;
-    P_total_W = Math.abs(U_geo_boost) * omega / Q_BURST * state.N_tiles * d_eff;
+    // Recompute power with boosted stored energy and keep state consistent
+    state.U_Q = U_geo * state.qMechanical;                    // keep state coherent
+    state.P_loss_raw = Math.abs(state.U_Q) * omega / Q_BURST; // per-tile (ON-window)
+    P_total_W = state.P_loss_raw * state.N_tiles * d_eff;
     state.P_avg = P_total_W / 1e6;
 
     // Mass knob: γ_VdB affects mass only
@@ -378,17 +379,41 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.M_exotic_raw = state.M_exotic = M_total;
   }
 
-  // Expose timing details for metrics API
+  // Duty-cycled energy and curvature limit (corrected)
+  state.U_cycle = state.U_Q * d_eff;
+  
+  // Expose timing details for metrics API (corrected naming)
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
-  state.dutyBurst           = d_eff;  // for client visibility (corrected)
-  state.dutyEffective_FR    = d_eff;  // same as dutyBurst (paper method)
+  state.dutyBurst           = BURST_DUTY_LOCAL; // 0.01 (10 μs / 1 ms)
+  state.dutyEffective_FR    = d_eff;            // 0.01 * S_live/400
   state.modelMode           = MODEL_MODE; // for client consistency
   
-  // Compliance flags
-  state.natarioConstraint   = true;
-  state.curvatureLimit      = Math.abs(state.U_Q ?? 0) < 1e-10;
+  // Sectoring HUD coherence
+  state.sectorStrobing = S_total; // 400 for paper partitioning consistency
   
+  // Compliance flags (corrected curvature check)
+  state.natarioConstraint   = true;
+  state.curvatureLimit      = Math.abs(state.U_cycle ?? 0) < 1e-10;
+  
+  // Audit guard (pipeline self-consistency check)
+  (function audit() {
+    const P_tile = Math.abs(state.U_Q) * omega / Q_BURST;
+    const P_exp  = P_tile * state.N_tiles * d_eff / 1e6;
+    if (Math.abs(state.P_avg - P_exp) > 1e-6 * Math.max(1, P_exp)) {
+      console.warn("[AUDIT] P_avg drift; correcting", {reported: state.P_avg, expected: P_exp});
+      state.P_avg = P_exp;
+    }
+
+    const E_tile = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
+                 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    const M_exp  = (E_tile / (C*C)) * state.N_tiles;
+    if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
+      console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
+      state.M_exotic_raw = state.M_exotic = M_exp;
+    }
+  })();
+
   // Overall status
   if (!state.fordRomanCompliance || !state.curvatureLimit) {
     state.overallStatus = 'CRITICAL';
