@@ -503,21 +503,17 @@ export default function HelixCore() {
           </CardHeader>
           <CardContent>
             <ShellOutlineVisualizer
-              params={{
+              parameters={{
                 hull: (hullMetrics && hullMetrics.hull) ? {
-                  ...hullMetrics.hull,
                   a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
                   b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
                   c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
                 } : {
-                  Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                  a: 503.5, b: 132, c: 86.5
+                  a: 0.42, b: 0.11, c: 0.09 // normalized scene units
                 },
-                wallWidth_m: 6.0,
-                showInner: true,
-                showCenter: true,
-                showOuter: true,
-                showShiftArrow: true
+                wallWidth: 0.06,
+                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number]
               }}
             />
           </CardContent>
