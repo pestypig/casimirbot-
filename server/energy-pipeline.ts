@@ -309,15 +309,17 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.P_loss_raw = P_loss_per_tile;
   state.P_avg      = P_total_W / 1e6; // MW
 
-  // 6) Mass (paper method): DCE chain uses Q_BURST and d_eff; γ_VdB fixed seed
-  state.gammaVanDenBroeck = GAMMA_VDB;
+  // 6) Mass calibration using raw formula then γ_VdB scaling
   const U_abs = Math.abs(state.U_static);
-  const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  const E_enh = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
-  const m_tile = E_enh / (C * C);
-  const M_total = m_tile * state.N_tiles;
-  state.M_exotic_raw = M_total;
-  state.M_exotic     = M_total;
+  const geo3 = Math.pow(state.gammaGeo ?? 26, 3);
+  
+  // Compute raw mass: M_raw = (|U_static| * geo3 * Q_BURST * gammaVanDenBroeck * d_eff / c^2) * N_tiles
+  state.gammaVanDenBroeck = GAMMA_VDB; // Start with paper-authentic seed
+  const M_raw = (U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff / (C * C)) * state.N_tiles;
+  
+  // Store raw mass and apply any γ_VdB scaling
+  state.M_exotic_raw = M_raw;
+  state.M_exotic = M_raw;
 
   // 7) Remove femtosecond burst duty and any "dutyTile" terms
   // (Delete variables burst_s, dutyBurst, dutyTile and any use of them)
@@ -382,14 +384,19 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     }
   }
 
-  // Mass target calibration (separate from power path)
-  if (process.env.MASS_TARGET_KG && state.currentMode === 'cruise') {
+  // Mass calibration system using exact formula specification
+  if (process.env.MASS_TARGET_KG) {
     const M_target = parseFloat(process.env.MASS_TARGET_KG);
-    const scaleM = M_target / (state.M_exotic_raw || 1e-30);
-    state.gammaVanDenBroeck *= scaleM;
-    const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
-    state.M_exotic_raw = Math.max(0, (E_enh_cal / (C*C)) * state.N_tiles);
-    state.M_exotic = state.M_exotic_raw;
+    if (M_raw > 0) {
+      // Set gammaVanDenBroeck *= (M_target / M_raw)
+      const scale_factor = M_target / M_raw;
+      state.gammaVanDenBroeck *= scale_factor;
+      
+      // Recompute with adjusted γ_VdB
+      const M_calibrated = (U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff / (C * C)) * state.N_tiles;
+      state.M_exotic_raw = M_calibrated;
+      state.M_exotic = M_calibrated;
+    }
   }
 
   // Expose timing details for metrics API
