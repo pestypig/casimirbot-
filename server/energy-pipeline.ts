@@ -294,16 +294,27 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const frac_active = (S_total === 0) ? 0 : (S_live / S_total);
   const d_eff   = BURST_DUTY_LOCAL * frac_active; // paper formula 0.01 * S_live/400
 
-  state.activeSectors  = S_live;
-  state.activeFraction = frac_active;
-  state.tilesPerSector = Math.floor(state.N_tiles / Math.max(1, S_total));
-  state.activeTiles    = state.tilesPerSector * S_live;
-  state.dutyBurst      = BURST_DUTY_LOCAL; // for HUD
-  state.dutyEffective_FR = d_eff;          // for HUD
+  state.activeSectors   = S_live;
+  state.activeFraction  = frac_active;
+  state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
+  state.activeTiles     = state.tilesPerSector * S_live;
 
-  // 4) Stored energy (raw core): no mechanical boost unless we calibrate power later
+  // 🔧 expose both duties explicitly and consistently
+  state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
+  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
+  state.dutyCycle        = state.dutyCycle;   // UI display only (from MODE_CONFIGS)
+
+  // ✅ optional convenience for UI reducers that look for this name:
+  (state as any).dutyEff = d_eff;
+
+  // 4) Stored energy (raw core): ensure qMechanical starts with valid value
+  // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
+  if (state.qMechanical === 0 && state.currentMode !== 'standby') {
+    state.qMechanical = 1; // restore default
+  }
+
   state.U_geo = state.U_static * state.gammaGeo;
-  state.U_Q   = state.U_geo;
+  state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
   // 5) Power — raw first, then power-only calibration via qMechanical
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
@@ -397,8 +408,6 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Expose timing details for metrics API (corrected naming)
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
-  state.dutyBurst           = BURST_DUTY_LOCAL; // 0.01 (10 μs / 1 ms)
-  state.dutyEffective_FR    = d_eff;            // 0.01 * S_live/400
   state.modelMode           = MODEL_MODE; // for client consistency
   
   // Sectoring HUD coherence
