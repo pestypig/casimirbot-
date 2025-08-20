@@ -121,7 +121,6 @@ export interface EnergyPipelineState {
   strobeHz?: number;
   sectorPeriod_ms?: number;
   dutyBurst?: number;
-  dutyEff?: number;
   dutyEffective_FR?: number;
   
   // Model mode for client consistency
@@ -294,19 +293,12 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // (optional guard) clamp qMechanical to 1 unless explicit cruise calibration enabled
   if (process.env.CRUISE_CALIBRATION !== '1') state.qMechanical = 1;
   
-  // 5) Power calibration using raw formula then qMechanical scaling
+  // 5) Power (paper method): use Q_BURST and d_eff
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  
-  // Compute raw average power: P_raw = (|U_geo| * omega / Q_BURST) * N_tiles * d_eff
-  const P_raw = (Math.abs(state.U_geo) * omega / Q_BURST) * state.N_tiles * d_eff;
-  
-  // Apply qMechanical scaling to get stored energy and final power
-  state.U_Q = state.U_geo * state.qMechanical;
   const U_Q_store = Math.abs(state.U_Q);
-  const P_loss_per_tile = U_Q_store * omega / Q_BURST;
-  const P_total_W = P_loss_per_tile * state.N_tiles * d_eff;
-  
-  state.P_loss_raw = P_loss_per_tile;
+  const P_loss_per_tile_raw = U_Q_store * omega / Q_BURST;
+  const P_total_W = P_loss_per_tile_raw * state.N_tiles * d_eff;
+  state.P_loss_raw = P_loss_per_tile_raw;
   state.P_avg      = P_total_W / 1e6; // MW
 
   // 6) Mass (paper method): DCE chain uses Q_BURST and d_eff; γ_VdB fixed seed
@@ -363,29 +355,19 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     Q_quantum,              // Paper value 1e12
   };
   
-  // 9) Power calibration system using exact formula specification
-  // For any mode that needs power targeting, compute qMechanical adjustment
-  if (process.env.POWER_TARGET_MW) {
-    const P_target_W = parseFloat(process.env.POWER_TARGET_MW) * 1e6;
-    if (P_raw > 0) {
-      const scale_factor = P_target_W / P_raw;
-      state.qMechanical *= scale_factor;
-      
-      // Recompute with adjusted qMechanical
-      state.U_Q = state.U_geo * state.qMechanical;
-      const U_Q_calibrated = Math.abs(state.U_Q);
-      const P_tile_calibrated = U_Q_calibrated * omega / Q_BURST;
-      const P_total_calibrated = P_tile_calibrated * state.N_tiles * d_eff;
-      
-      state.P_loss_raw = P_tile_calibrated;
-      state.P_avg = P_total_calibrated / 1e6;
-    }
-  }
+  // 9) (Optional) cruise calibration knobs, if you need exact paper numbers in cruise:
+  if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
+    // Power target: 7.4 MW → adjust qMechanical (power only)
+    const P_target_W = 7.4e6;
+    const scaleP = P_target_W / (P_total_W || 1e-30);
+    state.qMechanical *= scaleP;
+    state.U_Q = state.U_geo * state.qMechanical;
+    const P_tile_cal = Math.abs(state.U_Q) * omega / Q_BURST;
+    state.P_avg = (P_tile_cal * state.N_tiles * d_eff) / 1e6;
 
-  // Mass target calibration (separate from power path)
-  if (process.env.MASS_TARGET_KG && state.currentMode === 'cruise') {
-    const M_target = parseFloat(process.env.MASS_TARGET_KG);
-    const scaleM = M_target / (state.M_exotic_raw || 1e-30);
+    // Mass target: 1405 kg → adjust γ_VdB (mass only)
+    const M_target = 1405;
+    const scaleM   = M_target / (state.M_exotic_raw || 1e-30);
     state.gammaVanDenBroeck *= scaleM;
     const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
     state.M_exotic_raw = Math.max(0, (E_enh_cal / (C*C)) * state.N_tiles);
