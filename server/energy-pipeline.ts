@@ -188,8 +188,8 @@ function surfaceAreaEllipsoidFromHullDims(Lx_m: number, Ly_m: number, Lz_m: numb
 // Initialize pipeline state with defaults
 export function initializePipelineState(): EnergyPipelineState {
   return {
-    // Needle Hull full scale defaults for HELIX-CORE
-    tileArea_cm2: 5,
+    // Needle Hull full scale defaults for HELIX-CORE (paper-authentic)
+    tileArea_cm2: 25,  // 5×5 cm tiles (was 5 cm², now 25 cm²)
     shipRadius_m: 86.5,
     gap_nm: 1.0,
     sag_nm: 16,
@@ -266,8 +266,10 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
 
-  // 1) N_tiles — include radial layering
-  state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2) * RADIAL_LAYERS);
+  // 1) N_tiles — paper-authentic tile census
+  const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
+  const PACKING = 0.88; // edge/packing factor to match paper's ~1.96e9
+  state.N_tiles = Math.max(1, Math.round(surfaceTiles * RADIAL_LAYERS * PACKING));
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
@@ -276,38 +278,36 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.U_geo = state.U_static * state.gammaGeo;
   state.U_Q   = state.U_geo; // no extra mechanical gain in raw core
   
-  // 3) Sector scheduling — paper method: one-live-of-400
-  const S         = TOTAL_SECTORS;
-  const S_instant = 1;
-  const frac_active = S_instant / S;
-  const tilesPerSect = Math.floor(state.N_tiles / S);
-  state.activeSectors  = S_instant;
-  state.activeFraction = frac_active;
-  state.tilesPerSector = tilesPerSect;
-  state.activeTiles    = tilesPerSect * S_instant;
-
-  // 4) Effective duty for ship-wide averages
-  const d_eff = BURST_DUTY_LOCAL * frac_active; // 0.01 / 400 = 2.5e-5
-  state.dutyEff = d_eff;
+  // 3) Sector scheduling — paper method with mode-specific S_live
+  const S_total = TOTAL_SECTORS;
+  const S_live  = (state.currentMode === 'hover') ? 2 : 1; // zero-β hover uses 2 opposite-phase sectors
+  const d_eff   = BURST_DUTY_LOCAL * (S_live / S_total); // paper formula
+  
+  state.activeSectors  = S_live;
+  state.activeFraction = S_live / S_total;
+  state.tilesPerSector = Math.floor(state.N_tiles / S_total);
+  state.activeTiles    = state.tilesPerSector * S_live;
+  // state.dutyEff        = d_eff; // Remove - not in schema
 
   // (optional guard) clamp qMechanical to 1 unless explicit cruise calibration enabled
   if (process.env.CRUISE_CALIBRATION !== '1') state.qMechanical = 1;
   
-  // 5) Power (paper method): use Q_BURST and d_eff
+  // 5) Power (paper method): raw calculation first
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  const U_Q_store = Math.abs(state.U_Q);
-  const P_loss_per_tile_raw = U_Q_store * omega / Q_BURST;
-  const P_total_W = P_loss_per_tile_raw * state.N_tiles * d_eff;
-  state.P_loss_raw = P_loss_per_tile_raw;
+  const U_geo = state.U_static * state.gammaGeo;
+  const P_tile_raw = Math.abs(U_geo) * omega / Q_BURST;
+  let P_total_W = P_tile_raw * state.N_tiles * d_eff;
+  
+  state.P_loss_raw = P_tile_raw;
   state.P_avg      = P_total_W / 1e6; // MW
 
-  // 6) Mass (paper method): DCE chain uses Q_BURST and d_eff; γ_VdB fixed seed
+  // 6) Mass (paper method): raw calculation first 
   state.gammaVanDenBroeck = GAMMA_VDB;
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  const E_enh = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
-  const m_tile = E_enh / (C * C);
-  const M_total = m_tile * state.N_tiles;
+  let E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
+  let M_total = (E_tile / (C * C)) * state.N_tiles;
+  
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
 
@@ -355,23 +355,27 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     Q_quantum,              // Paper value 1e12
   };
   
-  // 9) (Optional) cruise calibration knobs, if you need exact paper numbers in cruise:
+  // 9) (Optional) cruise calibration — two knobs to hit exact paper targets
   if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
-    // Power target: 7.4 MW → adjust qMechanical (power only)
-    const P_target_W = 7.4e6;
-    const scaleP = P_target_W / (P_total_W || 1e-30);
+    // Power knob: qMechanical affects power only
+    const P_target_W = 7.4e6; // 7.4 MW cruise target
+    const scaleP = P_target_W / Math.max(P_total_W, 1e-30);
     state.qMechanical *= scaleP;
-    state.U_Q = state.U_geo * state.qMechanical;
-    const P_tile_cal = Math.abs(state.U_Q) * omega / Q_BURST;
-    state.P_avg = (P_tile_cal * state.N_tiles * d_eff) / 1e6;
+    
+    // Recompute power with boosted stored energy
+    const U_geo_boost = U_geo * state.qMechanical;
+    P_total_W = Math.abs(U_geo_boost) * omega / Q_BURST * state.N_tiles * d_eff;
+    state.P_avg = P_total_W / 1e6;
 
-    // Mass target: 1405 kg → adjust γ_VdB (mass only)
-    const M_target = 1405;
-    const scaleM   = M_target / (state.M_exotic_raw || 1e-30);
+    // Mass knob: γ_VdB affects mass only
+    const M_target = 1405; // 1405 kg paper target
+    const scaleM = M_target / Math.max(M_total, 1e-30);
     state.gammaVanDenBroeck *= scaleM;
-    const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
-    state.M_exotic_raw = Math.max(0, (E_enh_cal / (C*C)) * state.N_tiles);
-    state.M_exotic = state.M_exotic_raw;
+    
+    // Recompute mass with adjusted γ_VdB
+    E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    M_total = (E_tile / (C * C)) * state.N_tiles;
+    state.M_exotic_raw = state.M_exotic = M_total;
   }
 
   // Expose timing details for metrics API
