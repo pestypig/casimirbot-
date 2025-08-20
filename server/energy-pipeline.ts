@@ -320,28 +320,17 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
      Mass uses the same d_eff (see §7), no fs burst.
   ──────────────────────────────── */
 
-  // Use server-set γ_VdB (from Step 5)
-  const gammaVdBSeed = state.gammaVanDenBroeck;
-
-  // Geometric / DCE amplification  
-  const gammaGeo  = state.gammaGeo ?? 26;
-  const geoAmp    = Math.pow(gammaGeo, 3);        // γ_geo^3
-
-  // Per-tile enhanced energy over a cycle (use same d_eff as power)
-  const U_static_abs = Math.abs(state.U_static ?? 0);   // J (from calculateStaticCasimir)  
-  const E_tile_enh   = U_static_abs * geoAmp * Q_BURST * gammaVdBSeed * d_eff;
-
-  // Raw physics totals
-  const massPerTile_kg = E_tile_enh / (C * C);
-  const M_raw_total_kg = massPerTile_kg * N_tiles;
-
-  state.M_exotic_raw   = Math.max(0, M_raw_total_kg);
-
-  // Model switch: raw physics vs paper-calibrated targets
-  const M_CALIBRATED = 1405; // kg (paper target)
-  state.M_exotic = (MODEL_MODE === 'calibrated') ? M_CALIBRATED : state.M_exotic_raw;
-  state.massCalibration = (MODEL_MODE === 'calibrated' && M_raw_total_kg > 0) 
-    ? (M_CALIBRATED / M_raw_total_kg) : 1;
+  // Mass calculation (fixed): Use same Q_BURST and d_eff as power
+  const U_abs = Math.abs(state.U_static ?? 0);
+  const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
+  const E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+  const massPerTile_kg = E_tile / (C * C);
+  const M_total = massPerTile_kg * state.N_tiles;
+  
+  // Use raw physics - no calibration override
+  state.M_exotic_raw = M_total;
+  state.M_exotic     = M_total;
+  state.massCalibration = 1.0; // No calibration applied
   
   // Physics logging for debugging
   console.log("[PIPELINE]", {
