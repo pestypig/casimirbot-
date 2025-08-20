@@ -302,6 +302,23 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const d_eff = BURST_DUTY_LOCAL * frac_active;  // 0.01/400 = 2.5e-5
   state.dutyEff = d_eff;
 
+  // --- Invariants & guard-rails (after computing d_eff) ---
+  if (Math.abs(state.U_Q - state.U_geo) > Math.abs(state.U_geo) * 1e-12) {
+    console.warn("[PIPELINE][WARN] U_Q drifted from U_geo; forcing raw core U_Q = U_geo");
+    state.U_Q = state.U_geo; // ensure no hidden qMechanical gain leaks back in
+  }
+
+  // Freeze qMechanical=1 in raw core unless cruise calibration is explicitly enabled
+  if (process.env.CRUISE_CALIBRATION !== '1' && Math.abs(state.qMechanical - 1) > 1e-12) {
+    console.warn("[PIPELINE][WARN] qMechanical != 1 in raw mode; clamping to 1");
+    state.qMechanical = 1;
+  }
+
+  // Visibility logs to confirm the expected scaling
+  console.log("[CHECK] dutyEff=", state.dutyEff, " (expected ~2.5e-5)");
+  console.log("[CHECK] qMechanical=", state.qMechanical, " (expected 1 in raw)");
+  console.log("[CHECK] U_static, U_geo, U_Q:", state.U_static, state.U_geo, state.U_Q);
+
   // Step 7: Duty-cycled energy (physics calculation)
   state.U_cycle = state.U_Q * d_eff;
   
@@ -320,6 +337,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   state.P_loss_raw = P_loss_per_tile_raw;
   state.P_avg      = P_total_W / 1e6;   // MW (paper method)
+  
+  // ✓ Paper-method physics: Power = P_per_tile × N_tiles × d_eff 
+  // ✓ Reduction from old system: only qMechanical (50,000×), duty was already correct
 
   // Optional cruise power calibration (paper targets via your two knobs)
   if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
@@ -345,6 +365,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;   // physics-first
   state.massCalibration = 1;      // no overwrites
+  
+  // ✓ Paper-method physics: Mass = E_enh × N_tiles / c²
+  // ✓ No change from old system: mass path was already using correct d_eff
 
   // Optional cruise mode mass calibration (dial γ_VdB to hit 1405 kg target)
   if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
