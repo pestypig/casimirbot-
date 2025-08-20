@@ -664,7 +664,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   </div>
                 )}
                 <div className="text-green-300">Q-Factor: {safeExp(parameters.cavityQ, 0, '1e+9')}</div>
-                <div className="text-green-300">Exotic Mass: {parameters.exoticMass_kg}kg</div>
+                <div className="text-green-300">Exotic Mass: {safeFix(parameters.exoticMass_kg, 1405, 0)}kg</div>
               </div>
               
               {/* Debug Controls */}
