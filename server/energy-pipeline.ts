@@ -368,26 +368,20 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Export so /metrics can expose same numbers
   state.__sectors = { TOTAL_SECTORS: TOTAL_SECTORS_DERIVED, activeSectors, activeFraction, tilesPerSector, activeTiles };
 
-  // ----- Ford–Roman proxy with time-sliced strobing -----
-  // Instantaneous duty seen by a local observer inside an energized sector
-  const dutyInstant = state.dutyCycle * state.qSpoilingFactor;
-
-  // Effective duty used in ζ after strobing fraction is applied
-  const dutyEffectiveFR = dutyInstant * activeFraction;
-
-  // Quantum cavity Q used for the Ford–Roman inequality proxy
-  const Q_quantum = 1e10;
-
-  // ζ = 1 / (duty_eff * sqrt(Q))
-  state.zeta = 1 / (dutyEffectiveFR * Math.sqrt(Q_quantum));
+  // ----- Ford–Roman proxy (paper-authentic) -----
+  // Use same d_eff as power/mass calculations (paper method)
+  const Q_quantum = 1e12;  // Paper value (was 1e10)
+  
+  // ζ = 1 / (d_eff * sqrt(Q))
+  state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
   // Compliance
   state.fordRomanCompliance = state.zeta < 1.0;
 
   // Keep these around for the metrics + HUD
   state.__fr = {
-    dutyInstant,            // e.g. 0.14 in hover
-    dutyEffectiveFR,        // scaled by sectors
-    Q_quantum,
+    dutyInstant: d_eff,     // Paper-authentic d_eff (was UI duty)
+    dutyEffectiveFR: d_eff, // Same as dutyInstant (no scaling)
+    Q_quantum,              // Paper value 1e12
   };
   
   // Update state with sector calculations
@@ -400,7 +394,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.dutyBurst           = d_eff;  // for client visibility (corrected)
-  state.dutyEffective_FR    = dutyEffectiveFR; // for client visibility
+  state.dutyEffective_FR    = d_eff;  // same as dutyBurst (paper method)
   state.modelMode           = MODEL_MODE; // for client consistency
   
   // Compliance flags
