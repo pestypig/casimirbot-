@@ -510,8 +510,11 @@ export function getSystemMetrics(req: Request, res: Response) {
 
   // Calculate shift vector parameters (artificial gravity tilt)
   const c = 299_792_458;  // m/s
-  const hull = state.hull ?? { a: 503.5, b: 132, c: 86.5, Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);  // Geometric mean radius
+  const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const a = hull.Lx_m / 2;  // semi-axis a
+  const b = hull.Ly_m / 2;  // semi-axis b  
+  const ch = hull.Lz_m / 2; // semi-axis c (renamed to avoid conflict)
+  const R_geom = Math.cbrt(a * b * ch);  // Geometric mean radius
 
   // Per-mode gravity targets (matching WarpVisualizer)
   const G = 9.80665;
@@ -584,16 +587,7 @@ export function getSystemMetrics(req: Request, res: Response) {
       status: state.natarioConstraint ? "VALID" : "WARN"
     },
     curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
-    timeScaleRatio: state.TS_ratio,
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
-
-    // hull geometry and time-scale metrics for Bridge cards
-    hull: { 
-      Lx_m, Ly_m, Lz_m,
-      a: Lx_m / 2,  // semi-axis x
-      b: Ly_m / 2,  // semi-axis y  
-      c: Lz_m / 2   // semi-axis z
-    },
     wall: { w_norm: 0.06 }, // normalized wall thickness for ellipsoidal bell
     tiles: {
       tileArea_cm2: state.tileArea_cm2,
