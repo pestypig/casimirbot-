@@ -91,6 +91,7 @@ export interface EnergyPipelineState {
   U_cycle: number;          // Duty-cycled energy
   P_loss_raw: number;       // Raw power loss per tile
   P_avg: number;            // Average power (throttled)
+  P_avg_raw: number;        // Raw physics power (before calibration)
   M_exotic: number;         // Exotic mass generated
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
@@ -217,6 +218,7 @@ export function initializePipelineState(): EnergyPipelineState {
     U_cycle: 0,
     P_loss_raw: 0,
     P_avg: 0,
+    P_avg_raw: 0,
     M_exotic: 0,
     M_exotic_raw: 0,
     massCalibration: 1,
@@ -241,10 +243,18 @@ export function initializePipelineState(): EnergyPipelineState {
 // Legacy calculateHullArea function removed - now using surfaceAreaEllipsoidFromHullDims
 
 // Calculate static Casimir energy using corrected physics
-function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
-  const gap_m   = gap_nm * NM_TO_M;
-  const E_overA = -(PI * PI * HBAR_C) / (720 * Math.pow(gap_m, 3)); // J/m^2
-  return E_overA * area_m2; // J
+function calculateStaticCasimir(gap_nm: number, area_m2: number, sag_nm: number = 16): number {
+  // For 5 cm² tile with 1 nm gap, the correct energy is -2.168e-4 J
+  const gap_m = gap_nm * NM_TO_M;
+  // Volume of the cavity between parallel plates
+  const V_cavity = area_m2 * gap_m;
+  // Energy density for Casimir effect
+  const u_casimir = -(PI * PI * HBAR_C) / (720 * Math.pow(gap_m, 4));
+  // Total static Casimir energy — keep first-principles; if you require
+  // finite-conductivity/edge corrections, document and apply explicitly.
+  const calibrationFactor = 1.0;
+  const energy = u_casimir * V_cavity * calibrationFactor;
+  return energy;
 }
 
 // Main pipeline calculation
@@ -262,7 +272,10 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Derived tile count (no hard-coding; lets geometry drive it)
   state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2));
   
-  // Step 1: Static Casimir energy
+  // Step 1: Static Casimir energy (per tile)
+  // NOTE: Keep this strictly first-principles. If you previously matched a
+  // paper demo with an empirical factor (e.g. 0.159), remove it here and
+  // document finite-conductivity/edge corrections separately.
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
   // Step 2: Geometric amplification (γ × U_static, not γ³)
@@ -286,78 +299,68 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Step 6: Duty-cycled energy (physics calculation)
   state.U_cycle = state.U_Q * state.dutyCycle;
   
-  /* ──────────────────────────────
-     Step 7: Power (physics-first)
-     P_loss_per_tile ≈ ω · |U_Q| / Q_eff
-     Average power scales with duty and active fraction.
-  ──────────────────────────────── */
-  const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+  // Step 7: Power calculations (dual-path: RAW physics vs CALIBRATED display)
+  // RAW chain (first principles):
+  const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;  // rad/s
+  const gammaGeo = state.gammaGeo ?? 26;
+  const geoAmp   = Math.pow(gammaGeo, 3);                         // γ_geo^3
+  const Qmech    = state.qMechanical ?? 1;                         // optional mechanical gain
+  const Qcav     = state.qCavity ?? 1e9;                           // EM cavity Q
 
-  // Effective Q with spoiling
-  const Q_eff = Math.max(1, (state.qCavity ?? 1e9) * (state.qSpoilingFactor ?? 1));
+  // Per-tile stored energy in the driven mode:
+  const U_mode_tile = Math.abs(state.U_static) * geoAmp * Qmech;   // J / tile
+  // Per-tile instantaneous dissipated power via cavity Q:
+  const P_tile_inst = (omega * U_mode_tile) / Math.max(1, Qcav);   // W / tile
 
-  // Raw per-tile dissipation (J/s)
-  const P_loss_per_tile_raw = Math.abs(state.U_Q ?? 0) * omega / Q_eff;
+  // Sector aggregation
+  const sectors = Math.max(1, state.sectorStrobing ?? 1);
+  const tilesPerSectorCalc = Math.max(1, Math.floor(Math.max(1, state.N_tiles ?? 0) / sectors));
+  const P_sector_inst  = P_tile_inst * tilesPerSectorCalc;         // W per active sector
 
-  // Tiles & strobing
-  const N_tiles       = Math.max(1, Math.round(state.N_tiles ?? 1.96e9));
-  const sectorsActive = Math.max(1, Math.round(state.sectorStrobing ?? 1));
-  const activeFrac    = Math.min(1, sectorsActive / N_tiles);
+  // Time averaging (burst duty, sector fraction, Q-spoiling)
+  const duty_burst     = state.dutyCycle ?? 0.14;                  // instantaneous duty in sector
+  const activeSectorsCalc = Math.max(1, state.activeSectors ?? 1); // usually 1
+  const sectorFraction = activeSectorsCalc / sectors;              // e.g., 1/400 in cruise
+  const qSpoil         = state.qSpoilingFactor ?? 1;
 
-  // Duty components (add femtosecond burst duty)
-  const duty          = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
-  const f_m           = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
-  const T_m           = 1 / f_m;                                // s
-  const burst_s       = 0.5 * 1e-15; // default 0.5 fs (hardcoded for now)
-  const dutyBurst     = Math.min(1, Math.max(0, burst_s / T_m)); // << very small (~1e-5 .. 1e-6)
+  const P_avg_raw_W = P_sector_inst * duty_burst * sectorFraction * qSpoil; // W
+  const P_avg_raw_MW = P_avg_raw_W / 1e6;
+  state.P_avg_raw = P_avg_raw_MW;                                  // expose RAW
+
+  // CALIBRATED (paper-matched) — keep legacy value if requested
+  if (state.modelMode === 'calibrated') {
+    // Preserve whatever you previously put in state.P_avg (e.g., 83.3 MW) if present,
+    // otherwise fall back to RAW so UI never goes empty.
+    state.P_avg = typeof state.P_avg === 'number' ? state.P_avg : P_avg_raw_MW;
+  } else {
+    state.P_avg = P_avg_raw_MW;
+  }
   
-  // Effective duty for tile-level production
-  const dutyTile      = duty * dutyBurst;
-  
-  // Note: effDuty_FR is calculated later in Ford-Roman section
+  // Store raw power loss per tile for compatibility
+  state.P_loss_raw = P_tile_inst;
 
-  // Hull average power (only active sectors dissipate at once)
-  const P_total_W     = P_loss_per_tile_raw * N_tiles * duty * activeFrac;
+  // Step 8: Exotic mass calculation (dual-path: RAW vs CALIBRATED)
+  // RAW: convert energy per cycle to mass via E/c^2
+  // Use U_cycle if you already compute it; otherwise derive from U_mode_tile with duty.
+  const c2 = C * C;
+  // Cycle energy per tile (use already-computed U_cycle if available; otherwise proxy)
+  const U_cycle_tile = (typeof state.U_cycle === 'number' && isFinite(state.U_cycle))
+    ? Math.abs(state.U_cycle)
+    : Math.abs(U_mode_tile) * duty_burst; // conservative proxy if U_cycle absent
 
-  state.P_loss_raw    = P_loss_per_tile_raw;   // W per tile (raw)
-  
-  // Model switch: raw physics vs paper-calibrated power targets
-  const powerTargets = { hover: 83.3, cruise: 7.4, emergency: 297.5, standby: 0 };
-  const P_raw_MW = P_total_W / 1e6;  // Raw physics power
-  state.P_avg = (MODEL_MODE === 'calibrated') 
-    ? (powerTargets as any)[state.currentMode] ?? 83.3
-    : P_raw_MW;
+  const Ntiles = Math.max(1, state.N_tiles ?? 1);
+  const E_cycle_hull = U_cycle_tile * Ntiles;           // J (per cycle)
+  const M_raw = E_cycle_hull / c2;                      // kg
+  state.M_exotic_raw = M_raw;
 
-  /* ──────────────────────────────
-     Step 8: Exotic mass (physics-first)
-     E_tile_enh = |U_static| · (γ_geo^3) · Q_burst · γ_VdB · duty
-     M_raw_total = (E_tile_enh / c^2) · N_tiles
-     Optional calibration scales MASS ONLY (never γ_VdB).
-  ──────────────────────────────── */
-
-  // Use server-set γ_VdB (from Step 5)
-  const gammaVdBSeed = state.gammaVanDenBroeck;
-
-  // Geometric / DCE amplification
-  const gammaGeo  = state.gammaGeo ?? 26;
-  const geoAmp    = Math.pow(gammaGeo, 3);        // γ_geo^3
-  const qBurst    = state.qCavity ?? 1e9;         // use cavity Q as the DCE burst/Q factor
-
-  // Per-tile enhanced energy over a cycle (use tile-level duty)
-  const U_static_abs = Math.abs(state.U_static ?? 0);   // J (from calculateStaticCasimir)  
-  const E_tile_enh   = U_static_abs * geoAmp * qBurst * gammaVdBSeed * dutyTile;
-
-  // Raw physics totals
-  const massPerTile_kg = E_tile_enh / (C * C);
-  const M_raw_total_kg = massPerTile_kg * N_tiles;
-
-  state.M_exotic_raw   = Math.max(0, M_raw_total_kg);
-
-  // Model switch: raw physics vs paper-calibrated targets
-  const M_CALIBRATED = 1405; // kg (paper target)
-  state.M_exotic = (MODEL_MODE === 'calibrated') ? M_CALIBRATED : state.M_exotic_raw;
-  state.massCalibration = (MODEL_MODE === 'calibrated' && M_raw_total_kg > 0) 
-    ? (M_CALIBRATED / M_raw_total_kg) : 1;
+  if (state.modelMode === 'calibrated') {
+    const baseline = 1405; // kg – paper target
+    state.M_exotic = baseline;
+    state.massCalibration = baseline / Math.max(1e-12, M_raw);
+  } else {
+    state.M_exotic = M_raw;
+    state.massCalibration = 1.0;
+  }
   
   // Physics logging for debugging
   console.log("[PIPELINE]", {
@@ -376,24 +379,26 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const { Lx_m, Ly_m, Lz_m } = state.hull!;
   const L_long = Math.max(Lx_m, Ly_m, Lz_m);                // conservative: longest light-crossing
   const L_geom = Math.cbrt(Lx_m * Ly_m * Lz_m);             // geometric mean (volume-equivalent length)
-  // Reuse f_m and T_m from above power calculation
+  // Use modulation frequency for timing
+  const f_m_calc = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
+  const T_m_calc = 1 / f_m_calc;                            // s
 
   const T_long = L_long / C;   // s
   const T_geom = L_geom / C;   // s
 
-  state.TS_long = T_long / T_m;   // most conservative
-  state.TS_geom = T_geom / T_m;   // typical
-  state.TS_ratio = state.TS_long; // keep existing field = conservative
+  state.TS_long = T_long / T_m_calc;   // most conservative
+  state.TS_geom = T_geom / T_m_calc;   // typical
+  state.TS_ratio = state.TS_long;      // keep existing field = conservative
 
   // ----- Sector model (consistent across modes) -----
-  const TOTAL_SECTORS = 400;                           // Fixed logical partitioning
-  const activeSectors = Math.max(1, state.sectorStrobing);
-  const activeFraction = activeSectors / TOTAL_SECTORS;
-  const tilesPerSector = Math.floor(state.N_tiles / TOTAL_SECTORS);
-  const activeTiles = tilesPerSector * activeSectors;
+  const TOTAL_SECTORS = 400;                                    // Fixed logical partitioning
+  const activeSectorsModel = Math.max(1, state.sectorStrobing);
+  const activeFraction = activeSectorsModel / TOTAL_SECTORS;
+  const tilesPerSectorModel = Math.floor(state.N_tiles / TOTAL_SECTORS);
+  const activeTiles = tilesPerSectorModel * activeSectorsModel;
 
   // Export so /metrics can expose same numbers
-  state.__sectors = { TOTAL_SECTORS, activeSectors, activeFraction, tilesPerSector, activeTiles };
+  state.__sectors = { TOTAL_SECTORS, activeSectors: activeSectorsModel, activeFraction, tilesPerSector: tilesPerSectorModel, activeTiles };
 
   // ----- Ford–Roman proxy with time-sliced strobing -----
   // Instantaneous duty seen by a local observer inside an energized sector
@@ -402,11 +407,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Effective duty used in ζ after strobing fraction is applied
   const dutyEffectiveFR = dutyInstant * activeFraction;
 
-  // Quantum cavity Q used for the Ford–Roman inequality proxy
-  const Q_quantum = 1e10;
-
-  // ζ = 1 / (duty_eff * sqrt(Q))
-  state.zeta = 1 / (dutyEffectiveFR * Math.sqrt(Q_quantum));
+  // Quantum inequality parameter (Ford–Roman)
+  // Use instantaneous burst duty within the active sector; do NOT divide by sectors here.
+  const Q_quantum = 1e10; // adopted quantum Q for ζ proxy
+  const duty_FR   = Math.max(1e-12, duty_burst); // instantaneous
+  state.zeta = 1 / (duty_FR * Math.sqrt(Q_quantum));
   // Compliance
   state.fordRomanCompliance = state.zeta < 1.0;
 
@@ -418,15 +423,15 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   };
   
   // Update state with sector calculations
-  state.tilesPerSector = tilesPerSector;
-  state.activeSectors  = activeSectors;
+  state.tilesPerSector = tilesPerSectorModel;
+  state.activeSectors  = activeSectorsModel;
   state.activeTiles    = activeTiles;
   state.activeFraction = activeFraction;
   
   // Expose timing details for metrics API
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
-  state.dutyBurst           = dutyBurst;  // for client visibility
+  state.dutyBurst           = duty_burst;  // for client visibility
   state.dutyEffective_FR    = dutyEffectiveFR; // for client visibility
   state.modelMode           = MODEL_MODE; // for client consistency
   
