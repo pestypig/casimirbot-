@@ -369,6 +369,43 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // ✓ Paper-method physics: Mass = E_enh × N_tiles / c²
   // ✓ No change from old system: mass path was already using correct d_eff
 
+  // ---- Physics self-check (audit) -------------------------------------------
+  (function audit() {
+    const f_m   = (state.modulationFreq_GHz ?? 15) * 1e9;
+    const omega = 2 * PI * f_m;
+
+    const d_eff = state.dutyEff;                 // should be 0.01/400
+    const N     = state.N_tiles;
+    const UQ    = Math.abs(state.U_Q);           // should equal |U_geo| in raw core
+
+    // Expected power (W) from first principles
+    const P_tile_W = UQ * omega / Q_BURST;
+    const P_W_exp  = P_tile_W * N * d_eff;
+    const P_MW_exp = P_W_exp / 1e6;
+
+    // Expected mass (kg) from first principles
+    const U_abs  = Math.abs(state.U_static);
+    const geo3   = Math.pow(state.gammaGeo, 3);
+    const E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile
+    const M_exp  = (E_tile / (C*C)) * N;
+
+    // Tolerances (loose: just catching order-of-mag errors)
+    const near = (a:number,b:number,rtol=1e-3,atol=1e-6)=> Math.abs(a-b) <= (atol + rtol*Math.max(1,Math.abs(a),Math.abs(b)));
+
+    if (!near(state.P_avg, P_MW_exp, 5e-3)) {
+      console.warn("[AUDIT] P_avg mismatch",
+        { reported_MW: state.P_avg, expected_MW: P_MW_exp, ratio: (state.P_avg)/(P_MW_exp||1e-30) });
+      // Keep the expected physics authority:
+      state.P_avg = P_MW_exp;
+    }
+    if (!near(state.M_exotic, M_exp, 5e-3)) {
+      console.warn("[AUDIT] M_exotic mismatch",
+        { reported_kg: state.M_exotic, expected_kg: M_exp, ratio: (state.M_exotic)/(M_exp||1e-30) });
+      state.M_exotic = M_exp;
+      state.M_exotic_raw = M_exp;
+    }
+  })();
+
   // Optional cruise mode mass calibration (dial γ_VdB to hit 1405 kg target)
   if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
     const M_target = 1405;                            // 1.405×10³ kg target
@@ -389,6 +426,23 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
     massCal: state.massCalibration
   });
+
+  console.log("[REPORT]", JSON.stringify({
+    N_tiles: state.N_tiles,
+    dutyEff: state.dutyEff,
+    gammaGeo: state.gammaGeo,
+    gammaVdB: state.gammaVanDenBroeck,
+    Q_burst: Q_BURST,
+    gap_nm: state.gap_nm,
+    tileArea_cm2: state.tileArea_cm2,
+    U_static_J: state.U_static,
+    U_geo_J: state.U_geo,
+    U_Q_J: state.U_Q,
+    omega: 2*PI*(state.modulationFreq_GHz ?? 15)*1e9,
+    P_tile_W: Math.abs(state.U_Q) * (2*PI*(state.modulationFreq_GHz ?? 15)*1e9) / Q_BURST,
+    P_avg_MW: state.P_avg,
+    M_exotic_kg: state.M_exotic
+  }));
   
   /* ──────────────────────────────
      Additional metrics (derived)

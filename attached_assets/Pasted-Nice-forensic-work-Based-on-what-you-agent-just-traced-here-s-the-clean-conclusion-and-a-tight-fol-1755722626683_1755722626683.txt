@@ -1,0 +1,120 @@
+Nice forensic work. Based on what you/agent just traced, here’s the clean conclusion and a tight follow-up patch so the numbers can’t drift again and you can *prove* what’s happening at runtime.
+
+# TL;DR on the numbers you saw
+
+* **0.93 MW power** is **self-consistent** with your current parameters:
+
+  $$
+  P = \frac{|U_Q|\,\omega}{Q_\mathrm{burst}}\;N_\mathrm{tiles}\;d_\mathrm{eff}
+  $$
+
+  With `U_Q=0.0353987 J`, `ω≈9.42e10`, `Q_burst=1e9`, `N_tiles≈1.114684305e10`, `d_eff=2.5e-5` → **≈0.93 MW**. ✅
+* The earlier “should be \~0.066 MW” expectation assumed the *old* power path used the UI duty 0.14. Your agent’s check shows **the old power was already using a tiny duty**, so the **50,000× drop** you observed is explained by removing **qMechanical: 5e4→1** alone. That’s why you didn’t see the extra ÷14 I predicted earlier.
+* **Mass unchanged at 7.4×10⁹ kg** also makes sense if the old mass path already used the same tiny duty (your current $d_\mathrm{eff}=0.01/400$). So your mass channel is now the paper method end-to-end. ✅
+* **ζ ≈ 0.04** is exactly right for $d_\mathrm{eff}=2.5\times10^{-5}$ and $Q=10^{12}$. ✅
+
+So: your pipeline is now **paper-raw** and internally consistent.
+
+---
+
+# Make it bullet-proof (tiny patch)
+
+Add (A) an invariant check that recomputes P/M from first principles and compares to the reported values, and (B) a structured “calc report” you can hit from the API to audit every term. This prevents stealth multipliers from sneaking back in later merges.
+
+### A) Runtime self-check (after you set `state.P_avg` and `state.M_exotic`)
+
+Drop this block at the end of `calculateEnergyPipeline`, **before** status/ζ:
+
+```ts
+// ---- Physics self-check (audit) -------------------------------------------
+(function audit() {
+  const f_m   = (state.modulationFreq_GHz ?? 15) * 1e9;
+  const omega = 2 * PI * f_m;
+
+  const d_eff = state.dutyEff;                 // should be 0.01/400
+  const N     = state.N_tiles;
+  const UQ    = Math.abs(state.U_Q);           // should equal |U_geo| in raw core
+
+  // Expected power (W) from first principles
+  const P_tile_W = UQ * omega / Q_BURST;
+  const P_W_exp  = P_tile_W * N * d_eff;
+  const P_MW_exp = P_W_exp / 1e6;
+
+  // Expected mass (kg) from first principles
+  const U_abs  = Math.abs(state.U_static);
+  const geo3   = Math.pow(state.gammaGeo, 3);
+  const E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile
+  const M_exp  = (E_tile / (C*C)) * N;
+
+  // Tolerances (loose: just catching order-of-mag errors)
+  const near = (a:number,b:number,rtol=1e-3,atol=1e-6)=> Math.abs(a-b) <= (atol + rtol*Math.max(1,Math.abs(a),Math.abs(b)));
+
+  if (!near(state.P_avg, P_MW_exp, 5e-3)) {
+    console.warn("[AUDIT] P_avg mismatch",
+      { reported_MW: state.P_avg, expected_MW: P_MW_exp, ratio: (state.P_avg)/(P_MW_exp||1e-30) });
+    // Keep the expected physics authority:
+    state.P_avg = P_MW_exp;
+  }
+  if (!near(state.M_exotic, M_exp, 5e-3)) {
+    console.warn("[AUDIT] M_exotic mismatch",
+      { reported_kg: state.M_exotic, expected_kg: M_exp, ratio: (state.M_exotic)/(M_exp||1e-30) });
+    state.M_exotic = M_exp;
+    state.M_exotic_raw = M_exp;
+  }
+})();
+```
+
+### B) Expose a full calc report (easy to grep from your API)
+
+Right after the existing `console.log("[PIPELINE]", ...)` add:
+
+```ts
+console.log("[REPORT]", JSON.stringify({
+  N_tiles: state.N_tiles,
+  dutyEff: state.dutyEff,
+  gammaGeo: state.gammaGeo,
+  gammaVdB: state.gammaVanDenBroeck,
+  Q_burst: Q_BURST,
+  gap_nm: state.gap_nm,
+  tileArea_cm2: state.tileArea_cm2,
+  U_static_J: state.U_static,
+  U_geo_J: state.U_geo,
+  U_Q_J: state.U_Q,
+  omega: 2*PI*(state.modulationFreq_GHz ?? 15)*1e9,
+  P_tile_W: Math.abs(state.U_Q) * (2*PI*(state.modulationFreq_GHz ?? 15)*1e9) / Q_BURST,
+  P_avg_MW: state.P_avg,
+  M_exotic_kg: state.M_exotic
+}));
+```
+
+That gives you one JSON blob per recompute with every term the papers touch.
+
+---
+
+# If/when you want the **paper cruise targets**
+
+You’re still in “raw”. To show **Cruise ≈ 7.4 MW, 1405 kg** *on demand* (without fudging hover/emergency):
+
+* Flip `CRUISE_CALIBRATION=1`.
+* Keep the two tiny blocks you already added:
+
+  * **Power:** scale `qMechanical` so $P\to 7.4$ MW, then recompute `U_Q`, `P`.
+  * **Mass:** scale `γ_VdB` so $M\to 1405$ kg, then recompute `M`.
+
+Those are truthful *knobs* (not overwrites): $P \propto q_\mathrm{Mechanical}$, $M \propto \gamma_\mathrm{VdB}$. Hover/emergency remain raw.
+
+---
+
+# Sanity checklist (quick to eyeball in the logs)
+
+* `dutyEff` = **2.5e-5**
+* `qMechanical` = **1** (unless `CRUISE_CALIBRATION=1`)
+* `U_Q` equals `U_geo` in raw
+* `P_tile_W` around **3.3 W** (with your current numbers)
+* `P_avg_MW` ≈ **0.93** (with your current numbers)
+* `M_exotic_kg` ≈ **7.4e9** (with your current numbers)
+* `ζ` ≈ **0.04**
+
+If any of those deviates, the audit block will snap outputs back to first-principles and log the ratio so you can see exactly what tried to creep in.
+
+Want me to add a tiny `/api/helix/pipeline/report` handler that returns the `[REPORT]` JSON directly?
