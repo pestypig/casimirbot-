@@ -223,17 +223,6 @@ export function LiveEnergyPipeline({
   const P_avg_W = P_raw_W * combined_throttle; // Throttled power in W
   const P_total_realistic = P_avg_W / 1e6; // Convert W to MW
   
-  // Debug logging
-  console.log(`🔧 Power Calculation Debug (${currentMode.name} Mode):`);
-  console.log(`  P_loss_raw (per tile): ${P_loss_raw} W`);
-  console.log(`  N_tiles: ${N_tiles}`);
-  console.log(`  P_raw (total): ${P_raw_W} W`);
-  console.log(`  mode_duty: ${currentMode.duty}, sectors: ${currentMode.sectors}`);
-  console.log(`  Q_spoiling_factor: ${Q_spoiling_factor} (Q_idle=${Q_idle}, Q_cavity=${Q_cavity})`);
-  console.log(`  mode_throttle: ${mode_throttle}`);
-  console.log(`  combined_throttle: ${combined_throttle}`);
-  console.log(`  P_avg (throttled): ${P_avg_W} W`);
-  console.log(`  P_total_realistic (final): ${P_total_realistic} MW`);
   // Step 6 view values from the server (authoritative)
   const tauLC = (metrics as any)?.tauLC ?? NaN;     // s
   const T_m   = (metrics as any)?.T_m ?? NaN;       // s  
@@ -245,18 +234,6 @@ export function LiveEnergyPipeline({
   
   // Step 11: Quantum Inequality Margin (Dynamic based on mode)
   const zeta = currentMode.duty > 0 ? 1 / (currentMode.duty * Math.sqrt(Q_mechanical)) : Infinity; // ζ (Ford-Roman bound)
-  
-  // Debug logging (after all calculations complete)
-  console.log(`🔍 Static Energy Check: U_static = ${U_static.toExponential(3)} J (target: ~-6.5×10⁻⁵ J)`);
-  console.log(`🔍 Expected vs Actual: Target U_Q ≃ 260 J, Actual U_Q = ${U_Q.toExponential(3)} J`);
-  console.log(`🔍 Scale Analysis: U_Q/260 = ${(Math.abs(U_Q)/260).toExponential(3)}× too large`);
-  console.log(`🔍 Volume Check: V_cavity = ${V_cavity.toExponential(3)} m³, A_tile = ${A_tile.toExponential(3)} m², a = ${a.toExponential(3)} m`);
-  console.log(`🔍 Energy Density: u_casimir = ${u_casimir.toExponential(3)} J/m³`);
-  console.log(`🔍 Exotic Mass: M_exotic_total = ${M_exotic_total.toExponential(3)} kg (target: 32.21 kg)`);
-  console.log(`🔍 N_tiles calculation: A_hull_needle=${A_hull_needle.toExponential(2)} m², A_tile_slider=${A_tile*1e4} cm², N_tiles=${N_tiles.toExponential(2)}`);
-  console.log(`🔍 Energy calculation components: U_static=${U_static.toExponential(3)}, U_geo=${U_geo.toExponential(3)}, U_Q=${U_Q.toExponential(3)}, U_cycle_base=${U_cycle_base.toExponential(3)}, U_cycle=${U_cycle.toExponential(3)}`);
-  console.log(`🔍 Energy sequence check: γ=${gamma_geo}, Q_mechanical=${Q_mechanical}, Q_cavity=${Q_cavity}, d_mode=${d_mode}, γ_pocket=${gamma_pocket.toExponential(2)}`);
-  console.log(`🔍 Mass calculation: M_per_tile=${(Math.abs(U_cycle) / (c * c)).toExponential(3)} kg, N_tiles=${N_tiles.toFixed(0)}, M_total=${M_exotic_total.toExponential(3)} kg`);
   
   // Handle mode changes and notify parent
   const handleModeChange = (newMode: string) => {

@@ -309,12 +309,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   state.P_loss_raw    = P_tile_W;   // W per tile (corrected)
   
-  // Model switch: raw physics vs paper-calibrated power targets
-  const powerTargets = { hover: 83.3, cruise: 7.4, emergency: 297.5, standby: 0 };
+  // Always use raw physics - no power override
   const P_raw_MW = P_total_W / 1e6;  // Raw physics power
-  state.P_avg = (MODEL_MODE === 'calibrated') 
-    ? (powerTargets as any)[state.currentMode] ?? 83.3
-    : P_raw_MW;
+  state.P_avg = P_raw_MW;
 
   /* ──────────────────────────────
      Step 8: Exotic mass (physics-first) - FIXED to use same d_eff
