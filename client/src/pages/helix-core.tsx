@@ -42,6 +42,19 @@ import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import { HelpCircle } from "lucide-react";
 
+// --- Safe numeric formatters ---
+const isFiniteNumber = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v);
+
+const fmt = (v: unknown, digits = 3, fallback = '—') =>
+  isFiniteNumber(v) ? v.toFixed(digits) : fallback;
+
+const fexp = (v: unknown, digits = 1, fallback = '—') =>
+  isFiniteNumber(v) ? v.toExponential(digits) : fallback;
+
+const fint = (v: unknown, fallback = '0') =>
+  isFiniteNumber(v) ? Math.round(v).toLocaleString() : fallback;
+
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
   TILE_GRID: "Casimir Tile Grid",
@@ -65,9 +78,9 @@ interface EnergyPipelineState {
   P_avg?: number;
   zeta?: number;
   TS_ratio?: number;
-  fordRomanCompliance?: string;
-  natarioConstraint?: string;
-  curvatureLimit?: string;
+  fordRomanCompliance?: boolean; // was string
+  natarioConstraint?: boolean;   // was string
+  curvatureLimit?: boolean;      // was string
   U_cycle?: number;
   U_static?: number;
   U_geo?: number;
@@ -75,6 +88,8 @@ interface EnergyPipelineState {
   P_loss_raw?: number;
   N_tiles?: number;
   modulationFreq_GHz?: number;
+  M_exotic?: number;
+  gammaVanDenBroeck?: number;
 }
 
 interface SystemMetrics {
@@ -698,7 +713,11 @@ export default function HelixCore() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles.toLocaleString() || '2,800,000'}</p>
+                  <p className="text-lg font-mono text-cyan-400">
+                    {isFiniteNumber(systemMetrics?.activeTiles)
+                      ? systemMetrics!.activeTiles.toLocaleString()
+                      : '2,800,000'}
+                  </p>
                   {systemMetrics?.sectorStrobing && (
                     <p className="text-xs text-slate-500 mt-1">
                       {systemMetrics.sectorStrobing} sectors strobing
@@ -720,7 +739,9 @@ export default function HelixCore() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-lg font-mono text-yellow-400">{pipeline?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
+                  <p className="text-lg font-mono text-yellow-400">
+                    {fmt(pipeline?.P_avg ?? systemMetrics?.energyOutput, 1, '83.3')} MW
+                  </p>
                 </div>
               </div>
               
@@ -740,7 +761,9 @@ export default function HelixCore() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <p className="text-lg font-mono text-purple-400">{pipeline?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
+                  <p className="text-lg font-mono text-purple-400">
+                    {fmt(pipeline?.M_exotic ?? systemMetrics?.exoticMass, 0, '1405')} kg
+                  </p>
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
                   <p className="text-xs text-slate-400">System Status</p>
@@ -753,9 +776,9 @@ export default function HelixCore() {
                 <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div>Duty: {(pipeline.dutyCycle * 100).toFixed(1)}%</div>
-                    <div>Sectors: {pipeline.sectorStrobing}</div>
-                    <div>Q-Spoil: {pipeline.qSpoilingFactor?.toFixed(3)}</div>
+                    <div>Duty: {fmt((pipeline.dutyCycle ?? 0) * 100, 1, '0')}%</div>
+                    <div>Sectors: {fint(pipeline.sectorStrobing, '0')}</div>
+                    <div>Q-Spoil: {fmt(pipeline.qSpoilingFactor, 3, '1.000')}</div>
                     <Tooltip
                       label={
                         <div className="space-y-1">
@@ -773,7 +796,11 @@ export default function HelixCore() {
                       }
                     >
                       <span className="cursor-help underline decoration-dotted">
-                        γ<sub>VdB</sub>: {((pipelineState as any).gammaVanDenBroeck || 286000).toExponential(1)}
+                        γ<sub>VdB</sub>: {fexp(
+                          (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
+                          1,
+                          '2.9e+5'
+                        )}
                       </span>
                     </Tooltip>
                   </div>
@@ -881,9 +908,17 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Ford-Roman Inequality</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">ζ = {pipelineState?.zeta?.toFixed(3) || systemMetrics?.fordRoman.value.toFixed(3) || '0.032'}</span>
-                      <Badge className={`${(pipelineState?.fordRomanCompliance || systemMetrics?.fordRoman.status === 'PASS') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {pipelineState?.fordRomanCompliance ? 'PASS' : systemMetrics?.fordRoman.status || 'PASS'}
+                      <span className="font-mono text-sm">
+                        ζ = {fmt(pipelineState?.zeta ?? systemMetrics?.fordRoman?.value, 3, '0.032')}
+                      </span>
+                      <Badge
+                        className={`${
+                          (pipelineState?.fordRomanCompliance ?? (systemMetrics?.fordRoman?.status === 'PASS'))
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {(pipelineState?.fordRomanCompliance ?? (systemMetrics?.fordRoman?.status === 'PASS')) ? 'PASS' : 'FAIL'}
                       </Badge>
                     </div>
                   </div>
@@ -891,9 +926,15 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Natário Zero-Expansion</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">∇·ξ = {systemMetrics?.natario.value || 0}</span>
-                      <Badge className={`${(pipelineState?.natarioConstraint || systemMetrics?.natario.status === 'VALID') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {pipelineState?.natarioConstraint ? 'VALID' : systemMetrics?.natario.status || 'VALID'}
+                      <span className="font-mono text-sm">∇·ξ = {fmt(systemMetrics?.natario?.value, 3, '0')}</span>
+                      <Badge
+                        className={`${
+                          (pipelineState?.natarioConstraint ?? (systemMetrics?.natario?.status === 'VALID'))
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {(pipelineState?.natarioConstraint ?? (systemMetrics?.natario?.status === 'VALID')) ? 'VALID' : 'INVALID'}
                       </Badge>
                     </div>
                   </div>
@@ -901,7 +942,14 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Curvature Threshold</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">R {'<'} {(pipelineState && Math.abs(pipelineState.U_cycle) / (3e8 * 3e8))?.toExponential(0) || systemMetrics?.curvatureMax.toExponential(0) || '1e-21'}</span>
+                      <span className="font-mono text-sm">
+                        R {'<'} {(() => {
+                          const R_est = isFiniteNumber(pipelineState?.U_cycle)
+                            ? Math.abs(pipelineState.U_cycle) / (9e16) // c^2 ≈ 9e16 (safe since checked)
+                            : systemMetrics?.curvatureMax;
+                          return fexp(R_est, 0, '1e-21');
+                        })()}
+                      </span>
                       <Badge className={`${pipelineState?.curvatureLimit ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                         {pipelineState?.curvatureLimit ? 'SAFE' : 'WARN'}
                       </Badge>
@@ -911,7 +959,9 @@ export default function HelixCore() {
                   <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                     <span className="text-sm">Time-Scale Separation</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">TS = {pipelineState?.TS_ratio?.toFixed(1) || systemMetrics?.timeScaleRatio.toFixed(1) || '4102.7'}</span>
+                      <span className="font-mono text-sm">
+                        TS = {fmt(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio, 1, '4102.7')}
+                      </span>
                       <Badge className={`${(pipelineState && pipelineState.TS_ratio < 1) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                         {(pipelineState && pipelineState.TS_ratio < 1) ? 'SAFE' : 'CHECK'}
                       </Badge>
@@ -924,14 +974,14 @@ export default function HelixCore() {
                   <div className="mt-4 p-3 bg-slate-950 rounded-lg">
                     <p className="text-xs text-slate-400 mb-2">Energy Pipeline Values:</p>
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
-                      <div>U_static: {pipelineState.U_static.toExponential(2)} J</div>
-                      <div>U_geo: {pipelineState.U_geo.toExponential(2)} J</div>
-                      <div>U_Q: {pipelineState.U_Q.toExponential(2)} J</div>
-                      <div>U_cycle: {pipelineState.U_cycle.toExponential(2)} J</div>
-                      <div>P_loss: {pipelineState.P_loss_raw.toFixed(3)} W/tile</div>
-                      <div>N_tiles: {pipelineState.N_tiles.toExponential(2)}</div>
+                      <div>U_static: {fexp(pipelineState?.U_static, 2, '—')} J</div>
+                      <div>U_geo: {fexp(pipelineState?.U_geo, 2, '—')} J</div>
+                      <div>U_Q: {fexp(pipelineState?.U_Q, 2, '—')} J</div>
+                      <div>U_cycle: {fexp(pipelineState?.U_cycle, 2, '—')} J</div>
+                      <div>P_loss: {fmt(pipelineState?.P_loss_raw, 3, '—')} W/tile</div>
+                      <div>N_tiles: {fexp(pipelineState?.N_tiles, 2, '—')}</div>
                       <div className="col-span-2 text-yellow-300 border-t border-slate-700 pt-2 mt-1">
-                        γ_VdB: {pipelineState.gammaVanDenBroeck.toExponential(2)} (Van den Broeck)
+                        γ_VdB: {fexp(pipelineState?.gammaVanDenBroeck, 2, '—')} (Van den Broeck)
                       </div>
                     </div>
                   </div>
