@@ -1,0 +1,118 @@
+Below is a minimal, surgical patch against your `WarpEngine` class that brings the renderer into exact alignment with the updated HELIX-CORE pipeline. It:
+
+ • Defines the paper constants exactly once  
+ • Drops all femtosecond‐burst math in favor of a fixed 10 µs/1 ms duty  
+ • Uses Q_BURST = 1e9 and GAMMA_VDB = 1e11  
+ • Computes effective duty and β exactly as in the pipeline  
+ • Removes per‐mode “fudge” blocks and log‐compress hacks  
+
+Apply these changes in your source:
+
+```diff
+--- a/src/warp-engine.js
++++ b/src/warp-engine.js
+@@ // --- Grid defaults (scientifically scaled for needle hull) ---
+ const GRID_DEFAULTS = {
+   spanPadding: …,
+   minSpan: 2.6,
+   divisions: 100
+ };
+
++// ── Paper-backed physics constants ─────────────────────────────────────
++const TOTAL_SECTORS    = 400;     // fixed azimuthal partition
++const BURST_DUTY_LOCAL = 0.01;    // 10 µs per 1 ms
++const Q_BURST          = 1e9;     // cavity Q during 10 µs burst
++const GAMMA_VDB        = 1e11;    // Van-den-Broeck seed boost
+
+@@ _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+-        // ---- Physics-accurate amplitude calculation (matches energy pipeline) ----
++        // ---- Physics-accurate amplitude calculation (paper-correct) ----
+
+-        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
+-        const geoAmp = Math.pow(gammaGeo, 3);
+-        const qSpoil = Math.max(1e-9, bubbleParams.qSpoilingFactor || 1);
+-        const vdbAmp = Math.max(1.0,
+-                        bubbleParams.gammaVanDenBroeck ||
+-                        bubbleParams.gammaVdB ||
+-                        2.86e5);
+
+-        // 2) Duty / strobing …
+-        const sectors = Math.max(1, bubbleParams.sectors || bubbleParams.sectorStrobing || 1);
+-        const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16);
+-        const dutyInstEff = dutyBurst_fs * (1 / sectors);
+-        const dutyGlobal  = Math.max(1e-12, bubbleParams.dutyCycle || 0.14);
+-        const dutyAvgEff  = dutyGlobal * qSpoil * (1 / sectors);
+
+-        // 3) Build an amplitude chain…
+-        const A_phys      = geoAmp * qSpoil * vdbAmp;
+-        const norm        = this.uniforms?.vizNorm || 1e-9;
+-        const A_vis_base  = A_phys * norm;
+-        const viewAvg     = bubbleParams.viewAvg || 1.0;
+-        const A_inst      = A_vis_base * dutyInstEff;
+-        const A_avg       = A_vis_base * dutyAvgEff;
+-        const A_used      = viewAvg >= 0.5 ? A_avg : A_inst;
+-        const gain        = this.uniforms?.vizGain || 4.0;
+-        const betaVis     = A_used * gain;
++        // 1) Pure pipeline chain: γ_geo^3 × q_spoil × γ_VdB × duty_eff
++        const gammaGeo    = bubbleParams.gammaGeo    || 26;
++        const geoAmp      = Math.pow(gammaGeo, 3);    // γ_geo^3
++        const qSpoil      = bubbleParams.qSpoilingFactor || 1;
++        const vdbAmp      = bubbleParams.gammaVanDenBroeck || GAMMA_VDB;
++
++        // 2) effective ship-wide duty: 10 µs/1 ms × (active sectors / 400)
++        const secsActive  = bubbleParams.sectorStrobing || 1;
++        const d_eff       = BURST_DUTY_LOCAL * (secsActive / TOTAL_SECTORS);
++
++        // 3) final physics amplitude
++        const A_phys      = geoAmp * qSpoil * vdbAmp * d_eff;
++        const betaVis     = A_phys;  // optionally multiply vizGain here if you still want a global visual boost
++
++        console.log(`🔗 β_phys: γ³=${geoAmp.toExponential(2)}, q=${qSpoil}, γVdB=${vdbAmp.toExponential(2)}, d=${d_eff.toFixed(3)} → ${betaVis.toExponential(2)}`);
+@@ _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+-            if (mode === 'standby') {
+-                disp = 0;
+-            } else {
+-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+-                disp *= 2.0;
+-                const maxPush = 0.15;
+-                const softClamp = (x,m) => m * Math.tanh(x/m);
+-                disp = softClamp(disp, maxPush);
+-                const prev = this._prevDisp[i/3] || disp;
+-                disp = prev + this._dispAlpha*(disp - prev);
+-                this._prevDisp[i/3] = disp;
+-            }
++            // apply canonical curvature displacement + tilt
++            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
++            // clamp to 10% of shell radius
++            const maxPush = 0.10;
++            disp = maxPush * Math.tanh(disp / maxPush);
++            // temporal smoothing
++            const idx  = i/3;
++            const prev = this._prevDisp[idx] || disp;
++            const curr = prev + this._dispAlpha*(disp - prev);
++            this._prevDisp[idx] = curr;
++            disp = curr;
+@@ computeDiagnostics(){
+-        const gammaGeo     = U.gammaGeo || 0;
+-        const Qburst       = (U.Qburst ?? U.cavityQ) || 0;
+-        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+-        const gammaVdB     = U.gammaVdB || 1.0;
++        const gammaGeo = U.gammaGeo       || 0;
++        const Qburst   = Q_BURST;
++        const d_eff    = BURST_DUTY_LOCAL*((U.sectorStrobing||1)/TOTAL_SECTORS);
++        const gammaVdB = GAMMA_VDB;
+@@ computeDiagnostics(){
+-        const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
+-        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
++        const betaInst = Math.pow(gammaGeo,3) * Qburst * gammaVdB * d_eff;
++        const betaAvg  = betaInst; 
+```
+
+**In summary**  
+ • Top-of-file you now have the one source-of-truth constants  
+ • `_warpGridVertices` uses exactly  
+    β_phys = γ_geo³ × q_spoil × γ_VdB × d_eff  
+ • No more fs math, no more 2.86e5 fallback, no more per-mode hacks  
+ • Diagnostics now report the true pipeline βₙₛₜ and β_avg  
+
+After this patch, your WebGL grid will bend with the same raw, un-fudged physics as the HELIX-CORE pipeline.

@@ -6,6 +6,12 @@
 //  FIXED: Orange blob issue with proper Natário curvature scaling
 //====================================================================
 
+// ── Paper-backed physics constants ─────────────────────────────────────
+const TOTAL_SECTORS    = 400;     // fixed azimuthal partition
+const BURST_DUTY_LOCAL = 0.01;    // 10 µs per 1 ms
+const Q_BURST          = 1e9;     // cavity Q during 10 µs burst
+const GAMMA_VDB        = 1e11;    // Van-den-Broeck seed boost
+
 class WarpEngine {
     constructor(canvas) {
         try {
@@ -702,31 +708,25 @@ class WarpEngine {
         console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
     }
 
-    // Authentic Natário spacetime curvature implementation with FIXED scaling
+    // Authentic Natário spacetime curvature implementation (paper-correct)
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // Use fixed bubble radius with proper normalization
-        const bubbleRadius_nm = this.bubbleRadius_nm;  // 10 µm fixed bubble
-        const sagRclip = bubbleRadius_nm * this.normClip;  // ≈ 0.25 clip-units
-        
-        // Use computed β₀ from amplifier chain
-        const beta0 = bubbleParams.beta0;
-        if (beta0 === undefined) {
-            console.warn("No beta0 supplied to _warpGridVertices - skipping warp");
-            return;
-        }
-        
-        // Get realistic power for scaling deformation amplitude
-        const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
-        
-        const tsRatio = bubbleParams.tsRatio || 4100;
-        console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
-        console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
-        console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
-        console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
-        console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
-        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
-        console.log(`  normClip=${this.normClip.toExponential(3)} (nm→clip conversion)`);
-        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
+        // ---- Physics-accurate amplitude calculation (paper-correct) ----
+
+        // 1) Pure pipeline chain: γ_geo^3 × q_spoil × γ_VdB × duty_eff
+        const gammaGeo    = bubbleParams.gammaGeo    || 26;
+        const geoAmp      = Math.pow(gammaGeo, 3);    // γ_geo^3
+        const qSpoil      = bubbleParams.qSpoilingFactor || 1;
+        const vdbAmp      = bubbleParams.gammaVanDenBroeck || GAMMA_VDB;
+
+        // 2) effective ship-wide duty: 10 µs/1 ms × (active sectors / 400)
+        const secsActive  = bubbleParams.sectorStrobing || 1;
+        const d_eff       = BURST_DUTY_LOCAL * (secsActive / TOTAL_SECTORS);
+
+        // 3) final physics amplitude
+        const A_phys      = geoAmp * qSpoil * vdbAmp * d_eff;
+        const betaVis     = A_phys;  // optionally multiply vizGain here if you still want a global visual boost
+
+        console.log(`🔗 β_phys: γ³=${geoAmp.toExponential(2)}, q=${qSpoil}, γVdB=${vdbAmp.toExponential(2)}, d=${d_eff.toFixed(3)} → ${betaVis.toExponential(2)}`);
 
         for (let i = 0; i < vtx.length; i += 3) {
             // Work directly in clip-space coordinates
@@ -737,26 +737,31 @@ class WarpEngine {
             // Use original Y coordinate for each vertex, not a single constant
             const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
             
-            // Natário warp bubble profile (now with FIXED units)
+            // Natário warp bubble profile 
+            const sagRclip = 0.25; // Fixed clip-space radius
             const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-            const beta = beta0 * prof;              // |β| shift vector magnitude
+            const gridK = 0.1;
+            const wallWin = 1.0;
+            const front = 1.0;
+            const sgn = 1.0;
+            const gaussian_local = prof;
 
-            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
-            const lateralK = 0.10 * sagRclip;       // max 10% of radius
-            const verticalK = 0.10 * sagRclip;      // max 10% of radius
-            
-            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
-            const push = beta * lateralK;           // use clamped coefficient
-            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+            // apply canonical curvature displacement + tilt
+            let disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+            // clamp to 10% of shell radius
+            const maxPush = 0.10;
+            disp = maxPush * Math.tanh(disp / maxPush);
+            // temporal smoothing
+            const idx  = i/3;
+            const prev = this._prevDisp?.[idx] || disp;
+            const curr = prev + (this._dispAlpha || 0.1)*(disp - prev);
+            if (!this._prevDisp) this._prevDisp = {};
+            this._prevDisp[idx] = curr;
+            disp = curr;
 
-            vtx[i] = x * scale;                      // X warped laterally
-            vtx[i + 2] = z * scale;                  // Z warped laterally
-            
-            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
-            const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
-            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
-            vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
+            vtx[i] = x + disp * (r > 1e-6 ? x/r : 0);     // X lateral displacement
+            vtx[i + 2] = z + disp * (r > 1e-6 ? z/r : 0); // Z lateral displacement
+            vtx[i + 1] = y_original + disp * 0.5;         // Y vertical displacement
         }
         
         // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
