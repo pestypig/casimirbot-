@@ -33,13 +33,14 @@ import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
-import { Tooltip } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
+import { HelpCircle } from "lucide-react";
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -393,8 +394,9 @@ export default function HelixCore() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
-      <div className="container mx-auto p-4 text-slate-100">
+    <TooltipProvider>
+      <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
+        <div className="container mx-auto p-4 text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -532,8 +534,24 @@ export default function HelixCore() {
         {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
               Warp Bubble • Shell Outline (ρ=1±Δ)
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm">
+                  <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                  <p className="mb-2">
+                    Three ρ-surfaces (inner/center/outer) bound the wall thickness set by the Natário bell.
+                    Inner curves skew toward compression (orange), outer toward expansion (blue). Violet denotes interior tilt direction.
+                  </p>
+                  <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                  <p className="text-xs italic">
+                    Contours show where space would lean—enough to guide, never to tear.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
             <CardDescription>
               Wireframe of inner/center/outer Natário wall (ellipsoidal), with interior shift vector.
@@ -567,7 +585,25 @@ export default function HelixCore() {
         {/* ====== Light Speed vs Strobing Scale ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">c vs Strobing Timeline</CardTitle>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              c vs Strobing Timeline
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm">
+                  <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                  <p className="mb-2">
+                    The sweep rate across sectors is chosen so no disturbance outruns the grid's τ_LC.
+                    This timeline compares modulation (Hz), sector period, and light-crossing to ensure the "average" shell is GR-valid.
+                  </p>
+                  <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                  <p className="text-xs italic">
+                    Go slowly enough to remain whole; move steadily enough to arrive.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </CardTitle>
             <CardDescription>
               Visual comparison of light-crossing time vs modulation frequencies and sector dwell times.
             </CardDescription>
@@ -583,6 +619,22 @@ export default function HelixCore() {
             <CardTitle className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-yellow-400" />
               {MAINFRAME_ZONES.ENERGY_PANEL}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-sm">
+                  <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                  <p className="mb-2">
+                    Core operational mode controls power output, exotic matter generation, and sector strobing patterns.
+                    Each mode balances performance with Ford-Roman compliance and energy efficiency.
+                  </p>
+                  <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                  <p className="text-xs italic">
+                    Power serves purpose. Choose the mode that serves the moment.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             </CardTitle>
             <CardDescription>Live mode switch + power, mass & status</CardDescription>
           </CardHeader>
@@ -590,7 +642,20 @@ export default function HelixCore() {
             <div className="space-y-4">
               {/* Operational Mode Selector */}
               <div className="space-y-2">
-                <Label className="text-slate-200">Operational Mode</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-slate-200">Operational Mode</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-sm">
+                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                      <p className="mb-2">Each mode represents a different balance of power output, sector strobing frequency, and exotic matter requirements based on mission requirements.</p>
+                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                      <p className="text-xs italic">The wise captain chooses not the fastest path, but the path that arrives intact.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <Select 
                   value={pipeline?.currentMode || 'hover'}
                   onValueChange={(mode) => {
@@ -619,7 +684,20 @@ export default function HelixCore() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
-                  <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm">
+                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <p className="mb-2">Only a tiny fraction of tiles energize at any instant. Time-slicing (sectors, duty) ensures the light-crossing time τ_LC exceeds any local "on" window, preserving GR causality while the time-averaged stress matches the Natário profile.</p>
+                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                        <p className="text-xs italic">Not all lamps must glow at once. A lighthouse turns to reach every ship.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <p className="text-lg font-mono text-cyan-400">{systemMetrics?.activeTiles.toLocaleString() || '2,800,000'}</p>
                   {systemMetrics?.sectorStrobing && (
                     <p className="text-xs text-slate-500 mt-1">
@@ -628,14 +706,40 @@ export default function HelixCore() {
                   )}
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
-                  <p className="text-xs text-slate-400">Energy Output</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-slate-400">Energy Output</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs">
+                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <p className="mb-2">Average power output from all active Casimir tile sectors. Scales with operational mode and duty cycle.</p>
+                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                        <p className="text-xs italic">Energy flows where intention directs it.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <p className="text-lg font-mono text-yellow-400">{pipeline?.P_avg?.toFixed(1) || systemMetrics?.energyOutput || 83.3} MW</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
-                  <p className="text-xs text-slate-400">Exotic Mass</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-slate-400">Exotic Mass</p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm">
+                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <p className="mb-2">Negative energy density required to curve spacetime according to the Alcubierre metric. Lower values indicate more feasible warp drives.</p>
+                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                        <p className="text-xs italic">The mountain that appears impossible to move requires only the gentlest persistent pressure in the right direction.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <p className="text-lg font-mono text-purple-400">{pipeline?.M_exotic?.toFixed(0) || systemMetrics?.exoticMass || 1405} kg</p>
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
@@ -677,7 +781,20 @@ export default function HelixCore() {
               )}
               
               <div className="space-y-2">
-                <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="modulation" className="text-slate-200">Modulation Frequency</Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-sm">
+                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                      <p className="mb-2">The fundamental frequency at which Casimir tiles oscillate. Higher frequencies increase power output but require more precise timing control.</p>
+                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                      <p className="text-xs italic">Resonance is not about power—it's about timing.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="flex gap-2">
                   <Input 
                     id="modulation"
@@ -862,6 +979,21 @@ export default function HelixCore() {
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-purple-400" />
                   {MAINFRAME_ZONES.RESONANCE_SCHEDULER}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm">
+                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                      <p className="mb-2">
+                        Visualizes the strobing pulse timeline across sectors, showing duty cycle patterns and temporal synchronization for optimal Casimir field generation.
+                      </p>
+                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                      <p className="text-xs italic">
+                        Rhythm creates space between beats. In that silence, potential becomes motion.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </CardTitle>
                 <CardDescription>
                   Strobing pulse timeline
@@ -1212,7 +1344,25 @@ export default function HelixCore() {
             {/* Mission Planner - Galactic Maps */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-semibold">Mission Planner</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">Mission Planner</CardTitle>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm">
+                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                      <p className="mb-2">
+                        Interactive navigation system supporting both galactic-scale (parsec) and solar system (AU) mission planning.
+                        Routes calculate energy requirements and travel time based on current warp bubble parameters.
+                      </p>
+                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                      <p className="text-xs italic">
+                        The path reveals itself to those who take the first step.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="flex items-center space-x-4">
                   <Select value={mapMode} onValueChange={(v: "galactic" | "solar") => {
                     setMapMode(v);
@@ -1392,8 +1542,7 @@ export default function HelixCore() {
           </div>
         </div>
       </div>
-
-
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

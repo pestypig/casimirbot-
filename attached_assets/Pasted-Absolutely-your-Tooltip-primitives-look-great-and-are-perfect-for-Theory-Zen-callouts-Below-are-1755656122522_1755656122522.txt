@@ -1,0 +1,201 @@
+Absolutely—your Tooltip primitives look great and are perfect for “Theory + Zen” callouts. Below are ready-to-paste snippets for each of the new/updated panels. Drop them right next to the panel labels/titles (or inline with specific fields). They use your `Tooltip`, `TooltipTrigger`, and `TooltipContent` exactly as defined.&#x20;
+
+> Minimal setup (do this once near the top-level of the page, e.g., in `helix-core.tsx`):
+
+```tsx
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { HelpCircle } from "lucide-react";
+
+// Wrap your page (once):
+<TooltipProvider>
+  {/* ...rest of the page */}
+</TooltipProvider>
+```
+
+
+
+---
+
+### 1) Amplification Chain (γ-geo × qSpoil × γ-VdB)
+
+Place by the “Amplification Chain” title or next to the computed product:
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className="font-semibold">Amplification Chain</span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-sm">
+      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+      <p className="mb-2">
+        The chain multiplies the geometric shaping gain (γ<sub>geo</sub>), duty-aware Q-spoiling (ΔA/A),
+        and Van den Broeck pocket factor (γ<sub>VdB</sub>). In practice, γ<sub>geo</sub> modulates how sharply the
+        Natário bell is realized; q-spoiling bounds peak stored energy for stability; γ<sub>VdB</sub> encodes the
+        “pocket” geometry that lets a small cabin project a larger effective bubble.
+      </p>
+      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+      <p className="text-xs italic">
+        Form × restraint × intention. Power becomes usable only when it passes through all three.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+### 2) Sector Strobing Inspector (c vs sector cadence)
+
+Attach to the panel title or “activeSectors / tilesPerSector” label:
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className="font-semibold">Sector Strobing Inspector</span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-sm">
+      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+      <p className="mb-2">
+        Only a tiny fraction of tiles energize at any instant. Time-slicing (sectors, duty) ensures the
+        light-crossing time τ<sub>LC</sub> exceeds any local “on” window, preserving GR causality while
+        the time-averaged stress matches the Natário profile.
+      </p>
+      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+      <p className="text-xs italic">
+        Not all lamps must glow at once. A lighthouse turns to reach every ship.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+### 3) Shift Vector • Interior Gravity (ε<sub>tilt</sub>, **β**<sub>tilt</sub>)
+
+Place by the “Shift Vector” header or next to ε<sub>tilt</sub>:
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className="font-semibold">Shift Vector • Interior Gravity</span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-sm">
+      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+      <p className="mb-2">
+        A gentle tilt of the shift vector inside the ρ≲1 region approximates uniform “down” (g<sub>eff</sub>).
+        Parameter ε<sub>tilt</sub> ≈ (g<sub>target</sub>·R<sub>geom</sub>)/c²; direction is the interior **β**<sub>tilt</sub>.
+        The violet arrow in the visual marks this field’s orientation.
+      </p>
+      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+      <p className="text-xs italic">
+        Gravity begins as a direction to serve—then becomes a way to stand.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+### 4) c-vs-Strobing Timeline (live cadence)
+
+Attach to your timeline header:
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className="font-semibold">c vs Strobing Timeline</span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-sm">
+      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+      <p className="mb-2">
+        The sweep rate across sectors is chosen so no disturbance outruns the grid’s τ<sub>LC</sub>.
+        This timeline compares modulation (Hz), sector period, and light-crossing to ensure the “average” shell is GR-valid.
+      </p>
+      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+      <p className="text-xs italic">
+        Go slowly enough to remain whole; move steadily enough to arrive.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+### 5) Shell Outline Viewer (ρ-surfaces + legend)
+
+Add to the “Shell Outline” panel header:
+
+```tsx
+<div className="flex items-center gap-2">
+  <span className="font-semibold">Warp Bubble • Shell Outline</span>
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+    </TooltipTrigger>
+    <TooltipContent side="top" className="max-w-sm">
+      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+      <p className="mb-2">
+        Three ρ-surfaces (inner/center/outer) bound the wall thickness set by the Natário bell.
+        Inner curves skew toward compression (orange), outer toward expansion (blue). Violet denotes interior tilt direction.
+      </p>
+      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+      <p className="text-xs italic">
+        Contours show where space would lean—enough to guide, never to tear.
+      </p>
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+### 6) Color Key (tiny helper panel)
+
+You can reuse your color semantics from the visualizer:
+
+```tsx
+<div className="flex items-center gap-3 text-xs text-slate-300">
+  <div className="flex items-center gap-1">
+    <span className="inline-block w-3 h-3 rounded-sm bg-[#60a5fa]" />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">Expansion (blue)</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">Outward curvature bias on outer ρ-surface.</TooltipContent>
+    </Tooltip>
+  </div>
+  <div className="flex items-center gap-1">
+    <span className="inline-block w-3 h-3 rounded-sm bg-[#fb923c]" />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">Compression (orange)</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">Inward curvature bias on inner ρ-surface.</TooltipContent>
+    </Tooltip>
+  </div>
+  <div className="flex items-center gap-1">
+    <span className="inline-block w-3 h-3 rounded-sm bg-[#a78bfa]" />
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help">Shift (violet)</span>
+      </TooltipTrigger>
+      <TooltipContent side="top">Interior tilt direction (artificial gravity).</TooltipContent>
+    </Tooltip>
+  </div>
+</div>
+```
+
+---
+
+If you’d like, I can also wire these directly into your existing panels (with exact file/line pointers)—but you can drop any of the snippets above as-is next to the relevant labels. They will render using your current Radix-based Tooltip styles.&#x20;
