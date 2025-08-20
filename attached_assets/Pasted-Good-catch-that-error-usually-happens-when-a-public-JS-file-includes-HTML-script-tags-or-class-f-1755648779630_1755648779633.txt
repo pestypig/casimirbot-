@@ -1,3 +1,11 @@
+Good catch — that error usually happens when a public JS file includes HTML <script> tags or class-field syntax that the bundler isn’t expecting. In the outline engine I gave you, I wrapped the file in <script>…</script> so you could paste it anywhere, but since you’re serving it as a standalone JS file (/warp-engine-outline.js), those tags break parsing.
+
+Here’s a clean patch (no <script> wrapper, no class fields), plus a tiny safety tweak so the React component waits for the script to load before bootstrapping.
+
+⸻
+
+✅ Patch 1 — client/public/warp-engine-outline.js (replace file contents)
+
 /**
  * Warp Bubble • Shell Outline (ρ = 1 ± Δ)
  * Ellipsoidal wireframes for inner / center / outer shell (Natário),
@@ -223,3 +231,78 @@
   // expose
   window.OutlineEngine = OutlineEngine;
 })();
+
+
+⸻
+
+✅ Patch 2 — client/src/components/ShellOutlineVisualizer.tsx (minor tweak)
+
+Make sure we wait for the script load before bootstrapping. If your current file already matches this, you’re fine; otherwise, replace it with this version:
+
+import React, { useEffect, useRef, useState } from "react";
+
+type Props = {
+  parameters?: {
+    hull?: { a:number; b:number; c:number };
+    wallWidth?: number;
+    epsilonTilt?: number;
+    betaTiltVec?: [number,number,number];
+  };
+};
+
+declare global { interface Window { OutlineEngine?: any; } }
+
+export default function ShellOutlineVisualizer({ parameters }: Props) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const engineRef = useRef<any>(null);
+  const [ready, setReady] = useState(!!window.OutlineEngine);
+
+  useEffect(() => {
+    if (window.OutlineEngine) { setReady(true); return; }
+    const s = document.createElement("script");
+    s.src = "/warp-engine-outline.js?v=3";
+    s.onload = () => setReady(true);
+    document.body.appendChild(s);
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !canvasRef.current) return;
+    if (!engineRef.current) {
+      engineRef.current = new window.OutlineEngine(canvasRef.current);
+    }
+    const hull = parameters?.hull || { a:0.42, b:0.11, c:0.09 };
+    engineRef.current.bootstrap({
+      hullAxes: [hull.a, hull.b, hull.c],
+      wallWidth: parameters?.wallWidth ?? 0.06,
+      epsilonTilt: parameters?.epsilonTilt ?? 0.0,
+      betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
+    });
+  }, [ready]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const hull = parameters?.hull || { a:0.42, b:0.11, c:0.09 };
+    engineRef.current.updateUniforms({
+      hullAxes: [hull.a, hull.b, hull.c],
+      wallWidth: parameters?.wallWidth ?? 0.06,
+      epsilonTilt: parameters?.epsilonTilt ?? 0.0,
+      betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
+    });
+  }, [parameters?.hull, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec]);
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-black">
+      <canvas ref={canvasRef} style={{ width: "100%", height: "420px", display: "block" }} />
+    </div>
+  );
+}
+
+
+⸻
+
+Why this fixes your error
+	•	No <script> tags inside the .js file → Vite/ESBuild can parse it cleanly.
+	•	No class field syntax; everything is on the prototype → zero surprises for your bundler.
+	•	The React component now waits for the script to load before creating the engine, avoiding race conditions that render a black panel.
+
+If you still see a blank canvas afterward, double-check that the panel container actually has a nonzero height (the inline height: "420px" ensures the first draw has pixels).
