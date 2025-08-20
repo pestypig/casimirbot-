@@ -94,7 +94,7 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.14,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 6.57e7,  // Calibrated to achieve ~32.21 kg exotic mass
+    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "High-power hover mode for station-keeping",
     powerTarget: 83.3,
     color: "text-cyan-400"
@@ -104,7 +104,7 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.005,
     sectorStrobing: 400,
     qSpoilingFactor: 0.625,
-    gammaVanDenBroeck: 5.1e4,  // Scaled for cruise mode
+    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Low-power cruise mode for sustained travel",
     powerTarget: 7.4,
     color: "text-green-400"
@@ -114,7 +114,7 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.50,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 6.57e7,  // Same as hover
+    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Maximum power emergency mode",
     powerTarget: 297,
     color: "text-red-400"

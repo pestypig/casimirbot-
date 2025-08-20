@@ -930,6 +930,9 @@ export default function HelixCore() {
                       <div>U_cycle: {pipelineState.U_cycle.toExponential(2)} J</div>
                       <div>P_loss: {pipelineState.P_loss_raw.toFixed(3)} W/tile</div>
                       <div>N_tiles: {pipelineState.N_tiles.toExponential(2)}</div>
+                      <div className="col-span-2 text-yellow-300 border-t border-slate-700 pt-2 mt-1">
+                        γ_VdB: {pipelineState.gammaVanDenBroeck.toExponential(2)} (Van den Broeck)
+                      </div>
                     </div>
                   </div>
                 )}
