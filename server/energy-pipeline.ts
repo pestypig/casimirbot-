@@ -349,14 +349,17 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const { Lx_m, Ly_m, Lz_m } = state.hull!;
   const L_long = Math.max(Lx_m, Ly_m, Lz_m);                // conservative: longest light-crossing
   const L_geom = Math.cbrt(Lx_m * Ly_m * Lz_m);             // geometric mean (volume-equivalent length)
-  // Reuse f_m and T_m from above power calculation
+  
+  // Recompute f_m and T_m in this scope (fix scope bug)
+  const f_m_ts = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
+  const T_m_ts = 1 / f_m_ts;                              // s
 
   const T_long = L_long / C;   // s
   const T_geom = L_geom / C;   // s
 
-  state.TS_long = T_long / T_m;   // most conservative
-  state.TS_geom = T_geom / T_m;   // typical
-  state.TS_ratio = state.TS_long; // keep existing field = conservative
+  state.TS_long = T_long / T_m_ts;   // most conservative
+  state.TS_geom = T_geom / T_m_ts;   // typical
+  state.TS_ratio = state.TS_long;    // keep existing field = conservative
 
   // ----- Sector model (consistent across modes) -----
   const TOTAL_SECTORS_DERIVED = 400;                   // Fixed logical partitioning
