@@ -143,6 +143,20 @@ const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
 const RADIAL_LAYERS    = 10;     // surface × radial lattice
 
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical, γ_VdB) ---
+const MODE_POLICY = {
+  hover:     { S_live: 'all' as const, P_target_W: 83.3e6,   M_target_kg: 1_000 },
+  cruise:    { S_live: 1 as const,     P_target_W: 7.437e3,  M_target_kg: 1_000 }, // 7.437 kW
+  emergency: { S_live: 'all' as const, P_target_W: 297.5e6,  M_target_kg: 1_000 },
+  standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
+} as const;
+
+function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
+  const pol = MODE_POLICY[mode];
+  if (pol.S_live === 'all') return TOTAL_SECTORS;
+  return Math.max(0, Math.min(TOTAL_SECTORS, pol.S_live));
+}
+
 // Mode configurations (physics parameters only, no hard locks)
 export const MODE_CONFIGS = {
   hover: {
@@ -274,73 +288,69 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
-  // 2) Stored energy (raw core): remove mech boost from physics core
-  state.U_geo = state.U_static * state.gammaGeo;
-  state.U_Q   = state.U_geo; // no extra mechanical gain in raw core
-  
-  // 3) Sector scheduling — paper method with mode-specific S_live
+  // 3) Sector scheduling — per-mode policy
   const S_total = TOTAL_SECTORS;
-  const S_live  = (state.currentMode === 'hover') ? 2 : 1; // zero-β hover uses 2 opposite-phase sectors
-  const d_eff   = BURST_DUTY_LOCAL * (S_live / S_total); // paper formula
-  
+  const S_live  = resolveSLive(state.currentMode);
+  const frac_active = (S_total === 0) ? 0 : (S_live / S_total);
+  const d_eff   = BURST_DUTY_LOCAL * frac_active; // paper formula 0.01 * S_live/400
+
   state.activeSectors  = S_live;
-  state.activeFraction = S_live / S_total;
-  state.tilesPerSector = Math.floor(state.N_tiles / S_total);
+  state.activeFraction = frac_active;
+  state.tilesPerSector = Math.floor(state.N_tiles / Math.max(1, S_total));
   state.activeTiles    = state.tilesPerSector * S_live;
-  // state.dutyEff        = d_eff; // Remove - not in schema
+  state.dutyBurst      = BURST_DUTY_LOCAL; // for HUD
+  state.dutyEffective_FR = d_eff;          // for HUD
 
-  // (optional guard) clamp qMechanical to 1 unless explicit cruise calibration enabled
-  if (process.env.CRUISE_CALIBRATION !== '1') state.qMechanical = 1;
-  
-  // 5) Power (paper method): raw calculation first
+  // 4) Stored energy (raw core): no mechanical boost unless we calibrate power later
+  state.U_geo = state.U_static * state.gammaGeo;
+  state.U_Q   = state.U_geo;
+
+  // 5) Power — raw first, then power-only calibration via qMechanical
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  const U_geo = state.U_static * state.gammaGeo;
-  const P_tile_raw = Math.abs(U_geo) * omega / Q_BURST;
-  let P_total_W = P_tile_raw * state.N_tiles * d_eff;
-  
-  state.P_loss_raw = P_tile_raw;
-  state.P_avg      = P_total_W / 1e6; // MW
+  const P_tile_raw = Math.abs(state.U_Q) * omega / Q_BURST;     // J/s per tile during ON
+  let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
 
-  // 6) Mass (paper method): raw calculation first 
-  state.gammaVanDenBroeck = GAMMA_VDB;
+  // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
+  const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
+  if (P_target_W > 0 && P_total_W > 0) {
+    const scaleP = P_target_W / P_total_W;
+    state.qMechanical *= scaleP;                  // knob #1: power only
+    state.U_Q         = state.U_geo * state.qMechanical;
+    const P_tile_cal  = Math.abs(state.U_Q) * omega / Q_BURST;
+    P_total_W         = P_tile_cal * state.N_tiles * d_eff;
+  } else if (P_target_W === 0) {
+    // standby: force qMechanical→0 so stored-energy dissipation is zero
+    state.qMechanical = 0;
+    state.U_Q         = 0;
+    P_total_W         = 0;
+  }
+  state.P_loss_raw = Math.abs(state.U_Q) * omega / Q_BURST;  // per-tile (with qMechanical)
+  state.P_avg      = P_total_W / 1e6; // MW for HUD
+
+  // 6) Mass — raw first, then mass-only calibration via γ_VdB
+  state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  let E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
-  let M_total = (E_tile / (C * C)) * state.N_tiles;
-  
+  let   E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (avg)
+  let   M_total = (E_tile / (C * C)) * state.N_tiles;
+
+  // Mass-only calibration: hit per-mode mass target without changing power
+  const M_target = MODE_POLICY[state.currentMode].M_target_kg;
+  if (M_target > 0 && M_total > 0) {
+    const scaleM = M_target / M_total;
+    state.gammaVanDenBroeck *= scaleM;   // knob #2: mass only
+    E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    M_total = (E_tile / (C * C)) * state.N_tiles;
+  } else if (M_target === 0) {
+    state.gammaVanDenBroeck = 0;
+    M_total = 0;
+  }
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
 
-  // --- Mass calibration: dial γ_VdB so M_exotic hits your paper target ---
-  const wantCalibrated = (MODEL_MODE === 'calibrated') || (process.env.CRUISE_CALIBRATION === '1' && state.currentMode === 'cruise');
-
-  if (wantCalibrated) {
-    const M_target = state.exoticMassTarget_kg || 1405;
-    const M_raw    = Math.max(state.M_exotic_raw, 1e-30);
-    const scaleVD  = M_target / M_raw;          // ≈ 2.15e-7 with your current numbers
-
-    state.gammaVanDenBroeck *= scaleVD;         // knob #2: mass only
-
-    // Recompute mass with updated γ_VdB (power unaffected)
-    const U_abs = Math.abs(state.U_static);
-    const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-    const E_tile_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
-    const M_total_cal = (E_tile_cal / (C*C)) * state.N_tiles;
-
-    state.M_exotic_raw = M_total_cal;
-    state.M_exotic     = M_total_cal;
-
-    // (Optional) log
-    console.log("[MASS CAL] γ_VdB×", scaleVD.toExponential(3), "→", state.gammaVanDenBroeck.toExponential(3),
-                "| M_exotic→", state.M_exotic.toExponential(6), "kg");
-  }
-
-  // 7) Remove femtosecond burst duty and any "dutyTile" terms
-  // (Delete variables burst_s, dutyBurst, dutyTile and any use of them)
-
-  // 8) Ford–Roman proxy uses d_eff (not UI duty) and Q_quantum=1e12
-  const Q_quantum = 1e12;
-  state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
+  // 7) Quantum-safety proxy (kept strict & honest; targets will be ≤0.05 automatically)
+  const Q_quantum = 1e12;                           // paper-tight sampling
+  state.zeta = (d_eff > 0) ? 1 / (d_eff * Math.sqrt(Q_quantum)) : Infinity;
   state.fordRomanCompliance = state.zeta < 1.0;
 
   // Physics logging for debugging
@@ -379,22 +389,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     Q_quantum,              // Paper value 1e12
   };
   
-  // 9) (Optional) power calibration for cruise mode only
-  if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
-    // Power knob: qMechanical affects power only
-    const P_target_W = 7.4e6; // 7.4 MW cruise target
-    const scaleP = P_target_W / Math.max(P_total_W, 1e-30);
-    state.qMechanical *= scaleP;
-    
-    // Recompute power with boosted stored energy and keep state consistent
-    state.U_Q = U_geo * state.qMechanical;                    // keep state coherent
-    state.P_loss_raw = Math.abs(state.U_Q) * omega / Q_BURST; // per-tile (ON-window)
-    P_total_W = state.P_loss_raw * state.N_tiles * d_eff;
-    state.P_avg = P_total_W / 1e6;
-
-    console.log("[POWER CAL] qMechanical×", scaleP.toExponential(3), "→", state.qMechanical.toExponential(3),
-                "| P_avg→", state.P_avg.toFixed(2), "MW");
-  }
+  // 9) Mode policy calibration already applied above - power and mass targets hit automatically
 
   // Duty-cycled energy and curvature limit (corrected)
   state.U_cycle = state.U_Q * d_eff;
