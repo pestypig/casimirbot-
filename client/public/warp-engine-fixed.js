@@ -1,12 +1,6 @@
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
-// ── Paper-backed physics constants ─────────────────────────────────────
-const TOTAL_SECTORS    = 400;     // fixed azimuthal partition
-const BURST_DUTY_LOCAL = 0.01;    // 10 µs per 1 ms
-const Q_BURST          = 1e9;     // cavity Q during 10 µs burst
-const GAMMA_VDB        = 1e11;    // Van-den-Broeck seed boost
-
 // --- Grid defaults (scientifically scaled for needle hull) ---
 const GRID_DEFAULTS = {
   spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
@@ -681,9 +675,9 @@ class WarpEngine {
         const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
 
         const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
-        const QburstUniform   = this.uniforms?.Qburst   ?? Q_BURST;
+        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
         const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
-        const gammaVdBUniform = this.uniforms?.gammaVdB ?? GAMMA_VDB;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
         const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
         const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
@@ -773,9 +767,9 @@ class WarpEngine {
             // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
             // Pull uniforms for current mode and parameters
             const gammaGeo = this.uniforms?.gammaGeo ?? 26;
-            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? Q_BURST;
+            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
             const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
-            const gammaVdB = this.uniforms?.gammaVdB ?? GAMMA_VDB;
+            const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
             const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
             const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
             const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
@@ -1160,22 +1154,17 @@ class WarpEngine {
     _computePipelineBetas(U){
         const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || 1);
         const gammaGeo     = U.gammaGeo || 0;
-        const Qburst       = Q_BURST;
-        const qSpoil       = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
-        const gammaVdB     = GAMMA_VDB;
-        
-        // Paper-correct physics: β_phys = γ³ × q_spoil × γ_VdB × d_eff
-        const frac_active  = Math.min(1, sectors / TOTAL_SECTORS);
-        const d_eff        = BURST_DUTY_LOCAL * frac_active;
-        const gamma3       = Math.pow(gammaGeo, 3);
+        const Qburst       = (U.Qburst ?? U.cavityQ) || 0;
+        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+        const gammaVdB     = U.gammaVdB || 1.0;
 
-        const betaInst = gamma3 * qSpoil * gammaVdB * BURST_DUTY_LOCAL;  // instantaneous
-        const betaAvg  = gamma3 * qSpoil * gammaVdB * d_eff;             // ship-averaged
+        const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
+        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
         const phase    = (U.phaseSplit != null) ? U.phaseSplit :
                         (U.currentMode === 'cruise' ? 0.65 : 0.50);
         const betaNet  = betaAvg * (2*phase - 1);
 
-        return { betaInst, betaAvg, betaNet, sectors, phase, d_eff, frac_active };
+        return { betaInst, betaAvg, betaNet, sectors, phase };
     }
 
     _sampleYorkAndEnergy(U){
@@ -1217,7 +1206,7 @@ class WarpEngine {
         return {
             mode: U.currentMode||'hover',
             duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
-            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||GAMMA_VDB),
+            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
             sectors:P.sectors, phase:P.phase,
             beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
             theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,

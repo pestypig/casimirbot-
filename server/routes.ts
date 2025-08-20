@@ -349,14 +349,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/helix/field", getDisplacementField);
   app.post("/api/helix/pipeline/update", updatePipelineParams);
   app.post("/api/helix/pipeline/mode", switchOperationalMode);
-  
-  // Physics audit report endpoint
-  app.get("/api/helix/pipeline/report", (req, res) => {
-    res.json({
-      message: "Check console logs for [REPORT] JSON output",
-      note: "Force recalculation by changing mode to see latest report"
-    });
-  });
 
   return httpServer;
 }
