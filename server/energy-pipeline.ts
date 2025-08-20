@@ -136,6 +136,13 @@ const NM_TO_M = 1e-9;
 const MM_TO_M = 1e-3;
 const CM2_TO_M2 = 1e-4;
 
+// ── Paper-backed constants (consolidated physics)
+const TOTAL_SECTORS    = 400;
+const BURST_DUTY_LOCAL = 0.01;   // 10 µs / 1 ms
+const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
+const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
+const RADIAL_LAYERS    = 10;     // surface × radial lattice
+
 // Mode configurations (physics parameters only, no hard locks)
 export const MODE_CONFIGS = {
   hover: {
@@ -203,12 +210,12 @@ export function initializePipelineState(): EnergyPipelineState {
     sectorStrobing: 1,
     qSpoilingFactor: 1,
     
-    // Physics defaults
+    // Physics defaults (paper-backed)
     gammaGeo: 26,
-    qMechanical: 5e4,
-    qCavity: 1e9,
-    gammaVanDenBroeck: 1e11,  // Physics seed factor (configurable via env)
-    exoticMassTarget_kg: 1405,  // Reference target (not a lock)
+    qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
+    qCavity: Q_BURST,             // Use paper-backed Q_BURST 
+    gammaVanDenBroeck: GAMMA_VDB, // Use paper-backed γ_VdB seed
+    exoticMassTarget_kg: 1405,    // Reference target (not a lock)
     
     // Initial calculated values
     U_static: 0,
@@ -259,86 +266,66 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
 
-  // Derived tile count with radial layers (×10 multiplier from research papers)
-  const RADIAL_LAYERS = 10;
+  // 1) N_tiles — include radial layering
   state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2) * RADIAL_LAYERS);
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
-  // Step 2: Geometric amplification (γ × U_static, not γ³)
-  // The research papers use γ=26 as a linear amplification factor
+  // 2) Stored energy (raw core): remove mech boost from physics core
   state.U_geo = state.U_static * state.gammaGeo;
+  state.U_Q   = state.U_geo; // no extra mechanical gain in raw core
   
-  // Step 3: Q-enhancement
-  state.U_Q = state.U_geo * state.qMechanical;
+  // 3) Sector scheduling — paper method: one-live-of-400
+  const S         = TOTAL_SECTORS;
+  const S_instant = 1;
+  const frac_active = S_instant / S;
+  const tilesPerSect = Math.floor(state.N_tiles / S);
+  state.activeSectors  = S_instant;
+  state.activeFraction = frac_active;
+  state.tilesPerSector = tilesPerSect;
+  state.activeTiles    = tilesPerSect * S_instant;
+
+  // 4) Effective duty for ship-wide averages
+  const d_eff = BURST_DUTY_LOCAL * frac_active; // 0.01 / 400 = 2.5e-5
+  state.dutyEff = d_eff;
+
+  // (optional guard) clamp qMechanical to 1 unless explicit cruise calibration enabled
+  if (process.env.CRUISE_CALIBRATION !== '1') state.qMechanical = 1;
   
-  // Step 4: Apply mode configuration
-  const modeConfig = MODE_CONFIGS[state.currentMode];
-  state.dutyCycle = modeConfig.dutyCycle;
-  state.sectorStrobing = modeConfig.sectorStrobing;
-  state.qSpoilingFactor = modeConfig.qSpoilingFactor;
-  
-  // Step 5: γ_VdB (paper-authentic value, no target scaling)
-  const GAMMA_VDB = 1e11; // authentic paper value
-  state.gammaVanDenBroeck = GAMMA_VDB; // no dependence on mass target
-  
-  // Step 6: Duty-cycled energy (physics calculation)
-  state.U_cycle = state.U_Q * state.dutyCycle;
-  
-  /* ──────────────────────────────
-     Step 7: Power (physics-first) - FIXED per paper specs
-     Uses Q_BURST = 1e9 during ON-window only, proper duty calculation
-  ──────────────────────────────── */
-  const Q_BURST = 1e9;              // Paper value: Q during burst only
-  const BURST_DUTY_LOCAL = 0.01;    // 10 μs / 1 ms (paper)
-  const TOTAL_SECTORS = 400;
-  const frac_active = 1 / TOTAL_SECTORS;  // one-live-of-400
-  const d_eff = BURST_DUTY_LOCAL * frac_active;  // 0.01/400 = 2.5e-5
-  
-  // Power: P_tile_W = |U_geo| * ω / Q_BURST
+  // 5) Power (paper method): use Q_BURST and d_eff
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  const P_tile_W = Math.abs(state.U_geo ?? 0) * omega / Q_BURST;
-  const P_total_W = P_tile_W * state.N_tiles * d_eff;
+  const U_Q_store = Math.abs(state.U_Q);
+  const P_loss_per_tile_raw = U_Q_store * omega / Q_BURST;
+  const P_total_W = P_loss_per_tile_raw * state.N_tiles * d_eff;
+  state.P_loss_raw = P_loss_per_tile_raw;
+  state.P_avg      = P_total_W / 1e6; // MW
 
-  // Legacy variables for compatibility  
-  const N_tiles = Math.max(1, Math.round(state.N_tiles ?? 1.96e9));
-  const duty = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
-  const f_m = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
-  const T_m = 1 / f_m;                                // s
-
-  state.P_loss_raw    = P_tile_W;   // W per tile (corrected)
-  
-  // Always use raw physics - no power override
-  const P_raw_MW = P_total_W / 1e6;  // Raw physics power
-  state.P_avg = P_raw_MW;
-
-  /* ──────────────────────────────
-     Step 8: Exotic mass (physics-first) - FIXED to use same d_eff
-     E_tile_enh = |U_static| · (γ_geo^3) · Q_BURST · γ_VdB · d_eff
-     M_raw_total = (E_tile_enh / c^2) · N_tiles
-     Mass uses the same d_eff (see §7), no fs burst.
-  ──────────────────────────────── */
-
-  // Mass calculation (fixed): Use same Q_BURST and d_eff as power
-  const U_abs = Math.abs(state.U_static ?? 0);
+  // 6) Mass (paper method): DCE chain uses Q_BURST and d_eff; γ_VdB fixed seed
+  state.gammaVanDenBroeck = GAMMA_VDB;
+  const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  const E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
-  const massPerTile_kg = E_tile / (C * C);
-  const M_total = massPerTile_kg * state.N_tiles;
-  
-  // Use raw physics - no calibration override
+  const E_enh = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
+  const m_tile = E_enh / (C * C);
+  const M_total = m_tile * state.N_tiles;
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
-  state.massCalibration = 1.0; // No calibration applied
-  
+
+  // 7) Remove femtosecond burst duty and any "dutyTile" terms
+  // (Delete variables burst_s, dutyBurst, dutyTile and any use of them)
+
+  // 8) Ford–Roman proxy uses d_eff (not UI duty) and Q_quantum=1e12
+  const Q_quantum = 1e12;
+  state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
+  state.fordRomanCompliance = state.zeta < 1.0;
+
   // Physics logging for debugging
   console.log("[PIPELINE]", {
     duty: state.dutyCycle, sectors: state.sectorStrobing, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
-    massCal: state.massCalibration
+    massCal: 1
   });
   
   /* ──────────────────────────────
@@ -361,25 +348,6 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.TS_geom = T_geom / T_m_ts;   // typical
   state.TS_ratio = state.TS_long;    // keep existing field = conservative
 
-  // ----- Sector model (consistent across modes) -----
-  const TOTAL_SECTORS_DERIVED = 400;                   // Fixed logical partitioning
-  const activeSectors = Math.max(1, state.sectorStrobing);
-  const activeFraction = Math.min(1, activeSectors / TOTAL_SECTORS_DERIVED);
-  const tilesPerSector = Math.floor(state.N_tiles / TOTAL_SECTORS_DERIVED);
-  const activeTiles = tilesPerSector * activeSectors;
-
-  // Export so /metrics can expose same numbers
-  state.__sectors = { TOTAL_SECTORS: TOTAL_SECTORS_DERIVED, activeSectors, activeFraction, tilesPerSector, activeTiles };
-
-  // ----- Ford–Roman proxy (paper-authentic) -----
-  // Use same d_eff as power/mass calculations (paper method)
-  const Q_quantum = 1e12;  // Paper value (was 1e10)
-  
-  // ζ = 1 / (d_eff * sqrt(Q))
-  state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
-  // Compliance
-  state.fordRomanCompliance = state.zeta < 1.0;
-
   // Keep these around for the metrics + HUD
   state.__fr = {
     dutyInstant: d_eff,     // Paper-authentic d_eff (was UI duty)
@@ -387,12 +355,25 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     Q_quantum,              // Paper value 1e12
   };
   
-  // Update state with sector calculations
-  state.tilesPerSector = tilesPerSector;
-  state.activeSectors  = activeSectors;
-  state.activeTiles    = activeTiles;
-  state.activeFraction = activeFraction;
-  
+  // 9) (Optional) cruise calibration knobs, if you need exact paper numbers in cruise:
+  if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
+    // Power target: 7.4 MW → adjust qMechanical (power only)
+    const P_target_W = 7.4e6;
+    const scaleP = P_target_W / (P_total_W || 1e-30);
+    state.qMechanical *= scaleP;
+    state.U_Q = state.U_geo * state.qMechanical;
+    const P_tile_cal = Math.abs(state.U_Q) * omega / Q_BURST;
+    state.P_avg = (P_tile_cal * state.N_tiles * d_eff) / 1e6;
+
+    // Mass target: 1405 kg → adjust γ_VdB (mass only)
+    const M_target = 1405;
+    const scaleM   = M_target / (state.M_exotic_raw || 1e-30);
+    state.gammaVanDenBroeck *= scaleM;
+    const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    state.M_exotic_raw = Math.max(0, (E_enh_cal / (C*C)) * state.N_tiles);
+    state.M_exotic = state.M_exotic_raw;
+  }
+
   // Expose timing details for metrics API
   state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
@@ -401,9 +382,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.modelMode           = MODEL_MODE; // for client consistency
   
   // Compliance flags
-  state.fordRomanCompliance = state.zeta < 1.0;
   state.natarioConstraint   = true;
-  state.curvatureLimit      = Math.abs(state.U_cycle ?? 0) < 1e-10;
+  state.curvatureLimit      = Math.abs(state.U_Q ?? 0) < 1e-10;
   
   // Overall status
   if (!state.fordRomanCompliance || !state.curvatureLimit) {

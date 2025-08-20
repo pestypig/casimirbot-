@@ -53,6 +53,7 @@ Preferred communication style: Simple, everyday language.
 - **Hull Geometry Accuracy**: Corrected hull radius calculations to use actual Needle Hull dimensions (1.007 km) for geometric time-scale calculations, ensuring scientific accuracy across all physics.
 - **Visual-Physics Alignment**: Integrated authentic ellipsoidal needle hull geometry into 3D WebGL visualization, matching physics calculations.
 - **Smooth Natário Ridge Fix**: Implemented smooth C¹-continuous transitions in physics sampler using softSign and soft wall envelope windowing to eliminate jagged visual artifacts in the warp bubble.
+- **Paper-Backed Constants Module**: Comprehensive physics refactoring using modular constants (TOTAL_SECTORS=400, BURST_DUTY_LOCAL=0.01, Q_BURST=1e9, GAMMA_VDB=1e11, RADIAL_LAYERS=10) with unified calculations for power, mass, and Ford-Roman compliance. Includes optional cruise calibration system and complete elimination of scope bugs and parameter mixing.
 
 ## External Dependencies
 - **@neondatabase/serverless**: PostgreSQL database connection.
