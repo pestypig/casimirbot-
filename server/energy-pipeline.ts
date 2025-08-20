@@ -311,6 +311,30 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
 
+  // --- Mass calibration: dial γ_VdB so M_exotic hits your paper target ---
+  const wantCalibrated = (MODEL_MODE === 'calibrated') || (process.env.CRUISE_CALIBRATION === '1' && state.currentMode === 'cruise');
+
+  if (wantCalibrated) {
+    const M_target = state.exoticMassTarget_kg || 1405;
+    const M_raw    = Math.max(state.M_exotic_raw, 1e-30);
+    const scaleVD  = M_target / M_raw;          // ≈ 2.15e-7 with your current numbers
+
+    state.gammaVanDenBroeck *= scaleVD;         // knob #2: mass only
+
+    // Recompute mass with updated γ_VdB (power unaffected)
+    const U_abs = Math.abs(state.U_static);
+    const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
+    const E_tile_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    const M_total_cal = (E_tile_cal / (C*C)) * state.N_tiles;
+
+    state.M_exotic_raw = M_total_cal;
+    state.M_exotic     = M_total_cal;
+
+    // (Optional) log
+    console.log("[MASS CAL] γ_VdB×", scaleVD.toExponential(3), "→", state.gammaVanDenBroeck.toExponential(3),
+                "| M_exotic→", state.M_exotic.toExponential(6), "kg");
+  }
+
   // 7) Remove femtosecond burst duty and any "dutyTile" terms
   // (Delete variables burst_s, dutyBurst, dutyTile and any use of them)
 
@@ -355,7 +379,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     Q_quantum,              // Paper value 1e12
   };
   
-  // 9) (Optional) cruise calibration — two knobs to hit exact paper targets
+  // 9) (Optional) power calibration for cruise mode only
   if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
     // Power knob: qMechanical affects power only
     const P_target_W = 7.4e6; // 7.4 MW cruise target
@@ -368,15 +392,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     P_total_W = state.P_loss_raw * state.N_tiles * d_eff;
     state.P_avg = P_total_W / 1e6;
 
-    // Mass knob: γ_VdB affects mass only
-    const M_target = 1405; // 1405 kg paper target
-    const scaleM = M_target / Math.max(M_total, 1e-30);
-    state.gammaVanDenBroeck *= scaleM;
-    
-    // Recompute mass with adjusted γ_VdB
-    E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
-    M_total = (E_tile / (C * C)) * state.N_tiles;
-    state.M_exotic_raw = state.M_exotic = M_total;
+    console.log("[POWER CAL] qMechanical×", scaleP.toExponential(3), "→", state.qMechanical.toExponential(3),
+                "| P_avg→", state.P_avg.toFixed(2), "MW");
   }
 
   // Duty-cycled energy and curvature limit (corrected)
