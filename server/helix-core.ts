@@ -504,13 +504,14 @@ export function getSystemMetrics(req: Request, res: Response) {
   // Derive τLC and T_m once here from the pipeline state used to compute TS_ratio
   const f_m_Hz = state.modulationFreq_GHz * 1e9;   // Hz
   const T_m = 1 / f_m_Hz;                           // s
-  const { Lx_m, Ly_m, Lz_m } = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const { Lx_m, Ly_m, Lz_m } = state.hull ?? { Lx_m: 82, Ly_m: 82, Lz_m: 82 };
   const L_long = Math.max(Lx_m, Ly_m, Lz_m);
   const tauLC = L_long / 299_792_458;               // s
 
   // Calculate shift vector parameters (artificial gravity tilt)
   const c = 299_792_458;  // m/s
-  const R_geom = Math.cbrt((Lx_m/2) * (Ly_m/2) * (Lz_m/2));  // Geometric mean radius from semi-axes
+  const hull = state.hull ?? { a: 503.5, b: 132, c: 86.5, Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);  // Geometric mean radius
 
   // Per-mode gravity targets (matching WarpVisualizer)
   const G = 9.80665;
@@ -529,41 +530,22 @@ export function getSystemMetrics(req: Request, res: Response) {
   const gEff_check = epsilonTilt * (c * c) / R_geom;
 
   res.json({
-    // tiles / sectors
-    activeTiles: Math.max(0, Math.floor((state.N_tiles ?? 0) / Math.max(1, state.sectorStrobing ?? 1))),
-    totalTiles: Math.floor(state.N_tiles ?? 0),
-    sectorStrobing: state.sectorStrobing ?? 1,
-    activeSectors: state.activeSectors ?? 1,
+    // tile/sector truth (these are what your Tile Grid should use)
+    totalTiles: Math.floor(state.N_tiles),
+    activeTiles: Math.floor(sec.activeTiles),
     tilesPerSector: sec.tilesPerSector,
     totalSectors: sec.TOTAL_SECTORS,
+    activeSectors: sec.activeSectors,
     activeFraction: sec.activeFraction,
+    sectorStrobing: state.sectorStrobing,
     currentSector: currentSector,
-
-    // dual-path energy/mass
-    modelMode: state.modelMode ?? 'calibrated',
-    energyOutput: state.P_avg,               // MW (calibrated or raw depending on mode)
-    energyOutputRaw: state.P_avg_raw ?? null,// MW
-    exoticMass: Math.round(state.M_exotic ?? 0),       // kg (calibrated or raw)
-    exoticMassRaw: Math.round(state.M_exotic_raw ?? 0),// kg
-    massCalibration: state.massCalibration ?? 1,
-
-    // physics cores
-    gammaVanDenBroeck: state.gammaVanDenBroeck ?? null,
-    gammaGeo: state.gammaGeo ?? null,
-    qCavity: state.qCavity ?? null,
-    dutyGlobal: state.dutyCycle ?? null,
 
     // timing (optional but nice for the HUD)
     strobeHz: state.modulationFreq_GHz * 1e9 / sec.TOTAL_SECTORS,        // per sector sweep rate
     sectorPeriod_ms: 1000 * sec.TOTAL_SECTORS / (state.modulationFreq_GHz * 1e9),
 
-    // hull geometry (derived from state)
-    hull: {
-      Lx_m, Ly_m, Lz_m,
-      a: Lx_m / 2,  // semi-axis x
-      b: Ly_m / 2,  // semi-axis y  
-      c: Lz_m / 2   // semi-axis z
-    },
+    // hull geometry
+    hull,
 
     // shift vector for artificial gravity tilt
     shiftVector: {
@@ -574,6 +556,24 @@ export function getSystemMetrics(req: Request, res: Response) {
       gEff_check
     },
 
+    // core outputs
+    energyOutput: state.P_avg,                 // MW (your calibrated target)
+    exoticMass: Math.round(state.M_exotic),    // kg (calibrated/paper value)
+    exoticMassRaw: Math.round(state.M_exotic_raw ?? state.M_exotic), // if you keep a raw
+
+    // NEW: time scale components (authoritative from server)
+    timeScaleRatio: state.TS_ratio,            // dimensionless
+    tauLC,                                     // light-crossing time actually used (s)
+    T_m,                                       // modulation period actually used (s)
+
+    // FR & friends
+    dutyGlobal: state.dutyCycle,
+    dutyInstant: fr.dutyInstant,
+    dutyEffectiveFR: fr.dutyEffectiveFR,
+    gammaVanDenBroeck: state.gammaVanDenBroeck,
+    gammaGeo: state.gammaGeo,
+    qCavity: state.qCavity,
+
     fordRoman: {
       value: state.zeta,
       limit: 1.0,
@@ -583,25 +583,17 @@ export function getSystemMetrics(req: Request, res: Response) {
       value: 0,
       status: state.natarioConstraint ? "VALID" : "WARN"
     },
-    curvatureMax: Math.abs(state.U_cycle ?? 0) / (3e8 * 3e8),
+    curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
     timeScaleRatio: state.TS_ratio,
-    overallStatus: state.overallStatus,
-
-    // transparent power chain (for diagnostics/education)
-    P_chain: {
-      omega: 2 * Math.PI * ((state.modulationFreq_GHz ?? 15) * 1e9),
-      U_tile_static: Math.abs(state.U_static ?? 0),
-      gamma_geo3: (state.gammaGeo ?? 26) ** 3,
-      Q_mech: state.qMechanical ?? 1,
-      Q_cavity: state.qCavity ?? 1e9,
-      tilesPerSector: Math.max(1, Math.floor(Math.max(1, state.N_tiles ?? 0) / Math.max(1, state.sectorStrobing ?? 1))),
-      duty_burst: state.dutyCycle ?? 0.14,
-      sectorFraction: (Math.max(1, state.activeSectors ?? 1) / Math.max(1, state.sectorStrobing ?? 1)),
-      qSpoiling: state.qSpoilingFactor ?? 1,
-      P_avg_raw_MW: state.P_avg_raw ?? null
-    },
+    overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     // hull geometry and time-scale metrics for Bridge cards
+    hull: { 
+      Lx_m, Ly_m, Lz_m,
+      a: Lx_m / 2,  // semi-axis x
+      b: Ly_m / 2,  // semi-axis y  
+      c: Lz_m / 2   // semi-axis z
+    },
     wall: { w_norm: 0.06 }, // normalized wall thickness for ellipsoidal bell
     tiles: {
       tileArea_cm2: state.tileArea_cm2,
