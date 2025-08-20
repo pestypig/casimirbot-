@@ -239,6 +239,22 @@ export default function HelixCore() {
     'hover'
   ) as 'standby' | 'hover' | 'cruise' | 'emergency';
 
+  // --- Derived mode knobs for UI (always reflect the selected mode)
+  const modeCfg = MODE_CONFIGS[pipeline?.currentMode || effectiveMode] || MODE_CONFIGS.hover;
+
+  // Prefer live pipeline values if present; otherwise fall back to the mode config
+  const dutyUI = isFiniteNumber(pipeline?.dutyCycle)
+    ? pipeline!.dutyCycle!
+    : (modeCfg.dutyCycle ?? 0.14);
+
+  const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing)
+    ? pipeline!.sectorStrobing!
+    : (modeCfg.sectorStrobing ?? 1);
+
+  const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)
+    ? pipeline!.qSpoilingFactor!
+    : (modeCfg.qSpoilingFactor ?? 1);
+
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
   
@@ -504,9 +520,9 @@ export default function HelixCore() {
               return (
                 <div className="rounded-lg overflow-hidden bg-slate-950">
                   <WarpVisualizer
-                    key={`mode-${effectiveMode}-${pipeline?.sectorStrobing || 1}-${pipeline?.dutyCycle || 0.14}-v${modeVersion}`}
+                    key={`mode-${effectiveMode}-${sectorsUI}-${dutyUI}-v${modeVersion}`}
                     parameters={{
-                      dutyCycle: pipeline?.dutyCycle || 0.14,
+                      dutyCycle: dutyUI,
                       g_y: pipeline?.gammaGeo || 26,
                       cavityQ: pipeline?.qCavity || 1e9,
                       sagDepth_nm: pipeline?.sag_nm || 16,
@@ -514,8 +530,8 @@ export default function HelixCore() {
                       powerAvg_MW: pipeline?.P_avg || 83.3,
                       exoticMass_kg: pipeline?.M_exotic || 1405,
                       currentMode: effectiveMode,
-                      sectorStrobing: pipeline?.sectorStrobing || 1,
-                      qSpoilingFactor: pipeline?.qSpoilingFactor || 1,
+                      sectorStrobing: sectorsUI,
+                      qSpoilingFactor: qSpoilUI,
                       gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
                       hull: (hullMetrics && hullMetrics.hull) ? {
                         ...hullMetrics.hull,
@@ -587,10 +603,10 @@ export default function HelixCore() {
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
                 // NEW: mode coupling from live pipeline data
                 mode: effectiveMode,
-                dutyCycle: pipeline?.dutyCycle ?? 0.14,
-                sectors: pipeline?.sectorStrobing ?? 1,
+                dutyCycle: dutyUI,
+                sectors: sectorsUI,
                 gammaGeo: pipeline?.gammaGeo ?? 26,
-                qSpoil: pipeline?.qSpoilingFactor ?? 1.0,
+                qSpoil: qSpoilUI,
                 qCavity: pipeline?.qCavity ?? 1e9,
               }}
             />
@@ -675,7 +691,10 @@ export default function HelixCore() {
                   value={pipeline?.currentMode || 'hover'}
                   onValueChange={(mode) => {
                     switchMode.mutate(mode as any);
-                    setMainframeLog(prev => [...prev, `[MODE] Switching to ${mode} mode...`]);
+                    setMainframeLog(prev => [
+                      ...prev,
+                      `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].dutyCycle*100).toFixed(1)}%, sectors=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorStrobing})...`
+                    ]);
                   }}
                 >
                   <SelectTrigger className="bg-slate-950 border-slate-700">
@@ -776,9 +795,9 @@ export default function HelixCore() {
                 <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div>Duty: {fmt((pipeline.dutyCycle ?? 0) * 100, 1, '0')}%</div>
-                    <div>Sectors: {fint(pipeline.sectorStrobing, '0')}</div>
-                    <div>Q-Spoil: {fmt(pipeline.qSpoilingFactor, 3, '1.000')}</div>
+                    <div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
+                    <div>Sectors: {fint(sectorsUI, '0')}</div>
+                    <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
                     <Tooltip
                       label={
                         <div className="space-y-1">
@@ -1073,11 +1092,11 @@ export default function HelixCore() {
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Duty Cycle</p>
-                      <p className="font-mono text-slate-100">{pipelineState ? (pipelineState.dutyCycle * 100).toFixed(1) : '14'}%</p>
+                      <p className="font-mono text-slate-100">{(dutyUI * 100).toFixed(1)}%</p>
                     </div>
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Sectors</p>
-                      <p className="font-mono text-slate-100">{pipelineState?.sectorStrobing || 1}</p>
+                      <p className="font-mono text-slate-100">{sectorsUI}</p>
                     </div>
                     <div className="p-2 bg-slate-950 rounded text-center">
                       <p className="text-xs text-slate-400">Frequency</p>
@@ -1348,7 +1367,7 @@ export default function HelixCore() {
               natarioOk={pipelineState?.natarioConstraint || true}
               curvatureOk={pipelineState?.curvatureLimit || true}
               freqGHz={15.0}
-              duty={pipelineState?.dutyCycle || 0.14}
+              duty={dutyUI}
               gammaGeo={pipelineState?.gammaGeo || 26}
               qFactor={pipelineState?.qCavity || 1e9}
               pMaxMW={120}

@@ -444,6 +444,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.overallStatus = 'NOMINAL';
   }
   
+  // Ensure UI duty fields are populated from mode config for consistency  
+  state.dutyCycle = MODE_POLICY[state.currentMode].dutyCycle;
+  state.sectorStrobing = MODE_POLICY[state.currentMode].sectorStrobing;
+  state.qSpoilingFactor = MODE_POLICY[state.currentMode].qSpoilingFactor;
+  
   return state;
 }
 

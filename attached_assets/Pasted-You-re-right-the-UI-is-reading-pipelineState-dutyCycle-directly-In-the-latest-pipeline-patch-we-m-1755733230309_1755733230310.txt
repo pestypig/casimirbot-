@@ -1,0 +1,109 @@
+You’re right—the UI is reading `pipelineState.dutyCycle` directly. In the latest pipeline patch we made that field **informational** and sometimes omitted it, so the UI never updates when you switch modes.
+
+Fix: derive the duty (and related knobs) **from the active mode config** with a safe fallback to the pipeline value, then use that everywhere you render or pass a duty to children.
+
+Here’s a minimal TSX patch (drop-in edits):
+
+1. Right after you compute `effectiveMode`, add these derived UI knobs:
+
+```tsx
+// --- Derived mode knobs for UI (always reflect the selected mode)
+const modeCfg = MODE_CONFIGS[pipeline?.currentMode || effectiveMode] || MODE_CONFIGS.hover;
+
+// Prefer live pipeline values if present; otherwise fall back to the mode config
+const dutyUI = isFiniteNumber(pipeline?.dutyCycle)
+  ? pipeline!.dutyCycle!
+  : (modeCfg.dutyCycle ?? 0.14);
+
+const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing)
+  ? pipeline!.sectorStrobing!
+  : (modeCfg.sectorStrobing ?? 1);
+
+const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)
+  ? pipeline!.qSpoilingFactor!
+  : (modeCfg.qSpoilingFactor ?? 1);
+```
+
+2. Use those everywhere you display/pass duty/sectors/spoil. Replace these occurrences:
+
+* WarpVisualizer props:
+
+```tsx
+dutyCycle: dutyUI,
+sectorStrobing: sectorsUI,
+qSpoilingFactor: qSpoilUI,
+```
+
+* ShellOutlineVisualizer params:
+
+```tsx
+dutyCycle: dutyUI,
+sectors: sectorsUI,
+qSpoil: qSpoilUI,
+```
+
+* “Duty Cycle” chips/cards:
+
+```tsx
+// Pipeline Parameters
+<div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
+<div>Sectors: {fint(sectorsUI, '0')}</div>
+<div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
+
+// Resonance Scheduler cards
+<p className="font-mono text-slate-100">{(dutyUI * 100).toFixed(1)}%</p>
+<p className="font-mono text-slate-100">{sectorsUI}</p>
+```
+
+* FuelGauge:
+
+```tsx
+<FuelGauge
+  ...
+  duty={dutyUI}
+  ...
+/>
+```
+
+* RouteSteps perf (if you pass duty or use it in computeEffectiveLyPerHour):
+
+```tsx
+duty: dutyUI,
+vEffLyPerHour: (mode, duty) => computeEffectiveLyPerHour(
+  mode,
+  dutyUI,
+  pipelineState?.gammaGeo || 26,
+  pipelineState?.qCavity || 1e9,
+  pipelineState?.zeta || 0.032,
+  pipelineState?.TS_ratio || 4102.74
+)
+```
+
+* The “Pipeline Parameters” box (already shown above).
+
+3. Optional (nice UX): log the mode’s duty/sectors on switch so you can sanity-check:
+
+```tsx
+onValueChange={(mode) => {
+  switchMode.mutate(mode as any);
+  setMainframeLog(prev => [
+    ...prev,
+    `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode].dutyCycle*100).toFixed(1)}%, sectors=${MODE_CONFIGS[mode].sectorStrobing})...`
+  ]);
+}}
+```
+
+Why this fixes it
+
+* The UI no longer depends on the backend to echo `dutyCycle`; it deterministically reflects the chosen mode via `MODE_CONFIGS`, while still honoring a live pipeline value when present.
+* This mirrors the pipeline’s separation: **paper power** uses `d_eff`; **UI duty** is a mode control.
+
+If you want the backend to also populate `state.dutyCycle` for completeness, make sure the pipeline sets:
+
+```ts
+state.dutyCycle = MODE_CONFIGS[state.currentMode].dutyCycle;
+state.sectorStrobing = MODE_CONFIGS[state.currentMode].sectorStrobing;
+state.qSpoilingFactor = MODE_CONFIGS[state.currentMode].qSpoilingFactor;
+```
+
+…but with the TSX patch above, the UI will behave correctly even if those fields are missing.
