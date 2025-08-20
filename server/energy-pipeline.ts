@@ -140,7 +140,7 @@ const CM2_TO_M2 = 1e-4;
 export const MODE_CONFIGS = {
   hover: {
     dutyCycle: 0.14,
-    sectorStrobing: 1,
+    sectorStrobing: 400,
     qSpoilingFactor: 1,
     description: "High-power hover mode for station-keeping"
   },
@@ -152,13 +152,13 @@ export const MODE_CONFIGS = {
   },
   emergency: {
     dutyCycle: 0.50,
-    sectorStrobing: 1,
+    sectorStrobing: 400,
     qSpoilingFactor: 1,
     description: "Maximum power emergency mode"
   },
   standby: {
     dutyCycle: 0.001,
-    sectorStrobing: 1,
+    sectorStrobing: 400,
     qSpoilingFactor: 0.1,
     description: "Minimal power standby mode"
   }
@@ -259,8 +259,10 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
 
-  // Derived tile count (no hard-coding; lets geometry drive it)
-  state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2));
+  // Derived tile count: 5 cm pitch × 10 radial layers
+  const baseTiles = Math.floor(hullArea_m2 / tileArea_m2);
+  const RADIAL_LAYERS = 10;
+  state.N_tiles = Math.max(1, baseTiles * RADIAL_LAYERS);
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
@@ -278,8 +280,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.sectorStrobing = modeConfig.sectorStrobing;
   state.qSpoilingFactor = modeConfig.qSpoilingFactor;
   
-  // Step 5: γ_VdB (server-authoritative, paper-consistent)
-  const realisticGammaVdB = 2.86e5; // paper-consistent value
+  // Step 5: γ_VdB (use the published 1×10¹¹ seed)
+  const realisticGammaVdB = state.gammaVanDenBroeck; // default = 1e11
   const massScaling = (state.exoticMassTarget_kg ?? 1405) / 1405;
   state.gammaVanDenBroeck = realisticGammaVdB * massScaling;
   
@@ -299,16 +301,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Raw per-tile dissipation (J/s)
   const P_loss_per_tile_raw = Math.abs(state.U_Q ?? 0) * omega / Q_eff;
 
-  // Tiles & strobing
-  const N_tiles       = Math.max(1, Math.round(state.N_tiles ?? 1.96e9));
-  const sectorsActive = Math.max(1, Math.round(state.sectorStrobing ?? 1));
-  const activeFrac    = Math.min(1, sectorsActive / N_tiles);
+  // Tiles & strobing (400 fixed sectors → activeFraction = S/400)
+  const N_tiles       = state.N_tiles;
+  const sectorsActive = state.sectorStrobing; // should be set to 400
+  const activeFrac    = sectorsActive / 400;
 
   // Duty components (add femtosecond burst duty)
   const duty          = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
   const f_m           = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
   const T_m           = 1 / f_m;                                // s
-  const burst_s       = 0.5 * 1e-15; // default 0.5 fs (hardcoded for now)
+  const burst_s       = 10e-6;     // 10 µs pump burst per published design
   const dutyBurst     = Math.min(1, Math.max(0, burst_s / T_m)); // << very small (~1e-5 .. 1e-6)
   
   // Effective duty for tile-level production
@@ -399,8 +401,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Instantaneous duty seen by a local observer inside an energized sector
   const dutyInstant = state.dutyCycle * state.qSpoilingFactor;
 
-  // Effective duty used in ζ after strobing fraction is applied
-  const dutyEffectiveFR = dutyInstant * activeFraction;
+  // global Ford–Roman duty = d / S
+  const dutyEffectiveFR = dutyInstant / TOTAL_SECTORS;
 
   // Quantum cavity Q used for the Ford–Roman inequality proxy
   const Q_quantum = 1e10;
