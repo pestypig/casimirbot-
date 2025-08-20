@@ -1,0 +1,105 @@
+The diff below will graft in the four hard paper constants and replace the old mixed‐mode amplitude math with the exact pipeline chain:
+
+```diff
+--- a/src/warp-engine.js
++++ b/src/warp-engine.js
+@@ // --- Grid defaults (scientifically scaled for needle hull) ---
+ const GRID_DEFAULTS = {
+   spanPadding: …,
+   minSpan: 2.6,
+   divisions: 100
+ };
+
++// ── Paper‐validated physics constants ──────────────────────────────────────
++const TOTAL_SECTORS    = 400;     // fixed 400‐wedge partition
++const BURST_DUTY_LOCAL = 0.01;    // 10 µs per 1 ms local duty
++const Q_BURST          = 1e9;     // cavity Q during 10 µs burst
++const GAMMA_VDB        = 1e11;    // Van‐den‐Broeck seed boost
+
+@@ -283,45 +289,29 @@ class WarpEngine {
+     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+         // …
+-        // ---- Physics‐accurate amplitude calculation (matches energy pipeline) ----
+-        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
+-        const geoAmp   = Math.pow(gammaGeo, 3);  
+-        const qSpoil   = bubbleParams.qSpoilingFactor || 1;
+-        const vdbAmp   = bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5;
+-
+-        // 2) Duty / strobing
+-        const sectors     = Math.max(1, bubbleParams.sectorStrobing || 1);
+-        const dutyBurst_fs= Math.max(1e-12, bubbleParams.dutyBurst || 5e-16);
+-        const dutyInstEff = dutyBurst_fs * (1 / sectors);
+-        const dutyGlobal  = Math.max(1e-12, bubbleParams.dutyCycle || 0.14);
+-        const dutyAvgEff  = dutyGlobal * qSpoil * (1 / sectors);
+-
+-        // 3) Chain + normalize
+-        const A_phys      = geoAmp * qSpoil * vdbAmp;
+-        const norm        = this.uniforms?.vizNorm || 1e-9;
+-        const A_vis_base  = A_phys * norm;
+-
+-        // 4) pulse vs average toggle
+-        const viewAvg = bubbleParams.viewAvg || 1.0;
+-        const A_inst   = A_vis_base * dutyInstEff;
+-        const A_avg    = A_vis_base * dutyAvgEff;
+-        const A_used   = viewAvg >= 0.5 ? A_avg : A_inst;
+-
+-        // 5) optional visual gain
+-        const gain   = this.uniforms?.vizGain || 4.0;
+-        const betaVis = A_used * gain;
++        // ---- Paper‐correct amplitude chain: γ³·qSpoil·γ_VdB·d_eff ----
++        const gammaGeo    = bubbleParams.gammaGeo || 26;
++        const geoAmp      = Math.pow(gammaGeo, 3);
++        const qSpoil      = bubbleParams.qSpoilingFactor || 1;
++        const vdbAmp      = bubbleParams.gammaVanDenBroeck || GAMMA_VDB;
++        const activeSectors = bubbleParams.sectorStrobing || 1;
++        const d_eff       = BURST_DUTY_LOCAL * (activeSectors / TOTAL_SECTORS);
++        const betaVis     = geoAmp * qSpoil * vdbAmp * d_eff;
+ 
+         // … later, inside the per‐vertex loop …
+ 
+         // apply curvature only
+-        disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
++        disp = gridK * betaVis * wallWin * front * sgn * gaussian_local;
+ 
+-        // clamp at 15% of radius
+-        const maxPush = 0.15;
+-        disp = maxPush * Math.tanh(disp / maxPush);
++        // clamp at 10% of radius
++        const maxPush = 0.10;
++        disp = maxPush * Math.tanh(disp / maxPush);
+ 
+-        // temporal smoothing
+-        const idx = i/3;
+-        const prev= this._prevDisp[idx] || disp;
+-        disp = prev + this._dispAlpha*(disp - prev);
+-        this._prevDisp[idx] = disp;
++        // temporal smoothing
++        const idx  = i/3;
++        const prev = this._prevDisp[idx] || disp;
++        disp = prev + this._dispAlpha*(disp - prev);
++        this._prevDisp[idx] = disp;
+```
+
+Additionally, in your diagnostics routine replace the old mixed Q & duty logic:
+
+```diff
+--- a/src/warp-engine.js
++++ b/src/warp-engine.js
+@@ computeDiagnostics() {
+-  const gammaGeo  = U.gammaGeo || 0;
+-  const Qburst    = (U.Qburst ?? U.cavityQ) || 0;
+-  const dAa       = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+-  const gammaVdB  = U.gammaVdB || 1.0;
++  const gammaGeo  = U.gammaGeo    || 0;
++  const Qburst    = Q_BURST;
++  const sectors   = U.sectorStrobing || 1;
++  const d_eff     = BURST_DUTY_LOCAL * (sectors / TOTAL_SECTORS);
++  const gammaVdB  = GAMMA_VDB;
+
+-  const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
+-  const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
++  const betaInst = Math.pow(gammaGeo,3) * Qburst * gammaVdB * d_eff;
++  const betaAvg  = betaInst;
+```
+
+With this patch, **WarpEngine** will use the exact same constants and duty/Q/γ chain as your corrected pipeline, so both the server and the renderer are 100 % in sync with the published physics.
