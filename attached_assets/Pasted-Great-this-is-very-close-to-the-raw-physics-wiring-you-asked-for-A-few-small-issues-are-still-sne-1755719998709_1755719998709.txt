@@ -1,0 +1,125 @@
+Great—this is very close to the “raw physics” wiring you asked for. A few small issues are still sneaking in and will skew the numbers:
+
+## What’s still off (and why)
+
+1. **All modes use `sectorStrobing: 400`**
+
+   * In hover/emergency/standby you wanted **1 active sector** (so `frac_active = 1/400` and `d_eff = 0.01 × 1/400 = 2.5e-5`).
+   * With 400 everywhere, **hover** runs at `frac_active = 1` → **40,000×** more active surface than intended.
+
+2. **Ford–Roman proxy uses UI duty (0.14) instead of the physical burst duty (0.01)**
+
+   * You already compute `d_eff = 0.01 × frac_active`. The FR block should use that, not `state.dutyCycle`.
+
+3. **Sampler variable shadowing**
+
+   * The `a, b` you use for the wall window shadow the earlier `a, b` semi-axes in that scope; not a runtime bug, but easy to misread.
+
+4. **(Optional) sanity guard on `qMechanical`**
+
+   * With `S_active=400` in hover, your raw power will be enormous. If you want a raw-but-bounded run, set `qMechanical` small in hover (or compute it from a budget). This isn’t a “fudge”—it’s picking a mechanical participation consistent with your power envelope.
+
+---
+
+## Surgical patches (copy-paste)
+
+### A) Per-mode sectors (raw paper intent)
+
+Replace your `MODE_CONFIGS` with:
+
+```ts
+export const MODE_CONFIGS = {
+  hover: {
+    dutyCycle: 0.14,       // UI only
+    sectorStrobing: 1,     // <-- one sector live at a time
+    qSpoilingFactor: 1,
+    description: "High-power hover mode for station-keeping"
+  },
+  cruise: {
+    dutyCycle: 0.005,
+    sectorStrobing: 400,   // <-- all sectors (full spatial coverage)
+    qSpoilingFactor: 0.625,
+    description: "Low-power cruise mode for sustained travel"
+  },
+  emergency: {
+    dutyCycle: 0.50,
+    sectorStrobing: 1,     // <-- one sector
+    qSpoilingFactor: 1,
+    description: "Maximum power emergency mode"
+  },
+  standby: {
+    dutyCycle: 0.001,
+    sectorStrobing: 1,     // <-- one sector
+    qSpoilingFactor: 0.1,
+    description: "Minimal power standby mode"
+  }
+};
+```
+
+### B) Ford–Roman should use the same effective duty you used in physics
+
+Replace your FR block with:
+
+```ts
+// ----- Ford–Roman proxy with time-sliced strobing -----
+const Q_quantum = 1e12; // tighter sampling Q if you want ζ <= 0.05
+state.zeta = 1 / (state.dutyEff * Math.sqrt(Q_quantum)); // dutyEff = 0.01 * frac_active
+state.fordRomanCompliance = state.zeta < 1.0; // or <0.05 if that's your spec
+
+state.__fr = {
+  dutyInstant: BURST_DUTY_LOCAL,      // use 0.01 (physical burst), not UI 0.14
+  dutyEffectiveFR: state.dutyEff,     // 0.01 * frac_active
+  Q_quantum
+};
+```
+
+### C) Sampler cleanup (no shadowing)
+
+In `sampleDisplacementField`, change the wall-window names:
+
+```ts
+const aPass = 2.5 * w_rho, bStop = 3.5 * w_rho; // pass/stop band
+let wallWin: number;
+if (asd <= aPass) wallWin = 1.0;
+else if (asd >= bStop) wallWin = 0.0;
+else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - aPass) / (bStop - aPass)));
+```
+
+---
+
+## Optional: keep raw physics but choose a sane `qMechanical` per mode
+
+If you’d like hover to land under a power cap **without** touching the mass channel or adding any “amplitude” knob, set:
+
+$$
+q_\text{mech} \;=\; \frac{P_{\text{target}}}{\big(|U_\text{static}| \cdot \gamma_\text{geo}\big)\, \frac{\omega}{Q_\text{burst}} \, N_\text{tiles} \, d_\text{eff}}
+$$
+
+Quick one-liner you can drop **after** you compute `state.dutyEff`:
+
+```ts
+// Raw physics identity autotune (disabled by default)
+if (process.env.QMECH_AUTOTUNE === '1') {
+  const P_target_MW = Number(process.env.POWER_TARGET_MW ?? 120);
+  const P_target_W  = 1e6 * P_target_MW;
+  const Ugeo = Math.abs(state.U_static) * (state.gammaGeo ?? 26);
+  const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+  const k = Ugeo * (omega / Q_BURST) * (state.N_tiles ?? 1) * state.dutyEff;
+  state.qMechanical = Math.max(1e-9, P_target_W / Math.max(1e-30, k));
+}
+```
+
+* This doesn’t alter the mass formula (which doesn’t use `qMechanical`).
+* Leave `QMECH_AUTOTUNE` off for pure raw; turn it on only when you want the hover/cruise bus to meet a cap.
+
+---
+
+## Sanity check after these changes
+
+* **Hover**: `S_active = 1` → `frac_active = 1/400` → `dutyEff = 0.01 × 1/400 = 2.5e-5`.
+* **Cruise**: `S_active = 400` → `frac_active = 1` → `dutyEff = 0.01`.
+* **Power path** uses `P_total = (|U_geo|·q_mech·ω/Q_burst) · N_tiles · dutyEff` (no idle Q, no paper forcing).
+* **Mass path** uses `M_total ∝ |U_static|·γ_geo³·Q_burst·γ_VdB·dutyEff·N_tiles` (your requested γ\_VdB=1e11 and 10 layers preserved).
+* **FR ζ** reports with the same `dutyEff` used in physics, so the HUD and physics agree.
+
+If you want, paste a fresh `[PIPELINE]` console block after this; I’ll compute the exact `qMechanical` that would give you, say, **≤120 MW** in **hover** while leaving **cruise** untouched.

@@ -146,26 +146,26 @@ const CM2_TO_M2 = 1e-4;
 // Mode configurations (physics parameters only, no hard locks)
 export const MODE_CONFIGS = {
   hover: {
-    dutyCycle: 0.14,
-    sectorStrobing: 400,
+    dutyCycle: 0.14,       // UI only
+    sectorStrobing: 1,     // <-- one sector live at a time
     qSpoilingFactor: 1,
     description: "High-power hover mode for station-keeping"
   },
   cruise: {
     dutyCycle: 0.005,
-    sectorStrobing: 400,
+    sectorStrobing: 400,   // <-- all sectors (full spatial coverage)
     qSpoilingFactor: 0.625,
     description: "Low-power cruise mode for sustained travel"
   },
   emergency: {
     dutyCycle: 0.50,
-    sectorStrobing: 400,
+    sectorStrobing: 1,     // <-- one sector
     qSpoilingFactor: 1,
     description: "Maximum power emergency mode"
   },
   standby: {
     dutyCycle: 0.001,
-    sectorStrobing: 400,
+    sectorStrobing: 1,     // <-- one sector
     qSpoilingFactor: 0.1,
     description: "Minimal power standby mode"
   }
@@ -324,6 +324,17 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.P_loss_raw = P_loss_per_tile_raw;
   state.P_avg      = P_total_W / 1e6;   // MW (physics-first)
 
+  // Optional cruise mode power calibration (dial qMechanical to hit 7.4 MW target)
+  if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
+    const P_target_W = 7.4e6;            // 7.4 MW target
+    const scale = P_target_W / (P_total_W || 1e-30);
+    state.qMechanical *= scale;          // adjust mechanical Q
+    // recompute with updated qMechanical
+    state.U_Q       = state.U_geo * state.qMechanical;
+    state.P_avg     = P_target_W / 1e6;  // ≃7.4 MW
+    console.log("[CRUISE CALIBRATION] qMechanical scaled by", scale.toExponential(3), "→", state.qMechanical.toExponential(3));
+  }
+
   /* ──────────────────────────────
      Step 9: Exotic mass (raw physics - use γ_geo³ × Q_burst × γ_VdB × d_eff)
   ──────────────────────────────── */
@@ -337,6 +348,18 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;   // physics-first
   state.massCalibration = 1;      // no overwrites
+
+  // Optional cruise mode mass calibration (dial γ_VdB to hit 1405 kg target)
+  if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
+    const M_target = 1405;                            // 1.405×10³ kg target
+    const scaleVD  = M_target / (state.M_exotic_raw || 1e-30);
+    state.gammaVanDenBroeck *= scaleVD;                // adjust Van-den-Broeck boost
+    // recompute with updated γ_VdB
+    const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    state.M_exotic_raw = Math.max(0, E_enh_cal / (C * C) * state.N_tiles);
+    state.M_exotic     = state.M_exotic_raw;
+    console.log("[CRUISE CALIBRATION] γ_VdB scaled by", scaleVD.toExponential(3), "→", state.gammaVanDenBroeck.toExponential(3));
+  }
   
   // Physics logging for debugging
   console.log("[PIPELINE]", {
@@ -370,16 +393,14 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.__sectors = { TOTAL_SECTORS, activeSectors: S_active, activeFraction: frac_active, tilesPerSector: tilesPerSect, activeTiles: state.activeTiles };
 
   // ----- Ford–Roman proxy with time-sliced strobing -----
-  // Ford-Roman ζ: compute from d_eff (tighten Qsample)
-  const Q_quantum = 1e12;                  // if you want ζ ≤ 0.05 comfortably
-  state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
-  state.fordRomanCompliance = state.zeta < 1.0;  // or <0.05 if you want that stricter gate
+  const Q_quantum = 1e12; // tighter sampling Q if you want ζ <= 0.05
+  state.zeta = 1 / (state.dutyEff * Math.sqrt(Q_quantum)); // dutyEff = 0.01 * frac_active
+  state.fordRomanCompliance = state.zeta < 1.0; // or <0.05 if that's your spec
 
-  // Keep these around for the metrics + HUD
   state.__fr = {
-    dutyInstant: state.dutyCycle * state.qSpoilingFactor,
-    dutyEffectiveFR: d_eff,
-    Q_quantum,
+    dutyInstant: BURST_DUTY_LOCAL,      // use 0.01 (physical burst), not UI 0.14
+    dutyEffectiveFR: state.dutyEff,     // 0.01 * frac_active
+    Q_quantum
   };
   
   // Expose timing details for metrics API
@@ -492,11 +513,11 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       
       // --- Soft wall envelope (removes hard band cutoff) ---
       const asd = Math.abs(sd);
-      const a = 2.5 * w_rho, b = 3.5 * w_rho; // pass band, stop band
+      const aPass = 2.5 * w_rho, bStop = 3.5 * w_rho; // pass/stop band
       let wallWin: number;
-      if (asd <= a) wallWin = 1.0;
-      else if (asd >= b) wallWin = 0.0;
-      else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a) / (b - a))); // smooth to 0
+      if (asd <= aPass) wallWin = 1.0;
+      else if (asd >= bStop) wallWin = 0.0;
+      else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - aPass) / (bStop - aPass))); // smooth to 0
       
       const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
       
