@@ -259,8 +259,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
 
-  // Derived tile count (no hard-coding; lets geometry drive it)
-  state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2));
+  // Derived tile count with radial layers (×10 multiplier from research papers)
+  const RADIAL_LAYERS = 10;
+  state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2) * RADIAL_LAYERS);
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
