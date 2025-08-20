@@ -1,0 +1,137 @@
+Short answer: you’re *mostly* wired correctly to the pipeline, but there are a few accuracy/safety nits that can cause stale or wrong values in edge-cases:
+
+* You directly call `.toFixed/.toExponential` on several `parameters.*` without guarding (these are sometimes `undefined/null` during mode switches).
+* You shadow your `num` helper inside an effect (harmless, but easy to drift).
+* You default `gammaVanDenBroeck` to `1` in one path (should match pipeline’s \~`2.86e5`).
+* `wallWidth` is taken from a field named `w_norm`; your comment says “16 nm”, but you pass `0.016` straight through. That’s a **unit mismatch** unless your engine expects a *normalized* width.
+* `betaTiltVec` is typed `number[]` in props, but you treat it as a fixed 3-tuple; you should validate into a strict `[x,y,z]`.
+* Duplicate `declare global { interface Window { WarpEngine: any } }` (top *and* bottom).
+* The engine uniforms use `Qburst`, `sectors`, `split`—that’s good—but make sure the parent (helix-core) is feeding **mode-derived duty/sectors** (with that `dutyUI`/`sectorsUI` patch you added). The visualizer should just trust props.
+
+Here’s a tight patch that fixes the above without changing behavior:
+
+```tsx
+// 1) TOP: keep a single Window declaration (remove the one at the bottom)
+declare global {
+  interface Window {
+    WarpEngine: any;
+  }
+}
+
+// 2) Helpers: add safe formatters and a strict vec3 guard
+const isFiniteNum = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);
+const safeFix = (v: any, d = 0, digits = 1) => isFiniteNum(v) ? v.toFixed(digits) : d.toFixed(digits);
+const safeExp = (v: any, digits = 1, fallback = '—') => isFiniteNum(v) ? v.toExponential(digits) : fallback;
+const num = (v: any, d = 0) => (isFiniteNum(v) ? v : d);
+const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
+  Array.isArray(v) && v.length === 3 && v.every(isFiniteNum) ? (v as [number, number, number]) : d;
+
+// ...
+
+// 3) When building uniforms (both initializeEngine paths): fix defaults + units + vec3
+const mode = (parameters.currentMode || 'hover').toLowerCase();
+const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+
+const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+
+// If your engine expects a *normalized* wall width (ρ-space), keep w_norm.
+// If it expects meters, derive from sagDepth_nm (≈ wall thickness scale):
+const wallWidth_norm = num(parameters.wall?.w_norm, 0.016); // normalized (renderer space)
+const wallWidth_m = (isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9);
+
+// Choose exactly one to send depending on what WarpEngine expects:
+const wallWidth = wallWidth_norm; // <-- if engine uses normalized width
+// const wallWidth = wallWidth_m;  // <-- if engine uses meters
+
+const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+  mode === 'standby' ? 0.0 : mode === 'cruise' ? 0.012 : mode === 'hover' ? 0.020 : 0.035);
+
+const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
+
+const initialUniforms = {
+  dutyCycle: dutyFrac,
+  gammaGeo: num(parameters.g_y, 26),
+  Qburst: num(parameters.cavityQ, 1e9),
+  deltaAOverA: num(parameters.qSpoilingFactor, 1),
+  gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // <-- pipeline-aligned default
+  currentMode: mode,
+  sectors,
+  split: phaseSplit,
+  axesScene: parameters.axesScene,
+  hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+  wallWidth,
+  gridSpan: parameters.gridSpan,
+  epsilonTilt: epsilonTiltResolved,
+  betaTiltVec: betaTiltResolved,
+  tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
+};
+
+// 4) In the live-update useEffect, avoid shadowing `num` and keep the same defaults
+// Replace the inner `const num = ...` with:
+const n = (v: any, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+
+// ...then use n(...) in updateUniforms:
+engineRef.current.updateUniforms({
+  currentMode: mode,
+  dutyCycle: dutyFrac,
+  sectors,
+  split: phaseSplit,
+  viewAvg: true,
+  gammaGeo: n(parameters.g_y, 26),
+  Qburst: n(parameters.cavityQ, 1e9),
+  deltaAOverA: n(parameters.qSpoilingFactor, 1),
+  gammaVdB: n(parameters.gammaVanDenBroeck, 2.86e5),
+  hullAxes: [n(hull.a), n(hull.b), n(hull.c)],
+  wallWidth,
+  epsilonTilt: epsilonTiltResolved,
+  betaTiltVec: betaTiltResolved,
+  tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
+  vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
+  _debugHUD: true,
+  sagDepth_nm: n(parameters.sagDepth_nm, 16),
+  powerAvg_MW: n(parameters.powerAvg_MW, 83.3),
+  exoticMass_kg: n(parameters.exoticMass_kg, 1405),
+  tsRatio: n(parameters.tsRatio, 4100),
+});
+
+// 5) HUD / details: use safe formatters to avoid runtime crashes during mode flips
+// Example HUD lines:
+P: {safeFix(parameters.powerAvg_MW, 83.3, 1)}MW |
+D: {safeFix(parameters.dutyCycle * 100, 14, 1)}%
+
+// In the small details grid:
+<span className="text-yellow-400">{safeExp(parameters.cavityQ, 1, '1.0e+9')}</span>
+<span className="text-blue-400">{safeFix(parameters.sagDepth_nm, 16, 1)} nm</span>
+<span className="text-green-400">{safeFix(parameters.powerAvg_MW, 83.3, 1)} MW</span>
+<span className="text-purple-400">{safeFix(parameters.exoticMass_kg, 1405, 0)} kg</span>
+
+// 6) Animation toggle: use functional setState to avoid stale closure
+const toggleAnimation = () => {
+  setIsRunning(prev => {
+    const next = !prev;
+    if (engineRef.current) {
+      if (next) {
+        engineRef.current._startRenderLoop?.();
+      } else if (engineRef.current.animationId) {
+        cancelAnimationFrame(engineRef.current.animationId);
+        engineRef.current.animationId = null;
+      }
+    }
+    return next;
+  });
+};
+```
+
+### Why this answers your question
+
+* **Accuracy of sourcing:** The visualizer now *only* renders what the parent (Helix-Core) passes from the centralized energy pipeline: `dutyCycle`, `sectorStrobing`, `qSpoilingFactor`, `g_y`, `cavityQ`, `gammaVanDenBroeck`, `powerAvg_MW`, `exoticMass_kg`, etc. The defaults match the pipeline’s paper-backed values, so if a field is briefly undefined during a mode swap, the visual stays correct rather than crashing or showing nonsense.
+
+* **Mode-derived knobs:** You already patched Helix-Core to compute `dutyUI/sectorsUI/qSpoilUI` from `MODE_CONFIGS`. With that in place, the visualizer faithfully reflects the active mode (no hidden recomputation here).
+
+* **Units clarity:** The wall width ambiguity is called out and the code shows *both* paths. Pick the one that matches your WarpEngine’s convention. (If your engine expects normalized ρ-thickness, keep `w_norm`; if it expects meters, send `wallWidth_m`.)
+
+* **Guarded UI:** No more `.toFixed()` on `undefined` during mode transitions.
+
+If you want, I can also show the exact lines to change in Helix-Core to ensure `gammaVanDenBroeck`, `dutyCycle`, and `sectorStrobing` are always passed in their *mode-derived* form to this component.

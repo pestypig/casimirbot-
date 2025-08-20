@@ -12,12 +12,13 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 
-// Helper functions for safe parameter extraction
-const num = (v: any, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
-const arr3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
-  Array.isArray(v) && v.length === 3 && v.every(x => typeof x === "number" && isFinite(x))
-    ? (v as [number, number, number])
-    : d;
+// Safe formatters and parameter extractors (fixes accuracy/safety during mode switches)
+const isFiniteNum = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);
+const safeFix = (v: any, d = 0, digits = 1) => isFiniteNum(v) ? v.toFixed(digits) : d.toFixed(digits);
+const safeExp = (v: any, digits = 1, fallback = '—') => isFiniteNum(v) ? v.toExponential(digits) : fallback;
+const num = (v: any, d = 0) => (isFiniteNum(v) ? v : d);
+const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
+  Array.isArray(v) && v.length === 3 && v.every(isFiniteNum) ? (v as [number, number, number]) : d;
 
 // Shift/tilt parameters for gentle interior gravity
 type ShiftParams = {
@@ -110,30 +111,31 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               Lx_m: 1007, Ly_m: 264, Lz_m: 173,
               a: 503.5, b: 132, c: 86.5
             };
-            const wallWidth = num(parameters.wall?.w_norm, 0.016);
-            const epsilonTilt = num(
-              (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt),
-              modeEpsilonTilt(mode)
-            );
-            const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
-              ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
-              : defaultBetaTilt;
+            // Wall width: handle both normalized and meter units  
+            const wallWidth_norm = num(parameters.wall?.w_norm, 0.016);
+            const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
+            const wallWidth = wallWidth_norm; // Engine expects normalized width
+            
+            const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+              mode === 'standby' ? 0.0 : mode === 'cruise' ? 0.012 : mode === 'hover' ? 0.020 : 0.035);
+            
+            const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
             
             const initialUniforms = {
               dutyCycle: dutyFrac,
-              gammaGeo: Number(parameters.g_y ?? 26),
-              Qburst: Number(parameters.cavityQ ?? 1e9),
-              deltaAOverA: Number(parameters.qSpoilingFactor ?? 1),
-              gammaVdB: Number(parameters.gammaVanDenBroeck ?? 1),
+              gammaGeo: num(parameters.g_y, 26),
+              Qburst: num(parameters.cavityQ, 1e9),
+              deltaAOverA: num(parameters.qSpoilingFactor, 1),
+              gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // Pipeline-aligned default
               currentMode: mode,
               sectors,
               split: phaseSplit,
               axesScene: parameters.axesScene,
-              hullAxes: [hull.a, hull.b, hull.c],
-              wallWidth: wallWidth,
+              hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+              wallWidth,
               gridSpan: parameters.gridSpan,
-              epsilonTilt: Number(epsilonTilt || 0),
-              betaTiltVec: betaTiltVec || [0, -1, 0],
+              epsilonTilt: epsilonTiltResolved,
+              betaTiltVec: betaTiltResolved,
               tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
             };
 
@@ -166,32 +168,30 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 Lx_m: 1007, Ly_m: 264, Lz_m: 173,
                 a: 503.5, b: 132, c: 86.5
               };
-              const wallWidth = num(parameters.wall?.w_norm, 0.016);
-              const epsilonTilt = num(
-                (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt),
-                modeEpsilonTilt(mode)
-              );
-              const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
-                ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
-                : defaultBetaTilt;
+              const wallWidth_norm = num(parameters.wall?.w_norm, 0.016);
+              const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
+              const wallWidth = wallWidth_norm; // Engine expects normalized width
+              
+              const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+                mode === 'standby' ? 0.0 : mode === 'cruise' ? 0.012 : mode === 'hover' ? 0.020 : 0.035);
+              
+              const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
               
               const initialUniforms = {
                 dutyCycle: dutyFrac,
-                gammaGeo: Number(parameters.g_y ?? 26),
-                Qburst: Number(parameters.cavityQ ?? 1e9),
-                deltaAOverA: Number(parameters.qSpoilingFactor ?? 1),
-                gammaVdB: Number(parameters.gammaVanDenBroeck ?? 1),
+                gammaGeo: num(parameters.g_y, 26),
+                Qburst: num(parameters.cavityQ, 1e9),
+                deltaAOverA: num(parameters.qSpoilingFactor, 1),
+                gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // Pipeline-aligned default
                 currentMode: mode,
                 sectors,
                 split: phaseSplit,
-                // Prefer already-computed scene axes if you have them;
-                // otherwise pass hull in meters and the engine will convert.
-                axesScene: parameters.axesScene,         // optional, if you compute it
-                hullAxes: [hull.a, hull.b, hull.c],      // fallback if axesScene not present
-                wallWidth: wallWidth,
-                gridSpan: parameters.gridSpan,           // optional if you compute it
-                epsilonTilt: Number(epsilonTilt || 0),
-                betaTiltVec: betaTiltVec || [0, -1, 0],
+                axesScene: parameters.axesScene,
+                hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+                wallWidth,
+                gridSpan: parameters.gridSpan,
+                epsilonTilt: epsilonTiltResolved,
+                betaTiltVec: betaTiltResolved,
                 tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
               };
 
@@ -253,17 +253,14 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // === COMPREHENSIVE MODE TRACKING: push all mode-related uniforms ===
       const mode = parameters.currentMode ?? "hover";
       
-      // Helper to ensure numeric values
-      const num = (v: any, def = 0) => {
-        const n = Number(v);
-        return Number.isFinite(n) ? n : def;
-      };
+      // Helper to ensure numeric values (avoid shadowing)
+      const n = (v: any, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
       // Duty as fraction [0..1]
-      const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+      const dutyFrac = Math.max(0, Math.min(1, n(parameters.dutyCycle, 0.14)));
       
       // Sector count (hover=1, cruise=400, etc.)
-      const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+      const sectors = Math.max(1, Math.floor(n(parameters.sectorStrobing, 1)));
       
       // Optional view selection (avg vs instantaneous)
       const viewAvg = true; // Default to averaged view
@@ -329,13 +326,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         viewAvg,              // ✅ exact name (NOT useAvg)
 
         // Amplification chain
-        gammaGeo: num(parameters.g_y, 26),
-        Qburst: num(parameters.cavityQ, 1e9),
-        deltaAOverA: num(parameters.qSpoilingFactor, 1),
-        gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
+        gammaGeo: n(parameters.g_y, 26),
+        Qburst: n(parameters.cavityQ, 1e9),
+        deltaAOverA: n(parameters.qSpoilingFactor, 1),
+        gammaVdB: n(parameters.gammaVanDenBroeck, 2.86e5),
 
         // Hull / wall
-        hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+        hullAxes: [n(hull.a), n(hull.b), n(hull.c)],
         wallWidth,
 
         // NEW: interior gravity uniforms
@@ -348,10 +345,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
-        sagDepth_nm: num(parameters.sagDepth_nm),
-        powerAvg_MW: num(parameters.powerAvg_MW),
-        exoticMass_kg: num(parameters.exoticMass_kg),
-        tsRatio: num(parameters.tsRatio, 4100)
+        sagDepth_nm: n(parameters.sagDepth_nm, 16),
+        powerAvg_MW: n(parameters.powerAvg_MW, 83.3),
+        exoticMass_kg: n(parameters.exoticMass_kg, 1405),
+        tsRatio: n(parameters.tsRatio, 4100)
       });
 
       // CRITICAL: force immediate visual update on parameter change
@@ -409,19 +406,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   }, [isLoaded]);
 
   const toggleAnimation = () => {
-    setIsRunning(!isRunning);
-    if (engineRef.current) {
-      if (!isRunning) {
-        // Resume animation loop
-        engineRef.current._startRenderLoop();
-      } else {
-        // Pause animation loop
-        if (engineRef.current.animationId) {
+    setIsRunning(prev => {
+      const next = !prev;
+      if (engineRef.current) {
+        if (next) {
+          engineRef.current._startRenderLoop?.();
+        } else if (engineRef.current.animationId) {
           cancelAnimationFrame(engineRef.current.animationId);
           engineRef.current.animationId = null;
         }
       }
-    }
+      return next;
+    });
   };
 
   const resetView = () => {
@@ -513,8 +509,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 {parameters.currentMode?.toUpperCase() || 'HOVER'} MODE
               </div>
               <div className="text-green-400">
-                P: {parameters.powerAvg_MW.toFixed(1)}MW | 
-                D: {(parameters.dutyCycle * 100).toFixed(1)}%
+                P: {safeFix(parameters.powerAvg_MW, 83.3, 1)}MW | 
+                D: {safeFix(parameters.dutyCycle * 100, 14, 1)}%
               </div>
             </div>
           )}
@@ -525,29 +521,29 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             <div className="space-y-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Duty Cycle:</span>
-                <span className="text-cyan-400">{(parameters.dutyCycle * 100).toFixed(1)}%</span>
+                <span className="text-cyan-400">{safeFix(parameters.dutyCycle * 100, 14, 1)}%</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">γ Geometric:</span>
-                <span className="text-orange-400">{parameters.g_y.toFixed(1)}</span>
+                <span className="text-orange-400">{safeFix(parameters.g_y, 26, 1)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Q Factor:</span>
-                <span className="text-yellow-400">{parameters.cavityQ.toExponential(1)}</span>
+                <span className="text-yellow-400">{safeExp(parameters.cavityQ, 1, '1.0e+9')}</span>
               </div>
             </div>
             <div className="space-y-1">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Sag Depth:</span>
-                <span className="text-blue-400">{parameters.sagDepth_nm.toFixed(1)} nm</span>
+                <span className="text-blue-400">{safeFix(parameters.sagDepth_nm, 16, 1)} nm</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Power:</span>
-                <span className="text-green-400">{parameters.powerAvg_MW.toFixed(1)} MW</span>
+                <span className="text-green-400">{safeFix(parameters.powerAvg_MW, 83.3, 1)} MW</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Exotic Mass:</span>
-                <span className="text-purple-400">{parameters.exoticMass_kg.toFixed(0)} kg</span>
+                <span className="text-purple-400">{safeFix(parameters.exoticMass_kg, 1405, 0)} kg</span>
               </div>
             </div>
           </div>
@@ -635,19 +631,19 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   return (
                     <div key={point.name} className="font-mono space-y-0.5">
                       <div className={`flex justify-between ${totalClass}`}>
-                        <span>{point.name} (s={point.s.toFixed(2)}):</span>
-                        <span>β_total = {betaTotal.toExponential(2)}</span>
+                        <span>{point.name} (s={safeFix(point.s, 0, 2)}):</span>
+                        <span>β_total = {safeExp(betaTotal, 2)}</span>
                       </div>
                       <div className="text-xs text-slate-400 flex justify-between">
                         <span>• β_bell</span>
                         <span className={betaBell >= 0 ? "text-orange-400" : "text-sky-400"}>
-                          {betaBell.toExponential(2)}
+                          {safeExp(betaBell, 2)}
                         </span>
                       </div>
                       <div className="text-xs text-slate-400 flex justify-between">
                         <span>• β_tilt</span>
                         <span className="text-violet-400">
-                          {betaTilt.toExponential(2)}
+                          {safeExp(betaTilt, 2)}
                         </span>
                       </div>
                     </div>
@@ -659,15 +655,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               <div className="mt-4 pt-3 border-t border-cyan-500/20">
                 <div className="text-cyan-300 font-semibold mb-2">Current Parameters:</div>
                 <div className="text-green-300">Mode: {parameters.currentMode || 'hover'}</div>
-                <div className="text-green-300">Power: {parameters.powerAvg_MW.toFixed(1)}MW</div>
-                <div className="text-green-300">Duty: {(parameters.dutyCycle * 100).toFixed(1)}%</div>
+                <div className="text-green-300">Power: {safeFix(parameters.powerAvg_MW, 83.3, 1)}MW</div>
+                <div className="text-green-300">Duty: {safeFix(parameters.dutyCycle * 100, 14, 1)}%</div>
                 {parameters.hull && (
                   <div className="text-blue-300 mt-2">
                     <div>Hull: {parameters.hull.Lx_m}×{parameters.hull.Ly_m}×{parameters.hull.Lz_m}m</div>
-                    <div>Semi-axes: {parameters.hull.a.toFixed(1)}×{parameters.hull.b.toFixed(1)}×{parameters.hull.c.toFixed(1)}m</div>
+                    <div>Semi-axes: {safeFix(parameters.hull.a, 503.5, 1)}×{safeFix(parameters.hull.b, 132, 1)}×{safeFix(parameters.hull.c, 86.5, 1)}m</div>
                   </div>
                 )}
-                <div className="text-green-300">Q-Factor: {parameters.cavityQ.toExponential(0)}</div>
+                <div className="text-green-300">Q-Factor: {safeExp(parameters.cavityQ, 0, '1e+9')}</div>
                 <div className="text-green-300">Exotic Mass: {parameters.exoticMass_kg}kg</div>
               </div>
               
@@ -735,10 +731,4 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       </CardContent>
     </Card>
   );
-}
-
-declare global {
-  interface Window {
-    WarpEngine: any;
-  }
 }
