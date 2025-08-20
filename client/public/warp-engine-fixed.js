@@ -1161,16 +1161,21 @@ class WarpEngine {
         const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || 1);
         const gammaGeo     = U.gammaGeo || 0;
         const Qburst       = Q_BURST;
-        const d_eff        = BURST_DUTY_LOCAL * (sectors / TOTAL_SECTORS);
+        const qSpoil       = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
         const gammaVdB     = GAMMA_VDB;
+        
+        // Paper-correct physics: β_phys = γ³ × q_spoil × γ_VdB × d_eff
+        const frac_active  = Math.min(1, sectors / TOTAL_SECTORS);
+        const d_eff        = BURST_DUTY_LOCAL * frac_active;
+        const gamma3       = Math.pow(gammaGeo, 3);
 
-        const betaInst = Math.pow(gammaGeo,3) * Qburst * gammaVdB * d_eff;
-        const betaAvg  = betaInst; 
+        const betaInst = gamma3 * qSpoil * gammaVdB * BURST_DUTY_LOCAL;  // instantaneous
+        const betaAvg  = gamma3 * qSpoil * gammaVdB * d_eff;             // ship-averaged
         const phase    = (U.phaseSplit != null) ? U.phaseSplit :
                         (U.currentMode === 'cruise' ? 0.65 : 0.50);
         const betaNet  = betaAvg * (2*phase - 1);
 
-        return { betaInst, betaAvg, betaNet, sectors, phase };
+        return { betaInst, betaAvg, betaNet, sectors, phase, d_eff, frac_active };
     }
 
     _sampleYorkAndEnergy(U){
@@ -1212,7 +1217,7 @@ class WarpEngine {
         return {
             mode: U.currentMode||'hover',
             duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
-            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||GAMMA_VDB),
             sectors:P.sectors, phase:P.phase,
             beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
             theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
