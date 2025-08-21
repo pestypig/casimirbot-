@@ -11,6 +11,64 @@ import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
+import * as VIS from '@/constants/VIS';
+
+// ---- Visualization & Physics-Bridge Constants (no hidden magic) ----
+const VIS_LOCAL = {
+  // Grid & mesh
+  spanPaddingDesktop: VIS.spanPaddingDesktop,
+  spanPaddingPhone: 1.45,
+  minSpan: VIS.minSpan,
+  baseDivMin: 160,
+  divCap: 320,
+  targetVertsAcrossWall: 12,
+  yBase: -0.15,
+  yVariation: 0.05,
+
+  // Camera
+  fovDesktopRad: VIS.fovDesktopRad,   // ~55°
+  fovPortraitRad: VIS.fovPortraitRad,   // ~68°
+  portraitAspectKnee: 1.2,
+  portraitBlendWidth: 0.6,
+  baseMargin: 1.22,
+  portraitMarginMul: 1.12,
+  nearFar: { near: 0.08, far: 100.0 },
+  nearFarAlt: { near: 0.1, far: 200.0 },
+  eyeYScale: 0.62,
+  lookDownScale: -0.12,
+  dprCapPhone: 1.5,
+  dprCapDesktop: 2.0,
+
+  // Shading & colors
+  colorDiverge: {
+    blue: [0.15, 0.45, 1.0],
+    white: [1, 1, 1],
+    red: [1.0, 0.45, 0.0],
+  },
+  interiorViolet: [0.70, 0.30, 1.00],
+  alphaGrid: 0.85,
+  alphaGridGL2: 0.9,
+
+  // Temporal smoothing
+  dispBlendAlpha: 0.25,
+
+  // Physics→visual bridge
+  defaultWallWidthRho: VIS.defaultWallWidthRho,      // ρ-units, used only if not computed
+  gridGain: 0.12,                   // geometry push gain
+  vizNorm: 1e-9,                    // amplitude normalizer
+  vizGainDefault: VIS.vizGainDefault,
+  vizGainEmergency: VIS.vizGainEmergency,
+  vizGainCruise: VIS.vizGainCruise,
+  exposureDefault: VIS.exposureDefault,
+  zeroStopDefault: VIS.zeroStopDefault,
+  logKnee: 1e10,                    // prevents low-power modes from saturating colors after γ³ and γ_VdB amplification; not physics
+  logSlope: 1.0,
+  modeScale: { standby: 0.05, cruise: 0.25, hover: 0.60, emergency: 0.90 },
+  strobeBlendWidth: 1.5,
+  frontBackSoftDiv: 0.15,
+  maxPush: 0.15,                    // clamp ceiling
+  interior: { minWindow: 0.02, widthMul: 3.0, tiltGain: 0.55, maxTilt: 0.05, tintViz: 8.0 },
+};
 
 // Safe formatters and parameter extractors (fixes accuracy/safety during mode switches)
 const isFiniteNum = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -112,7 +170,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               a: 503.5, b: 132, c: 86.5
             };
             // Wall width: handle both normalized and meter units  
-            const wallWidth_norm = num(parameters.wall?.w_norm, 0.016);
+            const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
             const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
             const wallWidth = wallWidth_norm; // Engine expects normalized width
             
@@ -168,7 +226,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 Lx_m: 1007, Ly_m: 264, Lz_m: 173,
                 a: 503.5, b: 132, c: 86.5
               };
-              const wallWidth_norm = num(parameters.wall?.w_norm, 0.016);
+              const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
               const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
               const wallWidth = wallWidth_norm; // Engine expects normalized width
               
@@ -315,7 +373,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         Lx_m: 1007, Ly_m: 264, Lz_m: 173,
         a: 503.5, b: 132, c: 86.5
       };
-      const wallWidth = num(parameters.wall?.w_norm, 0.016); // 16 nm default
+      const wallWidth = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho); // ρ-units default
 
       // Enhanced mode reconnection: push all mode-related uniforms with exact names
       engineRef.current.updateUniforms({
@@ -342,14 +400,14 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         tiltGain,                                  // gentle visual scaling
         
         // Visual scaling for clear mode differences
-        vizGain: mode === 'emergency' ? 2.0 : mode === 'cruise' ? 0.8 : 1.0,
+        vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
         sagDepth_nm: n(parameters.sagDepth_nm, 16),
-        powerAvg_MW: n(parameters.powerAvg_MW, 83.3),
-        exoticMass_kg: n(parameters.exoticMass_kg, 1405),
-        tsRatio: n(parameters.tsRatio, 4100)
+        powerAvg_MW: n(parameters.powerAvg_MW, VIS.powerAvgFallback),
+        exoticMass_kg: n(parameters.exoticMass_kg, VIS.exoticMassFallback),
+        tsRatio: n(parameters.tsRatio, VIS.tsRatioDefault)
       });
 
       // CRITICAL: force immediate visual update on parameter change
@@ -467,7 +525,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               onClick={() => {
                 resetView();
                 zenLongToast("helix:diagnostics", {
-                  zeta: 0.032,
+                  zeta: VIS.zetaDefault,
                   tsRatio: parameters.tsRatio,
                   frOk: true,
                   natarioOk: true,
@@ -490,8 +548,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             ref={canvasRef}
             className="w-full h-full block transition-opacity duration-200"
             style={{ opacity: isLoaded ? 1 : 0 }}   // no "jump" while fitting
-            width={512}
-            height={256}
+            width={VIS.canvasWidthDefault}
+            height={VIS.canvasHeightDefault}
             data-testid="canvas-warp-bubble"
           />
           {!isLoaded && (
@@ -510,7 +568,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 {parameters.currentMode?.toUpperCase() || 'HOVER'} MODE
               </div>
               <div className="text-green-400">
-                P: {safeFix(parameters.powerAvg_MW, 83.3, 1)}MW | 
+                P: {safeFix(parameters.powerAvg_MW, VIS.powerAvgFallback, 1)}MW | 
                 D: {safeFix(parameters.dutyCycle * 100, 14, 1)}%
               </div>
             </div>
@@ -540,11 +598,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Power:</span>
-                <span className="text-green-400">{safeFix(parameters.powerAvg_MW, 83.3, 1)} MW</span>
+                <span className="text-green-400">{safeFix(parameters.powerAvg_MW, VIS.powerAvgFallback, 1)} MW</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Exotic Mass:</span>
-                <span className="text-purple-400">{safeFix(parameters.exoticMass_kg, 1405, 0)} kg</span>
+                <span className="text-purple-400">{safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)} kg</span>
               </div>
             </div>
           </div>
@@ -656,7 +714,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               <div className="mt-4 pt-3 border-t border-cyan-500/20">
                 <div className="text-cyan-300 font-semibold mb-2">Current Parameters:</div>
                 <div className="text-green-300">Mode: {parameters.currentMode || 'hover'}</div>
-                <div className="text-green-300">Power: {safeFix(parameters.powerAvg_MW, 83.3, 1)}MW</div>
+                <div className="text-green-300">Power: {safeFix(parameters.powerAvg_MW, VIS.powerAvgFallback, 1)}MW</div>
                 <div className="text-green-300">Duty: {safeFix(parameters.dutyCycle * 100, 14, 1)}%</div>
                 {parameters.hull && (
                   <div className="text-blue-300 mt-2">
@@ -665,7 +723,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   </div>
                 )}
                 <div className="text-green-300">Q-Factor: {safeExp(parameters.cavityQ, 0, '1e+9')}</div>
-                <div className="text-green-300">Exotic Mass: {safeFix(parameters.exoticMass_kg, 1405, 0)}kg</div>
+                <div className="text-green-300">Exotic Mass: {safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)}kg</div>
               </div>
               
               {/* Debug Controls */}
@@ -689,8 +747,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             qFactor={parameters.cavityQ}
             duty={parameters.dutyCycle}
             powerMW={parameters.powerAvg_MW}
-            tsRatio={parameters.tsRatio || 4102.7}
-            zeta={0.032}
+            tsRatio={parameters.tsRatio || VIS.tsRatioFallback}
+            zeta={VIS.zetaDefault}
           />
         </div>
         
