@@ -26,8 +26,8 @@ export const canvasHeightDefault = 256;  // Default canvas height
 export const vizGainDefault = 4.0;       // Default visualization gain
 export const vizGainEmergency = 2.0;     // Emergency mode viz gain
 export const vizGainCruise = 0.8;        // Cruise mode viz gain
-export const exposureDefault = 6.0;      // Default exposure level
-export const zeroStopDefault = 1e-7;     // Default zero-stop threshold
+export const exposureDefault = Math.max(1.0, 6.0);      // Default exposure level (>= 1.0)
+export const zeroStopDefault = Math.max(1e-18, 1e-7);     // Default zero-stop threshold (> 0)
 
 // Wall width constants
 export const defaultWallWidthRho = 0.016;  // Default wall width in ρ-units (16 nm normalized)

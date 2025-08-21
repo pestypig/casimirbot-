@@ -61,12 +61,13 @@ const VIS_LOCAL = {
   vizGainCruise: VIS.vizGainCruise,
   exposureDefault: VIS.exposureDefault,
   zeroStopDefault: VIS.zeroStopDefault,
-  logKnee: 1e10,                    // prevents low-power modes from saturating colors after γ³ and γ_VdB amplification; not physics
-  logSlope: 1.0,
-  modeScale: { standby: 0.05, cruise: 0.25, hover: 0.60, emergency: 0.90 },
+  // Legacy constants (no longer control visuals but kept for compatibility)
+  logKnee: 1e10,                    // deprecated: engine handles compression internally
+  logSlope: 1.0,                    // deprecated: unified log mapping in engine
+  modeScale: { standby: 0.05, cruise: 0.25, hover: 0.60, emergency: 0.90 }, // deprecated: light seasoning in engine
   strobeBlendWidth: 1.5,
   frontBackSoftDiv: 0.15,
-  maxPush: 0.15,                    // clamp ceiling
+  maxPush: 0.22,                    // clamp ceiling (matches engine)
   interior: { minWindow: 0.02, widthMul: 3.0, tiltGain: 0.55, maxTilt: 0.05, tintViz: 8.0 },
 };
 
@@ -163,6 +164,13 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         if (window.WarpEngine) {
           try {
             engineRef.current = new window.WarpEngine(canvasRef.current);
+            
+            // Bootstrap engine with sensible defaults for immediate visual feedback
+            engineRef.current.bootstrap({
+              exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
+              zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
+              curvatureGainDec: 3, // 10^3 = 1000 for visibly curved startup
+            });
             
             // Build initial uniforms from current props/metrics
             const mode = (parameters.currentMode || 'hover').toLowerCase();
