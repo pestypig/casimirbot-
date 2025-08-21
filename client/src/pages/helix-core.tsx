@@ -46,6 +46,7 @@ import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
 import { HelpCircle } from "lucide-react";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
+import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 
 // --- Safe numeric formatters ---
 const isFiniteNumber = (v: unknown): v is number =>
@@ -307,6 +308,17 @@ export default function HelixCore() {
   const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing)
     ? pipeline!.sectorStrobing!
     : (modeCfg.sectorStrobing ?? 1);
+
+  // Shared light-crossing loop for synchronized strobing across all visual components  
+  const lc = useLightCrossingLoop({
+    sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
+    currentSector: systemMetrics?.currentSector ?? 0,
+    sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,
+    duty: dutyUI,
+    freqGHz: pipeline?.modulationFreq_GHz ?? 15,
+    hull: { a: 503.5, b: 132, c: 86.5 },
+    wallWidth_m: 6.0,
+  });
 
   const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)
     ? pipeline!.qSpoilingFactor!
@@ -912,7 +924,13 @@ export default function HelixCore() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <LightSpeedStrobeScale />
+            <LightSpeedStrobeScale 
+              dwellMs={lc.dwell_ms}
+              tauLcMs={lc.tauLC_ms}
+              sectorIdx={lc.sectorIdx}
+              sectorCount={lc.sectorCount}
+              phase={lc.phase}
+            />
           </CardContent>
         </Card>
 
@@ -1876,6 +1894,7 @@ export default function HelixCore() {
             stateEndpoint="/api/helix/pipeline" 
             fieldEndpoint="/api/helix/displacement"
             modeEndpoint="/api/helix/mode"
+            lightCrossing={lc}
           />
         </div>
         
