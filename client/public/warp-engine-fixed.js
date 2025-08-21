@@ -111,27 +111,28 @@ class WarpEngine {
         };
         window.__warp_setCosmetic = this.__warp_setCosmetic;
 
-        // 🔬 True Physics preset (no cosmetics, no boosts, pure physics)
-        this.__warp_truePhysics = () => {
-            try {
-                // Enable physics parity mode for true no-cosmetics operation
-                this.updateUniforms({ physicsParityMode: true });
-                console.log('🔬 TRUE PHYSICS: Physics parity mode enabled - pure pipeline amplitude, no visual enhancements');
-            } catch(e) { console.warn(e); }
+        // One-click presets
+        window.__warp_truePhysics = () => {
+          this.updateUniforms({
+            physicsParityMode: true,        // activates the clamp above
+            curvatureBoostMax: 1,
+            curvatureGainT: 0,
+            // exposure/zeroStop are set in the parity block
+          });
+          console.log("✅ True Physics: parity ON, no boosts/cosmetics");
         };
-        window.__warp_truePhysics = this.__warp_truePhysics;
 
-        // 🎨 Showcase preset (full cosmetics, current look)
-        this.__warp_showcase = () => {
-            try {
-                // Disable physics parity mode and enable full visual enhancements
-                this.updateUniforms({ physicsParityMode: false });
-                this.setCosmeticLevel(10);  // full cosmetic blend
-                this.setCurvatureGainDec(0, 40);  // reset to baseline with full boost available
-                console.log('🎨 SHOWCASE: Maximum visual enhancement for demonstration');
-            } catch(e) { console.warn(e); }
+        window.__warp_showcase = () => {
+          this.updateUniforms({
+            physicsParityMode: false,
+            cosmeticLevel: 10,
+            curvatureBoostMax: 40,
+            curvatureGainT: 0.50,          // "demo" mid-boost; adjust to taste
+            exposure: 6.0,
+            zeroStop: 1e-7,
+          });
+          console.log("🎨 Showcase: parity OFF, cosmetics/boosts ON");
         };
-        window.__warp_showcase = this.__warp_showcase;
 
         // default to "current visuals" feel
         this.setCosmeticLevel(10);
