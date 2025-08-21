@@ -2,7 +2,8 @@
 // This module provides centralized energy calculations that all panels can access
 
 // Model mode switch: raw physics or paper-calibrated targets
-const MODEL_MODE: 'calibrated' | 'raw' = 
+// Explicit default: paper-calibrated targets; set HELIX_MODEL_MODE=raw to bypass
+const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
@@ -143,13 +144,23 @@ const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
 const RADIAL_LAYERS    = 10;     // surface × radial lattice
 
-// --- Mode power/mass policy (targets are *hit* by scaling qMechanical, γ_VdB) ---
+// Export paper constants so UI and docs can reference the single source of truth
+export const PAPER = { TOTAL_SECTORS, BURST_DUTY_LOCAL, Q_BURST, GAMMA_VDB };
+
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
+// NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
   hover:     { S_live: 'all' as const, P_target_W: 83.3e6,   M_target_kg: 1_000 },
-  cruise:    { S_live: 1 as const,     P_target_W: 7.437,    M_target_kg: 1_000 }, // 7.437 W
+  cruise:    { S_live: 1 as const,     P_target_W: 7.437,    M_target_kg: 1_000 }, // 7.437 **W**
   emergency: { S_live: 'all' as const, P_target_W: 297.5e6,  M_target_kg: 1_000 },
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
 } as const;
+
+// Runtime assert in dev to prevent unit confusion
+if (process.env.NODE_ENV !== 'production') {
+  const isWatt = MODE_POLICY.cruise.P_target_W < 1000;
+  if (!isWatt) console.warn("[PIPELINE] Cruise P_target looks >1kW; targets must be in watts.");
+}
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
   const pol = MODE_POLICY[mode];
@@ -168,7 +179,7 @@ export const MODE_CONFIGS = {
   cruise: {
     dutyCycle: 0.005,
     sectorStrobing: 400,
-    qSpoilingFactor: 0.625,
+    qSpoilingFactor: 0.625,  // keep this consistent with UI defaults below
     description: "Low-power cruise mode for sustained travel"
   },
   emergency: {
