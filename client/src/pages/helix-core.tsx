@@ -1366,6 +1366,8 @@ export default function HelixCore() {
               freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
               sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
               currentSector={systemMetrics?.currentSector}
+              hull={pipeline ? { a: 503.5, b: 132, c: 86.5 } : undefined}
+              wallWidth_m={6.0}
             />
           </div>
 
