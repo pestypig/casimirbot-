@@ -1,0 +1,189 @@
+Short answer: not yet. It “looks” aligned, but several names, units, and guardrails don’t match the new pipeline. That’s why duty/power/ζ don’t track what Helix-Core shows.
+
+Here’s what’s off + the fixes you should apply:
+
+### What’s inconsistent
+
+1. **Field names don’t match the pipeline**
+
+* You use `cavityQ`, `duty`, `sectors`, `qSpoiling`, `pocketGamma`.
+* Pipeline/Helix use: `qCavity`, `dutyCycle`, `sectorStrobing`, `qSpoilingFactor`, `gammaVanDenBroeck`.
+
+2. **`gammaVanDenBroeck` magnitude**
+
+* You set `pocketGamma` to `2.86e9`, `8.0e10`, etc.
+* Everywhere else (visualizer + pipeline) we use **\~2.86e5** as the stable default. That’s a **10⁴–10⁵×** mismatch and will skew feasibility colors.
+
+3. **Cruise power text**
+
+* Preset text says **“7.4 MW”**; earlier we use \~**83.3 MW (hover)**, **\~297 MW (emergency)**, and cruise is usually **very low average** (duty 0.5% with 400 sectors). If you want to show power, don’t hard-code; read `P_avg` from the pipeline or from `MODE_CONFIGS[mode].powerTarget`.
+
+4. **Ford-Roman limit vs `maxZeta`**
+
+* Pipeline compliance is `zeta ≤ 0.05`. Your defaults set `hover maxZeta = 0.1` (too lax) and `cruise maxZeta = 1.5` (way lax). That’ll mark non-compliant states as “viable”.
+
+5. **Time-scale threshold**
+
+* You label *“TS\_ratio ≥ 100”* but store `minTimescale = 0.01`. That’s inverted. Use **100** (or keep it as a ratio and log-slider 10²–10⁵).
+
+6. **Preset descriptions are parsed for numbers**
+
+* Pulling MW/kg/ζ out of the description string is brittle. Read the real numbers from the pipeline or pass them as fields.
+
+7. **Double-click resets**
+
+* `duty` slider min is 0.1% so you can’t reach Standby (0%) without a double-click. That’s OK if intentional; otherwise allow min 0.
+
+---
+
+## Drop-in patch (minimal + safe)
+
+**A. Normalize names and read mode numbers from the pipeline / MODE\_CONFIGS**
+
+```ts
+// add near top
+import { useEnergyPipeline, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+
+const DEFAULT_GAMMA_VDB = 2.86e5;
+
+const pick = <T,>(v: T | undefined, d: T) => (typeof v === "number" ? (isFinite(v as any) ? v! : d) : (v ?? d));
+
+function resolveModeNumbers(mode: string, pipeline?: any) {
+  const m = (mode || "hover").toLowerCase() as keyof typeof MODE_CONFIGS;
+
+  // Prefer live pipeline when present; else MODE_CONFIGS; else sane fallbacks
+  const dutyCycle       = pick(pipeline?.dutyCycle,       MODE_CONFIGS[m]?.duty ?? 0.14);
+  const sectorStrobing  = pick(pipeline?.sectorStrobing,  MODE_CONFIGS[m]?.sectors ?? 1);
+  const qSpoilingFactor = pick(pipeline?.qSpoilingFactor, MODE_CONFIGS[m]?.qSpoil ?? 1);
+  const qCavity         = pick(pipeline?.qCavity,         MODE_CONFIGS[m]?.qCavity ?? 1e9);
+  const P_avg           = pick(pipeline?.P_avg,           MODE_CONFIGS[m]?.powerTarget ?? 83.3);
+  const gammaVanDenBroeck = pick(pipeline?.gammaVanDenBroeck, DEFAULT_GAMMA_VDB);
+
+  return { dutyCycle, sectorStrobing, qSpoilingFactor, qCavity, P_avg, gammaVanDenBroeck };
+}
+```
+
+**B. Replace your `modePresets` with a thin adapter that stays in sync**
+
+```ts
+// inside InteractiveHeatMap component
+const { data: pipeline } = useEnergyPipeline();
+const resolved = resolveModeNumbers(selectedMode, pipeline);
+
+const modePreset = {
+  name: selectedMode[0].toUpperCase() + selectedMode.slice(1),
+  cavityQ: resolved.qCavity,
+  mechQ: 5e4, // if you keep a mechanical Q for the diagram
+  duty: resolved.dutyCycle,
+  sectors: resolved.sectorStrobing,
+  qSpoiling: resolved.qSpoilingFactor,
+  gammaVdB: resolved.gammaVanDenBroeck,  // rename from pocketGamma
+  powerMW: resolved.P_avg
+};
+```
+
+**C. Update everywhere you reference the old keys**
+
+* Rename:
+
+  * `qFactor` → `qCavity`
+  * `duty` → `dutyCycle`
+  * `sectors` → `sectorStrobing`
+  * `qSpoiling` → `qSpoilingFactor`
+  * `pocketGamma` → `gammaVanDenBroeck`
+
+Example changes:
+
+```diff
+- duty: viabilityParams?.duty || initialPreset.duty,
++ dutyCycle: viabilityParams?.dutyCycle ?? modePreset.duty,
+
+- qFactor: viabilityParams?.qFactor || initialPreset.cavityQ,
++ qCavity: viabilityParams?.qCavity ?? modePreset.cavityQ,
+```
+
+…and when you call the grid:
+
+```diff
+const enhancedParams = {
+  ...viabilityParams,
+  ...localParams,
+  currentMode: selectedMode,
+  modeConfig: {
+-   duty: currentMode.duty,
+-   sectors: currentMode.sectors,
+-   qSpoiling: currentMode.qSpoiling,
+-   pocketGamma: currentMode.pocketGamma
++   dutyCycle: modePreset.duty,
++   sectorStrobing: modePreset.sectors,
++   qSpoilingFactor: modePreset.qSpoiling,
++   gammaVanDenBroeck: modePreset.gammaVdB
+  }
+};
+```
+
+**D. Fix Ford-Roman and time-scale constraints**
+
+```diff
+// mode defaults for constraints
+- case 'hover': return { maxPower: 120, massTolerance: 5, maxZeta: 0.05, minTimescale: universalMinTimescale };
++ case 'hover': return { maxPower: 120, massTolerance: 5, maxZeta: 0.05, minTimescale: universalMinTimescale };
+
+- case 'cruise': return { maxPower: 20, massTolerance: 10, maxZeta: 1.0, minTimescale: universalMinTimescale };
++ case 'cruise': return { maxPower: 20, massTolerance: 10, maxZeta: 0.05, minTimescale: universalMinTimescale };
+
+- // universalMinTimescale set to 100 above, but your slider uses 0.01
++ const universalMinTimescale = 100; // TS_ratio >= 100
+
+// slider and label for time-scale (use TS_ratio directly, logarithmic)
+- <Label>Min Time-scale: {localParams.minTimescale.toFixed(3)}</Label>
++ <Label>Min TS Ratio: {localParams.minTimescale.toFixed(0)}</Label>
+
+- value={[Math.log10(localParams.minTimescale)]}
+- onValueChange={([v]) => updateParameter('minTimescale', Math.pow(10, v))}
+- min={-4} max={-1}
++ value={[Math.log10(localParams.minTimescale)]}
++ onValueChange={([v]) => updateParameter('minTimescale', Math.pow(10, v))}
++ min={2} max={5} step={0.1} // 10^2 … 10^5
+```
+
+**E. Stop parsing the description for numbers**
+Replace the `zenLongToast` call with the resolved values:
+
+```diff
+zenLongToast("mode:switch", {
+-  mode: preset.name,
+-  duty: preset.duty,
+-  powerMW: parseFloat(preset.description.split('MW')[0]) || 83.3,
+-  exoticKg: parseInt(preset.description.split('kg')[0].split('• ')[1]) || 1405,
+-  zeta: parseFloat(preset.description.split('ζ=')[1]) || 0.032
++  mode: modePreset.name,
++  duty: modePreset.duty,
++  powerMW: modePreset.powerMW,
++  exoticKg: pipeline?.M_exotic ?? 1405,
++  zeta: pipeline?.zeta ?? 0.032
+});
+```
+
+**F. Make the sliders write back using pipeline key names**
+
+```diff
+// Duty Cycle
+- updateParameter('duty', value/100)
++ updateParameter('dutyCycle', value/100)
+
+// Q
+- updateParameter('qFactor', qFactor)
++ updateParameter('qCavity', qFactor)
+```
+
+---
+
+### Result
+
+* The phase diagram now **consumes the same fields** Helix-Core/pipeline produce.
+* **γ\_VdB** is in the correct range, so viability colors won’t be wildly optimistic.
+* **Ford-Roman** and **time-scale** constraints match the Compliance HUD.
+* Mode switches propagate **`dutyCycle/sectorStrobing/qCavity/qSpoilingFactor`** coherently into your grid.
+
+If you want, I can also give you a tiny `computePhaseInputsFromPipeline(pipeline, mode)` helper so any other panel can reuse the exact same mapping.

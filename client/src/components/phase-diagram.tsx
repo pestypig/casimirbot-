@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MetricsDashboard from './metrics-dashboard';
 import { zenLongToast } from '@/lib/zen-long-toasts';
+import { useEnergyPipeline, MODE_CONFIGS } from '@/hooks/use-energy-pipeline';
 
 interface InteractiveHeatMapProps {
   currentTileArea: number;
@@ -16,6 +17,24 @@ interface InteractiveHeatMapProps {
   onParameterChange?: (newParams: any) => void;
   selectedMode?: string;
   onModeChange?: (mode: string) => void;
+}
+
+const DEFAULT_GAMMA_VDB = 2.86e5;
+
+const pick = <T,>(v: T | undefined, d: T) => (typeof v === "number" ? (isFinite(v as any) ? v! : d) : (v ?? d));
+
+function resolveModeNumbers(mode: string, pipeline?: any) {
+  const m = (mode || "hover").toLowerCase() as keyof typeof MODE_CONFIGS;
+
+  // Prefer live pipeline when present; else MODE_CONFIGS; else sane fallbacks
+  const dutyCycle       = pick(pipeline?.dutyCycle,       MODE_CONFIGS[m]?.dutyCycle ?? 0.14);
+  const sectorStrobing  = pick(pipeline?.sectorStrobing,  MODE_CONFIGS[m]?.sectorStrobing ?? 1);
+  const qSpoilingFactor = pick(pipeline?.qSpoilingFactor, MODE_CONFIGS[m]?.qSpoilingFactor ?? 1);
+  const qCavity         = pick(pipeline?.qCavity,         1e9);
+  const P_avg           = pick(pipeline?.P_avg_MW,        MODE_CONFIGS[m]?.powerTarget ?? 83.3);
+  const gammaVanDenBroeck = pick(pipeline?.gammaVanDenBroeck, DEFAULT_GAMMA_VDB);
+
+  return { dutyCycle, sectorStrobing, qSpoilingFactor, qCavity, P_avg, gammaVanDenBroeck };
 }
 
 function InteractiveHeatMap({ 
@@ -31,53 +50,68 @@ function InteractiveHeatMap({
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Mode presets with authentic calculated values from Live Energy Pipeline
-  const modePresets = {
+  // Get live pipeline data for authentic values
+  const { data: pipeline } = useEnergyPipeline();
+  const resolved = resolveModeNumbers(selectedMode, pipeline);
+
+  const modePreset = {
+    name: selectedMode[0].toUpperCase() + selectedMode.slice(1),
+    qCavity: resolved.qCavity,
+    mechQ: 5e4, // mechanical Q for the diagram
+    dutyCycle: resolved.dutyCycle,
+    sectorStrobing: resolved.sectorStrobing,
+    qSpoilingFactor: resolved.qSpoilingFactor,
+    gammaVanDenBroeck: resolved.gammaVanDenBroeck,
+    powerMW: resolved.P_avg
+  };
+  
+  // Legacy mode presets structure for compatibility (deprecated)
+  const legacyModePresets = {
     hover: {
       name: "Hover",
-      cavityQ: 1e9,        // 1.0×10⁹ (Cavity Q for power loss)
+      qCavity: 1e9,        // 1.0×10⁹ (Cavity Q for power loss)
       mechQ: 5e4,          // 5.0×10⁴ (Mechanical Q for energy boost - fixed)
-      duty: 0.14,          // 14% duty (station-hold)
-      sectors: 1,          // No strobing
-      qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
-      pocketGamma: 2.86e9, // Van-den-Broeck pocket amplification
+      dutyCycle: 0.14,     // 14% duty (station-hold)
+      sectorStrobing: 1,   // No strobing
+      qSpoilingFactor: 1,  // No Q-spoiling (Q_idle/Q_on = 1)
+      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
       description: "83.3 MW • 1,405 kg • ζ=0.032"
     },
     cruise: {
       name: "Cruise", 
-      cavityQ: 1.6e6,      // 1.6×10⁶ (Lower for stability)
+      qCavity: 1.6e6,      // 1.6×10⁶ (Lower for stability)
       mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      duty: 0.005,         // 0.5% duty (Ford-Roman compliant)
-      sectors: 400,        // 400-sector strobing (1/S = 1/400)
-      qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
-      pocketGamma: 8.0e10, // Van-den-Broeck pocket amplification
+      dutyCycle: 0.005,    // 0.5% duty (Ford-Roman compliant)
+      sectorStrobing: 400, // 400-sector strobing (1/S = 1/400)
+      qSpoilingFactor: 0.001, // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
+      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
       description: "7.4 MW • 1,405 kg • ζ=0.89"
     },
     emergency: {
       name: "Emergency",
-      cavityQ: 1e9,        // 1.0×10⁹
+      qCavity: 1e9,        // 1.0×10⁹
       mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      duty: 0.50,          // 50% duty (fast-burn)
-      sectors: 1,          // No strobing
-      qSpoiling: 1,        // No Q-spoiling
-      pocketGamma: 8.0e9,  // Van-den-Broeck pocket amplification
+      dutyCycle: 0.50,     // 50% duty (fast-burn)
+      sectorStrobing: 1,   // No strobing
+      qSpoilingFactor: 1,  // No Q-spoiling
+      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
       description: "297 MW • 1,405 kg • ζ=0.009"
     },
     standby: {
       name: "Standby",
-      cavityQ: 1e9,        // 1.0×10⁹ (Irrelevant when duty=0)
+      qCavity: 1e9,        // 1.0×10⁹ (Irrelevant when duty=0)
       mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      duty: 0.0,           // 0% duty (bubble collapsed)
-      sectors: 1,          // Irrelevant
-      qSpoiling: 1,        // Irrelevant
-      pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
+      dutyCycle: 0.0,      // 0% duty (bubble collapsed)
+      sectorStrobing: 1,   // Irrelevant
+      qSpoilingFactor: 1,  // Irrelevant
+      gammaVanDenBroeck: 0, // No pocket amplification (exotic mass = 0)
       description: "0 MW • 0 kg • System Off"
     }
   };
 
   // Get initial mode preset
   const initialMode = selectedMode || "hover";
-  const initialPreset = modePresets[initialMode as keyof typeof modePresets] || modePresets.hover;
+  const initialPreset = legacyModePresets[initialMode as keyof typeof legacyModePresets] || legacyModePresets.hover;
   
   // Helper to get mode-specific constraint defaults using authentic calculated values
   const getModeConstraintDefaults = (mode: string) => {
@@ -91,7 +125,7 @@ function InteractiveHeatMap({
         return { maxPower: 120, massTolerance: 5, maxZeta: 0.05, minTimescale: universalMinTimescale };
       case 'cruise':
         // Authentic values: 7.4 MW, 1,405 kg, ζ=0.89
-        return { maxPower: 20, massTolerance: 10, maxZeta: 1.0, minTimescale: universalMinTimescale };
+        return { maxPower: 20, massTolerance: 10, maxZeta: 0.05, minTimescale: universalMinTimescale };
       case 'emergency':
         // Authentic values: 297 MW, 1,405 kg, ζ=0.009
         return { maxPower: 400, massTolerance: 15, maxZeta: 0.02, minTimescale: universalMinTimescale };
@@ -109,8 +143,8 @@ function InteractiveHeatMap({
   const [localParams, setLocalParams] = useState({
     selectedMode: initialMode,
     gammaGeo: viabilityParams?.gammaGeo || 26,
-    qFactor: viabilityParams?.qFactor || initialPreset.cavityQ,
-    duty: viabilityParams?.duty || initialPreset.duty,
+    qCavity: viabilityParams?.qCavity || initialPreset.qCavity,
+    dutyCycle: viabilityParams?.dutyCycle || initialPreset.dutyCycle,
     sagDepth: viabilityParams?.sagDepth || 16,
     maxPower: viabilityParams?.maxPower || initialConstraints.maxPower,
     massTolerance: viabilityParams?.massTolerance || initialConstraints.massTolerance,
@@ -119,7 +153,7 @@ function InteractiveHeatMap({
   });
   
   // Get current mode configuration (use passed selectedMode instead of local state)
-  const currentMode = modePresets[selectedMode as keyof typeof modePresets] || modePresets.hover;
+  const currentMode = legacyModePresets[selectedMode as keyof typeof legacyModePresets] || legacyModePresets.hover;
 
   // Format Q-Factor for better readability
   const formatQFactor = (qFactor: number) => {
@@ -134,14 +168,16 @@ function InteractiveHeatMap({
   
   // Helper to apply a mode preset to all parameters
   const applyModePreset = (mode: string) => {
-    const preset = modePresets[mode as keyof typeof modePresets];
-    if (!preset) return;
+    // Use live pipeline data for authentic values
+    const resolved = resolveModeNumbers(mode, pipeline);
+    const constraints = getModeConstraintDefaults(mode);
     
     const newParams = {
       ...localParams,
       selectedMode: mode,
-      qFactor: preset.cavityQ,
-      duty: preset.duty
+      qCavity: resolved.qCavity,
+      dutyCycle: resolved.dutyCycle,
+      ...constraints
     };
     
     setLocalParams(newParams);
@@ -151,7 +187,7 @@ function InteractiveHeatMap({
       onParameterChange(newParams);
     }
     
-    console.log(`🎯 Applied ${mode} mode preset: Q=${preset.cavityQ}, duty=${preset.duty}`);
+    console.log(`🎯 Applied ${mode} mode preset: Q=${resolved.qCavity}, duty=${resolved.dutyCycle}`);
   };
 
   // React to mode changes from parent component
@@ -163,17 +199,15 @@ function InteractiveHeatMap({
 
   // Get mode-specific parameter values for double-click functionality
   const getModeSpecificValue = (parameter: string, mode: string) => {
-    const modeConfig = modePresets[mode as keyof typeof modePresets];
-    if (!modeConfig) return null;
+    const resolved = resolveModeNumbers(mode, pipeline);
     
     switch (parameter) {
       case 'gammaGeo':
         return 26; // Standard research value for all modes
-      case 'qFactor':
-        // Use the mode's cavity Q directly from preset
-        return modeConfig.cavityQ;
-      case 'duty':
-        return modeConfig.duty;
+      case 'qCavity':
+        return resolved.qCavity;
+      case 'dutyCycle':
+        return resolved.dutyCycle;
       case 'sagDepth':
         return 16; // Standard Needle Hull research value
       case 'maxPower':
@@ -195,18 +229,18 @@ function InteractiveHeatMap({
           default: return 5;
         }
       case 'maxZeta':
-        // Mode-specific quantum safety limits
+        // Mode-specific quantum safety limits (Ford-Roman compliant)
         switch (mode) {
-          case 'hover': return 0.1; // Very strict for station-keeping
-          case 'cruise': return 1.5; // Relaxed for Ford-Roman compliance
-          case 'emergency': return 0.05; // Extremely strict for high power  
+          case 'hover': return 0.05; // Ford-Roman compliant for station-keeping
+          case 'cruise': return 0.05; // Ford-Roman compliant for sustained travel
+          case 'emergency': return 0.05; // Ford-Roman compliant even for high power  
           case 'standby': return 10.0; // Very relaxed (system off)
-          default: return 1.0;
+          default: return 0.05;
         }
       case 'minTimescale':
         // UNIVERSAL homogenization threshold: TS_ratio = τ_LC/τ_pulse ≥ 100
         // Same for ALL modes - ensures τ_pulse ≪ τ_LC across all operational envelopes
-        return 0.01; // Conservative TS_ratio = 100 safety margin
+        return 100; // TS_ratio = 100 safety margin
       default:
         return null;
     }
