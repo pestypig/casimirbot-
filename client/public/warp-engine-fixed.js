@@ -281,6 +281,8 @@ class WarpEngine {
             "uniform float u_epsTilt;\n" +      // ε_tilt (dimensionless)
             "uniform float u_intWidth;\n" +     // interior window width in ρ-units
             "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
+            "uniform float u_exposure;\n" +     // logarithmic exposure control (3.0 .. 12.0)
+            "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -381,7 +383,9 @@ class WarpEngine {
             vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip'),
             epsTilt: gl.getUniformLocation(this.gridProgram, 'u_epsTilt'),
             intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
-            tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz')
+            tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
+            exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
+            zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop')
         };
         
         console.log("Grid shader program compiled successfully with York-time coloring support");
@@ -439,6 +443,8 @@ class WarpEngine {
             epsilonTiltFloor: N(parameters.epsilonTiltFloor || 0),
             betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
             tiltGain: N(parameters.tiltGain || 0.55),
+            exposure: N(parameters.exposure || 6.0),
+            zeroStop: N(parameters.zeroStop || 1e-7),
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -760,9 +766,9 @@ class WarpEngine {
             const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
             
             // --- (C) Gentler wall window for canonical smoothness ---
-            const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
-            const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
-                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // gentle falloff
+            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
+            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
+                           : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
             
             // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
             // Pull uniforms for current mode and parameters
@@ -945,6 +951,10 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.epsTilt, epsTilt);
         gl.uniform1f(this.gridUniforms.intWidth, wInt);
         gl.uniform1f(this.gridUniforms.tiltViz, tintViz);
+        
+        // Exposure controls for enhanced mode contrast
+        gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
+        gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;
