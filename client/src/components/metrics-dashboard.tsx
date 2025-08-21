@@ -94,6 +94,35 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     'hover';
   const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints(liveMode));
 
+  // Live constraint/target pack from backend (if provided), with safe fallbacks.
+  // If you later add a `constraints` object on the server, these will bind automatically.
+  const serverConstraints = (pipeline as any)?.constraints ?? {};
+  const liveTargets = {
+    // Power caps
+    P_max: Number.isFinite(serverConstraints.P_max) ? serverConstraints.P_max : 1000,
+    P_avg_max: Number.isFinite(serverConstraints.P_avg_max)
+      ? serverConstraints.P_avg_max
+      : getModeAwareConstraints(liveMode).P_avg_max,
+
+    // Time-scale minimum
+    TS_min: Number.isFinite(serverConstraints.TS_min)
+      ? serverConstraints.TS_min
+      : 100,
+
+    // Ford–Roman zeta bound
+    zeta_max: Number.isFinite(serverConstraints.zeta_max)
+      ? serverConstraints.zeta_max
+      : getModeAwareConstraints(liveMode).zeta_max,
+
+    // Mass target/tolerance (server wins)
+    M_target: Number.isFinite((pipeline as any)?.exoticMassTarget_kg)
+      ? (pipeline as any).exoticMassTarget_kg
+      : getModeAwareConstraints(liveMode).M_target,
+    M_tolerance: Number.isFinite(serverConstraints.M_tolerance)
+      ? serverConstraints.M_tolerance
+      : getModeAwareConstraints(liveMode).M_tolerance,
+  };
+
   // Safe accessors mapped to pipeline interface field names
   const P_avg = Number.isFinite((pipeline as any)?.P_avg) ? (pipeline as any).P_avg : 0;          // MW
   // Duty priority: effective (server) → UI (server) → mode default (client)
@@ -163,14 +192,23 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     // Current mode for debug logging (pipeline wins)
     const selectedMode = liveMode || viabilityParams?.selectedMode || "hover";
     
-    // Get fresh constraints directly for this mode (avoid stale state)
-    const currentConstraints = getModeAwareConstraints(selectedMode);
+    // Prefer live targets from the backend; fall back to client mode-aware limits
+    const currentConstraints = {
+      P_avg_max: liveTargets.P_avg_max,
+      zeta_max: liveTargets.zeta_max,
+      TS_min: liveTargets.TS_min,
+      P_max: liveTargets.P_max,
+      M_target: liveTargets.M_target,
+      M_tolerance: liveTargets.M_tolerance,
+    };
 
     // Define constraint types for proper normalization (all values should be ≤ 1 when safe)
     const rawValues = {
       P_avg: dashboardMetrics.P_avg,
       duty: dashboardMetrics.f_throttle,
-      mass_error: Math.abs(dashboardMetrics.M_exotic - currentConstraints.M_target) / (currentConstraints.M_target * currentConstraints.M_tolerance / 100),
+      mass_error:
+        Math.abs(dashboardMetrics.M_exotic - currentConstraints.M_target) /
+        (currentConstraints.M_target * currentConstraints.M_tolerance / 100),
       zeta: dashboardMetrics.zeta,
       TS_ratio: dashboardMetrics.TS_ratio,
       P_raw: dashboardMetrics.P_raw,
@@ -183,7 +221,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       { value: rawValues.mass_error, limit: 1.0, type: 'max' }, // Mass Error (already normalized)
       { value: rawValues.zeta, limit: currentConstraints.zeta_max, type: 'max' }, // Quantum Safety
       { value: rawValues.TS_ratio, limit: currentConstraints.TS_min, type: 'min' }, // Time-Scale (MINIMUM requirement)
-      { value: rawValues.P_raw, limit: 1000, type: 'max' }, // Raw Power
+      { value: rawValues.P_raw, limit: currentConstraints.P_max, type: 'max' }, // Raw Power
       { value: rawValues.U_cycle, limit: 1e12, type: 'max' } // Energy magnitude
     ];
 
@@ -209,8 +247,8 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         P_avg: `${f1(P_avg)}MW → ${f2(normalizedData[0])} (limit: ${currentConstraints.P_avg_max}MW)`,
         duty: `${f1(dutyFrac * 100)}% → ${f2(normalizedData[1])}`,
         mass_error: `${f0(Math.abs(M_exotic - currentConstraints.M_target))}kg → ${f2(normalizedData[2])}`,
-        zeta: `${f2(zeta)} → ${f2(normalizedData[3])} (limit < ${currentConstraints.zeta_max})`,
-        TS_ratio: `${f1(TS_ratio)} → ${f2(normalizedData[4])} (min: ${currentConstraints.TS_min})`,
+        zeta: `${f2(zeta)} → ${f2(normalizedData[3])} (limit ≤ ${currentConstraints.zeta_max})`,
+        TS_ratio: `${f1(TS_ratio)} → ${f2(normalizedData[4])} (min ≥ ${currentConstraints.TS_min})`,
       });
     }
 
@@ -231,7 +269,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       line: { color: '#22c55e', dash: 'dash', width: 2 },
       fillcolor: 'rgba(34, 197, 94, 0.1)'
     }];
-  }, [dashboardMetrics, viabilityParams?.selectedMode, constraints]);
+  }, [dashboardMetrics, viabilityParams?.selectedMode, liveTargets, liveMode]);
 
   // Force re-render when mode changes
   const [renderKey, setRenderKey] = React.useState(0);
@@ -388,23 +426,28 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                 
                 {/* Constraint Limits */}
                 <div>
-                  <h5 className="text-xs font-medium text-muted-foreground mb-2">CONSTRAINT LIMITS</h5>
+                  <h5 className="text-xs font-medium text-muted-foreground mb-2">
+                    CONSTRAINT LIMITS
+                    <span className="text-[10px] ml-2 opacity-60">
+                      ({Number.isFinite((pipeline as any)?.exoticMassTarget_kg) || Number.isFinite(serverConstraints.P_max) ? 'server' : 'defaults'})
+                    </span>
+                  </h5>
                   <div className="font-mono text-xs bg-background rounded p-2 space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_max:</span>
-                      <span>{constraints.P_avg_max} MW</span>
+                      <span>{liveTargets.P_avg_max} MW</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">M_target:</span>
-                      <span>{constraints.M_target} ±{constraints.M_tolerance}% kg</span>
+                      <span>{liveTargets.M_target} ±{liveTargets.M_tolerance}% kg</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">ζ_max:</span>
-                      <span>{constraints.zeta_max}</span>
+                      <span>{liveTargets.zeta_max}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TS_min:</span>
-                      <span>{constraints.TS_min}</span>
+                      <span>{liveTargets.TS_min}</span>
                     </div>
                   </div>
                 </div>
