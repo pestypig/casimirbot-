@@ -6,6 +6,7 @@ import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { useMetrics } from "@/hooks/use-metrics";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -142,114 +143,51 @@ export function LiveEnergyPipeline({
   onModeChange,
   onParameterUpdate
 }: LiveEnergyPipelineProps) {
-  // Get authoritative metrics from server
+  // Pull live state once and map names
+  const { data: pipelineState } = useEnergyPipeline();  // authoritative operational values
+  const switchMode = useSwitchMode();
   const { data: metrics } = useMetrics(); 
   
-  // Constants from physics
-  const h_bar = 1.055e-34; // J⋅s
-  const c = 2.998e8; // m/s
-  const pi = Math.PI;
-  
-  // Convert units
-  const a = gapDistance * 1e-9; // nm to m
-  const A_tile = tileArea * 1e-4; // cm² to m²
-  const R_ship = shipRadius; // already in m
-  
-  // Use full Needle Hull Mk 1 surface area (prolate ellipsoid ~5.6×10⁵ m²)
-  const A_hull_needle = 5.6e5; // m² (full Needle Hull exotic shell surface area)
-  const N_tiles = A_hull_needle / A_tile; // Use actual slider A_tile (5 cm² = 5e-4 m²) for ~1.12×10⁹ tiles
-  
-  // Step 1: Static Casimir Energy Density (Equation 2 from PDF)
-  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4)); // J/m³ (CORRECT: 720)
-  
-  // Step 2: Static Casimir Energy per Tile  
-  const V_cavity = A_tile * a; // Use current slider tile area (5 cm²)
-  const U_static = u_casimir * V_cavity; // J per tile (should be ~-6.5×10⁻⁵ J)
-  
-  // Step 3: Geometric Amplification (Equation 3 from PDF)
-  const gamma_geo = gammaGeo; // User parameter (26 for Needle Hull)
-  const U_geo = gamma_geo * U_static; // γ¹ scaling (NOT γ³)
-  
-  // Step 4: Q-Enhancement (Equation 3 from PDF)
-  const Q_mechanical = 5e4; // Mechanical/parametric resonator Q (~10^4-10^5)
-  const Q_cavity = 1e9; // EM cavity Q for power loss calculations
-  const U_Q = Q_mechanical * U_geo; // Q-enhanced energy per tile (use mechanical Q)
-  
-  // Get modes with dynamically calculated descriptions
-  const modes = getModesWithDynamicDescriptions(gammaGeo, qFactor, tileArea, exoticMassTarget);
-  
-  // Get current mode parameters
-  const currentMode = modes[selectedMode];
-  
-  // Step 5: Duty Cycle Averaging (Dynamic based on selected mode)
-  const d_mode = currentMode.duty; // Duty cycle for selected mode
-  const U_cycle_base = U_Q * d_mode; // J per tile (duty cycle on Q-enhanced energy)
-  
-  // Step 5b: Van-den-Broeck Pocket Blue-Shift (calibrated for user-configurable exotic mass)
-  let gamma_pocket: number;
-  let U_cycle: number;
-  
-  if (currentMode.duty === 0) {
-    // Standby mode: zero exotic mass
-    gamma_pocket = 0;
-    U_cycle = 0;
-  } else {
-    // Active modes: calculate gamma_pocket to achieve user-configured exotic mass target
-    const target_energy_per_tile = (exoticMassTarget * c * c) / N_tiles; // J per tile for target mass
-    gamma_pocket = target_energy_per_tile / Math.abs(U_cycle_base); // Van-den-Broeck amplification needed
-    U_cycle = U_cycle_base * gamma_pocket; // J per tile (with pocket boost)
-  }
-  
-  // Drive frequency (prefer server metrics if present)
-  const f_m = (metrics as any)?.T_m ? (1 / (metrics as any).T_m) : 15e9;  // Hz (fallback 15 GHz)
-  // Step 6: Raw Power Loss (Equation 3 from PDF)
-  const omega = 2 * pi * f_m; // rad/s
-  const P_loss_raw = Math.abs(U_geo * omega / Q_cavity); // W per tile (use cavity Q for power loss)
-  
-  // Step 7: Dynamic Power Throttling (Based on selected mode)
-  const Q_idle = currentMode.qSpoiling * Q_cavity; // Dynamic Q-spoiling based on mode
-  const Q_spoiling_factor = currentMode.qSpoiling; // Direct Q-spoiling ratio
-  
-  // Apply mode-specific throttling factors
-  const d_power = currentMode.duty; // Power duty cycle for selected mode
-  const S_mode = currentMode.sectors; // Sector strobing for selected mode
-  const mode_throttle = d_power * Q_spoiling_factor * (1/S_mode); // Combined throttle factor
-  
-  // Use selected mode throttling
-  const combined_throttle = mode_throttle;
-  
-  // Step 8: Realistic Average Power (83 MW target)
-  const P_raw_W = P_loss_raw * N_tiles; // Raw hull power in W
-  const P_avg_W = P_raw_W * combined_throttle; // Throttled power in W
-  const P_total_realistic = P_avg_W / 1e6; // Convert W to MW
-  
-  // Step 6 view values from the server (authoritative)
-  const tauLC = (metrics as any)?.tauLC ?? NaN;     // s
-  const T_m   = (metrics as any)?.T_m ?? NaN;       // s  
-  const TS_ratio = metrics?.timeScaleRatio ?? NaN; // dimensionless
-  
-  // Step 10: Total Exotic Mass (Equation 5 from PDF)  
-  const M_exotic_per_tile = Math.abs(U_cycle) / (c * c); // kg per tile (c^2 not c^3)
-  const M_exotic_total = M_exotic_per_tile * N_tiles; // kg total
-  
-  // Step 11: Quantum Inequality Margin (Dynamic based on mode)
-  const zeta = currentMode.duty > 0 ? 1 / (currentMode.duty * Math.sqrt(Q_mechanical)) : Infinity; // ζ (Ford-Roman bound)
-  
-  // Handle mode changes and notify parent
-  const handleModeChange = (newMode: string) => {
-    const mode = modes[newMode];
-    if (onModeChange) {
-      onModeChange(newMode);
-    }
-    if (onParameterUpdate) {
-      onParameterUpdate({ 
-        duty: mode.duty,
-        // Also update phase diagram parameters based on mode
-        qFactor: qFactor, // Keep existing Q factor
-        gammaGeo: gammaGeo // Keep existing gamma
-      });
-    }
+  const P = pipelineState || {};
+  const live = {
+    currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"cruise"|"emergency",
+    dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
+    sectorStrobing: Number.isFinite(P.sectorStrobing) ? P.sectorStrobing! : 1,
+    qSpoilingFactor: Number.isFinite(P.qSpoilingFactor) ? P.qSpoilingFactor! : 1,
+    qCavity:      Number.isFinite(P.qCavity) ? P.qCavity! : (qFactor ?? 1e9),
+    gammaGeo:     Number.isFinite(P.gammaGeo) ? P.gammaGeo! : (gammaGeo ?? 26),
+    gammaVanDenBroeck: Number.isFinite(P.gammaVanDenBroeck) ? P.gammaVanDenBroeck! : 2.86e5,
+    modulationFreq_GHz: Number.isFinite(P.modulationFreq_GHz) ? P.modulationFreq_GHz! : 15,
+    P_avg_MW:     Number.isFinite(P.P_avg) ? P.P_avg! : NaN,
+    M_exotic_kg:  Number.isFinite(P.M_exotic) ? P.M_exotic! : NaN,
+    zeta:         Number.isFinite(P.zeta) ? P.zeta! : NaN,
+    TS_ratio:     Number.isFinite(P.TS_ratio) ? P.TS_ratio! : NaN,
   };
+
+  // Replace local "mode presets" with MODE_CONFIGS and stop recomputing physics for descriptions
+  const modes = MODE_CONFIGS; // { hover, cruise, emergency, standby }
+  const currentModeCfg = modes[live.currentMode];
+
+  // human-friendly description built from live values when viewing the current mode
+  const liveDesc = [
+    Number.isFinite(live.P_avg_MW) ? `${live.P_avg_MW.toFixed(1)} MW` : "— MW",
+    Number.isFinite(live.M_exotic_kg) ? `${live.M_exotic_kg.toFixed(0)} kg` : "— kg",
+    Number.isFinite(live.zeta) ? `ζ=${live.zeta.toFixed(3)}` : "ζ=—"
+  ].join(" • ");
+
+  // Harden formatting
+  const fmt = (v: unknown, d = "—", n?: number) => {
+    const x = Number(v);
+    if (!Number.isFinite(x)) return d;
+    return typeof n === "number" ? x.toFixed(n) : String(x);
+  };
+  const fexp = (v: unknown, d = "—", n = 1) => {
+    const x = Number(v);
+    return Number.isFinite(x) ? x.toExponential(n) : d;
+  };
+  
+  // All physics values now come from the authoritative pipeline
+  // No local recomputation
   
   // Utility functions (declare before using)
   const formatScientific = (value: number, decimals = 3) => {
@@ -274,7 +212,7 @@ export function LiveEnergyPipeline({
             <Tooltip>
               <TooltipTrigger asChild>
                 <CardTitle className="text-lg cursor-help">
-                  Live Energy Pipeline: {currentMode.name} Mode
+                  Live Energy Pipeline: {currentModeCfg.name} Mode
                 </CardTitle>
               </TooltipTrigger>
               <TooltipContent className="max-w-md text-sm leading-snug">
@@ -305,53 +243,40 @@ export function LiveEnergyPipeline({
               <em>Moving Zen:</em> Every journey begins in stillness. Choose bearing; then move without hesitation (maai).
             </TooltipContent>
           </Tooltip>
-          <Select value={selectedMode} onValueChange={(value) => {
-            handleModeChange(value);
-            
-            // Calculate NEW mode values on the fly for toast
-            const mode = modes[value as keyof typeof modes];
-            if (mode) {
-              // Recalculate power and zeta with new mode duty cycle
-              const new_mode_throttle = mode.duty;
-              const new_combined_throttle = new_mode_throttle;
-              const new_P_avg_W = P_raw_W * new_combined_throttle;
-              const new_P_total_realistic = new_P_avg_W / 1e6; // Convert to MW
-              const new_zeta = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : Infinity;
-              
-              // Exotic mass budget stays constant (1405 kg for all modes except standby=0)
-              const new_M_exotic_total = mode.duty === 0 ? 0 : 1405; // Standby=0kg, all others=1405kg
-              
+          <Select
+            value={live.currentMode}
+            onValueChange={(value) => {
+              switchMode.mutate(value as any); // authoritative mode change
+              onModeChange?.(value);
+              // optional toast can echo *live* numbers (no recompute)
               zenLongToast("mode:switch", {
-                mode: mode.name,
-                duty: mode.duty,
-                powerMW: new_P_total_realistic, // Use NEW calculated power for this mode
-                zeta: new_zeta, // Use NEW calculated ζ for this mode
-                tsRatio: TS_ratio, // This is mode-independent
-                exoticKg: new_M_exotic_total, // Use NEW exotic mass for this mode
-                gammaGeo: gamma_geo,
-                qFactor: Q_cavity,
-                sagDepthMm: 16,
-                freqGHz: f_m / 1e9,
-                sectors: mode.sectors,
-                maxPowerMW: value === 'hover' ? 120 : value === 'cruise' ? 20 : value === 'emergency' ? 200 : 10,
-                massTolerancePct: 5,
-                shipRadiusM: R_ship,
-                gapNm: 16,
-                frOk: new_zeta < (value === 'hover' ? 0.05 : value === 'cruise' ? 1.0 : 20.0),
-                natarioOk: TS_ratio > 100,
-                curvatureOk: new_P_total_realistic < (value === 'hover' ? 120 : value === 'cruise' ? 20 : 200)
+                mode: modes[value].name,
+                duty: live.dutyCycle,
+                powerMW: live.P_avg_MW,
+                zeta: live.zeta,
+                tsRatio: live.TS_ratio,
+                exoticKg: live.M_exotic_kg,
+                gammaGeo: live.gammaGeo,
+                qFactor: live.qCavity,
+                freqGHz: live.modulationFreq_GHz,
+                sectors: live.sectorStrobing,
+                frOk: Number.isFinite(live.zeta) ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02) : true,
+                natarioOk: Number.isFinite(live.TS_ratio) ? live.TS_ratio >= 100 : true,
+                curvatureOk: true
               });
-            }
-          }}>
+            }}
+          >
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(modes).map(([key, mode]) => (
+              {Object.entries(modes).map(([key, cfg]) => (
                 <SelectItem key={key} value={key}>
                   <div className="flex flex-col">
-                    <span className="font-medium">{mode.name}</span>
-                    <span className="text-xs text-muted-foreground">{mode.description}</span>
+                    <span className="font-medium">{cfg.name}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {key === live.currentMode ? liveDesc : `${cfg.powerTarget} MW target`}
+                    </span>
                   </div>
                 </SelectItem>
               ))}
@@ -373,7 +298,7 @@ export function LiveEnergyPipeline({
                 const value = parseFloat(e.target.value);
                 if (!isNaN(value) && value > 0) {
                   onParameterUpdate?.({ 
-                    duty: currentMode.duty, 
+                    duty: live.dutyCycle, 
                     qFactor, 
                     gammaGeo,
                     exoticMassTarget: value 
@@ -386,13 +311,15 @@ export function LiveEnergyPipeline({
             />
             <span className="text-sm text-muted-foreground">kg</span>
             <span className="text-xs text-muted-foreground ml-2">
-              (γ_pocket = {formatScientific(gamma_pocket)} - paper spec: 2.86×10⁵)
+              (required γ_VdB to hit target ≈ {Number.isFinite(live.M_exotic_kg) && live.M_exotic_kg>0
+                ? fexp(exoticMassTarget / live.M_exotic_kg * (live.gammaVanDenBroeck || 1), "—", 2)
+                : "—"})
             </span>
           </div>
         </div>
         
         <p className="text-sm text-muted-foreground mt-2">
-          {currentMode.description.replace('1,405', exoticMassTarget.toString())}
+          Current: {liveDesc}
         </p>
       </CardHeader>
       
@@ -413,362 +340,142 @@ export function LiveEnergyPipeline({
             </TooltipContent>
           </Tooltip>
           <div className="font-mono text-xs space-y-1">
-            <div>u_Casimir = -π²ℏc/(720a⁴) = {formatScientific(u_casimir)} J/m³</div>
-            <div>U_static = u_Casimir × A_tile = {formatScientific(U_static)} J</div>
-            <div>U_Q = Q_mech × U_geo = {formatScientific(Q_mechanical)} × {formatScientific(U_geo)} = {formatScientific(U_Q)} J</div>
+            <div>Live Pipeline Foundations:</div>
+            <div>γ_geo = {fmt(live.gammaGeo, "—", 1)}</div>
+            <div>Q_cavity = {fexp(live.qCavity)}</div>
+            <div>f_mod = {fmt(live.modulationFreq_GHz)} GHz</div>
             <div className="text-blue-700 dark:text-blue-300 font-semibold">
-              U_geo = γ × U_static = {formatStandard(gamma_geo)} × {formatScientific(U_static)} = {formatScientific(U_geo)} J
+              Current Mode: {live.currentMode} ({fmt(live.dutyCycle * 100, "—", 1)}% duty)
             </div>
           </div>
         </div>
 
-        {/* Step 1: Raw Per-Tile Loss Power */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">1</span>
-                Raw Per-Tile Loss Power
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              P_raw,tile = |U_geo|·ω/Q_on. This is the tile's intrinsic dissipation at resonance before throttles (duty, sectors, Q-spoiling) are applied.<br/><br/>
-              <em>Moving Zen:</em> Accuracy is final—form (boundary & frequency) makes speed a consequence, not a goal.
-            </TooltipContent>
-          </Tooltip>
-          <div className="font-mono text-sm space-y-1">
-            <div>P_raw,tile = U_geo × ω / Q_on</div>
-            <div className="text-muted-foreground">
-              P_raw,tile = ({formatScientific(Math.abs(U_geo))}) × ({formatScientific(omega)}) / ({formatScientific(Q_cavity)})
-            </div>
-            <div className="text-primary font-semibold">
-              P_raw,tile = {formatScientific(P_loss_raw)} W per tile
-            </div>
-          </div>
-        </div>
-
-        {/* Step 2: Raw Hull Power */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">2</span>
-                Raw Hull Power
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              P_raw = P_raw,tile × N_tiles with N_tiles = A_hull/A_tile. Scaling preserves physics but magnifies any misalignment—geometry and Q settings must remain coherent.<br/><br/>
-              <em>Moving Zen:</em> Many hands, one motion. Coordination turns parts into purpose.
-            </TooltipContent>
-          </Tooltip>
-          <div className="font-mono text-sm space-y-1">
-            <div>P_raw = P_raw,tile × N_tiles</div>
-            <div className="text-muted-foreground">
-              P_raw = ({formatScientific(P_loss_raw)}) × ({formatScientific(N_tiles)})
-            </div>
-            <div className="text-primary font-semibold">
-              P_raw = {formatScientific(P_loss_raw * N_tiles)} W = {formatScientific(P_loss_raw * N_tiles * 1e-6)} MW
-            </div>
-          </div>
-        </div>
-
-        {/* Step 3: Combined Throttling Factor */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">3</span>
-                Combined Throttling Factor
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              f_throttle = d × (Q_idle/Q_on) × (1/S). Duty, Q-spoiling, and sector strobing set the real cadence and safe average output.<br/><br/>
-              <em>Moving Zen:</em> Breath and step together—distance and timing are interdependent (maai).
-            </TooltipContent>
-          </Tooltip>
-          <div className="font-mono text-sm space-y-1">
-            <div>f_throttle = d × (Q_idle/Q_on) × (1/S)</div>
-            <div className="text-muted-foreground">
-              d_{currentMode.name.toLowerCase()} = {formatStandard(currentMode.duty * 100)}% = {formatScientific(currentMode.duty)}
-            </div>
-            <div className="text-muted-foreground">
-              Q_idle/Q_cavity = {currentMode.qSpoiling} ({currentMode.qSpoiling === 1 ? "no spoiling" : "Q-spoiling"})
-            </div>
-            <div className="text-muted-foreground">
-              1/S = 1/{currentMode.sectors} = {formatScientific(1/currentMode.sectors)}
-            </div>
-            <div className="text-primary font-semibold">
-              f_throttle = {formatScientific(combined_throttle)} (÷{formatScientific(1/combined_throttle)} reduction)
-            </div>
-          </div>
-        </div>
-
-        {/* Step 4: Realistic Average Power */}
+        {/* Live Average Power */}
         <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
           <Tooltip>
             <TooltipTrigger asChild>
               <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">4</span>
-                Realistic Average Power (83 MW Target)
+                <span className="bg-green-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">P</span>
+                Live Average Power
               </h4>
             </TooltipTrigger>
             <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              P_avg = P_raw × f_throttle. This is the actionable budget that respects thermal and coherence limits—what the system can truly sustain.<br/><br/>
-              <em>Moving Zen:</em> Flow before force—guiding energy beats grinding it.
+              <strong>Pipeline Value</strong><br/>
+              Authoritative power calculation from the backend energy pipeline, incorporating all physics: Casimir foundations, geometric amplification, Q-enhancement, duty cycling, and sector strobing.<br/><br/>
+              <em>Moving Zen:</em> Truth before technique—authentic values guide authentic action.
             </TooltipContent>
           </Tooltip>
           <div className="font-mono text-sm space-y-1">
-            <div>P_avg = P_raw × f_throttle</div>
-            <div className="text-muted-foreground">
-              P_avg = ({formatScientific(P_loss_raw * N_tiles)} W) × ({formatScientific(combined_throttle)})
-            </div>
             <div className="text-green-700 dark:text-green-300 font-semibold text-lg">
-              P_avg = {P_total_realistic >= 1 
-                ? `${formatStandard(P_total_realistic)} MW`
-                : `${formatStandard(P_total_realistic * 1e6)} W`}
+              P_avg = {fmt(live.P_avg_MW, "—", 1)} MW
+            </div>
+            <div className="text-muted-foreground">
+              Mode: {live.currentMode} • Duty: {fmt(live.dutyCycle * 100, "—", 1)}% • Sectors: {live.sectorStrobing}
             </div>
           </div>
         </div>
 
-        {/* Step 5: Duty Cycle Averaging */}
-        <div className="bg-muted/50 rounded-lg p-4">
+        {/* Live Exotic Mass */}
+        <div className="bg-purple-50 dark:bg-purple-950/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
           <Tooltip>
             <TooltipTrigger asChild>
               <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">5</span>
-                Duty Cycle Averaging
+                <span className="bg-purple-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">M</span>
+                Live Exotic Mass
               </h4>
             </TooltipTrigger>
             <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              U_cycle = U_Q × d (plus pocket boost if configured). This per-cycle yield is the natural "fuel unit" Helix-Core can count.<br/><br/>
-              <em>Moving Zen:</em> Keep cadence you can keep—consistency turns effort into inevitability.
+              <strong>Pipeline Value</strong><br/>
+              Total exotic mass budget from the energy pipeline, incorporating Van-den-Broeck pocket amplification and mode-specific scaling.<br/><br/>
+              <em>Moving Zen:</em> Mass follows energy—every gram accountable, every calculation honest.
             </TooltipContent>
           </Tooltip>
           <div className="font-mono text-sm space-y-1">
-            <div>U_cycle = U_Q × d (with pocket boost)</div>
-            <div className="text-muted-foreground">
-              U_cycle = ({formatScientific(U_Q)}) × {formatStandard(currentMode.duty * 100)}%
+            <div className="text-purple-700 dark:text-purple-300 font-semibold text-lg">
+              M_exotic = {fmt(live.M_exotic_kg, "—", 0)} kg
             </div>
-            <div className="text-primary font-semibold">
-              U_cycle = {formatScientific(U_cycle)} J per tile
+            <div className="text-muted-foreground">
+              γ_VdB = {fexp(live.gammaVanDenBroeck, "—", 2)}
             </div>
           </div>
         </div>
 
-        {/* Step 6: Time-Scale Separation */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">6</span>
-                Time-Scale Separation
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              A minimum T_s/T_LC keeps homogenization ahead of drive changes, avoiding spurious curvature growth and decoherence.<br/><br/>
-              <em>Moving Zen:</em> Patience is speed in disguise—let structure settle before you move again.
-            </TooltipContent>
-          </Tooltip>
-          <div className="font-mono text-sm space-y-1">
-            <div>TS_ratio = τ_LC / T_m</div>
-            <div className="text-muted-foreground">
-              τ_LC = {tauLC ? formatScientific(tauLC) : "..."} s, T_m = {T_m ? formatScientific(T_m) : "..."} s
-            </div>
-            <div className="text-primary font-semibold">
-              TS_ratio = {TS_ratio ? formatStandard(TS_ratio) : "..."} {TS_ratio && TS_ratio > 100 ? "✓" : "✗"}
-            </div>
-          </div>
-        </div>
-
-        {/* Step 7: Quantum Safety */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-primary text-primary-foreground rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">7</span>
-                Quantum Inequality Margin
-              </h4>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              ζ summarizes Ford–Roman compliance; schedules throttle to keep ζ within safe bounds even if instantaneous output drops.<br/><br/>
-              <em>Moving Zen:</em> Compassion is part of skill—guard the system to guard the mission.
-            </TooltipContent>
-          </Tooltip>
-          <div className="font-mono text-sm space-y-1">
-            <div>ζ = 1 / (d × √Q_on)</div>
-            <div className="text-muted-foreground">
-              ζ = 1 / ({formatStandard(currentMode.duty * 100)}% × √{formatScientific(Q_mechanical)})
-            </div>
-            <div className="text-primary font-semibold">
-              ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}
-            </div>
-          </div>
-        </div>
-
-        {/* Step 8: Total Exotic Mass */}
+        {/* Live Quantum Safety */}
         <div className="bg-orange-50 dark:bg-orange-950/20 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
           <Tooltip>
             <TooltipTrigger asChild>
               <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
-                <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
-                Total Exotic Mass ({formatScientific(exoticMassTarget)} kg Target)
+                <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">ζ</span>
+                Live Quantum Safety (Ford-Roman ζ)
               </h4>
             </TooltipTrigger>
             <TooltipContent className="max-w-md text-sm leading-snug">
-              <strong>Theory</strong><br/>
-              Aggregated per-cycle yield across tiles toward a mission budget. This ties directly to payload support and "cycles required."<br/><br/>
-              <em>Moving Zen:</em> Honor your role to its completion—finish the cut you begin.
+              <strong>Pipeline Value</strong><br/>
+              Ford-Roman quantum inequality parameter ensuring averaged null energy condition compliance. Lower values indicate higher safety margins.<br/><br/>
+              <em>Moving Zen:</em> Safety first, speed second—quantum bounds respect no ambition.
             </TooltipContent>
           </Tooltip>
           <div className="font-mono text-sm space-y-1">
-            <div>M_exotic = N_tiles × |U_cycle| / c²</div>
-            <div className="text-muted-foreground">
-              M_exotic = ({formatScientific(N_tiles)}) × ({formatScientific(Math.abs(U_cycle))}) / ({formatScientific(c*c)})
-            </div>
             <div className="text-orange-700 dark:text-orange-300 font-semibold text-lg">
-              M_exotic = {formatScientific(M_exotic_total)} kg
+              ζ = {fmt(live.zeta, "—", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "✓" : "✗"}
+            </div>
+            <div className="text-muted-foreground">
+              Ford-Roman compliance: {Number.isFinite(live.zeta) && live.zeta <= 1 ? "SAFE" : "CHECK PARAMETERS"}
             </div>
           </div>
         </div>
 
-        {/* Key Results Summary */}
+        {/* Live Time-Scale Separation */}
+        <div className="bg-cyan-50 dark:bg-cyan-950/20 rounded-lg p-4 border border-cyan-200 dark:border-cyan-800">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+                <span className="bg-cyan-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">T</span>
+                Live Time-Scale Separation
+              </h4>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-md text-sm leading-snug">
+              <strong>Pipeline Value</strong><br/>
+              Ratio ensuring field homogenization outpaces drive modulation. Values ≥100 maintain Natário spacetime coherence.<br/><br/>
+              <em>Moving Zen:</em> Timing is everything—let structure settle before the next change.
+            </TooltipContent>
+          </Tooltip>
+          <div className="font-mono text-sm space-y-1">
+            <div className="text-cyan-700 dark:text-cyan-300 font-semibold text-lg">
+              TS_ratio = {fmt(live.TS_ratio, "—", 1)} {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "✓" : "✗"}
+            </div>
+            <div className="text-muted-foreground">
+              Natário coherence: {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "MAINTAINED" : "CHECK FREQUENCY"}
+            </div>
+          </div>
+        </div>
+
+        {/* Live Pipeline Summary */}
         <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
           <h4 className="font-semibold text-sm mb-2 flex items-center text-primary">
             <Atom className="h-4 w-4 mr-2" />
-            Key Results Summary
+            Live Pipeline Summary
           </h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <span className="text-muted-foreground">Raw Hull Power:</span>
-              <div className="font-semibold">{formatScientific(P_loss_raw * N_tiles * 1e-6)} MW</div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Throttle Factor:</span>
-              <div className="font-semibold">{formatScientific(combined_throttle)}</div>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Realistic Power:</span>
+              <span className="text-muted-foreground">Power:</span>
               <div className="font-semibold text-green-600 dark:text-green-400">
-                {P_total_realistic >= 1 
-                  ? `${formatStandard(P_total_realistic)} MW`
-                  : `${formatStandard(P_total_realistic * 1e6)} W`
-                }
+                {fmt(live.P_avg_MW, "—", 1)} MW
               </div>
             </div>
             <div>
               <span className="text-muted-foreground">Exotic Mass:</span>
-              <div className="font-semibold text-orange-600 dark:text-orange-400">{formatScientific(M_exotic_total)} kg</div>
+              <div className="font-semibold text-purple-600 dark:text-purple-400">
+                {fmt(live.M_exotic_kg, "—", 0)} kg
+              </div>
             </div>
             <div>
               <span className="text-muted-foreground">Quantum Safety:</span>
-              <div className="font-semibold">ζ = {formatStandard(zeta)} {zeta < 1.0 ? "✓" : "✗"}</div>
+              <div className="font-semibold">ζ = {fmt(live.zeta, "—", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "✓" : "✗"}</div>
             </div>
             <div>
               <span className="text-muted-foreground">Time-Scale:</span>
-              <div className="font-semibold">{formatStandard(TS_ratio)} {TS_ratio > 1 ? "✓" : "✗"}</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Mode Comparison Table */}
-        <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg p-4 border border-primary/20">
-          <h4 className="font-semibold text-sm mb-3 flex items-center text-primary">
-            <Settings className="h-4 w-4 mr-2" />
-            Operational Mode Comparison
-          </h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs border border-border rounded-md">
-              <thead>
-                <tr className="bg-muted/50">
-                  <th className="text-left p-2 border-r border-border font-medium">Mode</th>
-                  <th className="text-center p-2 border-r border-border font-medium">d</th>
-                  <th className="text-center p-2 border-r border-border font-medium">1/S</th>
-                  <th className="text-center p-2 border-r border-border font-medium">Q_idle/Q_on</th>
-                  <th className="text-center p-2 border-r border-border font-medium">P_avg</th>
-                  <th className="text-center p-2 border-r border-border font-medium">M_exotic (kg)</th>
-                  <th className="text-center p-2 border-r border-border font-medium">ζ</th>
-                  <th className="text-center p-2 border-r border-border font-medium">TS</th>
-                  <th className="text-center p-2 font-medium">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(modes).map(([key, mode]) => {
-                  // Calculate values for each mode using same logic as main pipeline
-                  const U_cycle_base_mode = mode.duty > 0 ? U_Q * mode.duty : 0;
-                  let M_exotic_mode = 0;
-                  
-                  if (mode.duty > 0) {
-                    // Calculate exotic mass for this mode using the current exotic mass target
-                    const gamma_pocket_mode = exoticMassTarget * (c * c) / (Math.abs(U_cycle_base_mode) * N_tiles);
-                    const U_cycle_mode = U_cycle_base_mode * gamma_pocket_mode;
-                    M_exotic_mode = Math.abs(U_cycle_mode) / (c * c) * N_tiles;
-                  }
-                  const throttle_mode = mode.duty * mode.qSpoiling * (1/mode.sectors);
-                  const P_avg_mode_W = mode.duty > 0 ? (P_loss_raw * N_tiles * throttle_mode) : 0;
-                  const zeta_mode = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : NaN;
-                  const isCurrentMode = key === selectedMode;
-                  const isStandby = mode.duty === 0;
-                  
-                  // Format power with appropriate units
-                  const formatPower = (powerW: number) => {
-                    if (powerW === 0) return "0.00";
-                    if (powerW < 1000) return `${powerW.toFixed(3)} W`;
-                    if (powerW < 1e6) return `${(powerW/1000).toFixed(3)} kW`;
-                    return `${(powerW/1e6).toFixed(1)} MW`;
-                  };
-                  
-                  return (
-                    <tr key={key} className={`${isCurrentMode ? "bg-primary/10" : "hover:bg-muted/30"} ${isStandby ? "opacity-50" : ""}`}>
-                      <td className={`p-2 border-r border-border ${isCurrentMode ? "font-semibold text-primary" : ""}`}>
-                        {mode.name}
-                      </td>
-                      <td className="text-center p-2 border-r border-border font-mono">
-                        {formatStandard(mode.duty * 100, 1)}%
-                      </td>
-                      <td className="text-center p-2 border-r border-border font-mono">
-                        {isStandby ? "—" : (mode.sectors === 1 ? "1" : `1/${mode.sectors}`)}
-                      </td>
-                      <td className="text-center p-2 border-r border-border font-mono">
-                        {isStandby ? "—" : (mode.qSpoiling === 1 ? "1" : "10⁻³")}
-                      </td>
-                      <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
-                        {formatPower(P_avg_mode_W)}
-                      </td>
-                      <td className={`text-center p-2 border-r border-border font-mono ${isCurrentMode ? "font-semibold" : ""}`}>
-                        {isStandby ? "0" : formatScientific(M_exotic_mode, 0)}
-                      </td>
-                      <td className={`text-center p-2 border-r border-border font-mono ${isStandby ? "" : (zeta_mode <= 1.0 ? "text-green-600" : "text-red-600")}`}>
-                        {isStandby ? "—" : `${formatStandard(zeta_mode, 2)} ${zeta_mode <= 1.0 ? "✓" : "✗"}`}
-                      </td>
-                      <td className="text-center p-2 border-r border-border font-mono text-green-600">
-                        {isStandby ? "—" : `${formatStandard(TS_ratio, 0)} ✓`}
-                      </td>
-                      <td className="text-center p-2 text-xs">
-                        {key === "hover" && "Station-hold"}
-                        {key === "cruise" && "Mass-budgeting"}
-                        {key === "emergency" && "High-Intensity Warp Pulse"}
-                        {key === "standby" && "System-off"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div className="mt-2 text-xs text-muted-foreground space-y-1">
-            <div>Exotic mass held fixed at 32.21 kg by adjusting Van-den-Broeck pocket amplification for active modes.</div>
-            <div>P_avg for Cruise is watts (7.4 W) due to 400-sector strobing and Q-spoiling throttling.</div>
-            <div className="flex items-center gap-4">
-              <span>✓ Ford-Roman compliant (ζ ≤ 1.0)</span>
-              <span>✗ Quantum inequality violation</span>
-              <span className="font-semibold text-primary">Current mode highlighted</span>
+              <div className="font-semibold">{fmt(live.TS_ratio, "—", 1)} {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "✓" : "✗"}</div>
             </div>
           </div>
         </div>
