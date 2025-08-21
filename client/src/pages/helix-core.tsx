@@ -41,7 +41,6 @@ import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
-import CurvatureBand from "@/components/CurvatureBand";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import { HelpCircle } from "lucide-react";
 
@@ -635,8 +634,73 @@ export default function HelixCore() {
                   </div>
 
                   <div className="space-y-4" ref={sliceHostRef}>
-                    <div className="relative bg-slate-50 rounded shadow p-2">
-                      <SliceViewer
+                    {/* Slice Controls Panel */}
+                    <div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="text-sm font-medium text-slate-200">Slice Preferences</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                            <p className="mb-2">Control the visual parameters for the equatorial slice viewer. These settings persist across mode switches and browser sessions.</p>
+                            <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                            <p className="text-xs italic">The eye adjusts to see truth clearly in any light.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <Label htmlFor="exposure-slider" className="text-slate-300">Exposure ({exposure})</Label>
+                          <Input
+                            id="exposure-slider"
+                            type="range"
+                            min="1"
+                            max="12"
+                            step="1"
+                            value={exposure}
+                            onChange={(e) => update("exposure", parseFloat(e.target.value))}
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <Label htmlFor="sigma-slider" className="text-slate-300">Sigma Range ({sigmaRange})</Label>
+                          <Input
+                            id="sigma-slider"
+                            type="range"
+                            min="2"
+                            max="12"
+                            step="1"
+                            value={sigmaRange}
+                            onChange={(e) => update("sigmaRange", parseInt(e.target.value))}
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="diff-mode"
+                            checked={diffMode}
+                            onCheckedChange={(checked) => update("diffMode", checked)}
+                          />
+                          <Label htmlFor="diff-mode" className="text-slate-300">Diff Mode</Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="show-contours"
+                            checked={showContours}
+                            onCheckedChange={(checked) => update("showContours", checked)}
+                          />
+                          <Label htmlFor="show-contours" className="text-slate-300">Show Contours</Label>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <SliceViewer
                       hullAxes={[
                         Number(hullAxes[0]) || 503.5,
                         Number(hullAxes[1]) || 132.0,
@@ -668,38 +732,6 @@ export default function HelixCore() {
                       height={sliceSize.h}
                       className="xl:sticky xl:top-4"
                     />
-                    
-                      {/* Axis and scale annotations */}
-                      <div className="absolute bottom-2 left-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
-                        X-axis: Radial ρ (m)
-                      </div>
-                      <div className="absolute top-2 left-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
-                        Y-axis: Curvature κ(ρ) (1/m²)
-                      </div>
-                      <div className="absolute bottom-2 right-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
-                        Grid scale: {Math.round((Number(hullAxes[0]) || 503.5) / 10)} m divisions
-                      </div>
-                    </div>
-
-                    {/* Micro-scale Curvature Band Viewer */}
-                    <div className="relative bg-slate-50 rounded shadow p-2 mt-4">
-                      <CurvatureBand
-                        hullAxes={[
-                          Number(hullAxes[0]) || 503.5,
-                          Number(hullAxes[1]) || 132.0,
-                          Number(hullAxes[2]) || 86.5,
-                        ]}
-                        wallWidth_m={6.0}
-                        gammaGeo={pipeline?.gammaGeo ?? 26}
-                        qSpoilingFactor={qSpoilUI}
-                        sigmaRange={6}
-                        exposure={8}
-                        showContours={true}
-                        width={480}
-                        height={200}
-                        className="xl:sticky xl:top-[300px]"
-                      />
-                    </div>
                   </div>
                 </div>
               );

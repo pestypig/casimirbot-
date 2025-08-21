@@ -1,63 +1,56 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 
-type Vec3 = [number, number, number];
+/**
+ * SliceViewer — true-to-scale equatorial curvature viewer (ρ-space)
+ *
+ * X-axis: (ρ-1)/w_ρ in σ units (±sigmaRange)
+ * Y-axis: φ ∈ [0, 2π)
+ * Color: York-time proxy θ(ρ,φ) with viewer-only amplitude chain
+ * Matches the canonical Gaussian shell used in your WebGL fragment shader.
+ */
+
+export type Vec3 = [number, number, number];
 
 export interface SliceViewerProps {
-  hullAxes: [number, number, number];       // [a, b, c] in meters (semi-axes)
-  wallWidth_m?: number;
-  driveDir?: Vec3;
-  vShip?: number;
-
-  // amplitude chain (viewer-only)
-  gammaGeo?: number;
-  qSpoilingFactor?: number;
-  gammaVdB?: number;
-  dutyCycle?: number;
-  sectors?: number;
-  viewAvg?: boolean;
-
-  // diff vs hover
-  diffMode?: boolean;
-  refParams?: Partial<{
-    gammaGeo: number;
-    qSpoilingFactor: number;
-    gammaVdB: number;
-    dutyCycle: number;
-    sectors: number;
-    viewAvg: boolean;
-  }>;
-
-  // visual controls
-  sigmaRange?: number;
-  exposure?: number;
-  zeroStop?: number;
-  showContours?: boolean;
-
-  // canvas size
-  width?: number;
-  height?: number;
-
-  // optional className
   className?: string;
-}
+  width?: number; // canvas width in CSS px
+  height?: number; // canvas height in CSS px
 
-/** Nice step utility for axis ticks (1, 2, 5 × 10^n) */
-function niceStep(spanMeters: number, targetTicks = 8) {
-  const rough = spanMeters / targetTicks;
-  const pow10 = Math.pow(10, Math.floor(Math.log10(Math.max(rough, 1e-9))));
-  const n = rough / pow10;
-  const mult = n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10;
-  return mult * pow10;
-}
+  // Geometry / wall
+  hullAxes: Vec3; // [a,b,c] in meters
+  wallWidth_m?: number; // optional (if given, overrides rho calc)
+  wallWidth_rho?: number; // optional (directly in ρ-units)
 
-/** Format length in meters with unit scaling (m / 10 m / 100 m / km) */
-function fmtMeters(m: number) {
-  const a = Math.abs(m);
-  if (a >= 1000) return `${(m / 1000).toFixed(2)} km`;
-  if (a >= 100)  return `${m.toFixed(0)} m`;
-  if (a >= 10)   return `${m.toFixed(1)} m`;
-  return `${m.toFixed(2)} m`;
+  // Drive / ship frame
+  driveDir?: Vec3; // default [1,0,0]
+  vShip?: number; // scale for θ proxy
+
+  // Amplitude chain (viewer-only; does not affect geometry)
+  gammaGeo?: number; // γ_geo
+  qSpoilingFactor?: number; // ΔA/A
+  gammaVdB?: number; // γ_VdB
+  dutyCycle?: number; // 0..1
+  sectors?: number; // ≥1
+  viewAvg?: boolean; // true→√(duty/sectors), false→instant
+
+  // Diff vs reference (viewer-only)
+  diffMode?: boolean;
+  refParams?: Partial<Pick<
+    SliceViewerProps,
+    | "gammaGeo"
+    | "qSpoilingFactor"
+    | "gammaVdB"
+    | "dutyCycle"
+    | "sectors"
+    | "viewAvg"
+  >>;
+
+  // Visual controls
+  sigmaRange?: number; // default 6 (±6σ)
+  exposure?: number; // dynamic range control for symmetric log (default 6)
+  zeroStop?: number; // avoids singularity at zero before log (default 1e-9)
+  showContours?: boolean; // overlay iso-contours
 }
 
 function harmonicMean(a: number, b: number, c: number) {
@@ -80,317 +73,216 @@ function dot(a: Vec3, b: Vec3) {
 function divergeColor(x: number): [number, number, number] {
   // x in [-1, 1]: blue → white → orange-red (matches engine aesthetic)
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
-  
-  if (x <= -1) return [30/255, 90/255, 160/255];
-  if (x >= 1) return [220/255, 100/255, 30/255];
-  
-  if (x < 0) {
-    const t = clamp(-x);
-    return [
-      30/255 + t * (1 - 30/255),
-      90/255 + t * (1 - 90/255),
-      160/255 + t * (1 - 160/255)
-    ];
+  const t = clamp((x + 1) * 0.5); // [0,1]
+  const c1: [number, number, number] = [0.15, 0.45, 1.0]; // blue
+  const c2: [number, number, number] = [1.0, 1.0, 1.0]; // white
+  const c3: [number, number, number] = [1.0, 0.45, 0.0]; // orange-red
+  let r: number, g: number, b: number;
+  if (t < 0.5) {
+    const u = t / 0.5; // 0..1 between c1→c2
+    r = c1[0] * (1 - u) + c2[0] * u;
+    g = c1[1] * (1 - u) + c2[1] * u;
+    b = c1[2] * (1 - u) + c2[2] * u;
   } else {
-    const t = clamp(x);
-    return [
-      1 + t * (220/255 - 1),
-      1 + t * (100/255 - 1),
-      1 + t * (30/255 - 1)
-    ];
+    const u = (t - 0.5) / 0.5; // 0..1 between c2→c3
+    r = c2[0] * (1 - u) + c3[0] * u;
+    g = c2[1] * (1 - u) + c3[1] * u;
+    b = c2[2] * (1 - u) + c3[2] * u;
   }
+  return [r, g, b];
 }
 
-function smoothSign(x: number, k = 50) {
-  return Math.tanh(k * x);
-}
-
-function natarioAmplitude(
-  rho: number,
-  sigma: number,
-  ship_R: number,
-  wall_widthRho: number,
-  gammaGeoEff: number
-): number {
-  const rhoNorm = rho / ship_R;
-  const vs = 1.0;
-  const rhoW = wall_widthRho / ship_R;
-  const deltaRho = rhoNorm - 1.0;
-  const deltaRhoAbs = Math.abs(deltaRho);
-  
-  if (deltaRhoAbs > rhoW) return 0;
-  
-  const u = deltaRhoAbs / rhoW;
-  const envelope = Math.exp(-u * u / (2 * sigma * sigma));
-  const soft = smoothSign(deltaRho / rhoW);
-  
-  const factor = gammaGeoEff * vs * vs;
-  return -factor * envelope * soft;
-}
-
-export function SliceViewer(props: SliceViewerProps) {
-  const {
-    hullAxes,
-    wallWidth_m = 2.27,
-    driveDir = [1, 0, 0],
-    vShip = 1.0,
-
-    gammaGeo = 26,
-    qSpoilingFactor = 1,
-    gammaVdB = 3.83e1,
-    dutyCycle = 0.14,
-    sectors = 1,
-    viewAvg = true,
-
-    diffMode = false,
-    refParams,
-
-    sigmaRange = 6,
-    exposure = 8,
-    zeroStop = 1e-7,
-    showContours = true,
-
-    width = 480,
-    height = 240,
-    className,
-  } = props;
-
+export const SliceViewer: React.FC<SliceViewerProps> = ({
+  className,
+  width = 480,
+  height = 240,
+  hullAxes,
+  wallWidth_m,
+  wallWidth_rho,
+  driveDir = [1, 0, 0],
+  vShip = 1.0,
+  gammaGeo = 26,
+  qSpoilingFactor = 1,
+  gammaVdB = 3.83e1,
+  dutyCycle = 0.14,
+  sectors = 1,
+  viewAvg = true,
+  diffMode = true,
+  refParams,
+  sigmaRange = 6,
+  exposure = 6,
+  zeroStop = 1e-9,
+  showContours = true,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Physics calculations
-  const physicsData = useMemo(() => {
-    const [a, b, c] = hullAxes;
-    const ship_R = harmonicMean(a, b, c);
-    const wall_widthRho = wallWidth_m;
-    
-    // Amplitude chain calculation
-    const chainBase = gammaGeo * qSpoilingFactor * gammaVdB;
-    const dutyFactor = viewAvg ? Math.sqrt(dutyCycle / sectors) : dutyCycle;
-    const gammaGeoEff = chainBase * dutyFactor;
-    
-    return { ship_R, wall_widthRho, gammaGeoEff };
-  }, [hullAxes, wallWidth_m, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
+  const wRho = useMemo(() => {
+    if (Number.isFinite(wallWidth_rho as number)) return wallWidth_rho as number;
+    if (Number.isFinite(wallWidth_m as number)) {
+      const aH = harmonicMean(hullAxes[0], hullAxes[1], hullAxes[2]);
+      return (wallWidth_m as number) / aH;
+    }
+    // Canonical default used in engine: 0.016 in ρ-space
+    return 0.016;
+  }, [hullAxes, wallWidth_m, wallWidth_rho]);
 
-  // Reference physics for diff mode
-  const refPhysicsData = useMemo(() => {
-    if (!diffMode || !refParams) return null;
-    
-    const [a, b, c] = hullAxes;
-    const ship_R = harmonicMean(a, b, c);
-    const wall_widthRho = wallWidth_m;
-    
-    const refGamma = refParams.gammaGeo ?? 26;
-    const refQ = refParams.qSpoilingFactor ?? 1;
-    const refVdB = refParams.gammaVdB ?? 3.83e1;
-    const refDuty = refParams.dutyCycle ?? 0.14;
-    const refSectors = refParams.sectors ?? 1;
-    const refViewAvg = refParams.viewAvg ?? true;
-    
-    const refChainBase = refGamma * refQ * refVdB;
-    const refDutyFactor = refViewAvg ? Math.sqrt(refDuty / refSectors) : refDuty;
-    const refGammaGeoEff = refChainBase * refDutyFactor;
-    
-    return { ship_R, wall_widthRho, gammaGeoEff: refGammaGeoEff };
-  }, [diffMode, refParams, hullAxes, wallWidth_m]);
+  const dN = useMemo(() => normalize(divVec(driveDir, hullAxes as Vec3)), [driveDir, hullAxes]);
 
-  // Render equatorial slice
+  const amp = useMemo(() => {
+    const A_geo = Math.pow(gammaGeo, 3);
+    const avg = viewAvg ? Math.sqrt(Math.max(1e-12, dutyCycle) / Math.max(1, sectors)) : 1.0;
+    return A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
+  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
+
+  const ampRef = useMemo(() => {
+    if (!diffMode) return 0;
+    const g = refParams?.gammaGeo ?? gammaGeo;
+    const q = refParams?.qSpoilingFactor ?? 1;
+    const v = refParams?.gammaVdB ?? 3.83e1;
+    const d = refParams?.dutyCycle ?? 0.14;
+    const s = refParams?.sectors ?? 1;
+    const avg = (refParams?.viewAvg ?? true) ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
+    return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
+  }, [diffMode, refParams, gammaGeo]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext("2d");
+
+    // Handle high-DPR displays for crisp result
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.floor(width * dpr);
+    const H = Math.floor(height * dpr);
+    canvas.width = W;
+    canvas.height = H;
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
-    // Clear with white background
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width, height);
+    const img = ctx.createImageData(W, H);
+    const data = img.data;
 
-    const margin = { L: 40, R: 18, T: 18, B: 40 };
-    const W = width - margin.L - margin.R;
-    const H = height - margin.T - margin.B;
+    const nX = W; // σ samples
+    const nY = H; // φ samples
 
-    const [a, c] = [hullAxes[0], hullAxes[2]];
-    const rhoExtent = Math.max(a, c) * 1.5; // Extend beyond hull
-    
-    // Create ImageData for pixel-level rendering
-    const imageData = ctx.createImageData(W, H);
-    const data = imageData.data;
+    // Precompute normalizing constants for symmetric log exposure
+    const logNorm = Math.log10(1 + Math.max(1, exposure));
 
-    for (let py = 0; py < H; py++) {
-      for (let px = 0; px < W; px++) {
-        // Map pixel to equatorial coordinates
-        const x = ((px / W) - 0.5) * 2 * rhoExtent; // forward/aft
-        const z = ((py / H) - 0.5) * 2 * rhoExtent; // port/starboard (flipped for screen coords)
-        
-        const rho = Math.sqrt(x*x + z*z);
-        const sigma = 0.1; // Fixed sigma for visualization
-        
-        // Calculate amplitude
-        let amplitude = natarioAmplitude(
-          rho,
-          sigma,
-          physicsData.ship_R,
-          physicsData.wall_widthRho,
-          physicsData.gammaGeoEff
-        );
-        
-        // Diff mode
-        if (diffMode && refPhysicsData) {
-          const refAmplitude = natarioAmplitude(
-            rho,
-            sigma,
-            refPhysicsData.ship_R,
-            refPhysicsData.wall_widthRho,
-            refPhysicsData.gammaGeoEff
-          );
-          amplitude = amplitude - refAmplitude;
+    // φ runs top→bottom
+    for (let j = 0; j < nY; j++) {
+      const phi = (j / (nY - 1)) * Math.PI * 2; // 0..2π
+      // unit point on equator in ellipsoidal normed coords (y=0)
+      // pN is direction only; ρ handled on X sweep
+      const pHat: Vec3 = [Math.cos(phi), 0, Math.sin(phi)];
+      const xs_over_rs = dot(pHat, dN); // equals cos(angle between p and drive)
+
+      for (let i = 0; i < nX; i++) {
+        // xσ ∈ [-sigmaRange, +sigmaRange]
+        const xσ = -sigmaRange + (2 * sigmaRange * i) / (nX - 1);
+        const ρ = 1 + xσ * wRho; // absolute ρ
+
+        // Canonical Gaussian shell and its derivative
+        const w = Math.max(1e-6, wRho);
+        const f = Math.exp(-((ρ - 1) * (ρ - 1)) / (w * w));
+        const dfdr = (-2 * (ρ - 1) / (w * w)) * f; // d/dρ
+
+        // York-time proxy (matches your shader form)
+        let theta = vShip * xs_over_rs * dfdr; // 1/ρ cancels because pHat has |p|=1
+
+        // Apply amplitude chain (viewer-only)
+        let value = theta * amp;
+
+        if (diffMode) {
+          const valueRef = theta * ampRef;
+          value = value - valueRef;
         }
-        
-        // Apply exposure scaling and color mapping
-        const scaledAmp = amplitude * Math.pow(10, exposure - 8);
-        const clampedAmp = Math.max(-1, Math.min(1, scaledAmp));
-        const [r, g, b] = divergeColor(clampedAmp);
-        
-        const idx = (py * W + px) * 4;
-        data[idx] = Math.round(r * 255);     // R
-        data[idx + 1] = Math.round(g * 255); // G
-        data[idx + 2] = Math.round(b * 255); // B
-        data[idx + 3] = 255;                 // A
+
+        // Symmetric log mapping to [-1,1]
+        const mag = Math.log10(1 + Math.abs(value) / Math.max(zeroStop, 1e-18));
+        const signed = (value < 0 ? -1 : 1) * (mag / logNorm);
+        const xCol = Math.max(-1, Math.min(1, signed));
+
+        const [r, g, b] = divergeColor(xCol);
+        const idx = 4 * (j * nX + i);
+        data[idx + 0] = Math.round(r * 255);
+        data[idx + 1] = Math.round(g * 255);
+        data[idx + 2] = Math.round(b * 255);
+        data[idx + 3] = 255;
       }
     }
 
-    // Draw the rendered slice
-    ctx.putImageData(imageData, margin.L, margin.T);
+    ctx.putImageData(img, 0, 0);
 
-    // Add contours if enabled
+    // Optional: overlay iso-contours and axes labels
     if (showContours) {
-      ctx.strokeStyle = "rgba(0, 0, 0, 0.3)";
-      ctx.lineWidth = 0.5;
-      
-      // Draw hull ellipse
-      ctx.beginPath();
-      ctx.ellipse(
-        margin.L + W/2,
-        margin.T + H/2,
-        (a / rhoExtent) * W/2,
-        (c / rhoExtent) * H/2,
-        0, 0, Math.PI * 2
-      );
-      ctx.stroke();
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.strokeStyle = "rgba(0,0,0,0.20)";
+
+      // vertical σ ticks every 2σ
+      for (let k = -sigmaRange; k <= sigmaRange; k += 2) {
+        const i = Math.round(((k + sigmaRange) / (2 * sigmaRange)) * (W - 1));
+        ctx.beginPath();
+        ctx.moveTo(i + 0.5, 0);
+        ctx.lineTo(i + 0.5, H);
+        ctx.stroke();
+      }
+
+      // horizontal φ ticks at quadrants
+      const quads = 8;
+      for (let q = 0; q < quads; q++) {
+        const jLine = Math.round((q / quads) * (H - 1));
+        ctx.beginPath();
+        ctx.moveTo(0, jLine + 0.5);
+        ctx.lineTo(W, jLine + 0.5);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+
+      // Labels (lightweight)
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.9)";
+      ctx.font = `${12 * dpr}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+      ctx.textBaseline = "top";
+      ctx.fillText(`(ρ-1)/w_ρ  [±${sigmaRange}σ]`, 8 * dpr, 6 * dpr);
+      ctx.textAlign = "right";
+      ctx.fillText("φ ∈ [0, 2π)", W - 8 * dpr, 6 * dpr);
+      if (diffMode) {
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText("Δθ vs baseline", 8 * dpr, H - 8 * dpr);
+      }
+      ctx.restore();
     }
-
-    // Add axis annotations and scale (after rendering the image)
-    ctx.save();
-
-    // border
-    ctx.strokeStyle = "rgba(30,41,59,0.85)"; // slate-800
-    ctx.lineWidth = 1;
-    ctx.strokeRect(0.5, 0.5, width-1, height-1);
-
-    // axis labels
-    ctx.fillStyle = "rgba(100,116,139,0.95)"; // slate-400
-    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
-
-    // x: normalized equatorial coordinate (−a … +a) mapped to meters
-    ctx.fillText("x (m) — fore (+) ⇄ aft (−)", 8, 16);
-
-    // y: normalized ρ (distance from hull in σ units if you're using it) — adapt if you show meters
-    ctx.save();
-    ctx.translate(12, height/2);
-    ctx.rotate(-Math.PI/2);
-    ctx.textAlign = "center";
-    ctx.fillText("δρ  (ellipsoidal radius offset)", 0, 0);
-    ctx.restore();
-
-    // tick marks (quarter divisions)
-    ctx.strokeStyle = "rgba(51,65,85,0.35)"; // slate-700
-    for (let k=1; k<4; k++){
-      const px = Math.round((k/4)*(width-1));
-      ctx.beginPath(); ctx.moveTo(px+0.5, height-14); ctx.lineTo(px+0.5, height-10); ctx.stroke();
-      const py = Math.round((k/4)*(height-1));
-      ctx.beginPath(); ctx.moveTo(10, py+0.5); ctx.lineTo(14, py+0.5); ctx.stroke();
-    }
-
-    // scale tag
-    ctx.fillStyle = "rgba(2,6,23,0.65)"; // slate-950
-    ctx.strokeStyle = "rgba(30,41,59,0.7)";
-    ctx.fillRect(width-210, 8, 202, 40);
-    ctx.strokeRect(width-210+0.5, 8.5, 202-1, 40-1);
-    ctx.fillStyle = "rgba(203,213,225,0.95)"; // slate-200
-    ctx.fillText(`equatorial slice (y=0)`, width-200, 24);
-    ctx.fillText(`grid: ${W}×${H} • σ span ±${sigmaRange}`, width-200, 38);
-
-    ctx.restore();
-
   }, [
-    hullAxes, wallWidth_m, driveDir, vShip,
-    gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg,
-    diffMode, refParams, sigmaRange, exposure, zeroStop, showContours,
-    width, height, physicsData, refPhysicsData
+    width,
+    height,
+    hullAxes,
+    wRho,
+    dN,
+    vShip,
+    amp,
+    ampRef,
+    sigmaRange,
+    exposure,
+    zeroStop,
+    diffMode,
+    showContours,
   ]);
 
-  // Dynamic axes + scale derived from hull geometry
-  const { a_m, c_m, tickX, tickZ, pxPerMeterX, pxPerMeterZ } = useMemo(() => {
-    const a_m = hullAxes?.[0] ?? 503.5;
-    const c_m = hullAxes?.[2] ?? 86.5;
-
-    // Leave a small margin so labels don't clip
-    const marginL = 40, marginR = 18, marginT = 18, marginB = 40;
-    const innerW = Math.max(1, width - marginL - marginR);
-    const innerH = Math.max(1, height - marginT - marginB);
-
-    // Map x∈[-a,a] → innerW; z∈[-c,c] → innerH
-    const pxPerMeterX = innerW / (2 * a_m);
-    const pxPerMeterZ = innerH / (2 * c_m);
-
-    // Choose "nice" tick spacing to get ~6–10 major lines
-    const tickX = niceStep(2 * a_m, 9);
-    const tickZ = niceStep(2 * c_m, 9);
-
-    return { a_m, c_m, tickX, tickZ, pxPerMeterX, pxPerMeterZ };
-  }, [hullAxes, width, height]);
-
-  // Precompute positions for ticks (centered at (0,0) in data → center in pixels)
-  const layout = useMemo(() => {
-    const margin = { L: 40, R: 18, T: 18, B: 40 };
-    const W = width - margin.L - margin.R;
-    const H = height - margin.T - margin.B;
-
-    const cx = margin.L + W / 2; // pixel center for x=0
-    const cz = margin.T + H / 2; // pixel center for z=0
-
-    // Generate ticks symmetric around 0 for x and z
-    const ticksX: number[] = [];
-    for (let x = 0; x <= a_m; x += tickX) {
-      if (x > 0) ticksX.push(-x);
-      ticksX.push(x);
-    }
-    ticksX.sort((p, q) => p - q);
-
-    const ticksZ: number[] = [];
-    for (let z = 0; z <= c_m; z += tickZ) {
-      if (z > 0) ticksZ.push(-z);
-      ticksZ.push(z);
-    }
-    ticksZ.sort((p, q) => p - q);
-
-    // Convert to pixel coordinates
-    const xToPx = (xm: number) => cx + xm * pxPerMeterX;
-    const zToPx = (zm: number) => cz - zm * pxPerMeterZ; // screen y grows downward
-
-    return { margin, W, H, cx, cz, ticksX, ticksZ, xToPx, zToPx };
-  }, [a_m, c_m, tickX, tickZ, pxPerMeterX, pxPerMeterZ, width, height]);
-
   return (
-    <div className={clsx(className)} style={{ position: "relative" }}>
-      {/* Base slice (white background with heatmap/contours) */}
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        style={{ display: "block", width, height, background: "#fff" }}
-      />
+    <div className={clsx("rounded-xl border border-cyan-500/30 bg-slate-900/70 p-3", className)}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-xs font-mono text-cyan-300">Equatorial Curvature Slice (ρ-space)</div>
+        <div className="text-[10px] font-mono text-slate-400">
+          γ³×(ΔA/A)×γ_VdB×{viewAvg ? "√(duty/sectors)" : "instant"}
+        </div>
+      </div>
+      <canvas ref={canvasRef} className="w-full h-auto block rounded-lg overflow-hidden" />
     </div>
   );
-}
+};
