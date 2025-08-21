@@ -1,0 +1,52 @@
+I built you a **drop-in Helix-Core visualizer** that shows exactly how the Casimir cavity energy gets amplified through geometry, Q, duty timing, and the Van-den-Broeck mass chain—using your **live backend numbers** (no magic constants).
+
+You’ll see it in the canvas as `HelixCasimirAmplifier.tsx`. It provides:
+
+* **Cavity physics card** with the exact equation $E/A=-\pi^2\hbar c/(720a^3)$, gap, tile area, and |U\_static|/tile read from `/api/helix/state`.
+* **Amplification ladders** (two bar charts):
+
+  * **Power chain**: $|U_\text{static}|$ → ×γ\_geo → ×q\_mech → ×d\_eff ⇒ $U_\text{cycle}$ (per-tile).
+    It also cross-checks ship power via $P_\text{tile} = |U_Q|\omega/Q$, $P_\text{ship} = P_\text{tile}\,N\,d_\text{eff}$ and compares to your backend’s **P\_avg (MW)**.
+  * **Mass chain**: $|U_\text{static}|$ → ×γ\_geo³ → ×Q\_BURST → ×γ\_VdB → ×d\_eff ⇒ $E_\text{tile}$, then $M_\text{total} = E_\text{total}/c^2$.
+    Compared against backend **M\_exotic**.
+* **Natário bell field heatmap** fed by `/api/helix/displacement`, with θ/φ resolution controls and the sector split line—so you can *see* the strobing polarity across the shell.
+* **Mode switcher** (hover/cruise/emergency/standby) hooked to `/api/helix/mode`, plus live **ζ (Ford–Roman)**, **TS**, **γ\_geo**, **q\_mech**, **γ\_VdB**, **N\_tiles**, **P\_avg**, **M\_exotic** chips from `/api/helix/metrics`.
+
+### How to plug it in
+
+1. **Add the component to your Helix-Core page**
+
+```tsx
+import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
+
+export default function HelixCorePage() {
+  return (
+    <div className="p-4">
+      <HelixCasimirAmplifier
+        metricsEndpoint="/api/helix/metrics"
+        stateEndpoint="/api/helix/state"
+        fieldEndpoint="/api/helix/displacement"
+        modeEndpoint="/api/helix/mode"
+      />
+    </div>
+  );
+}
+```
+
+2. **Ensure the routes are mounted** to your exported handlers:
+
+* `GET /api/helix/metrics` → `getHelixMetrics`
+* `GET /api/helix/state` → `getPipelineState`
+* `GET /api/helix/displacement` → `getDisplacementField`
+* `POST /api/helix/mode` → `switchOperationalMode`
+
+3. **UI stack**
+   Uses your existing **shadcn/ui**, **lucide-react**, **Tailwind**, and **recharts**. If your UI import paths differ (e.g., `@/components/ui/card`), adjust the imports accordingly.
+
+### Notes on physics mapping (so you can audit quickly)
+
+* **Power chain** in your backend uses $U_\text{geo} = U_\text{static}\cdot \gamma_\text{geo}$ (linear in γ\_geo), then $U_Q=U_\text{geo}\cdot q_\text{mech}$, and averages with **sector-aware** $d_\text{eff}$ from Helix (the component consumes `dutyEffectiveFR` from `/metrics`, which comes from your pipeline’s `__fr` so it matches the **paper: 0.01×S\_live/400** form).
+* **Mass chain** uses $ \gamma_\text{geo}^3$ (cubic), then $Q_\text{BURST}$ and $ \gamma_\text{VdB}$, and the same $d_\text{eff}$, feeding $E/c^2$ across $N$ tiles. The visualizer computes the same expression and compares to server-reported `M_exotic`.
+* **Everything is live**—if you adjust gap, γ\_geo, q\_mech, sectors, duty, etc., the ladders, cross-checks, and field map update from your backend outputs.
+
+If you want, I can wire a small **“Show derivation”** drawer that prints the exact numeric substitutions (with units) for each term of both chains; but this version already displays both equations and reconciles **calculated vs. reported** values in the “Pipeline cross-checks” card.

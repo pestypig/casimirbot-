@@ -42,6 +42,7 @@ import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
+import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
 import { HelpCircle } from "lucide-react";
 
 // --- Safe numeric formatters ---
@@ -1885,6 +1886,17 @@ export default function HelixCore() {
             </Card>
           </div>
         </div>
+
+        {/* ====== CASIMIR AMPLIFIER: Complete Physics Pipeline Visualization ====== */}
+        <div className="mt-8">
+          <HelixCasimirAmplifier 
+            metricsEndpoint="/api/helix/metrics"
+            stateEndpoint="/api/helix/pipeline" 
+            fieldEndpoint="/api/helix/displacement"
+            modeEndpoint="/api/helix/mode"
+          />
+        </div>
+        
       </div>
       </div>
     </TooltipProvider>
