@@ -193,6 +193,7 @@ export default function HelixCore() {
   // Fade memory for trailing glow (per-sector intensity 0..1)
   const [trail, setTrail] = useState<number[]>(() => Array(400).fill(0));
   const [useDeepZoom, setUseDeepZoom] = useState(false);
+  const [cosmeticLevel, setCosmeticLevel] = useState(10); // 1..10 (10 = current look)
   const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
     const stored = localStorage.getItem("helix-mapMode");
     return stored === "galactic" ? "galactic" : "solar";
@@ -638,6 +639,7 @@ export default function HelixCore() {
                             physicsParity,             // tells engine to render true-physics 1×
                             curvatureGainDec: 0,       // no slider; keep at 0 decades (1×)
                             curvatureBoostMax: 1,      // force visualBoost = 1× in parity mode anyway
+                            cosmeticLevel,             // 1..10 blend from real physics to current exaggeration
                             
                             // --- geometry (standard) ---
                             hull: (hullMetrics && hullMetrics.hull) ? {
@@ -771,6 +773,26 @@ export default function HelixCore() {
                           />
                           <Label htmlFor="show-contours" className="text-slate-300">Show Contours</Label>
                         </div>
+                      </div>
+                      
+                      {/* Cosmetic Curvature Slider */}
+                      <div className="mt-2 space-y-1">
+                        <Label htmlFor="cosmetic-slider" className="text-slate-300">
+                          Cosmetic Curvature ({cosmeticLevel})
+                        </Label>
+                        <Input
+                          id="cosmetic-slider"
+                          type="range"
+                          min="1"
+                          max="10"
+                          step="1"
+                          value={cosmeticLevel}
+                          onChange={(e) => setCosmeticLevel(parseInt(e.target.value, 10))}
+                          className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                        />
+                        <p className="text-[11px] text-slate-400">
+                          1 = real physics • 10 = current visual exaggeration
+                        </p>
                       </div>
                     </div>
                     
