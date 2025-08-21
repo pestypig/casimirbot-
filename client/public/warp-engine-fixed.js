@@ -427,6 +427,11 @@ class WarpEngine {
         // 🔬 PHYSICS PARITY MODE DETECTION
         const physicsParityMode = parameters.physicsParityMode === true;
         
+        // NEW: cosmetic curvature blend (1 = real physics, 10 = current visuals)
+        const rawLevel = Number.isFinite(parameters.cosmeticLevel) ? +parameters.cosmeticLevel : 10;
+        const cosmeticT0 = Math.max(0, Math.min(1, (rawLevel - 1) / 9)); // 1→0, 10→1
+        const cosmeticT = physicsParityMode ? 0 : cosmeticT0; // parity overrides to true-physics
+        
         if (physicsParityMode) {
             console.warn('🔬 PHYSICS PARITY MODE ACTIVE: All visual multipliers forced to unity for debug baseline');
             
@@ -436,6 +441,8 @@ class WarpEngine {
                 // Temporarily disable global boosts
                 window.__warp_setGainDec = () => {};
             }
+        } else if (cosmeticT < 1) {
+            console.log(`🎨 COSMETIC CURVATURE: Level ${rawLevel}/10 → blend ${(cosmeticT * 100).toFixed(1)}% toward current visuals`);
         }
         
         // Update internal parameters with operational mode integration
@@ -487,8 +494,6 @@ class WarpEngine {
             epsilonTiltFloor: physicsParityMode ? 0 : N(parameters.epsilonTiltFloor || 0), // 🔬 Force zero tilt floor
             betaTiltVec: physicsParityMode ? [0, 0, 0] : (parameters.betaTiltVec || [0, -1, 0]), // 🔬 Force zero tilt vector
             tiltGain: N(parameters.tiltGain || 0.55),
-            exposure: N(parameters.exposure || 6.0),
-            zeroStop: N(parameters.zeroStop || 1e-7),
             // NEW: Curvature Gain blend system (replaces vizGainOverride)
             // --- Curvature gain mapping (exactly matches SliceViewer) ---
             curvatureBoostMax: (() => {
@@ -568,6 +573,37 @@ class WarpEngine {
             )), // 🔬 Force 0 split in parity mode
             viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
         };
+
+        // 🎨 COSMETIC BLENDING: Apply visual parameter interpolation based on cosmeticLevel
+        if (cosmeticT < 1 && !physicsParityMode) {
+            // Baselines for a "real physics" look
+            const EXPOSURE_BASE = 3.0;    // lower contrast
+            const ZEROSTOP_BASE = 1e-5;   // less aggressive log pop
+            const USERGAIN_BASE = 1.0;    // no boost
+            
+            // Get current target values from parameters or uniforms
+            const exposureTarget = Number.isFinite(parameters.exposure) ? +parameters.exposure : (this.uniforms?.exposure ?? 6.0);
+            const zeroStopTarget = Number.isFinite(parameters.zeroStop) ? +parameters.zeroStop : (this.uniforms?.zeroStop ?? 1e-7);
+            const userGainCurrent = this.uniforms.userGain || 1;
+            
+            // BLEND: effective values that the shaders/geometry actually use
+            const userGainEffective = USERGAIN_BASE + cosmeticT * (userGainCurrent - USERGAIN_BASE);
+            const exposureEffective = EXPOSURE_BASE + cosmeticT * (exposureTarget - EXPOSURE_BASE);
+            const zeroStopEffective = ZEROSTOP_BASE + cosmeticT * (zeroStopTarget - ZEROSTOP_BASE);
+            
+            // Write back to uniforms so both shader & CPU geometry use the blended values
+            this.uniforms.userGain = userGainEffective;
+            this.uniforms.exposure = exposureEffective;
+            this.uniforms.zeroStop = zeroStopEffective;
+            this.uniforms.cosmeticT = cosmeticT; // Store for debugging
+            
+            console.log(`🎨 COSMETIC BLEND: userGain ${userGainCurrent.toFixed(2)}→${userGainEffective.toFixed(2)}, exposure ${exposureTarget.toFixed(1)}→${exposureEffective.toFixed(1)}, zeroStop ${zeroStopTarget.toExponential(1)}→${zeroStopEffective.toExponential(1)}`);
+        } else {
+            // Ensure exposure and zeroStop are set when not blending
+            this.uniforms.exposure = Number.isFinite(parameters.exposure) ? +parameters.exposure : (this.uniforms?.exposure ?? 6.0);
+            this.uniforms.zeroStop = Number.isFinite(parameters.zeroStop) ? +parameters.zeroStop : (this.uniforms?.zeroStop ?? 1e-7);
+            this.uniforms.cosmeticT = cosmeticT;
+        }
 
         // Update cached axes and refit camera if changed
         if (axesScene) {
