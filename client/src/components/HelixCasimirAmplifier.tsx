@@ -680,18 +680,20 @@ export default function HelixCasimirAmplifier({
                 Pipeline-Driven Cavity Cross-Section (To Scale)
               </h4>
               <CavitySideView
+                width={800}
+                height={240}
+                tileWidth_mm={50}
                 pocketDiameter_um={40}
-                sag_nm={state.sag_nm ?? 16}
+                sag_nm={state.sagDepth_nm ?? 16}
                 gap_nm={state.gap_nm ?? 1}
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
                 alnRim_width_um={20}
-                tileWidth_mm={50}
-                physicsParity={false} // TODO: Connect to Physics Parity mode if available
+                stroke_nm={50} // Enhanced stroke in nm instead of pm
+                gammaGeo={derived?.gammaGeo ?? 1}
                 onWindow={lightCrossing?.onWindow ?? false}
-                stroke_pm={50}
-                width={800}
-                height={240}
+                physicsParity={false}
+                mode="explanatory" // Use explanatory mode for better visibility
               />
             </div>
           </CardContent>

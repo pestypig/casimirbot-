@@ -1,3 +1,17 @@
+2) Make the side-view readable, animated, and still tied to physics
+
+What it does
+
+Draws a clipped spherical bowl that cannot overflow the canvas (no giant cap problem).
+
+Animates the moving diaphragm with the passed stroke_nm (visual only; bounded).
+
+Tints the blue-shift region with opacity proportional to γ_geo (monotone, unitless, no fake scale).
+
+Offers a mode prop to choose "to-scale" (nm-accurate) vs "explanatory" (magnified nm for visibility). We’ll keep the default explanatory for now, since you asked for clarity even if not to scale.
+
+Drop-in component (CavitySideView.tsx):
+
 import React, { useEffect, useRef } from "react";
 
 type Props = {
