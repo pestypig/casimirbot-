@@ -103,6 +103,14 @@ class WarpEngine {
         window.addEventListener('resize', this._resize);
         this._resizeCanvasToDisplaySize(); // Initial setup
         
+        // Prime the engine with initial visible curvature
+        this.updateUniforms({
+            curvatureGainDec: 3,   // 10^3 gain → plainly visible
+            exposure: 6.0,
+            zeroStop: 1e-7,
+            wallWidth: 0.05,       // fatten the wall to catch more vertices
+        });
+        
         // Start render loop
         this._renderLoop();
     }
@@ -799,10 +807,8 @@ class WarpEngine {
                 (n[2]/c_m)*(n[2]/c_m)
             );
             const R_eff = 1.0 / Math.max(invR, 1e-6);
-            const w_rho_local = (() => {
-              const w_m = (wallWidthUniform != null) ? wallWidthUniform : (w_rho * aH); // meters
-              return w_m / R_eff; // convert to ρ-units along this normal
-            })();
+            // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
+            const w_rho_local = Math.max(1e-4, w_rho);
             
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps

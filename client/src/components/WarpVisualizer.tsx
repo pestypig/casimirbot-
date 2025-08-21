@@ -386,7 +386,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         Lx_m: 1007, Ly_m: 264, Lz_m: 173,
         a: 503.5, b: 132, c: 86.5
       };
-      const wallWidth = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho); // ρ-units default
+      const wallWidth = Math.max(0.05, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho)); // Ensure visible wall width (≥0.05 for clear curvature)
 
       // Enhanced mode reconnection: push all mode-related uniforms with exact names
       engineRef.current.updateUniforms({
