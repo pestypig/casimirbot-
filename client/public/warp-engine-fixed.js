@@ -461,6 +461,9 @@ class WarpEngine {
             tiltGain: N(parameters.tiltGain || 0.55),
             exposure: N(parameters.exposure || 6.0),
             zeroStop: N(parameters.zeroStop || 1e-7),
+            // NEW: Curvature Gain blend system (replaces vizGainOverride)
+            curvatureGainT: Number.isFinite(parameters.curvatureGainT) ? Math.max(0, Math.min(1, parameters.curvatureGainT)) : (this.uniforms?.curvatureGainT ?? 0.75),
+            curvatureBoostMax: Number.isFinite(parameters.curvatureBoostMax) ? Math.max(1, parameters.curvatureBoostMax) : (this.uniforms?.curvatureBoostMax ?? 40),
             
             // Calculate thetaScale for unified color mapping with SliceViewer
             thetaScale: (() => {
@@ -818,19 +821,23 @@ class WarpEngine {
             const s = 1.0;            // slope after log
             const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
 
-            // Mode-specific visual scaling (keeps standby very small)
+            // Base ("honest") visual amplitude from physics only
+            const A_vis_base = Math.min(1.0, A_log);
+
+            // Curvature gain slider: blend between base and a boosted view
+            const tGain   = this.uniforms?.curvatureGainT ?? 0.75;     // 0..1 (default: clearly visible)
+            const boostMx = this.uniforms?.curvatureBoostMax ?? 40;    // >=1 (max boost multiplier)
+            const boost   = (1 - tGain) + tGain * boostMx;             // 1..boostMx
+
+            // Light per-mode seasoning (still small—doesn't hide physics)
             const modeScale =
-              mode === 'standby'  ? 0.05 :
-              mode === 'cruise'   ? 0.25 :
-              mode === 'hover'    ? 0.60 :
-              mode === 'emergency'? 0.90 : 0.50;
+              mode === 'standby'   ? 0.90 :  // keep some visibility when boosted
+              mode === 'cruise'    ? 1.00 :
+              mode === 'hover'     ? 1.05 :
+              mode === 'emergency' ? 1.10 : 1.00;
 
-            // Optional manual override from UI uniform (0 disables override)
-            const gainOverride = this.uniforms?.vizGainOverride ?? 0;
-            const vizGain = gainOverride > 0 ? gainOverride : modeScale;
-
-            // Final bounded visual amplitude 0..1
-            const A_vis = Math.min(1.0, A_log * vizGain);
+            // Final bounded visual amplitude: blend base physics with boost
+            const A_vis = Math.min(1.0, A_vis_base * boost * modeScale);
 
             // Special case: make standby perfectly flat if desired
             let disp;

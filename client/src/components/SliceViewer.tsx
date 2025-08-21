@@ -51,6 +51,10 @@ export interface SliceViewerProps {
   exposure?: number; // dynamic range control for symmetric log (default 6)
   zeroStop?: number; // avoids singularity at zero before log (default 1e-9)
   showContours?: boolean; // overlay iso-contours
+  
+  // Curvature gain controls (matches WarpVisualizer)
+  curvatureGain?: number; // 0-8 slider range for blend control
+  curvatureBoostMax?: number; // maximum boost multiplier (default 40)
 }
 
 function harmonicMean(a: number, b: number, c: number) {
@@ -113,6 +117,8 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   exposure = 6,
   zeroStop = 1e-9,
   showContours = true,
+  curvatureGain = 6.0,
+  curvatureBoostMax = 40,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -131,8 +137,16 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   const amp = useMemo(() => {
     const A_geo = Math.pow(gammaGeo, 3);
     const avg = viewAvg ? Math.sqrt(Math.max(1e-12, dutyCycle) / Math.max(1, sectors)) : 1.0;
-    return A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
-  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
+    const A_base = A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
+    
+    // Apply curvature gain blend: A_vis = A_base * boost * modeScale
+    // curvatureGain: 0-8 → curvatureGainT: 0-1
+    const curvatureGainT = Math.max(0, Math.min(1, curvatureGain / 8));
+    const boost = (1 - curvatureGainT) + curvatureGainT * curvatureBoostMax;
+    const modeScale = 1.0; // SliceViewer uses consistent scaling
+    
+    return A_base * boost * modeScale;
+  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, curvatureGain, curvatureBoostMax]);
 
   const ampRef = useMemo(() => {
     if (!diffMode) return 0;

@@ -623,8 +623,8 @@ export default function HelixCore() {
                           wall: { w_norm: 0.016 },
                           gridScale: 1.6,
                           epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                          vizGainOverride: curvatureGain,    // Geometry gain
-                          userColorGain: curvatureGain,      // Color gain (unified control)
+                          curvatureGainT: curvatureGain / 8.0,   // Convert 0-8 slider to 0-1 blend
+                          curvatureBoostMax: 40,              // Maximum boost multiplier
                           betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                           wallWidth_m: 6.0,
                           shift: {
@@ -674,7 +674,7 @@ export default function HelixCore() {
                             className="w-full"
                           />
                           <div className="text-xs text-slate-400">
-                            {curvatureGain === 0 ? "True physical result (no exaggeration)" : "Boosted visual for enhanced effect"}
+                            {curvatureGain === 0 ? "True physics only (no boost)" : `Blend: ${((1 - curvatureGain/8.0) * 100).toFixed(0)}% physics, ${((curvatureGain/8.0) * 100).toFixed(0)}% boosted`}
                           </div>
                         </div>
                       </div>
@@ -756,6 +756,8 @@ export default function HelixCore() {
                       exposure={exposure}
                       zeroStop={1e-7}
                       showContours={showContours}
+                      curvatureGain={curvatureGain}
+                      curvatureBoostMax={40}
                       width={sliceSize.w}
                       height={sliceSize.h}
                       className="xl:sticky xl:top-4"
