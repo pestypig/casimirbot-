@@ -22,6 +22,36 @@ import {
   ReferenceLine
 } from "recharts";
 
+// Helper functions
+function clamp01(x: number) { return Math.max(0, Math.min(1, x)); }
+
+// Exponential ON/OFF envelope for visuals (independent of U integration)
+function useDriveEnvelope({ on, tauRise_s, tauFall_s }: {
+  on: boolean; tauRise_s: number; tauFall_s: number;
+}) {
+  const [env, setEnv] = useState(0);
+  const last = useRef<number | null>(null);
+  useEffect(() => {
+    let raf: number;
+    const step = (t: number) => {
+      const now = t / 1000;
+      const prev = last.current ?? now;
+      const dt = Math.min(0.05, Math.max(0, now - prev));
+      last.current = now;
+
+      const tau = on ? tauRise_s : tauFall_s;
+      const target = on ? 1 : 0;
+      const k = dt / Math.max(1e-6, tau);
+      setEnv(e => e + (target - e) * (1 - Math.exp(-k)));
+
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [on, tauRise_s, tauFall_s]);
+  return env; // 0..1
+}
+
 /**
  * HelixCasimirAmplifier.tsx
  *
@@ -396,7 +426,6 @@ export default function HelixCasimirAmplifier({
     const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
     const U_Q       = U_geo * qMech;                 // per-tile stored energy proxy during ON
     const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // instantaneous dissipation W when ON (P=ωU/Q)
-    const P_tile_instant_W = isOnRaw ? P_tile_on : 0; // physics gating by light-crossing window
     const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
     const P_ship_avg_report_MW = state.P_avg;        // authoritative calibration (if provided)
 
@@ -418,13 +447,38 @@ export default function HelixCasimirAmplifier({
     return {
       U_static, gammaGeo, qMech, d_eff, N_tiles, omega, qCav, gammaVdB,
       U_geo, U_Q,
-      P_tile_on, P_tile_instant_W, P_ship_avg_calc_MW, P_ship_avg_report_MW,
+      P_tile_on, P_ship_avg_calc_MW, P_ship_avg_report_MW,
       geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
       gap_m, tileA_m2, casimir_theory, casimir_per_tile,
       isOnRaw, isBurstMeaningful
     };
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, lightCrossing?.onWindow, lightCrossing?.cyclesPerBurst, lightCrossing?.burst_ms, lightCrossing?.dwell_ms]);
+
+  // ---- DISPLAY gating: use onWindowDisplay (UI truth) ----
+  const onDisplay = !!lightCrossing?.onWindowDisplay;
+  const P_tile_instant_W_display = onDisplay ? (derived?.P_tile_on ?? 0) : 0;
+
+  // A gentle visual envelope (rise ~ two τ_Q, fall ~ one τ_Q)
+  const driveEnv = useDriveEnvelope({
+    on: onDisplay,
+    tauRise_s: 2 * tauQ_s,
+    tauFall_s: 1 * tauQ_s
+  });
+
+  // Compute mechanical stroke from pipeline values
+  const gap_nm = (state?.gap_nm ?? 16);
+  const qMech = state?.qMechanical ?? 1;
+
+  // Reference small actuation nm per unit q_mech (pipeline may send a better number later)
+  const ref_nm_per_q = 0.25; // small; purely visual, bounded below
+  const stroke_nm_peak = Math.min(
+    gap_nm * 0.25,                 // never exceed 25% of gap visually
+    Math.max(0, qMech * ref_nm_per_q)
+  );
+
+  // Visual instantaneous stroke (modulated by envelope)
+  const stroke_nm_instant = stroke_nm_peak * driveEnv;
 
   // Wire pipeline strobing to drive the WarpEngine (if present) for phase synchronization
   useEffect(() => {
@@ -613,7 +667,7 @@ export default function HelixCasimirAmplifier({
                       className={`h-full transition-all duration-100 ${
                         lightCrossing.onWindow ? 'bg-cyan-400' : 'bg-slate-600'
                       }`}
-                      style={{ width: `${Math.min(100, (U / Math.max(1e-12, U_inf)) * 100)}%` }}
+                      style={{ width: `${Math.min(100, driveEnv * 100)}%` }}
                     />
                   </div>
                   <Badge 
@@ -636,7 +690,7 @@ export default function HelixCasimirAmplifier({
                       {lightCrossing.onWindowDisplay ? "ON" : "OFF"}
                     </span>
                     <span className="text-slate-400 text-xs">
-                      {derived?.isBurstMeaningful ? `${fmtNum(derived.P_tile_instant_W, "W")}` : "insufficient cycles"}
+                      {derived?.isBurstMeaningful ? `${fmtNum(P_tile_instant_W_display, "W")}` : "insufficient cycles"}
                     </span>
                   </div>
                 </div>
@@ -689,7 +743,7 @@ export default function HelixCasimirAmplifier({
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
                 alnRim_width_um={20}
-                stroke_nm={50} // Enhanced stroke in nm instead of pm
+                stroke_nm={stroke_nm_instant} // Pipeline-driven mechanical stroke
                 gammaGeo={derived?.gammaGeo ?? 1}
                 onWindow={lightCrossing?.onWindow ?? false}
                 physicsParity={false}

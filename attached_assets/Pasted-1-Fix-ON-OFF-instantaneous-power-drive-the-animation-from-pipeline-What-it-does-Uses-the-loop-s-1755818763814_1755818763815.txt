@@ -1,0 +1,111 @@
+1) Fix ON/OFF instantaneous power & drive the animation from pipeline
+
+What it does
+
+Uses the loop’s onWindowDisplay (your UI truth) to gate the displayed instantaneous power, while keeping the physics calc (P = ωU/Q) intact.
+
+Adds a tiny, self-contained cavity drive envelope (exponential ring-up/down) you can reuse for animations.
+
+Computes a mechanical stroke (nm) from pipeline values (bounded by the gap) so the diaphragm motion is meaningful but never violates geometry.
+
+Patch (HelixCasimirAmplifier.tsx): replace the displayed instantaneous power and add the drive hook + stroke
+
+// --- ADD near other helpers ---
+function clamp01(x:number){ return Math.max(0, Math.min(1, x)); }
+
+// Exponential ON/OFF envelope for visuals (independent of U integration)
+function useDriveEnvelope({ on, tauRise_s, tauFall_s }:{
+  on: boolean; tauRise_s:number; tauFall_s:number;
+}){
+  const [env, setEnv] = useState(0);
+  const last = useRef<number|null>(null);
+  useEffect(()=>{
+    let raf:number;
+    const step = (t:number)=>{
+      const now = t/1000;
+      const prev = last.current ?? now;
+      const dt = Math.min(0.05, Math.max(0, now - prev));
+      last.current = now;
+
+      const tau = on ? tauRise_s : tauFall_s;
+      const target = on ? 1 : 0;
+      const k = dt/Math.max(1e-6, tau);
+      setEnv(e => e + (target - e) * (1 - Math.exp(-k)));
+
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return ()=> cancelAnimationFrame(raf);
+  }, [on, tauRise_s, tauFall_s]);
+  return env; // 0..1
+}
+
+
+Find the block where you derive/gate ON/OFF and replace the display gating:
+
+// ---- keep physics P_tile_on as-is ----
+const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // W when ON (physics)
+
+// ---- DISPLAY gating: use onWindowDisplay (UI truth) ----
+const onDisplay = !!lightCrossing?.onWindowDisplay;
+const P_tile_instant_W_display = onDisplay ? P_tile_on : 0;
+
+
+Replace usages of derived.P_tile_instant_W with P_tile_instant_W_display.
+
+Add a visual envelope (used for the bar fill and for the diaphragm animation):
+
+// A gentle visual envelope (rise ~ two τ_Q, fall ~ one τ_Q)
+const driveEnv = useDriveEnvelope({
+  on: onDisplay,
+  tauRise_s: 2 * tauQ_s,
+  tauFall_s: 1 * tauQ_s
+});
+
+
+Use it to make the bar smoother (optional but nice):
+
+style={{ width: `${Math.min(100, driveEnv * 100)}%` }}
+
+
+Compute a mechanical stroke (nm) from pipeline values and pass to the cavity view:
+
+const gap_nm = (state.gap_nm ?? 16);
+const qMech  = state.qMechanical ?? 1;
+
+// Reference small actuation nm per unit q_mech (pipeline may send a better number later)
+const ref_nm_per_q = 0.25; // small; purely visual, bounded below
+const stroke_nm_peak = Math.min(
+  gap_nm * 0.25,                 // never exceed 25% of gap visually
+  Math.max(0, qMech * ref_nm_per_q)
+);
+
+// Visual instantaneous stroke (modulated by envelope)
+const stroke_nm_instant = stroke_nm_peak * driveEnv;
+
+
+Use that in your CavitySideView call:
+
+<CavitySideView
+  pocketDiameter_um={40}
+  sag_nm={state.sag_nm ?? 16}
+  gap_nm={gap_nm}
+  topMirror_thick_um={1.5}
+  botMirror_thick_um={1.5}
+  alnRim_width_um={20}
+  tileWidth_mm={50}
+  physicsParity={false}
+  onWindow={onDisplay}
+  stroke_nm={stroke_nm_instant}           // <-- NEW
+  gammaGeo={state.gammaGeo}               // <-- for blue-shift intensity
+  width={800}
+  height={240}
+/>
+
+
+Update the UI readouts to use the new display variable:
+
+{/* Instantaneous per-tile power display */}
+<span className="text-slate-400 text-xs">
+  {derived?.isBurstMeaningful ? `${fmtNum(P_tile_instant_W_display, "W")}` : "insufficient cycles"}
+</span>
