@@ -367,8 +367,8 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const massPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
   const totalExoticMass = massPerTile * tileCount;
 
-  // 6. Power calculations (pipeline-driven average power if available)
-  const powerDraw = params.P_avg_W ?? totalExoticMass * 0.1 * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C; // 10% efficiency fallback
+  // 6. Power calculations (pipeline-driven average power preferred)
+  const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : NaN;
 
   // 7. Quantum inequality validation  
   const fordRomanLimit = params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg;
@@ -409,7 +409,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const isZeroExpansion = Math.abs(expansionScalar) < params.expansionTolerance;
   const isCurlFree = Math.abs(curlMagnitude) < 1e-10;
   const isQuantumSafe = quantumValidation.status !== 'violation';
-  const isPowerCompliant = powerDraw > 0; // Simply non-negative power requirement
+  const isPowerCompliant = Number.isFinite(powerDraw) ? true : false;
 
   return {
     geometricBlueshiftFactor: gammaGeo,
