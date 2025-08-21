@@ -103,10 +103,10 @@ export const MODE_CONFIGS = {
     name: "Cruise Mode",
     dutyCycle: 0.005,
     sectorStrobing: 400,
-    qSpoilingFactor: 0.625,
+    qSpoilingFactor: 0.001,   // matches pipeline/old values
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Low-power cruise mode for sustained travel",
-    powerTarget: 7.4,
+    powerTarget: 7.4e-6,      // store as MW (7.4 W)
     color: "text-green-400"
   },
   emergency: {

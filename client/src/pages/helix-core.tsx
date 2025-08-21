@@ -55,6 +55,14 @@ const fexp = (v: unknown, digits = 1, fallback = '—') =>
 const fint = (v: unknown, fallback = '0') =>
   isFiniteNumber(v) ? Math.round(v).toLocaleString() : fallback;
 
+const fmtPowerUnit = (mw?: number) => {
+  const x = Number(mw);
+  if (!Number.isFinite(x)) return "—";
+  if (x >= 1) return `${x.toFixed(1)} MW`;
+  if (x >= 1e-3) return `${(x * 1e3).toFixed(1)} kW`;
+  return `${(x * 1e6).toFixed(1)} W`;
+};
+
 // derive instantaneous active tiles from pipeline/system state
 const deriveActiveTiles = (
   totalTiles?: number,
@@ -725,7 +733,7 @@ export default function HelixCore() {
                       <SelectItem key={mode} value={mode}>
                         <div className="flex items-center gap-2">
                           <span className={config.color}>{config.name}</span>
-                          <span className="text-xs text-slate-500">({config.powerTarget} MW)</span>
+                          <span className="text-xs text-slate-500">({fmtPowerUnit(config.powerTarget)})</span>
                         </div>
                       </SelectItem>
                     ))}
