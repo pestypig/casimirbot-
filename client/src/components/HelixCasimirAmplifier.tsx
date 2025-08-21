@@ -556,6 +556,21 @@ export default function HelixCasimirAmplifier({
                     {lightCrossing.onWindowDisplay ? 'ON' : 'OFF'}
                   </Badge>
                 </div>
+                
+                {/* Instantaneous per-tile power display */}
+                <div className="mt-3 pt-3 border-t border-slate-700/50">
+                  <div className="mb-2 text-xs text-slate-400 font-mono uppercase tracking-wide">Per-Tile Instantaneous Power</div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      lightCrossing.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
+                    }`}>
+                      {lightCrossing.onWindowDisplay ? "ON" : "OFF"}
+                    </span>
+                    <span className="text-slate-400 text-xs">
+                      {derived?.isBurstMeaningful ? `${fmtNum(derived.P_tile_instant_W, "W")}` : "insufficient cycles"}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             
