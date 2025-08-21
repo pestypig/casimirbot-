@@ -45,6 +45,7 @@ import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
 import { HelpCircle } from "lucide-react";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
+import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 
 // --- Safe numeric formatters ---
 const isFiniteNumber = (v: unknown): v is number =>
@@ -1357,75 +1358,15 @@ export default function HelixCore() {
             {/* Physics Field Sampler for Validation */}
             <PhysicsFieldSampler />
 
-            {/* Resonance Scheduler */}
-            <Card className="bg-slate-900/50 border-slate-800">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-purple-400" />
-                  {MAINFRAME_ZONES.RESONANCE_SCHEDULER}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-sm">
-                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                      <p className="mb-2">
-                        Visualizes the strobing pulse timeline across sectors, showing duty cycle patterns and temporal synchronization for optimal Casimir field generation.
-                      </p>
-                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                      <p className="text-xs italic">
-                        Rhythm creates space between beats. In that silence, potential becomes motion.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </CardTitle>
-                <CardDescription>
-                  Strobing pulse timeline
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {/* Pulse Timeline Visualization */}
-                  <div className="h-32 bg-slate-950 rounded-lg p-4">
-                    <div className="h-full flex items-end justify-between gap-1">
-                      {Array.from({ length: 20 }, (_, i) => (
-                        <div
-                          key={i}
-                          className="flex-1 bg-gradient-to-t from-purple-600 to-purple-400 rounded-t"
-                          style={{ 
-                            height: `${Math.sin(i * 0.3) * 50 + 50}%`,
-                            opacity: 0.8 + Math.sin(i * 0.5) * 0.2
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-2 text-sm">
-                    <div className="p-2 bg-slate-950 rounded text-center">
-                      <p className="text-xs text-slate-400">Duty Cycle</p>
-                      <p className="font-mono text-slate-100">{(dutyUI * 100).toFixed(1)}%</p>
-                    </div>
-                    <div className="p-2 bg-slate-950 rounded text-center">
-                      <p className="text-xs text-slate-400">Sectors</p>
-                      <p className="font-mono text-slate-100">{sectorsUI}</p>
-                    </div>
-                    <div className="p-2 bg-slate-950 rounded text-center">
-                      <p className="text-xs text-slate-400">Frequency</p>
-                      <p className="font-mono text-slate-100">{pipelineState?.modulationFreq_GHz || 15} GHz</p>
-                    </div>
-                  </div>
-                  
-                  {/* Show current mode configuration */}
-                  {pipelineState && (
-                    <div className="mt-3 p-3 bg-slate-950 rounded-lg">
-                      <p className="text-xs text-slate-400 mb-1">Current Mode: {MODE_CONFIGS[pipelineState.currentMode]?.name}</p>
-                      <p className="text-xs text-slate-300">{MODE_CONFIGS[pipelineState.currentMode]?.description}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Resonance Scheduler (auto, mode-coupled) */}
+            <ResonanceSchedulerTile
+              mode={effectiveMode}
+              duty={dutyUI}
+              sectors={sectorsUI}
+              freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
+              sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
+              currentSector={systemMetrics?.currentSector}
+            />
           </div>
 
           {/* Right Column - Terminal & Inspector */}
