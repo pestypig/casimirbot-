@@ -18,7 +18,6 @@ import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } fro
 import { useMetrics } from "@/hooks/use-metrics";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { SliceViewer } from "@/components/SliceViewer";
-import { useSlicePrefs } from "@/hooks/use-slice-prefs";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -346,9 +345,7 @@ export default function HelixCore() {
   const sliceHostRef = useRef<HTMLDivElement>(null);
   const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
 
-  // Slice preferences - global persistent state
-  const { prefs, update } = useSlicePrefs();
-  const { exposure, sigmaRange, diffMode, showContours } = prefs;
+
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665, c = 299792458;
@@ -671,131 +668,6 @@ export default function HelixCore() {
                   </div>
 
                   <div className="space-y-4" ref={sliceHostRef}>
-                    {/* Slice Controls Panel */}
-                    <div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
-                      <div className="flex items-center gap-2 mb-3">
-                        <h4 className="text-sm font-medium text-slate-200">Slice Controls</h4>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                            <p className="mb-2">Control SliceViewer parameters and physics parity mode. Physics Parity forces authentic 1× physics visualization without visual amplification.</p>
-                            <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                            <p className="text-xs italic">Truth exists at every scale; visualization reveals its face.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      
-                      {/* Physics Parity Debug Mode */}
-                      <div className="mb-3 p-2 bg-red-950/30 rounded border border-red-800/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input 
-                            type="checkbox" 
-                            id="physics-parity-mode"
-                            className="w-4 h-4"
-                            onChange={(e) => {
-                              const physicsParityMode = e.target.checked;
-                              // Store in localStorage for persistence
-                              localStorage.setItem('physics-parity-mode', physicsParityMode.toString());
-                              // Force re-render by incrementing mode version
-                              setModeVersion(prev => prev + 1);
-                            }}
-                            defaultChecked={localStorage.getItem('physics-parity-mode') === 'true'}
-                          />
-                          <label htmlFor="physics-parity-mode" className="text-xs text-red-200 font-medium">
-                            🔬 Physics Parity Debug Mode
-                          </label>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="w-3 h-3 text-red-400 hover:text-red-300 cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-sm">
-                              <div className="font-medium text-red-300 mb-1">🔬 Debug Mode</div>
-                              <p className="text-xs">Forces all visual multipliers to 1 and physics parameters to unity values. Use to identify non-physical curvature sources. All WebGL uniforms will be logged to console.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        {localStorage.getItem('physics-parity-mode') === 'true' && (
-                          <div className="text-xs text-red-300 bg-red-950/50 p-1 rounded">
-                            ⚠️ All visual boosts disabled. Check console for uniform values.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Slice settings (kept) */}
-                    <div className="p-3 bg-slate-950 rounded-lg border border-slate-700 mb-3">
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="space-y-1">
-                          <Label htmlFor="exposure-slider" className="text-slate-300">Exposure ({exposure})</Label>
-                          <Input
-                            id="exposure-slider"
-                            type="range"
-                            min="1"
-                            max="12"
-                            step="1"
-                            value={exposure}
-                            onChange={(e) => update("exposure", parseFloat(e.target.value))}
-                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-                          />
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <Label htmlFor="sigma-slider" className="text-slate-300">Sigma Range ({sigmaRange})</Label>
-                          <Input
-                            id="sigma-slider"
-                            type="range"
-                            min="2"
-                            max="12"
-                            step="1"
-                            value={sigmaRange}
-                            onChange={(e) => update("sigmaRange", parseInt(e.target.value))}
-                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-                          />
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="diff-mode"
-                            checked={diffMode}
-                            onCheckedChange={(checked) => update("diffMode", checked)}
-                          />
-                          <Label htmlFor="diff-mode" className="text-slate-300">Diff Mode</Label>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            id="show-contours"
-                            checked={showContours}
-                            onCheckedChange={(checked) => update("showContours", checked)}
-                          />
-                          <Label htmlFor="show-contours" className="text-slate-300">Show Contours</Label>
-                        </div>
-                      </div>
-                      
-                      {/* Cosmetic Curvature Slider */}
-                      <div className="mt-2 space-y-1">
-                        <Label htmlFor="cosmetic-slider" className="text-slate-300">
-                          Cosmetic Curvature ({cosmeticLevel})
-                        </Label>
-                        <Input
-                          id="cosmetic-slider"
-                          type="range"
-                          min="1"
-                          max="10"
-                          step="1"
-                          value={cosmeticLevel}
-                          onChange={(e) => setCosmeticLevel(parseInt(e.target.value, 10))}
-                          className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
-                        />
-                        <p className="text-[11px] text-slate-400">
-                          1 = real physics • 10 = current visual exaggeration
-                        </p>
-                      </div>
-                    </div>
-                    
                     <SliceViewer
                       hullAxes={[
                         Number(hullAxes[0]) || 503.5,
@@ -811,7 +683,7 @@ export default function HelixCore() {
                       dutyCycle={dutyUI}
                       sectors={sectorsUI}
                       viewAvg={true}
-                      diffMode={diffMode}
+                      diffMode={false}
                       refParams={{
                         gammaGeo: 26,
                         qSpoilingFactor: 1,
@@ -820,10 +692,10 @@ export default function HelixCore() {
                         sectors: 1,
                         viewAvg: true,
                       }}
-                      sigmaRange={sigmaRange}
-                      exposure={exposure}
+                      sigmaRange={6}
+                      exposure={6}
                       zeroStop={1e-7}
-                      showContours={showContours}
+                      showContours={true}
                       curvatureBoostMax={40}
                       width={sliceSize.w}
                       height={sliceSize.h}
