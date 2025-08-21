@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
+import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -533,71 +534,111 @@ export default function HelixCore() {
               {MAINFRAME_ZONES.WARP_VISUALIZER}
             </CardTitle>
             <CardDescription>
-              3D spacetime curvature — live, mode-aware, and physically grounded
+              3D spacetime curvature + equatorial slice viewer — live, mode-aware, and physically grounded
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            {/* Natário Warp Bubble Visualizer */}
+            {/* Natário Warp Bubble Visualizer & Equatorial Slice Viewer */}
             {(() => {
               const betaTiltVec = [0, -1, 0] as [number, number, number];
+              const hullAxes: [number, number, number] = (hullMetrics && hullMetrics.hull) ? [
+                hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+              ] : [503.5, 132, 86.5];
 
               return (
-                <div className="rounded-lg overflow-hidden bg-slate-950">
-                  <WarpVisualizer
-                    key={`mode-${effectiveMode}-${sectorsUI}-${dutyUI}-v${modeVersion}`}
-                    parameters={{
-                      dutyCycle: dutyUI,
-                      g_y: pipeline?.gammaGeo || 26,
-                      cavityQ: pipeline?.qCavity || 1e9,
-                      sagDepth_nm: pipeline?.sag_nm || 16,
-                      tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
-                      powerAvg_MW: (() => {
-                        const MODE_TARGET = {
-                          standby:   { P_W: 0,        M_kg: 0    },
-                          hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                          cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                          emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                        } as const;
-                        const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                        return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
-                      })(),
-                      exoticMass_kg: (() => {
-                        const MODE_TARGET = {
-                          standby:   { P_W: 0,        M_kg: 0    },
-                          hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                          cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                          emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                        } as const;
-                        const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                        return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
-                      })(),
-                      currentMode: effectiveMode,
-                      sectorStrobing: sectorsUI,
-                      qSpoilingFactor: qSpoilUI,
-                      gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
-                      hull: (hullMetrics && hullMetrics.hull) ? {
-                        ...hullMetrics.hull,
-                        a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                        b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                        c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-                      } : {
-                        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                        a: 503.5, b: 132, c: 86.5,
-                        wallThickness_m: 6.0
-                      },
-                      wall: { w_norm: 0.016 },
-                      gridScale: 1.6,
-                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                      wallWidth_m: 6.0,
-                      shift: {
-                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                        betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                        gTarget, R_geom,
-                        gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
-                      }
-                    }}
-                  />
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  <div className="space-y-4">
+                    <div className="rounded-lg overflow-hidden bg-slate-950">
+                      <WarpVisualizer
+                        key={`mode-${effectiveMode}-${sectorsUI}-${dutyUI}-v${modeVersion}`}
+                        parameters={{
+                          dutyCycle: dutyUI,
+                          g_y: pipeline?.gammaGeo || 26,
+                          cavityQ: pipeline?.qCavity || 1e9,
+                          sagDepth_nm: pipeline?.sag_nm || 16,
+                          tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
+                          powerAvg_MW: (() => {
+                            const MODE_TARGET = {
+                              standby:   { P_W: 0,        M_kg: 0    },
+                              hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                              cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
+                              emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                            } as const;
+                            const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                            return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
+                          })(),
+                          exoticMass_kg: (() => {
+                            const MODE_TARGET = {
+                              standby:   { P_W: 0,        M_kg: 0    },
+                              hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                              cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
+                              emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                            } as const;
+                            const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                            return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
+                          })(),
+                          currentMode: effectiveMode,
+                          sectorStrobing: sectorsUI,
+                          qSpoilingFactor: qSpoilUI,
+                          gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
+                          hull: (hullMetrics && hullMetrics.hull) ? {
+                            ...hullMetrics.hull,
+                            a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                            b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                            c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+                          } : {
+                            Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                            a: 503.5, b: 132, c: 86.5,
+                            wallThickness_m: 6.0
+                          },
+                          wall: { w_norm: 0.016 },
+                          gridScale: 1.6,
+                          epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                          betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                          wallWidth_m: 6.0,
+                          shift: {
+                            epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                            betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                            gTarget, R_geom,
+                            gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <SliceViewer
+                      hullAxes={hullAxes}
+                      wallWidth_m={6.0}
+                      driveDir={[1, 0, 0]}
+                      vShip={1.0}
+                      gammaGeo={pipeline?.gammaGeo ?? 26}
+                      qSpoilingFactor={qSpoilUI}
+                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1}
+                      dutyCycle={dutyUI}
+                      sectors={sectorsUI}
+                      viewAvg={true}
+                      diffMode={true}
+                      refParams={{
+                        gammaGeo: 26,
+                        qSpoilingFactor: 1,
+                        gammaVdB: 3.83e1,
+                        dutyCycle: 0.14,
+                        sectors: 1,
+                        viewAvg: true,
+                      }}
+                      sigmaRange={6}
+                      exposure={6}
+                      zeroStop={1e-9}
+                      showContours={true}
+                      width={520}
+                      height={260}
+                      className="xl:sticky xl:top-4"
+                    />
+                  </div>
                 </div>
               );
             })()}
