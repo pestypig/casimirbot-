@@ -351,8 +351,12 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     params.effectiveDuty
   );
 
-  // 4. Pipeline energy source (fallback to modest default if none provided)
-  const baselineEnergyDensity = -4.3e8; // J/m³ reasonable reference 
+  // 4. Baseline Casimir energy density from gap (no constant)
+  // Casimir energy density between ideal plates: u = -π² ħ c / (720 a⁴)
+  const a_m = Math.max(1e-12, params.gap * 1e-9);
+  const u0 = -(Math.PI**2 / 720) * PHYSICS_CONSTANTS.HBAR_C / (a_m**4);
+
+  const baselineEnergyDensity = u0;                               // J/m³
   const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;
 
   // 5. Mass calculations (pipeline-driven, no TARGET constants)
