@@ -128,8 +128,6 @@ interface WarpVisualizerProps {
     curvatureGainDec?: number;      // NEW: Direct decades gain (0-8)
     // NEW: Shift parameters (structured format)
     shift?: ShiftParams;
-    // 🔬 Physics Parity Mode for debugging baseline
-    physicsParityMode?: boolean;
   };
 }
 
@@ -205,8 +203,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               axesScene: parameters.axesScene,
               hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
               wallWidth,
-              // 🔬 Pass physics parity mode flag to WebGL engine
-              physicsParityMode: parameters.physicsParityMode || false,
               gridSpan: parameters.gridSpan,
               epsilonTilt: epsilonTiltResolved,
               betaTiltVec: betaTiltResolved,
@@ -423,10 +419,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec! : 3;
           console.log(`🎛️ CURVATURE GAIN DEBUG: parameters.curvatureGainDec=${parameters.curvatureGainDec}, resolved gain=${gain}`);
           return gain;
-        })(),
-        
-        // 🔬 Physics Parity Mode flag for debug baseline
-        physicsParityMode: parameters.physicsParityMode || false,
+        })(), // 0..8 slider value
         curvatureBoostMax: Math.max(1, Number(parameters.curvatureBoostMax) || 40), // same as SliceViewer
         // Engine will handle: curvatureGain 0..8 → curvatureGainT 0..1 → userGain 1..40
         _debugHUD: true,

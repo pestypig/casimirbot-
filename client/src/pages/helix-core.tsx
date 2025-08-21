@@ -593,104 +593,61 @@ export default function HelixCore() {
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <WarpVisualizer
-                        key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}-parity-${localStorage.getItem('physics-parity-mode')}`}
-                        parameters={(() => {
-                          const physicsParityMode = localStorage.getItem('physics-parity-mode') === 'true';
-                          
-                          if (physicsParityMode) {
-                            // Physics Parity Mode: Force all multipliers to 1
-                            console.warn('🔬 PHYSICS PARITY MODE: All visual boosts disabled, physics-only baseline');
-                            return {
-                              curvatureGainDec: 0, // Force flat curvature gain
-                              dutyCycle: 1,        // Unity duty cycle
-                              g_y: 1,              // Unity geometric factor
-                              cavityQ: 1,          // Unity Q factor
-                              sagDepth_nm: 0,      // Zero sag depth
-                              tsRatio: 1,          // Unity time-scale ratio
-                              powerAvg_MW: 0,      // Zero power for baseline
-                              exoticMass_kg: 0,    // Zero mass for baseline
-                              currentMode: 'standby' as const,
-                              sectorStrobing: 1,   // Single sector
-                              qSpoilingFactor: 1,  // Unity spoiling factor
-                              gammaVanDenBroeck: 1, // Unity Van den Broeck factor
-                              hull: {
-                                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                                a: 503.5, b: 132, c: 86.5,
-                                wallThickness_m: 6.0
-                              },
-                              wall: { w_norm: 0.016 },
-                              gridScale: 1,        // Unity grid scale
-                              epsilonTilt: 0,      // Zero tilt for flat baseline
-                              curvatureBoostMax: 1, // Unity boost max
-                              betaTiltVec: [0, 0, 0] as [number, number, number], // Zero tilt vector
-                              wallWidth_m: 6.0,
-                              shift: {
-                                epsilonTilt: 0,
-                                betaTiltVec: [0, 0, 0] as [number, number, number],
-                                gTarget: 0, R_geom: 0,
-                                gEff_check: 0
-                              },
-                              physicsParityMode: true // Flag to enable uniform logging
-                            };
-                          } else {
-                            // Normal mode: Use authentic physics parameters
-                            return {
-                              curvatureGainDec: curvatureGain,
-                              dutyCycle: dutyUI,
-                              g_y: pipeline?.gammaGeo || 26,
-                              cavityQ: pipeline?.qCavity || 1e9,
-                              sagDepth_nm: pipeline?.sag_nm || 16,
-                              tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
-                              powerAvg_MW: (() => {
-                                const MODE_TARGET = {
-                                  standby:   { P_W: 0,        M_kg: 0    },
-                                  hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                                  cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                                  emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                                } as const;
-                                const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                                return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
-                              })(),
-                              exoticMass_kg: (() => {
-                                const MODE_TARGET = {
-                                  standby:   { P_W: 0,        M_kg: 0    },
-                                  hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                                  cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                                  emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                                } as const;
-                                const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                                return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
-                              })(),
-                              currentMode: effectiveMode,
-                              sectorStrobing: sectorsUI,
-                              qSpoilingFactor: qSpoilUI,
-                              gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
-                              hull: (hullMetrics && hullMetrics.hull) ? {
-                                ...hullMetrics.hull,
-                                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-                              } : {
-                                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                                a: 503.5, b: 132, c: 86.5,
-                                wallThickness_m: 6.0
-                              },
-                              wall: { w_norm: 0.016 },
-                              gridScale: 1.6,
-                              epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                              curvatureBoostMax: 40,              // Fallback for legacy T mode
-                              betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                              wallWidth_m: 6.0,
-                              shift: {
-                                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                                betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                                gTarget, R_geom,
-                                gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
-                              },
-                              physicsParityMode: false
-                            };
+                        key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`}
+                        parameters={{
+                          curvatureGainDec: curvatureGain,
+                          dutyCycle: dutyUI,
+                          g_y: pipeline?.gammaGeo || 26,
+                          cavityQ: pipeline?.qCavity || 1e9,
+                          sagDepth_nm: pipeline?.sag_nm || 16,
+                          tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
+                          powerAvg_MW: (() => {
+                            const MODE_TARGET = {
+                              standby:   { P_W: 0,        M_kg: 0    },
+                              hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                              cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
+                              emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                            } as const;
+                            const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                            return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
+                          })(),
+                          exoticMass_kg: (() => {
+                            const MODE_TARGET = {
+                              standby:   { P_W: 0,        M_kg: 0    },
+                              hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                              cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
+                              emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                            } as const;
+                            const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                            return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
+                          })(),
+                          currentMode: effectiveMode,
+                          sectorStrobing: sectorsUI,
+                          qSpoilingFactor: qSpoilUI,
+                          gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
+                          hull: (hullMetrics && hullMetrics.hull) ? {
+                            ...hullMetrics.hull,
+                            a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                            b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                            c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+                          } : {
+                            Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                            a: 503.5, b: 132, c: 86.5,
+                            wallThickness_m: 6.0
+                          },
+                          wall: { w_norm: 0.016 },
+                          gridScale: 1.6,
+                          epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                          curvatureBoostMax: 40,              // Fallback for legacy T mode
+                          betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                          wallWidth_m: 6.0,
+                          shift: {
+                            epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                            betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                            gTarget, R_geom,
+                            gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
                           }
-                        })()}
+                        }}
                       />
                     </div>
                   </div>
@@ -713,42 +670,6 @@ export default function HelixCore() {
                         </Tooltip>
                       </div>
                       
-                      {/* Physics Parity Debug Mode */}
-                      <div className="mb-3 p-2 bg-red-950/30 rounded border border-red-800/50">
-                        <div className="flex items-center gap-2 mb-2">
-                          <input 
-                            type="checkbox" 
-                            id="physics-parity-mode"
-                            className="w-4 h-4"
-                            onChange={(e) => {
-                              const physicsParityMode = e.target.checked;
-                              // Store in localStorage for persistence
-                              localStorage.setItem('physics-parity-mode', physicsParityMode.toString());
-                              // Force re-render by incrementing mode version
-                              setModeVersion(prev => prev + 1);
-                            }}
-                            defaultChecked={localStorage.getItem('physics-parity-mode') === 'true'}
-                          />
-                          <label htmlFor="physics-parity-mode" className="text-xs text-red-200 font-medium">
-                            🔬 Physics Parity Debug Mode
-                          </label>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="w-3 h-3 text-red-400 hover:text-red-300 cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-sm">
-                              <div className="font-medium text-red-300 mb-1">🔬 Debug Mode</div>
-                              <p className="text-xs">Forces all visual multipliers to 1 and physics parameters to unity values. Use to identify non-physical curvature sources. All WebGL uniforms will be logged to console.</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        {localStorage.getItem('physics-parity-mode') === 'true' && (
-                          <div className="text-xs text-red-300 bg-red-950/50 p-1 rounded">
-                            ⚠️ All visual boosts disabled. Check console for uniform values.
-                          </div>
-                        )}
-                      </div>
-
                       {/* Unified Curvature Gain Control */}
                       <div className="mb-4 p-2 bg-slate-900/50 rounded border border-slate-600">
                         <div className="space-y-1">
