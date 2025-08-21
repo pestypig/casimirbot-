@@ -32,11 +32,6 @@ export function useLightCrossingLoop({
   const dwell_ms = Math.max(0.01, sectorPeriod_ms);
   const burst_ms = Math.max(tauLC_ms, dwell_ms * localBurstFrac); // enforce τLC bound
 
-  // --- UI latch system for stable ON/OFF display
-  const UI_HOLD_MS = 200; // how long we keep the ON label visible
-  const [displayOn, setDisplayOn] = useState(false);
-  const lastOnRef = useRef<number>(0);
-
   // --- Phase clock synced to server's sector pointer
   const [phase, setPhase] = useState(0);           // 0..1 within current sector
   const [sectorIdx, setSectorIdx] = useState(currentSector % Math.max(1, sectorStrobing));
@@ -55,25 +50,11 @@ export function useLightCrossingLoop({
       const dt = now - t0Ref.current;
       const φ = (dt % dwell_ms) / dwell_ms; // 0..1
       setPhase(φ);
-      
-      // Calculate raw ON window (authentic physics)
-      const half = (burst_ms / dwell_ms) / 2; // fraction
-      const center = 0.5;
-      const dist = Math.abs(φ - center);
-      const onWindowRaw = dist <= half;
-      
-      // Record last ON time for UI latch
-      if (onWindowRaw) lastOnRef.current = now;
-      
-      // UI latch: stays ON for UI_HOLD_MS after any real ON
-      const onLatched = onWindowRaw || (now - lastOnRef.current) < UI_HOLD_MS;
-      setDisplayOn(onLatched);
-      
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [dwell_ms, burst_ms, UI_HOLD_MS]);
+  }, [dwell_ms]);
 
   const onWindow = useMemo(() => {
     // center a burst window of width = burst_ms inside the dwell
@@ -82,6 +63,16 @@ export function useLightCrossingLoop({
     const dist = Math.abs(phase - center);
     return dist <= half;
   }, [phase, burst_ms, dwell_ms]);
+
+  // simple 200ms latch for the UI badge (does NOT affect physics)
+  const [onWindowDisplay, setOnWindowDisplay] = useState(false);
+  useEffect(() => {
+    if (onWindow) {
+      setOnWindowDisplay(true);
+      const t = setTimeout(() => setOnWindowDisplay(false), 200);
+      return () => clearTimeout(t);
+    }
+  }, [onWindow]);
 
   // Calculate cycles per burst for meaningful RF energy
   const cyclesPerBurst = (burst_ms * 1e-3) * (freqGHz * 1e9);
@@ -99,6 +90,6 @@ export function useLightCrossingLoop({
     cyclesPerBurst,   // RF cycles per burst window
     onWindow,         // boolean: raw physics ON window (for WarpEngine sync)
     onWindowRaw: onWindow,  // explicit alias for authentic physics
-    onWindowDisplay: displayOn, // UI latch: stable display state for labels
+    onWindowDisplay, // UI latch: stable display state for labels
   };
 }

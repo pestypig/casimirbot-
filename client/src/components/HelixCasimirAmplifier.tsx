@@ -52,6 +52,8 @@ type LightCrossing = {
   duty: number; 
   freqGHz: number; 
   onWindow: boolean;
+  cyclesPerBurst: number;
+  onWindowDisplay: boolean;
 };
 
 type EnergyPipelineState = {
