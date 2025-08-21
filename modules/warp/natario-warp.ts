@@ -114,9 +114,9 @@ export function calculateGeometricBlueshift(
   const gammaGeo = Math.max(1, opts?.gammaGeo ?? 1);
 
   // Path length a_eff = a - t (meters)
-  const a_m = gap * PHYSICS_CONSTANTS.NM_TO_M; // nm to m
-  const t_m = sagDepth * PHYSICS_CONSTANTS.NM_TO_M; // nm to m
-  const effectivePathLength_m = Math.max(1e-12, a_m - t_m);
+  const effectivePathLength_m = Math.max(1e-12,
+    (bowlRadius * 1e-6) - (sagDepth * 1e-9)
+  );
 
   // Van den Broeck factor from pipeline; default 1 if not modeling it
   const gammaVdB = Math.max(1, opts?.gammaVanDenBroeck ?? 1);
