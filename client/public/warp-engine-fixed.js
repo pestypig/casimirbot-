@@ -547,7 +547,7 @@ class WarpEngine {
         const halfSize = 20000; // Half grid size in original units
         const originalY = -0.144; // Base Y coordinate
         
-        this._warpGridVertices(vtx, halfSize, originalY, this.currentParams);
+        this._warpGridVertices(vtx, this.currentParams);
         
         // Upload updated vertices to GPU
         const gl = this.gl;
@@ -559,7 +559,7 @@ class WarpEngine {
     }
 
     // Authentic Natário spacetime curvature implementation
-    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+    _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
         // Clean wall thickness handling - use either meters or ρ-units
@@ -588,50 +588,32 @@ class WarpEngine {
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
         const gridK = 0.12;                       // deformation gain
         
-        // ---- Physics-accurate amplitude calculation (matches energy pipeline) ----
-        
-        // 1) Same multiplicative chain as the physics pipeline (display model):
-        //    A_total ~ (gammaGeo^3) * qSpoilingFactor * gammaVdB
-        //    (q_cavity is kept out of the display amplitude; it lives in ζ and losses)
-        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
-        const geoAmp = Math.pow(gammaGeo, 3);                               // γ_geo^3
-        const qSpoil = Math.max(1e-9, (bubbleParams.qSpoilingFactor || bubbleParams.deltaAOverA || 1)); // [0..1]
-        const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 3.83e1);
-        
-        // 2) Duty / strobing: use the same effective definitions the server uses
-        const sectors = Math.max(1, bubbleParams.sectors || bubbleParams.sectorStrobing || 1);
-        
-        // Instantaneous (during a hot sector burst)
-        const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
-        const dutyInstEff = dutyBurst_fs * (1 / sectors);
-        
-        // Time-averaged (what the UI cards show next to power)
-        const dutyGlobal = Math.max(1e-12, bubbleParams.dutyCycle || 0.14);
-        const dutyAvgEff = dutyGlobal * qSpoil * (1 / sectors);
-        
-        // 3) Build an amplitude consistent with the energy-side scaling.
-        //    Keep purely visual normalization so it doesn't explode on screen.
-        const A_phys = geoAmp * qSpoil * vdbAmp;    // physics-like chain
-        const norm = (this.uniforms?.vizNorm || 1.0e-9);  // visual normalizer
-        const A_vis_base = A_phys * norm;
-        
-        // 4) Choose instant vs average (no √duty hacks)
-        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
-        const A_inst = A_vis_base * dutyInstEff;
-        const A_avg = A_vis_base * dutyAvgEff;
-        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
-        
-        // 5) Optional viewer gain (like your old betaGain) to make it legible
-        const gain = (this.uniforms?.vizGain || 4.0);
-        const betaVis = A_used * gain;
+        // ---- Single amplitude calculation outside the loop ----
+        const gammaGeo = this.uniforms?.gammaGeo ?? 26;
+        const qSpoil   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdB = this.uniforms?.gammaVdB ?? 3.83e1;
+        const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
+        const duty     = Math.max(1e-12, this.uniforms?.dutyCycle ?? 0.14);
+        const viewAvg  = !!(this.uniforms?.viewAvg ?? true);
+
+        const A_geo    = gammaGeo ** 3;
+        const dutyEff  = viewAvg ? (duty / sectors) : (1 / sectors);
+        const A_gross  = A_geo * qSpoil * gammaVdB * dutyEff;
+
+        const knee = 1e10;
+        const A_log = Math.log10(1 + A_gross / knee);
+        const mode  = (this.uniforms?.currentMode || 'hover').toLowerCase();
+        const modeScale = mode==='standby'?0.05:mode==='cruise'?0.25:mode==='hover'?0.60:mode==='emergency'?0.90:0.50;
+        const vizGain = (this.uniforms?.vizGainOverride ?? 0) || modeScale;
+        const A_vis_scalar = Math.min(1, A_log * vizGain);
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
         console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
-        console.log(`  🔬 PHYSICS SCALING: γ³=${geoAmp.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${vdbAmp.toExponential(2)}`);
-        console.log(`  📊 DUTY FACTORS: instant=${dutyInstEff.toExponential(2)}, avg=${dutyAvgEff.toExponential(2)} (sectors=${sectors})`);
-        console.log(`  β_phys=${A_phys.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (norm=${norm.toExponential(0)})`);
+        console.log(`  🔬 PHYSICS SCALING: γ³=${A_geo.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${gammaVdB.toExponential(2)}`);
+        console.log(`  📊 DUTY FACTORS: instant=1.00e-12, avg=${dutyEff.toExponential(2)} (sectors=${sectors})`);
+        console.log(`  β_phys=${A_gross.toExponential(2)} → β_vis=${A_vis_scalar.toExponential(2)} (norm=1e-9)`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
 
         // Ellipsoid utilities (using consistent scene-scaled axes)
@@ -670,48 +652,7 @@ class WarpEngine {
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
-        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
-        
-        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
-        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
-        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
-        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
-        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
-
-        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
-        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
-        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
-        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
-
-        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
-        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
-
-        // Physics-consistent amplitude and averaged duty
-        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
-        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
-        
-        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
-        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-        
-        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
-        const betaVisUniform  = betaUsedUniform * betaGainUniform;
-
-        // Debug per mode (once per 60 frames)
-        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
-            console.log("🧪 warp-mode", {
-                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
-                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
-                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
-                betaVis: betaVisUniform.toExponential(2)
-            });
-        }
-        
-        // Check for uniform updates
-        if (this._uniformsDirty) {
-            // (nothing special needed, just consume fresh uniforms)
-            this._uniformsDirty = false;
-        }
+        const split = sectors > 1 ? Math.floor(sectors / 2) : 0;
 
         // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
@@ -757,74 +698,27 @@ class WarpEngine {
                 (n[2]/c_m)*(n[2]/c_m)
             );
             const R_eff = 1.0 / Math.max(invR, 1e-6);
-            const w_rho_local = w_rho / R_eff;   // thickness in ρ-units
+            const w_rho_local = w_rho * (aH / R_eff);   // correct units: ρ-ratio scaling
             
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps
             const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
             
             // --- (C) Gentler wall window for canonical smoothness ---
-            const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
-            const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
-                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // gentle falloff
+            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
+            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
+                           : 0.5*(1 + Math.cos(Math.PI*(asd-aWin)/(bWin-aWin))); // gentle falloff
             
-            // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
-            // Pull uniforms for current mode and parameters
-            const gammaGeo = this.uniforms?.gammaGeo ?? 26;
-            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
-            const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
-            const gammaVdB = this.uniforms?.gammaVdB ?? 3.83e1;
-            const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
-            const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
-            const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
+            // Use pre-computed amplitude scalar from outside the loop
+            const A_vis = A_vis_scalar;
 
-            // Physics amplitude (gross, unbounded)
-            const A_geo   = gammaGeo * gammaGeo * gammaGeo; // γ^3
-            const dutyEff = Math.sqrt(duty / sectors);      // visual proxy like before
-            const A_gross = A_geo * Qburst * gammaVdB * qSpoil * dutyEff;
-
-            // Log compression so modes separate visually instead of saturating
-            const k = 1e10;           // knee – prevents standby from saturating
-            const s = 1.0;            // slope after log
-            const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
-
-            // Mode-specific visual scaling (keeps standby very small)
-            const modeScale =
-              mode === 'standby'  ? 0.05 :
-              mode === 'cruise'   ? 0.25 :
-              mode === 'hover'    ? 0.60 :
-              mode === 'emergency'? 0.90 : 0.50;
-
-            // Optional manual override from UI uniform (0 disables override)
-            const gainOverride = this.uniforms?.vizGainOverride ?? 0;
-            const vizGain = gainOverride > 0 ? gainOverride : modeScale;
-
-            // Final bounded visual amplitude 0..1
-            const A_vis = Math.min(1.0, A_log * vizGain);
-
-            // Special case: make standby perfectly flat if desired
-            let disp;
-            if (mode === 'standby') {
-                disp = 0; // perfectly flat grid for standby mode
-            } else {
-                // Normal displacement calculation with compressed amplitude
-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
-                
-                // Reduced visual gain to avoid clamp flattening + higher ceiling
-                disp *= 2.0; // lower than 4.0 to avoid hitting clamp
-                
-                // Soft clamp with higher ceiling (no jaggies)
-                const maxPush = 0.15;                        // slightly higher ceiling
-                const softClamp = (x, m) => m * Math.tanh(x / m);
-                disp = softClamp(disp, maxPush);
-                
-                // Optional temporal smoothing for canonical visual calm
-                const vertIndex = i / 3;
-                const prev = this._prevDisp[vertIndex] ?? disp;
-                const blended = prev + this._dispAlpha * (disp - prev);
-                this._prevDisp[vertIndex] = blended;
-                disp = blended;
-            }
+            // Normal displacement calculation with compressed amplitude
+            let disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+            
+            // Soft clamp with higher ceiling (no jaggies)
+            const maxPush = 0.15;
+            const softClamp = (x, m) => m * Math.tanh(x / m);
+            disp = softClamp(disp, maxPush);
             
             // ----- Interior gravity (shift vector "tilt") -----
             // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
