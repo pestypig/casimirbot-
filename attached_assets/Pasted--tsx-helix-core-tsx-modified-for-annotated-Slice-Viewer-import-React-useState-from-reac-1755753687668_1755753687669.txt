@@ -1,0 +1,85 @@
+```tsx
+// helix-core.tsx (modified for annotated Slice Viewer)
+import React, { useState } from "react";
+import { WarpVisualizer } from "@/components/WarpVisualizer";
+import { SliceViewer } from "@/components/SliceViewer";
+
+export default function HelixCore(props) {
+  const { uniforms } = props;
+
+  // Local state for viewer controls
+  const [exposure, setExposure] = useState(6);
+  const [sigmaRange, setSigmaRange] = useState(6);
+  const [diffMode, setDiffMode] = useState(true);
+  const [showContours, setShowContours] = useState(true);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col lg:flex-row gap-4">
+        {/* Main 3D warp bubble viewer */}
+        <div className="flex-1 min-w-[480px]">
+          <WarpVisualizer uniforms={uniforms} />
+        </div>
+
+        {/* Equatorial curvature slice viewer */}
+        <div className="flex-1 min-w-[480px] relative bg-slate-50 rounded shadow p-2">
+          <SliceViewer
+            hullAxes={uniforms.axesScene || [503.5, 132, 86.5]}
+            wallWidth_m={uniforms.wallWidth ?? 2.27}
+            driveDir={uniforms.driveDir ?? [1, 0, 0]}
+            vShip={uniforms.vShip ?? 1.0}
+
+            // amplitude chain (viewer-only)
+            gammaGeo={uniforms.gammaGeo ?? 26}
+            qSpoilingFactor={uniforms.deltaAOverA ?? 1}
+            gammaVdB={uniforms.gammaVdB ?? 3.83e1}
+            dutyCycle={uniforms.dutyCycle ?? 0.14}
+            sectors={uniforms.sectors ?? 1}
+            viewAvg={true}
+
+            // diff vs hover baseline
+            diffMode={diffMode}
+            refParams={{
+              gammaGeo: 26,
+              qSpoilingFactor: 1,
+              gammaVdB: 3.83e1,
+              dutyCycle: 0.14,
+              sectors: 1,
+              viewAvg: true,
+            }}
+
+            // visual controls (fixed for now)
+            sigmaRange={sigmaRange}
+            exposure={exposure}
+            zeroStop={1e-7}
+            showContours={showContours}
+            width={480}
+            height={240}
+          />
+
+          {/* Axis and scale annotations */}
+          <div className="absolute bottom-2 left-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
+            X-axis: Radial ρ (m)
+          </div>
+          <div className="absolute top-2 left-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
+            Y-axis: Curvature κ(ρ) (1/m²)
+          </div>
+          <div className="absolute bottom-2 right-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
+            Grid scale: 50 m divisions
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### What changed
+- **Removed Slice Preferences panel** — no sliders/toggles, purely visual for now.
+- **Added overlay annotations**:
+  - X-axis = radial ρ (meters).
+  - Y-axis = curvature κ(ρ) (per m²).
+  - Grid scale annotation (example: 50 m per major division; you can adjust if your grid spacing is different).
+- **Non-white text**: annotations styled in `text-slate-700` with semi-transparent background for contrast against the white slice.
+
+This makes it clear what the equatorial slice is showing without overwhelming controls. You can later restore preferences or tweak scale labels if needed. Would you like me to also make the grid scale dynamically calculated from `hullAxes` so it always shows the *actual* spacing instead of the fixed “50 m divisions”?
