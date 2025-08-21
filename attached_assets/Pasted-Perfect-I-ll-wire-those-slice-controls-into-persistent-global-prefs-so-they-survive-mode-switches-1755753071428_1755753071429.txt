@@ -1,0 +1,114 @@
+Perfect — I’ll wire those slice controls into persistent, global prefs so they survive mode switches and reloads, and other panels (e.g. Diagnostics) can read them too. Here’s a tight, drop-in patch set:
+
+1) Add a tiny prefs hook (localStorage + event bus)
+
+src/hooks/use-slice-prefs.ts
+
+import { useEffect, useState, useCallback } from "react";
+import { publish } from "@/lib/luma-bus";
+
+type SlicePrefs = {
+  exposure: number;     // 1..12
+  sigmaRange: number;   // 2..12
+  diffMode: boolean;
+  showContours: boolean;
+};
+
+const KEY = "helix:slice-prefs:v1";
+
+const defaults: SlicePrefs = {
+  exposure: 6,
+  sigmaRange: 6,
+  diffMode: true,
+  showContours: true,
+};
+
+function load(): SlicePrefs {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return defaults;
+    const obj = JSON.parse(raw);
+    return {
+      exposure: Number.isFinite(obj.exposure) ? obj.exposure : defaults.exposure,
+      sigmaRange: Number.isFinite(obj.sigmaRange) ? obj.sigmaRange : defaults.sigmaRange,
+      diffMode: typeof obj.diffMode === "boolean" ? obj.diffMode : defaults.diffMode,
+      showContours: typeof obj.showContours === "boolean" ? obj.showContours : defaults.showContours,
+    };
+  } catch { return defaults; }
+}
+
+function save(p: SlicePrefs) {
+  localStorage.setItem(KEY, JSON.stringify(p));
+}
+
+export function useSlicePrefs() {
+  const [prefs, setPrefs] = useState<SlicePrefs>(() => load());
+
+  // save + broadcast whenever prefs change
+  useEffect(() => {
+    save(prefs);
+    publish("slice:prefs", prefs); // lets Diagnostics or other panels react
+  }, [prefs]);
+
+  const update = useCallback(<K extends keyof SlicePrefs>(k: K, v: SlicePrefs[K]) => {
+    setPrefs(prev => ({ ...prev, [k]: v }));
+  }, []);
+
+  return { prefs, update };
+}
+
+2) Use it in your helix-core.tsx (replace local state)
+
+Replace your four useState lines with the hook and wire the setters:
+
+-  const [exposure, setExposure] = useState(6);
+-  const [sigmaRange, setSigmaRange] = useState(6);
+-  const [diffMode, setDiffMode] = useState(true);
+-  const [showContours, setShowContours] = useState(true);
++  const { prefs, update } = useSlicePrefs();
++  const { exposure, sigmaRange, diffMode, showContours } = prefs;
+
+
+Then update the controls:
+
+- onChange={(e) => setExposure(parseFloat(e.target.value))}
++ onChange={(e) => update("exposure", parseFloat(e.target.value))}
+
+- onChange={(e) => setSigmaRange(parseInt(e.target.value))}
++ onChange={(e) => update("sigmaRange", parseInt(e.target.value))}
+
+- onChange={(e) => setDiffMode(e.target.checked)}
++ onChange={(e) => update("diffMode", e.target.checked)}
+
+- onChange={(e) => setShowContours(e.target.checked)}
++ onChange={(e) => update("showContours", e.target.checked)}
+
+
+And pass the values to <SliceViewer /> (as you already do), no change needed besides using the new variables.
+
+3) (Optional) Make Diagnostics aware (read-only)
+
+Anywhere you want to display or react to these (e.g., a Diagnostics panel), just subscribe once:
+
+import { useEffect, useState } from "react";
+import { subscribe } from "@/lib/luma-bus";
+
+type SlicePrefs = { exposure:number; sigmaRange:number; diffMode:boolean; showContours:boolean; };
+
+function useSlicePrefsBus() {
+  const [state, setState] = useState<SlicePrefs | null>(null);
+  useEffect(() => {
+    const unsub = subscribe("slice:prefs", (p: SlicePrefs) => setState(p));
+    return () => unsub?.();
+  }, []);
+  return state;
+}
+
+
+Now the Diagnostics panel can show the current prefs or annotate plots accordingly.
+
+4) (Optional) URL sync for shareable state
+
+If you want sharable links, you can append a compact query like ?slice=6,6,1,1 and hydrate on mount. Happy to add that too, but the above is already production-clean and minimal.
+
+That’s it — your slice controls now persist across sessions and modes, broadcast to other panels, and stay in one source of truth. Want me to also add a tiny “Reset to defaults” button next to the controls?

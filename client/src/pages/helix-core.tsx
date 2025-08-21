@@ -18,6 +18,7 @@ import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } fro
 import { useMetrics } from "@/hooks/use-metrics";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { SliceViewer } from "@/components/SliceViewer";
+import { useSlicePrefs } from "@/hooks/use-slice-prefs";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -300,6 +301,10 @@ export default function HelixCore() {
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);
   const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
+
+  // Slice preferences - global persistent state
+  const { prefs, update } = useSlicePrefs();
+  const { exposure, sigmaRange, diffMode, showContours } = prefs;
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665, c = 299792458;
@@ -629,6 +634,72 @@ export default function HelixCore() {
                   </div>
 
                   <div className="space-y-4" ref={sliceHostRef}>
+                    {/* Slice Controls Panel */}
+                    <div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <h4 className="text-sm font-medium text-slate-200">Slice Preferences</h4>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                            <p className="mb-2">Control the visual parameters for the equatorial slice viewer. These settings persist across mode switches and browser sessions.</p>
+                            <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                            <p className="text-xs italic">The eye adjusts to see truth clearly in any light.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <Label htmlFor="exposure-slider" className="text-slate-300">Exposure ({exposure})</Label>
+                          <Input
+                            id="exposure-slider"
+                            type="range"
+                            min="1"
+                            max="12"
+                            step="1"
+                            value={exposure}
+                            onChange={(e) => update("exposure", parseFloat(e.target.value))}
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <Label htmlFor="sigma-slider" className="text-slate-300">Sigma Range ({sigmaRange})</Label>
+                          <Input
+                            id="sigma-slider"
+                            type="range"
+                            min="2"
+                            max="12"
+                            step="1"
+                            value={sigmaRange}
+                            onChange={(e) => update("sigmaRange", parseInt(e.target.value))}
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+                          />
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="diff-mode"
+                            checked={diffMode}
+                            onCheckedChange={(checked) => update("diffMode", checked)}
+                          />
+                          <Label htmlFor="diff-mode" className="text-slate-300">Diff Mode</Label>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="show-contours"
+                            checked={showContours}
+                            onCheckedChange={(checked) => update("showContours", checked)}
+                          />
+                          <Label htmlFor="show-contours" className="text-slate-300">Show Contours</Label>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <SliceViewer
                       hullAxes={[
                         Number(hullAxes[0]) || 503.5,
@@ -644,7 +715,7 @@ export default function HelixCore() {
                       dutyCycle={dutyUI}
                       sectors={sectorsUI}
                       viewAvg={true}
-                      diffMode={true}
+                      diffMode={diffMode}
                       refParams={{
                         gammaGeo: 26,
                         qSpoilingFactor: 1,
@@ -653,10 +724,10 @@ export default function HelixCore() {
                         sectors: 1,
                         viewAvg: true,
                       }}
-                      sigmaRange={6}
-                      exposure={8}
+                      sigmaRange={sigmaRange}
+                      exposure={exposure}
                       zeroStop={1e-7}
-                      showContours={true}
+                      showContours={showContours}
                       width={sliceSize.w}
                       height={sliceSize.h}
                       className="xl:sticky xl:top-4"
