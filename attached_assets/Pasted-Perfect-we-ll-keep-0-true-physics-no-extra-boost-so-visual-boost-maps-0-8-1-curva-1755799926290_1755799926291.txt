@@ -1,0 +1,93 @@
+Perfect — we’ll keep “0” = **true-physics** (no extra boost), so visual boost maps `0..8 → 1×..curvatureBoostMax×`.
+
+Here’s the minimal, surgical wiring to make that happen end-to-end:
+
+# 1) Use the same mapping everywhere
+
+```ts
+// shared helper (use inside WarpVisualizer)
+function displayBoostFromDecades(dec: number, max = 40) {
+  const t = Math.max(0, Math.min(1, (dec ?? 0) / 8)); // 0..1
+  return (1 - t) + t * max; // 0→1×, 8→max×
+}
+```
+
+✅ Your `SliceViewer` already does this:
+
+```ts
+const t = Math.max(0, Math.min(1, curvatureGain / 8));
+const boost = (1 - t) + t * curvatureBoostMax; // 1..max  ✅
+```
+
+# 2) Push the boost into the 3D renderer
+
+In `WarpVisualizer` (React wrapper around your WebGL/CPU engine), read the `parameters.curvatureGainDec` and **set a uniform** (or CPU multiplier) whenever it changes:
+
+```tsx
+// WarpVisualizer.tsx (inside component)
+useEffect(() => {
+  const dec = parameters.curvatureGainDec ?? 0;
+  const max = parameters.curvatureBoostMax ?? 40;
+  const gain = displayBoostFromDecades(dec, max); // 1..max
+
+  // WebGL:
+  engineRef.current?.setUniform?.('uDisplayGain', gain);
+
+  // CPU fallback (if your engine has a setter):
+  engineRef.current?.setDisplayGain?.(gain);
+}, [parameters.curvatureGainDec, parameters.curvatureBoostMax]);
+```
+
+In your shader/CPU amplitude, multiply **only at the final visual step**:
+
+```glsl
+// GLSL
+uniform float uDisplayGain; // default 1.0
+float vis = baseTheta * ampChain /* γ_geo^3 * q_spoil * ... */ * uDisplayGain;
+```
+
+# 3) Ensure the prop is actually consumed
+
+You already pass this from HelixCore:
+
+```tsx
+<WarpVisualizer
+  parameters={{
+    curvatureGainDec: curvatureGain,
+    curvatureBoostMax: 40,
+    /* ... */
+  }}
+/>
+```
+
+If your renderer only reads props on mount, either:
+
+* add the `useEffect` above (preferred), or
+* force remount on change:
+
+```tsx
+key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`}
+```
+
+# 4) Keep the physics honest (no pipeline changes)
+
+Nothing in `calculateEnergyPipeline` should touch this; it’s purely **display-only**. You can prove that by logging one invariant while dragging the slider:
+
+```ts
+console.log('GAIN_VIS', {
+  gainDec: curvatureGain,
+  gainApplied: displayBoostFromDecades(curvatureGain, 40),
+  P_avg_MW: pipeline?.P_avg,
+  M_exotic_kg: pipeline?.M_exotic
+});
+// P_avg and M_exotic should not change as the slider moves
+```
+
+# 5) Quick checklist
+
+* [x] Same 0..8 → 1..max mapping in both viewers
+* [x] `WarpVisualizer` sends `uDisplayGain` on every change
+* [x] Shader/CPU path multiplies by `uDisplayGain` at the end
+* [x] No edits to the energy pipeline (values stay honest)
+
+With that, dragging the slider to **0.0** shows “true-physics scale (1×)”; to **8.0** shows the chosen visual boost (e.g., **40×**).
