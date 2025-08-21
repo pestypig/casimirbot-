@@ -7,11 +7,12 @@
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 import type { SimulationParameters } from '../../shared/schema.js';
 
-// Warp bubble constants from research papers
-const FORD_ROMAN_LIMIT = 1e6; // kg - quantum inequality upper bound
-const NEEDLE_HULL_RADIUS = 20000; // μm - 40 μm diameter = 20 μm radius
-const TARGET_EXOTIC_MASS = 1.4e3; // kg - total warp bubble mass
-const TARGET_POWER = 83e6; // W - 83 MW target power
+// Pipeline-driven defaults (configurable, no hard-coded targets)
+const DEFAULTS = {
+  fordRomanLimit_kg: 1e6,
+  Q0: 1e9,                       // reference Q for normalization (configurable)
+  tileArea_m2: 0.05 * 0.05,      // 5 cm × 5 cm (override from pipeline if different)
+};
 
 export interface NatarioWarpParams {
   // Geometry parameters
@@ -32,6 +33,16 @@ export interface NatarioWarpParams {
   // Warp field parameters
   shiftAmplitude: number;      // β amplitude for shift vector
   expansionTolerance: number;  // Zero-expansion tolerance
+
+  // NEW: pipeline-driven knobs
+  gammaGeo?: number;           // From pipeline geometric amplification
+  gammaVanDenBroeck?: number;  // γ_VdB from pipeline
+  qSpoilingFactor?: number;    // ΔA/A (if modeling spoiling)
+  tileCount?: number;          // From pipeline tile census
+  tileArea_m2?: number;        // Override tile area if needed
+  fordRomanLimit_kg?: number;  // Ford-Roman limit (default 1e6 kg)
+  referenceQ?: number;         // Q0 for normalization
+  P_avg_W?: number;            // Live average power (preferred over targets)
 }
 
 export interface NatarioWarpResult {
@@ -93,102 +104,63 @@ export interface StressEnergyComponents {
 }
 
 /**
- * Calculate geometric blue-shift factor γ_geo from concave bowl geometry
+ * Calculate geometric blue-shift factor γ_geo from pipeline (no magic numbers)
  */
 export function calculateGeometricBlueshift(
-  bowlRadius: number, // μm
-  sagDepth: number,   // nm
-  gap: number         // nm
-): { gammaGeo: number; effectivePathLength: number; amplification: number } {
-  if (sagDepth === 0) {
-    return { gammaGeo: 1.0, effectivePathLength: bowlRadius * 1e-6, amplification: 1e11 };
-  }
-  
-  // Research paper calibration: For 25mm radius, 16nm sag depth → γ_geo ≈ 25
-  // Empirical formula based on "Geometry-Amplified Dynamic Casimir Effect" research
-  const radiusMillimeters = bowlRadius / 1000; // Convert μm to mm
-  const sagDepthNanometers = sagDepth; // Already in nm
-  const gapNanometers = gap; // Already in nm
-  
-  // Enhanced geometric amplification based on research paper methodology
-  // The 16nm sag depth at 25mm radius creates significant field focusing
-  const curvatureParameter = sagDepthNanometers / (radiusMillimeters * 1e6); // Dimensionless
-  
-  // Research-validated scaling to achieve γ_geo ≈ 25 for reference geometry
-  // Based on field concentration in concave resonator cavity
-  const concentrationFactor = 1 + (curvatureParameter * 125000); // Calibrated to paper values
-  const fieldFocusingEffect = Math.pow(concentrationFactor, 0.45); // Power law from electromagnetic simulations
-  
-  // Final γ_geo calculation to match research target of ≈25
-  let gammaGeo = fieldFocusingEffect * (25 / 26.2); // Normalize to target value
-  
-  // Ensure we get the right value for the 25mm radius, 16nm sag depth reference case
-  if (Math.abs(radiusMillimeters - 25) < 0.1 && Math.abs(sagDepthNanometers - 16) < 0.1) {
-    gammaGeo = 25.0; // Exact match for research reference case
-  }
-  
-  const effectivePathLength = (bowlRadius * 1e-6) - (sagDepth * 1e-9); // a_eff = a - t
-  
-  // Overall amplification includes Van den Broeck enhancement
-  const vanDenBroeckAmplification = 1e11; // From research papers
-  const amplification = Math.pow(gammaGeo, 3) * vanDenBroeckAmplification;
-  
-  return {
-    gammaGeo: Math.max(1.0, gammaGeo),
-    effectivePathLength,
-    amplification
-  };
+  bowlRadius: number, sagDepth: number, gap: number,
+  opts?: { gammaGeo?: number; gammaVanDenBroeck?: number }
+): { gammaGeo: number; effectivePathLength_m: number; amplification: number } {
+  // If pipeline provides γ_geo, trust it; otherwise fall back to 1
+  const gammaGeo = Math.max(1, opts?.gammaGeo ?? 1);
+
+  // Path length a_eff = a - t (meters)
+  const a_m = gap * PHYSICS_CONSTANTS.NM_TO_M; // nm to m
+  const t_m = sagDepth * PHYSICS_CONSTANTS.NM_TO_M; // nm to m
+  const effectivePathLength_m = Math.max(1e-12, a_m - t_m);
+
+  // Van den Broeck factor from pipeline; default 1 if not modeling it
+  const gammaVdB = Math.max(1, opts?.gammaVanDenBroeck ?? 1);
+
+  // Total amplification (geometry only, no Q or duty here)
+  const amplification = Math.pow(gammaGeo, 3) * gammaVdB;
+
+  return { gammaGeo, effectivePathLength_m, amplification };
 }
 
 /**
- * Calculate dynamic Casimir amplification with Q-factor enhancement
+ * Calculate dynamic Casimir amplification with configurable Q baseline
  */
 export function calculateDynamicAmplification(
-  geometricFactor: number,
+  geometricAmplification: number,
   cavityQ: number,
-  burstDuration: number,  // μs
-  cycleDuration: number   // μs
-): { qEnhancement: number; totalAmplification: number; dutyFactor: number } {
-  // Q-factor enhancement (√Q scaling from cavity dynamics)
-  const qEnhancement = Math.sqrt(cavityQ / 1e9); // Normalized to 10^9
-  
-  // Duty factor for burst operation
-  const dutyFactor = burstDuration / cycleDuration;
-  
-  // Total amplification: γ_geo³ × √Q × duty_factor
-  const totalAmplification = geometricFactor * qEnhancement * dutyFactor;
-  
-  return {
-    qEnhancement,
-    totalAmplification,
-    dutyFactor
-  };
+  burstDuration_us: number,
+  cycleDuration_us: number,
+  opts?: { referenceQ?: number; qSpoilingFactor?: number }
+) {
+  const Q0 = Math.max(1, opts?.referenceQ ?? DEFAULTS.Q0);
+  const qEnhancement = Math.sqrt(cavityQ / Q0);
+  const dutyFactor = Math.max(1e-12, burstDuration_us / cycleDuration_us);
+  const qSpoil = Math.max(0, opts?.qSpoilingFactor ?? 1);
+
+  // Do not apply effective duty here; keep this purely "per-pulse"
+  const totalAmplification = geometricAmplification * qEnhancement * qSpoil;
+
+  return { qEnhancement, totalAmplification, dutyFactor };
 }
 
 /**
- * Calculate sector strobing effects and time-averaged quantities
+ * Calculate sector strobing effects using ship-wide effective duty for averaging
  */
 export function calculateSectorStrobing(
-  baseAmplification: number,
-  sectorCount: number,     // S = 400
-  dutyFactor: number,      // d = 0.01
-  effectiveDuty: number    // d_eff = 2.5×10^-5
-): { timeAveragedAmplification: number; powerReduction: number; effectivenessFactor: number } {
-  // Time-averaged amplification with sector strobing
-  // Formula from paper: ⟨A⟩ = A × d_eff
-  const timeAveragedAmplification = baseAmplification * effectiveDuty;
-  
-  // Power reduction from sector strobing
-  const powerReduction = effectiveDuty / dutyFactor; // Ratio of effective to local duty
-  
-  // Effectiveness factor for S-sector strobing
-  const effectivenessFactor = effectiveDuty * sectorCount; // Should approach target efficiency
-  
-  return {
-    timeAveragedAmplification,
-    powerReduction,
-    effectivenessFactor
-  };
+  perPulseAmplification: number,
+  sectorCount: number,
+  dutyLocal: number,
+  dutyEffective: number
+) {
+  const timeAveragedAmplification = perPulseAmplification * Math.max(0, dutyEffective);
+  const powerReduction = Math.max(1e-12, dutyEffective) / Math.max(1e-12, dutyLocal);
+  const effectivenessFactor = Math.max(0, dutyEffective) * Math.max(1, sectorCount);
+  return { timeAveragedAmplification, powerReduction, effectivenessFactor };
 }
 
 /**
@@ -223,7 +195,7 @@ export function calculateNatarioShiftField(
   
   // Tangential and axial components (for curl-free condition)
   const tangentialComponent = 0; // β_θ = 0 for cylindrical symmetry
-  const axialComponent = shiftAmplitude * 0.1; // Small axial component for stability
+  const axialComponent = 0; // Remove arbitrary 0.1 fudge factor
   
   return {
     amplitude: shiftAmplitude,
@@ -243,10 +215,11 @@ export function validateQuantumInequality(
   exoticMass: number,        // kg
   energyDensity: number,     // J/m³
   pulseDuration: number,     // s
-  spatialScale: number       // m
+  spatialScale: number,      // m (gap scale, NOT converted)
+  fordRomanLimit: number = DEFAULTS.fordRomanLimit_kg
 ): { margin: number; status: 'safe' | 'warning' | 'violation'; bound: number } {
-  // Ford-Roman quantum inequality bound
-  const fordRomanBound = FORD_ROMAN_LIMIT; // 10^6 kg upper limit
+  // Ford-Roman quantum inequality bound (configurable)
+  const fordRomanBound = fordRomanLimit;
   
   // Energy density × time constraint
   const quantumBound = PHYSICS_CONSTANTS.HBAR_C / Math.pow(spatialScale, 4);
@@ -344,22 +317,30 @@ export function calculateMomentumFlux(
 }
 
 /**
- * Main calculation function for complete Natário warp bubble system
+ * Main calculation function for complete Natário warp bubble system (pipeline-driven)
  */
 export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWarpResult {
-  // 1. Geometric blue-shift calculation
-  const { gammaGeo, effectivePathLength, amplification } = calculateGeometricBlueshift(
+  // 1. Geometric amplification (using pipeline values if available)
+  const { gammaGeo, effectivePathLength_m, amplification } = calculateGeometricBlueshift(
     params.bowlRadius,
     params.sagDepth,
-    params.gap
+    params.gap,
+    { 
+      gammaGeo: params.gammaGeo,
+      gammaVanDenBroeck: params.gammaVanDenBroeck
+    }
   );
   
-  // 2. Dynamic Casimir amplification
+  // 2. Dynamic Casimir amplification 
   const { qEnhancement, totalAmplification } = calculateDynamicAmplification(
     amplification,
     params.cavityQ,
     params.burstDuration,
-    params.cycleDuration
+    params.cycleDuration,
+    {
+      referenceQ: params.referenceQ,
+      qSpoilingFactor: params.qSpoilingFactor
+    }
   );
   
   // 3. Sector strobing effects
@@ -369,81 +350,76 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     params.dutyFactor,
     params.effectiveDuty
   );
-  
-  // 4. Energy density calculations
-  const baselineEnergyDensity = -4.3e8; // J/m³ from paper (1 nm gap)
+
+  // 4. Pipeline energy source (fallback to modest default if none provided)
+  const baselineEnergyDensity = -4.3e8; // J/m³ reasonable reference 
   const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;
+
+  // 5. Mass calculations (pipeline-driven, no TARGET constants)
+  const tileCount = Math.max(1, params.tileCount ?? 1); // Pipeline tile census or minimal fallback
+  const tileArea_m2 = params.tileArea_m2 ?? DEFAULTS.tileArea_m2;
+  const tileThickness_m = 0.01; // 1 cm reasonable thickness
+  const tileVolume_m3 = tileArea_m2 * tileThickness_m;
   
-  // 5. Mass calculations - working backwards from target values
-  // Research paper targets: 1.4×10³ kg total exotic mass
-  const TARGET_TOTAL_MASS = 1.4e3; // kg
-  const tileCount = 1.96e9; // Total tiles in needle hull from paper
-  
-  // Calculate per-tile mass to achieve target total
-  const targetMassPerTile = TARGET_TOTAL_MASS / tileCount; // ≈ 7.14×10⁻⁷ kg per tile
-  
-  // For simulation display: show both calculated and target values
-  const tileVolume = 0.05 * 0.05 * 0.01; // m³ (5cm × 5cm × 1cm)
-  const calculatedMassPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  
-  // Use target mass for total calculation (research paper compliance)
-  const totalExoticMass = TARGET_TOTAL_MASS;
-  
-  // 6. Power calculations  
-  // Research paper target: 83 MW is the FINAL power after all mitigation factors
-  // This is the actual target value, not a raw power that needs further reduction
-  const powerDraw = TARGET_POWER; // 83 MW direct from research paper
-  
-  // 7. Quantum inequality validation
+  // Physics-derived mass per tile (E = mc²)
+  const massPerTile_physics = Math.abs(amplifiedEnergyDensity * tileVolume_m3) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
+  const totalExoticMass = massPerTile_physics * tileCount;
+
+  // 6. Power calculations (pipeline-driven average power if available)
+  const powerDraw = params.P_avg_W ?? totalExoticMass * 0.1 * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C; // 10% efficiency fallback
+
+  // 7. Quantum inequality validation  
+  const fordRomanLimit = params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg;
   const quantumValidation = validateQuantumInequality(
     totalExoticMass,
     amplifiedEnergyDensity,
     params.burstDuration * 1e-6, // Convert μs to s
-    effectivePathLength * 1e-9   // Convert nm to m
+    Math.max(1e-12, effectivePathLength_m), // Safe scaling
+    fordRomanLimit
   );
-  
+
   // 8. Natário shift vector field
   const shiftVectorField = calculateNatarioShiftField(params, totalExoticMass);
-  
-  // 9. Expansion and curl calculations
-  const expansionScalar = 0.0; // Zero by construction for zero-expansion profile
-  const curlMagnitude = 0.0;   // Zero by construction for curl-free field
-  
+
+  // 9. Expansion and curl (zero by construction for Natário metric)
+  const expansionScalar = 0.0;
+  const curlMagnitude = 0.0;
+
   // 10. Stress-energy tensor
   const spatialGradients = {
-    dvdr: shiftVectorField.amplitude / (params.bowlRadius * 1e-6), // ∂β/∂r
-    dvdt: 0.0 // No explicit time dependence in steady state
+    dvdr: shiftVectorField.amplitude / Math.max(1e-12, params.bowlRadius * 1e-6),
+    dvdt: 0.0 // Steady state
   };
   const stressEnergyTensor = calculateStressEnergyTensor(
     amplifiedEnergyDensity,
     shiftVectorField,
     spatialGradients
   );
-  
+
   // 11. Momentum flux balance
   const { momentumFlux } = calculateMomentumFlux(
     stressEnergyTensor,
-    params.bowlRadius * 1e-6,  // Convert μm to m
-    1e-6  // 1 μm shell thickness
+    Math.max(1e-12, params.bowlRadius * 1e-6),
+    1e-6 // Shell thickness
   );
-  
-  // 12. Validation flags
+
+  // 12. Validation flags (no hard-coded targets)
   const isZeroExpansion = Math.abs(expansionScalar) < params.expansionTolerance;
   const isCurlFree = Math.abs(curlMagnitude) < 1e-10;
   const isQuantumSafe = quantumValidation.status !== 'violation';
-  const isPowerCompliant = Math.abs(powerDraw - TARGET_POWER) / TARGET_POWER < 0.1; // 10% tolerance
-  
+  const isPowerCompliant = powerDraw > 0; // Simply non-negative power requirement
+
   return {
     geometricBlueshiftFactor: gammaGeo,
-    effectivePathLength,
+    effectivePathLength: effectivePathLength_m,
     geometricAmplification: amplification,
     qEnhancementFactor: qEnhancement,
     totalAmplificationFactor: totalAmplification,
     baselineEnergyDensity,
     amplifiedEnergyDensity,
-    exoticMassPerTile: targetMassPerTile,
+    exoticMassPerTile: massPerTile_physics,
     totalExoticMass,
-    timeAveragedMass: totalExoticMass * params.effectiveDuty,
+    timeAveragedMass: totalExoticMass * Math.max(0, params.effectiveDuty),
     powerDraw,
     quantumInequalityMargin: quantumValidation.margin,
     quantumSafetyStatus: quantumValidation.status,
