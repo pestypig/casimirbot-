@@ -414,22 +414,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
-        // Use the existing 0-8 curvature gain slider with same blend as SliceViewer
-        curvatureGainT: (() => {
-          const params = parameters as any;
-          const hasDec = Object.prototype.hasOwnProperty.call(params, 'curvatureGainDec');
-          const hasT = Object.prototype.hasOwnProperty.call(params, 'curvatureGainT');
-          
-          if (hasDec && Number.isFinite(params.curvatureGainDec)) {
-            // Convert 0..8 slider to 0..1 normalized value
-            return Math.max(0, Math.min(1, +params.curvatureGainDec / 8));
-          } else if (hasT && Number.isFinite(params.curvatureGainT)) {
-            return Math.max(0, Math.min(1, +params.curvatureGainT));
-          }
-          return 0.75; // default
-        })(),
+        // Wire existing 0-8 curvature gain slider directly to engine (same as SliceViewer)
+        curvatureGain: Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec : 3, // 0..8 slider value
         curvatureBoostMax: Math.max(1, Number(parameters.curvatureBoostMax) || 40), // same as SliceViewer
-        // Let engine compute userGain from curvatureGainT + curvatureBoostMax
+        // Engine will handle: curvatureGain 0..8 → curvatureGainT 0..1 → userGain 1..40
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility

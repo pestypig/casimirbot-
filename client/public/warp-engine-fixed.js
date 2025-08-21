@@ -471,35 +471,46 @@ class WarpEngine {
             exposure: N(parameters.exposure || 6.0),
             zeroStop: N(parameters.zeroStop || 1e-7),
             // NEW: Curvature Gain blend system (replaces vizGainOverride)
-            curvatureGainT: Number.isFinite(parameters.curvatureGainT) ? Math.max(0, Math.min(1, parameters.curvatureGainT)) : (this.uniforms?.curvatureGainT ?? 0.75),
-            curvatureBoostMax: Number.isFinite(parameters.curvatureBoostMax) ? Math.max(1, parameters.curvatureBoostMax) : (this.uniforms?.curvatureBoostMax ?? 40),
+            // --- Curvature gain mapping (exactly matches SliceViewer) ---
+            curvatureBoostMax: (() => {
+                const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+                    ? Math.max(1, parameters.curvatureBoostMax)
+                    : (this.uniforms?.curvatureBoostMax ?? 40);
+                return boostMax;
+            })(),
             
-            // Enhanced unified gain with decades slider support:
+            curvatureGainT: (() => {
+                const clamp01 = t => Math.max(0, Math.min(1, t));
+                // Normalize to T in [0,1]
+                const T_from_props =
+                    Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
+                    Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
+                    Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
+                    (this.uniforms?.curvatureGainT ?? 0.375); // default = slider ~3/8
+                return T_from_props;
+            })(),
+            
             userGain: (() => {
-                // Accept either a normalized T (0..1) or a big numeric slider (0..8), or direct gain
-                const gainInput = 
-                    Number.isFinite(parameters.userGain)              ? +parameters.userGain :        // absolute gain override (1..1e6)
-                    Number.isFinite(parameters.curvatureGainDec)      ? +parameters.curvatureGainDec : // decades slider (0..8 => 10^dec)  
-                    Number.isFinite(parameters.curvatureGainT)        ? +parameters.curvatureGainT :   // normalized T (0..1)
-                    (this.uniforms?.curvatureGainT ?? 0.75);
+                const clamp01 = t => Math.max(0, Math.min(1, t));
+                const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+                    ? Math.max(1, parameters.curvatureBoostMax)
+                    : (this.uniforms?.curvatureBoostMax ?? 40);
+                
+                const T_from_props =
+                    Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
+                    Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
+                    Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
+                    (this.uniforms?.curvatureGainT ?? 0.375);
 
-                // Normalize into a usable gain:
-                let userGain;
-                if (gainInput > 1.5) {
-                    // Treat as decades (e.g., 0..8): 10^dec, capped to 8 decades => 1e8
-                    const dec = Math.min(8, gainInput);            
-                    userGain = Math.pow(10, dec);
-                } else if (gainInput >= 0 && gainInput <= 1) {
-                    // Treat as normalized T (0..1): blend 1..BoostMax
-                    const boostMax = Number.isFinite(parameters.curvatureBoostMax)
-                        ? Math.max(1, parameters.curvatureBoostMax)
-                        : (this.uniforms?.curvatureBoostMax ?? 40);
-                    userGain = (1 - gainInput) + gainInput * boostMax;
-                } else {
-                    // Treat as absolute gain
-                    userGain = Math.max(1, gainInput);
-                }
-                return userGain;
+                // Blend 1→boostMax exactly like SliceViewer
+                const userGainFromT = 1 + T_from_props * (boostMax - 1);
+
+                // Allow absolute override if caller passes userGain directly
+                const userGainFinal = Number.isFinite(parameters.userGain)
+                    ? Math.max(1, +parameters.userGain)
+                    : userGainFromT;
+
+                return userGainFinal;
             })(),
             
             // Calculate thetaScale for unified color mapping with SliceViewer
@@ -836,18 +847,30 @@ class WarpEngine {
             const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
             const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
 
-            const val  = xs_over_rs * df * thetaScale * userGain;
-            const mag  = Math.log(1.0 + Math.abs(val) / zeroStop);
+            // Geometry amplitude should be monotonic with the slider and not instantly saturate.
+            // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
+            const T_gain     = this.uniforms?.curvatureGainT ?? 0.375;
+            const boostMax   = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
+            const boostNow   = 1 + T_gain * (boostMax - 1);
+
+            // Use natural log like the shader, but normalize by the "max boost" so result is in [0,1]
+            const val = xs_over_rs * df * thetaScale * userGain;
+            const num   = Math.log(1.0 + Math.abs(val) / zeroStop);
+            const modeScale = (mode === 'emergency' ? 1.25 : mode === 'cruise' ? 0.5 : 1.05);
+            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * boostMax * modeScale) / zeroStop));
+            const A_geom = Math.pow(Math.min(1.0, num / denom), 0.85); // 0..1, tracks the UI gain with gentle curve
+            
+            // Keep A_vis for color (can saturate)
             const norm = Math.log(1.0 + exposure);
-            const A_vis = Math.min(1.0, mag / norm);               // 0..1
+            const A_vis = Math.min(1.0, num / norm);               // 0..1
 
             // Special case: make standby perfectly flat if desired
             let disp;
             if (mode === 'standby') {
                 disp = 0; // perfectly flat grid for standby mode
             } else {
-                // Normal displacement calculation with compressed amplitude
-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+                // Normal displacement calculation with normalized amplitude (A_geom tracks slider)
+                disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
                 
                 // Reduced visual gain to avoid clamp flattening + higher ceiling
                 disp *= 2.0; // lower than 4.0 to avoid hitting clamp
