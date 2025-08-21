@@ -375,8 +375,8 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const quantumValidation = validateQuantumInequality(
     totalExoticMass,
     amplifiedEnergyDensity,
-    params.burstDuration * 1e-6, // Convert μs to s
-    Math.max(1e-12, effectivePathLength_m), // Safe scaling
+    params.burstDuration * 1e-6,               // s
+    a_m,                                        // m (gap scale)
     fordRomanLimit
   );
 
