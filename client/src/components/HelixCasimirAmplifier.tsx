@@ -41,6 +41,18 @@ import {
 
 // ------------------------- Types from your backend -------------------------
 
+type LightCrossing = {
+  sectorIdx: number; 
+  sectorCount: number; 
+  phase: number;
+  dwell_ms: number; 
+  tauLC_ms: number; 
+  burst_ms: number;
+  duty: number; 
+  freqGHz: number; 
+  onWindow: boolean;
+};
+
 type EnergyPipelineState = {
   // inputs / config
   tileArea_cm2: number;
@@ -294,12 +306,14 @@ export default function HelixCasimirAmplifier({
   metricsEndpoint = "/api/helix/metrics",
   stateEndpoint = "/api/helix/state",
   fieldEndpoint = "/api/helix/displacement",
-  modeEndpoint = "/api/helix/mode"
+  modeEndpoint = "/api/helix/mode",
+  lightCrossing
 }: {
   metricsEndpoint?: string;
   stateEndpoint?: string;
   fieldEndpoint?: string;
   modeEndpoint?: string;
+  lightCrossing?: LightCrossing;
 }) {
   const { data: metrics } = usePolling<HelixMetrics>(metricsEndpoint, 1500, [metricsEndpoint]);
   const { data: state }   = usePolling<EnergyPipelineState>(stateEndpoint, 3000, [stateEndpoint]);
@@ -345,6 +359,50 @@ export default function HelixCasimirAmplifier({
       gap_m, tileA_m2, casimir_theory, casimir_per_tile
     };
   }, [state, metrics]);
+
+  // Time-evolving cavity energy system using shared light-crossing loop
+  const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  
+  const qCav = isFiniteNumber(state?.qCavity) ? state.qCavity : 1e9;
+  const f = (lightCrossing?.freqGHz ?? 15) * 1e9;
+  const tauQ_s = qCav / (Math.PI * f); // cavity time constant
+
+  // Normalized steady-state target energy from pipeline (or fallback)
+  const U_inf = (state?.U_cycle ?? 1) * 1; // arbitrary scale -> keep consistent
+
+  const [U, setU] = useState(0);  // cavity "stored" energy (relative units)
+  const lastT = useRef<number | null>(null);
+
+  useEffect(() => {
+    let raf: number;
+    const step = (t: number) => {
+      if (!lightCrossing) { raf = requestAnimationFrame(step); return; }
+      const on = lightCrossing.onWindow;          // τLC-safe ON window
+      const now = t / 1000;                       // s
+      const prev = lastT.current ?? now;
+      const dt = Math.min(0.05, Math.max(0, now - prev)); // clamp dt for stability
+      lastT.current = now;
+
+      setU((U0) => {
+        if (tauQ_s <= 0) return U0;
+        const alpha = dt / tauQ_s;
+        if (on) {
+          // ring-up toward U_inf
+          return U0 + (U_inf - U0) * (1 - Math.exp(-alpha));
+        } else {
+          // ring-down toward 0
+          return U0 * Math.exp(-alpha);
+        }
+      });
+
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [lightCrossing?.onWindow, tauQ_s, U_inf]);
+
+  // Use U to drive visuals / numbers
+  const pInstant = U / Math.max(1e-9, lightCrossing?.dwell_ms ?? 1); // arbitrary proportional readout
 
   // Mode switch
   const [switchingMode, setSwitchingMode] = useState(false);
@@ -435,6 +493,48 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">P = {fmtNum(derived.P_ship_avg_report_MW, "MW", 2)}</Badge>
               <Badge variant="outline" className="justify-center">M = {fmtNum(derived.M_total_report, "kg", 0)}</Badge>
             </div>
+
+            {/* Time-Evolving Cavity Physics Display */}
+            {lightCrossing && (
+              <div className="mt-4 pt-4 border-t border-slate-700">
+                <div className="mb-2 text-xs text-slate-400 font-mono uppercase tracking-wide">Cavity Dynamics (Phase-Locked)</div>
+                <div className="grid grid-cols-3 gap-3 text-[10px] font-mono">
+                  <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
+                    <div className="text-slate-400 mb-0.5">τ_LC</div>
+                    <div className="text-slate-200">{(lightCrossing.tauLC_ms).toFixed(3)} ms</div>
+                  </div>
+                  <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
+                    <div className="text-slate-400 mb-0.5">τ_Q</div>
+                    <div className="text-slate-200">{(tauQ_s * 1e3).toFixed(1)} ms</div>
+                  </div>
+                  <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
+                    <div className="text-slate-400 mb-0.5">U(t)/U∞</div>
+                    <div className="text-slate-200">{(U / Math.max(1e-12, U_inf)).toFixed(3)}</div>
+                  </div>
+                </div>
+                
+                {/* Visual cavity energy bar with ON/OFF indication */}
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-100 ${
+                        lightCrossing.onWindow ? 'bg-cyan-400' : 'bg-slate-600'
+                      }`}
+                      style={{ width: `${Math.min(100, (U / Math.max(1e-12, U_inf)) * 100)}%` }}
+                    />
+                  </div>
+                  <Badge 
+                    variant={lightCrossing.onWindow ? "default" : "secondary"} 
+                    className={`text-xs ${
+                      lightCrossing.onWindow ? 'bg-cyan-500 text-white' : 'bg-slate-600 text-slate-200'
+                    }`}
+                  >
+                    {lightCrossing.onWindow ? 'ON' : 'OFF'}
+                  </Badge>
+                </div>
+              </div>
+            )}
+            
           </CardContent>
         </Card>
 
