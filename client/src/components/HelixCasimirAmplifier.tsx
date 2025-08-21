@@ -368,9 +368,16 @@ export default function HelixCasimirAmplifier({
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   
   const qCav = isFiniteNumber(state?.qCavity) ? state.qCavity : 1e9;
-  // Single authoritative frequency source
-  const fGHz = isFiniteNumber(state?.modulationFreq_GHz) ? state!.modulationFreq_GHz : 
-               (lightCrossing?.freqGHz ?? 15);
+  
+  // SAFE frequency selection - positive-only guard
+  const fGHz_state = Number(state?.modulationFreq_GHz);
+  const fGHz =
+    Number.isFinite(fGHz_state) && fGHz_state > 0
+      ? fGHz_state
+      : (Number.isFinite(lightCrossing?.freqGHz) && (lightCrossing!.freqGHz as number) > 0
+          ? (lightCrossing!.freqGHz as number)
+          : 15);
+  
   const f = fGHz * 1e9;
   const omega = 2 * Math.PI * f;
   const tauQ_s = qCav / (2 * Math.PI * f); // cavity time constant: τ = Q/(2πf)
@@ -456,8 +463,19 @@ export default function HelixCasimirAmplifier({
     }
   }, [metrics?.totalSectors, metrics?.activeSectors, state?.sectorStrobing, lightCrossing?.sectorIdx, lightCrossing?.sectorCount]);
 
-  // Normalized steady-state target energy from pipeline (or fallback)
-  const U_inf = (state?.U_cycle ?? 1) * 1; // arbitrary scale -> keep consistent
+  // Safe U_inf target - use physics-driven value with robust fallback
+  const U_inf = (() => {
+    const fromState = state?.U_cycle;
+    if (Number.isFinite(fromState) && fromState !== 0) return fromState;
+    
+    // Fallback: use |U_Q| from derived calculations if available
+    if (derived?.U_Q && Number.isFinite(derived.U_Q) && derived.U_Q !== 0) {
+      return Math.abs(derived.U_Q);
+    }
+    
+    // Last resort: ensure non-zero target for ring-up
+    return 1e-6; // small but finite target
+  })();
 
   const [U, setU] = useState(0);  // cavity "stored" energy (relative units)
   const lastT = useRef<number | null>(null);
