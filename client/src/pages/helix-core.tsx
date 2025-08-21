@@ -243,6 +243,21 @@ export default function HelixCore() {
     };
   }, []);
   
+  // SliceViewer responsive sizing with ResizeObserver
+  useEffect(() => {
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) {
+        const w = Math.floor((e.contentBoxSize?.[0]?.inlineSize ?? e.contentRect.width) || 480);
+        // Keep 2:1 aspect; cap a bit so it fits the column nicely
+        const clampedW = Math.max(360, Math.min(w, 800));
+        setSliceSize({ w: clampedW, h: Math.round(clampedW / 2) });
+      }
+    });
+    const el = sliceHostRef.current;
+    if (el) ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  
   // Use centralized energy pipeline
   const { data: pipelineState } = useEnergyPipeline();
   const switchMode = useSwitchMode();
@@ -281,6 +296,10 @@ export default function HelixCore() {
 
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
+  
+  // SliceViewer responsive sizing
+  const sliceHostRef = useRef<HTMLDivElement>(null);
+  const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665, c = 299792458;
@@ -552,7 +571,7 @@ export default function HelixCore() {
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <WarpVisualizer
-                        key={`mode-${effectiveMode}-${sectorsUI}-${dutyUI}-v${modeVersion}`}
+                        key={`mode-${effectiveMode}-v${modeVersion}`}
                         parameters={{
                           dutyCycle: dutyUI,
                           g_y: pipeline?.gammaGeo || 26,
@@ -609,9 +628,13 @@ export default function HelixCore() {
                     </div>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-4" ref={sliceHostRef}>
                     <SliceViewer
-                      hullAxes={hullAxes}
+                      hullAxes={[
+                        Number(hullAxes[0]) || 503.5,
+                        Number(hullAxes[1]) || 132.0,
+                        Number(hullAxes[2]) || 86.5,
+                      ]}
                       wallWidth_m={6.0}
                       driveDir={[1, 0, 0]}
                       vShip={1.0}
@@ -634,8 +657,8 @@ export default function HelixCore() {
                       exposure={8}
                       zeroStop={1e-7}
                       showContours={true}
-                      width={480}
-                      height={240}
+                      width={sliceSize.w}
+                      height={sliceSize.h}
                       className="xl:sticky xl:top-4"
                     />
                   </div>
@@ -859,7 +882,7 @@ export default function HelixCore() {
                   {isFiniteNumber(sectorsLive) && (
                     <p className="text-xs text-slate-500 mt-1">
                       {sectorsLive > 1
-                        ? `${sectorsLive} sectors • ~${(100 / sectorsLive * 0.01).toFixed(2)}% of grid ON`
+                        ? `${sectorsLive} sectors • ~${(dutyLive * 100).toFixed(2)}% of grid ON`
                         : `${(dutyLive*100).toFixed(1)}% eligible • 1% local ON`}
                     </p>
                   )}
@@ -921,8 +944,17 @@ export default function HelixCore() {
                     <div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
                     <div>Sectors: {fint(sectorsUI, '0')}</div>
                     <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
-                    <Tooltip
-                      label={
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help underline decoration-dotted">
+                          γ<sub>VdB</sub>: {fexp(
+                            (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
+                            1,
+                            '2.9e+5'
+                          )}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm">
                         <div className="space-y-1">
                           <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
                           <p>
@@ -935,15 +967,7 @@ export default function HelixCore() {
                             with duty cycle or strobing sectors.
                           </p>
                         </div>
-                      }
-                    >
-                      <span className="cursor-help underline decoration-dotted">
-                        γ<sub>VdB</sub>: {fexp(
-                          (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
-                          1,
-                          '2.9e+5'
-                        )}
-                      </span>
+                      </TooltipContent>
                     </Tooltip>
                   </div>
                 </div>
