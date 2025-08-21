@@ -97,6 +97,11 @@ class WarpEngine {
             this.strobingState.sectorCount = sectorCount;
             this.strobingState.currentSector = currentSector;
         };
+        // Expose curvature gain setter for the UI slider (0..8 decades)
+        this.__warp_setGainDec = (dec, max = 40) => {
+            try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
+        };
+        window.__warp_setGainDec = this.__warp_setGainDec;
         
         // Bind responsive resize handler
         this._resize = () => this._resizeCanvasToDisplaySize();
@@ -105,7 +110,7 @@ class WarpEngine {
         
         // Prime the engine with initial visible curvature using T+boostMax pattern
         this.updateUniforms({
-            curvatureGainT: 0.375,   // 3/8 = 0.375 → equivalent to slider at 3
+            curvatureGainT: 0.0,     // 0 → 1× (true-physics visual scale)
             curvatureBoostMax: 40,   // same as SliceViewer
             exposure: 6.0,
             zeroStop: 1e-7,
@@ -673,7 +678,7 @@ class WarpEngine {
         // Higher resolution for smoother canonical curvature
         const gridDivisions = 120; // increased from default for smoother profiles
         const driveDir = [1, 0, 0];               // +x is "aft" by convention
-        const gridK = 0.12;                       // deformation gain
+        const gridK = 0.10;                       // mild base (acts as unit scale)
         
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
         // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
@@ -682,6 +687,7 @@ class WarpEngine {
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
         const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
         // Small per-mode seasoning only, so we don't hide the physics
+        // Keep mode scale only for non-geometry uses (colors, display), not geometry amplitude
         const modeScale =
             mode === 'standby'   ? 0.95 :
             mode === 'cruise'    ? 1.00 :
@@ -856,8 +862,8 @@ class WarpEngine {
             // Use natural log like the shader, but normalize by the "max boost" so result is in [0,1]
             const val = xs_over_rs * df * thetaScale * userGain;
             const num   = Math.log(1.0 + Math.abs(val) / zeroStop);
-            const modeScale = (mode === 'emergency' ? 1.25 : mode === 'cruise' ? 0.5 : 1.05);
-            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * boostMax * modeScale) / zeroStop));
+            // Remove mode scaling from geometry - keep modes visual-only elsewhere
+            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * boostMax) / zeroStop));
             const A_geom = Math.pow(Math.min(1.0, num / denom), 0.85); // 0..1, tracks the UI gain with gentle curve
             
             // Keep A_vis for color (can saturate)
@@ -872,8 +878,7 @@ class WarpEngine {
                 // Normal displacement calculation with normalized amplitude (A_geom tracks slider)
                 disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
                 
-                // Reduced visual gain to avoid clamp flattening + higher ceiling
-                disp *= 2.0; // lower than 4.0 to avoid hitting clamp
+                // No fixed bump; slider controls all visual scaling
                 
                 // Let curvature breathe more under big gain
                 const maxPush = 0.22;                        // higher ceiling for decades slider
@@ -1347,6 +1352,11 @@ class WarpEngine {
         
         // Clean up event listeners
         window.removeEventListener('resize', this._resize);
+        // Remove globals we installed
+        if (window.__warp_setGainDec === this.__warp_setGainDec) {
+            delete window.__warp_setGainDec;
+        }
+        delete window.setStrobingState;
         
         // Clean up WebGL resources
         const gl = this.gl;

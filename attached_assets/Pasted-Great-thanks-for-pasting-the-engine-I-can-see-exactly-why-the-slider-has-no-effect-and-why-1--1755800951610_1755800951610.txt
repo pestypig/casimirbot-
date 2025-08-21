@@ -1,0 +1,168 @@
+Great — thanks for pasting the engine. I can see exactly why the slider “has no effect” and why “1” still looks juiced.
+
+## The three blockers
+
+1. **Your global hook isn’t wired.**
+   Helix-Core calls `window.__warp_setGainDec?.(v, 40)`, but the engine never sets `__warp_setGainDec`. Result: it’s a no-op.
+
+2. **Default boost is baked in.**
+   In the constructor you prime the engine with:
+
+   ```js
+   this.updateUniforms({ curvatureGainT: 0.375, curvatureBoostMax: 40, ... })
+   ```
+
+   That is \~**5.9×** effective gain (0.375 of the way from 1→40). So even when the slider says “1”, you’re still boosted.
+
+3. **Extra geometry multipliers ignore the slider.**
+
+   * Fixed visual multipliers: `const gridK = 0.12;` then `disp *= 2.0;` → hard, always-on boost.
+   * “Mode seasoning” inside the geometry blend (`modeScale`) further inflates amplitude.
+     These make the picture look exaggerated even when the UI gain is at minimum.
+
+---
+
+## Minimal, surgical fix (safe & keeps your look)
+
+Apply these tiny diffs:
+
+### A) Expose the global setter (so the slider actually reaches the engine)
+
+**Constructor (after `this._initializeGrid();`)**
+
+```diff
+ // Expose strobing sync function globally
+ window.setStrobingState = ({ sectorCount, currentSector }) => {
+   this.strobingState.sectorCount = sectorCount;
+   this.strobingState.currentSector = currentSector;
+ };
++// Expose curvature gain setter for the UI slider (0..8 decades)
++window.__warp_setGainDec = (dec, max = 40) => {
++  try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
++};
+```
+
+**destroy()**
+
+```diff
+ // Clean up event listeners
+ window.removeEventListener('resize', this._resize);
++// Remove globals we installed
++if (window.__warp_setGainDec === this.setCurvatureGainDec) {
++  delete window.__warp_setGainDec;
++}
+```
+
+*(We compare identity if you want to be strict; or simply `delete window.__warp_setGainDec`.)*
+
+---
+
+### B) Make “min” truly unboosted (no baked-in prime)
+
+**Constructor: replace the priming call**
+
+```diff
+- this.updateUniforms({
+-   curvatureGainT: 0.375,   // pre-boosted (~5.9×)
+-   curvatureBoostMax: 40,
+-   exposure: 6.0,
+-   zeroStop: 1e-7,
+-   wallWidth: 0.05,
+- });
++ this.updateUniforms({
++   curvatureGainT: 0.0,     // 0 → 1× (true-physics visual scale)
++   curvatureBoostMax: 40,
++   exposure: 6.0,
++   zeroStop: 1e-7,
++   wallWidth: 0.05,
++});
+```
+
+---
+
+### C) Remove hidden geometry inflation so the slider is the **only** gain
+
+In `_warpGridVertices`:
+
+1. **Remove the silent x2 bump**
+
+```diff
+- disp *= 2.0; // lower than 4.0 to avoid hitting clamp
++ // no fixed bump; slider controls all visual scaling
+```
+
+2. **Tame the base geometry gain to neutral**
+
+```diff
+- const gridK = 0.12;                       // deformation gain
++ const gridK = 0.10;                       // mild base (acts as unit scale)
+```
+
+*(You can set `0.08–0.12`; the point is: don’t multiply again later.)*
+
+3. **Don’t season geometry by mode (keep modes visual-only elsewhere)**
+   Find where `modeScale` is introduced for geometry:
+
+```diff
+- const modeScale =
+-   mode === 'standby'   ? 0.95 :
+-   mode === 'cruise'    ? 1.00 :
+-   mode === 'hover'     ? 1.05 :
+-   mode === 'emergency' ? 1.08 : 1.00;
+```
+
+…and remove it from the **geometry** amplitude computation (keep it if you want for colors/HUD):
+
+```diff
+- const denom = ... * boostMax * modeScale) / zeroStop));
++ const denom = ... * boostMax) / zeroStop);
+```
+
+*(This makes the geometry’s normalized amplitude depend only on physics×userGain, not the current mode.)*
+
+That’s it in geometry.
+
+---
+
+## Optional (nice-to-have; makes the UI “honest”)
+
+* In Helix-Core, show the **effective multiplier** so “1” means 1×, not “1 decade”.
+  Map `0..8 → 1..40` and display that. (You already have the code; just use it in the label.)
+
+* Add a tiny effect near the slider to push the gain into the engine even if the global is late:
+
+```ts
+useEffect(() => {
+  (window as any).__warp_setGainDec?.(curvatureGain, 40);
+}, [curvatureGain]);
+```
+
+* If you want belt-and-suspenders: add the gain to the `WarpVisualizer` `key` so it remounts while you iterate:
+
+```tsx
+key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`}
+```
+
+---
+
+## Quick sanity checks (what you should see)
+
+* With slider at **0.0** → `__warp_setGainDec(0)` → `userGain = 1.0`.
+  Grid should look “true-physics” (no extra bend); logs should show:
+
+  ```
+  🎛️ UNIFIED AMPLITUDE: ... userGain=1.00 ...
+  🔬 FINAL A_vis ~ small
+  ```
+* With slider at **1.0** (one decade on the old scale), now it maps via your engine to `T=0.125` and **userGain ≈ 5.9×** — and the picture should clearly bend more.
+* Dragging the slider should immediately move curvature (because A + C make the path live).
+
+---
+
+## Why this fixes your exact symptoms
+
+* The slider was calling a missing function → now wired.
+* The engine started life already boosted → now starts at 1×.
+* The geometry had hidden extra multipliers → now only the slider (and physics) determine amplitude.
+
+If you’d like, I can also post a tiny diff for the fragment shader path to ensure `u_userGain` is the only color gain (it already is in your code), but the three changes above will make the slider honest and obvious.
