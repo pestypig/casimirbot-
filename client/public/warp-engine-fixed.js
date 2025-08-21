@@ -308,10 +308,10 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
-            "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
-            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
+            "    float val  = theta * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    float mag  = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
+            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / norm), -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
@@ -361,10 +361,10 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
-            "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
-            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
+            "    float val  = theta * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    float mag  = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
+            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / norm), -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
@@ -714,8 +714,6 @@ class WarpEngine {
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
-        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
-        
         // Read mode uniforms with sane defaults (renamed to avoid conflicts)
         const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
         const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
@@ -801,7 +799,10 @@ class WarpEngine {
                 (n[2]/c_m)*(n[2]/c_m)
             );
             const R_eff = 1.0 / Math.max(invR, 1e-6);
-            const w_rho_local = w_rho / R_eff;   // thickness in ρ-units
+            const w_rho_local = (() => {
+              const w_m = (wallWidthUniform != null) ? wallWidthUniform : (w_rho * aH); // meters
+              return w_m / R_eff; // convert to ρ-units along this normal
+            })();
             
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps
@@ -812,43 +813,26 @@ class WarpEngine {
             const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
                            : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
             
-            // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
-            // Pull uniforms for current mode and parameters
-            const gammaGeo = this.uniforms?.gammaGeo ?? 26;
-            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
-            const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
-            const gammaVdB = this.uniforms?.gammaVdB ?? 3.83e1;
-            const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
-            const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
-            const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
+            // Local θ proxy (same kernel as shader)
+            const rs = rho;
+            const w  = Math.max(1e-6, w_rho_local);
+            const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
+            const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
 
-            // Physics amplitude (gross, unbounded)
-            const A_geo   = gammaGeo * gammaGeo * gammaGeo; // γ^3
-            const dutyEff = Math.sqrt(duty / sectors);      // visual proxy like before
-            const A_gross = A_geo * Qburst * gammaVdB * qSpoil * dutyEff;
+            // ≈ cos between surface normal and drive direction
+            const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
 
-            // Log compression so modes separate visually instead of saturating
-            const k = 1e10;           // knee – prevents standby from saturating
-            const s = 1.0;            // slope after log
-            const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
+            // Same amplitude chain + user gain as the shader
+            const thetaScale = this.uniforms?.thetaScale ?? 1.0;
+            const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+            const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+            const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+            const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
 
-            // Base ("honest") visual amplitude from physics only
-            const A_vis_base = Math.min(1.0, A_log);
-
-            // Curvature gain slider: blend between base and a boosted view
-            const tGain   = this.uniforms?.curvatureGainT ?? 0.75;     // 0..1 (default: clearly visible)
-            const boostMx = this.uniforms?.curvatureBoostMax ?? 40;    // >=1 (max boost multiplier)
-            const boost   = (1 - tGain) + tGain * boostMx;             // 1..boostMx
-
-            // Light per-mode seasoning (still small—doesn't hide physics)
-            const modeScale =
-              mode === 'standby'   ? 0.90 :  // keep some visibility when boosted
-              mode === 'cruise'    ? 1.00 :
-              mode === 'hover'     ? 1.05 :
-              mode === 'emergency' ? 1.10 : 1.00;
-
-            // Final bounded visual amplitude: blend base physics with boost
-            const A_vis = Math.min(1.0, A_vis_base * boost * modeScale);
+            const val  = xs_over_rs * df * thetaScale * userGain;
+            const mag  = Math.log(1.0 + Math.abs(val) / zeroStop);
+            const norm = Math.log(1.0 + exposure);
+            const A_vis = Math.min(1.0, mag / norm);               // 0..1
 
             // Special case: make standby perfectly flat if desired
             let disp;

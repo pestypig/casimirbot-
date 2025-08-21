@@ -1,0 +1,164 @@
+Great timing—your “new code” already pulled in most of the ideas from my earlier patch, so don’t resend that whole thing. You only need a few **surgical fixes** to make the gain actually bite and to keep color + geometry perfectly in sync.
+
+Here’s exactly what to change.
+
+---
+
+# 1) Fix the shader’s tone-map (the current `denom` crushes contrast)
+
+**In both WebGL2 and WebGL1 fragment shaders**, replace this block:
+
+```glsl
+float val = theta * u_thetaScale * max(1.0, u_userGain);
+float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));
+float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));
+float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);
+```
+
+with the simpler, slice-parity mapping:
+
+```glsl
+float val  = theta * u_thetaScale * max(1.0, u_userGain);
+float mag  = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));
+float norm = log(1.0 + max(1.0, u_exposure));
+float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / norm), -1.0, 1.0);
+```
+
+> Why: your `denom` multiplies extra logs, over-normalizing the output so the slider feels dead.
+
+---
+
+# 2) Make decades gain behave like… decades (0..8 → 10^dec)
+
+Right now the decades path only triggers if the value is `> 1.5`, so `0..1.5` are misinterpreted as “absolute gain”. Replace the whole `userGain` IIFE in `updateUniforms(...)` with this deterministic version:
+
+```js
+const hasDec = Object.prototype.hasOwnProperty.call(parameters, 'curvatureGainDec');
+const hasT   = Object.prototype.hasOwnProperty.call(parameters, 'curvatureGainT');
+
+let userGain;
+if (Number.isFinite(parameters.userGain) && parameters.userGain > 0) {
+  userGain = +parameters.userGain;                         // direct absolute multiplier
+} else if (hasDec && Number.isFinite(parameters.curvatureGainDec)) {
+  const dec = Math.max(0, Math.min(8, +parameters.curvatureGainDec)); // 0..8
+  userGain = Math.pow(10, dec);                             // 10^dec
+} else {
+  const t = hasT ? Math.max(0, Math.min(1, +parameters.curvatureGainT))
+                 : (this.uniforms?.curvatureGainT ?? 0.75);
+  const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+      ? Math.max(1, +parameters.curvatureBoostMax)
+      : (this.uniforms?.curvatureBoostMax ?? 40);
+  userGain = (1 - t) + t * boostMax;                        // 1..boostMax
+}
+
+this.uniforms = {
+  ...this.uniforms,
+  ...
+  userGain,
+  ...
+};
+```
+
+---
+
+# 3) Kill a crash: remove the stray `sectors` reference
+
+In `_warpGridVertices(...)` you have:
+
+```js
+const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
+```
+
+`sectors` isn’t defined here (you later use `sectorsUniform`), so this can throw and freeze updates. **Delete that line**. You already compute `splitUniform` correctly a few lines later.
+
+---
+
+# 4) Fix wall thickness units per direction
+
+`w_rho_local` should be `(wallWidth_m / R_eff)` in ρ-units. You currently do `w_rho / R_eff`, which mixes units. Replace:
+
+```js
+const w_rho_local = w_rho / R_eff;
+```
+
+with:
+
+```js
+const w_rho_local = (() => {
+  const w_m = (wallWidth_m != null) ? wallWidth_m : (w_rho * aH); // meters
+  return w_m / R_eff; // convert to ρ-units along this normal
+})();
+```
+
+---
+
+# 5) Use the **same** gain + tone-map for geometry as for color
+
+Right now the geometry still uses the old `A_log / boost` chain (and ignores `userGain`). Delete the whole “LOGARITHMIC COMPRESSION…” block in the per-vertex loop and compute displacement with the exact mapping the shader uses.
+
+**Inside the per-vertex loop**, after you have `rho`, `n`, `front`, `sgn`, and `w_rho_local`, insert:
+
+```js
+// Local θ proxy (same kernel as shader)
+const rs = rho;
+const w  = Math.max(1e-6, w_rho_local);
+const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
+const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
+
+// ≈ cos between surface normal and drive direction
+const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
+
+// Same amplitude chain + user gain as the shader
+const thetaScale = this.uniforms?.thetaScale ?? 1.0;
+const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+
+const val  = xs_over_rs * df * thetaScale * userGain;
+const mag  = Math.log(1.0 + Math.abs(val) / zeroStop);
+const norm = Math.log(1.0 + exposure);
+const aVis = Math.min(1.0, mag / norm);               // 0..1
+
+let disp = gridK * aVis * wallWin * front * sgn;
+disp *= 2.0;                                          // gentle boost
+const maxPush = 0.22;                                 // higher headroom
+disp = maxPush * Math.tanh(disp / maxPush);
+```
+
+…and keep your interior tilt + smoothing exactly as you already have.
+
+> Result: the **same slider** changes color *and* bend, predictably.
+
+---
+
+# 6) Span boost with gain (you’re close—just keep it logarithmic)
+
+You already do:
+
+```js
+const spanBoost = 1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5;
+targetSpan *= spanBoost;
+```
+
+👍 That’s fine. (If you want gentler behavior on phones, cap at `+1.25×` instead of `+1.5×`.)
+
+---
+
+# 7) Optional nicety: clear smoothing after grid rebuild
+
+After regenerating the grid (inside the `if (Math.abs(targetSpan - this.currentGridSpan) > 0.1)` block), add:
+
+```js
+this._prevDisp = []; // avoid stale smoothing after topology/mesh change
+```
+
+---
+
+## Quick sanity checklist
+
+* Call: `engine.updateUniforms({ curvatureGainDec: 4 })` → clearly stronger bend and hotter colors.
+* Try: `curvatureGainDec: 0` vs `8` → big visible difference.
+* Log: `this.uniforms.userGain` and `this.uniforms.thetaScale` in `updateUniforms` once; values should match expectations.
+* No console error about `sectors` in `_warpGridVertices`.
+
+If you apply those patches, your current codebase is already aligned with the “old visual” look—just without the brittle magic numbers.

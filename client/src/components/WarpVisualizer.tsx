@@ -406,11 +406,24 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
-        // Enhanced decades-scale curvature gain: use exponential scaling for dramatic control
+        // Deterministic decades gain: 0..8 → 10^dec
         userGain: (() => {
-          const decades = n(parameters.curvatureGainDec ?? (parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 0);
-          // Convert 0-8 decades slider to exponential gain (10^(t*4) scaled to 1-10000 range)
-          return decades > 0 ? Math.pow(10, decades * 0.5) : 1.0;
+          const params = parameters as any; // Type assertion for flexible parameter access
+          const hasDec = Object.prototype.hasOwnProperty.call(params, 'curvatureGainDec');
+          const hasT = Object.prototype.hasOwnProperty.call(params, 'curvatureGainT');
+
+          let userGain;
+          if (Number.isFinite(params.userGain) && params.userGain > 0) {
+            userGain = +params.userGain;  // direct absolute multiplier
+          } else if (hasDec && Number.isFinite(params.curvatureGainDec)) {
+            const dec = Math.max(0, Math.min(8, +params.curvatureGainDec)); // 0..8
+            userGain = Math.pow(10, dec);  // 10^dec
+          } else {
+            const t = hasT ? Math.max(0, Math.min(1, +params.curvatureGainT)) : 0.75;
+            const boostMax = Number.isFinite(params.curvatureBoostMax) ? Math.max(1, +params.curvatureBoostMax) : 40;
+            userGain = (1 - t) + t * boostMax;  // 1..boostMax
+          }
+          return userGain;
         })(),
         _debugHUD: true,
         
