@@ -1,0 +1,82 @@
+You're super close—the slider state is fine, but nothing guarantees the **WarpVisualizer’s engine** gets poked every time the slider moves. Passing `parameters={{ curvatureGainDec: curvatureGain }}` *should* work, but if `WarpVisualizer` memoizes props or its `useEffect` only runs on mount, the engine won’t see the updates.
+
+Here’s a tiny, robust fix that makes the slider drive **both** the engine and the SliceViewer, regardless of memoization.
+
+# 1) Add a one-line bridge in `WarpVisualizer`
+
+Inside `WarpVisualizer` (after you create the `WarpEngine`), register a global setter and clean it up:
+
+```ts
+// inside WarpVisualizer, after engine init:
+useEffect(() => {
+  if (!engineRef.current) return;
+  // expose a safe setter used by HelixCore's slider
+  (window as any).__warp_setGainDec = (g: number, boost = 40) =>
+    engineRef.current?.setCurvatureGainDec(g, boost);
+
+  return () => {
+    if ((window as any).__warp_setGainDec) delete (window as any).__warp_setGainDec;
+  };
+}, []);
+```
+
+(Keep your existing `updateUniforms(parameters)` path too.)
+
+# 2) Nudge HelixCore’s slider to call that setter
+
+Your slider block is almost perfect. Just add an immediate call to the bridge (coalesced with `requestAnimationFrame` so you don’t flood WebGL):
+
+```tsx
+// state already defined: const [curvatureGain, setCurvatureGain] = useState(8.0);
+const rafGate = useRef<number | null>(null);
+
+<Input
+  id="curvature-gain"
+  type="range"
+  min="0"
+  max="8"
+  step="0.1"
+  value={curvatureGain}
+  onChange={(e) => {
+    const v = parseFloat(e.target.value);
+    setCurvatureGain(v);                                // drives SliceViewer prop below
+
+    // also drive the WarpEngine immediately (bypasses any memoization)
+    if (rafGate.current == null) {
+      rafGate.current = requestAnimationFrame(() => {
+        rafGate.current = null;
+        (window as any).__warp_setGainDec?.(v, 40);
+      });
+    }
+  }}
+  className="w-full"
+/>
+```
+
+# 3) Keep props flowing (no change needed, just confirming)
+
+* You already pass the slider value into both components:
+
+  * `WarpVisualizer parameters={{ curvatureGainDec: curvatureGain, curvatureBoostMax: 40, ... }}`
+  * `SliceViewer curvatureGain={curvatureGain} curvatureBoostMax={40} …`
+
+This bridge makes the engine respond instantly even if `WarpVisualizer` internally memoizes `parameters`. The SliceViewer will continue to repaint from its `useEffect` because `amp` depends on `curvatureGain`.
+
+# Optional niceties
+
+* If you want to hard-guarantee reactivity without the bridge, you can also include the gain in the visualizer key:
+
+  ```tsx
+  <WarpVisualizer key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`} … />
+  ```
+
+  (This forces a remount on gain changes—more brute-force.)
+
+* If you’d like the label to show the **blend gain** (1→40) instead of decades, compute it exactly like the viewers:
+
+  ```tsx
+  const t = Math.max(0, Math.min(1, curvatureGain / 8));
+  const blend = (1 - t) + t * 40; // 1..40
+  ```
+
+With the bridge in place, you should see the grid bend more/less as you slide, and the SliceViewer colors follow in lock-step.

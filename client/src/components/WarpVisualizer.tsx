@@ -416,7 +416,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
         // Wire existing 0-8 curvature gain slider directly to engine (same as SliceViewer)
         curvatureGain: (() => {
-          const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec : 3;
+          const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec! : 3;
           console.log(`🎛️ CURVATURE GAIN DEBUG: parameters.curvatureGainDec=${parameters.curvatureGainDec}, resolved gain=${gain}`);
           return gain;
         })(), // 0..8 slider value
@@ -483,6 +483,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
+  }, [isLoaded]);
+
+  // Global bridge for immediate slider updates (bypasses memoization)
+  useEffect(() => {
+    if (!engineRef.current) return;
+    // expose a safe setter used by HelixCore's slider
+    (window as any).__warp_setGainDec = (g: number, boost = 40) =>
+      engineRef.current?.setCurvatureGainDec(g, boost);
+
+    return () => {
+      if ((window as any).__warp_setGainDec) delete (window as any).__warp_setGainDec;
+    };
   }, [isLoaded]);
 
   const toggleAnimation = () => {

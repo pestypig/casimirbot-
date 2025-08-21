@@ -300,6 +300,7 @@ export default function HelixCore() {
   
   // 🎛️ Unified curvature gain control (scales both geometry and color)
   const [curvatureGain, setCurvatureGain] = useState(8.0); // Default: maximum boosted view (×8)
+  const rafGateRef = useRef<number | null>(null);
   
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);
@@ -670,7 +671,18 @@ export default function HelixCore() {
                             max="8"
                             step="0.1"
                             value={curvatureGain}
-                            onChange={(e) => setCurvatureGain(parseFloat(e.target.value))}
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              setCurvatureGain(v);                                // drives SliceViewer prop below
+
+                              // also drive the WarpEngine immediately (bypasses any memoization)
+                              if (rafGateRef.current == null) {
+                                rafGateRef.current = requestAnimationFrame(() => {
+                                  rafGateRef.current = null;
+                                  (window as any).__warp_setGainDec?.(v, 40);
+                                });
+                              }
+                            }}
                             className="w-full"
                           />
                           <div className="text-xs text-slate-400">
