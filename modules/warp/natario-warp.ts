@@ -360,14 +360,12 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;
 
   // 5. Mass calculations (pipeline-driven, no TARGET constants)
-  const tileCount = Math.max(1, params.tileCount ?? 1); // Pipeline tile census or minimal fallback
-  const tileArea_m2 = params.tileArea_m2 ?? DEFAULTS.tileArea_m2;
-  const tileThickness_m = 0.01; // 1 cm reasonable thickness
-  const tileVolume_m3 = tileArea_m2 * tileThickness_m;
-  
-  // Physics-derived mass per tile (E = mc²)
-  const massPerTile_physics = Math.abs(amplifiedEnergyDensity * tileVolume_m3) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  const totalExoticMass = massPerTile_physics * tileCount;
+  const tileArea = params.tileArea_m2 ?? DEFAULTS.tileArea_m2;
+  const tileVolume = tileArea * a_m;
+
+  const tileCount = Math.max(1, params.tileCount ?? 1);           // ← pipeline preferred
+  const massPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
+  const totalExoticMass = massPerTile * tileCount;
 
   // 6. Power calculations (pipeline-driven average power if available)
   const powerDraw = params.P_avg_W ?? totalExoticMass * 0.1 * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C; // 10% efficiency fallback
@@ -421,7 +419,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     totalAmplificationFactor: totalAmplification,
     baselineEnergyDensity,
     amplifiedEnergyDensity,
-    exoticMassPerTile: massPerTile_physics,
+    exoticMassPerTile: massPerTile,
     totalExoticMass,
     timeAveragedMass: totalExoticMass * Math.max(0, params.effectiveDuty),
     powerDraw,
