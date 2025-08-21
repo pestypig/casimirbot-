@@ -82,8 +82,20 @@ export function useUpdatePipeline() {
 export function useSwitchMode() {
   return useMutation({
     mutationFn: async (mode: EnergyPipelineState['currentMode']) => {
-      const response = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
-      return response.json();
+      // 1) switch server mode
+      const resMode = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
+      const data = await resMode.json();
+
+      // 2) immediately push mode-specific knobs so duty/strobing/qSpoil are in sync
+      const cfg = MODE_CONFIGS[mode];
+      if (cfg) {
+        await apiRequest('POST', '/api/helix/pipeline/update', {
+          dutyCycle: cfg.dutyCycle,
+          sectorStrobing: cfg.sectorStrobing,
+          qSpoilingFactor: cfg.qSpoilingFactor
+        });
+      }
+      return data;
     },
     onSuccess: (data, mode) => {
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
@@ -140,4 +152,14 @@ export const MODE_CONFIGS = {
     powerTarget_W: 0,
     color: "text-slate-400"
   }
+};
+
+// Optional: helper if other components want to apply mode knobs explicitly
+export const modeKnobsFor = (mode: EnergyPipelineState['currentMode']) => {
+  const m = MODE_CONFIGS[mode];
+  return m ? {
+    dutyCycle: m.dutyCycle,
+    sectorStrobing: m.sectorStrobing,
+    qSpoilingFactor: m.qSpoilingFactor,
+  } : undefined;
 };

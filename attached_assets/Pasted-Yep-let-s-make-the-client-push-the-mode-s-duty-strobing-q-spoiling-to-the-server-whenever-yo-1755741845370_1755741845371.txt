@@ -1,0 +1,139 @@
+Yep—let’s make the client push the **mode’s duty / strobing / q-spoiling** to the server whenever you switch modes, so the pipeline snaps to those values immediately (no stale UI).
+
+Here’s a focused patch to `client/src/hooks/use-energy-pipeline.ts` that:
+
+* keeps the **watts** target (`powerTarget_W`) we added,
+* exports a small helper to **apply** a mode’s knobs,
+* updates `useSwitchMode()` to **POST /mode** and then **/update** with the mode’s dutyCycle, sectorStrobing, and qSpoilingFactor,
+* keeps existing cache invalidation + Luma whisper behavior.
+
+---
+
+### Patch — `client/src/hooks/use-energy-pipeline.ts`
+
+```diff
+@@
+ export interface EnergyPipelineState {
+@@
+   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+ }
+ 
++// Shared smart formatter (W→kW→MW) for UI labels
++export const fmtPowerUnitFromW = (watts?: number) => {
++  const x = Number(watts);
++  if (!Number.isFinite(x)) return '—';
++  if (x >= 1e6) return `${(x/1e6).toFixed(1)} MW`;
++  if (x >= 1e3) return `${(x/1e3).toFixed(1)} kW`;
++  return `${x.toFixed(1)} W`;
++};
++
+ // Hook to get current pipeline state
+ export function useEnergyPipeline() {
+   return useQuery({
+@@
+ }
+ 
+ // Hook to switch operational mode
+ export function useSwitchMode() {
+   return useMutation({
+     mutationFn: async (mode: EnergyPipelineState['currentMode']) => {
+-      const response = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
+-      return response.json();
++      // 1) switch server mode
++      const resMode = await apiRequest('POST', '/api/helix/pipeline/mode', { mode });
++      const data = await resMode.json();
++
++      // 2) immediately push mode-specific knobs so duty/strobing/qSpoil are in sync
++      const cfg = MODE_CONFIGS[mode];
++      if (cfg) {
++        await apiRequest('POST', '/api/helix/pipeline/update', {
++          dutyCycle: cfg.dutyCycle,
++          sectorStrobing: cfg.sectorStrobing,
++          qSpoilingFactor: cfg.qSpoilingFactor
++        });
++      }
++      return data;
+     },
+     onSuccess: (data, mode) => {
+       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+       
+       // Trigger Luma whisper for mode changes
+       const wisdom = getModeWisdom(mode);
+       publish("luma:whisper", { text: wisdom });
+     }
+   });
+ }
+ 
+ // Mode configurations for UI display (synchronized with backend)
+ export const MODE_CONFIGS = {
+   hover: {
+     name: "Hover Mode",
+     dutyCycle: 0.14,
+     sectorStrobing: 1,
+     qSpoilingFactor: 1,
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "High-power hover mode for station-keeping",
+-    powerTarget: 83.3,
++    powerTarget_W: 83.3e6,
+     color: "text-cyan-400"
+   },
+   cruise: {
+     name: "Cruise Mode",
+     dutyCycle: 0.005,
+     sectorStrobing: 400,
+-    qSpoilingFactor: 0.001,   // matches pipeline/old values
++    qSpoilingFactor: 0.001,   // matches pipeline/old values
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "Low-power cruise mode for sustained travel",
+-    powerTarget: 7.4e-6,      // store as MW (7.4 W)
++    powerTarget_W: 7.437,     // 7.437 W (server policy)
+     color: "text-green-400"
+   },
+   emergency: {
+     name: "Emergency Mode",
+     dutyCycle: 0.50,
+     sectorStrobing: 1,
+     qSpoilingFactor: 1,
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "Maximum power emergency mode",
+-    powerTarget: 297,
++    powerTarget_W: 297.5e6,
+     color: "text-red-400"
+   },
+   standby: {
+     name: "Standby Mode",
+     dutyCycle: 0.001,
+     sectorStrobing: 1,
+     qSpoilingFactor: 0.1,
+     gammaVanDenBroeck: 1,
+     description: "Minimal power standby mode",
+-    powerTarget: 0.1,
++    powerTarget_W: 0,
+     color: "text-slate-400"
+   }
+ };
++
++// Optional: helper if other components want to apply mode knobs explicitly
++export const modeKnobsFor = (mode: EnergyPipelineState['currentMode']) => {
++  const m = MODE_CONFIGS[mode];
++  return m ? {
++    dutyCycle: m.dutyCycle,
++    sectorStrobing: m.sectorStrobing,
++    qSpoilingFactor: m.qSpoilingFactor,
++  } : undefined;
++};
+```
+
+**What changes at runtime**
+
+* When the user selects **Cruise**, the client:
+
+  1. switches server mode → `/mode`,
+  2. immediately posts the **Cruise** knobs to `/update`:
+
+     * `dutyCycle: 0.005`
+     * `sectorStrobing: 400`
+     * `qSpoilingFactor: 0.001`
+* Both the **Energy Control Panel** and **Metrics Dashboard** will now reflect the mode’s duty/strobing instantly, with power still coming from the server’s real pipeline.
+* Your labels continue to show **“Cruise Mode (7.4 W)”** via `powerTarget_W` + `fmtPowerUnitFromW`.
