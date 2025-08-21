@@ -203,16 +203,16 @@ export function calculateNatarioShiftField(
   // Radial profile for zero-expansion condition
   // β(r) = A × f(r/R) where f ensures ∇·β = 0
   const radialProfile = (r: number): number => {
-    const rNorm = r / (bowlRadius * 1e-6); // Normalize to meters
+    const bowlRadiusM = Math.max(1e-12, bowlRadius * 1e-6); // Convert μm to meters with safety clamp
+    const rho = r / bowlRadiusM; // Both in meters now
     
     // Zero-expansion profile: f(ρ) = ρ² × (3 - 2ρ) for ρ ∈ [0,1]
-    // This ensures ∇·β = 0 at all points
-    if (rNorm <= 1) {
-      const rho = rNorm;
-      return shiftAmplitude * rho * rho * (3 - 2 * rho);
+    // This ensures ∇·β = 0 at all points (C¹ smooth)
+    if (rho <= 1) {
+      return shiftAmplitude * (rho * rho) * (3 - 2 * rho);
     } else {
-      // Outside the active region
-      return shiftAmplitude / (rNorm * rNorm); // 1/r² falloff
+      // Outside the active region: 1/r² falloff
+      return shiftAmplitude / (rho * rho);
     }
   };
   
