@@ -283,6 +283,7 @@ class WarpEngine {
             "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
             "uniform float u_exposure;\n" +     // logarithmic exposure control (3.0 .. 12.0)
             "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
+            "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -305,7 +306,11 @@ class WarpEngine {
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
-            "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+            "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
+            "    float val = theta * u_thetaScale;\n" +
+            "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
+            "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
@@ -329,6 +334,9 @@ class WarpEngine {
             "uniform float u_epsTilt;\n" +
             "uniform float u_intWidth;\n" +
             "uniform float u_tiltViz;\n" +
+            "uniform float u_exposure;\n" +
+            "uniform float u_zeroStop;\n" +
+            "uniform float u_thetaScale;\n" +
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -350,7 +358,11 @@ class WarpEngine {
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
-            "    float tVis = clamp(theta * 1.0, -1.0, 1.0);\n" +
+            "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
+            "    float val = theta * u_thetaScale;\n" +
+            "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
+            "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
             "    vec3 col = diverge(tVis);\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
@@ -385,7 +397,8 @@ class WarpEngine {
             intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
             tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
             exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
-            zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop')
+            zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
+            thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale')
         };
         
         console.log("Grid shader program compiled successfully with York-time coloring support");
@@ -445,6 +458,18 @@ class WarpEngine {
             tiltGain: N(parameters.tiltGain || 0.55),
             exposure: N(parameters.exposure || 6.0),
             zeroStop: N(parameters.zeroStop || 1e-7),
+            
+            // Calculate thetaScale for unified color mapping with SliceViewer
+            thetaScale: (() => {
+                const gammaGeo = N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y ?? 26);
+                const qSpoil = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1.0);
+                const gammaVdB = N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 3.83e1);
+                const duty = Math.max(1e-12, N(dutyFrac));
+                const sectors = Math.max(1, N(parameters.sectors ?? parameters.sectorStrobing ?? 1));
+                
+                // Same amplitude chain as SliceViewer: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
+                return Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(duty / sectors);
+            })(),
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
@@ -955,6 +980,7 @@ class WarpEngine {
         // Exposure controls for enhanced mode contrast
         gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
         gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
+        gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;
