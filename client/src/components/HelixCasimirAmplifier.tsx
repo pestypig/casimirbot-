@@ -188,48 +188,66 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
   metrics?: HelixMetrics;
   state?: EnergyPipelineState;
 }) {
-  // Seed with pipeline strobing defaults (still user-overrideable)
-  const [seed, setSeed] = useState<{ sectors?: number; split?: number }>({});
-  
   const [params, setParams] = useState({ nTheta: 128, nPhi: 64, sectors: 400, split: 200 });
-  
-  // Initialize with pipeline defaults if available from props or window globals
+  const [data, setData] = useState<FieldResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  // Observe visibility of the card
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!cardRef.current) return;
+    const io = new IntersectionObserver(([e]) => setVisible(!!e.isIntersecting), { threshold: 0.1 });
+    io.observe(cardRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // Update params when sectors/split change
   useEffect(() => {
     const sectors = metrics?.totalSectors 
                  ?? state?.sectorStrobing
-                 ?? (window as any)?.HELIX_METRICS?.totalSectors
-                 ?? (window as any)?.HELIX_STATE?.sectorStrobing
                  ?? 400;
-    const split = Math.round(sectors * 0.5); // neutral split if server doesn't provide
-    setSeed({ sectors, split });
+    const split = Math.round(sectors * 0.5);
     
-    // Update params with seeded values
     setParams(prevParams => ({
       ...prevParams,
       sectors,
       split
     }));
   }, [metrics?.totalSectors, state?.sectorStrobing]);
-  
-  // Update params when seed changes
+
+  // Debounced fetch on param change & when visible
   useEffect(() => {
-    if (seed.sectors !== undefined && seed.split !== undefined) {
-      setParams(prevParams => ({
-        ...prevParams,
-        sectors: seed.sectors ?? prevParams.sectors,
-        split: seed.split ?? prevParams.split
-      }));
-    }
-  }, [seed]);
-  const q = new URLSearchParams({
-    nTheta: String(params.nTheta),
-    nPhi: String(params.nPhi),
-    sectors: String(params.sectors),
-    split: String(params.split)
-  }).toString();
-  const { data } = usePollingSmart<FieldResponse>(`${endpoint}?${q}`, { 
-    minMs: 30000, maxMs: 60000, dedupeKey: `helix:displacement:${q}` 
-  }); // Smart polling with deduplication
+    if (!visible) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const q = new URLSearchParams({
+          nTheta: String(params.nTheta),
+          nPhi: String(params.nPhi),
+          sectors: String(params.sectors),
+          split: String(params.split)
+        }).toString();
+        const res = await fetch(`${endpoint}?${q}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const json = await res.json();
+        setData(json);
+        setErr(null);
+      } catch (e: any) {
+        if (e.name !== "AbortError") setErr(e?.message ?? "fetch failed");
+      }
+    }, 300); // debounce user changes
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [endpoint, params, visible]);
+
+  // Optional: light keep-alive every ~45s while visible
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => {
+      setParams(p => ({ ...p })); // retrigger effect w/ same params
+    }, 45000);
+    return () => clearInterval(id);
+  }, [visible]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -286,11 +304,16 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
   }, [data, params]);
 
   return (
-    <Card className="bg-slate-900/40 border-slate-800">
+    <Card ref={cardRef} className="bg-slate-900/40 border-slate-800">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-slate-100"><ScanSearch className="w-5 h-5"/> Displacement Field (Natário bell)</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {err && (
+          <div className="text-red-400 text-sm p-2 bg-red-900/20 rounded border border-red-800">
+            Error: {err}
+          </div>
+        )}
         <div className="flex flex-wrap gap-3 items-end">
           <div>
             <Label htmlFor="th">θ samples</Label>
@@ -316,7 +339,10 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
         <div className="rounded-xl overflow-hidden ring-1 ring-slate-800 shadow-inner">
           <canvas ref={canvasRef} width={960} height={360} className="w-full h-[240px]"/>
         </div>
-        <p className="text-xs text-slate-400">Heatmap shows signed displacement amplitude on the ellipsoidal shell; white line marks the +/− sector split. Colormap is blue (−) → red (+).</p>
+        <p className="text-xs text-slate-400">
+          Heatmap shows signed displacement amplitude on the ellipsoidal shell; white line marks the +/− sector split. Colormap is blue (−) → red (+).
+          {!visible && <span className="text-yellow-400 ml-2">(Paused - not visible)</span>}
+        </p>
       </CardContent>
     </Card>
   );
