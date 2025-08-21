@@ -420,11 +420,13 @@ export default function HelixCasimirAmplifier({
   const omega = 2 * Math.PI * f;
   const tauQ_s = qCav / (2 * Math.PI * f); // cavity time constant: τ = Q/(2πf)
 
-  // derived quantities (robust to partial data)
-  // Physics vs UI gating
-  const MIN_CYCLES_PER_BURST = 10;                 // tune if needed
+  // ---- DISPLAY gating consistency fix ----
+  const MIN_CYCLES_PER_BURST = 10;
   const isBurstMeaningful = (lightCrossing?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
-  const isOnRaw = !!lightCrossing?.onWindow && isBurstMeaningful;
+  
+  // Use display gating consistently
+  const onDisplay = !!lightCrossing?.onWindowDisplay;
+  const gateOn = onDisplay && isBurstMeaningful;
 
   // effective duty for ship-averaged quantities:
   // prefer authoritative metrics.dutyEffectiveFR, else derive from loop
@@ -476,13 +478,13 @@ export default function HelixCasimirAmplifier({
       P_tile_on, P_ship_avg_calc_MW, P_ship_avg_report_MW,
       geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
       gap_m, tileA_m2, casimir_theory, casimir_per_tile,
-      isOnRaw, isBurstMeaningful
+      P_tile_instant_W: P_tile_on, // Add missing field
+      isBurstMeaningful // Add missing field
     };
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, lightCrossing?.onWindow, lightCrossing?.cyclesPerBurst, lightCrossing?.burst_ms, lightCrossing?.dwell_ms]);
 
   // ---- DISPLAY gating: use onWindowDisplay (UI truth) ----
-  const onDisplay = !!lightCrossing?.onWindowDisplay;
   const P_tile_instant_W_display = onDisplay ? (derived?.P_tile_on ?? 0) : 0;
 
   // A gentle visual envelope (rise ~ two τ_Q, fall ~ one τ_Q)
@@ -546,7 +548,7 @@ export default function HelixCasimirAmplifier({
     let raf: number;
     const step = (t: number) => {
       if (!lightCrossing) { raf = requestAnimationFrame(step); return; }
-      const on = lightCrossing.onWindow;          // τLC-safe ON window (raw physics)
+      const on = onDisplay && isBurstMeaningful;  // Use display gating consistently
       const now = t / 1000;                       // s
       const prev = lastT.current ?? now;
       const dt = Math.min(0.05, Math.max(0, now - prev)); // clamp dt for stability
@@ -556,8 +558,9 @@ export default function HelixCasimirAmplifier({
         if (tauQ_s <= 0) return U0;
         const alpha = dt / tauQ_s;
         if (on) {
-          // ring-up toward U_inf
-          return U0 + (U_inf - U0) * (1 - Math.exp(-alpha));
+          // ring-up toward U_inf (with fallback for safety)
+          const target = U_inf || 1e-6;
+          return U0 + (target - U0) * (1 - Math.exp(-alpha));
         } else {
           // ring-down toward 0
           return U0 * Math.exp(-alpha);
@@ -568,7 +571,7 @@ export default function HelixCasimirAmplifier({
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [lightCrossing?.onWindow, tauQ_s, U_inf]);
+  }, [onDisplay, isBurstMeaningful, tauQ_s, U_inf]);
 
   // Use U to drive visuals / numbers
   const pInstant = U / Math.max(1e-9, lightCrossing?.dwell_ms ?? 1); // arbitrary proportional readout
@@ -682,7 +685,7 @@ export default function HelixCasimirAmplifier({
                   </div>
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">U(t)/U∞</div>
-                    <div className="text-slate-200">{(U / Math.max(1e-12, U_inf)).toFixed(3)}</div>
+                    <div className="text-slate-200">{(U / Math.max(1e-12, U_inf || 1e-6)).toFixed(3)}</div>
                   </div>
                 </div>
                 
@@ -691,7 +694,7 @@ export default function HelixCasimirAmplifier({
                   <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
                     <div 
                       className={`h-full transition-all duration-100 ${
-                        lightCrossing.onWindow ? 'bg-cyan-400' : 'bg-slate-600'
+                        onDisplay ? 'bg-cyan-400' : 'bg-slate-600'
                       }`}
                       style={{ width: `${Math.min(100, driveEnv * 100)}%` }}
                     />
@@ -764,7 +767,7 @@ export default function HelixCasimirAmplifier({
                 height={240}
                 tileWidth_mm={50}
                 pocketDiameter_um={40}
-                sag_nm={state.sagDepth_nm ?? 16}
+                sag_nm={state.sag_nm ?? 16}
                 gap_nm={state.gap_nm ?? 1}
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
