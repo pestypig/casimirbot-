@@ -691,25 +691,19 @@ class WarpEngine {
     }
     
     _calculateModeEffects(params) {
-        const mode = params.currentMode || 'hover';
-        const strobing = params.sectorStrobing || 1;
-        const qSpoiling = params.qSpoilingFactor || 1;
-        const vanDenBroeck = params.gammaVanDenBroeck || 6.57e7;
-        
-        // Mode-specific visual scaling factors for authentic Natário physics
-        const modeConfigs = {
-            hover: { baseScale: 1.0, curvatureBoost: 1.2, strobingViz: 0.8 },
-            cruise: { baseScale: 0.3, curvatureBoost: 0.6, strobingViz: 0.2 },
-            emergency: { baseScale: 2.0, curvatureBoost: 1.8, strobingViz: 1.0 },
-            standby: { baseScale: 0.1, curvatureBoost: 0.2, strobingViz: 0.05 }
-        };
-        
-        const config = modeConfigs[mode] || modeConfigs.hover;
-        
+        // visual-only seasoning; geometry ignores this
+        const mode = (params.currentMode || 'hover').toLowerCase();
+        const config = {
+            hover:     { baseScale: 1.0, strobingViz: 0.8 },
+            cruise:    { baseScale: 1.0, strobingViz: 0.6 },
+            emergency: { baseScale: 1.0, strobingViz: 1.0 },
+            standby:   { baseScale: 1.0, strobingViz: 0.3 }
+        }[mode] || { baseScale: 1.0, strobingViz: 0.8 };
+
         return {
-            visualScale: config.baseScale * Math.sqrt(qSpoiling),
-            curvatureAmplifier: config.curvatureBoost * (vanDenBroeck / 1e7) * 0.1, 
-            strobingFactor: config.strobingViz * (400 / Math.max(strobing, 1))
+            visualScale: config.baseScale,
+            curvatureAmplifier: 1.0,   // <- neutralized for geometry
+            strobingFactor: config.strobingViz
         };
     }
 
@@ -857,45 +851,17 @@ class WarpEngine {
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
 
-        // ---- NEW: Single visual-only multiplier injected AFTER physics ----
-        function mapDecadesToBoost(dec, maxBoost) {
-            // dec ∈ [0,8] → 1..maxBoost, geometric interpolation (smooth, scale-free)
-            const t = Math.max(0, Math.min(1, dec / 8));
-            return Math.exp(Math.log(Math.max(1, maxBoost)) * t);
-        }
+        // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
+        const betaVisUniform = betaUsedUniform;
 
-        // These come in as uniforms from React:
-        const physicsParityOn   = !!this.uniforms?.physicsParity;                    // true/false
-        const gainDec           = Number.isFinite(this.uniforms?.curvatureGainDec) ? this.uniforms.curvatureGainDec : 0;
-        const boostMax          = Math.max(1, this.uniforms?.curvatureBoostMax || 1);
-
-        // When parity is on → force 1×; otherwise map 0..8 to 1..boostMax
-        const visualBoostUniform = physicsParityOn ? 1 : mapDecadesToBoost(gainDec, boostMax);
-
-        // Final viz field used by vertex/color shaders (visual-only; physics chain intact)
-        const betaVisUniform = betaUsedUniform * visualBoostUniform;
-
-        // ---- Sanity assertions (dev-only) ----
-        if (physicsParityOn) {
-            console.assert(visualBoostUniform === 1, "Parity ON but visualBoost ≠ 1");
-        }
-        if (boostMax < 1) {
-            console.warn("curvatureBoostMax < 1; clamping to 1");
-        }
-
-        // Debug per mode (once per 60 frames) with new visual boost info
+        // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
-            console.debug("[β chain]", {
-                betaUsedUniform: betaUsedUniform.toExponential(2), 
-                visualBoostUniform, 
-                betaVizUniform: betaVisUniform.toExponential(2), 
-                gainDec, boostMax, physicsParityOn
-            });
             console.log("🧪 warp-mode", {
                 mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
                 split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
                 betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
-                betaVis: betaVisUniform.toExponential(2)
+                betaVis: betaVisUniform.toExponential(2),
+                cosmeticLevel: this.uniforms?.cosmeticLevel || 10
             });
         }
         
@@ -932,9 +898,7 @@ class WarpEngine {
             const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
             const front = Math.tanh(dotND / 0.15);          // softer front polarity for canonical smoothness
             
-            // --- Mode gains ---
-            const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
-            const modeViz = (this.currentParams.modeVisualScale || 1.0);
+            // --- Mode gains removed (cosmetic slider controls all exaggeration) ---
             
             // --- Local wall thickness in ellipsoidal ρ (correct units) ---
             // Semi-axes in meters (not the clip-scaled ones)
