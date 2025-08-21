@@ -55,6 +55,26 @@ const fexp = (v: unknown, digits = 1, fallback = '—') =>
 const fint = (v: unknown, fallback = '0') =>
   isFiniteNumber(v) ? Math.round(v).toLocaleString() : fallback;
 
+// derive instantaneous active tiles from pipeline/system state
+const deriveActiveTiles = (
+  totalTiles?: number,
+  sectors?: number,
+  duty?: number,
+  mode?: 'standby'|'hover'|'cruise'|'emergency'
+) => {
+  if (!isFiniteNumber(totalTiles) || !isFiniteNumber(sectors) || sectors <= 0) return undefined;
+  if (mode === 'standby' || !isFiniteNumber(duty) || duty <= 0) return 0;
+
+  // Rule of thumb (consistent w/ strobing model and your tooltip):
+  // • If S > 1 (strobing): one sector is energized at a time → tilesPerSector
+  // • If S = 1 (no strobing): a duty fraction of the whole grid can be energized at once
+  if (sectors > 1) {
+    return Math.round(totalTiles / sectors);
+  } else {
+    return Math.round(totalTiles * duty);
+  }
+};
+
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
   TILE_GRID: "Casimir Tile Grid",
@@ -716,7 +736,43 @@ export default function HelixCore() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              {/* Mode-aware Active Tiles computation */}
+              {(() => {
+                // Pull inputs
+                const totalTilesLive =
+                  (systemMetrics?.totalTiles && isFiniteNumber(systemMetrics.totalTiles))
+                    ? systemMetrics.totalTiles
+                    : (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
+
+                const sectorsLive = isFiniteNumber(systemMetrics?.sectorStrobing)
+                  ? systemMetrics!.sectorStrobing!
+                  : (isFiniteNumber(pipeline?.sectorStrobing) ? pipeline!.sectorStrobing! : (MODE_CONFIGS[effectiveMode]?.sectorStrobing ?? 1));
+
+                const dutyLive = isFiniteNumber(pipeline?.dutyCycle)
+                  ? pipeline!.dutyCycle!
+                  : (MODE_CONFIGS[effectiveMode]?.dutyCycle ?? 0);
+
+                // Derived count (mode-aware)
+                const derivedActiveTiles = deriveActiveTiles(totalTilesLive, sectorsLive, dutyLive, effectiveMode);
+
+                // Prefer a sensible live server value, but override if it's missing or obviously stale
+                const activeTilesDisplay = (() => {
+                  const serverVal = systemMetrics?.activeTiles;
+                  if (isFiniteNumber(serverVal)) {
+                    // If server value matches our derivation (or is close), trust server
+                    if (isFiniteNumber(derivedActiveTiles)) {
+                      const diff = Math.abs(serverVal - derivedActiveTiles);
+                      const rel = derivedActiveTiles === 0 ? diff : diff / derivedActiveTiles;
+                      return rel < 0.05 ? serverVal : derivedActiveTiles; // >5% drift → use derived
+                    }
+                    return serverVal;
+                  }
+                  // No server value → use derived or a small fallback
+                  return isFiniteNumber(derivedActiveTiles) ? derivedActiveTiles : 2_800_000;
+                })();
+
+                return (
+                  <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
@@ -733,13 +789,15 @@ export default function HelixCore() {
                     </Tooltip>
                   </div>
                   <p className="text-lg font-mono text-cyan-400">
-                    {isFiniteNumber(systemMetrics?.activeTiles)
-                      ? systemMetrics!.activeTiles.toLocaleString()
+                    {isFiniteNumber(activeTilesDisplay)
+                      ? activeTilesDisplay.toLocaleString()
                       : '2,800,000'}
                   </p>
-                  {systemMetrics?.sectorStrobing && (
+                  {isFiniteNumber(sectorsLive) && (
                     <p className="text-xs text-slate-500 mt-1">
-                      {systemMetrics.sectorStrobing} sectors strobing
+                      {sectorsLive > 1
+                        ? `${sectorsLive} sectors • ~${Math.round((1/sectorsLive)*10000)/100}% of grid`
+                        : `${(dutyLive*100).toFixed(1)}% duty • no strobing`}
                     </p>
                   )}
                 </div>
@@ -762,7 +820,9 @@ export default function HelixCore() {
                     {fmt(pipeline?.P_avg ?? systemMetrics?.energyOutput, 1, '83.3')} MW
                   </p>
                 </div>
-              </div>
+                  </div>
+                );
+              })()}
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
