@@ -581,6 +581,7 @@ export default function HelixCore() {
                       <WarpVisualizer
                         key={`mode-${effectiveMode}-v${modeVersion}`}
                         parameters={{
+                          curvatureGainDec: curvatureGain,
                           dutyCycle: dutyUI,
                           g_y: pipeline?.gammaGeo || 26,
                           cavityQ: pipeline?.qCavity || 1e9,
@@ -623,7 +624,6 @@ export default function HelixCore() {
                           wall: { w_norm: 0.016 },
                           gridScale: 1.6,
                           epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                          curvatureGainDec: curvatureGain,       // Direct decades slider (0-8)
                           curvatureBoostMax: 40,              // Fallback for legacy T mode
                           betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                           wallWidth_m: 6.0,
