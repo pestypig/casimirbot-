@@ -451,7 +451,7 @@ export default function HelixCasimirAmplifier({
   const massLadder: LadderDatum[] = [
     { stage: "|U_static|", value: Math.abs(derived.U_static) },
     { stage: "×γ_geo³", value: Math.abs(derived.U_static) * derived.geo3 },
-    { stage: "×Q_BURST", value: Math.abs(derived.U_static) * derived.geo3 * Q_BURST },
+    { stage: "×Q_cav", value: Math.abs(derived.U_static) * derived.geo3 * qCav },
     { stage: "×γ_VdB", value: derived.E_tile_mass },
     { stage: "×d_eff", value: derived.E_tile_mass } // (×d_eff happens in E_tile_mass calc)
   ];
