@@ -83,6 +83,9 @@ export function useLightCrossingLoop({
     return dist <= half;
   }, [phase, burst_ms, dwell_ms]);
 
+  // Calculate cycles per burst for meaningful RF energy
+  const cyclesPerBurst = (burst_ms * 1e-3) * (freqGHz * 1e9);
+
   return {
     // shared timeline
     sectorIdx,
@@ -93,6 +96,7 @@ export function useLightCrossingLoop({
     burst_ms,
     duty,
     freqGHz,
+    cyclesPerBurst,   // RF cycles per burst window
     onWindow,         // boolean: raw physics ON window (for WarpEngine sync)
     onWindowRaw: onWindow,  // explicit alias for authentic physics
     onWindowDisplay: displayOn, // UI latch: stable display state for labels

@@ -331,45 +331,60 @@ export default function HelixCasimirAmplifier({
   const tauQ_s = qCav / (2 * Math.PI * f); // cavity time constant: τ = Q/(2πf)
 
   // derived quantities (robust to partial data)
+  // Physics vs UI gating
+  const MIN_CYCLES_PER_BURST = 10;                 // tune if needed
+  const isBurstMeaningful = (lightCrossing?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
+  const isOnRaw = !!lightCrossing?.onWindow && isBurstMeaningful;
+
+  // effective duty for ship-averaged quantities:
+  // prefer authoritative metrics.dutyEffectiveFR, else derive from loop
+  const d_eff =
+    metrics?.dutyEffectiveFR ??
+    (lightCrossing ? (lightCrossing.burst_ms / lightCrossing.dwell_ms) : 0);        // equals duty/sectorCount with τLC floor
+
   const derived = useMemo(() => {
     if (!state || !metrics) return null;
 
+    // inputs
     const U_static = state.U_static;                 // J per tile (signed)
     const gammaGeo = state.gammaGeo;
-    const qMech    = state.qMechanical ?? 1;         // mechanical gain/Q-factor (consider renaming to mechGain)
-    const d_eff    = metrics.dutyEffectiveFR ?? 0;   // authoritative duty for FR & ship averaging
+    const qMech    = state.qMechanical ?? 1;         // mech gain
     const N_tiles  = state.N_tiles ?? metrics.totalTiles;
+    const gammaVdB = state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck ?? 1;
 
-    // Power chain (per tile → ship)
-    const U_geo    = U_static * gammaGeo;            // note: power chain uses γ^1 (as in backend)
-    const U_Q      = U_geo * qMech;                  // per tile (ON-window stored energy proxy)
-    const U_cycle  = U_Q * d_eff;                    // per tile average contribution
+    // power chain (per tile → ship)
+    const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
+    const U_Q       = U_geo * qMech;                 // per-tile stored energy proxy during ON
+    const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // instantaneous dissipation W when ON (P=ωU/Q)
+    const P_tile_instant_W = isOnRaw ? P_tile_on : 0; // physics gating by light-crossing window
+    const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
+    const P_ship_avg_report_MW = state.P_avg;        // authoritative calibration (if provided)
 
-    const P_tile_on = (omega * Math.abs(U_Q)) / qCav;  // W per tile during ON (P = ωU/Q)
-    const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6;
-    const P_ship_avg_report_MW = state.P_avg;           // authoritative from backend calibration
-
-    // Mass chain (per tile energy that maps to exotic mass via E/c^2)
-    const geo3    = Math.pow(gammaGeo, 3);
-    const E_tile_mass = Math.abs(U_static) * geo3 * qCav * (state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck) * d_eff;
-    const M_tile = E_tile_mass / (C * C);               // kg per tile
-    const M_total_calc = M_tile * N_tiles;
+    // mass chain (no Q in energy; Q is for power)
+    const geo3        = Math.pow(gammaGeo, 3);
+    const E_tile_geo3 = Math.abs(U_static) * geo3;             // step: ×γ_geo^3
+    const E_tile_VdB  = E_tile_geo3 * gammaVdB;                // step: ×γ_VdB
+    const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
+    const M_tile      = E_tile_mass / (C * C);                 // kg per tile
+    const M_total_calc   = M_tile * N_tiles;
     const M_total_report = state.M_exotic ?? metrics.exoticMass;
 
-    // Casimir foundation
-    const gap_m = (state.gap_nm ?? 16) * 1e-9;
-    const tileA_m2 = (state.tileArea_cm2 ?? 25) * 1e-4;
-    const casimir_theory = -(PI * PI / 720) * HBAR_C / Math.pow(gap_m, 4);  // theory prediction J/m³
-    const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;            // J per tile
+    // casimir foundation (unchanged)
+    const gap_m       = (state.gap_nm ?? 16) * 1e-9;
+    const tileA_m2    = (state.tileArea_cm2 ?? 25) * 1e-4;
+    const casimir_theory   = -(PI * PI / 720) * HBAR_C / Math.pow(gap_m, 4);
+    const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;
 
     return {
-      U_static, gammaGeo, qMech, d_eff, N_tiles, omega,
-      U_geo, U_Q, U_cycle,
-      P_tile_on, P_ship_avg_calc_MW, P_ship_avg_report_MW,
-      geo3, E_tile_mass, M_tile, M_total_calc, M_total_report,
-      gap_m, tileA_m2, casimir_theory, casimir_per_tile
+      U_static, gammaGeo, qMech, d_eff, N_tiles, omega, qCav, gammaVdB,
+      U_geo, U_Q,
+      P_tile_on, P_tile_instant_W, P_ship_avg_calc_MW, P_ship_avg_report_MW,
+      geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
+      gap_m, tileA_m2, casimir_theory, casimir_per_tile,
+      isOnRaw, isBurstMeaningful
     };
-  }, [state, metrics, omega, qCav]);
+    // include lc-derived values in the deps so gating/duty react to the loop
+  }, [state, metrics, omega, qCav, lightCrossing?.onWindow, lightCrossing?.cyclesPerBurst, lightCrossing?.burst_ms, lightCrossing?.dwell_ms]);
 
   // Normalized steady-state target energy from pipeline (or fallback)
   const U_inf = (state?.U_cycle ?? 1) * 1; // arbitrary scale -> keep consistent
@@ -441,20 +456,23 @@ export default function HelixCasimirAmplifier({
     );
   }
 
-  // build ladder data
+  // ----- Ladders (show the actual steps you compute) -----
+
   const powerLadder: LadderDatum[] = [
     { stage: "|U_static|", value: Math.abs(derived.U_static) },
-    { stage: "×γ_geo", value: Math.abs(derived.U_geo) },
-    { stage: "×q_mech", value: Math.abs(derived.U_Q) },
-    { stage: "×d_eff", value: Math.abs(derived.U_cycle) }
+    { stage: "×γ_geo",     value: Math.abs(derived.U_geo) },
+    { stage: "×q_mech",    value: Math.abs(derived.U_Q) },
+    // instantaneous power when ON: P = ωU/Q (display per tile)
+    { stage: "→P_tile_on (ωU/Q_cav)", value: derived.P_tile_on },
+    // ship-averaged power using d_eff
+    { stage: "×N_tiles × d_eff", value: derived.P_ship_avg_calc_MW * 1e6 } // back in watts for consistency
   ];
 
   const massLadder: LadderDatum[] = [
     { stage: "|U_static|", value: Math.abs(derived.U_static) },
-    { stage: "×γ_geo³", value: Math.abs(derived.U_static) * derived.geo3 },
-    { stage: "×Q_cav", value: Math.abs(derived.U_static) * derived.geo3 * qCav },
-    { stage: "×γ_VdB", value: derived.E_tile_mass },
-    { stage: "×d_eff", value: derived.E_tile_mass } // (×d_eff happens in E_tile_mass calc)
+    { stage: "×γ_geo³",    value: derived.E_tile_geo3 },
+    { stage: "×γ_VdB",     value: derived.E_tile_VdB },
+    { stage: "×d_eff",     value: derived.E_tile_mass } // duty applied here (no Q_cav in mass)
   ];
 
   return (
