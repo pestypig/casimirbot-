@@ -41,6 +41,7 @@ import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
+import CurvatureBand from "@/components/CurvatureBand";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import { HelpCircle } from "lucide-react";
 
@@ -678,6 +679,26 @@ export default function HelixCore() {
                       <div className="absolute bottom-2 right-2 text-xs text-slate-700 bg-slate-200/70 px-1 rounded">
                         Grid scale: {Math.round((Number(hullAxes[0]) || 503.5) / 10)} m divisions
                       </div>
+                    </div>
+
+                    {/* Micro-scale Curvature Band Viewer */}
+                    <div className="relative bg-slate-50 rounded shadow p-2 mt-4">
+                      <CurvatureBand
+                        hullAxes={[
+                          Number(hullAxes[0]) || 503.5,
+                          Number(hullAxes[1]) || 132.0,
+                          Number(hullAxes[2]) || 86.5,
+                        ]}
+                        wallWidth_m={6.0}
+                        gammaGeo={pipeline?.gammaGeo ?? 26}
+                        qSpoilingFactor={qSpoilUI}
+                        sigmaRange={6}
+                        exposure={8}
+                        showContours={true}
+                        width={480}
+                        height={200}
+                        className="xl:sticky xl:top-[300px]"
+                      />
                     </div>
                   </div>
                 </div>

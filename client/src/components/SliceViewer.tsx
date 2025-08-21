@@ -280,6 +280,49 @@ export function SliceViewer(props: SliceViewerProps) {
       ctx.stroke();
     }
 
+    // Add axis annotations and scale (after rendering the image)
+    ctx.save();
+
+    // border
+    ctx.strokeStyle = "rgba(30,41,59,0.85)"; // slate-800
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, width-1, height-1);
+
+    // axis labels
+    ctx.fillStyle = "rgba(100,116,139,0.95)"; // slate-400
+    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+
+    // x: normalized equatorial coordinate (−a … +a) mapped to meters
+    ctx.fillText("x (m) — fore (+) ⇄ aft (−)", 8, 16);
+
+    // y: normalized ρ (distance from hull in σ units if you're using it) — adapt if you show meters
+    ctx.save();
+    ctx.translate(12, height/2);
+    ctx.rotate(-Math.PI/2);
+    ctx.textAlign = "center";
+    ctx.fillText("δρ  (ellipsoidal radius offset)", 0, 0);
+    ctx.restore();
+
+    // tick marks (quarter divisions)
+    ctx.strokeStyle = "rgba(51,65,85,0.35)"; // slate-700
+    for (let k=1; k<4; k++){
+      const px = Math.round((k/4)*(width-1));
+      ctx.beginPath(); ctx.moveTo(px+0.5, height-14); ctx.lineTo(px+0.5, height-10); ctx.stroke();
+      const py = Math.round((k/4)*(height-1));
+      ctx.beginPath(); ctx.moveTo(10, py+0.5); ctx.lineTo(14, py+0.5); ctx.stroke();
+    }
+
+    // scale tag
+    ctx.fillStyle = "rgba(2,6,23,0.65)"; // slate-950
+    ctx.strokeStyle = "rgba(30,41,59,0.7)";
+    ctx.fillRect(width-210, 8, 202, 40);
+    ctx.strokeRect(width-210+0.5, 8.5, 202-1, 40-1);
+    ctx.fillStyle = "rgba(203,213,225,0.95)"; // slate-200
+    ctx.fillText(`equatorial slice (y=0)`, width-200, 24);
+    ctx.fillText(`grid: ${W}×${H} • σ span ±${sigmaRange}`, width-200, 38);
+
+    ctx.restore();
+
   }, [
     hullAxes, wallWidth_m, driveDir, vShip,
     gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg,
@@ -348,123 +391,6 @@ export function SliceViewer(props: SliceViewerProps) {
         height={height}
         style={{ display: "block", width, height, background: "#fff" }}
       />
-
-      {/* Axis + grid overlay (SVG so text is crisp) */}
-      <svg
-        width={width}
-        height={height}
-        style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
-      >
-        {/* Inner frame */}
-        <rect
-          x={layout.margin.L}
-          y={layout.margin.T}
-          width={layout.W}
-          height={layout.H}
-          fill="none"
-          stroke="rgba(30,41,59,0.65)"        // slate-800-ish
-          strokeWidth={1}
-        />
-
-        {/* Vertical grid lines (x ticks) */}
-        {layout.ticksX.map((xm, i) => {
-          const x = layout.xToPx(xm);
-          const isZero = Math.abs(xm) < 1e-9;
-          return (
-            <g key={`gx-${i}`}>
-              <line
-                x1={x}
-                y1={layout.margin.T}
-                x2={x}
-                y2={layout.margin.T + layout.H}
-                stroke={isZero ? "rgba(56,189,248,0.6)" : "rgba(51,65,85,0.25)"} // cyan-400 for x=0, slate-700 for others
-                strokeWidth={isZero ? 1.5 : 1}
-              />
-              {!isZero && (
-                <text
-                  x={x}
-                  y={layout.margin.T + layout.H + 18}
-                  textAnchor="middle"
-                  fontSize="10"
-                  fill="rgba(100,116,139,0.9)" // slate-400
-                >
-                  {fmtMeters(xm)}
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {/* Horizontal grid lines (z ticks) */}
-        {layout.ticksZ.map((zm, i) => {
-          const y = layout.zToPx(zm);
-          const isZero = Math.abs(zm) < 1e-9;
-          return (
-            <g key={`gz-${i}`}>
-              <line
-                x1={layout.margin.L}
-                y1={y}
-                x2={layout.margin.L + layout.W}
-                y2={y}
-                stroke={isZero ? "rgba(251,146,60,0.6)" : "rgba(51,65,85,0.25)"} // orange-400 for z=0, slate-700 for others
-                strokeWidth={isZero ? 1.5 : 1}
-              />
-              {!isZero && (
-                <text
-                  x={layout.margin.L - 6}
-                  y={y + 3}
-                  textAnchor="end"
-                  fontSize="10"
-                  fill="rgba(100,116,139,0.9)" // slate-400
-                >
-                  {fmtMeters(zm)}
-                </text>
-              )}
-            </g>
-          );
-        })}
-
-        {/* Axis labels */}
-        <text
-          x={layout.margin.L + layout.W / 2}
-          y={height - 8}
-          textAnchor="middle"
-          fontSize="11"
-          fontWeight={600}
-          fill="rgba(148,163,184,0.95)" // slate-300
-        >
-          x (forward / aft) — span ±{fmtMeters(a_m)}
-        </text>
-
-        <text
-          x={12}
-          y={layout.margin.T + layout.H / 2}
-          textAnchor="start"
-          transform={`rotate(-90 12 ${layout.margin.T + layout.H / 2})`}
-          fontSize="11"
-          fontWeight={600}
-          fill="rgba(148,163,184,0.95)" // slate-300
-        >
-          z (port / starboard) — span ±{fmtMeters(c_m)}
-        </text>
-
-        {/* Scale legend (shows current major tick spacing) */}
-        <rect
-          x={width - 168}
-          y={layout.margin.T + 8}
-          width={156}
-          height={36}
-          rx={6}
-          fill="rgba(2,6,23,0.65)"       // slate-950 with opacity
-          stroke="rgba(30,41,59,0.7)"
-        />
-        <text x={width - 160 + 8} y={layout.margin.T + 22} fontSize="11" fill="rgba(203,213,225,0.95)">
-          Grid Δx = {fmtMeters(tickX)}
-        </text>
-        <text x={width - 160 + 8} y={layout.margin.T + 36} fontSize="11" fill="rgba(203,213,225,0.95)">
-          Grid Δz = {fmtMeters(tickZ)}
-        </text>
-      </svg>
     </div>
   );
 }
