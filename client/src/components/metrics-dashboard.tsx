@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useEnergyPipeline, MODE_CONFIGS } from '@/hooks/use-energy-pipeline';
+import { useEnergyPipeline, MODE_CONFIGS, PIPE_CONST } from '@/hooks/use-energy-pipeline';
 import Plot from 'react-plotly.js';
 
 interface MetricsDashboardProps {
@@ -37,6 +37,35 @@ const fmtPowerUnit = (mw?: number) => {
   if (x >= 1) return `${x.toFixed(1)} MW`;
   if (x >= 1e-3) return `${(x * 1e3).toFixed(1)} kW`;
   return `${(x * 1e6).toFixed(1)} W`;
+};
+
+// Accurate active tiles calculation using pipeline burst duty
+const deriveActiveTiles = (totalTiles?: number, sectors?: number, duty?: number, mode?: string) => {
+  if (!totalTiles || !Number.isFinite(totalTiles) || !sectors || !Number.isFinite(sectors) || sectors <= 0) return undefined;
+  if (mode === 'standby' || !duty || !Number.isFinite(duty) || duty <= 0) return 0;
+  
+  const BURST = PIPE_CONST.BURST_DUTY_LOCAL; // Always 1% local window
+  
+  if (sectors > 1) {
+    // One sector at a time, but only 1% of tiles in that sector are ON in the local window
+    return Math.round((totalTiles / sectors) * BURST);
+  } else {
+    // No strobe; a duty fraction of the whole grid can be "eligible", but still burst-gated
+    return Math.round(totalTiles * duty * BURST);
+  }
+};
+
+// Helper to get physics-accurate defaults by mode
+const getPhysicsDefaults = (mode: string, pipeline: any) => {
+  const modeKey = mode as keyof typeof PIPE_CONST.MODE_TARGETS;
+  const target = PIPE_CONST.MODE_TARGETS[modeKey] || PIPE_CONST.MODE_TARGETS.hover;
+  
+  return {
+    powerAvg_MW: Number.isFinite(pipeline?.P_avg) ? pipeline.P_avg : (target.P_W / 1e6),
+    exoticMass_kg: Number.isFinite(pipeline?.M_exotic) ? pipeline.M_exotic : target.M_kg,
+    gammaVanDenBroeck: Number.isFinite(pipeline?.gammaVanDenBroeck) ? pipeline.gammaVanDenBroeck : 3.83e1,
+    tsRatio: Number.isFinite(pipeline?.TS_ratio) ? pipeline.TS_ratio : 5.03e4, // L_long=1007m × f=15GHz / c
+  };
 };
 
 export default function MetricsDashboard({ viabilityParams }: MetricsDashboardProps) {
@@ -138,8 +167,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
   })();
   const dutyFrac = (dutyEff ?? dutyUi ?? dutyModeDefault ?? 0);
   const M_exotic = Number.isFinite((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic : 0; // kg
-  const TS_ratio = Number.isFinite((pipeline as any)?.TS_ratio) ? (pipeline as any).TS_ratio : 0;
-  const zeta = Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta : 0;
+  const TS_ratio = Number.isFinite((pipeline as any)?.TS_ratio) ? (pipeline as any).TS_ratio : 5.03e4; // Physics-accurate default: L_long×f/c
+  const zeta = Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta : 
+    // Compute ζ from duty effective if available: ζ = 1/(d_eff × √Q_quantum)
+    (Number.isFinite(dutyEff) ? (1 / (dutyEff * Math.sqrt(1e12))) : 0);
   
   // Prefer a true raw (instant/peak) power from backend if available; keep units = MW
   const P_raw = Number.isFinite((pipeline as any)?.P_raw)

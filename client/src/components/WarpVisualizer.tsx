@@ -172,8 +172,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
               const wallWidth = wallWidth_norm; // Engine expects normalized width
               
+              // Use physics-computed tilt value, not hard defaults
               const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
-                mode === 'standby' ? 0.0 : mode === 'cruise' ? 0.012 : mode === 'hover' ? 0.020 : 0.035);
+                mode === 'standby' ? 0.0 : 5e-7); // Use physics-accurate tiny value instead of 0.012
               
               const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
               
@@ -182,7 +183,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 gammaGeo: num(parameters.g_y, 26),
                 Qburst: num(parameters.cavityQ, 1e9),
                 deltaAOverA: num(parameters.qSpoilingFactor, 1),
-                gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // Pipeline-aligned default
+                gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1), // Physics-accurate neutral default
                 currentMode: mode,
                 sectors,
                 split: phaseSplit,

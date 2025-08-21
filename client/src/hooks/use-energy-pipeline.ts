@@ -47,6 +47,19 @@ export interface EnergyPipelineState {
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
 }
 
+// Shared physics constants from pipeline backend
+export const PIPE_CONST = {
+  TOTAL_SECTORS: 400,
+  BURST_DUTY_LOCAL: 0.01,  // 1% local burst window
+  Q_BURST: 1e9,
+  MODE_TARGETS: {
+    hover:    { P_W: 83.3e6, M_kg: 1000 },
+    cruise:   { P_W: 7.437e3, M_kg: 1000 },  // 7.437 kW
+    emergency:{ P_W: 297.5e6, M_kg: 1000 },
+    standby:  { P_W: 0, M_kg: 0 }
+  }
+};
+
 // Shared smart formatter (W→kW→MW) for UI labels
 export const fmtPowerUnitFromW = (watts?: number) => {
   const x = Number(watts);
