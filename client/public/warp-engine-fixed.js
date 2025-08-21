@@ -259,7 +259,6 @@ class WarpEngine {
             "void main() {\n" +
             "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 12.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
@@ -268,7 +267,6 @@ class WarpEngine {
             "void main() {\n" +
             "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 12.0;\n" +
             "}";
 
         const gridFs = isWebGL2 ?
@@ -544,10 +542,8 @@ class WarpEngine {
         
         // Apply warp field deformation
         const vtx = this.gridVertices;
-        const halfSize = 20000; // Half grid size in original units
-        const originalY = -0.144; // Base Y coordinate
         
-        this._warpGridVertices(vtx, halfSize, originalY, this.currentParams);
+        this._warpGridVertices(vtx, this.currentParams);
         
         // Upload updated vertices to GPU
         const gl = this.gl;
@@ -559,7 +555,7 @@ class WarpEngine {
     }
 
     // Authentic Natário spacetime curvature implementation
-    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
+    _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
         // Clean wall thickness handling - use either meters or ρ-units

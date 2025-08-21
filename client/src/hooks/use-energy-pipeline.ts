@@ -9,7 +9,7 @@ export interface EnergyPipelineState {
   tileArea_cm2: number;
   shipRadius_m: number;
   gap_nm: number;
-  sag_nm: number;
+  sag_nm?: number;
   temperature_K: number;
   modulationFreq_GHz: number;
   
@@ -45,6 +45,27 @@ export interface EnergyPipelineState {
   natarioConstraint: boolean;
   curvatureLimit: boolean;
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+}
+
+// Chat message interface for HELIX-CORE
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+}
+
+// System metrics interface
+export interface SystemMetrics {
+  totalTiles: number;
+  activeTiles: number;
+  currentMode?: string;
+}
+
+// Helix metrics interface
+export interface HelixMetrics {
+  totalTiles: number;
+  activeTiles: number;
+  data?: any;
 }
 
 // Shared physics constants from pipeline backend
