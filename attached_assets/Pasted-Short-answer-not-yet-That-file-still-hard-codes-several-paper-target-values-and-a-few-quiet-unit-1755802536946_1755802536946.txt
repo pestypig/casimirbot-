@@ -1,0 +1,188 @@
+Short answer: not yet. That file still hard-codes several “paper target” values and a few quiet unit bugs. It isn’t fully wired to the live physics pipeline.
+
+Here’s what’s off + a surgical patch you can drop in.
+
+# What’s still “magic” (and/or incorrect)
+
+* Hard-coded targets: `TARGET_EXOTIC_MASS = 1.4e3`, `TARGET_POWER = 83e6`, `tileCount = 1.96e9`. These should come from the pipeline (or be optional defaults).
+* Geometric gain: `gammaGeo` is synthesized with `125000`, exponent `0.45`, and a normalize factor `25/26.2`, plus a fixed `vanDenBroeckAmplification = 1e11`. All are magic. Use pipeline’s `gammaGeo` and `gammaVanDenBroeck`.
+* Q normalization: `√(Q/1e9)` bakes in a baseline. Make `Q0` configurable.
+* Baseline energy density: `-4.3e8 J/m³` is a constant. Use the Casimir formula:
+  $u = -\pi^2 \hbar c / (720\, a^4)$.
+* Tile volume: `0.05*0.05*0.01` m³ assumes a 1 cm thickness; that contradicts the gap-based volume used elsewhere. Use `tileArea * gapM`.
+* Axial component: `axialComponent = shiftAmplitude * 0.1` is arbitrary. Either derive from a tilt vector or default to 0.
+* Ford–Roman limit: `1e6 kg` is baked in. Expose as a param with a default.
+* Unit bug: `effectivePathLength` is computed in meters, then later multiplied by `1e-9` as if it were nm when passed to `validateQuantumInequality`. That double-converts (meters → nm → meters) and shrinks the scale by 1e9 erroneously.
+
+# Minimal no-magic, pipeline-first patch
+
+**1) Make targets & baselines come from params (with safe defaults).**
+Replace the top constants with configurable defaults:
+
+```ts
+// Before
+// const FORD_ROMAN_LIMIT = 1e6;
+// const NEEDLE_HULL_RADIUS = 20000;
+// const TARGET_EXOTIC_MASS = 1.4e3;
+// const TARGET_POWER = 83e6;
+
+// After
+const DEFAULTS = {
+  fordRomanLimit_kg: 1e6,
+  Q0: 1e9,                       // reference Q for normalization (configurable)
+  tileArea_m2: 0.05 * 0.05,      // 5 cm × 5 cm (override from pipeline if different)
+};
+
+export interface NatarioWarpParams {
+  bowlRadius: number;  // μm
+  sagDepth: number;    // nm
+  gap: number;         // nm
+  cavityQ: number;
+  burstDuration: number;  // μs
+  cycleDuration: number;  // μs
+  sectorCount: number;
+  dutyFactor: number;     // local
+  effectiveDuty: number;  // ship-wide (≈ duty/sectors)
+  shiftAmplitude: number;
+  expansionTolerance: number;
+
+  // NEW: pipeline-driven knobs
+  gammaGeo?: number;
+  gammaVanDenBroeck?: number;     // γ_VdB
+  qSpoilingFactor?: number;       // ΔA/A (if you model it)
+  tileCount?: number;
+  tileArea_m2?: number;
+  fordRomanLimit_kg?: number;
+  referenceQ?: number;            // Q0
+  P_avg_W?: number;               // live average power (preferred over “target”)
+}
+```
+
+**2) Use pipeline γ’s, remove “curve-fit” for γ\_geo and fixed γ\_VdB.**
+
+```ts
+export function calculateGeometricBlueshift(
+  bowlRadius: number, sagDepth: number, gap: number,
+  opts?: { gammaGeo?: number; gammaVanDenBroeck?: number }
+): { gammaGeo: number; effectivePathLength_m: number; amplification: number } {
+
+  // If pipeline provides γ_geo, trust it; otherwise fall back to 1
+  const gammaGeo = Math.max(1, opts?.gammaGeo ?? 1);
+
+  // Path length a_eff = a - t (meters)
+  const effectivePathLength_m = Math.max(1e-12,
+    (bowlRadius * 1e-6) - (sagDepth * 1e-9)
+  );
+
+  // Van den Broeck factor from pipeline; default 1 if not modeling it
+  const gammaVdB = Math.max(1, opts?.gammaVanDenBroeck ?? 1);
+
+  // Total amplification (geometry only, no Q or duty here)
+  const amplification = Math.pow(gammaGeo, 3) * gammaVdB;
+
+  return { gammaGeo, effectivePathLength_m, amplification };
+}
+```
+
+**3) Q-factor enhancement with configurable baseline; include optional spoiling.**
+
+```ts
+export function calculateDynamicAmplification(
+  geometricAmplification: number,
+  cavityQ: number,
+  burstDuration_us: number,
+  cycleDuration_us: number,
+  opts?: { referenceQ?: number; qSpoilingFactor?: number }
+) {
+  const Q0 = Math.max(1, opts?.referenceQ ?? DEFAULTS.Q0);
+  const qEnhancement = Math.sqrt(cavityQ / Q0);
+  const dutyFactor = Math.max(1e-12, burstDuration_us / cycleDuration_us);
+  const qSpoil = Math.max(0, opts?.qSpoilingFactor ?? 1);
+
+  // Do not apply effective duty here; keep this purely “per-pulse”
+  const totalAmplification = geometricAmplification * qEnhancement * qSpoil;
+
+  return { qEnhancement, totalAmplification, dutyFactor };
+}
+```
+
+**4) Sector strobing uses ship-wide effective duty for averaging.**
+
+```ts
+export function calculateSectorStrobing(
+  perPulseAmplification: number,
+  sectorCount: number,
+  dutyLocal: number,
+  dutyEffective: number
+) {
+  const timeAveragedAmplification = perPulseAmplification * Math.max(0, dutyEffective);
+  const powerReduction = Math.max(1e-12, dutyEffective) / Math.max(1e-12, dutyLocal);
+  const effectivenessFactor = Math.max(0, dutyEffective) * Math.max(1, sectorCount);
+  return { timeAveragedAmplification, powerReduction, effectivenessFactor };
+}
+```
+
+**5) Baseline Casimir energy density from gap (no constant).**
+
+```ts
+// Casimir energy density between ideal plates: u = -π² ħ c / (720 a⁴)
+const a_m = Math.max(1e-12, params.gap * 1e-9);
+const u0 = -(Math.PI**2 / 720) * PHYSICS_CONSTANTS.HBAR_C / (a_m**4);
+
+const baselineEnergyDensity = u0;                               // J/m³
+const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;
+```
+
+**6) Tile volume from area × gap; counts from pipeline.**
+
+```ts
+const tileArea = params.tileArea_m2 ?? DEFAULTS.tileArea_m2;
+const tileVolume = tileArea * a_m;
+
+const tileCount = Math.max(1, params.tileCount ?? 1);           // ← pipeline preferred
+const massPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
+const totalExoticMass = massPerTile * tileCount;
+```
+
+**7) Quantum inequality: use a physical length scale in meters (no double conversion).**
+
+```ts
+const quantumValidation = validateQuantumInequality(
+  totalExoticMass,
+  amplifiedEnergyDensity,
+  params.burstDuration * 1e-6,               // s
+  a_m                                        // m (gap scale)
+);
+```
+
+**8) Shift field axial component: remove the 0.1 fudge.**
+
+```ts
+const tangentialComponent = 0;
+const axialComponent = 0; // unless you feed a tilt vector; keep 0 by default
+```
+
+**9) Power: prefer live `P_avg_W` from the pipeline; only fall back when absent.**
+
+```ts
+const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : NaN;
+const isPowerCompliant = Number.isFinite(powerDraw) ? true : false;
+```
+
+**10) Ford–Roman limit from params or default.**
+
+```ts
+const fordRomanLimit = params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg;
+// …in validateQuantumInequality use that value
+```
+
+**11) Fix the unit bug in `effectivePathLength` usage.**
+
+* Return it as `effectivePathLength_m` (meters).
+* Never multiply by `1e-9` again when passing into other functions.
+
+---
+
+That keeps the module numerically sane, removes the hidden boosts, and lets the **true pipeline** (γ\_geo, γ\_VdB, Q, duty/sectors, tile count/area, P\_avg) drive the results. After this, your curvature slider won’t be fighting baked-in values, and the 3D visualizer will track the same amplitude chain as the slice.
+
+If you want, I can produce a single consolidated diff of your file with all the above applied verbatim.
