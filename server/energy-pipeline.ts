@@ -146,7 +146,7 @@ const RADIAL_LAYERS    = 10;     // surface × radial lattice
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical, γ_VdB) ---
 const MODE_POLICY = {
   hover:     { S_live: 'all' as const, P_target_W: 83.3e6,   M_target_kg: 1_000 },
-  cruise:    { S_live: 1 as const,     P_target_W: 7.437e3,  M_target_kg: 1_000 }, // 7.437 kW
+  cruise:    { S_live: 1 as const,     P_target_W: 7.437,    M_target_kg: 1_000 }, // 7.437 W
   emergency: { S_live: 'all' as const, P_target_W: 297.5e6,  M_target_kg: 1_000 },
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
 } as const;
