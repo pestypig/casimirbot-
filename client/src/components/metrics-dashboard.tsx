@@ -96,7 +96,18 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
   // Safe accessors mapped to pipeline interface field names
   const P_avg = Number.isFinite((pipeline as any)?.P_avg) ? (pipeline as any).P_avg : 0;          // MW
-  const dutyFrac = Number.isFinite((pipeline as any)?.dutyCycle) ? (pipeline as any).dutyCycle : 0;     // 0..1
+  // Duty priority: effective (server) → UI (server) → mode default (client)
+  const dutyEff = Number.isFinite((pipeline as any)?.dutyEffective_FR)
+    ? (pipeline as any).dutyEffective_FR as number
+    : undefined;
+  const dutyUi = Number.isFinite((pipeline as any)?.dutyCycle)
+    ? (pipeline as any).dutyCycle as number
+    : undefined;
+  const dutyModeDefault = (() => {
+    const m = ((pipeline as any)?.currentMode as keyof typeof MODE_CONFIGS) || 'hover';
+    return MODE_CONFIGS[m]?.dutyCycle;
+  })();
+  const dutyFrac = (dutyEff ?? dutyUi ?? dutyModeDefault ?? 0);
   const M_exotic = Number.isFinite((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic : 0; // kg
   const TS_ratio = Number.isFinite((pipeline as any)?.TS_ratio) ? (pipeline as any).TS_ratio : 0;
   const zeta = Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta : 0;
@@ -339,7 +350,12 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Duty:</span>
-                      <span className="font-semibold">{f1(dutyFrac * 100)}%</span>
+                      <span className="font-semibold">
+                        {f1(dutyFrac * 100)}%
+                        {Number.isFinite(dutyEff) && Number.isFinite(dutyUi) && dutyEff !== dutyUi && (
+                          <span className="text-muted-foreground"> (eff), UI {f1((dutyUi as number) * 100)}%</span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">M_exotic:</span>

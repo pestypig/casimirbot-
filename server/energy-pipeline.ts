@@ -445,9 +445,17 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   }
   
   // Ensure UI duty fields are populated from mode config for consistency  
-  state.dutyCycle = MODE_POLICY[state.currentMode].dutyCycle;
-  state.sectorStrobing = MODE_POLICY[state.currentMode].sectorStrobing;
-  state.qSpoilingFactor = MODE_POLICY[state.currentMode].qSpoilingFactor;
+  const MODE_UI = {
+    hover:    { dutyCycle: 0.14,  sectorStrobing: 1,   qSpoilingFactor: 1     },
+    cruise:   { dutyCycle: 0.005, sectorStrobing: 400, qSpoilingFactor: 0.001 },
+    emergency:{ dutyCycle: 0.50,  sectorStrobing: 1,   qSpoilingFactor: 1     },
+    standby:  { dutyCycle: 0.001, sectorStrobing: 1,   qSpoilingFactor: 0.1   }
+  } as const;
+  
+  const ui = MODE_UI[state.currentMode];
+  state.dutyCycle       = ui.dutyCycle;
+  state.sectorStrobing  = ui.sectorStrobing;
+  state.qSpoilingFactor = ui.qSpoilingFactor;
   
   return state;
 }
