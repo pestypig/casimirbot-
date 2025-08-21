@@ -30,6 +30,15 @@ interface MetricConstraints {
   M_tolerance: number; // Mass tolerance (%)
 }
 
+// Smart power formatter (MW→kW→W)
+const fmtPowerUnit = (mw?: number) => {
+  const x = Number(mw);
+  if (!Number.isFinite(x)) return "—";
+  if (x >= 1) return `${x.toFixed(1)} MW`;
+  if (x >= 1e-3) return `${(x * 1e3).toFixed(1)} kW`;
+  return `${(x * 1e6).toFixed(1)} W`;
+};
+
 export default function MetricsDashboard({ viabilityParams }: MetricsDashboardProps) {
   // Authoritative live pipeline snapshot (already kept fresh by your backend/hooks)
   const { data: pipeline } = useEnergyPipeline();
@@ -91,10 +100,16 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
   const M_exotic = Number.isFinite((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic : 0; // kg
   const TS_ratio = Number.isFinite((pipeline as any)?.TS_ratio) ? (pipeline as any).TS_ratio : 0;
   const zeta = Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta : 0;
-  // Prefer explicit raw MW if provided; else fall back to avg
-  const P_raw = Number.isFinite((pipeline as any)?.P_loss_raw)
+  
+  // Prefer a true raw (instant/peak) power from backend if available; keep units = MW
+  const P_raw = Number.isFinite((pipeline as any)?.P_raw)
+    ? (pipeline as any).P_raw
+    : P_avg; // fallback
+
+  // Keep per-tile loss (W/tile) separate so we don't mix units
+  const P_loss_W_per_tile = Number.isFinite((pipeline as any)?.P_loss_raw)
     ? (pipeline as any).P_loss_raw
-    : P_avg;
+    : undefined;
 
   // Safe formatters that won't throw
   const f0 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(0) : "—";
@@ -319,7 +334,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_avg:</span>
                       <span className="font-semibold">
-                        {P_avg >= 1 ? `${f1(P_avg)} MW` : `${f1(P_avg * 1e6)} W`}
+                        {fmtPowerUnit(P_avg)}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -340,8 +355,14 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">P_raw:</span>
-                      <span className="font-semibold">{f1(P_raw)} MW</span>
+                      <span className="font-semibold">{fmtPowerUnit(P_raw)}</span>
                     </div>
+                    {Number.isFinite(P_loss_W_per_tile) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">P_loss:</span>
+                        <span className="font-semibold">{f1(P_loss_W_per_tile)} W/tile</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">γ_geo:</span>
                       <span className="font-semibold">{viabilityParams?.gammaGeo || 26}</span>
@@ -386,18 +407,9 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Power Draw</p>
-                {/* Smart unit display: MW for ≥1 MW, W for <1 MW */}
-                {P_avg >= 1 ? (
-                  <p className="text-2xl font-bold">{f1(P_avg)} MW</p>
-                ) : (
-                  <p className="text-2xl font-bold">{f1(P_avg * 1e6)} W</p>
-                )}
+                <p className="text-2xl font-bold">{fmtPowerUnit(P_avg)}</p>
                 <p className="text-xs text-muted-foreground">
-                  Peak: {f1(P_raw)} MW • Avg: {
-                    P_avg >= 1 
-                      ? `${f3(P_avg)} MW`
-                      : `${f1(P_avg * 1e6)} W`
-                  }
+                  Peak: {fmtPowerUnit(P_raw)} • Avg: {fmtPowerUnit(P_avg)}
                 </p>
               </div>
               <Badge variant={getStatus(P_avg, constraints.P_avg_max) === 'pass' ? 'default' : 'destructive'}>
@@ -479,7 +491,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Raw Power</p>
-                <p className="text-2xl font-bold">{f1(P_raw)} MW</p>
+                <p className="text-2xl font-bold">{fmtPowerUnit(P_raw)}</p>
               </div>
               <Badge variant={getStatus(P_raw, constraints.P_max) === 'pass' ? 'default' : 'destructive'}>
                 {getStatus(P_raw, constraints.P_max) === 'pass' ? '✓' : '✗'}
