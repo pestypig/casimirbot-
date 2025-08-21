@@ -299,8 +299,15 @@ export default function HelixCore() {
   const [modeVersion, setModeVersion] = useState(0);
   
   // 🎛️ Unified curvature gain control (scales both geometry and color)
-  const [curvatureGain, setCurvatureGain] = useState(8.0); // Default: maximum boosted view (×8)
+  const [curvatureGain, setCurvatureGain] = useState(0); // Default: true physics (1×)
   const rafGateRef = useRef<number | null>(null);
+
+  // Compute actual visual multiplier (1× at min, 40× at max)
+  const gainFromDecades = (dec: number, max = 40) => {
+    // Map 0..8 to 1..max with linear ramp (keeps "0 = 1×" invariant)
+    const t = Math.max(0, Math.min(1, (dec ?? 0) / 8));
+    return (1 - t) + t * max;
+  };
   
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);
@@ -326,6 +333,11 @@ export default function HelixCore() {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
   
+  // Ensure engine receives latest gain value (covers late mounts and globals)
+  useEffect(() => {
+    (window as any).__warp_setGainDec?.(curvatureGain, 40);
+  }, [curvatureGain]);
+
   // Scroll to bottom when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
@@ -580,7 +592,7 @@ export default function HelixCore() {
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <WarpVisualizer
-                        key={`mode-${effectiveMode}-v${modeVersion}`}
+                        key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`}
                         parameters={{
                           curvatureGainDec: curvatureGain,
                           dutyCycle: dutyUI,
@@ -662,7 +674,7 @@ export default function HelixCore() {
                         <div className="space-y-1">
                           <Label htmlFor="curvature-gain" className="text-slate-300 text-xs flex items-center gap-2">
                             Curvature Gain
-                            <span className="text-cyan-400 font-mono">{curvatureGain.toFixed(1)}×</span>
+                            <span className="text-cyan-400 font-mono">{gainFromDecades(curvatureGain, 40).toFixed(1)}×</span>
                           </Label>
                           <Input
                             id="curvature-gain"
@@ -686,7 +698,7 @@ export default function HelixCore() {
                             className="w-full"
                           />
                           <div className="text-xs text-slate-400">
-                            {curvatureGain === 0 ? "True physics only" : `Decades boost: 10^${curvatureGain.toFixed(1)} = ${Math.pow(10, curvatureGain).toExponential(1)}`}
+                            {curvatureGain === 0 ? "True physics only" : `Visual boost: ${gainFromDecades(curvatureGain, 40).toFixed(1)}× (raw: ${curvatureGain.toFixed(1)})`}
                           </div>
                         </div>
                       </div>
