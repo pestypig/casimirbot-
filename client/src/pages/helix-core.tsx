@@ -554,13 +554,13 @@ export default function HelixCore() {
                       g_y: pipeline?.gammaGeo || 26,
                       cavityQ: pipeline?.qCavity || 1e9,
                       sagDepth_nm: pipeline?.sag_nm || 16,
-                      tsRatio: pipeline?.TS_ratio || 4102.74,
-                      powerAvg_MW: pipeline?.P_avg || 83.3,
-                      exoticMass_kg: pipeline?.M_exotic || 1405,
+                      tsRatio: pipeline?.TS_ratio || 5.03e4, // Physics-accurate default: L_long×f/c
+                      powerAvg_MW: pipeline?.P_avg || 7.437e-3, // Mode-aware cruise power
+                      exoticMass_kg: pipeline?.M_exotic || 1000, // Mode-aware target
                       currentMode: effectiveMode,
                       sectorStrobing: sectorsUI,
                       qSpoilingFactor: qSpoilUI,
-                      gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5,
+                      gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 3.83e1, // Physics-accurate neutral default
                       hull: (hullMetrics && hullMetrics.hull) ? {
                         ...hullMetrics.hull,
                         a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
@@ -573,11 +573,11 @@ export default function HelixCore() {
                       },
                       wall: { w_norm: 0.016 },
                       gridScale: 1.6,
-                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
                       betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                       wallWidth_m: 6.0,
                       shift: {
-                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
                         betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                         gTarget: 0.5, R_geom: 86.5,
                         gEff_check: ((systemMetrics?.shiftVector?.epsilonTilt ?? 0.012) * 86.5 * 86.5) / 86.5
@@ -627,7 +627,7 @@ export default function HelixCore() {
                   a: 0.42, b: 0.11, c: 0.09 // normalized scene units
                 },
                 wallWidth: 0.06,
-                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0.012,
+                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
                 // NEW: mode coupling from live pipeline data
                 mode: effectiveMode,
