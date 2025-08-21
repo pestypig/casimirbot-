@@ -410,9 +410,6 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.modelMode           = MODEL_MODE; // for client consistency
   
-  // Sectoring HUD coherence
-  state.sectorStrobing = S_total; // 400 for paper partitioning consistency
-  
   // Compliance flags (corrected curvature check)
   state.natarioConstraint   = true;
   state.curvatureLimit      = Math.abs(state.U_cycle ?? 0) < 1e-10;
@@ -444,18 +441,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.overallStatus = 'NOMINAL';
   }
   
-  // Ensure UI duty fields are populated from mode config for consistency  
-  const MODE_UI = {
-    hover:    { dutyCycle: 0.14,  sectorStrobing: 1,   qSpoilingFactor: 1     },
-    cruise:   { dutyCycle: 0.005, sectorStrobing: 400, qSpoilingFactor: 0.001 },
-    emergency:{ dutyCycle: 0.50,  sectorStrobing: 1,   qSpoilingFactor: 1     },
-    standby:  { dutyCycle: 0.001, sectorStrobing: 1,   qSpoilingFactor: 0.1   }
-  } as const;
-  
-  const ui = MODE_UI[state.currentMode];
+  // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
+  const ui = MODE_CONFIGS[state.currentMode];
   state.dutyCycle       = ui.dutyCycle;
-  state.sectorStrobing  = ui.sectorStrobing;
-  state.qSpoilingFactor = ui.qSpoilingFactor;
+  state.sectorStrobing  = ui.sectorStrobing;   // ✅ Use mode-specific value (hover=1, cruise=400)
+  state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   return state;
 }
