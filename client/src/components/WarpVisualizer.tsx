@@ -418,17 +418,16 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
-        // Wire existing 0-8 curvature gain slider directly to engine (same as SliceViewer)
-        curvatureGain: (() => {
-          const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec! : 3;
-          console.log(`🎛️ CURVATURE GAIN DEBUG: parameters.curvatureGainDec=${parameters.curvatureGainDec}, resolved gain=${gain}`);
-          return gain;
+        
+        // NEW: Unified visual boost system (shared with SliceViewer)
+        curvatureGainDec: (() => {
+          const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec! : 0; // Default to 0 = 1×
+          console.log(`🎛️ CURVATURE GAIN DEBUG: curvatureGainDec=${parameters.curvatureGainDec}, resolved=${gain}`);
+          return Math.max(0, Math.min(8, gain));
         })(),
         
-        // 🔬 Physics Parity Mode flag for debug baseline
-        physicsParityMode: parameters.physicsParityMode || false,
-        curvatureBoostMax: Math.max(1, Number(parameters.curvatureBoostMax) || 40), // same as SliceViewer
-        // Engine will handle: curvatureGain 0..8 → curvatureGainT 0..1 → userGain 1..40
+        physicsParity: parameters.physicsParityMode || false, // Renamed from physicsParityMode
+        curvatureBoostMax: (parameters.physicsParityMode) ? 1 : Math.max(1, Number(parameters.curvatureBoostMax) || 40),
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
@@ -515,27 +514,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     console.log(`🎛️ 3D DISPLAY GAIN: curvatureGainDec=${parameters.curvatureGainDec} → displayBoost=${boost.toFixed(2)}× (matches SliceViewer)`);
   }, [parameters.curvatureGainDec, parameters.curvatureBoostMax, isLoaded]);
 
-  // Global bridge for immediate slider updates (bypasses memoization)
-  useEffect(() => {
-    if (!engineRef.current) return;
-    // expose a safe setter used by HelixCore's slider
-    (window as any).__warp_setGainDec = (g: number, boost = 40) => {
-      engineRef.current?.setCurvatureGainDec(g, boost);
-      
-      // Also apply display gain
-      const displayBoost = computeDisplayBoost(g, boost);
-      if (engineRef.current.setUniform) {
-        engineRef.current.setUniform('uDisplayGain', displayBoost);
-      }
-      if (engineRef.current.setDisplayGain) {
-        engineRef.current.setDisplayGain(displayBoost);
-      }
-    };
-
-    return () => {
-      if ((window as any).__warp_setGainDec) delete (window as any).__warp_setGainDec;
-    };
-  }, [isLoaded]);
+  // REMOVED: Global bridge - now using unified visual boost system passed via uniforms
 
   const toggleAnimation = () => {
     setIsRunning(prev => {

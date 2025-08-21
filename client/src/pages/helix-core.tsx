@@ -334,10 +334,7 @@ export default function HelixCore() {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
   
-  // Ensure engine receives latest gain value (covers late mounts and globals)
-  useEffect(() => {
-    (window as any).__warp_setGainDec?.(curvatureGain, 40);
-  }, [curvatureGain]);
+  // REMOVED: Legacy global function call - now using unified visual boost system via WarpVisualizer uniforms
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -767,13 +764,7 @@ export default function HelixCore() {
                               const v = parseFloat(e.target.value);
                               setCurvatureGain(v);                                // drives SliceViewer prop below
 
-                              // also drive the WarpEngine immediately (bypasses any memoization)
-                              if (rafGateRef.current == null) {
-                                rafGateRef.current = requestAnimationFrame(() => {
-                                  rafGateRef.current = null;
-                                  (window as any).__warp_setGainDec?.(v, 40);
-                                });
-                              }
+                              // REMOVED: Legacy direct engine call - now handled via WarpVisualizer uniforms
                             }}
                             className="w-full"
                           />

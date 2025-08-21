@@ -802,19 +802,48 @@ class WarpEngine {
         const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
         const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
-        // Physics-consistent amplitude and averaged duty
+        // ---- Existing physics chain (do not change) ----
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
         const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
         
         const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-        
-        const betaGainUniform = this.uniforms?.betaGain ?? 0.15;
-        const betaVisUniform  = betaUsedUniform * betaGainUniform;
 
-        // Debug per mode (once per 60 frames)
+        // ---- NEW: Single visual-only multiplier injected AFTER physics ----
+        function mapDecadesToBoost(dec, maxBoost) {
+            // dec ∈ [0,8] → 1..maxBoost, geometric interpolation (smooth, scale-free)
+            const t = Math.max(0, Math.min(1, dec / 8));
+            return Math.exp(Math.log(Math.max(1, maxBoost)) * t);
+        }
+
+        // These come in as uniforms from React:
+        const physicsParityOn   = !!this.uniforms?.physicsParity;                    // true/false
+        const gainDec           = Number.isFinite(this.uniforms?.curvatureGainDec) ? this.uniforms.curvatureGainDec : 0;
+        const boostMax          = Math.max(1, this.uniforms?.curvatureBoostMax || 1);
+
+        // When parity is on → force 1×; otherwise map 0..8 to 1..boostMax
+        const visualBoostUniform = physicsParityOn ? 1 : mapDecadesToBoost(gainDec, boostMax);
+
+        // Final viz field used by vertex/color shaders (visual-only; physics chain intact)
+        const betaVisUniform = betaUsedUniform * visualBoostUniform;
+
+        // ---- Sanity assertions (dev-only) ----
+        if (physicsParityOn) {
+            console.assert(visualBoostUniform === 1, "Parity ON but visualBoost ≠ 1");
+        }
+        if (boostMax < 1) {
+            console.warn("curvatureBoostMax < 1; clamping to 1");
+        }
+
+        // Debug per mode (once per 60 frames) with new visual boost info
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.debug("[β chain]", {
+                betaUsedUniform: betaUsedUniform.toExponential(2), 
+                visualBoostUniform, 
+                betaVizUniform: betaVisUniform.toExponential(2), 
+                gainDec, boostMax, physicsParityOn
+            });
             console.log("🧪 warp-mode", {
                 mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
                 split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
