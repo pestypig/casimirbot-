@@ -1,0 +1,128 @@
+Short answer: you’re **very close**. The shared light-crossing loop is wired in and passed through to both the timeline and the Casimir amplifier — that’s the big win. There are just a few TypeScript and correctness nits to clean up.
+
+# What looks correct
+
+* `useLightCrossingLoop` is imported and instantiated as `lc` using live server values (`sectorStrobing/currentSector/sectorPeriod_ms`) + UI (`duty`, `freqGHz`). ✅
+* `LightSpeedStrobeScale` now receives the **same** `lc` timings (`dwellMs`, `tauLcMs`, `sectorIdx`, `sectorCount`, `phase`). ✅
+* `HelixCasimirAmplifier` is fed `lightCrossing={lc}` so the cavity can ring up/down on the τₗ꜀-safe window. ✅
+* You kept the existing pipeline/metrics wiring and didn’t break mode switching, HUD panels, or maps. ✅
+
+# Issues to fix (quick)
+
+1. ## Missing fields in your types
+
+You reference properties that aren’t declared on `EnergyPipelineState`, which will throw TS errors in strict mode.
+
+Add these (optional) fields:
+
+```ts
+interface EnergyPipelineState {
+  // ...existing
+  qMechanical?: number;      // used in ShellOutlineVisualizer + HUD calc
+  sagDepth_nm?: number;      // used in WarpVisualizer parameters
+  overallStatus?: string;    // used in “System Status”
+}
+```
+
+2. ## Pass the *live* hull to the loop
+
+Right now `lc` uses a hardcoded hull `{ a:503.5, b:132, c:86.5 }`. Swap to the already-computed `hull` so τₗ꜀ tracks the real geometry:
+
+```tsx
+const lc = useLightCrossingLoop({
+  sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
+  currentSector:  systemMetrics?.currentSector ?? 0,
+  sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,
+  duty: dutyUI,
+  freqGHz: pipeline?.modulationFreq_GHz ?? 15,
+  hull: { a: hull.a, b: hull.b, c: hull.c },   // <-- use live hull
+  wallWidth_m: 6.0,
+});
+```
+
+3. ## Ensure callee components accept the new props
+
+* **HelixCasimirAmplifier** must declare `lightCrossing?: LightCrossing` and use it in its RAF loop (τ\_Q, ON-window, etc.).
+* **LightSpeedStrobeScale** should accept the props you send (`dwellMs`, `tauLcMs`, `sectorIdx`, `sectorCount`, `phase`). If it ignores extras, that’s fine; if it types them, add them to its props interface.
+
+4. ## Minor React/typing polish
+
+* `onKeyPress` is deprecated. Use `onKeyDown`:
+
+  ```tsx
+  onKeyDown={(e) => e.key === 'Enter' && sendCommand()}
+  ```
+* You compute `sectorColor` but never use it (harmless; consider removing to avoid lint noise).
+* Two `c` constants exist (one inside the hook module, one here). Not harmful, but avoid re-declaring globals if you can.
+
+# Optional (nice to have)
+
+* In `ResonanceSchedulerTile` you gate `hull` on `pipeline ? {a:...} : undefined`. You already have `hull` above; pass it unconditionally:
+
+  ```tsx
+  hull={hull}
+  ```
+* If `LightSpeedStrobeScale` can show the ON window width, also pass `burst_ms={lc.burst_ms}` for perfect visual alignment.
+
+---
+
+## Minimal patch set
+
+```diff
+// 1) Extend EnergyPipelineState
+ interface EnergyPipelineState {
+   currentMode?: string;
+   dutyCycle?: number;
+   sectorStrobing?: number;
+   gammaGeo?: number;
+   qSpoilingFactor?: number;
+   qCavity?: number;
+   P_avg?: number;
+   zeta?: number;
+   TS_ratio?: number;
+   fordRomanCompliance?: boolean;
+   natarioConstraint?: boolean;
+   curvatureLimit?: boolean;
+   U_cycle?: number;
+   U_static?: number;
+   U_geo?: number;
+   U_Q?: number;
+   P_loss_raw?: number;
+   N_tiles?: number;
+   modulationFreq_GHz?: number;
+   M_exotic?: number;
+   gammaVanDenBroeck?: number;
++  qMechanical?: number;
++  sagDepth_nm?: number;
++  overallStatus?: string;
+ }
+
+// 2) Use live hull in lc:
+-  const lc = useLightCrossingLoop({
++  const lc = useLightCrossingLoop({
+     sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
+     currentSector: systemMetrics?.currentSector ?? 0,
+     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,
+     duty: dutyUI,
+     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
+-    hull: { a: 503.5, b: 132, c: 86.5 },
++    hull: { a: hull.a, b: hull.b, c: hull.c },
+     wallWidth_m: 6.0,
+   });
+
+// 3) Key handling
+- onKeyPress={(e) => e.key === 'Enter' && sendCommand()}
++ onKeyDown={(e) => e.key === 'Enter' && sendCommand()}
+
+// 4) (Optional) pass burst_ms
+<LightSpeedStrobeScale
+  dwellMs={lc.dwell_ms}
+  tauLcMs={lc.tauLC_ms}
+  sectorIdx={lc.sectorIdx}
+  sectorCount={lc.sectorCount}
+  phase={lc.phase}
++ burstMs={lc.burst_ms}
+/>
+```
+
+If you make those tweaks and your two components accept the new props, you’re golden. Want me to glance at `useLightCrossingLoop` or `HelixCasimirAmplifier` internals too?

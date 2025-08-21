@@ -119,6 +119,9 @@ interface EnergyPipelineState {
   modulationFreq_GHz?: number;
   M_exotic?: number;
   gammaVanDenBroeck?: number;
+  qMechanical?: number;      // used in ShellOutlineVisualizer + HUD calc
+  sagDepth_nm?: number;      // used in WarpVisualizer parameters
+  overallStatus?: string;    // used in "System Status"
 }
 
 interface SystemMetrics {
@@ -309,6 +312,14 @@ export default function HelixCore() {
     ? pipeline!.sectorStrobing!
     : (modeCfg.sectorStrobing ?? 1);
 
+  // Calculate hull geometry before using it
+  const hull = (hullMetrics && hullMetrics.hull) ? {
+    ...hullMetrics.hull,
+    a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+    b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+    c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+  } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+
   // Shared light-crossing loop for synchronized strobing across all visual components  
   const lc = useLightCrossingLoop({
     sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
@@ -316,7 +327,7 @@ export default function HelixCore() {
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,
     duty: dutyUI,
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
-    hull: { a: 503.5, b: 132, c: 86.5 },
+    hull: { a: hull.a, b: hull.b, c: hull.c },   // use live hull geometry
     wallWidth_m: 6.0,
   });
 
@@ -340,12 +351,6 @@ export default function HelixCore() {
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665, c = 299792458;
-  const hull = (hullMetrics && hullMetrics.hull) ? {
-    ...hullMetrics.hull,
-    a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-    b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-    c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-  } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
   const gTargets: Record<string, number> = {
     hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
   };
@@ -930,6 +935,7 @@ export default function HelixCore() {
               sectorIdx={lc.sectorIdx}
               sectorCount={lc.sectorCount}
               phase={lc.phase}
+              burstMs={lc.burst_ms}
             />
           </CardContent>
         </Card>
@@ -1384,7 +1390,7 @@ export default function HelixCore() {
               freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
               sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
               currentSector={systemMetrics?.currentSector}
-              hull={pipeline ? { a: 503.5, b: 132, c: 86.5 } : undefined}
+              hull={hull}
               wallWidth_m={6.0}
             />
           </div>
@@ -1449,7 +1455,7 @@ export default function HelixCore() {
                       <Input
                         value={commandInput}
                         onChange={(e) => setCommandInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && sendCommand()}
+                        onKeyDown={(e) => e.key === 'Enter' && sendCommand()}
                         placeholder="Ask HELIX-CORE..."
                         className="bg-slate-950 border-slate-700 text-slate-100"
                         disabled={isProcessing}
