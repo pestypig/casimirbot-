@@ -424,6 +424,20 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
+        // 🔬 PHYSICS PARITY MODE DETECTION
+        const physicsParityMode = parameters.physicsParityMode === true;
+        
+        if (physicsParityMode) {
+            console.warn('🔬 PHYSICS PARITY MODE ACTIVE: All visual multipliers forced to unity for debug baseline');
+            
+            // Suppress global boost injections
+            if (typeof window !== 'undefined' && window.__warp_setGainDec) {
+                console.warn('🔬 PARITY MODE: Suppressing global warp boost injections');
+                // Temporarily disable global boosts
+                window.__warp_setGainDec = () => {};
+            }
+        }
+        
         // Update internal parameters with operational mode integration
         this.currentParams = { ...this.currentParams, ...parameters };
         // If caller provided a cameraZ override, keep it
@@ -469,9 +483,9 @@ class WarpEngine {
             axesClip: axesScene,
             driveDir: parameters.driveDir || [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
-            epsilonTilt: N(parameters.epsilonTilt || 0),
-            epsilonTiltFloor: N(parameters.epsilonTiltFloor || 0),
-            betaTiltVec: parameters.betaTiltVec || [0, -1, 0],
+            epsilonTilt: physicsParityMode ? 0 : N(parameters.epsilonTilt || 0), // 🔬 Force zero tilt in parity mode
+            epsilonTiltFloor: physicsParityMode ? 0 : N(parameters.epsilonTiltFloor || 0), // 🔬 Force zero tilt floor
+            betaTiltVec: physicsParityMode ? [0, 0, 0] : (parameters.betaTiltVec || [0, -1, 0]), // 🔬 Force zero tilt vector
             tiltGain: N(parameters.tiltGain || 0.55),
             exposure: N(parameters.exposure || 6.0),
             zeroStop: N(parameters.zeroStop || 1e-7),
@@ -496,6 +510,11 @@ class WarpEngine {
             })(),
             
             userGain: (() => {
+                // 🔬 Physics Parity Mode: Force unity gain
+                if (physicsParityMode) {
+                    return 1;
+                }
+                
                 const clamp01 = t => Math.max(0, Math.min(1, t));
                 const boostMax = Number.isFinite(parameters.curvatureBoostMax)
                     ? Math.max(1, parameters.curvatureBoostMax)
@@ -520,6 +539,11 @@ class WarpEngine {
             
             // Calculate thetaScale for unified color mapping with SliceViewer
             thetaScale: (() => {
+                // 🔬 Physics Parity Mode: Force unity values
+                if (physicsParityMode) {
+                    return 0; // Zero theta scale for flat baseline
+                }
+                
                 const gammaGeo = N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y ?? 26);
                 const qSpoil = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1.0);
                 const gammaVdB = N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 3.83e1);
@@ -532,16 +556,16 @@ class WarpEngine {
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
-            dutyCycle: dutyFrac,
-            gammaGeo: N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y),
-            Qburst: N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ),
-            deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1),
-            gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1),
-            sectors: Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorStrobing ?? 1))),
-            split: Math.max(0, Math.min(
+            dutyCycle: physicsParityMode ? 1 : dutyFrac, // 🔬 Force unity duty cycle in parity mode
+            gammaGeo: physicsParityMode ? 1 : N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y), // 🔬 Force unity
+            Qburst: physicsParityMode ? 1 : N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ), // 🔬 Force unity
+            deltaAOverA: physicsParityMode ? 1 : N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1), // 🔬 Force unity
+            gammaVdB: physicsParityMode ? 1 : N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1), // 🔬 Force unity
+            sectors: physicsParityMode ? 1 : Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorStrobing ?? 1))), // 🔬 Force 1 sector
+            split: physicsParityMode ? 0 : Math.max(0, Math.min(
                 (N(parameters.sectors ?? parameters.sectorStrobing ?? 1)) - 1,
                 Math.floor(N(parameters.split ?? ((mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50) * N(parameters.sectors ?? parameters.sectorStrobing ?? 1))))
-            )),
+            )), // 🔬 Force 0 split in parity mode
             viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
         };
 
@@ -575,6 +599,30 @@ class WarpEngine {
             this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
         }
         
+        // 🔬 PHYSICS PARITY MODE: Comprehensive uniform logging for debug baseline
+        if (physicsParityMode) {
+            console.warn('🔬 PHYSICS PARITY UNIFORM LOGGING:', {
+                A_geoUniform: this.uniforms?.gammaGeo || 1,
+                QburstUniform: this.uniforms?.Qburst || 1,
+                gammaVdBUniform: this.uniforms?.gammaVdB || 1,
+                qSpoilUniform: this.uniforms?.deltaAOverA || 1,
+                dutyCycleUniform: this.uniforms?.dutyCycle || 1,
+                sectorsUniform: this.uniforms?.sectors || 1,
+                betaInstUniform: 'calculated in _warpGridVertices',
+                betaAvgUniform: 'calculated in _warpGridVertices',
+                betaUsedUniform: 'calculated in _warpGridVertices',
+                thetaScaleUniform: this.uniforms?.thetaScale || 0,
+                userGainUniform: this.uniforms?.userGain || 1,
+                curvatureBoostMaxUniform: this.uniforms?.curvatureBoostMax || 1,
+                curvatureGainTUniform: this.uniforms?.curvatureGainT || 0,
+                epsilonTiltUniform: this.uniforms?.epsilonTilt || 0,
+                betaTiltVecUniform: this.uniforms?.betaTiltVec || [0,0,0],
+                wallWidthUniform: this.uniforms?.wallWidth || 0.016,
+                exposureUniform: this.uniforms?.exposure || 6,
+                zeroStopUniform: this.uniforms?.zeroStop || 1e-7
+            });
+        }
+
         // Log tilt uniforms for diagnostics
         if (this._diagEnabled || true) {  // Always log for now
           console.log('🎛️ Tilt uniforms:', {
