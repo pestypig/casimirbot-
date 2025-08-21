@@ -274,27 +274,18 @@ function InteractiveHeatMap({
     const newParams = { ...localParams, [key]: value };
     setLocalParams(newParams);
     
-    // If mode changed, update duty and other mode-specific parameters
+    // If mode changed, update dutyCycle and other mode-specific parameters
     if (key === 'selectedMode' && typeof value === 'string') {
       if (onModeChange) {
         onModeChange(value); // Notify parent component
       }
-      const mode = modePresets[value as keyof typeof modePresets];
-      if (mode) {
-        newParams.duty = mode.duty;
-        // Update constraint defaults based on mode
-        switch(value) {
-          case "hover":
-            newParams.maxPower = 120; newParams.maxZeta = 0.1; break;
-          case "cruise":
-            newParams.maxPower = 20; newParams.maxZeta = 1.5; break;
-          case "emergency":
-            newParams.maxPower = 400; newParams.maxZeta = 0.05; break;
-          case "standby":
-            newParams.maxPower = 10; newParams.maxZeta = 10; break;
-        }
-        setLocalParams(newParams);
-      }
+      const resolved = resolveModeNumbers(value, pipeline);
+      const constraints = getModeConstraintDefaults(value);
+      
+      newParams.dutyCycle = resolved.dutyCycle;
+      newParams.qCavity = resolved.qCavity;
+      Object.assign(newParams, constraints);
+      setLocalParams(newParams);
     }
     
     if (onParameterChange) {
@@ -320,10 +311,10 @@ function InteractiveHeatMap({
           // Include current mode configuration for exact Live Energy Pipeline matching
           currentMode: currentMode,
           modeConfig: {
-            duty: currentMode.duty,
-            sectors: currentMode.sectors,
-            qSpoiling: currentMode.qSpoiling,
-            pocketGamma: currentMode.pocketGamma
+            dutyCycle: resolved.dutyCycle,
+            sectorStrobing: resolved.sectorStrobing,
+            qSpoilingFactor: resolved.qSpoilingFactor,
+            gammaVanDenBroeck: resolved.gammaVanDenBroeck
           }
         };
         const gridResult = computeViabilityGrid(enhancedParams, 25);
@@ -387,23 +378,21 @@ function InteractiveHeatMap({
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
                 // Trigger zen toast with current metrics
-                const preset = modePresets[value as keyof typeof modePresets];
-                if (preset) {
-                  zenLongToast("mode:switch", {
-                    mode: preset.name,
-                    duty: preset.duty,
-                    powerMW: parseFloat(preset.description.split('MW')[0]) || 83.3,
-                    exoticKg: parseInt(preset.description.split('kg')[0].split('• ')[1]) || 1405,
-                    zeta: parseFloat(preset.description.split('ζ=')[1]) || 0.032
-                  });
-                }
+                const resolved = resolveModeNumbers(value, pipeline);
+                zenLongToast("mode:switch", {
+                  mode: resolved.dutyCycle === 0.14 ? 'Hover' : resolved.dutyCycle === 0.005 ? 'Cruise' : resolved.dutyCycle === 0.5 ? 'Emergency' : 'Standby',
+                  duty: resolved.dutyCycle,
+                  powerMW: resolved.P_avg,
+                  exoticKg: pipeline?.M_exotic ?? 1405,
+                  zeta: pipeline?.zeta ?? 0.032
+                });
               }}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(modePresets).map(([key, mode]) => (
+                {Object.entries(legacyModePresets).map(([key, mode]) => (
                   <SelectItem key={key} value={key}>
                     {mode.name} - {mode.description}
                   </SelectItem>
@@ -411,8 +400,8 @@ function InteractiveHeatMap({
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Current: {currentMode.duty * 100}% duty, {currentMode.sectors === 1 ? 'no' : `${currentMode.sectors}-sector`} strobing, 
-              {currentMode.qSpoiling === 1 ? 'no' : `${(currentMode.qSpoiling * 1000).toFixed(0)}×10⁻³`} Q-spoiling
+              Current: {currentMode.dutyCycle * 100}% duty, {currentMode.sectorStrobing === 1 ? 'no' : `${currentMode.sectorStrobing}-sector`} strobing, 
+              {currentMode.qSpoilingFactor === 1 ? 'no' : `${(currentMode.qSpoilingFactor * 1000).toFixed(0)}×10⁻³`} Q-spoiling
             </p>
           </div>
           
@@ -445,13 +434,13 @@ function InteractiveHeatMap({
             {/* Q-Factors (Two Types) */}
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label>Cavity Q-Factor: {formatQFactor(localParams.qFactor)} <span className="text-xs text-blue-600">(User Control)</span></Label>
-                <div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
+                <Label>Cavity Q-Factor: {formatQFactor(localParams.qCavity)} <span className="text-xs text-blue-600">(User Control)</span></Label>
+                <div onDoubleClick={() => handleSliderDoubleClick('qCavity')}>
                   <Slider
-                    value={[Math.log10(localParams.qFactor)]}
+                    value={[Math.log10(localParams.qCavity)]}
                     onValueChange={([value]) => {
                       const qFactor = Math.pow(10, value);
-                      updateParameter('qFactor', qFactor);
+                      updateParameter('qCavity', qFactor);
                       zenLongToast("geom:qfactor", {
                         qFactor: qFactor,
                         powerMW: 83.3, // Current power estimate
@@ -465,12 +454,12 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode.cavityQ)})
+                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode.qCavity)})
                 </p>
               </div>
               
               <div className="bg-muted/30 rounded p-2">
-                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
+                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode.qMechanical)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
                 </p>
@@ -479,12 +468,12 @@ function InteractiveHeatMap({
             
             {/* Duty Cycle - Mode-controlled but still adjustable */}
             <div className="space-y-2">
-              <Label>Duty Cycle: {(localParams.duty * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
-              <div onDoubleClick={() => handleSliderDoubleClick('duty')}>
+              <Label>Duty Cycle: {(localParams.dutyCycle * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
+              <div onDoubleClick={() => handleSliderDoubleClick('dutyCycle')}>
                 <Slider
-                  value={[localParams.duty * 100]}
-                  onValueChange={([value]) => updateParameter('duty', value / 100)}
-                  min={0.1}
+                  value={[localParams.dutyCycle * 100]}
+                  onValueChange={([value]) => updateParameter('dutyCycle', value / 100)}
+                  min={0}
                   max={50}
                   step={0.1}
                   className="w-full cursor-pointer"
@@ -492,7 +481,7 @@ function InteractiveHeatMap({
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Set by operational mode ({currentMode.name}) • Double-click to reset to mode default ({(currentMode.duty * 100).toFixed(1)}%)
+                Set by operational mode ({currentMode.name}) • Double-click to reset to mode default ({(currentMode.dutyCycle * 100).toFixed(1)}%)
               </p>
             </div>
             
@@ -577,19 +566,19 @@ function InteractiveHeatMap({
               
               {/* Time-scale Separation */}
               <div className="space-y-2">
-                <Label>Min Time-scale: {localParams.minTimescale.toFixed(3)}</Label>
+                <Label>Min TS Ratio: {localParams.minTimescale.toFixed(0)}</Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('minTimescale')}>
                   <Slider
                     value={[Math.log10(localParams.minTimescale)]}
                     onValueChange={([value]) => updateParameter('minTimescale', Math.pow(10, value))}
-                    min={-4}
-                    max={-1}
+                    min={2}
+                    max={5}
                     step={0.1}
                     className="w-full cursor-pointer"
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Universal homogenization threshold (TS_ratio ≥ 100) • Double-click to apply research value (0.010)
+                  Universal homogenization threshold (TS_ratio ≥ 100) • Double-click to apply research value (100)
                 </p>
               </div>
             </div>
@@ -609,7 +598,7 @@ function InteractiveHeatMap({
           <MetricsDashboard viabilityParams={{
             ...viabilityParams,
             selectedMode: selectedMode,
-            duty: localParams.duty
+            dutyCycle: localParams.dutyCycle
           }} />
         </CardContent>
       </Card>
