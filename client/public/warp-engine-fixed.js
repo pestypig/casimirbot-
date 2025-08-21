@@ -35,6 +35,11 @@ class WarpEngine {
         // Initialize uniform dirty flag
         this._uniformsDirty = false;
         
+        // Debug mode and performance tracking
+        this._debugMode = false;
+        this._lastDebugTime = 0;
+        this._lastRenderLog = 0;
+        
         // Cache for responsive camera
         this._lastAxesScene = null;
         this._gridSpan = null;
@@ -557,19 +562,18 @@ class WarpEngine {
     _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
-        // Enhanced wall thickness handling (meters vs normalized)
-        const wallWidth_m = (bubbleParams.wallWidth_m ?? null) != null
-            ? bubbleParams.wallWidth_m
-            : (bubbleParams.wallWidth ?? 0.06) * 100; // Convert normalized to meters if needed
+        // Clean wall thickness handling - use either meters or ρ-units
+        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
+        const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
+        const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m)   ? bubbleParams.wallWidth_m   : undefined;
+        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho : undefined;
+        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
         
         // Single scene scale based on long semi-axis (scientifically faithful)
-        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
         const sceneScale = 1.0 / a;  // Make long semi-axis = 1 scene unit
         const axesScene = [a * sceneScale, b * sceneScale, c * sceneScale]; // Exact aspect ratio [1, b/a, c/a]
         
-        // Convert wall thickness to ρ-space using harmonic mean
-        const aH = 3 / (1/a + 1/b + 1/c);  // Harmonic mean of semi-axes
-        const w_rho = wallWidth_m / aH;     // Dimensionless wall thickness
+        // Use the computed w_rho from above
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
@@ -592,7 +596,7 @@ class WarpEngine {
         const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
         const geoAmp = Math.pow(gammaGeo, 3);                               // γ_geo^3
         const qSpoil = Math.max(1e-9, (bubbleParams.qSpoilingFactor || bubbleParams.deltaAOverA || 1)); // [0..1]
-        const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 2.86e5);
+        const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 3.83e1);
         
         // 2) Duty / strobing: use the same effective definitions the server uses
         const sectors = Math.max(1, bubbleParams.sectors || bubbleParams.sectorStrobing || 1);
@@ -623,7 +627,7 @@ class WarpEngine {
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
-        console.log(`  Wall: ${wallWidth_m} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
+        console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${spanPadding})`);
         console.log(`  🔬 PHYSICS SCALING: γ³=${geoAmp.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${vdbAmp.toExponential(2)}`);
         console.log(`  📊 DUTY FACTORS: instant=${dutyInstEff.toExponential(2)}, avg=${dutyAvgEff.toExponential(2)} (sectors=${sectors})`);
@@ -753,7 +757,7 @@ class WarpEngine {
                 (n[2]/c_m)*(n[2]/c_m)
             );
             const R_eff = 1.0 / Math.max(invR, 1e-6);
-            const w_rho_local = wallWidth_m / R_eff;   // thickness in ρ-units
+            const w_rho_local = w_rho / R_eff;   // thickness in ρ-units
             
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps
@@ -769,7 +773,7 @@ class WarpEngine {
             const gammaGeo = this.uniforms?.gammaGeo ?? 26;
             const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
             const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
-            const gammaVdB = this.uniforms?.gammaVdB ?? 2.86e5;
+            const gammaVdB = this.uniforms?.gammaVdB ?? 3.83e1;
             const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
             const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
             const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
@@ -910,7 +914,11 @@ class WarpEngine {
             return;
         }
         
-        console.log("Using grid program for rendering...");
+        // Throttled logging for performance
+        if (this._debugMode && Date.now() - (this._lastDebugTime || 0) > 1000) {
+            console.log("Using grid program for rendering...");
+            this._lastDebugTime = Date.now();
+        }
         gl.useProgram(this.gridProgram);
         
         // Bind vertex data
@@ -946,7 +954,11 @@ class WarpEngine {
         const vertexCount = this.gridVertices.length / 3;
         gl.drawArrays(gl.LINES, 0, vertexCount);
         
-        console.log(`Rendered ${vertexCount} grid lines with 3D perspective - should now be visible!`);
+        // Throttled render logging
+        if (this._debugMode && Date.now() - (this._lastRenderLog || 0) > 1000) {
+            console.log(`Rendered ${vertexCount} grid lines with 3D perspective - should now be visible!`);
+            this._lastRenderLog = Date.now();
+        }
         
         // Clean up
         gl.disableVertexAttribArray(positionLocation);
@@ -954,8 +966,8 @@ class WarpEngine {
     }
 
     _renderLoop() {
+        this._raf = requestAnimationFrame(() => this._renderLoop());
         this._render();
-        requestAnimationFrame(() => this._renderLoop());
     }
 
     _render() {
@@ -1218,13 +1230,37 @@ class WarpEngine {
     }
 
     destroy() {
+        // Cancel animation frame
+        if (this._raf) {
+            cancelAnimationFrame(this._raf);
+            this._raf = null;
+        }
+        
+        // Clean up event listeners
         window.removeEventListener('resize', this._resize);
-        if (this.gridVbo) {
-            this.gl.deleteBuffer(this.gridVbo);
+        
+        // Clean up WebGL resources
+        const gl = this.gl;
+        if (gl) {
+            if (this.gridProgram) {
+                gl.deleteProgram(this.gridProgram);
+                this.gridProgram = null;
+            }
+            
+            if (this.gridVbo) {
+                gl.deleteBuffer(this.gridVbo);
+                this.gridVbo = null;
+            }
         }
-        if (this.gridProgram) {
-            this.gl.deleteProgram(this.gridProgram);
-        }
+        
+        // Clear callbacks
+        this.onDiagnostics = null;
+        
+        // Clear vertex arrays
+        this.gridVertices = null;
+        this.originalGridVertices = null;
+        
+        console.log("WarpEngine resources cleaned up");
     }
 }
 

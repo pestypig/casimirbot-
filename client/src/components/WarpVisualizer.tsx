@@ -126,7 +126,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               gammaGeo: num(parameters.g_y, 26),
               Qburst: num(parameters.cavityQ, 1e9),
               deltaAOverA: num(parameters.qSpoilingFactor, 1),
-              gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // Pipeline-aligned default
+              gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1), // Corrected physics default
               currentMode: mode,
               sectors,
               split: phaseSplit,
@@ -330,7 +330,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaGeo: n(parameters.g_y, 26),
         Qburst: n(parameters.cavityQ, 1e9),
         deltaAOverA: n(parameters.qSpoilingFactor, 1),
-        gammaVdB: n(parameters.gammaVanDenBroeck, 2.86e5),
+        gammaVdB: n(parameters.gammaVanDenBroeck, 3.83e1),
 
         // Hull / wall
         hullAxes: [n(hull.a), n(hull.b), n(hull.c)],
