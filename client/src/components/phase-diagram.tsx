@@ -139,31 +139,37 @@ function InteractiveHeatMap({
 
   const initialConstraints = getModeConstraintDefaults(initialMode);
 
-  // Local parameter state for sliders - initialized with correct mode preset
+  // Local parameter state for sliders - initialized with safe numeric fallbacks
   const [localParams, setLocalParams] = useState({
     selectedMode: initialMode,
-    gammaGeo: viabilityParams?.gammaGeo || 26,
-    qCavity: viabilityParams?.qCavity || initialPreset.qCavity,
-    dutyCycle: viabilityParams?.dutyCycle || initialPreset.dutyCycle,
-    sagDepth: viabilityParams?.sagDepth || 16,
-    maxPower: viabilityParams?.maxPower || initialConstraints.maxPower,
-    massTolerance: viabilityParams?.massTolerance || initialConstraints.massTolerance,
-    maxZeta: viabilityParams?.maxZeta || initialConstraints.maxZeta,
-    minTimescale: viabilityParams?.minTimescale || initialConstraints.minTimescale
+    gammaGeo: Number.isFinite(viabilityParams?.gammaGeo) ? viabilityParams.gammaGeo : 26,
+    qCavity: Number.isFinite(viabilityParams?.qCavity) && viabilityParams.qCavity > 0
+      ? viabilityParams.qCavity
+      : (initialPreset?.qCavity ?? 1e9),
+    dutyCycle: Number.isFinite(viabilityParams?.dutyCycle) ? viabilityParams.dutyCycle : (initialPreset?.dutyCycle ?? 0.14),
+    sagDepth: Number.isFinite(viabilityParams?.sagDepth) ? viabilityParams.sagDepth : 16,
+    maxPower: Number.isFinite(viabilityParams?.maxPower) ? viabilityParams.maxPower : initialConstraints.maxPower,
+    massTolerance: Number.isFinite(viabilityParams?.massTolerance) ? viabilityParams.massTolerance : initialConstraints.massTolerance,
+    maxZeta: Number.isFinite(viabilityParams?.maxZeta) ? viabilityParams.maxZeta : initialConstraints.maxZeta,
+    minTimescale: Number.isFinite(viabilityParams?.minTimescale) ? viabilityParams.minTimescale : initialConstraints.minTimescale
   });
   
   // Get current mode configuration (use passed selectedMode instead of local state)
   const currentMode = legacyModePresets[selectedMode as keyof typeof legacyModePresets] || legacyModePresets.hover;
 
-  // Format Q-Factor for better readability
-  const formatQFactor = (qFactor: number) => {
-    if (qFactor >= 1e9) {
-      return `${(qFactor / 1e9).toFixed(1)}×10⁹`;
-    } else if (qFactor >= 1e6) {
-      return `${(qFactor / 1e6).toFixed(1)}×10⁶`;
-    } else {
-      return qFactor.toExponential(1);
-    }
+  // Safe parser for numeric values with fallbacks
+  const safeParse = <T extends number>(v: any, d: T): T => {
+    const n = Number(v);
+    return (Number.isFinite(n) ? (n as T) : d);
+  };
+
+  // Format Q-Factor for better readability (hardened against undefined/NaN)
+  const formatQFactor = (q: unknown) => {
+    const n = Number(q);
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}×10⁹`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}×10⁶`;
+    return n.toExponential(1);
   };
   
   // Helper to apply a mode preset to all parameters
@@ -311,10 +317,10 @@ function InteractiveHeatMap({
           // Include current mode configuration for exact Live Energy Pipeline matching
           currentMode: currentMode,
           modeConfig: {
-            dutyCycle: resolved.dutyCycle,
-            sectorStrobing: resolved.sectorStrobing,
-            qSpoilingFactor: resolved.qSpoilingFactor,
-            gammaVanDenBroeck: resolved.gammaVanDenBroeck
+            dutyCycle: (resolved as any)?.dutyCycle || currentMode.dutyCycle,
+            sectorStrobing: (resolved as any)?.sectorStrobing || currentMode.sectorStrobing,
+            qSpoilingFactor: (resolved as any)?.qSpoilingFactor || currentMode.qSpoilingFactor,
+            gammaVanDenBroeck: (resolved as any)?.gammaVanDenBroeck || currentMode.gammaVanDenBroeck
           }
         };
         const gridResult = computeViabilityGrid(enhancedParams, 25);
@@ -383,8 +389,8 @@ function InteractiveHeatMap({
                   mode: resolved.dutyCycle === 0.14 ? 'Hover' : resolved.dutyCycle === 0.005 ? 'Cruise' : resolved.dutyCycle === 0.5 ? 'Emergency' : 'Standby',
                   duty: resolved.dutyCycle,
                   powerMW: resolved.P_avg,
-                  exoticKg: pipeline?.M_exotic ?? 1405,
-                  zeta: pipeline?.zeta ?? 0.032
+                  exoticKg: (pipeline as any)?.M_exotic ?? 1405,
+                  zeta: (pipeline as any)?.zeta ?? 0.032
                 });
               }}
             >
@@ -437,14 +443,18 @@ function InteractiveHeatMap({
                 <Label>Cavity Q-Factor: {formatQFactor(localParams.qCavity)} <span className="text-xs text-blue-600">(User Control)</span></Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('qCavity')}>
                   <Slider
-                    value={[Math.log10(localParams.qCavity)]}
+                    value={[(() => {
+                      const n = Number(localParams.qCavity);
+                      return Number.isFinite(n) && n > 0 ? Math.log10(n) : 6; // default to 1e6
+                    })()]}
                     onValueChange={([value]) => {
-                      const qFactor = Math.pow(10, value);
+                      // clamp to [1e6, 1e10] like your min/max
+                      const qFactor = Math.min(1e10, Math.max(1e6, Math.pow(10, value)));
                       updateParameter('qCavity', qFactor);
                       zenLongToast("geom:qfactor", {
-                        qFactor: qFactor,
-                        powerMW: 83.3, // Current power estimate
-                        zeta: 0.032 // Current zeta
+                        qFactor,
+                        powerMW: 83.3,
+                        zeta: 0.032
                       });
                     }}
                     min={6}
@@ -454,12 +464,12 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode.qCavity)})
+                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode?.qCavity)})
                 </p>
               </div>
               
               <div className="bg-muted/30 rounded p-2">
-                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode.qMechanical)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
+                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode?.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
                 </p>
