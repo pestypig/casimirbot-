@@ -1,0 +1,119 @@
+Short answer: there are still quite a few “magic numbers.” Most are UI/visualization choices (camera, colors, log-compression, smoothing), but a few slip into physics-ish paths. I’d keep them—just lift them into a named config so they’re explicit and tunable.
+
+Here’s a quick audit (what/why/impact):
+
+* Grid & layout
+
+  * `GRID_DEFAULTS.spanPadding = 1.35 / 1.45`, `minSpan = 2.6`, `divisions = 100` → visual framing density.
+  * `_createGrid`: `baseDiv ≥ 160`, `targetVertsAcrossWall = 12`, cap `divisions ≤ 320`, `yBase = -0.15`, `yVariation = 0.05` → mesh quality + a small Z-fighting avoider.
+* Camera
+
+  * `_fitFovForAspect`: `fovDesktop = π/3.272 (~55°)`, `fovPortrait = π/2.65 (~68°)`, blend cutoff `1.2`, range `0.6`.
+  * Overhead margins: `baseMargin = 1.22`, portrait multiplier `1.12`. Near/far planes `0.08–100` or `0.1–200`. Eye/center scale factors: `0.62 R`, `-0.12 R`.
+  * DPR cap: `1.5` on phones, `2.0` desktop.
+* Rendering & shading
+
+  * Diverging colormap RGB triplets (blue/white/orange), interior violet `(0.70, 0.30, 1.00)` → color design.
+  * Alpha: grid `0.85/0.9`.
+  * Temporal smoothing: `_dispAlpha = 0.25`.
+* Physics→visual bridge (important to name!)
+
+  * Default wall width in ρ: `0.016` (if not computed), grid deformation gain `gridK = 0.12`.
+  * Visual normalizer `vizNorm = 1e-9`, viewer gain `vizGain = 4.0` (and optional `vizGainOverride`), exposure `6.0`, zeroStop `1e-7`.
+  * Log compression knee `k = 1e10`, slope `s = 1.0`, modeScale map (`0.05, 0.25, 0.60, 0.90`).
+  * Strobing smooth width `strobeWidth = 1.5`, front/back soft sign divisor `0.15`.
+  * Displacement clamp: `maxPush = 0.15` (and `softClamp=tanh(x/m)`).
+  * Interior gravity window: `w_int = max(3×wallWidth, 0.02)`, `tiltGain = 0.55`, interior tint gain `tintViz = 8.0`, max tilt `0.05`.
+  * Standby flattening: `disp = 0` (hard choice—documented).
+* Defaults that look physical but are really viewer defaults
+
+  * `axesClip` `[0.40, 0.22, 0.22]` (fallback) and hull axes `[503.5,132,86.5] m` are fine, but keep them coming from pipeline when possible.
+  * `wallWidth` fallback `0.06` (shader side) vs ρ default `0.016` (CPU side) — these differ in units; your code later overwrites shader uniform, but make both unit-labeled to avoid regressions.
+
+### Suggestion: centralize into a named config (no functional change)
+
+Drop this once at the top and replace literals with references. It makes review & tuning easy.
+
+```ts
+// ---- Visualization & Physics-Bridge Constants (no hidden magic) ----
+const VIS = {
+  // Grid & mesh
+  spanPaddingDesktop: 1.35,
+  spanPaddingPhone: 1.45,
+  minSpan: 2.6,
+  baseDivMin: 160,
+  divCap: 320,
+  targetVertsAcrossWall: 12,
+  yBase: -0.15,
+  yVariation: 0.05,
+
+  // Camera
+  fovDesktopRad: Math.PI / 3.272,   // ~55°
+  fovPortraitRad: Math.PI / 2.65,   // ~68°
+  portraitAspectKnee: 1.2,
+  portraitBlendWidth: 0.6,
+  baseMargin: 1.22,
+  portraitMarginMul: 1.12,
+  nearFar: { near: 0.08, far: 100.0 },
+  nearFarAlt: { near: 0.1, far: 200.0 },
+  eyeYScale: 0.62,
+  lookDownScale: -0.12,
+  dprCapPhone: 1.5,
+  dprCapDesktop: 2.0,
+
+  // Shading & colors
+  colorDiverge: {
+    blue: [0.15, 0.45, 1.0],
+    white: [1, 1, 1],
+    red: [1.0, 0.45, 0.0],
+  },
+  interiorViolet: [0.70, 0.30, 1.00],
+  alphaGrid: 0.85,
+  alphaGridGL2: 0.9,
+
+  // Temporal smoothing
+  dispBlendAlpha: 0.25,
+
+  // Physics→visual bridge
+  defaultWallWidthRho: 0.016,      // ρ-units, used only if not computed
+  gridGain: 0.12,                   // geometry push gain
+  vizNorm: 1e-9,                    // amplitude normalizer
+  vizGainDefault: 4.0,
+  exposureDefault: 6.0,
+  zeroStopDefault: 1e-7,
+  logKnee: 1e10,
+  logSlope: 1.0,
+  modeScale: { standby: 0.05, cruise: 0.25, hover: 0.60, emergency: 0.90 },
+  strobeBlendWidth: 1.5,
+  frontBackSoftDiv: 0.15,
+  maxPush: 0.15,                    // clamp ceiling
+  interior: { minWindow: 0.02, widthMul: 3.0, tiltGain: 0.55, maxTilt: 0.05, tintViz: 8.0 },
+};
+```
+
+Then replace usages, e.g.
+
+* `const strobeWidth = VIS.strobeBlendWidth;`
+* `const maxPush = VIS.maxPush;`
+* camera FOV/margins from `VIS`.
+* shader color uniforms from `VIS.colorDiverge/...`
+* DPR caps from `VIS.dprCapPhone/Desktop`.
+* `gridK` → `VIS.gridGain`, etc.
+
+### Two small correctness nits to fix while you de-magic:
+
+1. **Unit mismatch default**
+   CPU path uses `w_rho` default `0.016` (ρ-units); shader path has `u_wallWidth` fallback `0.06` (unlabeled). Ensure both defaults are the same unit and sourced from the same constant. After the change:
+
+* compute `w_rho` once, assign to `this.uniforms.wallWidth` and pass to shader; remove the `0.06` fallback.
+
+2. **Hard log knee choice**
+   `k = 1e10` is purely visual. It’s fine, but pull from `VIS.logKnee` and comment: “prevents low-power modes from saturating colors after γ³ and γ\_VdB amplification; not physics.”
+
+---
+
+If you want, I can hand you a tiny patch that:
+
+* introduces `VIS` and swaps the top-level literals,
+* aligns the wall-width defaults,
+* and threads the color constants into the shader compile step (via string interpolation).
