@@ -20,7 +20,17 @@ import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
+import { TripPlayer } from "@/components/TripPlayer";
+import { GalaxyMapPanZoom } from "@/components/GalaxyMapPanZoom";
+import { GalaxyDeepZoom } from "@/components/GalaxyDeepZoom";
+import { GalaxyOverlays } from "@/components/GalaxyOverlays";
+import { SolarMap } from "@/components/SolarMap";
+import { RouteSteps } from "@/components/RouteSteps";
+import { BODIES } from "@/lib/galaxy-catalog";
+import { HelixPerf } from "@/lib/galaxy-schema";
+import { computeSolarXY, solarToBodies, getSolarBodiesAsPc } from "@/lib/solar-adapter";
 import { Switch } from "@/components/ui/switch";
+import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
 import { publish } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
@@ -177,21 +187,67 @@ export default function HelixCore() {
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
+  
   // Fade memory for trailing glow (per-sector intensity 0..1)
   const [trail, setTrail] = useState<number[]>(() => Array(400).fill(0));
+  const [useDeepZoom, setUseDeepZoom] = useState(false);
   const [cosmeticLevel, setCosmeticLevel] = useState(10); // 1..10 (10 = current look)
+  const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
+    const stored = localStorage.getItem("helix-mapMode");
+    return stored === "galactic" ? "galactic" : "solar";
+  });
+  const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
+  
+  // Live solar positions for route planning (updates every 5 seconds)
+  const [solarTick, setSolarTick] = useState(0);
+  const solarBodiesForRoutes = useMemo(() => getSolarBodiesAsPc(), [solarTick]);
+  const [deepZoomViewer, setDeepZoomViewer] = useState<any>(null);
+  const [galaxyCalibration, setGalaxyCalibration] = useState<{originPx:{x:number;y:number}; pxPerPc:number} | null>(null);
 
+  // Load galaxy map and compute calibration
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      const { originPx, pxPerPc } = calibrateToImage(img.naturalWidth, img.naturalHeight, SVG_CALIB);
+      setGalaxyCalibration({ originPx, pxPerPc });
+      console.log('🗺️ Galaxy calibration:', { 
+        imageSize: { w: img.naturalWidth, h: img.naturalHeight },
+        sunPixel: originPx, 
+        scale: `${pxPerPc.toFixed(4)} px/pc` 
+      });
+    };
+    img.src = "/galaxymap.png";
+  }, []);
   
   // Get metrics data for hull geometry
   const { metrics: hullMetrics } = useMetrics();
   
-  // Test Luma whisper on first load
+  // Update solar system positions periodically
   useEffect(() => {
+    if (mapMode === "solar") {
+      const updateSolarPositions = () => {
+        setSolarBodies(solarToBodies(computeSolarXY()));
+      };
+      
+      const interval = setInterval(updateSolarPositions, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [mapMode]);
+  
+  // Update route calculation positions every 5 seconds and test Luma whisper
+  useEffect(() => {
+    const interval = setInterval(() => setSolarTick(t => t + 1), 5000);
+    
+    // Test Luma whisper on first load
     const timer = setTimeout(() => {
       publish("luma:whisper", { text: "HELIX-CORE initialized. Welcome to the cosmic bridge." });
     }, 2000);
     
-    return () => clearTimeout(timer);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timer);
+    };
   }, []);
   
   // SliceViewer responsive sizing with ResizeObserver
@@ -219,7 +275,7 @@ export default function HelixCore() {
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
     queryKey: ['/api/helix/metrics'],
-    refetchInterval: 15000 // Update every 15 seconds (reduced from 5s)
+    refetchInterval: 5000 // Update every 5 seconds
   });
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
@@ -1490,9 +1546,49 @@ export default function HelixCore() {
               pMaxMW={120}
             />
 
-            {/* Mission Planner - Streamlined for Performance */}
+            {/* Trip Player */}
+            <TripPlayer
+              plan={{ 
+                distanceLy: 0.5, 
+                cruiseDuty: 0.14, 
+                cruiseMode: "Cruise",
+                hoverMode: "Hover",
+                stationKeepHours: 2 
+              }}
+              getState={() => ({
+                zeta: pipelineState?.zeta,
+                tsRatio: pipelineState?.TS_ratio || 5.03e4,
+                powerMW: pipelineState?.P_avg || 83.3,
+                freqGHz: 15.0
+              })}
+              setMode={(mode) => {
+                if (switchMode) {
+                  switchMode.mutate(mode as any);
+                  // Bump mode version to force WarpVisualizer remount
+                  setModeVersion(v => v + 1);
+                  // Luma whisper on mode change
+                  const whispers = {
+                    'Hover': "Form first. Speed follows.",
+                    'Cruise': "Timing matched. Take the interval; apply thrust.",
+                    'Emergency': "Breathe once. Choose the useful distance.",
+                    'Standby': "Meet change with correct posture. The rest aligns."
+                  };
+                  publish("luma:whisper", { text: whispers[mode as keyof typeof whispers] || "Configuration updated." });
+                }
+              }}
+              setDuty={(duty) => {
+                // Note: In real implementation, would need a setDuty function from energy pipeline
+                console.log('Setting duty:', duty);
+              }}
+              onTick={(phase, t) => {
+                // Optional: Log trip progress
+                console.log(`Trip phase: ${phase}, time: ${t}s`);
+              }}
+            />
+
+            {/* Mission Planner - Galactic Maps */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <div className="flex items-center gap-2">
                   <CardTitle className="text-sm font-semibold">Mission Planner</CardTitle>
                   <Tooltip>
@@ -1500,22 +1596,192 @@ export default function HelixCore() {
                       <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent side="top" className="max-w-sm">
-                      <div className="font-medium text-yellow-300 mb-1">Theory</div>
+                      <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
                       <p className="mb-2">
-                        Mission planning capabilities temporarily streamlined for optimal physics simulation performance.
+                        Interactive navigation system supporting both galactic-scale (parsec) and solar system (AU) mission planning.
+                        Routes calculate energy requirements and travel time based on current warp bubble parameters.
                       </p>
-                      <div className="font-medium text-cyan-300 mb-1">Zen</div>
+                      <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
                       <p className="text-xs italic">
-                        Focus enables clarity.
+                        The path reveals itself to those who take the first step.
                       </p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
+                <div className="flex items-center space-x-4">
+                  <Select value={mapMode} onValueChange={(v: "galactic" | "solar") => {
+                    setMapMode(v);
+                    localStorage.setItem("helix-mapMode", v); // Persist preference
+                    // Reset route when switching modes
+                    if (v === "solar") {
+                      setRoute(["EARTH", "SATURN", "SUN"]);
+                      publish("luma:whisper", { text: "Solar navigation initialized. Near-space trajectory computed." });
+                    } else {
+                      setRoute(["SOL", "ORI_OB1", "VEL_OB2", "SOL"]);
+                      publish("luma:whisper", { text: "Galactic coordinates engaged. Interstellar passage mapped." });
+                    }
+                  }}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="View" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="galactic">Galactic (pc)</SelectItem>
+                      <SelectItem value="solar">Solar (AU)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {mapMode === "galactic" && (
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="deep-zoom-toggle" className="text-xs">High-Res</Label>
+                      <Switch
+                        id="deep-zoom-toggle"
+                        checked={useDeepZoom}
+                        onCheckedChange={setUseDeepZoom}
+                      />
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="h-20 grid place-items-center text-sm text-slate-400 bg-slate-900/50 rounded border border-slate-800">
-                  Navigation system optimized for maximum physics performance
+                {mapMode === "solar" ? (
+                  <div className="w-full overflow-hidden rounded-md bg-slate-950 border border-slate-800">
+                    {/* Constrained container so the canvas can't blow past its panel */}
+                    <div className="mx-auto max-w-[720px]">
+                      <SolarMap
+                        key={`solar-${720}x${360}`}   // force a single mounted instance
+                        /* Slightly smaller, stable aspect to fit the panel */
+                        width={720}
+                        height={360}
+                        routeIds={route}
+                        /* Auto-fit so Earth & Saturn BOTH appear within the smaller panel */
+                        fitToIds={["EARTH","SATURN"]}
+                        fitMarginPx={28}
+                        /* Clean props to avoid conflicts */
+                        centerOnId={undefined}
+                        centerBetweenIds={undefined}
+                        onPickBody={(id) => {
+                          setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                          publish("luma:whisper", { text: "Waypoint selected. Route updated." });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : !galaxyCalibration ? (
+                  <div className="h-40 grid place-items-center text-xs text-slate-400">
+                    Loading galactic coordinate system…
+                  </div>
+                ) : useDeepZoom ? (
+                  <div className="relative">
+                    <GalaxyDeepZoom
+                      dziUrl="/galaxy_tiles.dzi"
+                      width={800}
+                      height={400}
+                      onViewerReady={setDeepZoomViewer}
+                    />
+                    {deepZoomViewer && (
+                      <GalaxyOverlays
+                        viewer={deepZoomViewer}
+                        labels={[]} // Will load from JSON when available
+                        bodies={BODIES}
+                        routeIds={route}
+                        originPx={galaxyCalibration.originPx}
+                        pxPerPc={galaxyCalibration.pxPerPc}
+                        onBodyClick={(id) => {
+                          setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                          publish("luma:whisper", { text: "Stellar target acquired. Course adjusted." });
+                        }}
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <GalaxyMapPanZoom
+                    imageUrl="/galaxymap.png"
+                    bodies={BODIES}
+                    routeIds={route}
+                    onPickBody={(id) => {
+                      setRoute(r => r.length ? [...r.slice(0,-1), id, r[r.length-1]] : [id]);
+                      publish("luma:whisper", { text: "Galactic destination set. Navigation computed." });
+                    }}
+                    originPx={{ x: 10123.142, y: 9480.491 }}
+                    scalePxPerPc={1.6666667}
+                    debug
+                    width={800}
+                    height={400}
+                  />
+                )}
+                {/* Removable route chips */}
+                <div className="flex flex-wrap gap-2 items-center">
+                  {route.map((id, idx) => (
+                    <span
+                      key={`${id}-${idx}`}
+                      className="inline-flex items-center gap-2 px-2 py-1 rounded bg-slate-800 text-slate-100 text-xs"
+                    >
+                      {id}
+                      {/* Protect start/end if you want (optional): e.g., idx>0 && idx<route.length-1 */}
+                      <button
+                        className="ml-1 rounded px-1 text-slate-300 hover:text-red-300 hover:bg-slate-700"
+                        onClick={() => {
+                          setRoute(r => {
+                            const copy = r.slice();
+                            copy.splice(idx, 1);
+                            // If last node removed, keep SUN as terminus by convention (optional)
+                            if (copy.length === 0) return ["SUN"];
+                            return copy;
+                          });
+                          publish("luma:whisper", { text: `Removed waypoint: ${id}` });
+                        }}
+                        aria-label={`Remove ${id}`}
+                        title={`Remove ${id}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {route.length === 0 && (
+                    <span className="text-xs text-slate-500">
+                      No waypoints yet — tap bodies on the map to add them.
+                    </span>
+                  )}
                 </div>
+
+                <RouteSteps 
+                  bodies={mapMode === "solar" ? solarBodiesForRoutes : BODIES}
+                  plan={{ waypoints: route }}
+                  mode={mapMode}
+                  perf={{
+                    mode: pipelineState?.currentMode || 'Hover',
+                    powerMW: pipelineState?.P_avg || 83.3,
+                    duty: pipelineState?.dutyCycle || 0.14,
+                    gammaGeo: pipelineState?.gammaGeo || 26,
+                    qFactor: pipelineState?.qCavity || 1e9,
+                    zeta: pipelineState?.zeta,
+                    tsRatio: pipelineState?.TS_ratio || 5.03e4,
+                    freqGHz: 15.0,
+                    energyPerLyMWh: (() => {
+                      const vLyPerHour = computeEffectiveLyPerHour(
+                        pipelineState?.currentMode || 'Hover',
+                        pipelineState?.dutyCycle || 0.14,
+                        pipelineState?.gammaGeo || 26,
+                        pipelineState?.qCavity || 1e9,
+                        pipelineState?.zeta,
+                        pipelineState?.TS_ratio || 5.03e4
+                      );
+                      const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
+                      return isFinite(hoursPerLy) ? (pipelineState?.P_avg || 83.3) * hoursPerLy : Infinity;
+                    })(),
+                    energyPerCycleJ: (() => {
+                      const cyclesPerSec = 15.0 * 1e9;
+                      return cyclesPerSec > 0 ? ((pipelineState?.P_avg || 83.3) * 1e6) / cyclesPerSec : Infinity;
+                    })(),
+                    vEffLyPerHour: (mode, duty) => computeEffectiveLyPerHour(
+                      mode, 
+                      duty, 
+                      pipelineState?.gammaGeo || 26,
+                      pipelineState?.qCavity || 1e9,
+                      pipelineState?.zeta,
+                      pipelineState?.TS_ratio || 5.03e4
+                    )
+                  } as HelixPerf}
+                />
               </CardContent>
             </Card>
           </div>
