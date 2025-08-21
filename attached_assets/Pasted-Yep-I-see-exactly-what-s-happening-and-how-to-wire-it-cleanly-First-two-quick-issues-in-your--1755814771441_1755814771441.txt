@@ -1,0 +1,180 @@
+Yep — I see exactly what’s happening and how to wire it cleanly.
+
+First, two quick issues in your page code:
+
+* You pass `sectorPeriod_ms` **twice**; the second (2000) silently overwrites the first (1.0). That’s why your agent “fix” looked like it worked. Remove the duplicate.
+* Your hook hard-codes a 20% window; that makes the UI look “ON” regardless of the real duty and sectors.
+
+Below is a drop-in way to connect the Casimir cavity to the light-crossing loop while keeping physics faithful and the UI readable.
+
+# 1) Fix the hook: return both RAW (physics) and LATCHED (UI) ON flags
+
+* RAW: true only during the actual ON window for the current sector, sized by real duty and sector count, but never shorter than the light-crossing time τLC.
+* LATCHED: a UI “hold” that keeps ON visible for \~200 ms so React can show it even if the raw pulse was micro-short.
+
+```ts
+import { useEffect, useMemo, useRef, useState } from "react";
+
+type HullLike = { a: number; b: number; c: number };
+type Args = {
+  sectorStrobing?: number;      // S (e.g., 1 or 400)
+  currentSector?: number;       // server index (0..S-1)
+  sectorPeriod_ms?: number;     // dwell per sector
+  duty?: number;                // global duty (0..1)
+  freqGHz?: number;             // tile modulation frequency
+  hull?: HullLike;              // ellipsoid axes (meters)
+  wallWidth_m?: number;         // physical wall thickness
+  uiHold_ms?: number;           // OPTIONAL: UI latch duration (default 200 ms)
+};
+
+export function useLightCrossingLoop({
+  sectorStrobing = 1,
+  currentSector = 0,
+  sectorPeriod_ms = 1,
+  duty = 0.14,
+  freqGHz = 15,
+  hull,
+  wallWidth_m = 6.0,
+  uiHold_ms = 200
+}: Args) {
+  // --- Light-crossing bound τLC across the thinnest relevant scale
+  const c = 299_792_458;
+  const L_m = Math.max(1e-6, wallWidth_m);
+  const tauLC_ms = (L_m / c) * 1e3;
+
+  // --- Effective duty per sector
+  // If you strobe S sectors, each sector’s ON fraction ≈ duty/S
+  const S = Math.max(1, Math.floor(sectorStrobing));
+  const dutyPerSector = Math.min(1, Math.max(0, duty)) / S;
+
+  // dwell per sector (ms) and burst width (ms) with τLC floor
+  const dwell_ms = Math.max(0.01, sectorPeriod_ms);
+  const burst_ms = Math.max(tauLC_ms, dwell_ms * dutyPerSector);
+
+  // --- Phase clock in current sector
+  const [phase, setPhase] = useState(0); // 0..1 in this sector
+  const [sectorIdx, setSectorIdx] = useState(currentSector % S);
+  const rafRef = useRef<number | null>(null);
+  const t0Ref = useRef(performance.now());
+
+  useEffect(() => {
+    setSectorIdx(currentSector % S);
+    t0Ref.current = performance.now(); // start of dwell
+  }, [currentSector, S]);
+
+  useEffect(() => {
+    const tick = () => {
+      const now = performance.now();
+      const dt = now - t0Ref.current;
+      const φ = (dt % dwell_ms) / dwell_ms; // 0..1
+      setPhase(φ);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [dwell_ms]);
+
+  // RAW ON: a centered window of width = burst_ms
+  const onWindowRaw = useMemo(() => {
+    const half = (burst_ms / dwell_ms) / 2; // fraction
+    const center = 0.5;
+    return Math.abs(phase - center) <= half;
+  }, [phase, burst_ms, dwell_ms]);
+
+  // UI-latched ON: keep ON visible for uiHold_ms after any raw ON edge
+  const [onWindowDisplay, setOnWindowDisplay] = useState(false);
+  const lastOnRef = useRef<number>(0);
+
+  useEffect(() => {
+    const now = performance.now();
+    if (onWindowRaw) lastOnRef.current = now;
+
+    const stillWithinHold = (now - lastOnRef.current) < uiHold_ms;
+    if (stillWithinHold !== onWindowDisplay) setOnWindowDisplay(stillWithinHold);
+  }, [onWindowRaw, onWindowDisplay, uiHold_ms]);
+
+  // Diagnostics that help the cavity choose how to gate
+  const cyclesPerBurst = (burst_ms / 1000) * (freqGHz * 1e9); // RF cycles in each ON window
+
+  return {
+    sectorIdx,
+    sectorCount: S,
+    phase, dwell_ms,
+    tauLC_ms, burst_ms,
+    duty, dutyPerSector,
+    freqGHz, cyclesPerBurst,
+    onWindow: onWindowRaw,          // physics/visualizer gating
+    onWindowRaw,                    // explicit alias
+    onWindowDisplay                 // UI label
+  };
+}
+```
+
+# 2) Fix the page wiring
+
+Remove the duplicate key; pass only one `sectorPeriod_ms`. Consider keeping your original (fast) physics value here and let the UI latch handle visibility.
+
+```tsx
+const lc = useLightCrossingLoop({
+  sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
+  currentSector:  systemMetrics?.currentSector  ?? 0,
+  sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0, // ← single source of truth
+  duty: dutyUI,
+  freqGHz: pipeline?.modulationFreq_GHz ?? 15,
+  hull: { a: hull.a, b: hull.b, c: hull.c },
+  wallWidth_m: hull.wallWidth_m ?? 6.0,
+  uiHold_ms: 200 // tune for readability; does not affect physics
+});
+```
+
+If you *want* a slower demo mode sometimes, add a separate **demo** control and switch `sectorPeriod_ms` there; don’t hard-code both.
+
+# 3) Connect the Casimir cavity to the loop (physics vs UI)
+
+**Physics & visualizer sync (RAW):**
+
+* Gate any “burst-only” terms with `lc.onWindow` (or `onWindowRaw`).
+* Keep the visualizer strobe synced with the real sector pointer.
+
+```ts
+// Example: pass strobing to the warp visualizer
+window.setStrobingState?.({
+  sectorCount: lc.sectorCount,
+  currentSector: lc.sectorIdx
+});
+
+// Example: cavity burst gating (pseudo—adapt to your derived variables)
+const Qburst_eff = lc.onWindow ? derived.cavityQ : 0; // or scale instead of hard 0
+```
+
+**UI labels (LATCHED):**
+
+```tsx
+const statusText = lc.onWindowDisplay ? "ON" : "OFF";
+// use statusText in the badge; stays readable without changing physics
+```
+
+**Optional sanity for the cavity: ensure each ON burst has meaningfully many RF cycles.**
+
+```ts
+// If cyclesPerBurst < ~5–10, you may decide to suppress “ON” physically,
+// even if the window opens, or require accumulation across bursts.
+const burstIsMeaningful = lc.cyclesPerBurst >= 10;
+const cavityDriveEnabled = lc.onWindow && burstIsMeaningful;
+```
+
+# 4) Make operational modes *visual-only* unless the slider says otherwise
+
+You already added the “cosmetic curvature” blend. Keep operational-mode exaggeration **out** of the physics chain. Let your slider decide how much to exaggerate visuals, while `lc.onWindow` drives the actual cavity/burst logic.
+
+---
+
+### TL;DR wiring
+
+* **Hook returns:** `onWindow` (RAW), `onWindowDisplay` (LATCHED), `cyclesPerBurst`, `sectorIdx/Count`.
+* **Cavity physics:** drive with `onWindow` (+ optional `cyclesPerBurst` guard).
+* **Visualizer strobe:** `setStrobingState({ sectorCount, currentSector: sectorIdx })`.
+* **UI label:** show `onWindowDisplay`.
+* **Fix duplicate `sectorPeriod_ms`** prop.
+
+If you paste me your `HelixCasimirAmplifier.tsx` snippet where you compute the stage table (the place that tried to use `Q_BURST`), I’ll wire `lc.onWindow` and `cyclesPerBurst` into it directly so the numbers line up.
