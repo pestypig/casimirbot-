@@ -42,6 +42,13 @@ import {
 
 // ------------------------- Types from your backend -------------------------
 
+// Optional typing for WarpEngine integration
+declare global {
+  interface Window {
+    setStrobingState?: (args: { sectorCount: number; currentSector: number }) => void;
+  }
+}
+
 type LightCrossing = {
   sectorIdx: number; 
   sectorCount: number; 
@@ -387,6 +394,25 @@ export default function HelixCasimirAmplifier({
     };
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, lightCrossing?.onWindow, lightCrossing?.cyclesPerBurst, lightCrossing?.burst_ms, lightCrossing?.dwell_ms]);
+
+  // Wire pipeline strobing to drive the WarpEngine (if present) for phase synchronization
+  useEffect(() => {
+    const sectorCount =
+      metrics?.totalSectors ??
+      state?.sectorStrobing ??
+      lightCrossing?.sectorCount ?? 1;
+
+    const currentSector =
+      lightCrossing?.sectorIdx ??
+      metrics?.activeSectors ?? 0;
+
+    if (typeof window !== "undefined" && typeof window.setStrobingState === "function") {
+      window.setStrobingState({ 
+        sectorCount: Math.max(1, sectorCount), 
+        currentSector: Math.max(0, currentSector % Math.max(1, sectorCount)) 
+      });
+    }
+  }, [metrics?.totalSectors, metrics?.activeSectors, state?.sectorStrobing, lightCrossing?.sectorIdx, lightCrossing?.sectorCount]);
 
   // Normalized steady-state target energy from pipeline (or fallback)
   const U_inf = (state?.U_cycle ?? 1) * 1; // arbitrary scale -> keep consistent
