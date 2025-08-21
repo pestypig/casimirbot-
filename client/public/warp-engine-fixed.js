@@ -85,7 +85,9 @@ class WarpEngine {
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
             betaTiltVec: [0, -1, 0],  // tilt direction vector (default: -Y = "down")
-            tiltGain: 0.55       // gentle visual scaling
+            tiltGain: 0.55,      // gentle visual scaling
+            // NEW: Cosmetic curvature control (1 = real physics, 10 = current visuals)
+            cosmeticLevel: 10    // default to current visual feel
         };
         
         // Initialize rendering pipeline
@@ -102,6 +104,15 @@ class WarpEngine {
             try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
         };
         window.__warp_setGainDec = this.__warp_setGainDec;
+
+        // Expose cosmetic curvature level API (1 = real physics, 10 = current visuals)
+        this.__warp_setCosmetic = (level /* 1..10 */) => {
+            try { this.setCosmeticLevel(level); } catch(e){ console.warn(e); }
+        };
+        window.__warp_setCosmetic = this.__warp_setCosmetic;
+
+        // default to "current visuals" feel
+        this.setCosmeticLevel(10);
         
         // Bind responsive resize handler
         this._resize = () => this._resizeCanvasToDisplaySize();
@@ -1352,6 +1363,11 @@ class WarpEngine {
     setCurvatureGainDec(slider0to8, boostMax = 40) {
         const T = Math.max(0, Math.min(1, slider0to8 / 8));
         this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
+    }
+
+    setCosmeticLevel(level /* 1..10 */) {
+        const L = Math.max(1, Math.min(10, level));
+        this.updateUniforms({ cosmeticLevel: L });
     }
 
     // === Natário Diagnostics (viewer-only, does not affect physics) ===
