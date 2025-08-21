@@ -1,18 +1,33 @@
 import React, { useEffect, useRef, useState } from "react";
 
+type MechanicalParams = {
+  /** Power-only mechanical knob from pipeline (used to back out damping) */
+  qMechanical?: number;          // dimensionless
+  /** Mechanical resonance center (Hz). If omitted, default to modulation freq */
+  mechResonance_Hz?: number;     // f0
+  /** Damping ratio ζ. If omitted, infer from qMechanical: Q≈1/(2ζ) */
+  mechZeta?: number;             // ζ in [0, 1)
+  /** Coupling strength of mech chain into the visible shell modulation */
+  mechCoupling?: number;         // 0..1 (UI gain)
+};
+
 type Props = {
   parameters?: {
     hull?: { a:number; b:number; c:number };
     wallWidth?: number;
     epsilonTilt?: number;
     betaTiltVec?: [number,number,number];
-    // NEW: mode coupling
+    // Mode coupling
     mode?: string;
     dutyCycle?: number;
     sectors?: number;
     gammaGeo?: number;
     qSpoil?: number;
     qCavity?: number;
+    // NEW: Mechanical response parameters
+    qMechanical?: number;
+    modulationHz?: number;        // convenience (else derive from pipeline GHz)
+    mech?: MechanicalParams;
   };
 };
 
@@ -22,6 +37,24 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<any>(null);
   const [ready, setReady] = useState(!!window.OutlineEngine);
+
+  // Mechanical response calculations
+  const hull = parameters?.hull || { a: 0.42, b: 0.11, c: 0.09 };
+  const f_mod = parameters?.modulationHz ?? 15e9;             // Hz (default 15 GHz)
+  const qMech = parameters?.qMechanical ?? 1;                 // from pipeline
+  const f0 = parameters?.mech?.mechResonance_Hz ?? f_mod;     // default: centered
+  const zeta = parameters?.mech?.mechZeta 
+             ?? (qMech > 0 ? 1 / (2 * qMech) : 0.005);       // Q≈1/(2ζ)
+  const kCouple = Math.min(1, Math.max(0, parameters?.mech?.mechCoupling ?? 0.6));
+
+  // Relative amplitude A_rel(ω) for a damped resonator at drive frequency f_mod
+  const r = f_mod / f0; // ω/ω0 (since r uses frequency ratio, 2π cancels)
+  const Arel = 1 / Math.sqrt((1 - r*r)**2 + (2*zeta*r)**2);  // dimensionless
+
+  // Squash to a sane visual range; respect user coupling
+  const mechGain = Math.tanh(kCouple * Arel);                // 0..~1
+
+  console.log(`🔧 MECHANICAL RESPONSE: f_mod=${(f_mod/1e9).toFixed(1)}GHz, f0=${(f0/1e9).toFixed(1)}GHz, ζ=${zeta.toFixed(3)}, A_rel=${Arel.toFixed(2)}, mechGain=${mechGain.toFixed(3)}`);
 
   useEffect(() => {
     if (window.OutlineEngine) { setReady(true); return; }
@@ -36,39 +69,53 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
     if (!engineRef.current) {
       engineRef.current = new window.OutlineEngine(canvasRef.current);
     }
-    const hull = parameters?.hull || { a:0.42, b:0.11, c:0.09 };
-    engineRef.current.bootstrap({
+    const initialUniforms = {
       hullAxes: [hull.a, hull.b, hull.c],
       wallWidth: parameters?.wallWidth ?? 0.06,
       epsilonTilt: parameters?.epsilonTilt ?? 0.0,
       betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
-      // NEW: mode coupling
+      // Mode coupling
       mode: parameters?.mode || 'hover',
       dutyCycle: parameters?.dutyCycle ?? 0.14,
       sectors: parameters?.sectors ?? 1,
       gammaGeo: parameters?.gammaGeo ?? 26,
       qSpoil: parameters?.qSpoil ?? 1.0,
       qCavity: parameters?.qCavity ?? 1e9,
-    });
+
+      // NEW: mechanical uniforms
+      qMechanical: qMech,
+      fMod_Hz: f_mod,
+      f0_Hz: f0,
+      mechZeta: zeta,
+      mechGain,           // single "is-mechanics-hot?" scalar for the shader
+    };
+    engineRef.current.bootstrap(initialUniforms);
   }, [ready]);
 
   useEffect(() => {
     if (!engineRef.current) return;
-    const hull = parameters?.hull || { a:0.42, b:0.11, c:0.09 };
-    engineRef.current.updateUniforms({
+    const updatedUniforms = {
       hullAxes: [hull.a, hull.b, hull.c],
       wallWidth: parameters?.wallWidth ?? 0.06,
       epsilonTilt: parameters?.epsilonTilt ?? 0.0,
       betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
-      // NEW: mode coupling
+      // Mode coupling
       mode: parameters?.mode || 'hover',
       dutyCycle: parameters?.dutyCycle ?? 0.14,
       sectors: parameters?.sectors ?? 1,
       gammaGeo: parameters?.gammaGeo ?? 26,
       qSpoil: parameters?.qSpoil ?? 1.0,
       qCavity: parameters?.qCavity ?? 1e9,
-    });
-  }, [parameters?.hull, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity]);
+
+      // NEW: mechanical uniforms (computed above)
+      qMechanical: qMech,
+      fMod_Hz: f_mod,
+      f0_Hz: f0,
+      mechZeta: zeta,
+      mechGain,           // single "is-mechanics-hot?" scalar for the shader
+    };
+    engineRef.current.updateUniforms(updatedUniforms);
+  }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain]);
 
   return (
     <div className="rounded-xl overflow-hidden bg-black">

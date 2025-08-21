@@ -903,13 +903,21 @@ export default function HelixCore() {
                 wallWidth: 0.06,
                 epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
-                // NEW: mode coupling from live pipeline data
+                // Mode coupling from live pipeline data
                 mode: effectiveMode,
                 dutyCycle: dutyUI,
                 sectors: sectorsUI,
                 gammaGeo: pipeline?.gammaGeo ?? 26,
                 qSpoil: qSpoilUI,
                 qCavity: pipeline?.qCavity ?? 1e9,
+                // NEW: Mechanical response parameters  
+                qMechanical: pipeline?.qMechanical ?? 1,
+                modulationHz: 15e9, // 15 GHz modulation frequency
+                mech: {
+                  mechResonance_Hz: 15e9, // Default to modulation frequency
+                  mechZeta: undefined,    // Will be computed from qMechanical
+                  mechCoupling: 0.6       // 60% coupling strength
+                }
               }}
             />
           </CardContent>

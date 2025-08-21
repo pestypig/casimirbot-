@@ -40,13 +40,19 @@
       wallWidth: 0.06,              // normalized Δρ thickness
       epsilonTilt: 0.0,
       betaTiltVec: [0, -1, 0],
-      // NEW: mode coupling
+      // Mode coupling
       mode: 'hover',
       dutyCycle: 0.14,
       sectors: 1,
       gammaGeo: 26,
       qSpoil: 1.0,
-      qCavity: 1e9
+      qCavity: 1e9,
+      // NEW: Mechanical response parameters
+      qMechanical: 1,
+      fMod_Hz: 15e9,
+      f0_Hz: 15e9,
+      mechZeta: 0.005,
+      mechGain: 0.0                 // 0..~1 mechanical amplification scalar
     };
     this._needsFrame = false;
     this._resize = this._resize.bind(this);
@@ -140,6 +146,12 @@
     const qspoil   = Math.max(1e-3, p.qSpoil ?? 1.0);
     const gainVis  = Math.pow(gamma3 * qspoil * dutyEff, 0.25); // gentle 1/4 power so it doesn't blow up
 
+    // NEW: Mechanical response modulation (cavity "in band" status)
+    const mechGain = Math.max(0, Math.min(1, p.mechGain ?? 0));
+    const mechMod  = 1 + 2.5 * mechGain; // 1.0 to 3.5x mechanical amplification
+    
+    console.log(`🔧 OUTLINE ENGINE: mechGain=${mechGain.toFixed(3)}, mechMod=${mechMod.toFixed(2)}x, f_mod=${((p.fMod_Hz??15e9)/1e9).toFixed(1)}GHz, ζ=${(p.mechZeta??0.005).toFixed(3)}`);
+
     // Mode tint/alpha
     const modeAlpha =
       p.mode === 'standby'   ? 0.40 :
@@ -153,14 +165,16 @@
     const finalAlpha = (0.9 + breathe) * modeAlpha;
 
     // Shell styling that responds to mode/gain
-    const baseInner = `rgba(255,176,176,${0.60 * finalAlpha})`; // red-ish (compression)
-    const baseCenter= `rgba(200,208,220,${0.45 * finalAlpha})`;
-    const baseOuter = `rgba(176,208,255,${0.60 * finalAlpha})`; // blue-ish (expansion)
+    // Add orange glow when mechanical response is active (cavity "in band")
+    const glowIntensity = mechGain * 0.4; // 0 to 40% extra brightness when active
+    const baseInner = `rgba(${255 + Math.round(60 * glowIntensity)},${176 + Math.round(40 * glowIntensity)},176,${0.60 * finalAlpha})`; // red-ish with glow
+    const baseCenter= `rgba(${200 + Math.round(80 * glowIntensity)},${208 + Math.round(60 * glowIntensity)},220,${0.45 * finalAlpha})`;
+    const baseOuter = `rgba(176,${208 + Math.round(60 * glowIntensity)},${255 + Math.round(40 * glowIntensity)},${0.60 * finalAlpha})`; // blue-ish with glow
     const colShift  = `rgba(180,120,255,${0.90})`;              // violet (shift vector)
 
-    const innerWidth  = 1.0 + 0.75 * gainVis;
-    const centerWidth = 0.8 + 0.50 * gainVis;
-    const outerWidth  = 1.0 + 0.75 * gainVis;
+    const innerWidth  = (1.0 + 0.75 * gainVis) * mechMod;
+    const centerWidth = (0.8 + 0.50 * gainVis) * mechMod;
+    const outerWidth  = (1.0 + 0.75 * gainVis) * mechMod;
 
     const a0 = p.hullAxes[0], b0 = p.hullAxes[1], c0 = p.hullAxes[2];
     const dRho = clamp(p.wallWidth, 0.005, 0.40);
@@ -249,7 +263,8 @@
     ctx.fillText('Shift vector (violet) • Live physics coupling', 18, 60);
     ctx.fillStyle = '#888';
     ctx.font = '10px ui-sans-serif, system-ui, -apple-system';
-    ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty=${(dutyEff*100).toFixed(2)}% • q=${qspoil.toFixed(2)}`, 18, 74);
+    const mechStatus = mechGain > 0.1 ? `IN-BAND` : `off-resonance`;
+    ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty=${(dutyEff*100).toFixed(2)}% • mechanical: ${mechStatus}`, 18, 74);
   };
 
   // expose
