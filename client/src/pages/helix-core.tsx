@@ -631,11 +631,11 @@ export default function HelixCore() {
                         viewAvg: true,
                       }}
                       sigmaRange={6}
-                      exposure={6}
-                      zeroStop={1e-9}
+                      exposure={8}
+                      zeroStop={1e-7}
                       showContours={true}
-                      width={520}
-                      height={260}
+                      width={480}
+                      height={240}
                       className="xl:sticky xl:top-4"
                     />
                   </div>
