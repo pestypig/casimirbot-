@@ -1303,6 +1303,41 @@ class WarpEngine {
         };
     }
 
+    // Generic uniform setter for display gain and other shader uniforms
+    setUniform(name, value) {
+        if (!this.gl || !this.gridProgram) return;
+        
+        const gl = this.gl;
+        const location = gl.getUniformLocation(this.gridProgram, name);
+        if (location !== null) {
+            gl.useProgram(this.gridProgram);
+            if (typeof value === 'number') {
+                gl.uniform1f(location, value);
+            } else if (Array.isArray(value)) {
+                if (value.length === 2) gl.uniform2fv(location, value);
+                else if (value.length === 3) gl.uniform3fv(location, value);
+                else if (value.length === 4) gl.uniform4fv(location, value);
+            }
+            console.log(`🎛️ setUniform: ${name} = ${value}`);
+        }
+    }
+
+    // Display gain multiplier for visual scaling (matches SliceViewer)
+    setDisplayGain(gain) {
+        // Store for future reference
+        this.uniforms.displayGain = gain;
+        
+        // Apply to any visual scaling parameters
+        if (this.uniforms.userGain !== undefined) {
+            // Scale the existing userGain by display gain
+            const originalUserGain = this.uniforms.userGain / (this.uniforms.displayGain || 1);
+            this.uniforms.userGain = originalUserGain * gain;
+            this._uniformsDirty = true;
+        }
+        
+        console.log(`🎛️ setDisplayGain: ${gain}× applied to visual scaling`);
+    }
+
     destroy() {
         // Cancel animation frame
         if (this._raf) {

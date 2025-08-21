@@ -485,12 +485,45 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isLoaded]);
 
+  // Compute the same display boost used by SliceViewer
+  function computeDisplayBoost(curvatureGainDec: number, curvatureBoostMax = 40) {
+    const t = Math.max(0, Math.min(1, curvatureGainDec / 8));
+    return (1 - t) + t * curvatureBoostMax; // 1..curvatureBoostMax
+  }
+
+  // Display gain multiplier effect (matches SliceViewer)
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const boost = computeDisplayBoost(parameters.curvatureGainDec ?? 0, parameters.curvatureBoostMax ?? 40);
+    
+    // Send to shader(s) or CPU deformation code
+    if (engineRef.current.setUniform) {
+      engineRef.current.setUniform('uDisplayGain', boost);
+    }
+    // If your geometry CPU path uses an amplitude, multiply there as well
+    if (engineRef.current.setDisplayGain) {
+      engineRef.current.setDisplayGain(boost);
+    }
+    
+    console.log(`🎛️ 3D DISPLAY GAIN: curvatureGainDec=${parameters.curvatureGainDec} → displayBoost=${boost.toFixed(2)}× (matches SliceViewer)`);
+  }, [parameters.curvatureGainDec, parameters.curvatureBoostMax, isLoaded]);
+
   // Global bridge for immediate slider updates (bypasses memoization)
   useEffect(() => {
     if (!engineRef.current) return;
     // expose a safe setter used by HelixCore's slider
-    (window as any).__warp_setGainDec = (g: number, boost = 40) =>
+    (window as any).__warp_setGainDec = (g: number, boost = 40) => {
       engineRef.current?.setCurvatureGainDec(g, boost);
+      
+      // Also apply display gain
+      const displayBoost = computeDisplayBoost(g, boost);
+      if (engineRef.current.setUniform) {
+        engineRef.current.setUniform('uDisplayGain', displayBoost);
+      }
+      if (engineRef.current.setDisplayGain) {
+        engineRef.current.setDisplayGain(displayBoost);
+      }
+    };
 
     return () => {
       if ((window as any).__warp_setGainDec) delete (window as any).__warp_setGainDec;
