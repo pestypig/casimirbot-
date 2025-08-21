@@ -178,8 +178,44 @@ type FieldResponse = {
   physics: { gammaGeo: number; qSpoiling: number; sectorStrobing: number };
 };
 
-function DisplacementHeatmap({ endpoint }: { endpoint: string }) {
+function DisplacementHeatmap({ endpoint, metrics, state }: { 
+  endpoint: string;
+  metrics?: HelixMetrics;
+  state?: EnergyPipelineState;
+}) {
+  // Seed with pipeline strobing defaults (still user-overrideable)
+  const [seed, setSeed] = useState<{ sectors?: number; split?: number }>({});
+  
   const [params, setParams] = useState({ nTheta: 128, nPhi: 64, sectors: 400, split: 200 });
+  
+  // Initialize with pipeline defaults if available from props or window globals
+  useEffect(() => {
+    const sectors = metrics?.totalSectors 
+                 ?? state?.sectorStrobing
+                 ?? (window as any)?.HELIX_METRICS?.totalSectors
+                 ?? (window as any)?.HELIX_STATE?.sectorStrobing
+                 ?? 400;
+    const split = Math.round(sectors * 0.5); // neutral split if server doesn't provide
+    setSeed({ sectors, split });
+    
+    // Update params with seeded values
+    setParams(prevParams => ({
+      ...prevParams,
+      sectors,
+      split
+    }));
+  }, [metrics?.totalSectors, state?.sectorStrobing]);
+  
+  // Update params when seed changes
+  useEffect(() => {
+    if (seed.sectors !== undefined && seed.split !== undefined) {
+      setParams(prevParams => ({
+        ...prevParams,
+        sectors: seed.sectors ?? prevParams.sectors,
+        split: seed.split ?? prevParams.split
+      }));
+    }
+  }, [seed]);
   const q = new URLSearchParams({
     nTheta: String(params.nTheta),
     nPhi: String(params.nPhi),
@@ -716,7 +752,7 @@ export default function HelixCasimirAmplifier({
         </Card>
 
         {/* Displacement Field Heatmap */}
-        <DisplacementHeatmap endpoint={fieldEndpoint} />
+        <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
         
       </div>
     </div>
