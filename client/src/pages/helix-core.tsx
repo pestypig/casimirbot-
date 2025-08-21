@@ -836,6 +836,35 @@ export default function HelixCore() {
                 },
               }}
             />
+            
+            {/* Mechanical Physics HUD */}
+            {(() => {
+              // Compute A_rel using same formula as mechanical response
+              const qMech = pipeline?.qMechanical ?? 1;
+              const zeta = 1 / (2 * qMech);
+              const f_mod = (pipeline?.modulationFreq_GHz ?? 15) * 1e9;
+              const f0 = f_mod; // Resonant frequency defaults to modulation frequency
+              const omega = f_mod / f0; // Normalized frequency
+              const denomSq = (1 - omega*omega)**2 + (2*zeta*omega)**2;
+              const Arel = 1 / Math.sqrt(denomSq);
+              
+              return (
+                <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-300 font-mono">
+                  <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">
+                    Q_mech = {qMech.toFixed(3)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">
+                    ζ ≈ {zeta.toExponential(2)}
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">
+                    f₀ = {(f0 / 1e9).toFixed(2)} GHz
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">
+                    A_rel = {Arel.toFixed(2)}
+                  </span>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 
