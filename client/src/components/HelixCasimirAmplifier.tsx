@@ -222,7 +222,7 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
     sectors: String(params.sectors),
     split: String(params.split)
   }).toString();
-  const { data } = usePolling<FieldResponse>(`${endpoint}?${q}`, 2500, [endpoint, q]);
+  const { data } = usePolling<FieldResponse>(`${endpoint}?${q}`, 30000, [endpoint, q]); // 30s vs 2.5s
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -361,8 +361,8 @@ export default function HelixCasimirAmplifier({
   modeEndpoint?: string;
   lightCrossing?: LightCrossing;
 }) {
-  const { data: metrics } = usePolling<HelixMetrics>(metricsEndpoint, 1500, [metricsEndpoint]);
-  const { data: state }   = usePolling<EnergyPipelineState>(stateEndpoint, 3000, [stateEndpoint]);
+  const { data: metrics } = usePolling<HelixMetrics>(metricsEndpoint, 10000, [metricsEndpoint]); // 10s vs 1.5s
+  const { data: state }   = usePolling<EnergyPipelineState>(stateEndpoint, 15000, [stateEndpoint]); // 15s vs 3s
 
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);

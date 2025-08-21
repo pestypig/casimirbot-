@@ -220,8 +220,8 @@ export default function HelixCore() {
     img.src = "/galaxymap.png";
   }, []);
   
-  // Get metrics data for hull geometry
-  const { metrics: hullMetrics } = useMetrics();
+  // Get metrics data for hull geometry (reduced polling for performance)
+  const { metrics: hullMetrics } = useMetrics(20000); // 20s vs 2s default
   
   // Update solar system positions periodically
   useEffect(() => {
