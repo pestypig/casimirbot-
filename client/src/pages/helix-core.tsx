@@ -63,7 +63,7 @@ const fmtPowerUnit = (mw?: number) => {
   return `${(x * 1e6).toFixed(1)} W`;
 };
 
-// derive instantaneous active tiles from pipeline/system state
+// derive instantaneous active tiles from pipeline/system state (with 1% burst duty)
 const deriveActiveTiles = (
   totalTiles?: number,
   sectors?: number,
@@ -73,14 +73,9 @@ const deriveActiveTiles = (
   if (!isFiniteNumber(totalTiles) || !isFiniteNumber(sectors) || sectors <= 0) return undefined;
   if (mode === 'standby' || !isFiniteNumber(duty) || duty <= 0) return 0;
 
-  // Rule of thumb (consistent w/ strobing model and your tooltip):
-  // • If S > 1 (strobing): one sector is energized at a time → tilesPerSector
-  // • If S = 1 (no strobing): a duty fraction of the whole grid can be energized at once
-  if (sectors > 1) {
-    return Math.round(totalTiles / sectors);
-  } else {
-    return Math.round(totalTiles * duty);
-  }
+  const BURST = 0.01; // local ON window
+  if (sectors > 1) return Math.round((totalTiles / sectors) * BURST);
+  return Math.round(totalTiles * duty * BURST);
 };
 
 // Mainframe zones configuration
@@ -554,13 +549,31 @@ export default function HelixCore() {
                       g_y: pipeline?.gammaGeo || 26,
                       cavityQ: pipeline?.qCavity || 1e9,
                       sagDepth_nm: pipeline?.sag_nm || 16,
-                      tsRatio: pipeline?.TS_ratio || 5.03e4, // Physics-accurate default: L_long×f/c
-                      powerAvg_MW: pipeline?.P_avg || 7.437e-3, // Mode-aware cruise power
-                      exoticMass_kg: pipeline?.M_exotic || 1000, // Mode-aware target
+                      tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
+                      powerAvg_MW: (() => {
+                        const MODE_TARGET = {
+                          standby:   { P_W: 0,        M_kg: 0    },
+                          hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                          cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+                          emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                        } as const;
+                        const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                        return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
+                      })(),
+                      exoticMass_kg: (() => {
+                        const MODE_TARGET = {
+                          standby:   { P_W: 0,        M_kg: 0    },
+                          hover:     { P_W: 83.3e6,   M_kg: 1000 },
+                          cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+                          emergency: { P_W: 297.5e6,  M_kg: 1000 },
+                        } as const;
+                        const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
+                        return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
+                      })(),
                       currentMode: effectiveMode,
                       sectorStrobing: sectorsUI,
                       qSpoilingFactor: qSpoilUI,
-                      gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 3.83e1, // Physics-accurate neutral default
+                      gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
                       hull: (hullMetrics && hullMetrics.hull) ? {
                         ...hullMetrics.hull,
                         a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
@@ -573,14 +586,14 @@ export default function HelixCore() {
                       },
                       wall: { w_norm: 0.016 },
                       gridScale: 1.6,
-                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
+                      epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                       betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                       wallWidth_m: 6.0,
                       shift: {
-                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
+                        epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                         betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                        gTarget: 0.5, R_geom: 86.5,
-                        gEff_check: ((systemMetrics?.shiftVector?.epsilonTilt ?? 0.012) * 86.5 * 86.5) / 86.5
+                        gTarget, R_geom,
+                        gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
                       }
                     }}
                   />
@@ -627,7 +640,7 @@ export default function HelixCore() {
                   a: 0.42, b: 0.11, c: 0.09 // normalized scene units
                 },
                 wallWidth: 0.06,
-                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 5e-7, // Physics-computed tiny value
+                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
                 // NEW: mode coupling from live pipeline data
                 mode: effectiveMode,
@@ -804,8 +817,8 @@ export default function HelixCore() {
                   {isFiniteNumber(sectorsLive) && (
                     <p className="text-xs text-slate-500 mt-1">
                       {sectorsLive > 1
-                        ? `${sectorsLive} sectors • ~${Math.round((1/sectorsLive)*10000)/100}% of grid`
-                        : `${(dutyLive*100).toFixed(1)}% duty • no strobing`}
+                        ? `${sectorsLive} sectors • ~${(100 / sectorsLive * 0.01).toFixed(2)}% of grid ON`
+                        : `${(dutyLive*100).toFixed(1)}% eligible • 1% local ON`}
                     </p>
                   )}
                 </div>
@@ -1047,10 +1060,10 @@ export default function HelixCore() {
                     <span className="text-sm">Time-Scale Separation</span>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-sm">
-                        TS = {fmt(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio, 1, '4102.7')}
+                        TS = {fmt(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio, 1, '5.03e4')}
                       </span>
-                      <Badge className={`${(pipelineState && pipelineState.TS_ratio < 1) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                        {(pipelineState && pipelineState.TS_ratio < 1) ? 'SAFE' : 'CHECK'}
+                      <Badge className={`${(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio ?? 0) > 1 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                        {(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio ?? 0) > 1 ? 'SAFE' : 'CHECK'}
                       </Badge>
                     </div>
                   </div>
@@ -1429,8 +1442,8 @@ export default function HelixCore() {
             <FuelGauge
               mode={pipelineState?.currentMode || 'Hover'}
               powerMW={pipelineState?.P_avg || 83.3}
-              zeta={pipelineState?.zeta || 0.032}
-              tsRatio={pipelineState?.TS_ratio || 4102.74}
+              zeta={pipelineState?.zeta}
+              tsRatio={pipelineState?.TS_ratio || 5.03e4}
               frOk={pipelineState?.fordRomanCompliance || true}
               natarioOk={pipelineState?.natarioConstraint || true}
               curvatureOk={pipelineState?.curvatureLimit || true}
@@ -1451,8 +1464,8 @@ export default function HelixCore() {
                 stationKeepHours: 2 
               }}
               getState={() => ({
-                zeta: pipelineState?.zeta || 0.032,
-                tsRatio: pipelineState?.TS_ratio || 4102.74,
+                zeta: pipelineState?.zeta,
+                tsRatio: pipelineState?.TS_ratio || 5.03e4,
                 powerMW: pipelineState?.P_avg || 83.3,
                 freqGHz: 15.0
               })}
@@ -1648,8 +1661,8 @@ export default function HelixCore() {
                     duty: pipelineState?.dutyCycle || 0.14,
                     gammaGeo: pipelineState?.gammaGeo || 26,
                     qFactor: pipelineState?.qCavity || 1e9,
-                    zeta: pipelineState?.zeta || 0.032,
-                    tsRatio: pipelineState?.TS_ratio || 4102.74,
+                    zeta: pipelineState?.zeta,
+                    tsRatio: pipelineState?.TS_ratio || 5.03e4,
                     freqGHz: 15.0,
                     energyPerLyMWh: (() => {
                       const vLyPerHour = computeEffectiveLyPerHour(
@@ -1657,8 +1670,8 @@ export default function HelixCore() {
                         pipelineState?.dutyCycle || 0.14,
                         pipelineState?.gammaGeo || 26,
                         pipelineState?.qCavity || 1e9,
-                        pipelineState?.zeta || 0.032,
-                        pipelineState?.TS_ratio || 4102.74
+                        pipelineState?.zeta,
+                        pipelineState?.TS_ratio || 5.03e4
                       );
                       const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
                       return isFinite(hoursPerLy) ? (pipelineState?.P_avg || 83.3) * hoursPerLy : Infinity;
@@ -1672,8 +1685,8 @@ export default function HelixCore() {
                       duty, 
                       pipelineState?.gammaGeo || 26,
                       pipelineState?.qCavity || 1e9,
-                      pipelineState?.zeta || 0.032,
-                      pipelineState?.TS_ratio || 4102.74
+                      pipelineState?.zeta,
+                      pipelineState?.TS_ratio || 5.03e4
                     )
                   } as HelixPerf}
                 />
