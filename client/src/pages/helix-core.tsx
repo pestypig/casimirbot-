@@ -280,6 +280,22 @@ export default function HelixCore() {
 
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
+
+  // Calculate epsilonTilt after pipeline is available
+  const G = 9.80665, c = 299792458;
+  const hull = (hullMetrics && hullMetrics.hull) ? {
+    ...hullMetrics.hull,
+    a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+    b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+    c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+  } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+  const gTargets: Record<string, number> = {
+    hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
+  };
+  const currentMode = (pipeline?.currentMode ?? 'hover').toLowerCase();
+  const gTarget = gTargets[currentMode] ?? 0;
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
   
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -523,21 +539,6 @@ export default function HelixCore() {
           <CardContent className="pt-0">
             {/* Natário Warp Bubble Visualizer */}
             {(() => {
-              const G = 9.80665, c = 299792458;
-              const hull = (hullMetrics && hullMetrics.hull) ? {
-                ...hullMetrics.hull,
-                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-              } : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
-
-              const gTargets: Record<string, number> = {
-                hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
-              };
-              const mode = (pipeline?.currentMode ?? 'hover').toLowerCase();
-              const gTarget = gTargets[mode] ?? 0;
-              const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
-              const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
               const betaTiltVec = [0, -1, 0] as [number, number, number];
 
               return (
@@ -554,7 +555,7 @@ export default function HelixCore() {
                         const MODE_TARGET = {
                           standby:   { P_W: 0,        M_kg: 0    },
                           hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                          cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+                          cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
                           emergency: { P_W: 297.5e6,  M_kg: 1000 },
                         } as const;
                         const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
@@ -564,7 +565,7 @@ export default function HelixCore() {
                         const MODE_TARGET = {
                           standby:   { P_W: 0,        M_kg: 0    },
                           hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                          cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+                          cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
                           emergency: { P_W: 297.5e6,  M_kg: 1000 },
                         } as const;
                         const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
