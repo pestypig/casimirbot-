@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Activity, Zap, Sigma, Atom, Gauge, RadioReceiver, Thermometer, CircuitBoard, ScanSearch, ShieldCheck } from "lucide-react";
+import CavitySideView from "./CavitySideView";
 import {
   ResponsiveContainer,
   CartesianGrid,
@@ -566,6 +567,28 @@ export default function HelixCasimirAmplifier({
                   Theory match: {Math.abs((derived.U_static - derived.casimir_per_tile) / derived.casimir_per_tile * 100) < 5 ? "✓ Good" : "⚠ Check units"}
                 </div>
               </div>
+            </div>
+            
+            {/* To-Scale Cavity Cross-Section */}
+            <div className="mt-6 pt-4 border-t border-slate-700">
+              <h4 className="font-semibold mb-3 text-slate-200 flex items-center gap-2">
+                <ScanSearch className="w-4 h-4"/>
+                Pipeline-Driven Cavity Cross-Section (To Scale)
+              </h4>
+              <CavitySideView
+                pocketDiameter_um={40}
+                sag_nm={state.sag_nm ?? 16}
+                gap_nm={state.gap_nm ?? 1}
+                topMirror_thick_um={1.5}
+                botMirror_thick_um={1.5}
+                alnRim_width_um={20}
+                tileWidth_mm={50}
+                physicsParity={false} // TODO: Connect to Physics Parity mode if available
+                onWindow={lightCrossing?.onWindow ?? false}
+                stroke_pm={50}
+                width={800}
+                height={240}
+              />
             </div>
           </CardContent>
         </Card>
