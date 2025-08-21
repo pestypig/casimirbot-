@@ -121,6 +121,10 @@ interface WarpVisualizerProps {
     epsilonTilt?: number;
     betaTiltVec?: number[];
     wallWidth_m?: number;
+    // Curvature gain controls (legacy and new approaches)
+    curvatureGainT?: number;        // Legacy T blend mode (0-1)
+    curvatureBoostMax?: number;     // Legacy boost maximum
+    curvatureGainDec?: number;      // NEW: Direct decades gain (0-8)
     // NEW: Shift parameters (structured format)
     shift?: ShiftParams;
   };
@@ -402,7 +406,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
-        userGain: n((parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 1.0), // Unified curvature gain from UI slider
+        // Enhanced decades-scale curvature gain: use exponential scaling for dramatic control
+        userGain: (() => {
+          const decades = n(parameters.curvatureGainDec ?? (parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 0);
+          // Convert 0-8 decades slider to exponential gain (10^(t*4) scaled to 1-10000 range)
+          return decades > 0 ? Math.pow(10, decades * 0.5) : 1.0;
+        })(),
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility

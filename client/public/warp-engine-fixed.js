@@ -465,15 +465,32 @@ class WarpEngine {
             curvatureGainT: Number.isFinite(parameters.curvatureGainT) ? Math.max(0, Math.min(1, parameters.curvatureGainT)) : (this.uniforms?.curvatureGainT ?? 0.75),
             curvatureBoostMax: Number.isFinite(parameters.curvatureBoostMax) ? Math.max(1, parameters.curvatureBoostMax) : (this.uniforms?.curvatureBoostMax ?? 40),
             
-            // Derived unified gain used by both color and geometry:
+            // Enhanced unified gain with decades slider support:
             userGain: (() => {
-                const t = (Number.isFinite(parameters.curvatureGainT)
-                    ? parameters.curvatureGainT
-                    : (this.uniforms?.curvatureGainT ?? 0.75));
-                const mx = (Number.isFinite(parameters.curvatureBoostMax)
-                    ? Math.max(1, parameters.curvatureBoostMax)
-                    : (this.uniforms?.curvatureBoostMax ?? 40));
-                return (1 - t) + t * mx; // 1 .. curvatureBoostMax
+                // Accept either a normalized T (0..1) or a big numeric slider (0..8), or direct gain
+                const gainInput = 
+                    Number.isFinite(parameters.userGain)              ? +parameters.userGain :        // absolute gain override (1..1e6)
+                    Number.isFinite(parameters.curvatureGainDec)      ? +parameters.curvatureGainDec : // decades slider (0..8 => 10^dec)  
+                    Number.isFinite(parameters.curvatureGainT)        ? +parameters.curvatureGainT :   // normalized T (0..1)
+                    (this.uniforms?.curvatureGainT ?? 0.75);
+
+                // Normalize into a usable gain:
+                let userGain;
+                if (gainInput > 1.5) {
+                    // Treat as decades (e.g., 0..8): 10^dec, capped to 8 decades => 1e8
+                    const dec = Math.min(8, gainInput);            
+                    userGain = Math.pow(10, dec);
+                } else if (gainInput >= 0 && gainInput <= 1) {
+                    // Treat as normalized T (0..1): blend 1..BoostMax
+                    const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+                        ? Math.max(1, parameters.curvatureBoostMax)
+                        : (this.uniforms?.curvatureBoostMax ?? 40);
+                    userGain = (1 - gainInput) + gainInput * boostMax;
+                } else {
+                    // Treat as absolute gain
+                    userGain = Math.max(1, gainInput);
+                }
+                return userGain;
             })(),
             
             // Calculate thetaScale for unified color mapping with SliceViewer
@@ -627,10 +644,10 @@ class WarpEngine {
           hullMaxClip * spanPadding
         );
         
-        // --- Gain boost used for BOTH color & geometry ---
+        // --- Enhanced gain boost for BOTH color & geometry (decades slider support) ---
         const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
-        // Expand grid a little with gain so boosted curvature stays framed
-        const spanBoost = 1.0 + (userGain - 1.0) * 0.35;  // 35% of gain goes to span
+        // Expand the grid more aggressively with gain so you actually see it
+        const spanBoost = 1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5; // +0..1.5× span
         targetSpan *= spanBoost;
         
         // Higher resolution for smoother canonical curvature
@@ -650,8 +667,8 @@ class WarpEngine {
             mode === 'cruise'    ? 1.00 :
             mode === 'hover'     ? 1.05 :
             mode === 'emergency' ? 1.08 : 1.00;
-        // Final, bounded visual amplitude for geometry
-        const A_vis = Math.min(1.0, A_base * boost * modeScale);
+        // Enhanced amplitude compression for decades-scale gains: compress *after* boosting
+        const A_vis = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
         
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
@@ -844,8 +861,8 @@ class WarpEngine {
                 // Reduced visual gain to avoid clamp flattening + higher ceiling
                 disp *= 2.0; // lower than 4.0 to avoid hitting clamp
                 
-                // Soft clamp with higher ceiling (no jaggies)
-                const maxPush = 0.15;                        // slightly higher ceiling
+                // Let curvature breathe more under big gain
+                const maxPush = 0.22;                        // higher ceiling for decades slider
                 const softClamp = (x, m) => m * Math.tanh(x / m);
                 disp = softClamp(disp, maxPush);
                 

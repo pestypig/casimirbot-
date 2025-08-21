@@ -623,8 +623,8 @@ export default function HelixCore() {
                           wall: { w_norm: 0.016 },
                           gridScale: 1.6,
                           epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                          curvatureGainT: curvatureGain / 8.0,   // Convert 0-8 slider to 0-1 blend
-                          curvatureBoostMax: 40,              // Maximum boost multiplier
+                          curvatureGainDec: curvatureGain,       // Direct decades slider (0-8)
+                          curvatureBoostMax: 40,              // Fallback for legacy T mode
                           betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                           wallWidth_m: 6.0,
                           shift: {
@@ -674,7 +674,7 @@ export default function HelixCore() {
                             className="w-full"
                           />
                           <div className="text-xs text-slate-400">
-                            {curvatureGain === 0 ? "True physics only (no boost)" : `Blend: ${((1 - curvatureGain/8.0) * 100).toFixed(0)}% physics, ${((curvatureGain/8.0) * 100).toFixed(0)}% boosted`}
+                            {curvatureGain === 0 ? "True physics only" : `Decades boost: 10^${curvatureGain.toFixed(1)} = ${Math.pow(10, curvatureGain).toExponential(1)}`}
                           </div>
                         </div>
                       </div>
