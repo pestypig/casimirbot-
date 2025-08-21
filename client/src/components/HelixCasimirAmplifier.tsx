@@ -113,7 +113,7 @@ type HelixMetrics = {
 const HBAR_C = 1.98644586e-25; // J·m
 const PI = Math.PI;
 const C = 299_792_458;
-const Q_BURST = 1e9; // keep in sync with backend PAPER.Q_BURST
+// Q_BURST removed - using cavity Q directly in physics calculations
 
 // ---------------------------- Helper utilities ----------------------------
 
@@ -318,29 +318,39 @@ export default function HelixCasimirAmplifier({
   const { data: metrics } = usePolling<HelixMetrics>(metricsEndpoint, 1500, [metricsEndpoint]);
   const { data: state }   = usePolling<EnergyPipelineState>(stateEndpoint, 3000, [stateEndpoint]);
 
+  // Time-evolving cavity energy system using shared light-crossing loop
+  const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  
+  const qCav = isFiniteNumber(state?.qCavity) ? state.qCavity : 1e9;
+  // Single authoritative frequency source
+  const fGHz = isFiniteNumber(state?.modulationFreq_GHz) ? state!.modulationFreq_GHz : 
+               (lightCrossing?.freqGHz ?? 15);
+  const f = fGHz * 1e9;
+  const omega = 2 * Math.PI * f;
+  const tauQ_s = qCav / (2 * Math.PI * f); // cavity time constant: τ = Q/(2πf)
+
   // derived quantities (robust to partial data)
   const derived = useMemo(() => {
     if (!state || !metrics) return null;
 
     const U_static = state.U_static;                 // J per tile (signed)
     const gammaGeo = state.gammaGeo;
-    const qMech    = state.qMechanical ?? 1;
+    const qMech    = state.qMechanical ?? 1;         // mechanical gain/Q-factor (consider renaming to mechGain)
     const d_eff    = metrics.dutyEffectiveFR ?? 0;   // authoritative duty for FR & ship averaging
     const N_tiles  = state.N_tiles ?? metrics.totalTiles;
-    const omega    = 2 * Math.PI * (state.modulationFreq_GHz ?? 15) * 1e9;
 
     // Power chain (per tile → ship)
     const U_geo    = U_static * gammaGeo;            // note: power chain uses γ^1 (as in backend)
     const U_Q      = U_geo * qMech;                  // per tile (ON-window stored energy proxy)
     const U_cycle  = U_Q * d_eff;                    // per tile average contribution
 
-    const P_tile_on = Math.abs(U_Q) * omega / Q_BURST;  // W per tile during ON
+    const P_tile_on = (omega * Math.abs(U_Q)) / qCav;  // W per tile during ON (P = ωU/Q)
     const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6;
     const P_ship_avg_report_MW = state.P_avg;           // authoritative from backend calibration
 
     // Mass chain (per tile energy that maps to exotic mass via E/c^2)
     const geo3    = Math.pow(gammaGeo, 3);
-    const E_tile_mass = Math.abs(U_static) * geo3 * Q_BURST * (state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck) * d_eff;
+    const E_tile_mass = Math.abs(U_static) * geo3 * qCav * (state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck) * d_eff;
     const M_tile = E_tile_mass / (C * C);               // kg per tile
     const M_total_calc = M_tile * N_tiles;
     const M_total_report = state.M_exotic ?? metrics.exoticMass;
@@ -358,14 +368,7 @@ export default function HelixCasimirAmplifier({
       geo3, E_tile_mass, M_tile, M_total_calc, M_total_report,
       gap_m, tileA_m2, casimir_theory, casimir_per_tile
     };
-  }, [state, metrics]);
-
-  // Time-evolving cavity energy system using shared light-crossing loop
-  const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  
-  const qCav = isFiniteNumber(state?.qCavity) ? state.qCavity : 1e9;
-  const f = (lightCrossing?.freqGHz ?? 15) * 1e9;
-  const tauQ_s = qCav / (Math.PI * f); // cavity time constant
+  }, [state, metrics, omega, qCav]);
 
   // Normalized steady-state target energy from pipeline (or fallback)
   const U_inf = (state?.U_cycle ?? 1) * 1; // arbitrary scale -> keep consistent
