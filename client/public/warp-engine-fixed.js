@@ -111,6 +111,26 @@ class WarpEngine {
         };
         window.__warp_setCosmetic = this.__warp_setCosmetic;
 
+        // 🔬 True Physics preset (no cosmetics, no boosts, pure physics)
+        this.__warp_truePhysics = () => {
+            try {
+                this.setCosmeticLevel(1);  // no cosmetic blend
+                this.setCurvatureGainDec(0, 1);  // no user gain boost
+                console.log('🔬 TRUE PHYSICS: Pure pipeline amplitude, no visual enhancements');
+            } catch(e) { console.warn(e); }
+        };
+        window.__warp_truePhysics = this.__warp_truePhysics;
+
+        // 🎨 Showcase preset (full cosmetics, current look)
+        this.__warp_showcase = () => {
+            try {
+                this.setCosmeticLevel(10);  // full cosmetic blend
+                this.setCurvatureGainDec(0, 40);  // reset to baseline with full boost available
+                console.log('🎨 SHOWCASE: Maximum visual enhancement for demonstration');
+            } catch(e) { console.warn(e); }
+        };
+        window.__warp_showcase = this.__warp_showcase;
+
         // default to "current visuals" feel
         this.setCosmeticLevel(10);
         
@@ -555,19 +575,17 @@ class WarpEngine {
             
             // Calculate thetaScale for unified color mapping with SliceViewer
             thetaScale: (() => {
-                // 🔬 Physics Parity Mode: Force unity values
-                if (physicsParityMode) {
-                    return 0; // Zero theta scale for flat baseline
-                }
-                
+                // NOTE: Keep the *real* physics chain even in parity mode; only cosmetics turn off.
                 const gammaGeo = N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y ?? 26);
-                const qSpoil = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1.0);
+                const qSpoil   = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1.0);
                 const gammaVdB = N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 3.83e1);
-                const duty = Math.max(1e-12, N(dutyFrac));
-                const sectors = Math.max(1, N(parameters.sectors ?? parameters.sectorStrobing ?? 1));
-                
-                // Same amplitude chain as SliceViewer: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
-                return Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(duty / sectors);
+                const duty     = Math.max(1e-12, N(dutyFrac));
+                const sectors  = Math.max(1, N(parameters.sectors ?? parameters.sectorStrobing ?? 1));
+
+                const chain = Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(duty / sectors);
+
+                // Parity mode = use real chain, but no extra boosts or cosmetics elsewhere.
+                return chain;
             })(),
             
             // Mirror pipeline fields for diagnostics
