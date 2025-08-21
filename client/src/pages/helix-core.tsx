@@ -299,7 +299,7 @@ export default function HelixCore() {
   const [modeVersion, setModeVersion] = useState(0);
   
   // 🎛️ Unified curvature gain control (scales both geometry and color)
-  const [curvatureGain, setCurvatureGain] = useState(4.0); // Default: boosted view (×4)
+  const [curvatureGain, setCurvatureGain] = useState(8.0); // Default: maximum boosted view (×8)
   
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);

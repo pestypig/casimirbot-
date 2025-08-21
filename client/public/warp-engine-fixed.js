@@ -308,7 +308,7 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale * u_userGain;\n" +
+            "    float val = theta * u_thetaScale * max(1.0, u_userGain);\n" +
             "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
             "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
             "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
@@ -361,7 +361,7 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale * u_userGain;\n" +
+            "    float val = theta * u_thetaScale * max(1.0, u_userGain);\n" +
             "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
             "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
             "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +

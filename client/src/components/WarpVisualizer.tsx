@@ -365,7 +365,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         : defaultBetaTilt;
 
       console.log("🎛️ uniforms-to-engine (tilt resolve)", {
-        mode, epsilonTilt, tiltGain, betaTiltVec, fromPanel: hasGoodPanelEps
+        mode, epsilonTilt, tiltGain, betaTiltVec, fromPanel: hasGoodPanelEps,
+        userGain: n((parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 1.0)
       });
 
       // Hull geometry from parameters or use needle hull defaults
