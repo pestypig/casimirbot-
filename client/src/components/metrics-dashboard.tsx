@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useQuery } from '@tanstack/react-query';
+import { useEnergyPipeline, MODE_CONFIGS } from '@/hooks/use-energy-pipeline';
 import Plot from 'react-plotly.js';
 
 interface MetricsDashboardProps {
@@ -31,21 +31,8 @@ interface MetricConstraints {
 }
 
 export default function MetricsDashboard({ viabilityParams }: MetricsDashboardProps) {
-  // Use React Query for real-time metrics with polling
-  const {
-    data: metrics,
-    isLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["helix-metrics"],
-    queryFn: async () => {
-      const res = await fetch("/api/helix/metrics");
-      if (!res.ok) throw new Error("metrics fetch failed");
-      return res.json();
-    },
-    refetchInterval: 1500,            // refresh every 1.5s
-    refetchOnWindowFocus: true,       // ensures focus brings in fresh numbers
-  });
+  // Authoritative live pipeline snapshot (already kept fresh by your backend/hooks)
+  const { data: pipeline } = useEnergyPipeline();
   // Mode-aware constraint calculation for dynamic safe zones
   const getModeAwareConstraints = (selectedMode: string): MetricConstraints => {
     const baseConstraints = {
@@ -92,15 +79,22 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     }
   };
 
-  const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints("hover"));
+  const liveMode: string =
+    ((pipeline as any)?.currentMode as string) ||
+    (viabilityParams?.selectedMode as string) ||
+    'hover';
+  const [constraints, setConstraints] = useState<MetricConstraints>(getModeAwareConstraints(liveMode));
 
-  // Safe accessors to handle both old and new API field names
-  const P_avg = metrics?.P_avg ?? metrics?.energyOutput ?? 0;            // MW
-  const dutyFrac = metrics?.f_throttle ?? metrics?.dutyGlobal ?? metrics?.duty ?? 0; // 0..1
-  const M_exotic = metrics?.M_exotic ?? metrics?.exoticMass ?? 0;           // kg
-  const TS_ratio = metrics?.TS_ratio ?? metrics?.timeScaleRatio ?? 0;
-  const zeta = metrics?.zeta ?? metrics?.fordRoman?.value ?? 0;
-  const P_raw = metrics?.P_raw ?? metrics?.energyOutput ?? 0;
+  // Safe accessors mapped to pipeline interface field names
+  const P_avg = Number.isFinite((pipeline as any)?.P_avg) ? (pipeline as any).P_avg : 0;          // MW
+  const dutyFrac = Number.isFinite((pipeline as any)?.dutyCycle) ? (pipeline as any).dutyCycle : 0;     // 0..1
+  const M_exotic = Number.isFinite((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic : 0; // kg
+  const TS_ratio = Number.isFinite((pipeline as any)?.TS_ratio) ? (pipeline as any).TS_ratio : 0;
+  const zeta = Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta : 0;
+  // Prefer explicit raw MW if provided; else fall back to avg
+  const P_raw = Number.isFinite((pipeline as any)?.P_loss_raw)
+    ? (pipeline as any).P_loss_raw
+    : P_avg;
 
   // Safe formatters that won't throw
   const f0 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(0) : "—";
@@ -110,7 +104,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
 
   // Convert to dashboard format using safe accessors
   const dashboardMetrics = React.useMemo(() => {
-    if (!metrics) return null;
+    if (!pipeline) return null;
     
     return {
       P_raw,
@@ -121,12 +115,12 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       zeta,
       M_exotic
     };
-  }, [metrics, P_avg, dutyFrac, M_exotic, TS_ratio, zeta, P_raw]);
+  }, [pipeline, P_avg, dutyFrac, M_exotic, TS_ratio, zeta, P_raw]);
 
   // Update constraints when parameters change
   useEffect(() => {
-    // Update constraints based on operational mode for dynamic safe zones
-    const selectedMode = viabilityParams?.selectedMode || "hover";
+    // Always derive constraints from the *live* mode, with prop fallback
+    const selectedMode = liveMode || viabilityParams?.selectedMode || "hover";
     const modeConstraints = getModeAwareConstraints(selectedMode);
     setConstraints(modeConstraints);
     
@@ -134,14 +128,14 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
       P_avg_max: modeConstraints.P_avg_max,
       zeta_max: modeConstraints.zeta_max
     });
-  }, [viabilityParams]);
+  }, [viabilityParams, liveMode]);
 
   // Memoize radar chart data with mode-aware safe zones
   const radarData = React.useMemo(() => {
     if (!dashboardMetrics) return null;
 
-    // Current mode for debug logging
-    const selectedMode = viabilityParams?.selectedMode || "hover";
+    // Current mode for debug logging (pipeline wins)
+    const selectedMode = liveMode || viabilityParams?.selectedMode || "hover";
     
     // Get fresh constraints directly for this mode (avoid stale state)
     const currentConstraints = getModeAwareConstraints(selectedMode);
@@ -184,7 +178,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     const safeZoneBoundary = [1, 1, 1, 1, 1, 1, 1]; // All values should be ≤ 1.0 to be "safe"
 
     // Debug: Log actual vs normalized values for verification (only if data is ready)
-    if (metrics && normalizedData?.length >= 5) {
+    if (pipeline && normalizedData?.length >= 5) {
       console.log(`🎯 Radar Normalization Debug for ${selectedMode}:`, {
         P_avg: `${f1(P_avg)}MW → ${f2(normalizedData[0])} (limit: ${currentConstraints.P_avg_max}MW)`,
         duty: `${f1(dutyFrac * 100)}% → ${f2(normalizedData[1])}`,
@@ -216,9 +210,9 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
   // Force re-render when mode changes
   const [renderKey, setRenderKey] = React.useState(0);
   React.useEffect(() => {
-    console.log(`🔄 Mode changed to: ${viabilityParams?.selectedMode}, forcing chart re-render`);
+    console.log(`🔄 Mode changed to: ${liveMode || viabilityParams?.selectedMode}, forcing chart re-render`);
     setRenderKey(prev => prev + 1);
-  }, [viabilityParams?.selectedMode]);
+  }, [viabilityParams?.selectedMode, liveMode]);
 
   const radarLayout = {
     polar: {
@@ -246,7 +240,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
     return error <= tolerance ? 'pass' : 'fail';
   };
 
-  if (!metrics) return <div>Computing metrics...</div>;
+  if (!pipeline) return <div>Computing metrics...</div>;
 
   return (
     <div className="space-y-4">
@@ -262,9 +256,9 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
           <div className="flex gap-6">
             {/* Radar Chart */}
             <div className="flex-1">
-              {metrics && radarData && (
+              {pipeline && radarData && (
                 <Plot
-                  key={`radar-${renderKey}-${viabilityParams?.selectedMode || 'hover'}`}
+                  key={`radar-${renderKey}-${liveMode || viabilityParams?.selectedMode || 'hover'}`}
                   data={radarData}
                   layout={radarLayout}
                   config={{ responsive: true, displayModeBar: false }}
@@ -461,10 +455,10 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
                       {f2(TS_ratio)}
                     </p>
                   </TooltipTrigger>
-                  {metrics && (
+                  {pipeline && (
                     <TooltipContent className="text-xs">
-                      <div>τ<sub>LC</sub>: {metrics.tauLC?.toExponential?.(2) ?? "—"} s</div>
-                      <div>T<sub>m</sub>: {metrics.T_m?.toExponential?.(2) ?? "—"} s</div>
+                      <div>τ<sub>LC</sub>: {(pipeline as any).tauLC?.toExponential?.(2) ?? "—"} s</div>
+                      <div>T<sub>m</sub>: {(pipeline as any).T_m?.toExponential?.(2) ?? "—"} s</div>
                       <div>TS = τ<sub>LC</sub> / T<sub>m</sub></div>
                     </TooltipContent>
                   )}
