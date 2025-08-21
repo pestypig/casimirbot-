@@ -680,7 +680,19 @@ export default function HelixCasimirAmplifier({
               <div>
                 <h4 className="font-semibold mb-2 text-slate-200">Power Verification</h4>
                 <div className="space-y-1 text-slate-300">
-                  <div>P_tile (ON): {fmtNum(derived.P_tile_on, "W", 2)}</div>
+                  <div className="flex items-center gap-2">
+                    <span>P_tile (instantaneous):</span>
+                    <span className={`px-2 py-0.5 rounded text-xs ${
+                      lightCrossing?.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
+                    }`}>
+                      {lightCrossing?.onWindowDisplay ? "ON" : "OFF"}
+                    </span>
+                    <span className="text-slate-400 text-xs">
+                      {derived?.isBurstMeaningful
+                        ? `${fmtNum(derived.P_tile_instant_W, "W")}`
+                        : "OFF · insufficient cycles"}
+                    </span>
+                  </div>
                   <div>P_ship (calc): {fmtNum(derived.P_ship_avg_calc_MW, "MW", 2)}</div>
                   <div>P_ship (report): {fmtNum(derived.P_ship_avg_report_MW, "MW", 2)}</div>
                   <div className="text-xs text-slate-400">
