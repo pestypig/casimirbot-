@@ -12,6 +12,10 @@ const DEFAULTS = {
   fordRomanLimit_kg: 1e6,
   Q0: 1e9,                       // reference Q for normalization (configurable)
   tileArea_m2: 0.05 * 0.05,      // 5 cm × 5 cm (override from pipeline if different)
+  minPos: 1e-12,                 // numeric floor for divisions
+  shellThickness_m: 1e-6,        // default shell thickness for momentum flux
+  stressTangentialFactor: 0.5,   // default anisotropy factor for T22
+  powerTolerance: 0.10           // ±10% unless overridden
 };
 
 export interface NatarioWarpParams {
@@ -43,13 +47,20 @@ export interface NatarioWarpParams {
   fordRomanLimit_kg?: number;  // Ford-Roman limit (default 1e6 kg)
   referenceQ?: number;         // Q0 for normalization
   P_avg_W?: number;            // Live average power (preferred over targets)
+  
+  // Advanced parameterization (eliminates remaining magic constants)
+  shellThickness_m?: number;                // for momentum flux
+  stressTangentialFactor?: number;          // replaces hard-coded 0.5
+  powerTarget_W?: number;                   // optional compliance target
+  powerTolerance?: number;                  // fractional tolerance
+  betaTiltVec?: [number, number, number];   // optional pipeline tilt mapping
 }
 
 export interface NatarioWarpResult {
   // Geometric amplification
   geometricBlueshiftFactor: number;     // γ_geo ≈ 25
   effectivePathLength: number;          // a_eff = a - t
-  geometricAmplification: number;       // -γ_geo³/a³ scaling
+  geometricAmplification: number;       // γ_geo³ × γ_VdB (Casimir a⁻⁴ already in baseline)
   
   // Dynamic amplification
   qEnhancementFactor: number;           // Q-factor enhancement
@@ -195,7 +206,7 @@ export function calculateNatarioShiftField(
   
   // Tangential and axial components (for curl-free condition)
   const tangentialComponent = 0; // β_θ = 0 for cylindrical symmetry
-  const axialComponent = 0; // Remove arbitrary 0.1 fudge factor
+  const axialComponent = Array.isArray(params.betaTiltVec) ? shiftAmplitude * (params.betaTiltVec[2] ?? 0) : 0;
   
   return {
     amplitude: shiftAmplitude,
@@ -252,7 +263,8 @@ export function validateQuantumInequality(
 export function calculateStressEnergyTensor(
   energyDensity: number,     // J/m³
   shiftField: NatarioShiftField,
-  spatialGradients: { dvdr: number; dvdt: number }
+  spatialGradients: { dvdr: number; dvdt: number },
+  tangentialFactor: number = DEFAULTS.stressTangentialFactor
 ): StressEnergyComponents {
   const { amplitude, radialProfile } = shiftField;
   const { dvdr, dvdt } = spatialGradients;
@@ -264,8 +276,8 @@ export function calculateStressEnergyTensor(
   // T^11 = -(energy_density + pressure_r)
   const T11 = -(energyDensity + dvdr * amplitude * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
   
-  // Tangential pressure T^22
-  const T22 = -energyDensity * 0.5; // Reduced tangential stress
+  // Tangential pressure T^22 (parameterized anisotropy factor)
+  const T22 = -energyDensity * tangentialFactor;
   
   // Axial pressure T^33
   const T33 = -(energyDensity + dvdt * amplitude * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
@@ -395,21 +407,30 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const stressEnergyTensor = calculateStressEnergyTensor(
     amplifiedEnergyDensity,
     shiftVectorField,
-    spatialGradients
+    spatialGradients,
+    params.stressTangentialFactor ?? DEFAULTS.stressTangentialFactor
   );
 
   // 11. Momentum flux balance
+  const shellThickness = params.shellThickness_m ?? DEFAULTS.shellThickness_m;
   const { momentumFlux } = calculateMomentumFlux(
     stressEnergyTensor,
-    Math.max(1e-12, params.bowlRadius * 1e-6),
-    1e-6 // Shell thickness
+    Math.max(DEFAULTS.minPos, params.bowlRadius * 1e-6),
+    shellThickness
   );
 
   // 12. Validation flags (no hard-coded targets)
   const isZeroExpansion = Math.abs(expansionScalar) < params.expansionTolerance;
   const isCurlFree = Math.abs(curlMagnitude) < 1e-10;
   const isQuantumSafe = quantumValidation.status !== 'violation';
-  const isPowerCompliant = Number.isFinite(powerDraw) ? true : false;
+  
+  // Power compliance against optional target with tolerance
+  const powerTarget = params.powerTarget_W;
+  const tol = params.powerTolerance ?? DEFAULTS.powerTolerance;
+  const isPowerCompliant =
+    Number.isFinite(powerDraw) && Number.isFinite(powerTarget)
+      ? Math.abs(powerDraw - (powerTarget as number)) <= (powerTarget as number) * tol
+      : Number.isFinite(powerDraw); // fallback: "has data" ⇒ ok
 
   return {
     geometricBlueshiftFactor: gammaGeo,
