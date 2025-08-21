@@ -27,8 +27,8 @@ export function useLightCrossingLoop({
   const L_m = Math.max(1e-6, wallWidth_m); // clamp
   const tauLC_ms = (L_m / c) * 1e3;        // ms
 
-  // --- 1% local ON window inside each sector's dwell
-  const localBurstFrac = 0.01;
+  // --- 20% local ON window inside each sector's dwell (increased for visual clarity)
+  const localBurstFrac = 0.20;
   const dwell_ms = Math.max(0.01, sectorPeriod_ms);
   const burst_ms = Math.max(tauLC_ms, dwell_ms * localBurstFrac); // enforce τLC bound
 
