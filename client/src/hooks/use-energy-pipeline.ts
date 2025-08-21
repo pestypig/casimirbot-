@@ -47,6 +47,15 @@ export interface EnergyPipelineState {
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
 }
 
+// Shared smart formatter (W→kW→MW) for UI labels
+export const fmtPowerUnitFromW = (watts?: number) => {
+  const x = Number(watts);
+  if (!Number.isFinite(x)) return '—';
+  if (x >= 1e6) return `${(x/1e6).toFixed(1)} MW`;
+  if (x >= 1e3) return `${(x/1e3).toFixed(1)} kW`;
+  return `${x.toFixed(1)} W`;
+};
+
 // Hook to get current pipeline state
 export function useEnergyPipeline() {
   return useQuery({
@@ -96,7 +105,8 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 1,
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "High-power hover mode for station-keeping",
-    powerTarget: 83.3,
+    // Store targets in **watts** to match the server pipeline MODE_POLICY
+    powerTarget_W: 83.3e6,
     color: "text-cyan-400"
   },
   cruise: {
@@ -106,7 +116,8 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 0.001,   // matches pipeline/old values
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Low-power cruise mode for sustained travel",
-    powerTarget: 7.4e-6,      // store as MW (7.4 W)
+    // Correct target = **7.437 W** (NOT kW/MW)
+    powerTarget_W: 7.437,
     color: "text-green-400"
   },
   emergency: {
@@ -116,7 +127,7 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 1,
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Maximum power emergency mode",
-    powerTarget: 297,
+    powerTarget_W: 297.5e6,
     color: "text-red-400"
   },
   standby: {
@@ -126,7 +137,7 @@ export const MODE_CONFIGS = {
     qSpoilingFactor: 0.1,
     gammaVanDenBroeck: 1,
     description: "Minimal power standby mode",
-    powerTarget: 0.1,
+    powerTarget_W: 0,
     color: "text-slate-400"
   }
 };

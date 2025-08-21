@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
 import { WarpVisualizer } from "@/components/WarpVisualizer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
@@ -733,7 +733,7 @@ export default function HelixCore() {
                       <SelectItem key={mode} value={mode}>
                         <div className="flex items-center gap-2">
                           <span className={config.color}>{config.name}</span>
-                          <span className="text-xs text-slate-500">({fmtPowerUnit(config.powerTarget)})</span>
+                          <span className="text-xs text-slate-500">({fmtPowerUnitFromW(config.powerTarget_W)})</span>
                         </div>
                       </SelectItem>
                     ))}

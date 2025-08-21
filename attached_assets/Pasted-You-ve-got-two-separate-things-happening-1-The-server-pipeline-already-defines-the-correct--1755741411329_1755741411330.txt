@@ -1,0 +1,106 @@
+You’ve got two separate things happening:
+
+1. The **server pipeline** already defines the correct targets (in watts):
+
+* hover: **83.3 MW** → `83.3e6 W`
+* cruise: **7.437 W** → `7.437 W`
+* emergency: **297.5 MW** → `297.5e6 W`
+* standby: **0 W**
+
+2. The **small client file** (`client/src/hooks/use-energy-pipeline.ts`) was hard-coding a `powerTarget` as if it were **MW**, which is what caused the “7.4 kW” / “7.4 MW” confusion. That value is only used for **UI labels**, so it can mislead even if the backend numbers are right.
+
+Below is a focused patch that makes the small file **mirror the server’s units (W)** and exposes a single, safe formatter you can reuse across the UI. With this, “Cruise Mode (7.4 W)” will show correctly and you’re no longer standing in the way of the real pipeline values.
+
+---
+
+# Patch — `client/src/hooks/use-energy-pipeline.ts`
+
+**What it does**
+
+* Switches `powerTarget` → `powerTarget_W` (store in **watts**, matching server).
+* Sets cruise to **7.437 W** (not kW/MW).
+* Exports a tiny `fmtPowerUnitFromW` to render W/kW/MW consistently anywhere.
+
+```diff
+--- a/client/src/hooks/use-energy-pipeline.ts
++++ b/client/src/hooks/use-energy-pipeline.ts
+@@
+ export interface EnergyPipelineState {
+@@
+   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+ }
+ 
++// Shared smart formatter (W→kW→MW) for UI labels
++export const fmtPowerUnitFromW = (watts?: number) => {
++  const x = Number(watts);
++  if (!Number.isFinite(x)) return '—';
++  if (x >= 1e6) return `${(x/1e6).toFixed(1)} MW`;
++  if (x >= 1e3) return `${(x/1e3).toFixed(1)} kW`;
++  return `${x.toFixed(1)} W`;
++};
++
+ // Mode configurations for UI display (synchronized with backend)
+ export const MODE_CONFIGS = {
+   hover: {
+     name: "Hover Mode",
+     dutyCycle: 0.14,
+     sectorStrobing: 1,
+     qSpoilingFactor: 1,
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "High-power hover mode for station-keeping",
+-    powerTarget: 83.3,
++    // Store targets in **watts** to match the server pipeline MODE_POLICY
++    powerTarget_W: 83.3e6,
+     color: "text-cyan-400"
+   },
+   cruise: {
+     name: "Cruise Mode",
+     dutyCycle: 0.005,
+     sectorStrobing: 400,
+-    qSpoilingFactor: 0.001,   // matches pipeline/old values
++    qSpoilingFactor: 0.001,   // matches pipeline/old values
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "Low-power cruise mode for sustained travel",
+-    powerTarget: 7.4e-6,      // store as MW (7.4 W)
++    // Correct target = **7.437 W** (NOT kW/MW)
++    powerTarget_W: 7.437,
+     color: "text-green-400"
+   },
+   emergency: {
+     name: "Emergency Mode",
+     dutyCycle: 0.50,
+     sectorStrobing: 1,
+     qSpoilingFactor: 1,
+     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
+     description: "Maximum power emergency mode",
+-    powerTarget: 297,
++    powerTarget_W: 297.5e6,
+     color: "text-red-400"
+   },
+   standby: {
+     name: "Standby Mode",
+     dutyCycle: 0.001,
+     sectorStrobing: 1,
+     qSpoilingFactor: 0.1,
+     gammaVanDenBroeck: 1,
+     description: "Minimal power standby mode",
+-    powerTarget: 0.1,
++    powerTarget_W: 0,
+     color: "text-slate-400"
+   }
+ };
+```
+
+> Minimal UI tweak where you build the dropdown label (in `helix-core.tsx`): replace the old `fmtPowerUnit(config.powerTarget)` with the new watts-based helper:
+
+```tsx
+// was: ({fmtPowerUnit(config.powerTarget)})
+// now:
+({fmtPowerUnitFromW(config.powerTarget_W)})
+```
+
+That’s it.
+
+* Server remains the source of truth (real P\_avg still streams from `/api/helix/pipeline` in **MW**).
+* The small file no longer injects bogus units; its labels mirror the server’s policy in **watts**.
+* “Cruise Mode (7.4 W)” will display correctly and consistently everywhere.
