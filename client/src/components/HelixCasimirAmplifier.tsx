@@ -539,6 +539,7 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">γ_geo = {fmtNum(derived.gammaGeo, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">q_mech = {fmtNum(derived.qMech, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">γ_VdB = {fmtNum(state.gammaVanDenBroeck, "", 1)}</Badge>
+              <Badge variant="outline" className="justify-center">Q_cav = {fmtNum(qCav, "", 0)}</Badge>
               <Badge variant="outline" className="justify-center">N = {fmtNum(derived.N_tiles, "", 0)}</Badge>
               <Badge variant="outline" className="justify-center">P = {fmtNum(derived.P_ship_avg_report_MW, "MW", 2)}</Badge>
               <Badge variant="outline" className="justify-center">M = {fmtNum(derived.M_total_report, "kg", 0)}</Badge>
@@ -656,8 +657,8 @@ export default function HelixCasimirAmplifier({
 
         {/* Amplification Ladders */}
         <div className="grid lg:grid-cols-2 gap-6">
-          <LadderChart title="Power Chain (Per Tile → Ship)" unit="J or W" data={powerLadder} />
-          <LadderChart title="Mass Chain (Per Tile Energy)" unit="J or kg" data={massLadder} />
+          <LadderChart title="Power Chain (Per Tile → Ship)" unit="W" data={powerLadder} />
+          <LadderChart title="Energy Chain (Per Tile → Ship Avg)" unit="J" data={massLadder} />
         </div>
 
         {/* Pipeline Cross-checks */}
