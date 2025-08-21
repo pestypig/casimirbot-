@@ -826,14 +826,14 @@ export default function HelixCore() {
                 gammaGeo: pipeline?.gammaGeo ?? 26,
                 qSpoil: qSpoilUI,
                 qCavity: pipeline?.qCavity ?? 1e9,
-                // NEW: Mechanical response parameters  
+                // 🔽 NEW: mechanical chain
                 qMechanical: pipeline?.qMechanical ?? 1,
-                modulationHz: 15e9, // 15 GHz modulation frequency
+                modulationHz: (pipeline?.modulationFreq_GHz ?? 15) * 1e9,
                 mech: {
-                  mechResonance_Hz: 15e9, // Default to modulation frequency
-                  mechZeta: undefined,    // Will be computed from qMechanical
-                  mechCoupling: 0.6       // 60% coupling strength
-                }
+                  mechResonance_Hz: undefined,  // default = modulation (centered)
+                  mechZeta: undefined,          // infer from qMechanical if omitted
+                  mechCoupling: 0.65,           // tweak visual strength 0..1
+                },
               }}
             />
           </CardContent>

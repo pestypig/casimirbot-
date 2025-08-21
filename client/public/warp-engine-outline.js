@@ -164,17 +164,43 @@
     const breathe = 0.07 * Math.sin(t * 0.8); // ±7%
     const finalAlpha = (0.9 + breathe) * modeAlpha;
 
-    // Shell styling that responds to mode/gain
-    // Add orange glow when mechanical response is active (cavity "in band")
-    const glowIntensity = mechGain * 0.4; // 0 to 40% extra brightness when active
-    const baseInner = `rgba(${255 + Math.round(60 * glowIntensity)},${176 + Math.round(40 * glowIntensity)},176,${0.60 * finalAlpha})`; // red-ish with glow
-    const baseCenter= `rgba(${200 + Math.round(80 * glowIntensity)},${208 + Math.round(60 * glowIntensity)},220,${0.45 * finalAlpha})`;
-    const baseOuter = `rgba(176,${208 + Math.round(60 * glowIntensity)},${255 + Math.round(40 * glowIntensity)},${0.60 * finalAlpha})`; // blue-ish with glow
+    // Shell styling that responds to mechanical resonance
+    // Apply mechGain modulation: thickness *= (1.0 + 0.5 * mechGain), alpha *= mix(0.6, 1.0, mechGain)
+    const alphaMod = 0.6 + 0.4 * mechGain; // 0.6 to 1.0 alpha multiplier
+    const thicknessMod = 1.0 + 0.5 * mechGain; // 1.0 to 1.5x thickness multiplier
+    
+    // Mechanical response alpha modulation
+    const mechAlpha = finalAlpha * alphaMod;
+    
+    // Base shell colors with optional cyan tint when "in band"
+    const baseColors = {
+      inner:  [255, 176, 176], // red-ish
+      center: [200, 208, 220], // gray-ish  
+      outer:  [176, 208, 255]  // blue-ish
+    };
+    const mechTint = [77, 230, 255]; // cyan tint (0.3, 0.9, 1.0 * 255)
+    const tintStrength = 0.35 * mechGain;
+    
+    // Mix base colors with cyan tint when mechanical response is active
+    const mixColor = (base, tint, strength) => [
+      Math.round(base[0] * (1 - strength) + tint[0] * strength),
+      Math.round(base[1] * (1 - strength) + tint[1] * strength),
+      Math.round(base[2] * (1 - strength) + tint[2] * strength)
+    ];
+    
+    const innerColor = mixColor(baseColors.inner, mechTint, tintStrength);
+    const centerColor = mixColor(baseColors.center, mechTint, tintStrength);
+    const outerColor = mixColor(baseColors.outer, mechTint, tintStrength);
+    
+    const baseInner = `rgba(${innerColor[0]},${innerColor[1]},${innerColor[2]},${0.60 * mechAlpha})`;
+    const baseCenter= `rgba(${centerColor[0]},${centerColor[1]},${centerColor[2]},${0.45 * mechAlpha})`;
+    const baseOuter = `rgba(${outerColor[0]},${outerColor[1]},${outerColor[2]},${0.60 * mechAlpha})`;
     const colShift  = `rgba(180,120,255,${0.90})`;              // violet (shift vector)
 
-    const innerWidth  = (1.0 + 0.75 * gainVis) * mechMod;
-    const centerWidth = (0.8 + 0.50 * gainVis) * mechMod;
-    const outerWidth  = (1.0 + 0.75 * gainVis) * mechMod;
+    // Apply mechanical response thickness modulation: thickness *= (1.0 + 0.5 * mechGain)
+    const innerWidth  = (1.0 + 0.75 * gainVis) * thicknessMod;
+    const centerWidth = (0.8 + 0.50 * gainVis) * thicknessMod;
+    const outerWidth  = (1.0 + 0.75 * gainVis) * thicknessMod;
 
     const a0 = p.hullAxes[0], b0 = p.hullAxes[1], c0 = p.hullAxes[2];
     const dRho = clamp(p.wallWidth, 0.005, 0.40);
