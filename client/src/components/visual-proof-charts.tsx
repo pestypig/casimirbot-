@@ -5,109 +5,195 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-         RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, 
-         LineChart, Line, ComposedChart } from 'recharts';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar,
+  LineChart, Line, ComposedChart
+} from 'recharts';
 import { TrendingUp, Activity, Target } from "lucide-react";
+import { useEnergyPipeline, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 
 interface VisualProofChartsProps {
-  results: {
-    // Static Casimir results
-    totalEnergy?: number;           // J
-    
-    // Warp bubble results  
+  // Optional overrides; if omitted, live pipeline values are used
+  results?: {
+    totalEnergy?: number;               // J (we'll use pipeline.U_cycle if missing)
     geometricBlueshiftFactor?: number;  // γ_geo
     qEnhancementFactor?: number;        // Q factor
     totalExoticMass?: number;           // kg
-    powerDraw?: number;                 // W
+    powerDraw?: number;                 // W (NOTE: pipeline.P_avg is MW → convert)
     quantumInequalityMargin?: number;   // ζ
-    
-    // Duty cycle parameters
-    dutyFactor?: number;            // d = 0.01
-    effectiveDuty?: number;         // d_eff = 2.5×10⁻⁵
-    
-    // Energy progression
-    baselineEnergyDensity?: number; // J/m³ baseline
-    amplifiedEnergyDensity?: number; // J/m³ amplified
+    dutyFactor?: number;                // d_burst (local ON window, e.g. 0.01)
+    effectiveDuty?: number;             // d_eff (shipwide, e.g. S_live/400 * d_burst)
+    baselineEnergyDensity?: number;
+    amplifiedEnergyDensity?: number;
   };
-  targets: {
-    gammaGeo: number;      // 25
-    cavityQ: number;       // 1e9
-    dutyFactor: number;    // 0.01
-    effectiveDuty: number; // 2.5e-5
-    exoticMassTarget: number; // 1.4e3 kg
-    powerTarget: number;   // 83e6 W
-    zetaSafeLimit: number; // 1.0
+  targets?: {
+    gammaGeo?: number;         // nominal target
+    cavityQ?: number;          // Q target
+    dutyFactor?: number;       // burst duty target (e.g. 0.01)
+    effectiveDuty?: number;    // effective duty target (e.g. 2.5e-5)
+    exoticMassTarget?: number; // kg
+    powerTarget?: number;      // W  (NOTE: this component expects W)
+    zetaSafeLimit?: number;    // ≤ 1.0 typically
   };
 }
 
-export function VisualProofCharts({ results, targets }: VisualProofChartsProps) {
+export function VisualProofCharts({ results = {}, targets = {} }: VisualProofChartsProps) {
+  const { data: pipeline } = useEnergyPipeline();
+
+  // --- Live values from pipeline with safe fallbacks ---
+  const mode = (pipeline as any)?.currentMode as keyof typeof MODE_CONFIGS | undefined;
+
+  // Power: server sends P_avg in MW for the HUD — convert to W for this component
+  const powerDrawW =
+    Number.isFinite((pipeline as any)?.P_avg) ? ((pipeline as any).P_avg as number) * 1e6 :
+    Number.isFinite(results.powerDraw) ? (results.powerDraw as number) :
+    0;
+
+  // Mass
+  const massKg =
+    Number.isFinite((pipeline as any)?.M_exotic) ? (pipeline as any).M_exotic as number :
+    Number.isFinite(results.totalExoticMass) ? (results.totalExoticMass as number) :
+    0;
+
+  // Gamma_geo, Q, ζ
+  const gammaGeo =
+    Number.isFinite((pipeline as any)?.gammaGeo) ? (pipeline as any).gammaGeo as number :
+    (results.geometricBlueshiftFactor ?? 26);
+
+  const qCavity =
+    Number.isFinite((pipeline as any)?.qCavity) ? (pipeline as any).qCavity as number :
+    (results.qEnhancementFactor ?? 1e9);
+
+  const zeta =
+    Number.isFinite((pipeline as any)?.zeta) ? (pipeline as any).zeta as number :
+    (results.quantumInequalityMargin ?? 0.5);
+
+  // Energy (J): prefer pipeline.U_cycle (duty-cycled energy per tile *? server semantics*).
+  // If not available, fall back to given results or a paper-ish seed.
+  const totalEnergyJ =
+    Number.isFinite((pipeline as any)?.U_cycle) ? (pipeline as any).U_cycle as number :
+    Number.isFinite(results.totalEnergy) ? (results.totalEnergy as number) :
+    -2.55e-3;
+
+  // Duty (two notions): server exposes both
+  const dutyBurst =
+    Number.isFinite((pipeline as any)?.dutyBurst) ? (pipeline as any).dutyBurst as number :
+    (results.dutyFactor ?? 0.01);
+
+  const dutyEff =
+    Number.isFinite((pipeline as any)?.dutyEffective_FR) ? (pipeline as any).dutyEffective_FR as number :
+    (results.effectiveDuty ?? 2.5e-5);
+
+  // --- Targets (server-first if you expose them; else sane fallbacks) ---
+  // Prefer server's exoticMassTarget_kg if present
+  const exoticMassTarget =
+    Number.isFinite((pipeline as any)?.exoticMassTarget_kg) ? (pipeline as any).exoticMassTarget_kg as number :
+    (targets.exoticMassTarget ?? 1405);
+
+  // Prefer server constraints if you add them as `pipeline.constraints`
+  const serverCons = (pipeline as any)?.constraints ?? {};
+
+  const zetaSafeLimit =
+    Number.isFinite(serverCons.zeta_max) ? serverCons.zeta_max as number :
+    (targets.zetaSafeLimit ?? 1.0);
+
+  const targetGammaGeo =
+    Number.isFinite((pipeline as any)?.gammaGeo) ? (pipeline as any).gammaGeo as number :
+    (targets.gammaGeo ?? 26);
+
+  const targetQ =
+    Number.isFinite((pipeline as any)?.qCavity) ? (pipeline as any).qCavity as number :
+    (targets.cavityQ ?? 1e9);
+
+  const targetDutyBurst =
+    Number.isFinite((pipeline as any)?.dutyBurst) ? (pipeline as any).dutyBurst as number :
+    (targets.dutyFactor ?? 0.01);
+
+  const targetDutyEff =
+    Number.isFinite((pipeline as any)?.dutyEffective_FR) ? (pipeline as any).dutyEffective_FR as number :
+    (targets.effectiveDuty ?? 2.5e-5);
+
+  // Power target by mode — this component expects W.
+  // If the backend later exposes a per-mode power target (e.g. pipeline.policy.P_target_W),
+  // use that instead. Until then, map from known mode policy.
+  const powerTargetW =
+    Number.isFinite(serverCons.P_target_W) ? serverCons.P_target_W as number :
+    (mode === 'hover'    ? 83.3e6 :
+     mode === 'cruise'   ? 7.437 :
+     mode === 'emergency'? 297.5e6 :
+     mode === 'standby'  ? 0 :
+     (targets.powerTarget ?? 83e6));
+
   // A. Radar Plot Data - "Spec vs Achieved"
   const radarData = [
     {
       subject: 'γ_geo',
-      target: targets.gammaGeo,
-      achieved: results.geometricBlueshiftFactor || 0,
-      fullMark: targets.gammaGeo * 1.2
+      target: targetGammaGeo,
+      achieved: gammaGeo,
+      fullMark: targetGammaGeo * 1.2
     },
     {
       subject: 'Q (10⁹)',
-      target: targets.cavityQ / 1e9,
-      achieved: (results.qEnhancementFactor || 0) / 1e9,
-      fullMark: targets.cavityQ / 1e9 * 1.2
+      target: targetQ / 1e9,
+      achieved: qCavity / 1e9,
+      fullMark: (targetQ / 1e9) * 1.2
     },
     {
       subject: 'duty d (%)',
-      target: targets.dutyFactor * 100,
-      achieved: (results.dutyFactor || 0) * 100,
-      fullMark: targets.dutyFactor * 100 * 1.2
+      target: targetDutyBurst * 100,
+      achieved: dutyBurst * 100,
+      fullMark: (targetDutyBurst * 100) * 1.2
     },
     {
       subject: '1/ζ',
-      target: 1 / targets.zetaSafeLimit,
-      achieved: results.quantumInequalityMargin ? 1 / results.quantumInequalityMargin : 0,
-      fullMark: 1 / targets.zetaSafeLimit * 1.2
+      target: 1 / zetaSafeLimit,
+      achieved: zeta > 0 ? (1 / zeta) : 0,
+      fullMark: (1 / zetaSafeLimit) * 1.2
     },
     {
       subject: 'Power (MW)',
-      target: targets.powerTarget / 1e6,
-      achieved: (results.powerDraw || 0) / 1e6,
-      fullMark: targets.powerTarget / 1e6 * 1.2
+      target: powerTargetW / 1e6,
+      achieved: powerDrawW / 1e6,
+      fullMark: (powerTargetW / 1e6) * 1.2
     },
     {
       subject: 'Mass (10³kg)',
-      target: targets.exoticMassTarget / 1e3,
-      achieved: (results.totalExoticMass || 0) / 1e3,
-      fullMark: targets.exoticMassTarget / 1e3 * 1.2
+      target: exoticMassTarget / 1e3,
+      achieved: massKg / 1e3,
+      fullMark: (exoticMassTarget / 1e3) * 1.2
     }
   ];
 
-  // B. Energy Boost Pipeline Data
-  const E_flat = -2.55e-3; // J (baseline from paper)
-  const E_bowl = results.totalEnergy || E_flat; // J (bowl geometry)
-  const gamma_geo = results.geometricBlueshiftFactor || 1;
-  const Q_enhancement = results.qEnhancementFactor || 1;
-  const duty_factor = results.dutyFactor || 0.01;
-  const duty_eff = results.effectiveDuty || 2.5e-5;
-  
+  // B. Energy Boost Pipeline Data (units: mJ for display)
+  const E_flat = -2.55e-3;                            // J (paper-ish seed)
+  const E_bowl = Number.isFinite(totalEnergyJ) ? totalEnergyJ : E_flat; // J
+  const Q_enhancement = Number.isFinite(qCavity) ? qCavity : 1;         // dimensionless
+
   const energyPipelineData = [
-    { stage: 'E_flat', energy: Math.abs(E_flat) * 1e3, label: 'Flat Plates' }, // mJ
-    { stage: 'E_bowl', energy: Math.abs(E_bowl) * 1e3, label: 'Bowl Geometry' }, // mJ
-    { stage: 'E_Q', energy: Math.abs(E_bowl) * Q_enhancement * 1e3, label: '+Q Enhancement' }, // mJ
-    { stage: 'E_duty', energy: Math.abs(E_bowl) * Q_enhancement * duty_factor * 1e3, label: '+Duty Factor' }, // mJ
-    { stage: 'E_deff', energy: Math.abs(E_bowl) * Q_enhancement * duty_eff * 1e3, label: '+Sector Strobing' }, // mJ
+    { stage: 'E_flat',  energy: Math.abs(E_flat) * 1e3,                 label: 'Flat Plates' },        // mJ
+    { stage: 'E_bowl',  energy: Math.abs(E_bowl) * 1e3,                 label: 'Bowl Geometry' },      // mJ
+    { stage: 'E_Q',     energy: Math.abs(E_bowl) * Q_enhancement * 1e3, label: '+Q Enhancement' },     // mJ
+    { stage: 'E_duty',  energy: Math.abs(E_bowl) * Q_enhancement * dutyBurst * 1e3,  label: '+Duty Factor' },     // mJ
+    { stage: 'E_deff',  energy: Math.abs(E_bowl) * Q_enhancement * dutyEff * 1e3,    label: '+Sector Strobing' }, // mJ
   ];
 
-  // C. Duty vs Power Analysis Data
-  const dutyRange = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1]; // Range of duty factors
+  // C. Duty vs Power Analysis Data (scale around live baseline)
+  // Use the current live dutyBurst as the baseline and scale power/ζ proportionally.
+  const dutyRange = [0.001, 0.005, 0.01, 0.02, 0.05, 0.1]; // candidate d values
+  const baseDuty = dutyBurst || 0.01;
+  const basePowerW = powerDrawW || powerTargetW; // avoid zero dividing; use target if no reading
+  const baseZeta = zeta || 0.5;
+
   const dutyAnalysisData = dutyRange.map(d => {
-    const power = (results.powerDraw || 83e6) * (d / (results.dutyFactor || 0.01)); // Scale power
-    const zeta = (results.quantumInequalityMargin || 0.5) * (d / (results.dutyFactor || 0.01)); // Scale zeta
+    const scale = baseDuty > 0 ? (d / baseDuty) : 1;
+    const power = basePowerW * scale; // proportional scaling assumption
+    const zetaScaled = baseZeta * scale;
     return {
-      duty: d * 100, // Convert to percentage
-      power: power / 1e6, // Convert to MW
-      zeta: zeta,
-      isOptimal: power < 83e6 && zeta < 1.0
+      duty: d * 100,          // %
+      power: power / 1e6,     // MW
+      zeta: zetaScaled,
+      isOptimal: power < 83e6 && zetaScaled < 1.0 // legacy sweet-spot rule; adjust if you expose per-mode caps
     };
   });
 
@@ -134,33 +220,10 @@ export function VisualProofCharts({ results, targets }: VisualProofChartsProps) 
               <RadarChart data={radarData}>
                 <PolarGrid />
                 <PolarAngleAxis dataKey="subject" className="text-xs" />
-                <PolarRadiusAxis 
-                  angle={90} 
-                  domain={[0, 'dataMax']} 
-                  className="text-xs"
-                />
-                <Radar
-                  name="Target"
-                  dataKey="target"
-                  stroke="#10b981"
-                  fill="#10b981"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-                <Radar
-                  name="Achieved"
-                  dataKey="achieved"
-                  stroke="#3b82f6"
-                  fill="#3b82f6"
-                  fillOpacity={0.4}
-                  strokeWidth={2}
-                />
-                <Tooltip 
-                  formatter={(value: number, name: string) => [
-                    typeof value === 'number' ? value.toFixed(2) : value, 
-                    name
-                  ]}
-                />
+                <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} className="text-xs" />
+                <Radar name="Target"   dataKey="target"   stroke="#10b981" fill="#10b981" fillOpacity={0.2} strokeWidth={2} />
+                <Radar name="Achieved" dataKey="achieved" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.4} strokeWidth={2} />
+                <Tooltip formatter={(v: number, n: string) => [typeof v === 'number' ? v.toFixed(2) : v, n]} />
               </RadarChart>
             </ResponsiveContainer>
             <div className="text-xs text-muted-foreground mt-2">
@@ -181,33 +244,16 @@ export function VisualProofCharts({ results, targets }: VisualProofChartsProps) 
             <ResponsiveContainer width="100%" height={250}>
               <BarChart data={energyPipelineData} layout="horizontal">
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  type="number" 
-                  scale="log" 
-                  domain={['dataMin', 'dataMax']}
-                  className="text-xs"
-                />
-                <YAxis 
-                  type="category" 
-                  dataKey="stage" 
-                  className="text-xs"
-                  width={60}
-                />
-                <Tooltip 
-                  formatter={(value: number) => [
-                    `${value.toExponential(2)} mJ`, 
-                    'Energy'
-                  ]}
+                <XAxis type="number" scale="log" domain={['dataMin', 'dataMax']} className="text-xs" />
+                <YAxis type="category" dataKey="stage" className="text-xs" width={60} />
+                <Tooltip
+                  formatter={(value: number) => [`${value.toExponential(2)} mJ`, 'Energy']}
                   labelFormatter={(label: string) => {
                     const item = energyPipelineData.find(d => d.stage === label);
                     return item?.label || label;
                   }}
                 />
-                <Bar 
-                  dataKey="energy" 
-                  fill="#8884d8"
-                  name="Energy (mJ)"
-                />
+                <Bar dataKey="energy" fill="#8884d8" name="Energy (mJ)" />
               </BarChart>
             </ResponsiveContainer>
             <div className="text-xs text-muted-foreground mt-2">
@@ -228,81 +274,28 @@ export function VisualProofCharts({ results, targets }: VisualProofChartsProps) 
             <ResponsiveContainer width="100%" height={250}>
               <ComposedChart data={dutyAnalysisData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="duty" 
-                  className="text-xs"
-                  label={{ value: 'Duty (%)', position: 'insideBottom', offset: -5 }}
-                />
-                <YAxis 
-                  yAxisId="left" 
-                  className="text-xs"
-                  label={{ value: 'Power (MW)', angle: -90, position: 'insideLeft' }}
-                />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  className="text-xs"
-                  label={{ value: 'ζ margin', angle: 90, position: 'insideRight' }}
-                />
-                <Tooltip 
+                <XAxis dataKey="duty" className="text-xs" />
+                <YAxis yAxisId="left" className="text-xs" />
+                <YAxis yAxisId="right" orientation="right" className="text-xs" />
+                <Tooltip
                   formatter={(value: number, name: string) => [
-                    typeof value === 'number' ? value.toFixed(2) : value,
-                    name === 'power' ? 'Power (MW)' : 'ζ margin'
+                    name === 'power' ? `${value.toFixed(1)} MW` : 
+                    name === 'zeta' ? `${value.toFixed(3)}` : value,
+                    name === 'power' ? 'Power' : 'ζ Safety'
                   ]}
+                  labelFormatter={(label: number) => `Duty: ${label}%`}
                 />
-                <Bar 
-                  yAxisId="left"
-                  dataKey="power" 
-                  fill="#ef4444"
-                  name="power"
-                  opacity={0.7}
-                />
-                <Line 
-                  yAxisId="right"
-                  type="monotone" 
-                  dataKey="zeta" 
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                  name="zeta"
-                />
+                <Bar yAxisId="left" dataKey="power" fill="#3b82f6" name="power" />
+                <Line yAxisId="right" type="monotone" dataKey="zeta" stroke="#ef4444" strokeWidth={2} name="zeta" />
               </ComposedChart>
             </ResponsiveContainer>
             <div className="text-xs text-muted-foreground mt-2">
-              Sweet spot: Power &lt; 83 MW (red) & ζ &lt; 1.0 (green)
+              Blue: Power draw | Red: Safety margin (ζ)
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Summary Status */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Proof Validation Status:</span>
-            <div className="flex gap-2">
-              <Badge variant={
-                radarData.every(d => Math.abs(d.achieved - d.target) / d.target <= 0.1) 
-                  ? "default" : "secondary"
-              }>
-                Spec Compliance
-              </Badge>
-              <Badge variant={
-                (results.powerDraw || 0) < targets.powerTarget * 1.1 
-                  ? "default" : "destructive"
-              }>
-                Power Target
-              </Badge>
-              <Badge variant={
-                (results.quantumInequalityMargin || 0) < targets.zetaSafeLimit 
-                  ? "default" : "destructive"
-              }>
-                Quantum Safety
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }
