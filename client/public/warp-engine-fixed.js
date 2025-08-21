@@ -114,9 +114,9 @@ class WarpEngine {
         // 🔬 True Physics preset (no cosmetics, no boosts, pure physics)
         this.__warp_truePhysics = () => {
             try {
-                this.setCosmeticLevel(1);  // no cosmetic blend
-                this.setCurvatureGainDec(0, 1);  // no user gain boost
-                console.log('🔬 TRUE PHYSICS: Pure pipeline amplitude, no visual enhancements');
+                // Enable physics parity mode for true no-cosmetics operation
+                this.updateUniforms({ physicsParityMode: true });
+                console.log('🔬 TRUE PHYSICS: Physics parity mode enabled - pure pipeline amplitude, no visual enhancements');
             } catch(e) { console.warn(e); }
         };
         window.__warp_truePhysics = this.__warp_truePhysics;
@@ -124,6 +124,8 @@ class WarpEngine {
         // 🎨 Showcase preset (full cosmetics, current look)
         this.__warp_showcase = () => {
             try {
+                // Disable physics parity mode and enable full visual enhancements
+                this.updateUniforms({ physicsParityMode: false });
                 this.setCosmeticLevel(10);  // full cosmetic blend
                 this.setCurvatureGainDec(0, 40);  // reset to baseline with full boost available
                 console.log('🎨 SHOWCASE: Maximum visual enhancement for demonstration');
@@ -602,6 +604,19 @@ class WarpEngine {
             )), // 🔬 Force 0 split in parity mode
             viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
         };
+
+        // 🔬 PHYSICS PARITY MODE: Hard disable cosmetics & boosts, keep real thetaScale above
+        if (physicsParityMode) {
+            // Hard disable cosmetics & boosts, keep real thetaScale above.
+            this.uniforms.userGain           = 1;
+            this.uniforms.curvatureBoostMax  = 1;
+            this.uniforms.curvatureGainT     = 0;
+            this.uniforms.exposure           = 3.0;    // lower contrast
+            this.uniforms.zeroStop           = 1e-5;   // less aggressive log pop
+            this.uniforms.epsilonTilt        = 0;      // no interior tilt visuals
+            this.uniforms.betaTiltVec        = [0,0,0];
+            this.uniforms.cosmeticT          = 0;
+        }
 
         // 🎨 COSMETIC BLENDING: Apply visual parameter interpolation based on cosmeticLevel
         if (cosmeticT < 1 && !physicsParityMode) {
