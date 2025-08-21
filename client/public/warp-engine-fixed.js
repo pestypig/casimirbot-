@@ -103,12 +103,13 @@ class WarpEngine {
         window.addEventListener('resize', this._resize);
         this._resizeCanvasToDisplaySize(); // Initial setup
         
-        // Prime the engine with initial visible curvature
+        // Prime the engine with initial visible curvature using T+boostMax pattern
         this.updateUniforms({
-            curvatureGainDec: 3,   // 10^3 gain → plainly visible
+            curvatureGainT: 0.375,   // 3/8 = 0.375 → equivalent to slider at 3
+            curvatureBoostMax: 40,   // same as SliceViewer
             exposure: 6.0,
             zeroStop: 1e-7,
-            wallWidth: 0.05,       // fatten the wall to catch more vertices
+            wallWidth: 0.05,         // fatten the wall to catch more vertices
         });
         
         // Start render loop
@@ -1204,6 +1205,12 @@ class WarpEngine {
 
         // Mark so we don't rely on any legacy default camera
         this._bootstrapped = true;
+    }
+
+    // --- Convenience method: Set curvature gain from 0-8 slider value --------
+    setCurvatureGainDec(slider0to8, boostMax = 40) {
+        const T = Math.max(0, Math.min(1, slider0to8 / 8));
+        this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
     }
 
     // === Natário Diagnostics (viewer-only, does not affect physics) ===

@@ -414,25 +414,22 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
-        // Deterministic decades gain: 0..8 → 10^dec
-        userGain: (() => {
-          const params = parameters as any; // Type assertion for flexible parameter access
+        // Use the existing 0-8 curvature gain slider with same blend as SliceViewer
+        curvatureGainT: (() => {
+          const params = parameters as any;
           const hasDec = Object.prototype.hasOwnProperty.call(params, 'curvatureGainDec');
           const hasT = Object.prototype.hasOwnProperty.call(params, 'curvatureGainT');
-
-          let userGain;
-          if (Number.isFinite(params.userGain) && params.userGain > 0) {
-            userGain = +params.userGain;  // direct absolute multiplier
-          } else if (hasDec && Number.isFinite(params.curvatureGainDec)) {
-            const dec = Math.max(0, Math.min(8, +params.curvatureGainDec)); // 0..8
-            userGain = Math.pow(10, dec);  // 10^dec
-          } else {
-            const t = hasT ? Math.max(0, Math.min(1, +params.curvatureGainT)) : 0.75;
-            const boostMax = Number.isFinite(params.curvatureBoostMax) ? Math.max(1, +params.curvatureBoostMax) : 40;
-            userGain = (1 - t) + t * boostMax;  // 1..boostMax
+          
+          if (hasDec && Number.isFinite(params.curvatureGainDec)) {
+            // Convert 0..8 slider to 0..1 normalized value
+            return Math.max(0, Math.min(1, +params.curvatureGainDec / 8));
+          } else if (hasT && Number.isFinite(params.curvatureGainT)) {
+            return Math.max(0, Math.min(1, +params.curvatureGainT));
           }
-          return userGain;
+          return 0.75; // default
         })(),
+        curvatureBoostMax: Math.max(1, Number(parameters.curvatureBoostMax) || 40), // same as SliceViewer
+        // Let engine compute userGain from curvatureGainT + curvatureBoostMax
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
