@@ -347,9 +347,15 @@ export default function HelixCasimirAmplifier({
 
   // effective duty for ship-averaged quantities:
   // prefer authoritative metrics.dutyEffectiveFR, else derive from loop
-  const d_eff =
-    metrics?.dutyEffectiveFR ??
-    (lightCrossing ? (lightCrossing.burst_ms / lightCrossing.dwell_ms) : 0);        // equals duty/sectorCount with τLC floor
+  const d_eff = (() => {
+    const fromMetrics = metrics?.dutyEffectiveFR;
+    if (Number.isFinite(fromMetrics)) return Math.max(0, Math.min(1, Number(fromMetrics)));
+    if (lightCrossing && lightCrossing.dwell_ms > 0) {
+      const val = lightCrossing.burst_ms / lightCrossing.dwell_ms;
+      return Math.max(0, Math.min(1, val));
+    }
+    return state?.dutyCycle ?? metrics?.dutyGlobal ?? 0; // last resort
+  })();
 
   const derived = useMemo(() => {
     if (!state || !metrics) return null;
