@@ -188,9 +188,8 @@ export default function HelixCore() {
   const [trail, setTrail] = useState<number[]>(() => Array(400).fill(0));
   const [useDeepZoom, setUseDeepZoom] = useState(false);
   const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
-    // Persist mode preference with Solar (AU) as default
     const stored = localStorage.getItem("helix-mapMode");
-    return (stored === "galactic" || stored === "solar") ? stored : "solar";
+    return stored === "galactic" ? "galactic" : "solar";
   });
   const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
   
@@ -688,9 +687,10 @@ export default function HelixCore() {
                           </div>
                         )}
                       </div>
+                    </div>
 
-
-                      
+                    {/* Slice settings (kept) */}
+                    <div className="p-3 bg-slate-950 rounded-lg border border-slate-700 mb-3">
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div className="space-y-1">
                           <Label htmlFor="exposure-slider" className="text-slate-300">Exposure ({exposure})</Label>
