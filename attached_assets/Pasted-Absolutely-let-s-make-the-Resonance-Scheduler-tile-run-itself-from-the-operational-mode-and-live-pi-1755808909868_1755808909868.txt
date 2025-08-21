@@ -1,0 +1,65 @@
+Absolutely—let’s make the Resonance Scheduler tile run itself from the operational mode (and live pipeline params) instead of that manual Execute button. Below is a drop-in patch:
+
+1) Auto-duty controller (fires on mode/param changes)
+
+Create a tiny hook that watches the effective mode, duty, sectors, and modulation frequency and then calls your existing /api/helix/command endpoint to run simulate_pulse_cycle (or the full execute_auto_pulse_sequence for hover/emergency). It debounces quickly so rapid UI changes don’t spam the server, and it refreshes metrics after each run.
+
+// hooks/useResonatorAutoDuty.ts
+import { useEffect, useRef } from "react";
+import { apiRequest } from "@/lib/queryClient";
+
+type Args = {
+  mode: 'standby'|'hover'|'cruise'|'emergency';
+  duty: number;
+  sectors: number;
+  freqGHz: number;
+  onLog?: (line: string) => void;
+  onAfterRun?: () => void; // e.g. refetchMetrics
+  enabled?: boolean;       // allow disable in debug
+};
+
+export function useResonatorAutoDuty({
+  mode, duty, sectors, freqGHz, onLog, onAfterRun, enabled = true
+}: Args) {
+  const debounceRef = useRef<number | null>(null);
+  const lastSigRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    // Make a small, stable signature for changes that matter to the schedule
+    const sig = `${mode}|${duty.toFixed(6)}|${sectors}|${freqGHz.toFixed(6)}`;
+    if (lastSigRef.current === sig) return;
+    lastSigRef.current = sig;
+
+    if (debounceRef.current) cancelAnimationFrame(debounceRef.current);
+    debounceRef.current = requestAnimationFrame(async () => {
+      try {
+        const cmd = (mode === 'hover' || mode === 'emergency')
+          ? "Execute auto-duty pulse sequence across all 400 sectors"
+          : `Simulate a full pulse cycle at ${freqGHz} GHz`;
+
+        onLog?.(`[SCHED] ${cmd} (mode=${mode}, duty=${(duty*100).toFixed(2)}%, S=${sectors}, f=${freqGHz.toFixed(3)} GHz)`);
+
+        const res = await apiRequest('POST', '/api/helix/command', {
+          messages: [{ role: 'user', content: cmd }]
+        });
+        const data = await res.json();
+
+        if (data?.functionResult?.log) {
+          onLog?.(`[SCHED:OK] ${data.functionResult.log}`);
+        } else {
+          onLog?.(`[SCHED:OK] Completed ${mode} update`);
+        }
+        onAfterRun?.();
+      } catch (e) {
+        onLog?.(`[SCHED:ERR] ${(e as Error)?.message ?? 'update failed'}`);
+      }
+    });
+
+    return () => {
+      if (debounceRef.current) cancelAnimationFrame(debounceRef.current);
+      debounceRef.current = null;
+    };
+  }, [mode, duty, sectors, freqGHz, enabled, onLog, onAfterRun]);
+}

@@ -44,6 +44,7 @@ import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
 import { HelpCircle } from "lucide-react";
+import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 
 // --- Safe numeric formatters ---
 const isFiniteNumber = (v: unknown): v is number =>
@@ -270,6 +271,21 @@ export default function HelixCore() {
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
     queryKey: ['/api/helix/metrics'],
     refetchInterval: 5000 // Update every 5 seconds
+  });
+
+  // Auto-duty controller - automatically runs resonance scheduler on mode changes
+  useResonatorAutoDuty({
+    mode: (pipeline?.currentMode ?? 'hover') as 'standby'|'hover'|'cruise'|'emergency',
+    duty: pipeline?.dutyCycle ?? 0.14,
+    sectors: systemMetrics?.activeSectors ?? 1,
+    freqGHz: pipeline?.modulationFreq_GHz ?? 15,
+    onLog: (line) => {
+      setMainframeLog(prev => [...prev, line].slice(-50)); // Keep last 50 lines
+    },
+    onAfterRun: () => {
+      refetchMetrics(); // Refresh metrics after auto-duty run
+    },
+    enabled: true // Enable auto-duty controller
   });
 
   // Unified, defensive mode fallback for the whole page
