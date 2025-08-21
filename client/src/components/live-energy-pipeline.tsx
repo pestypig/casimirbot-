@@ -2,10 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
-import { useState } from "react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
 
 interface LiveEnergyPipelineProps {
@@ -30,102 +28,9 @@ interface LiveEnergyPipelineProps {
   onParameterUpdate?: (params: { duty: number; qFactor?: number; gammaGeo?: number; exoticMassTarget?: number }) => void;
 }
 
-// Operational mode configurations
-type OperationalMode = {
-  name: string;
-  duty: number;        // Duty cycle fraction
-  sectors: number;     // Strobing sectors (1 = no strobing)
-  qSpoiling: number;   // Q_idle/Q_cavity ratio
-  pocketGamma: number; // Van-den-Broeck pocket amplification
-  description: string;
-};
 
-// Function to calculate actual mode metrics for descriptions
-const calculateModeMetrics = (mode: OperationalMode, gammaGeo: number, qFactor: number, tileArea: number, exoticMassTarget: number = 32.21) => {
-  // Physics constants
-  const h_bar = 1.055e-34; // J⋅s
-  const c = 2.998e8; // m/s
-  const pi = Math.PI;
-  const a = 1e-9; // 1 nm gap
-  const A_tile = tileArea * 1e-4; // cm² to m²
-  const A_hull_needle = 5.6e5; // m²
-  const N_tiles = A_hull_needle / A_tile;
-  
-  // Energy pipeline calculation
-  const u_casimir = -(pi * pi * h_bar * c) / (720 * Math.pow(a, 4));
-  const U_static = u_casimir * A_tile * a;
-  const U_geo = gammaGeo * U_static;
-  const Q_mechanical = 5e4;
-  const Q_cavity = 1e9;
-  const U_Q = Q_mechanical * U_geo;
-  const U_cycle_base = U_Q * mode.duty;
-  
-  // Van-den-Broeck pocket boost for configurable mass target
-  const gamma_pocket = mode.duty > 0 ? exoticMassTarget * (c * c) / (Math.abs(U_cycle_base) * N_tiles) : 0;
-  const U_cycle = U_cycle_base * gamma_pocket;
-  
-  // Power calculation
-  const omega = 2 * pi * 15e9; // 15 GHz
-  const P_loss_raw = Math.abs(U_geo) * omega / Q_cavity;
-  const P_raw_total = P_loss_raw * N_tiles / 1e6; // MW
-  const mode_throttle = mode.duty / mode.sectors * mode.qSpoiling;
-  const P_avg = P_raw_total * mode_throttle;
-  
-  // Quantum safety
-  const zeta = mode.duty > 0 ? 1 / (mode.duty * Math.sqrt(Q_mechanical)) : 0;
-  
-  // Exotic mass
-  const M_exotic = mode.duty > 0 ? Math.abs(U_cycle) / (c * c) * N_tiles : 0;
-  
-  return { P_avg, M_exotic, zeta, P_raw_total, mode_throttle };
-};
 
-const getModesWithDynamicDescriptions = (gammaGeo: number, qFactor: number, tileArea: number, exoticMassTarget: number) => {
-  const modes: Record<string, OperationalMode> = {
-    hover: {
-      name: "Hover",
-      duty: 0.14,          // 14% duty (station-hold)
-      sectors: 1,          // No strobing
-      qSpoiling: 1,        // No Q-spoiling (Q_idle/Q_on = 1)
-      pocketGamma: 0,      // Will be calculated dynamically
-      description: ""      // Will be calculated
-    },
-    cruise: {
-      name: "Cruise", 
-      duty: 0.005,         // 0.5% duty (Ford-Roman compliant: ζ = 1.00)
-      sectors: 400,        // 400-sector strobing (1/S = 1/400)
-      qSpoiling: 0.001,    // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
-      pocketGamma: 0,      // Will be calculated dynamically
-      description: ""      // Will be calculated
-    },
-    emergency: {
-      name: "Emergency",
-      duty: 0.50,          // 50% duty (fast-burn)
-      sectors: 1,          // No strobing
-      qSpoiling: 1,        // No Q-spoiling
-      pocketGamma: 0,      // Will be calculated dynamically
-      description: ""      // Will be calculated
-    },
-    standby: {
-      name: "Standby",
-      duty: 0.0,           // 0% duty (bubble collapsed)
-      sectors: 1,          // Irrelevant
-      qSpoiling: 1,        // Irrelevant
-      pocketGamma: 0,      // No pocket amplification (exotic mass = 0)
-      description: "0 MW • 0 kg • System Off"
-    }
-  };
-  
-  // Calculate descriptions for each mode
-  Object.entries(modes).forEach(([key, mode]) => {
-    if (key !== 'standby') {
-      const metrics = calculateModeMetrics(mode, gammaGeo, qFactor, tileArea, exoticMassTarget);
-      mode.description = `${metrics.P_avg.toFixed(1)} MW • ${metrics.M_exotic.toFixed(0)} kg • ζ=${metrics.zeta.toFixed(3)}`;
-    }
-  });
-  
-  return modes;
-};
+
 
 export function LiveEnergyPipeline({
   gammaGeo,
@@ -145,8 +50,7 @@ export function LiveEnergyPipeline({
 }: LiveEnergyPipelineProps) {
   // Pull live state once and map names
   const { data: pipelineState } = useEnergyPipeline();  // authoritative operational values
-  const switchMode = useSwitchMode();
-  const { data: metrics } = useMetrics(); 
+  const switchMode = useSwitchMode(); 
   
   const P = pipelineState || {};
   const live = {
@@ -164,9 +68,10 @@ export function LiveEnergyPipeline({
     TS_ratio:     Number.isFinite(P.TS_ratio) ? P.TS_ratio! : NaN,
   };
 
-  // Replace local "mode presets" with MODE_CONFIGS and stop recomputing physics for descriptions
-  const modes = MODE_CONFIGS; // { hover, cruise, emergency, standby }
-  const currentModeCfg = modes[live.currentMode];
+  // Guard MODE_CONFIGS lookups (prevents a crash if keys ever drift or arrive late)
+  const modes = MODE_CONFIGS as Record<string, { name: string; powerTarget?: number }>;
+  const currentModeKey = live.currentMode in modes ? live.currentMode : "hover";
+  const currentModeCfg = modes[currentModeKey] ?? { name: currentModeKey };
 
   // human-friendly description built from live values when viewing the current mode
   const liveDesc = [
@@ -212,7 +117,7 @@ export function LiveEnergyPipeline({
             <Tooltip>
               <TooltipTrigger asChild>
                 <CardTitle className="text-lg cursor-help">
-                  Live Energy Pipeline: {currentModeCfg.name} Mode
+                  Live Energy Pipeline: {currentModeCfg?.name ?? currentModeKey} Mode
                 </CardTitle>
               </TooltipTrigger>
               <TooltipContent className="max-w-md text-sm leading-snug">
@@ -244,13 +149,13 @@ export function LiveEnergyPipeline({
             </TooltipContent>
           </Tooltip>
           <Select
-            value={live.currentMode}
+            value={currentModeKey}
             onValueChange={(value) => {
               switchMode.mutate(value as any); // authoritative mode change
               onModeChange?.(value);
-              // optional toast can echo *live* numbers (no recompute)
+              // Defensive access in the toast
               zenLongToast("mode:switch", {
-                mode: modes[value].name,
+                mode: modes[value]?.name ?? value,
                 duty: live.dutyCycle,
                 powerMW: live.P_avg_MW,
                 zeta: live.zeta,
@@ -260,7 +165,9 @@ export function LiveEnergyPipeline({
                 qFactor: live.qCavity,
                 freqGHz: live.modulationFreq_GHz,
                 sectors: live.sectorStrobing,
-                frOk: Number.isFinite(live.zeta) ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02) : true,
+                frOk: Number.isFinite(live.zeta)
+                        ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02)
+                        : true,
                 natarioOk: Number.isFinite(live.TS_ratio) ? live.TS_ratio >= 100 : true,
                 curvatureOk: true
               });
@@ -273,9 +180,13 @@ export function LiveEnergyPipeline({
               {Object.entries(modes).map(([key, cfg]) => (
                 <SelectItem key={key} value={key}>
                   <div className="flex flex-col">
-                    <span className="font-medium">{cfg.name}</span>
+                    <span className="font-medium">{cfg?.name ?? key}</span>
                     <span className="text-xs text-muted-foreground">
-                      {key === live.currentMode ? liveDesc : `${cfg.powerTarget} MW target`}
+                      {key === currentModeKey
+                        ? liveDesc
+                        : (cfg?.powerTarget != null
+                            ? `${cfg.powerTarget} MW target`
+                            : "")}
                     </span>
                   </div>
                 </SelectItem>

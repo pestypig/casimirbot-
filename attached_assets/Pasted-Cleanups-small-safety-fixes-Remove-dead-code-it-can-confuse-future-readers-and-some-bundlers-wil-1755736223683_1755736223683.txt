@@ -1,0 +1,96 @@
+Cleanups & small safety fixes
+
+Remove dead code (it can confuse future readers and some bundlers will keep it):
+
+useState import (unused)
+
+OperationalMode type
+
+calculateModeMetrics(...)
+
+getModesWithDynamicDescriptions(...)
+
+useMetrics import and call (you aren’t using metrics anymore)
+
+Guard MODE_CONFIGS lookups (prevents a crash if keys ever drift or arrive late):
+
+const modes = MODE_CONFIGS as Record<string, { name: string; powerTarget?: number }>;
+const currentModeKey = live.currentMode in modes ? live.currentMode : "hover";
+const currentModeCfg = modes[currentModeKey] ?? { name: currentModeKey };
+
+
+Don’t assume powerTarget exists on MODE_CONFIGS (some versions don’t have it):
+
+<span className="text-xs text-muted-foreground">
+  {key === currentModeKey
+    ? liveDesc
+    : (modes[key]?.powerTarget != null
+        ? `${modes[key].powerTarget} MW target`
+        : "")}
+</span>
+
+
+Defensive access in the toast:
+
+zenLongToast("mode:switch", {
+  mode: modes[value]?.name ?? value,
+  duty: live.dutyCycle,
+  powerMW: live.P_avg_MW,
+  zeta: live.zeta,
+  tsRatio: live.TS_ratio,
+  exoticKg: live.M_exotic_kg,
+  gammaGeo: live.gammaGeo,
+  qFactor: live.qCavity,
+  freqGHz: live.modulationFreq_GHz,
+  sectors: live.sectorStrobing,
+  frOk: Number.isFinite(live.zeta)
+          ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02)
+          : true,
+  natarioOk: Number.isFinite(live.TS_ratio) ? live.TS_ratio >= 100 : true,
+  curvatureOk: true
+});
+
+
+Header null-safety:
+
+<CardTitle className="text-lg cursor-help">
+  Live Energy Pipeline: {currentModeCfg?.name ?? currentModeKey} Mode
+</CardTitle>
+
+Tiny diff (just the essentials)
+- import { useState } from "react";
+- import { useMetrics } from "@/hooks/use-metrics";
+- // ... OperationalMode, calculateModeMetrics, getModesWithDynamicDescriptions
+
++ // (no useState here)
++ // (no useMetrics here)
+
+- const { data: metrics } = useMetrics();
+- // ... calculateModeMetrics/getModesWithDynamicDescriptions definitions
+
+- const modes = MODE_CONFIGS; 
+- const currentModeCfg = modes[live.currentMode];
++ const modes = MODE_CONFIGS as Record<string, { name: string; powerTarget?: number }>;
++ const currentModeKey = live.currentMode in modes ? live.currentMode : "hover";
++ const currentModeCfg = modes[currentModeKey] ?? { name: currentModeKey };
+
+- value={live.currentMode}
++ value={currentModeKey}
+
+- {Object.entries(modes).map(([key, cfg]) => (
++ {Object.entries(modes).map(([key, cfg]) => (
+    <SelectItem key={key} value={key}>
+      <div className="flex flex-col">
+        <span className="font-medium">{cfg?.name ?? key}</span>
+        <span className="text-xs text-muted-foreground">
+-         {key === live.currentMode ? liveDesc : `${cfg.powerTarget} MW target`}
++         {key === currentModeKey
++           ? liveDesc
++           : (cfg?.powerTarget != null ? `${cfg.powerTarget} MW target` : "")}
+        </span>
+      </div>
+    </SelectItem>
+  ))}
+
+
+If you apply those tweaks (or just strip the dead code + add the guards), you’re fully aligned with the new pipeline and protected against undefined values.
