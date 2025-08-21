@@ -1,0 +1,114 @@
+import { useEffect, useRef, useState } from "react";
+
+/**
+ * Smart polling:
+ * - Visibility aware (pauses when tab hidden)
+ * - Online/Offline aware
+ * - AbortController to cancel in-flight requests when cycle restarts
+ * - Exponential backoff on failures
+ * - Optional deduping so multiple components share one network stream per URL
+ */
+
+type Opts = {
+  minMs?: number;              // initial interval
+  maxMs?: number;              // cap
+  backoffFactor?: number;      // on error
+  dedupeKey?: string;          // share requests across components
+  enabled?: boolean;           // allow turning off
+  parser?: (res: Response) => Promise<any>; // override json()
+};
+
+const defaultParser = (r: Response) => r.json();
+
+// in-module cache to fan out results to multiple components
+const bus = new Map<
+  string,
+  {
+    subscribers: Set<(v: any) => void>;
+    last?: any;
+    controller?: AbortController;
+    timer?: number;
+    running?: boolean;
+  }
+>();
+
+export function usePollingSmart<T = any>(
+  url: string,
+  { minMs = 8000, maxMs = 30000, backoffFactor = 1.6, dedupeKey, enabled = true, parser = defaultParser }: Opts = {}
+) {
+  const key = dedupeKey ?? url;
+  const [data, setData] = useState<T | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const delayRef = useRef(minMs);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    // ensure channel exists
+    if (!bus.has(key)) {
+      bus.set(key, { subscribers: new Set(), running: false });
+    }
+    const ch = bus.get(key)!;
+
+    const sub = (v: any) => setData(v as T);
+    ch.subscribers.add(sub);
+
+    // emit cached value immediately if available
+    if (ch.last !== undefined) setData(ch.last as T);
+
+    let disposed = false;
+
+    const tick = async () => {
+      if (disposed) return;
+      if (document.hidden || !navigator.onLine) {
+        ch.timer = window.setTimeout(tick, minMs); // cheap wait while hidden/offline
+        return;
+      }
+      try {
+        ch.controller?.abort();
+        ch.controller = new AbortController();
+        const res = await fetch(url, { signal: ch.controller.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const json = await parser(res);
+        ch.last = json;
+        ch.subscribers.forEach(fn => fn(json));
+        setErr(null);
+        delayRef.current = minMs; // reset backoff on success
+      } catch (e: any) {
+        setErr(e?.message ?? "fetch failed");
+        delayRef.current = Math.min(maxMs, Math.max(minMs, Math.round(delayRef.current * backoffFactor)));
+      } finally {
+        ch.timer = window.setTimeout(tick, delayRef.current);
+      }
+    };
+
+    // start loop only once per key
+    if (!ch.running) {
+      ch.running = true;
+      delayRef.current = minMs;
+      tick();
+    }
+
+    const onVis = () => {
+      if (!document.hidden && ch.timer == null) {
+        delayRef.current = minMs;
+        tick();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVis);
+      ch.subscribers.delete(sub);
+      // stop loop if nobody is listening
+      if (ch.subscribers.size === 0) {
+        if (ch.timer) clearTimeout(ch.timer);
+        ch.controller?.abort();
+        bus.delete(key);
+      }
+    };
+  }, [key, url, enabled, minMs, maxMs, backoffFactor, parser]);
+
+  return { data, err } as const;
+}

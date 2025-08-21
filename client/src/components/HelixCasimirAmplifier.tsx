@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Activity, Zap, Sigma, Atom, Gauge, RadioReceiver, Thermometer, CircuitBoard, ScanSearch, ShieldCheck } from "lucide-react";
 import CavitySideView from "./CavitySideView";
+import { usePollingSmart } from "@/lib/usePollingSmart";
 import {
   ResponsiveContainer,
   CartesianGrid,
@@ -142,32 +143,6 @@ function fmtNum(n: number | undefined | null, unit = "", digits = 3) {
   return `${n.toFixed(digits)}${unit ? " " + unit : ""}`;
 }
 
-function usePolling<T>(url: string, ms = 1500, deps: any[] = []) {
-  const [data, setData] = useState<T | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    async function tick() {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-        const json = await res.json();
-        if (!alive) return;
-        setData(json);
-        setErr(null);
-      } catch (e: any) {
-        if (!alive) return;
-        setErr(e?.message ?? "fetch failed");
-      }
-    }
-    tick();
-    const id = setInterval(tick, ms);
-    return () => { alive = false; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return { data, err } as const;
-}
-
 // ------------------------- Heatmap (displacement) -------------------------
 
 type FieldSample = { p: [number, number, number]; bell: number; sgn: number; disp: number };
@@ -222,7 +197,7 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
     sectors: String(params.sectors),
     split: String(params.split)
   }).toString();
-  const { data } = usePolling<FieldResponse>(`${endpoint}?${q}`, 30000, [endpoint, q]); // 30s vs 2.5s
+  const { data } = usePollingSmart<FieldResponse>(`${endpoint}?${q}`, { minMs: 30000 }); // Smart polling with 30s interval
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -361,8 +336,8 @@ export default function HelixCasimirAmplifier({
   modeEndpoint?: string;
   lightCrossing?: LightCrossing;
 }) {
-  const { data: metrics } = usePolling<HelixMetrics>(metricsEndpoint, 10000, [metricsEndpoint]); // 10s vs 1.5s
-  const { data: state }   = usePolling<EnergyPipelineState>(stateEndpoint, 15000, [stateEndpoint]); // 15s vs 3s
+  const { data: metrics } = usePollingSmart<HelixMetrics>(metricsEndpoint, { minMs: 10000 }); // Smart polling with 10s interval
+  const { data: state }   = usePollingSmart<EnergyPipelineState>(stateEndpoint, { minMs: 15000 }); // Smart polling with 15s interval
 
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
