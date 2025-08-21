@@ -197,7 +197,9 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
     sectors: String(params.sectors),
     split: String(params.split)
   }).toString();
-  const { data } = usePollingSmart<FieldResponse>(`${endpoint}?${q}`, { minMs: 30000 }); // Smart polling with 30s interval
+  const { data } = usePollingSmart<FieldResponse>(`${endpoint}?${q}`, { 
+    minMs: 30000, maxMs: 60000, dedupeKey: `helix:displacement:${q}` 
+  }); // Smart polling with deduplication
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -336,8 +338,13 @@ export default function HelixCasimirAmplifier({
   modeEndpoint?: string;
   lightCrossing?: LightCrossing;
 }) {
-  const { data: metrics } = usePollingSmart<HelixMetrics>(metricsEndpoint, { minMs: 10000 }); // Smart polling with 10s interval
-  const { data: state }   = usePollingSmart<EnergyPipelineState>(stateEndpoint, { minMs: 15000 }); // Smart polling with 15s interval
+  const { data: metrics } = usePollingSmart<HelixMetrics>(metricsEndpoint, {
+    minMs: 10000, maxMs: 30000, dedupeKey: "helix:metrics"
+  });
+
+  const { data: state } = usePollingSmart<EnergyPipelineState>(stateEndpoint, {
+    minMs: 10000, maxMs: 30000, dedupeKey: "helix:state"
+  });
 
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
