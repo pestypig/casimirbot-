@@ -1,0 +1,104 @@
+Love that. Let’s add a single “Curvature Gain” slider that scales **both** the geometry deformation and the color scale. Default = boosted (so the bubble is obvious); slide to **0** = “true result” (no visual exaggeration).
+
+Below are minimal patches—drop-in and you’re done.
+
+---
+
+# 1) UI: add the slider (HelixCore / your React host)
+
+```tsx
+// inside your helix-core.tsx control row (or wherever you keep viewer controls)
+const [curvatureGain, setCurvatureGain] = useState(4); // default: boosted view (×4)
+...
+<label className="flex items-center gap-2 text-sm">
+  Curvature Gain
+  <input
+    type="range"
+    min={0}
+    max={8}
+    step={0.1}
+    value={curvatureGain}
+    onChange={(e) => setCurvatureGain(parseFloat(e.target.value))}
+  />
+  <span>{curvatureGain.toFixed(1)}×</span>
+</label>
+```
+
+Where you call into the visualizer/engine, pass:
+
+```tsx
+warpEngine.updateUniforms({
+  // ...your existing params
+  vizGainOverride: curvatureGain,   // geometry gain (already supported in your engine)
+  userColorGain: curvatureGain,     // new: color gain (see shader patch below)
+});
+```
+
+If you’re instantiating `WarpEngine` directly, just pipe the same fields into `updateUniforms` whenever the slider changes.
+
+---
+
+# 2) Shader: apply the same gain to the color scale
+
+Add a **new uniform** to both WebGL2 and WebGL1 fragment shaders:
+
+```glsl
+uniform float u_thetaScale;  // you may already have this from the earlier unification
+uniform float u_exposure;
+uniform float u_zeroStop;
+uniform float u_userGain;    // NEW: viewer gain 0..8 (0 = “true result”)
+```
+
+Then replace the color scalar with a symmetric-log that is multiplied by the gain:
+
+```glsl
+// compute theta as you already do
+float val = theta * u_thetaScale;
+
+// symmetric log like SliceViewer (maps to [-1,1])
+float mag   = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));
+float denom = log(1.0 + max(1.0, u_exposure));
+float signed = (val < 0.0 ? -1.0 : 1.0) * (mag / denom);
+
+// apply viewer gain (0 = physical, higher = exaggerated)
+float tVis = clamp(signed * max(u_userGain, 0.0), -1.0, 1.0);
+```
+
+*(If you haven’t added `u_thetaScale` yet, set it to 1.0 for now and it still works—the gain will just scale your current color map.)*
+
+Remember to cache the new uniform location:
+
+```js
+this.gridUniforms.userGain = gl.getUniformLocation(this.gridProgram, 'u_userGain');
+```
+
+And set it before `drawArrays`:
+
+```js
+gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userColorGain ?? this.uniforms?.vizGainOverride ?? 0.0);
+```
+
+---
+
+# 3) Geometry deformation uses the same slider (already supported)
+
+Your engine already supports `vizGainOverride` inside `_warpGridVertices` (it feeds the visual amplitude after the log). With the UI change, sliding to **0** yields the “physical/true” visual, and sliding up exaggerates the curvature.
+
+If you prefer *strictly* physical at zero (no hidden mode multipliers), add this tiny guard where you compute `A_vis`:
+
+```js
+const userGain = this.uniforms?.vizGainOverride ?? 0;
+// if user wants "true result", bypass any baked-in modeScale
+const vizGain = userGain > 0 ? userGain : 1.0;  // 0 => 1x physical, >0 => exaggerate
+const A_vis = Math.min(1.0, A_log * vizGain);
+```
+
+---
+
+## UX copy (optional)
+
+* Label: **Curvature Gain**
+* Helper text: *“Boosts the visual strength of the induced curvature. 0× shows the true (unexaggerated) result.”*
+* Defaults: `4×` desktop, maybe `3×` on mobile.
+
+That’s it—now newcomers immediately see spacetime bending, and power users can slide to **0×** to inspect the “true result.”

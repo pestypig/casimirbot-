@@ -298,6 +298,9 @@ export default function HelixCore() {
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
   
+  // 🎛️ Unified curvature gain control (scales both geometry and color)
+  const [curvatureGain, setCurvatureGain] = useState(4.0); // Default: boosted view (×4)
+  
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);
   const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
@@ -620,6 +623,8 @@ export default function HelixCore() {
                           wall: { w_norm: 0.016 },
                           gridScale: 1.6,
                           epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                          vizGainOverride: curvatureGain,    // Geometry gain
+                          userColorGain: curvatureGain,      // Color gain (unified control)
                           betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
                           wallWidth_m: 6.0,
                           shift: {
@@ -637,18 +642,41 @@ export default function HelixCore() {
                     {/* Slice Controls Panel */}
                     <div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-2 mb-3">
-                        <h4 className="text-sm font-medium text-slate-200">Slice Preferences</h4>
+                        <h4 className="text-sm font-medium text-slate-200">Visual Controls</h4>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
                             <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                            <p className="mb-2">Control the visual parameters for the equatorial slice viewer. These settings persist across mode switches and browser sessions.</p>
+                            <p className="mb-2">Control visual parameters for both 3D and slice viewers. Curvature Gain scales both geometry deformation and color mapping uniformly.</p>
                             <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                            <p className="text-xs italic">The eye adjusts to see truth clearly in any light.</p>
+                            <p className="text-xs italic">Truth exists at every scale; visualization reveals its face.</p>
                           </TooltipContent>
                         </Tooltip>
+                      </div>
+                      
+                      {/* Unified Curvature Gain Control */}
+                      <div className="mb-4 p-2 bg-slate-900/50 rounded border border-slate-600">
+                        <div className="space-y-1">
+                          <Label htmlFor="curvature-gain" className="text-slate-300 text-xs flex items-center gap-2">
+                            Curvature Gain
+                            <span className="text-cyan-400 font-mono">{curvatureGain.toFixed(1)}×</span>
+                          </Label>
+                          <Input
+                            id="curvature-gain"
+                            type="range"
+                            min="0"
+                            max="8"
+                            step="0.1"
+                            value={curvatureGain}
+                            onChange={(e) => setCurvatureGain(parseFloat(e.target.value))}
+                            className="w-full"
+                          />
+                          <div className="text-xs text-slate-400">
+                            {curvatureGain === 0 ? "True physical result (no exaggeration)" : "Boosted visual for enhanced effect"}
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-3 text-xs">

@@ -284,6 +284,7 @@ class WarpEngine {
             "uniform float u_exposure;\n" +     // logarithmic exposure control (3.0 .. 12.0)
             "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
             "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
+            "uniform float u_userGain;\n" +     // unified curvature gain from UI slider
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -307,7 +308,7 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale;\n" +
+            "    float val = theta * u_thetaScale * u_userGain;\n" +
             "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
             "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
             "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
@@ -337,6 +338,7 @@ class WarpEngine {
             "uniform float u_exposure;\n" +
             "uniform float u_zeroStop;\n" +
             "uniform float u_thetaScale;\n" +
+            "uniform float u_userGain;\n" +
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -359,7 +361,7 @@ class WarpEngine {
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
             "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val = theta * u_thetaScale;\n" +
+            "    float val = theta * u_thetaScale * u_userGain;\n" +
             "    float denom = log(2.0) * log(10.0) * log(1.0 + max(1.0, u_exposure));\n" +
             "    float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
             "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);\n" +
@@ -398,7 +400,8 @@ class WarpEngine {
             tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
             exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
             zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
-            thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale')
+            thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
+            userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain')
         };
         
         console.log("Grid shader program compiled successfully with York-time coloring support");
@@ -981,6 +984,7 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
         gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
         gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
+        gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;

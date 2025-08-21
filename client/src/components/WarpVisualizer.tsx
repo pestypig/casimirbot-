@@ -401,6 +401,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         
         // Visual scaling for clear mode differences
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
+        userGain: n((parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 1.0), // Unified curvature gain from UI slider
         _debugHUD: true,
         
         // Legacy parameters for backward compatibility
