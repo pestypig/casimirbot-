@@ -299,16 +299,8 @@ export default function HelixCore() {
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
   
-  // 🎛️ Unified curvature gain control (scales both geometry and color)
-  const [curvatureGain, setCurvatureGain] = useState(0); // Default: true physics (1×)
+  // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
-
-  // Compute actual visual multiplier (1× at min, 40× at max)
-  const gainFromDecades = (dec: number, max = 40) => {
-    // Map 0..8 to 1..max with linear ramp (keeps "0 = 1×" invariant)
-    const t = Math.max(0, Math.min(1, (dec ?? 0) / 8));
-    return (1 - t) + t * max;
-  };
   
   // SliceViewer responsive sizing
   const sliceHostRef = useRef<HTMLDivElement>(null);
@@ -590,103 +582,54 @@ export default function HelixCore() {
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <WarpVisualizer
-                        key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}-parity-${localStorage.getItem('physics-parity-mode')}`}
+                        key={`mode-${effectiveMode}-v${modeVersion}-parity-${localStorage.getItem('physics-parity-mode')}`}
                         parameters={(() => {
-                          const physicsParityMode = localStorage.getItem('physics-parity-mode') === 'true';
+                          // Compute physics parity from localStorage once per render
+                          const physicsParity = localStorage.getItem('physics-parity-mode') === 'true';
                           
-                          if (physicsParityMode) {
-                            // Physics Parity Mode: Force all multipliers to 1
-                            console.warn('🔬 PHYSICS PARITY MODE: All visual boosts disabled, physics-only baseline');
-                            return {
-                              curvatureGainDec: 0, // Force flat curvature gain
-                              dutyCycle: 1,        // Unity duty cycle
-                              g_y: 1,              // Unity geometric factor
-                              cavityQ: 1,          // Unity Q factor
-                              sagDepth_nm: 0,      // Zero sag depth
-                              tsRatio: 1,          // Unity time-scale ratio
-                              powerAvg_MW: 0,      // Zero power for baseline
-                              exoticMass_kg: 0,    // Zero mass for baseline
-                              currentMode: 'standby' as const,
-                              sectorStrobing: 1,   // Single sector
-                              qSpoilingFactor: 1,  // Unity spoiling factor
-                              gammaVanDenBroeck: 1, // Unity Van den Broeck factor
-                              hull: {
-                                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                                a: 503.5, b: 132, c: 86.5,
-                                wallThickness_m: 6.0
-                              },
-                              wall: { w_norm: 0.016 },
-                              gridScale: 1,        // Unity grid scale
-                              epsilonTilt: 0,      // Zero tilt for flat baseline
-                              curvatureBoostMax: 1, // Unity boost max
-                              betaTiltVec: [0, 0, 0] as [number, number, number], // Zero tilt vector
-                              wallWidth_m: 6.0,
-                              shift: {
-                                epsilonTilt: 0,
-                                betaTiltVec: [0, 0, 0] as [number, number, number],
-                                gTarget: 0, R_geom: 0,
-                                gEff_check: 0
-                              },
-                              physicsParityMode: true // Flag to enable uniform logging
-                            };
-                          } else {
-                            // Normal mode: Use authentic physics parameters
-                            return {
-                              curvatureGainDec: curvatureGain,
-                              dutyCycle: dutyUI,
-                              g_y: pipeline?.gammaGeo || 26,
-                              cavityQ: pipeline?.qCavity || 1e9,
-                              sagDepth_nm: pipeline?.sag_nm || 16,
-                              tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
-                              powerAvg_MW: (() => {
-                                const MODE_TARGET = {
-                                  standby:   { P_W: 0,        M_kg: 0    },
-                                  hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                                  cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                                  emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                                } as const;
-                                const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                                return isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (targets.P_W / 1e6);
-                              })(),
-                              exoticMass_kg: (() => {
-                                const MODE_TARGET = {
-                                  standby:   { P_W: 0,        M_kg: 0    },
-                                  hover:     { P_W: 83.3e6,   M_kg: 1000 },
-                                  cruise:    { P_W: 7.437,    M_kg: 1000 }, // 7.437 W
-                                  emergency: { P_W: 297.5e6,  M_kg: 1000 },
-                                } as const;
-                                const targets = MODE_TARGET[effectiveMode as keyof typeof MODE_TARGET] || MODE_TARGET.hover;
-                                return isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : targets.M_kg;
-                              })(),
-                              currentMode: effectiveMode,
-                              sectorStrobing: sectorsUI,
-                              qSpoilingFactor: qSpoilUI,
-                              gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
-                              hull: (hullMetrics && hullMetrics.hull) ? {
-                                ...hullMetrics.hull,
-                                a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                                b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                                c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-                              } : {
-                                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                                a: 503.5, b: 132, c: 86.5,
-                                wallThickness_m: 6.0
-                              },
-                              wall: { w_norm: 0.016 },
-                              gridScale: 1.6,
+                          return {
+                            // --- physics inputs (unchanged from pipeline) ---
+                            dutyCycle: dutyUI,
+                            g_y: pipeline?.gammaGeo || 26,
+                            cavityQ: pipeline?.qCavity || 1e9,
+                            sagDepth_nm: pipeline?.sagDepth_nm || 16,
+                            tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
+                            powerAvg_MW: isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : 83.3,
+                            exoticMass_kg: isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : 1000,
+                            currentMode: effectiveMode,
+                            sectorStrobing: sectorsUI,
+                            qSpoilingFactor: qSpoilUI,
+                            gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
+                            
+                            // --- visual policy (clean approach) ---
+                            physicsParity,             // tells engine to render true-physics 1×
+                            curvatureGainDec: 0,       // no slider; keep at 0 decades (1×)
+                            curvatureBoostMax: 1,      // force visualBoost = 1× in parity mode anyway
+                            
+                            // --- geometry (standard) ---
+                            hull: (hullMetrics && hullMetrics.hull) ? {
+                              ...hullMetrics.hull,
+                              a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
+                              b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
+                              c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
+                            } : {
+                              Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+                              a: 503.5, b: 132, c: 86.5,
+                              wallThickness_m: 6.0
+                            },
+                            wall: { w_norm: 0.016 },
+                            gridScale: 1.6,
+                            epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+                            betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                            wallWidth_m: 6.0,
+                            shift: {
                               epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                              curvatureBoostMax: 40,              // Fallback for legacy T mode
                               betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                              wallWidth_m: 6.0,
-                              shift: {
-                                epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                                betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                                gTarget, R_geom,
-                                gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
-                              },
-                              physicsParityMode: false
-                            };
-                          }
+                              gTarget, R_geom,
+                              gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
+                            },
+                            physicsParityMode: physicsParity
+                          };
                         })()}
                       />
                     </div>
@@ -696,14 +639,14 @@ export default function HelixCore() {
                     {/* Slice Controls Panel */}
                     <div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
                       <div className="flex items-center gap-2 mb-3">
-                        <h4 className="text-sm font-medium text-slate-200">Visual Controls</h4>
+                        <h4 className="text-sm font-medium text-slate-200">Slice Controls</h4>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
                             <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                            <p className="mb-2">Control visual parameters for both 3D and slice viewers. Curvature Gain scales both geometry deformation and color mapping uniformly.</p>
+                            <p className="mb-2">Control SliceViewer parameters and physics parity mode. Physics Parity forces authentic 1× physics visualization without visual amplification.</p>
                             <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
                             <p className="text-xs italic">Truth exists at every scale; visualization reveals its face.</p>
                           </TooltipContent>
@@ -746,33 +689,7 @@ export default function HelixCore() {
                         )}
                       </div>
 
-                      {/* Unified Curvature Gain Control */}
-                      <div className="mb-4 p-2 bg-slate-900/50 rounded border border-slate-600">
-                        <div className="space-y-1">
-                          <Label htmlFor="curvature-gain" className="text-slate-300 text-xs flex items-center gap-2">
-                            Curvature Gain
-                            <span className="text-cyan-400 font-mono">{gainFromDecades(curvatureGain, 40).toFixed(1)}×</span>
-                          </Label>
-                          <Input
-                            id="curvature-gain"
-                            type="range"
-                            min="0"
-                            max="8"
-                            step="0.1"
-                            value={curvatureGain}
-                            onChange={(e) => {
-                              const v = parseFloat(e.target.value);
-                              setCurvatureGain(v);                                // drives SliceViewer prop below
 
-                              // REMOVED: Legacy direct engine call - now handled via WarpVisualizer uniforms
-                            }}
-                            className="w-full"
-                          />
-                          <div className="text-xs text-slate-400">
-                            {curvatureGain === 0 ? "True physics only" : `Visual boost: ${gainFromDecades(curvatureGain, 40).toFixed(1)}× (raw: ${curvatureGain.toFixed(1)})`}
-                          </div>
-                        </div>
-                      </div>
                       
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div className="space-y-1">
@@ -851,7 +768,6 @@ export default function HelixCore() {
                       exposure={exposure}
                       zeroStop={1e-7}
                       showContours={showContours}
-                      curvatureGain={curvatureGain}
                       curvatureBoostMax={40}
                       width={sliceSize.w}
                       height={sliceSize.h}
