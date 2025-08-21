@@ -347,8 +347,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/helix/metrics", getSystemMetrics);
   app.get("/api/helix/pipeline", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);
+  // Alias for HelixCasimirAmplifier component compatibility
+  app.get("/api/helix/displacement", getDisplacementField);
   app.post("/api/helix/pipeline/update", updatePipelineParams);
   app.post("/api/helix/pipeline/mode", switchOperationalMode);
+  // Alias for HelixCasimirAmplifier component mode switching
+  app.post("/api/helix/mode", switchOperationalMode);
 
   return httpServer;
 }

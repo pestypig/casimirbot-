@@ -1,0 +1,75 @@
+Nice—your page scaffolding is solid. To make the **Amplifier** and the rest of the page fully live, here’s a tiny wiring patch set (server + client) so every endpoint lines up and the component gets real data.
+
+# 1) Server routes (Express)
+
+Add these routes (or confirm they exist) wherever you mount your API. The only “new” one is the **alias** for `/api/helix/pipeline` so your page prop works as-is.
+
+```ts
+// helix-server.ts (or routes index)
+import express from "express";
+import {
+  getHelixMetrics,
+  getSystemMetrics,         // alias of getHelixMetrics (already exported)
+  getPipelineState,
+  getDisplacementField,
+  switchOperationalMode,
+  handleHelixCommand
+} from "./helix-core/helix-core.js";
+
+const app = express();
+app.use(express.json());
+
+// --- Metrics & pipeline state
+app.get("/api/helix/metrics", getHelixMetrics);
+app.get("/api/helix/state", getPipelineState);
+
+// ✅ alias so your page’s stateEndpoint="/api/helix/pipeline" works
+app.get("/api/helix/pipeline", getPipelineState);
+
+// --- Field samples for heatmap
+app.get("/api/helix/displacement", getDisplacementField);
+
+// --- Mode switch
+app.post("/api/helix/mode", switchOperationalMode);
+
+// --- HELIX-CORE command bridge (function-calling endpoint)
+app.post("/api/helix/command", handleHelixCommand);
+
+export default app;
+```
+
+# 2) Client: HelixCasimirAmplifier is already ready
+
+You passed:
+
+```tsx
+<HelixCasimirAmplifier 
+  metricsEndpoint="/api/helix/metrics"
+  stateEndpoint="/api/helix/pipeline"  // <— we added the server alias above
+  fieldEndpoint="/api/helix/displacement"
+  modeEndpoint="/api/helix/mode"
+/>
+```
+
+No changes needed on the client for the Amplifier; it polls and renders from these endpoints.
+
+# 3) Optional consistency nits (safe to skip)
+
+* Your **Compliance HUD** computes `R` from `U_cycle/c²`. The server already returns `curvatureMax`; consider using that value directly to keep one source of truth:
+
+  ```tsx
+  const R_est = isFiniteNumber(systemMetrics?.curvatureMax)
+    ? systemMetrics!.curvatureMax
+    : (isFiniteNumber(pipelineState?.U_cycle) ? Math.abs(pipelineState.U_cycle) / (9e16) : undefined);
+  ```
+* The “Active Tiles (Energized)” card: you already reconcile server vs. derived. That’s great; leave as-is.
+
+# 4) Smoke-test checklist
+
+* Open `/api/helix/metrics` in a browser → should return JSON with `dutyEffectiveFR`, `exoticMass`, `hull`, etc.
+* Open `/api/helix/pipeline` → should mirror `/api/helix/state`.
+* Open `/api/helix/displacement?nTheta=32&nPhi=16&sectors=400&split=200` → should return `count` and `data[]`.
+* Click mode buttons (Hover/Cruise/Emergency/Standby) → backend scales power/mass; Amplifier ladders and HUD update.
+* Use the “Execute Pulse Sequence” button → you should see a function call log entry and refreshed metrics.
+
+That’s it—once those routes are mounted, your page is fully connected end-to-end and the **Casimir amplification** visualization is driven purely by the HELIX-CORE pipeline.
