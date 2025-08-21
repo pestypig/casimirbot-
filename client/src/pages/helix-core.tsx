@@ -324,7 +324,7 @@ export default function HelixCore() {
   const lc = useLightCrossingLoop({
     sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
     currentSector: systemMetrics?.currentSector ?? 0,
-    sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 2000.0,  // Increased from 1.0ms to 2000ms for visible strobing
+    sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,  // Restored authentic physics timing
     duty: dutyUI,
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
     hull: { a: hull.a, b: hull.b, c: hull.c },   // use live hull geometry

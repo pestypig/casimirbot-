@@ -381,7 +381,7 @@ export default function HelixCasimirAmplifier({
     let raf: number;
     const step = (t: number) => {
       if (!lightCrossing) { raf = requestAnimationFrame(step); return; }
-      const on = lightCrossing.onWindow;          // τLC-safe ON window
+      const on = lightCrossing.onWindow;          // τLC-safe ON window (raw physics)
       const now = t / 1000;                       // s
       const prev = lastT.current ?? now;
       const dt = Math.min(0.05, Math.max(0, now - prev)); // clamp dt for stability
@@ -528,12 +528,12 @@ export default function HelixCasimirAmplifier({
                     />
                   </div>
                   <Badge 
-                    variant={lightCrossing.onWindow ? "default" : "secondary"} 
+                    variant={lightCrossing.onWindowDisplay ? "default" : "secondary"} 
                     className={`text-xs ${
-                      lightCrossing.onWindow ? 'bg-cyan-500 text-white' : 'bg-slate-600 text-slate-200'
+                      lightCrossing.onWindowDisplay ? 'bg-cyan-500 text-white' : 'bg-slate-600 text-slate-200'
                     }`}
                   >
-                    {lightCrossing.onWindow ? 'ON' : 'OFF'}
+                    {lightCrossing.onWindowDisplay ? 'ON' : 'OFF'}
                   </Badge>
                 </div>
               </div>
