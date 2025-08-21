@@ -67,6 +67,10 @@ export default function CavitySideView({
 
     // helper
     const toPx = (m: number) => m * pxPerM;
+    
+    // Calculate pocket dimensions once for reuse
+    const pocketHeight = toPx(t);
+    const pocketWidth = toPx(D);
 
     // Top mirror (graphene+Nb3Sn)
     ctx.fillStyle = "#777c86";
@@ -78,23 +82,6 @@ export default function CavitySideView({
     y += toPx(topT);
     ctx.fillStyle = "#0f172a";
     ctx.fillRect(x0, y - toPx(zStroke), Wpocket, toPx(a));
-    
-    // bowl (spherical cap) carved into lower mirror: draw orange pocket
-    const pocketHeight = toPx(t);
-    if (pocketHeight > 0) {
-      const pocketWidth = toPx(D);
-      const pxR = (D*D + 4*t*t) / (8*t) * pxPerM; // spherical-cap radius (approx)
-      const cx = x0 + Wpocket/2;
-      const cy = y - toPx(zStroke) + toPx(a) + pocketHeight - pxR; // circle center
-      ctx.fillStyle = "rgba(255,153,51,0.85)";
-      ctx.beginPath();
-      ctx.arc(cx, cy, pxR, Math.PI - Math.asin((pocketWidth/2)/pxR), Math.PI + Math.asin((pocketWidth/2)/pxR));
-      ctx.lineTo(cx + pocketWidth/2, y - toPx(zStroke) + toPx(a));
-      ctx.lineTo(cx - pocketWidth/2, y - toPx(zStroke) + toPx(a));
-      ctx.closePath();
-      ctx.fill();
-      label(ctx, cx + pocketWidth/2 + 8, y + toPx(a/2) - toPx(zStroke), `Pocket: D=${(pocketDiameter_um).toFixed(0)} µm, sag=${sag_nm} nm`, "#fbbf24");
-    }
 
     // Gap ruler line and labels
     ctx.strokeStyle = "#4ade80";
@@ -109,11 +96,27 @@ export default function CavitySideView({
     ctx.lineTo(x0 - 20, gapY + toPx(a));
     ctx.stroke();
     
-    // fixed mirror substrate (Nb3Sn on SiC)
+    // fixed mirror substrate (Nb3Sn on SiC)  
     y += toPx(a);
     ctx.fillStyle = "#666c78";
     ctx.fillRect(x0, y, Wpocket, toPx(botT));
     label(ctx, x0 + 6, y + toPx(botT/2), "Nb₃Sn (fixed) on SiC", "#e5e7eb");
+
+    // Draw orange pocket as a simple bowl arc extending into the fixed mirror
+    if (pocketHeight > 0.5) { // Only draw if sag is meaningful (>0.5 pixels)
+      const cx = x0 + Wpocket/2;
+      const pocketY = y; // top of fixed mirror (bottom of vacuum gap)
+      
+      ctx.fillStyle = "rgba(255,153,51,0.65)";
+      ctx.beginPath();
+      ctx.moveTo(cx - pocketWidth/2, pocketY);
+      ctx.quadraticCurveTo(cx, pocketY + pocketHeight, cx + pocketWidth/2, pocketY);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Blue-shift region label (positioned outside the pocket)
+      label(ctx, cx + pocketWidth/2 + 8, pocketY + pocketHeight/2, `Pocket: D=${(pocketDiameter_um).toFixed(0)} µm, sag=${sag_nm} nm`, "#fbbf24");
+    }
 
     // AlN rim actuator band (schematic top view tick)
     ctx.strokeStyle = "#38bdf8";
@@ -125,8 +128,8 @@ export default function CavitySideView({
     ctx.fillStyle = "#e2e8f0";
     label(ctx, x0 + 6, height - 28, `gap a=${gap_nm} nm, a_eff=${(a_eff*1e9).toFixed(2)} nm, γ_geo=${gamma_geo.toFixed(2)}`, "#a3e635");
 
-    // Blue-shift region indicator
-    if (pocketHeight > 0) {
+    // Blue-shift region indicator (only if pocket is visible)
+    if (pocketHeight > 0.5) {
       label(ctx, x0 + Wpocket/2 - 60, y - toPx(a) - 8, "Blue-shift region", "#fbbf24");
     }
 
