@@ -160,158 +160,138 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   // Default cabin "down" (can be overridden via props.parameters.betaTiltVec)
   const defaultBetaTilt: [number, number, number] = [0, -1, 0];
 
-  useEffect(() => {
-    const initializeEngine = async () => {
-      if (!canvasRef.current) return;
+useEffect(() => {
+  let cancelled = false;
+  let watchdog: number | undefined;
 
-      try {
-        // Check if WarpEngine is already loaded  
-        if (window.WarpEngine) {
-          try {
-            engineRef.current = new window.WarpEngine(canvasRef.current);
-            
-            // Bootstrap engine with sensible defaults for immediate visual feedback
-            engineRef.current.bootstrap({
-              exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
-              zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
-              curvatureGainDec: 3, // 10^3 = 1000 for visibly curved startup
-            });
-            
-            // Build initial uniforms from current props/metrics
-            const mode = (parameters.currentMode || 'hover').toLowerCase();
-            const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
-            const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
-            const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
-            const hull = parameters.hull || {
-              Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-              a: 503.5, b: 132, c: 86.5
-            };
-            // Wall width: handle both normalized and meter units  
-            const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
-            const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
-            const wallWidth = wallWidth_norm; // Engine expects normalized width
-            
-            const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
-              mode === 'standby' ? 0.0 : mode === 'cruise' ? 0.012 : mode === 'hover' ? 0.020 : 0.035);
-            
-            const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
-            
-            const initialUniforms = {
-              dutyCycle: dutyFrac,
-              gammaGeo: num(parameters.g_y, 26),
-              Qburst: num(parameters.cavityQ, 1e9),
-              deltaAOverA: num(parameters.qSpoilingFactor, 1),
-              gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1), // Corrected physics default
-              currentMode: mode,
-              sectors,
-              split: phaseSplit,
-              axesScene: parameters.axesScene,
-              hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
-              wallWidth,
-              // 🔬 Pass physics parity mode flag to WebGL engine
-              physicsParityMode: parameters.physicsParityMode || false,
-              gridSpan: parameters.gridSpan,
-              epsilonTilt: epsilonTiltResolved,
-              betaTiltVec: betaTiltResolved,
-              tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
-            };
+  const setLoaded = () => { if (!cancelled) setIsLoaded(true); };
+  const setFailed = (msg: string) => { if (!cancelled) { setIsLoaded(false); setLoadError(msg); } };
 
-            // Bootstrap before first draw to prevent camera jump
-            engineRef.current.bootstrap(initialUniforms);
-            setIsLoaded(true);
-          } catch (error) {
-            console.error('Failed to initialize existing WarpEngine:', error);
-          }
+  const makeEngine = (EngineCtor: any) => {
+    if (!canvasRef.current) throw new Error("canvas missing");
+    const engine = new EngineCtor(canvasRef.current);
+
+    // Build sanitized uniforms once
+    const mode = (parameters.currentMode || 'hover').toLowerCase();
+    const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
+    const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
+    const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+    const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
+    const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
+
+    // unified, physics-accurate tiny tilt (or pipeline-provided)
+    const epsilonTiltResolved =
+      num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+          mode === 'standby' ? 0.0 : 5e-7);
+    const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
+    const tiltGain = mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0;
+
+    const uniforms = {
+      // camera/exposure defaults moved into single bootstrap
+      exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
+      zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
+      curvatureGainDec: 3,
+
+      dutyCycle: dutyFrac,
+      gammaGeo: num(parameters.g_y, 26),
+      Qburst: num(parameters.cavityQ, 1e9),
+      deltaAOverA: num(parameters.qSpoilingFactor, 1),
+      gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1),
+
+      currentMode: mode,
+      sectors, split: phaseSplit,
+      axesScene: parameters.axesScene,
+      hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+      wallWidth: wallWidth_norm,
+
+      gridSpan: parameters.gridSpan,
+      physicsParityMode: !!parameters.physicsParityMode,
+
+      epsilonTilt: epsilonTiltResolved,
+      betaTiltVec: betaTiltResolved,
+      tiltGain,
+    };
+
+    // single bootstrap: fit + all uniforms in one shot
+    engine.bootstrap(uniforms);
+
+    // visual knobs that aren't strictly physics
+    engine.updateUniforms({
+      vizGain:
+        mode === 'emergency' ? VIS_LOCAL.vizGainEmergency :
+        mode === 'cruise'    ? VIS_LOCAL.vizGainCruise    :
+                               VIS_LOCAL.vizGainDefault,
+      curvatureGainDec: Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
+      curvatureBoostMax: parameters.physicsParityMode ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
+
+      // legacy readouts (safe fallbacks)
+      sagDepth_nm: parameters.sagDepth_nm || 16,
+      powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
+      exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
+      tsRatio: parameters.tsRatio || VIS.tsRatioDefault
+    });
+
+    // start render explicitly so we get a first frame
+    engine._startRenderLoop?.();
+
+    // mark loaded on the next frame (ensures WebGL context is live)
+    requestAnimationFrame(() => !cancelled && setLoaded());
+
+    return engine;
+  };
+
+  const init = async () => {
+    setLoadError(null);
+    setIsLoaded(false);
+
+    // 6s watchdog to avoid infinite spinner
+    watchdog = window.setTimeout(() => {
+      setFailed("Timeout waiting for WarpEngine. Check /public/warp-engine-fixed.js and WebGL support.");
+    }, 6000) as any;
+
+    try {
+      if ((window as any).WarpEngine) {
+        engineRef.current = makeEngine((window as any).WarpEngine);
+        return;
+      }
+
+      // Try fixed bundle, then fall back
+      const trySrcs = ['/warp-engine-fixed.js?v=tilt2', '/warp-engine.js?v=fallback'];
+      for (const src of trySrcs) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`Failed to load ${src}`));
+          document.head.appendChild(script);
+        }).catch((e) => { console.warn(e.message); });
+
+        if ((window as any).WarpEngine) {
+          engineRef.current = makeEngine((window as any).WarpEngine);
           return;
         }
-
-        // Load the 3D WebGL WarpEngine with enhanced 3D ellipsoidal shell physics
-        const script = document.createElement('script');
-        script.src = '/warp-engine-fixed.js?v=tilt2'; // cache-bust for tilt implementation
-        console.log('Loading 3D WarpEngine from:', script.src);
-        script.onload = () => {
-          console.log('WarpEngine loaded, window.WarpEngine available:', !!window.WarpEngine);
-          if (window.WarpEngine) {
-            try {
-              console.log('Creating WarpEngine instance...');
-              engineRef.current = new window.WarpEngine(canvasRef.current);
-              
-              // Build initial uniforms from current props/metrics (same data you pass into updateUniforms)
-              const mode = (parameters.currentMode || 'hover').toLowerCase();
-              const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
-              const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
-              const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
-              const hull = parameters.hull || {
-                Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                a: 503.5, b: 132, c: 86.5
-              };
-              const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
-              const wallWidth_m = isFiniteNum(parameters.wallWidth_m) ? parameters.wallWidth_m : num(parameters.sagDepth_nm, 16) * 1e-9;
-              const wallWidth = wallWidth_norm; // Engine expects normalized width
-              
-              // Use physics-computed tilt value, not hard defaults
-              const epsilonTiltResolved = num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
-                mode === 'standby' ? 0.0 : 5e-7); // Use physics-accurate tiny value instead of 0.012
-              
-              const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
-              
-              const initialUniforms = {
-                dutyCycle: dutyFrac,
-                gammaGeo: num(parameters.g_y, 26),
-                Qburst: num(parameters.cavityQ, 1e9),
-                deltaAOverA: num(parameters.qSpoilingFactor, 1),
-                gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1), // Physics-accurate neutral default
-                currentMode: mode,
-                sectors,
-                split: phaseSplit,
-                axesScene: parameters.axesScene,
-                hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
-                wallWidth,
-                gridSpan: parameters.gridSpan,
-                epsilonTilt: epsilonTiltResolved,
-                betaTiltVec: betaTiltResolved,
-                tiltGain: mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0,
-              };
-
-              // 1) Bootstrap (fits camera + sets uniforms) BEFORE first draw
-              engineRef.current.bootstrap(initialUniforms);
-              
-              console.log('WarpEngine instance created successfully - checking mode:', engineRef.current.isWebGLFallback ? 'FALLBACK' : 'WEBGL');
-              setIsLoaded(true);
-            } catch (error) {
-              console.error('Failed to initialize WarpEngine:', error);
-              setIsLoaded(false);
-            }
-          } else {
-            console.error('WarpEngine not found on window after script load');
-          }
-        };
-        script.onerror = () => {
-          console.error('Failed to load WarpEngine');
-          setIsLoaded(false);
-        };
-        document.head.appendChild(script);
-
-        return () => {
-          if (document.head.contains(script)) {
-            document.head.removeChild(script);
-          }
-        };
-      } catch (error) {
-        console.error('Failed to initialize WarpEngine:', error);
-        setIsLoaded(false);
       }
-    };
 
-    initializeEngine();
+      throw new Error("WarpEngine not found on window after script load");
+    } catch (err: any) {
+      console.error('WarpEngine init error:', err);
+      setFailed(err?.message || "Engine initialization failed");
+    } finally {
+      if (watchdog) clearTimeout(watchdog);
+    }
+  };
 
-    return () => {
-      // Clean up engine resources
-      if (engineRef.current?.destroy) {
-        engineRef.current.destroy();
-      }
-    };
-  }, []);
+  init();
+
+  return () => {
+    cancelled = true;
+    if (watchdog) clearTimeout(watchdog);
+    try { engineRef.current?.destroy?.(); } catch {}
+    engineRef.current = null;
+  };
+  // re-run on retry
+}, [initNonce]);
 
   useEffect(() => {
     if (engineRef.current && isLoaded) {
@@ -644,11 +624,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               </div>
               
               <div className="text-green-300">
-                <div>β₀ = duty × γ_geo = {parameters.dutyCycle.toFixed(3)} × {parameters.g_y} = {(parameters.dutyCycle * parameters.g_y).toFixed(3)}</div>
+                <div>β₀ = duty × γ_geo = {safeFix(parameters.dutyCycle, 0.14, 3)} × {num(parameters.g_y, 26)} = {safeFix((num(parameters.dutyCycle, 0.14) * num(parameters.g_y, 26)), 3.64, 3)}</div>
               </div>
               
               <div className="text-blue-300">
-                <div>R = {parameters.sagDepth_nm}nm | View = {(parameters.sagDepth_nm * 4)}nm (4× zoom)</div>
+                <div>R = {num(parameters.sagDepth_nm, 16)}nm | View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
                 <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
               </div>
               
@@ -679,7 +659,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   { name: 'Edge',   s: 2.00 }
                 ].map(point => {
                   // Canonical Natário bell
-                  const beta0 = parameters.dutyCycle * parameters.g_y;       // β0 = duty·γ_geo
+                  const beta0 = num(parameters.dutyCycle, 0.14) * num(parameters.g_y, 26);       // β0 = duty·γ_geo
                   const betaBell = beta0 * point.s * Math.exp(-(point.s ** 2));
 
                   // Interior tilt (small, interior-weighted)
