@@ -486,8 +486,15 @@ export async function handleHelixCommand(req: Request, res: Response) {
   }
 }
 
+function setCors(res: Response) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 // Tile status endpoint
 export function getTileStatus(req: Request, res: Response) {
+  setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const { sectorId } = req.params;
   
@@ -512,6 +519,7 @@ setGlobalPipelineState(pipelineState);
 
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
+  setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const s = getGlobalPipelineState();
 
@@ -633,6 +641,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
 // Get full pipeline state
 export function getPipelineState(req: Request, res: Response) {
+  setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const state = getGlobalPipelineState();
   res.json(state);
@@ -683,6 +692,7 @@ export function getHelixMetrics(req: Request, res: Response) {
 
 // Get displacement field samples for physics validation
 export function getDisplacementField(req: Request, res: Response) {
+  setCors(res);
   res.setHeader("Cache-Control", "no-store");
   try {
     const s = getGlobalPipelineState();
