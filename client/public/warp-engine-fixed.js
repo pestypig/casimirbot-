@@ -267,7 +267,7 @@ class WarpEngine {
         
         // Create a slight height variation across the grid for proper 3D visualization
         const yBase = -0.15;  // Base Y level
-        const yVariation = 0.05;  // Small height variation
+        const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
 
         for (let z = 0; z <= divisions; ++z) {
             const zPos = -half + z * step;
@@ -1503,6 +1503,9 @@ class WarpEngine {
         // Remove globals we installed
         if (window.__warp_setGainDec === this.__warp_setGainDec) {
             delete window.__warp_setGainDec;
+        }
+        if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
+            delete window.__warp_setCosmetic;
         }
         delete window.setStrobingState;
         
