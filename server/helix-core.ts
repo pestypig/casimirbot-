@@ -553,6 +553,29 @@ export function getSystemMetrics(req: Request, res: Response) {
     wallWidth_rho: w_rho,     // use this in shaders & geometry
     aEff_geo_m: aEff_geo,
 
+    viz: (() => {
+      const gammaGeo = s.gammaGeo ?? 26;
+      const dAa      = s.qSpoilingFactor ?? 1;
+      const gammaVdB = s.gammaVanDenBroeck ?? 1;
+      const sectors  = Math.max(1, s.concurrentSectors || 1);
+
+      // "UI-like" (what your current shader expects if it divides by sectors)
+      const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
+      const thetaScale_UI_like =
+        Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyUI / sectors);
+
+      // "FR-like" (ship-wide exposure already averaged)
+      const dutyFR   = Math.max(1e-12, s.dutyEffective_FR ?? dutyUI / sectors);
+      const thetaScale_FR_like =
+        Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyFR);
+
+      return {
+        thetaScale_UI_like,
+        thetaScale_FR_like,
+        dutyUI, dutyFR, sectors
+      };
+    })(),
+
     modelMode: s.modelMode ?? "calibrated"
   });
 }
