@@ -196,42 +196,37 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
 async function runDiagnosticsScan() {
   const s = getGlobalPipelineState();
   const totalSectors = Math.max(1, s.sectorCount || 400);
+  const baseQ   = s.qCavity || 1e9;
+  const baseT_K = s.temperature_K ?? 20;
+  const massPerTile = (s.N_tiles > 0) ? (s.M_exotic / s.N_tiles) : 0; // proxy
+
   const sectors = [];
-  const issues = [];
-  
-  // Check each sector
+  const issues  = [];
+
+  const jitter = (k:number, span:number) => 1 + span * Math.sin(0.7*k + 0.13); // deterministic
+
   for (let i = 1; i <= totalSectors; i++) {
-    const qFactor = 5e4 + Math.random() * 1e5;
-    const errorRate = Math.random() * 0.05;
-    const temperature = 20 + Math.random() * 5;
-    const curvature = Math.random() * 1e-15;
-    
-    // Check for issues
-    const sectorIssues = [];
-    if (qFactor < 1e5) sectorIssues.push("LOW_Q");
-    if (errorRate > 0.03) sectorIssues.push("HIGH_ERROR");
-    if (temperature > 23) sectorIssues.push("TEMP_WARNING");
-    if (curvature > 5e-16) sectorIssues.push("CURVATURE_LIMIT");
-    
-    const sector = {
-      id: `S${i}`,
-      qFactor,
-      errorRate,
-      temperature,
-      curvature,
-      status: sectorIssues.length > 0 ? "FAULT" : "OK",
-      issues: sectorIssues
-    };
-    
+    const jQ  = jitter(i, 0.08);
+    const jT  = jitter(i, 0.04);
+    const jEr = jitter(i, 0.10);
+
+    const qFactor    = baseQ * jQ;
+    const temperature= baseT_K * jT;
+    const errorRate  = Math.max(0, 0.02 * (1/Math.max(1e-3, s.qSpoilingFactor ?? 1)) * jEr);
+    const curvatureP = Math.abs(s.U_cycle) / (9e16); // J→kg proxy per tile
+
+    const sectorIssues:string[] = [];
+    if (qFactor < baseQ * 0.9) sectorIssues.push("LOW_Q");
+    if (errorRate > 0.03)      sectorIssues.push("HIGH_ERROR");
+    if (temperature > baseT_K + 2.5) sectorIssues.push("TEMP_WARNING");
+    if (curvatureP > massPerTile * 1.2) sectorIssues.push("CURVATURE_LIMIT");
+
+    const status = sectorIssues.length ? "FAULT" : "OK";
+    const sector = { id:`S${i}`, qFactor, errorRate, temperature, curvature:curvatureP, status, issues:sectorIssues };
     sectors.push(sector);
-    if (sectorIssues.length > 0) {
-      issues.push({
-        sectorId: `S${i}`,
-        issues: sectorIssues
-      });
-    }
+    if (sectorIssues.length) issues.push({ sectorId: sector.id, issues: sectorIssues });
   }
-  
+
   return {
     mode: "DIAGNOSTICS",
     totalSectors,
@@ -241,7 +236,7 @@ async function runDiagnosticsScan() {
     criticalIssues: issues.filter(i => i.issues.includes("CURVATURE_LIMIT")),
     warnings: issues.filter(i => !i.issues.includes("CURVATURE_LIMIT")),
     recommendations: [
-      issues.length > 20 ? "Consider thermal cycling to reset Q-factors" : null,
+      issues.length > totalSectors * 0.05 ? "Consider thermal cycling to nudge Q-factors upward" : null,
       issues.some(i => i.issues.includes("TEMP_WARNING")) ? "Increase coolant flow to affected sectors" : null
     ].filter(Boolean)
   };
