@@ -299,6 +299,23 @@ useEffect(() => {
     try {
       if ((window as any).WarpEngine) {
         engineRef.current = makeEngine((window as any).WarpEngine);
+        
+        // Install local strobing bridge for other panels
+        const prevSetter = (window as any).setStrobingState;
+        (window as any).setStrobingState = ({ sectorCount, currentSector }: { sectorCount:number; currentSector:number; }) => {
+          if (engineRef.current) {
+            const s = Math.max(1, Math.floor(sectorCount || 1));
+            engineRef.current.updateUniforms({
+              sectors: s,
+              split: Math.max(0, Math.min(s - 1, Math.floor(s / 2))),
+              sectorIdx: Math.max(0, currentSector % s)
+            });
+            engineRef.current.requestRewarp?.();
+          }
+          // optional: cascade if someone else was listening
+          if (typeof prevSetter === "function") prevSetter({ sectorCount, currentSector });
+        };
+        
         return;
       }
 
@@ -316,6 +333,23 @@ useEffect(() => {
 
         if ((window as any).WarpEngine) {
           engineRef.current = makeEngine((window as any).WarpEngine);
+          
+          // Install local strobing bridge for other panels
+          const prevSetter = (window as any).setStrobingState;
+          (window as any).setStrobingState = ({ sectorCount, currentSector }: { sectorCount:number; currentSector:number; }) => {
+            if (engineRef.current) {
+              const s = Math.max(1, Math.floor(sectorCount || 1));
+              engineRef.current.updateUniforms({
+                sectors: s,
+                split: Math.max(0, Math.min(s - 1, Math.floor(s / 2))),
+                sectorIdx: Math.max(0, currentSector % s)
+              });
+              engineRef.current.requestRewarp?.();
+            }
+            // optional: cascade if someone else was listening
+            if (typeof prevSetter === "function") prevSetter({ sectorCount, currentSector });
+          };
+          
           return;
         }
       }
@@ -336,6 +370,13 @@ useEffect(() => {
     if (watchdog) clearTimeout(watchdog);
     try { engineRef.current?.destroy?.(); } catch {}
     engineRef.current = null;
+    
+    // cleanup strobing bridge
+    const currentSetter = (window as any).setStrobingState;
+    if (typeof currentSetter === "function" && currentSetter.toString().includes('engineRef.current')) {
+      // restore previous setter if we installed one
+      (window as any).setStrobingState = undefined;
+    }
   };
   // re-run on retry
 }, [initNonce]);
