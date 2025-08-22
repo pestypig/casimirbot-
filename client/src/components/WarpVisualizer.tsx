@@ -815,8 +815,9 @@ useEffect(() => {
             {/* Physics Equations */}
             <div className="space-y-2">
               <div className="text-cyan-300">
-                <div>β(r) = β₀ × (r/R) × exp(-r²/R²)</div>
-                <div className="text-cyan-500 text-xs">[Natário 2002 Canonical Bell Profile]</div>
+                <div>θ(ρ) ∝ (n·d) · d/dρ {`{ exp(- (ρ-1)² / w²) }`}</div>
+                <div className="text-cyan-500 text-xs">with ρ = ‖(x/a, y/b, z/c)‖</div>
+                <div className="text-cyan-500 text-xs">(ellipsoidal ring at ρ≈1, width w = w_ρ ; visual scale uses γ_geo³ · ΔA/A · γ_VdB · √(duty/sectors))</div>
               </div>
               
               <div className="text-green-300">
@@ -827,6 +828,14 @@ useEffect(() => {
               <div className="text-blue-300">
                 <div>R = {num(parameters.sagDepth_nm, 16)}nm | View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
                 <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
+                {(() => {
+                  const aH = parameters.hullDimensions?.aH || parameters.hullAxes?.[0] || 142.0;
+                  const w_rho = parameters.wallWidth ?? 0.016;
+                  const w_m = Number.isFinite(aH) ? w_rho * aH : NaN;
+                  return (
+                    <div>wall width: w = {w_rho.toFixed(4)} ρ-units{Number.isFinite(w_m) ? ` ≈ ${w_m.toFixed(3)} m` : ''}</div>
+                  );
+                })()}
               </div>
               
               <div className="text-yellow-300">
