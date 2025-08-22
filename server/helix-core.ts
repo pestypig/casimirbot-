@@ -138,36 +138,47 @@ const AVAILABLE_FUNCTIONS = [
   }
 ];
 
+// ── Local Casimir helpers (plates) ───────────────────────────────────────────
+const HBAR = 1.054_571_8e-34;           // J·s
+const C    = 299_792_458;               // m/s
+const PI   = Math.PI;
+
+// Energy per area:  E/A = −π² ℏ c / (720 a³)
+function casimirEnergyPerTile(gap_m: number, area_m2: number): number {
+  const E_over_A = -(PI*PI*HBAR*C) / (720 * Math.pow(gap_m, 3)); // J/m²
+  return E_over_A * area_m2;                                      // J
+}
+
+// Pressure: P = −π² ℏ c /(240 a⁴),  Force = P·A
+function casimirForce(area_m2: number, gap_m: number): number {
+  const P = -(PI*PI*HBAR*C) / (240 * Math.pow(gap_m, 4)); // N/m²
+  return P * area_m2;                                     // N
+}
+
 // Function to execute pulse_sector
 async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
   const s = getGlobalPipelineState();
 
-  // tile area from pipeline (m²)
-  const A = (s.tileArea_cm2 ?? 25) * 1e-4;
-  const a = args.gap_nm * 1e-9;                  // meters
-  const HBAR = 1.054_571_8e-34;
-  const C = 299_792_458;
-  const PI = Math.PI;
+  // area: respect pipeline default unless you later add an explicit override param
+  const area_m2 = (s.tileArea_cm2 ?? 25) * 1e-4;
+  const gap_m   = args.gap_nm * 1e-9;
 
-  // Energy per tile you already compute (J)
-  const energyPerTile = s.U_static;
+  // tile energy for THIS gap (do not reuse s.U_static if gaps differ)
+  const energy_J = casimirEnergyPerTile(gap_m, area_m2);
+  const force_N  = casimirForce(area_m2, gap_m);
 
-  // Correct pressure & force
-  const P = - (PI*PI*HBAR*C) / (240 * Math.pow(a, 4)); // N/m²
-  const force = P * A;                                  // N (negative = attractive)
-
-  // instantaneous (on-window) power per tile and ship-wide avg
-  const powerLossPerTile = s.P_loss_raw;        // W
-  const curvatureContribution = Math.abs(energyPerTile) / (C*C); // kg (mass-equivalent proxy)
+  // dissipation and proxies remain pipeline-coupled
+  const powerLoss_W_per_tile = s.P_loss_raw;
+  const curvatureMass_kg = Math.abs(energy_J) / (C*C);
 
   return {
     sectorId: args.sectorId,
-    gap_m: a,
-    area_m2: A,
-    energy_J: energyPerTile,
-    force_N: force,
-    powerLoss_W_per_tile: powerLossPerTile,
-    curvatureMass_kg: curvatureContribution,
+    gap_m,
+    area_m2,
+    energy_J,
+    force_N,
+    powerLoss_W_per_tile,
+    curvatureMass_kg,
     status: "PULSED"
   };
 }
