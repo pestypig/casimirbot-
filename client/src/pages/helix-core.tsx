@@ -71,6 +71,8 @@ if (typeof window !== "undefined") {
 const isFiniteNumber = (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(v);
 
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x)); // ⬅️ add this
+
 const fmt = (v: unknown, digits = 3, fallback = '—') =>
   isFiniteNumber(v) ? v.toFixed(digits) : fallback;
 
