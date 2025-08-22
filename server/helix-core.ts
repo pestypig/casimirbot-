@@ -185,7 +185,7 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
 
   const area_m2 =
     Number.isFinite(args.radius_mm) && args.radius_mm > 0
-      ? Math.PI * Math.pow(args.radius_mm * 1e-3, 2)  // tile radius override
+      ? PI * Math.pow(args.radius_mm * 1e-3, 2)  // use imported PI
       : (s.tileArea_cm2 ?? 25) * 1e-4;                 // pipeline default
 
   const gap_m = args.gap_nm * 1e-9;
