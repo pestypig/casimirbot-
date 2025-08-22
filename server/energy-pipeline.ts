@@ -158,8 +158,10 @@ const MODE_POLICY = {
 
 // Runtime assert in dev to prevent unit confusion
 if (process.env.NODE_ENV !== 'production') {
-  const powerTargetsInWatts = MODE_POLICY.hover.P_target_W >= 1e3; // Check non-standby targets are >= 1kW
-  if (!powerTargetsInWatts) console.warn("[PIPELINE] Power targets must be in watts (found values < 1kW).");
+  const bad = Object.entries(MODE_POLICY)
+    .filter(([k,v]) => k !== 'standby')
+    .some(([,v]) => v.P_target_W < 1e3);
+  if (bad) console.warn("[PIPELINE] Power targets must be in watts (>= 1kW).");
 }
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
@@ -168,6 +170,7 @@ function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
 }
 
 // Mode configurations (physics parameters only, no hard locks)
+// NOTE: Concurrent sectors come from MODE_POLICY.*.S_live, total sectors = TOTAL_SECTORS = 400
 export const MODE_CONFIGS = {
   hover: {
     dutyCycle: 0.14,
@@ -225,7 +228,7 @@ export function initializePipelineState(): EnergyPipelineState {
       Lx_m: 1007,  // length (needle axis)
       Ly_m: 264,   // width  
       Lz_m: 173,   // height
-      wallThickness_m: 6.0  // physical wall thickness for Natário bell (meters)
+      wallThickness_m: 1.0  // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
     },
     
     // Mode defaults (hover)
@@ -311,7 +314,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
-  state.dutyCycle        = state.dutyCycle;   // UI display only (from MODE_CONFIGS)
+  // (dutyCycle will be set from MODE_CONFIGS at end of function)
 
   // ✅ optional convenience for UI reducers that look for this name:
   (state as any).dutyEff = d_eff;
