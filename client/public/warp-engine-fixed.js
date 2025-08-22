@@ -605,309 +605,72 @@ class WarpEngine {
     updateUniforms(parameters) {
         if (!parameters) return;
         
-        // 🔬 PHYSICS PARITY MODE DETECTION
-        const physicsParityMode = parameters.physicsParityMode === true;
-        
-        // NEW: cosmetic curvature blend (1 = real physics, 10 = current visuals)
-        const rawLevel = Number.isFinite(parameters.cosmeticLevel) ? +parameters.cosmeticLevel : 10;
-        const cosmeticT0 = Math.max(0, Math.min(1, (rawLevel - 1) / 9)); // 1→0, 10→1
-        const cosmeticT = physicsParityMode ? 0 : cosmeticT0; // parity overrides to true-physics
-        
-        // Color mode parsing: accept strings or ints: 'solid'|'theta'|'shear' or 0|1|2
-        const colorMode = (() => {
-            const cm = parameters.colorMode;
-            if (cm === 'solid' || cm === 0) return 0;
-            if (cm === 'shear' || cm === 2) return 2;
-            return 1; // default theta
-        })();
-        
-        if (physicsParityMode) {
-            console.warn('🔬 PHYSICS PARITY MODE ACTIVE: All visual multipliers forced to unity for debug baseline');
-            
-            // Suppress global boost injections
-            if (typeof window !== 'undefined' && window.__warp_setGainDec) {
-                console.warn('🔬 PARITY MODE: Suppressing global warp boost injections');
-                // Temporarily disable global boosts
-                window.__warp_setGainDec = () => {};
-            }
-        } else if (cosmeticT < 1) {
-            console.log(`🎨 COSMETIC CURVATURE: Level ${rawLevel}/10 → blend ${(cosmeticT * 100).toFixed(1)}% toward current visuals`);
-        }
-        
-        // Update internal parameters with operational mode integration
+        // Helper functions
+        const N = (x, d=0) => (Number.isFinite(x) ? +x : d);
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+        // --- Resolve hull + scene scaling ---
+        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? this.uniforms?.hullAxes?.[0], 503.5);
+        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? this.uniforms?.hullAxes?.[1], 132.0);
+        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? this.uniforms?.hullAxes?.[2], 86.5);
+        const s = 1 / Math.max(a, b, c, 1e-9);
+        const axesScene = [a*s, b*s, c*s];
+        const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+        // --- Parity / visualization ---
+        const parity = !!parameters?.physicsParityMode;
+        const colorMode = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
+        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
+        const vizGain   = parity ? 1 : N(parameters?.vizGain, this.uniforms?.vizGain ?? 1);
+        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, this.uniforms?.curvatureGainT ?? 0));
+        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, this.uniforms?.curvatureBoostMax ?? 40));
+        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, this.uniforms?.cosmeticLevel ?? 10);
+
+        // camera framing lock
+        const lockFraming = parameters?.lockFraming ?? this.uniforms?.lockFraming ?? true;
+        const cameraZ = (parameters?.cameraZ != null)
+          ? +parameters.cameraZ
+          : (lockFraming ? (this.uniforms?.cameraZ ?? null) : this.uniforms?.cameraZ ?? null);
+
+        // Update internal parameters
         this.currentParams = { ...this.currentParams, ...parameters };
-        // If caller provided a cameraZ override, keep it
-        if (Number.isFinite(parameters?.cameraZ)) {
-            this.currentParams.cameraZ = Number(parameters.cameraZ);
-        }
-        
-        // Numeric coercion helper
-        const N = v => (Number.isFinite(+v) ? +v : 0);
-        const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
 
-        // duty as fraction [0..1]
-        const dutyFrac = (() => {
-          const d = parameters.dutyCycle;
-          if (d == null) return N(this.currentParams.dutyCycle);
-          return d > 1 ? d/100 : N(d);
-        })();
-
-        const axesScene =
-            parameters.axesScene || parameters.axesClip || this.uniforms?.axesClip || (function resolveFromHull(p){
-                if (!p) return null;
-                const a = (p.hullAxes?.[0] ?? p.hull?.a) || 503.5;
-                const b = (p.hullAxes?.[1] ?? p.hull?.b) || 132.0;
-                const c = (p.hullAxes?.[2] ?? p.hull?.c) || 86.5;
-                // Convert meters → scene (using standard scale)
-                const s = 1.0 / 1200.0;
-                return [a * s, b * s, c * s];
-            })(parameters) ||
-            this._lastAxesScene ||
-            [0.4, 0.22, 0.22];
-
-        // Mirror pipeline fields into uniforms for diagnostics
         this.uniforms = {
-            ...this.uniforms,
-            vizGain: Number.isFinite(parameters.vizGain) ? +parameters.vizGain
-                   : (this.uniforms?.vizGain ?? 1.0),
-            vShip: parameters.vShip || 1,
-            wallWidth: parameters.wallWidth || 0.06,
-            axesClip: axesScene,
-            driveDir: parameters.driveDir || [1, 0, 0],
-            // NEW: Artificial gravity tilt parameters
-            epsilonTilt: physicsParityMode ? 0 : N(parameters.epsilonTilt || 0), // 🔬 Force zero tilt in parity mode
-            betaTiltVec: physicsParityMode ? [0, 0, 0] : (parameters.betaTiltVec || [0, -1, 0]), // 🔬 Force zero tilt vector
-            tiltGain: N(parameters.tiltGain || 0.55),
-            // NEW: Curvature Gain blend system (replaces vizGainOverride)
-            // --- Curvature gain mapping (exactly matches SliceViewer) ---
-            curvatureBoostMax: (() => {
-                const boostMax = Number.isFinite(parameters.curvatureBoostMax)
-                    ? Math.max(1, parameters.curvatureBoostMax)
-                    : (this.uniforms?.curvatureBoostMax ?? 40);
-                return boostMax;
-            })(),
-            
-            curvatureGainT: (() => {
-                const clamp01 = t => Math.max(0, Math.min(1, t));
-                // Normalize to T in [0,1]
-                const T_from_props =
-                    Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
-                    Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
-                    Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
-                    (this.uniforms?.curvatureGainT ?? 0.375); // default = slider ~3/8
-                return T_from_props;
-            })(),
-            
-            userGain: (() => {
-                // 🔬 Physics Parity Mode: Force unity gain
-                if (physicsParityMode) {
-                    return 1;
-                }
+          ...this.uniforms,
 
-                // First-class exaggeration input (takes priority)
-                if (Number.isFinite(parameters.exaggeration)) {
-                    const ex = Math.max(1, +parameters.exaggeration);
-                    this.uniforms.curvatureBoostMax = Math.max(ex, this.uniforms?.curvatureBoostMax ?? 40); // keep headroom
-                    this.uniforms.userGain = ex;
-                    return ex;
-                } else {
-                    // Existing curvatureGainT → [1..boostMax] mapping
-                    const clamp01 = t => Math.max(0, Math.min(1, t));
-                    const boostMax = Number.isFinite(parameters.curvatureBoostMax)
-                        ? Math.max(1, parameters.curvatureBoostMax)
-                        : (this.uniforms?.curvatureBoostMax ?? 40);
-                    
-                    const T_from_props =
-                        Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
-                        Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
-                        Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
-                        (this.uniforms?.curvatureGainT ?? 0.375);
+          // geometry (authoritative)
+          hullAxes: [a, b, c],
+          axesClip: axesScene,      // ← replaces the baked unit ring
+          gridSpan,
 
-                    // Blend 1→boostMax exactly like SliceViewer
-                    const userGainFromT = 1 + T_from_props * (boostMax - 1);
+          // camera/framing
+          lockFraming,
+          cameraZ,
 
-                    // Allow absolute override if caller passes userGain directly
-                    const userGainFinal = Number.isFinite(parameters.userGain)
-                        ? Math.max(1, +parameters.userGain)
-                        : userGainFromT;
+          // visualization / parity
+          physicsParityMode: parity,
+          colorMode, exposure, zeroStop,
+          vizGain,
+          curvatureGainT: curvT,
+          curvatureBoostMax: curvMax,
+          cosmeticLevel: cosmetic,
 
-                    return userGainFinal;
-                }
-            })(),
-            
-            // Explicit thetaScale wins; otherwise derive from physics (matches SliceViewer)
-            thetaScale: (() => {
-                if (Number.isFinite(parameters.thetaScale)) return +parameters.thetaScale;
-                const gammaGeo = N(parameters.gammaGeo ?? this.currentParams.g_y ?? 26);
-                const gammaVdB = N(parameters.gammaVdB ?? this.currentParams.gammaVanDenBroeck ?? 1);
-                const dAa      = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1);
-                const duty     = Math.max(1e-12, N(dutyFrac));
-                const sectors  = Math.max(1, N(parameters.sectors ?? parameters.sectorStrobing ?? 1));
-                const viewAvg  = parameters.viewAvg !== undefined ? !!parameters.viewAvg : true;
-                const eff      = viewAvg ? Math.sqrt(duty / sectors) : 1.0;
-                return Math.pow(gammaGeo, 3) * dAa * gammaVdB * eff;
-            })(),
-            
-            // Mirror pipeline fields for diagnostics
-            currentMode: mode,
-            // UI duty for HUD/visual seasoning; FR duty handled by thetaScale (server/viz)
-            dutyCycle: physicsParityMode ? 1 : dutyFrac,
-            gammaGeo: physicsParityMode ? 1 : N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y), // 🔬 Force unity
-            Qburst: physicsParityMode ? 1 : N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ), // 🔬 Force unity
-            deltaAOverA: physicsParityMode ? 1 : N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1), // 🔬 Force unity
-            gammaVdB: physicsParityMode ? 1 : N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1), // 🔬 Force unity
-            sectors: physicsParityMode ? 1 : Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorStrobing ?? 1))), // 🔬 Force 1 sector
-            split: physicsParityMode ? 0 : Math.max(0, Math.min(
-                (N(parameters.sectors ?? parameters.sectorStrobing ?? 1)) - 1,
-                Math.floor(N(parameters.split ?? ((mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50) * N(parameters.sectors ?? parameters.sectorStrobing ?? 1))))
-            )), // 🔬 Force 0 split in parity mode
-            viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
+          // existing fields (keep your defaults if caller didn't supply)
+          vShip: parameters.vShip || this.uniforms.vShip || 1,
+          wallWidth: parameters.wallWidth || this.uniforms.wallWidth || 0.06,
+          driveDir: parameters.driveDir || this.uniforms.driveDir || [1,0,0],
+
+          // tilt (zeroed in parity mode)
+          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || this.uniforms.epsilonTilt || 0),
+          betaTiltVec: Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length === 3
+            ? parameters.betaTiltVec
+            : (this.uniforms.betaTiltVec || [0,-1,0]),
+          tiltGain: this.uniforms.tiltGain ?? 0.55
         };
 
-        // pipeline drives hullAxes (meters); clip-axes are computed later in _warpGridVertices
-        const hullAxes = parameters.hullAxes || this.uniforms?.hullAxes || [503.5,132,86.5];
-        this.uniforms = {
-            ...this.uniforms,
-            hullAxes,
-            colorMode,
-        };
-        this.currentParams.hullAxes = hullAxes;    // keep currentParams in sync
-
-        // 🔬 PHYSICS PARITY MODE: Hard disable cosmetics & boosts, keep real thetaScale above
-        if (physicsParityMode) {
-            // Hard disable cosmetics & boosts, keep real thetaScale above.
-            this.uniforms.userGain        = 1;   // no exaggeration
-            this.uniforms.curvatureGainT  = 0;   // slider at 0
-            // keep curvatureBoostMax as declared (e.g., 40) so normalization has range
-            this.uniforms.exposure        = 3.5; // modest contrast to avoid pegging
-            this.uniforms.zeroStop        = 1e-5;
-            this.uniforms.epsilonTilt     = 0;
-            this.uniforms.betaTiltVec     = [0,0,0];
-            this.uniforms.cosmeticT       = 0;
-        }
-
-        if (physicsParityMode && !Number.isFinite(parameters.exposure)) {
-            // push colors away from ±1 saturation in parity
-            this.uniforms.exposure = 4.0;
-        }
-
-        // 🎨 COSMETIC BLENDING: Apply visual parameter interpolation based on cosmeticLevel
-        if (cosmeticT < 1 && !physicsParityMode) {
-            // Baselines for a "real physics" look
-            const EXPOSURE_BASE = 3.0;    // lower contrast
-            const ZEROSTOP_BASE = 1e-5;   // less aggressive log pop
-            const USERGAIN_BASE = 1.0;    // no boost
-            
-            // Get current target values from parameters or uniforms
-            const exposureTarget = Number.isFinite(parameters.exposure) ? +parameters.exposure : (this.uniforms?.exposure ?? 6.0);
-            const zeroStopTarget = Number.isFinite(parameters.zeroStop) ? +parameters.zeroStop : (this.uniforms?.zeroStop ?? 1e-7);
-            const userGainCurrent = this.uniforms.userGain || 1;
-            
-            // BLEND: effective values that the shaders/geometry actually use
-            const userGainEffective = USERGAIN_BASE + cosmeticT * (userGainCurrent - USERGAIN_BASE);
-            const exposureEffective = EXPOSURE_BASE + cosmeticT * (exposureTarget - EXPOSURE_BASE);
-            const zeroStopEffective = ZEROSTOP_BASE + cosmeticT * (zeroStopTarget - ZEROSTOP_BASE);
-            
-            // Write back to uniforms so both shader & CPU geometry use the blended values
-            this.uniforms.userGain = userGainEffective;
-            this.uniforms.exposure = exposureEffective;
-            this.uniforms.zeroStop = zeroStopEffective;
-            this.uniforms.cosmeticT = cosmeticT; // Store for debugging
-            
-            console.log(`🎨 COSMETIC BLEND: userGain ${userGainCurrent.toFixed(2)}→${userGainEffective.toFixed(2)}, exposure ${exposureTarget.toFixed(1)}→${exposureEffective.toFixed(1)}, zeroStop ${zeroStopTarget.toExponential(1)}→${zeroStopEffective.toExponential(1)}`);
-        } else {
-            // Ensure exposure and zeroStop are set when not blending
-            this.uniforms.exposure = Number.isFinite(parameters.exposure) ? +parameters.exposure : (this.uniforms?.exposure ?? 6.0);
-            this.uniforms.zeroStop = Number.isFinite(parameters.zeroStop) ? +parameters.zeroStop : (this.uniforms?.zeroStop ?? 1e-7);
-            this.uniforms.cosmeticT = cosmeticT;
-        }
-
-        // Auto-exposure: prevent colors from clamping at high gains (only when caller didn't set one)
-        if (!physicsParityMode && parameters.autoExposure !== false && !Number.isFinite(parameters.exposure)) {
-            const g = Math.max(1, this.uniforms.userGain || 1);
-            this.uniforms.exposure = Math.min(12, 3.0 + 1.4 * Math.log10(g));
-        }
-
-        // Expose exaggeration snapshot that UI can read per frame (for HUD)
-        this.uniforms.__exaggeration = {
-            userGain: this.uniforms.userGain,
-            exposure: this.uniforms.exposure,
-            zeroStop: this.uniforms.zeroStop,
-            cosmeticT: this.uniforms.cosmeticT || 1
-        };
-
-        // Update cached axes and refit camera if changed
-        if (axesScene) {
-            this._lastAxesScene = axesScene;
-            this._fitCameraToBubble(axesScene, this._gridSpan || 1);
-        }
-
-        // If grid span provided, cache it and refit
-        if (typeof parameters.gridSpan === 'number') {
-            this._gridSpan = Math.max(0.5, parameters.gridSpan);
-            this._fitCameraToBubble(this._lastAxesScene || axesScene, this._gridSpan);
-        }
-        
-        // NEW: Map operational mode parameters to spacetime visualization
-        if (parameters.currentMode) {
-            const modeEffects = this._calculateModeEffects(parameters);
-            console.log('🎯 Operational Mode Effects:', {
-                mode: parameters.currentMode,
-                strobing: parameters.sectorStrobing,
-                qSpoiling: parameters.qSpoilingFactor, 
-                vanDenBroeck: parameters.gammaVanDenBroeck,
-                visualScale: modeEffects.visualScale,
-                curvatureAmplifier: modeEffects.curvatureAmplifier
-            });
-            
-            // Apply mode-specific physics scaling
-            this.currentParams.modeVisualScale = modeEffects.visualScale;
-            this.currentParams.modeCurvatureAmplifier = modeEffects.curvatureAmplifier;
-            this.currentParams.modeStrobingFactor = modeEffects.strobingFactor;
-        }
-        
-        // 🔬 PHYSICS PARITY MODE: Comprehensive uniform logging for debug baseline
-        if (physicsParityMode) {
-            console.warn('🔬 PHYSICS PARITY UNIFORM LOGGING:', {
-                A_geoUniform: this.uniforms?.gammaGeo || 1,
-                // QburstUniform: removed from curvature chain,
-                gammaVdBUniform: this.uniforms?.gammaVdB || 1,
-                qSpoilUniform: this.uniforms?.deltaAOverA || 1,
-                dutyCycleUniform: this.uniforms?.dutyCycle || 1,
-                sectorsUniform: this.uniforms?.sectors || 1,
-                betaInstUniform: 'calculated in _warpGridVertices',
-                betaAvgUniform: 'calculated in _warpGridVertices',
-                betaUsedUniform: 'calculated in _warpGridVertices',
-                thetaScaleUniform: this.uniforms?.thetaScale || 0,
-                userGainUniform: this.uniforms?.userGain || 1,
-                curvatureBoostMaxUniform: this.uniforms?.curvatureBoostMax || 1,
-                curvatureGainTUniform: this.uniforms?.curvatureGainT || 0,
-                epsilonTiltUniform: this.uniforms?.epsilonTilt || 0,
-                betaTiltVecUniform: this.uniforms?.betaTiltVec || [0,0,0],
-                wallWidthUniform: this.uniforms?.wallWidth || 0.016,
-                exposureUniform: this.uniforms?.exposure || 6,
-                zeroStopUniform: this.uniforms?.zeroStop || 1e-7
-            });
-        }
-
-        // Log tilt uniforms for diagnostics
-        if (this._diagEnabled) {
-          console.log('🎛️ Tilt uniforms:', {
-            epsilonTilt: this.uniforms?.epsilonTilt,
-            tiltGain: this.uniforms?.tiltGain,
-            betaTiltVec: this.uniforms?.betaTiltVec,
-          });
-        }
-        
-        // Apply warp deformation to grid with mode-specific enhancements
+        // Rebuild mesh/attributes with the new geometry/camera assumptions
         this._updateGrid();
-        
-        // Apply camera positioning - prefer overhead fit unless explicit cameraZ provided
-        if (Number.isFinite(this.currentParams?.cameraZ)) {
-            this._adjustCameraForSpan(this._gridSpan || this._lastFittedR || 1.0);
-        } else {
-            this._applyOverheadCamera({ spanHint: this._gridSpan || this._lastFittedR || 1.0 });
-        }
     }
     
     _calculateModeEffects(params) {
