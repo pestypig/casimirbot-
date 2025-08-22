@@ -208,6 +208,10 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
 
   const frequency_Hz = (args.frequency_GHz ?? s.modulationFreq_GHz ?? 15) * 1e9;
 
+  const dutyReq = (args.duration_us && args.cycle_ms)
+    ? Math.max(0, Math.min(1, (args.duration_us*1e-6) / (args.cycle_ms*1e-3)))
+    : null;
+
   const base = await executePulseSector({
     sectorId: "S1",
     gap_nm: s.gap_nm ?? 1.0,
@@ -231,6 +235,7 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
     exoticMassGenerated_kg: s.M_exotic,
     frequency_Hz,
     dutyCycle_ship_pct: Math.max(0, (s.dutyEffective_FR ?? 0)) * 100,
+    dutyCycle_requested_pct: dutyReq != null ? dutyReq*100 : null,
     status: "SEQUENCE_COMPLETE",
     log: `Pulsed ${totalSectors} sectors (${totalTiles} tiles) @ ${frequency_Hz/1e9} GHz. M_exotic=${s.M_exotic.toFixed(1)} kg.`
   };
