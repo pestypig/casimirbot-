@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-// Extend Window interface for 3D WarpEngine
-declare global {
-  interface Window {
-    WarpEngine: any;
-  }
-}
+// Global WarpEngine interface defined in types/globals.d.ts
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, RotateCcw } from 'lucide-react';
