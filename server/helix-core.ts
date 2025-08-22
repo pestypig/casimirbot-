@@ -337,13 +337,10 @@ export async function handleHelixCommand(req: Request, res: Response) {
     }
 
     // BEFORE sending to the API:
-    const liveState = getGlobalPipelineState();
+    const live = getGlobalPipelineState();
     const chatGPTRequest = {
-      model: "gpt-4-0613",
-      messages: [
-        { role: "system", content: buildHelixCorePrompt(liveState) },
-        ...chatMessages
-      ],
+      model: process.env.HELIX_OPENAI_MODEL || "gpt-4-0613",
+      messages: [{ role: "system", content: buildHelixCorePrompt(live) }, ...chatMessages],
       functions: AVAILABLE_FUNCTIONS,
       function_call: function_call || "auto",
       temperature: 0.7
