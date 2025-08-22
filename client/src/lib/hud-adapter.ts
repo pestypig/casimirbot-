@@ -25,6 +25,8 @@ export type PipelineLike = {
   N_tiles: number;               // total tiles
   tilesPerSector: number;        // computed per pipeline
   activeSectors: number;         // concurrent sectors used this mode
+  sectorCount?: number;          // total sectors (always 400)
+  concurrentSectors?: number;    // concurrent live sectors (1-2)
   activeFraction: number;        // = activeSectors/400
   dutyCycle: number;             // UI duty (mode description)
   dutyBurst?: number;            // 0.01
@@ -111,7 +113,7 @@ export function toHUDModel(s: PipelineLike): HUDModel {
     powerOnW,
     dutyShip,
     dutyBurst,
-    sectorsConcurrent: s.activeSectors ?? 1,
+    sectorsConcurrent: s.concurrentSectors ?? s.activeSectors ?? 1,
     sectorsTotal: SECTORS_TOTAL,
     tilesTotal: s.N_tiles ?? 0,
     tilesPerSector: s.tilesPerSector ?? Math.floor((s.N_tiles || 0) / SECTORS_TOTAL),

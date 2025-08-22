@@ -75,7 +75,9 @@ export interface EnergyPipelineState {
   // Mode parameters
   currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
-  sectorStrobing: number;
+  sectorCount: number;        // Total sectors (always 400)
+  concurrentSectors: number; // Live concurrent sectors (1-2)
+  sectorStrobing: number;     // Legacy alias for UI compatibility
   qSpoilingFactor: number;
   
   // Physics parameters
@@ -234,7 +236,9 @@ export function initializePipelineState(): EnergyPipelineState {
     // Mode defaults (hover)
     currentMode: 'hover',
     dutyCycle: 0.14,
-    sectorStrobing: 1,
+    sectorCount: 400,        // Total sectors (always 400)
+    concurrentSectors: 1,    // Live concurrent sectors (default 1)
+    sectorStrobing: 1,       // Legacy alias
     qSpoilingFactor: 1,
     
     // Physics defaults (paper-backed)
@@ -302,14 +306,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
   // 3) Sector scheduling — per-mode policy
-  const S_total = TOTAL_SECTORS;
-  const concurrent = resolveSLive(state.currentMode);
-  const d_eff = BURST_DUTY_LOCAL * (concurrent / S_total); // ship-wide duty
+  state.sectorCount = TOTAL_SECTORS;                     // ✅ Total sectors (always 400)
+  state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
+  const S_total = state.sectorCount;
+  const S_live = state.concurrentSectors;
+  const d_eff = BURST_DUTY_LOCAL * (S_live / S_total); // ship-wide duty
 
-  state.activeSectors   = concurrent;
-  state.activeFraction  = concurrent / S_total;
+  state.activeSectors   = S_live;
+  state.activeFraction  = S_live / S_total;
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
-  state.activeTiles     = state.tilesPerSector * concurrent;
+  state.activeTiles     = state.tilesPerSector * S_live;
 
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
@@ -410,7 +416,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // Physics logging for debugging (before UI field updates)
   console.log("[PIPELINE]", {
-    dutyShip: d_eff, dutyUI_before: state.dutyCycle, concurrent, N: state.N_tiles,
+    dutyShip: d_eff, dutyUI_before: state.dutyCycle, S_live, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
@@ -494,14 +500,14 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
   const ui = MODE_CONFIGS[state.currentMode];
   state.dutyCycle       = ui.dutyCycle;
-  state.sectorCount     = TOTAL_SECTORS;                    // ✅ Total sectors for sampling (always 400)
-  state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
   state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
   state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   // UI field updates logging (after MODE_CONFIGS applied)
   console.log("[PIPELINE_UI]", {
     dutyUI_after: state.dutyCycle, 
+    sectorCount: state.sectorCount,
+    concurrentSectors: state.concurrentSectors,
     sectorStrobing: state.sectorStrobing,
     qSpoilingFactor: state.qSpoilingFactor
   });
