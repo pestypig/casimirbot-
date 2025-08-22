@@ -1,3 +1,4 @@
+Replace your WarpBubbleCompare.tsx with this
 import React, { useEffect, useRef } from "react";
 
 /* ---------------- Script loader & strobe mux ---------------- */
@@ -220,7 +221,7 @@ export default function WarpBubbleCompare({
           );
         });
 
-        // lock framing across resizes (prevents "camera pulled back")
+        // lock framing across resizes (prevents “camera pulled back”)
         roRef.current = new ResizeObserver(() => {
           const fresh = frameFromHull(parameters?.hull, parameters?.gridSpan);
           const camL = compactCameraZ(L, fresh.axesScene);
