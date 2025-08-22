@@ -820,7 +820,8 @@ useEffect(() => {
               </div>
               
               <div className="text-green-300">
-                <div>β₀ = duty × γ_geo = {safeFix(parameters.dutyCycle, 0.14, 3)} × {num(parameters.g_y, 26)} = {safeFix((num(parameters.dutyCycle, 0.14) * num(parameters.g_y, 26)), 3.64, 3)}</div>
+                <div>β_chain (inst) = γ_geo³ · (ΔA/A) · γ_VdB</div>
+                <div>β_chain (avg)  = β_chain(inst) · √(duty / sectors)</div>
               </div>
               
               <div className="text-blue-300">
