@@ -151,7 +151,7 @@ type HelixMetrics = {
 
 // --------------------------- Constants (UI only) ---------------------------
 
-const HBAR_C = 1.98644586e-25; // J·m
+const HBAR_C = 3.16152677e-26; // ħc (corrected from hc) J·m
 const PI = Math.PI;
 const C = 299_792_458;
 // Q_BURST removed - using cavity Q directly in physics calculations
@@ -468,7 +468,7 @@ export default function HelixCasimirAmplifier({
     const M_total_report = state.M_exotic ?? metrics.exoticMass;
 
     // casimir foundation (unchanged)
-    const gap_m       = (state.gap_nm ?? 16) * 1e-9;
+    const gap_m       = Math.max(1e-12, (state.gap_nm ?? 16) * 1e-9);
     const tileA_m2    = (state.tileArea_cm2 ?? 25) * 1e-4;
     const casimir_theory   = -(PI * PI / 720) * HBAR_C / Math.pow(gap_m, 4);
     const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;
@@ -528,16 +528,12 @@ export default function HelixCasimirAmplifier({
 
   // Safe U_inf target - use physics-driven value with robust fallback
   const U_inf = (() => {
-    const fromState = state?.U_cycle;
-    if (Number.isFinite(fromState) && fromState !== 0) return fromState;
-    
-    // Fallback: use |U_Q| from derived calculations if available
-    if (derived?.U_Q && Number.isFinite(derived.U_Q) && derived.U_Q !== 0) {
-      return Math.abs(derived.U_Q);
-    }
-    
-    // Last resort: ensure non-zero target for ring-up
-    return 1e-6; // small but finite target
+    const cand = Number.isFinite(state?.U_cycle) && state!.U_cycle !== 0
+      ? Math.abs(state!.U_cycle)
+      : (Number.isFinite(derived?.U_Q) && derived!.U_Q !== 0
+          ? Math.abs(derived!.U_Q)
+          : 1e-6);
+    return Math.max(cand, 1e-12);
   })();
 
   const [U, setU] = useState(0);  // cavity "stored" energy (relative units)
