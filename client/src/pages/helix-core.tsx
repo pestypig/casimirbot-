@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Link } from "wouter";
-import { Home, Activity, Grid3X3, Gauge, Brain, Calendar, Terminal, Atom, Cpu, Send, AlertCircle, CheckCircle2, Zap, Database, Settings } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Cpu, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
