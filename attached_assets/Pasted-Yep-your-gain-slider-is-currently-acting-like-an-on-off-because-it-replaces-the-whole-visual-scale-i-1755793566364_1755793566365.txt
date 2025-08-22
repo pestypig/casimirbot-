@@ -1,0 +1,140 @@
+Yep—your gain slider is currently acting like an on/off because it replaces the whole visual scale instead of blending with the “honest” physics amplitude. Below is a tiny, surgical patch that:
+
+1. makes the visualizer **depend only on the pipeline** (uses `dutyEffective_FR` already in your adapter), and
+2. turns the “Curvature Gain” slider into a **blend** between the true result and a boosted view (so sliding to 0 never flattens the bubble).
+
+---
+
+# 1) Adapter: keep using the pipeline’s average duty (no changes needed)
+
+If you already have `toWarpUniforms(pkt)` from the plan, you’re good—this is the source of truth the visualizer should consume.
+
+You’ll just add one optional UI param to pass down:
+
+```ts
+// when calling engine.updateUniforms(...)
+const uniforms = toWarpUniforms(pkt);
+uniforms.curvatureGainT = uiCurvatureGainT;   // 0..1 slider (0 = true result, 1 = boosted)
+```
+
+---
+
+# 2) WarpEngine: add a proper *blend* gain, not a hard override
+
+### A. Accept the slider and a cap
+
+Add two display-only uniforms in `updateUniforms`:
+
+```diff
+ this.uniforms = {
+   ...this.uniforms,
++  curvatureGainT: Number.isFinite(parameters.curvatureGainT) ? Math.max(0, Math.min(1, parameters.curvatureGainT)) : (this.uniforms?.curvatureGainT ?? 0.75),
++  curvatureBoostMax: Number.isFinite(parameters.curvatureBoostMax) ? Math.max(1, parameters.curvatureBoostMax) : (this.uniforms?.curvatureBoostMax ?? 40),
+   // (keep your existing uniforms)
+ };
+```
+
+> Defaults: `curvatureGainT=0.75` (clearly visible by default), `curvatureBoostMax=40` (\~40× legibility boost). Tweak to taste.
+
+### B. Blend physics → boosted inside `_warpGridVertices`
+
+Find where you compute the **final bounded visual amplitude** (right before you build `disp`). Replace the current “override” logic with a **blend**:
+
+```diff
+- // Log compression so modes separate visually instead of saturating
++ // Log compression so modes separate visually instead of saturating
+ const k = 1e10;
+ const s = 1.0;
+ const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
+
+- // Mode-specific visual scaling (keeps standby very small)
+- const modeScale =
+-   mode === 'standby'  ? 0.05 :
+-   mode === 'cruise'   ? 0.25 :
+-   mode === 'hover'    ? 0.60 :
+-   mode === 'emergency'? 0.90 : 0.50;
+-
+- // Optional manual override from UI uniform (0 disables override)
+- const gainOverride = this.uniforms?.vizGainOverride ?? 0;
+- const vizGain = gainOverride > 0 ? gainOverride : modeScale;
+-
+- // Final bounded visual amplitude 0..1
+- const A_vis = Math.min(1.0, A_log * vizGain);
++ // Base (“honest”) visual amplitude from physics only
++ const A_vis_base = Math.min(1.0, A_log);
++
++ // Curvature gain slider: blend between base and a boosted view
++ const tGain   = this.uniforms?.curvatureGainT ?? 0;      // 0..1
++ const boostMx = this.uniforms?.curvatureBoostMax ?? 40;  // >=1
++ const boost   = (1 - tGain) + tGain * boostMx;           // 1..boostMx
++
++ // Light per-mode seasoning (still small—doesn’t hide physics)
++ const modeScale =
++   mode === 'standby'   ? 0.90 :  // keep some visibility when boosted
++   mode === 'cruise'    ? 1.00 :
++   mode === 'hover'     ? 1.05 :
++   mode === 'emergency' ? 1.10 : 1.00;
++
++ const A_vis = Math.min(1.0, A_vis_base * boost * modeScale);
+```
+
+This guarantees:
+
+* **tGain = 0** → `boost = 1` → you see the **true** (un-boosted) curvature.
+* **tGain = 1** → `boost = curvatureBoostMax` → you see a magnified version (great for first impressions).
+
+No more “flat at zero” unless the underlying physics is truly flat (e.g., standby), which is exactly what we want.
+
+### C. Keep geometry & color consistent
+
+You already use `A_vis` in the *geometry* displacement. The *color* map uses the shader’s York proxy and exposure; that’s fine—users mainly read the curvature from geometry, and your symmetric-log coloring already compresses extremes. If you want the **colors** to respond to the same gain, add this one-line uniform in `_renderGridPoints`:
+
+```diff
+gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
+gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
++// Optionally remap exposure with the same gain (makes colors pop with gain)
++const expGain = Math.max(1, Math.log10(1 + (this.uniforms?.curvatureGainT ?? 0) * (this.uniforms?.curvatureBoostMax ?? 40)));
++gl.uniform1f(this.gridUniforms.exposure, (this.uniforms?.exposure || 6.0) * expGain);
+```
+
+(You can skip this if you prefer color to stay strictly “honest” while only geometry boosts.)
+
+---
+
+# 3) Minimal UI hook (example)
+
+```tsx
+// React control (0 = true result, 1 = boosted)
+<input
+  type="range"
+  min={0}
+  max={1}
+  step={0.01}
+  value={curvatureGainT}
+  onChange={e => {
+    const t = parseFloat(e.target.value);
+    setCurvatureGainT(t);
+    warpEngine.updateUniforms({ curvatureGainT: t });
+  }}
+/>
+```
+
+Optionally expose a “max boost” knob for you (not end users):
+
+```tsx
+<input
+  type="number"
+  min={1}
+  max={200}
+  value={curvatureBoostMax}
+  onChange={e => warpEngine.updateUniforms({ curvatureBoostMax: +e.target.value })}
+/>
+```
+
+---
+
+## Why this fixes “no curvature”
+
+Previously, your override path could set a **single** visual scale that, when near zero, wiped out *both* the boosted and the base amplitude. The blend keeps the base physics amplitude intact and only scales **upward** from there, so sliding to zero returns to truth rather than to “nothing.”
+
+If you want, I can also hand you a tiny patch for the slice viewer to drive its `exposure` from the same `curvatureGainT`, so both 2D and 3D stay visually in sync.

@@ -1,0 +1,83 @@
+Gotcha — so here’s the exact mapping you want:
+
+* **`casimirbot.com` → current `/start` page** (profile selector)
+* **`casimirbot.com/bridge` → current root landing page** (equation pipeline)
+* **Buttons & links updated** so:
+
+  * “Home” in `/documentation` → `/` (profile selector)
+  * “Bridge” in `/helix-core` → `/bridge`
+
+Here’s what needs to be done:
+
+---
+
+### **1. Routing Changes (`App.tsx` or `Routes.tsx`)**
+
+```tsx
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import StartPage from "./pages/StartPage";
+import BridgePage from "./pages/BridgePage"; // was your main root page
+import DocumentationPage from "./pages/DocumentationPage";
+import HelixCorePage from "./pages/HelixCorePage";
+
+export default function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<StartPage />} />       {/* Profile selector */}
+        <Route path="/bridge" element={<BridgePage />} /> {/* Equation pipeline */}
+        <Route path="/documentation" element={<DocumentationPage />} />
+        <Route path="/helix-core" element={<HelixCorePage />} />
+      </Routes>
+    </Router>
+  );
+}
+```
+
+---
+
+### **2. Update Profile Selector Buttons (StartPage)**
+
+If you want them to take people straight into the bridge:
+
+```tsx
+<button onClick={() => navigate("/bridge")}>Enter HELIX-CORE</button>
+```
+
+Or with links:
+
+```html
+<a href="/bridge" class="btn">Enter HELIX-CORE</a>
+```
+
+---
+
+### **3. Update Navigation Links**
+
+* In `/documentation`, set `"Home"` link to `/`
+
+```tsx
+<Link to="/">Home</Link>
+```
+
+* In `/helix-core`, set `"Bridge"` link to `/bridge`
+
+```tsx
+<Link to="/bridge">Bridge</Link>
+```
+
+---
+
+### **4. Testing**
+
+After these changes:
+
+* Visiting `casimirbot.com` shows the **profile selector**.
+* Clicking “Enter HELIX-CORE” or “Bridge” always goes to `/bridge`.
+* “Home” from documentation always returns to the profile selector.
+
+---
+
+If you want, I can write you **a ready-to-paste `StartPage.tsx`** and **the updated navigation components** so the Agent can drop them in without touching anything else. That would make the redirect change safe and fully linked.
+
+Do you want me to prep that drop-in bundle?

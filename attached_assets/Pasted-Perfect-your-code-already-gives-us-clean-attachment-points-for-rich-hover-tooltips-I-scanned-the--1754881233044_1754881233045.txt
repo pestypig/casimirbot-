@@ -1,0 +1,342 @@
+Perfect—your code already gives us clean “attachment points” for rich hover tooltips. I scanned the repo and mapped the **exact files/lines** for the Live Energy Pipeline headings and the Mode selector, so you (or your Replit agent) can drop in theory + Moving-Zen reflections right where users hover.
+
+Below are copy-paste patches for each spot.
+
+---
+
+# 1) Live Energy Pipeline: card title (contextual overview)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~288–296 (the `<CardTitle>`)
+
+**Before:**
+
+```tsx
+<div className="flex items-center space-x-2">
+  <Calculator className="h-5 w-5 text-primary" />
+  <CardTitle className="text-lg">Live Energy Pipeline: {currentMode.name} Mode</CardTitle>
+</div>
+```
+
+**After (wrap in Tooltip):**
+
+```tsx
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+...
+<div className="flex items-center space-x-2">
+  <Calculator className="h-5 w-5 text-primary" />
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <CardTitle className="text-lg cursor-help">
+        Live Energy Pipeline: {currentMode.name} Mode
+      </CardTitle>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-md text-sm leading-snug">
+      <strong>Pipeline overview</strong><br/>
+      This view assembles cavity energy, geometric amplification (γ_geo), Q-enhancement, duty, sector strobing, and safety guards (ζ, Natário, curvature) into a single operational picture.<br/><br/>
+      <em>Moving Zen:</em> Presence before action—see the whole garden before you rake a single line.
+    </TooltipContent>
+  </Tooltip>
+</div>
+```
+
+---
+
+# 2) Foundation: Cycle-Averaged Cavity Energy
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~359–366 (Step “Foundation” `<h4>`)
+
+**Before:**
+
+```tsx
+<h4 className="font-semibold text-sm mb-2 flex items-center">
+  <span ...>∞</span>
+  Foundation: Cycle-Averaged Cavity Energy
+</h4>
+```
+
+**After:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>∞</span>
+      Foundation: Cycle-Averaged Cavity Energy
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    u_Casimir = -π²ℏc/(720a⁴) defines the baseline field energy. U_static = u_Casimir·A_tile·a, then geometry sets U_geo = γ·U_static; Q_mech lifts it to U_Q = Q_mech·U_geo—the posture of all later steps.<br/><br/>
+    <em>Moving Zen:</em> Posture before movement. A stance you can hold quietly is the root of accurate cuts.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 3) Step 1: Raw Per-Tile Loss Power
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~375–383
+
+**Before:**
+
+```tsx
+<h4 className="font-semibold text-sm mb-2 flex items-center">
+  <span ...>1</span>
+  Raw Per-Tile Loss Power
+</h4>
+```
+
+**After:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>1</span>
+      Raw Per-Tile Loss Power
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    P_raw,tile = |U_geo|·ω/Q_on. This is the tile’s intrinsic dissipation at resonance before throttles (duty, sectors, Q-spoiling) are applied.<br/><br/>
+    <em>Moving Zen:</em> Accuracy is final—form (boundary & frequency) makes speed a consequence, not a goal.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 4) Step 2: Raw Hull Power
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~392–399
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>2</span>
+      Raw Hull Power
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    P_raw = P_raw,tile × N_tiles with N_tiles = A_hull/A_tile. Scaling preserves physics but magnifies any misalignment—geometry and Q settings must remain coherent.<br/><br/>
+    <em>Moving Zen:</em> Many hands, one motion. Coordination turns parts into purpose.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 5) Step 3: Combined Throttling Factor
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~409–416
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>3</span>
+      Combined Throttling Factor
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    f_throttle = d × (Q_idle/Q_on) × (1/S). Duty, Q-spoiling, and sector strobing set the real cadence and safe average output.<br/><br/>
+    <em>Moving Zen:</em> Breath and step together—distance and timing are interdependent (maai).
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 6) Step 4: Realistic Average Power (83 MW Target)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~432–440
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>4</span>
+      Realistic Average Power (83 MW Target)
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    P_avg = P_raw × f_throttle. This is the actionable budget that respects thermal and coherence limits—what the system can truly sustain.<br/><br/>
+    <em>Moving Zen:</em> Flow before force—guiding energy beats grinding it.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 7) Step 5: Duty Cycle Averaging (U\_cycle)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~451–458
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>5</span>
+      Duty Cycle Averaging
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    U_cycle = U_Q × d (plus pocket boost if configured). This per-cycle yield is the natural “fuel unit” Helix-Core can count.<br/><br/>
+    <em>Moving Zen:</em> Keep cadence you can keep—consistency turns effort into inevitability.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 8) Step 6: Time-Scale Separation
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~468–472
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>6</span>
+      Time-Scale Separation
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    A minimum T_s/T_LC keeps homogenization ahead of drive changes, avoiding spurious curvature growth and decoherence.<br/><br/>
+    <em>Moving Zen:</em> Patience is speed in disguise—let structure settle before you move again.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 9) Step 7: Quantum Inequality Margin (ζ)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~487–494
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span ...>7</span>
+      Quantum Inequality Margin
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    ζ summarizes Ford–Roman compliance; schedules throttle to keep ζ within safe bounds even if instantaneous output drops.<br/><br/>
+    <em>Moving Zen:</em> Compassion is part of skill—guard the system to guard the mission.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 10) Step 8: Total Exotic Mass (target)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~504–512
+
+**After change:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <h4 className="font-semibold text-sm mb-2 flex items-center cursor-help">
+      <span className="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs mr-2">8</span>
+      Total Exotic Mass ({formatScientific(exoticMassTarget)} kg Target)
+    </h4>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    Aggregated per-cycle yield across tiles toward a mission budget. This ties directly to payload support and “cycles required.”<br/><br/>
+    <em>Moving Zen:</em> Honor your role to its completion—finish the cut you begin.
+  </TooltipContent>
+</Tooltip>
+```
+
+---
+
+# 11) Mode selector (top of pipeline)
+
+**File:** `client/src/components/live-energy-pipeline.tsx`
+**Around:** lines \~301–309 (the “Operational Mode” label and `<Select>`)
+
+**Before:**
+
+```tsx
+<div className="flex items-center space-x-2">
+  <Settings className="h-4 w-4 text-muted-foreground" />
+  <span className="text-sm font-medium">Operational Mode:</span>
+</div>
+<Select value={selectedMode} onValueChange={handleModeChange}>
+  <SelectTrigger className="w-48">
+    <SelectValue placeholder="Select mode" />
+  </SelectTrigger>
+  ...
+</Select>
+```
+
+**After (hover on the label):**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <div className="flex items-center space-x-2 cursor-help">
+      <Settings className="h-4 w-4 text-muted-foreground" />
+      <span className="text-sm font-medium">Operational Mode:</span>
+    </div>
+  </TooltipTrigger>
+  <TooltipContent className="max-w-md text-sm leading-snug">
+    <strong>Theory</strong><br/>
+    Mode rebalances contraction/expansion zones, duty, sector strobing, and Q-spoiling. It changes power, ζ, and viable payload.<br/><br/>
+    <em>Moving Zen:</em> Every journey begins in stillness. Choose bearing; then move without hesitation (maai).
+  </TooltipContent>
+</Tooltip>
+<Select value={selectedMode} onValueChange={handleModeChange}>
+  <SelectTrigger className="w-48">
+    <SelectValue placeholder="Select mode" />
+  </SelectTrigger>
+  ...
+</Select>
+```
+
+---
+
+## Notes for your agent
+
+* `Tooltip` components are already provided via `TooltipProvider` in `App.tsx`; imports used above:
+  `import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";`
+* Keep the tooltip copy short enough to fit a **max-width \~28–32rem** (I used `max-w-md`).
+* Add `cursor-help` to make affordance obvious.
+* You can reuse this pattern for any other headings/buttons (e.g., Diagnostics in HELIX-CORE).
+
+If you want, I can also generate **variant wording** for Hover, Cruise, Emergency, and Standby that reacts to `currentMode`—so the tooltip text itself changes with mode.

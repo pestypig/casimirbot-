@@ -1,0 +1,91 @@
+You want your Phase Diagram to be a living reflection of whatever parameters your user has set in the “Natário Warp Bubble” panel—so that if they tweak γ_geo, Q, duty‐cycle, sag depth, temperature, etc., the green “viable” region on the heat‐map morphs in real time to exactly match the new Energy-Pipeline viability envelope.
+
+Here’s the recipe to wire that up:
+
+1) Extend your central `viability()` API to accept a full `params` object  
+   • In `sim_core/viability.ts` change  
+     ```ts
+     export function viability(tile_cm2: number, ship_m: number): ViabilityMeta
+     ```  
+     to  
+     ```ts
+     export function viability(
+       tile_cm2: number,
+       ship_m:   number,
+       params:   SimulationParams
+     ): ViabilityMeta
+     ```  
+   • Inside, use **exactly** the same pipeline code you run for a single simulation:  
+     – Read `params.gamma_geo, params.Q, params.duty, params.sagDepth, …`  
+     – Compute U_static→U_geo→U_Q→U_cycle→P_loss→TS_ratio→m_exotic→zeta→ok  
+
+2) Pass your current UI state into the PhaseDiagram grid builder  
+   • In your top‐level `App` (or wherever you hoist “Natário Warp Bubble” state), add all the dynamic levers:  
+     ```ts
+     const [gammaGeo,   setGammaGeo]   = useState(25)
+     const [Qfactor,    setQfactor]    = useState(1e9)
+     const [duty,       setDuty]       = useState(0.01)
+     const [sagDepth,   setSagDepth]   = useState(16)
+     // …plus any temperature or material settings…
+     ```  
+   • Pass **all** of these into your `PhaseDiagram` component as props:  
+     ```tsx
+     <PhaseDiagram
+       tileArea={tileArea}
+       shipRadius={shipRadius}
+       gammaGeo={gammaGeo}
+       Qfactor={Qfactor}
+       duty={duty}
+       sagDepth={sagDepth}
+       /* etc */
+       onTileAreaChange={setTileArea}
+       onShipRadiusChange={setShipRadius}
+     />
+     ```
+
+3) Make your grid‐builder regenerate whenever *any* of those props change  
+   ```tsx
+   // inside PhaseDiagram.tsx
+   useEffect(() => {
+     const { A_vals, R_vals, Z, metaGrid } = buildGrid({
+       tileRange, shipRange,   // your 1–100 cm², 1–30 m arrays
+       gammaGeo, Qfactor, duty, sagDepth, /* … */
+     })
+     setGrid({ A_vals, R_vals, Z, metaGrid })
+   }, [tileRange, shipRange, gammaGeo, Qfactor, duty, sagDepth /* … */])
+   ```  
+   Where `buildGrid` is:  
+   ```ts
+   function buildGrid(config: {
+     A_vals: number[], R_vals: number[],
+     gammaGeo: number, Q: number, duty: number, sagDepth: number, /*…*/
+   }) {
+     const Z = R_vals.map(r =>
+       A_vals.map(a => {
+         const { ok } = viability(a, r, config)
+         return ok ? 1 : 0
+       }))
+     // …also build metaGrid for hovertext…
+     return { A_vals, R_vals, Z, metaGrid }
+   }
+   ```
+
+4) Wire your “Apply Needle‐Hull Preset” to set *all* of those state variables to the paper’s defaults:  
+   ```ts
+   function applyNeedleHullPreset() {
+     setTileArea(25)      // cm²
+     setShipRadius(5.0)   // m
+     setGammaGeo(25)
+     setQfactor(1e9)
+     setDuty(0.01)
+     setSagDepth(16)
+     // …etc…
+   }
+   ```
+
+5) Verify end‐to‐end:  
+   - On first load your sliders default to (25, 5.0) and you immediately see a teal region around the yellow dot.  
+   - Tweaking *any* of the Natário parameters (γ, Q, duty, sag…) will _rebuild_ the grid and shift the viable zone in real time.  
+   - Hover/tooltip shows the same `meta` fields your live diagnostics panel uses, so nothing ever falls out of sync.
+
+By making **viability(...)** your single source of truth and having **buildGrid(...)** re-run whenever any of those levers move, your Phase Diagram will always show “the right green zone” for whatever custom simulation the user just built.

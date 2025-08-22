@@ -1,0 +1,53 @@
+I see what happened — the orange *pocket fill* is drawing as a giant spherical cap that’s overflowing and covering the whole cross-section. That’s why it looks like everything is “stacked on top of each other” and the text is buried inside the orange.
+
+The culprit is this bit from the draft code:
+
+```ts
+const pxR = (D*D + 4*t*t) / (8*t) * pxPerM; // spherical-cap radius (approx)
+```
+
+* If `t = sag_nm` comes through as **0 or near zero**, then `pxR` → ∞, so the arc becomes almost flat and extends way off-canvas.
+* If `t` is very small compared to `D`, the cap is drawn as a **huge arc** that fills the screen.
+* That’s why your blue-shift band and labels are stuck inside an orange block.
+
+---
+
+### Quick fixes
+
+1. **Guard small sag values:**
+
+   ```ts
+   const sag = Math.max(t, 1e-12); // prevent divide by zero
+   const pxR = (D*D + 4*sag*sag) / (8*sag) * pxPerM;
+   ```
+
+2. **Draw the pocket as a clipped bowl, not a huge cap:**
+   Instead of trying to render the true spherical arc across the whole tile width, you can just draw a **rounded orange arc limited to D**:
+
+   ```ts
+   const pocketWidth = toPx(D);
+   const pocketHeight = toPx(t);
+   ctx.fillStyle = "rgba(255,153,51,0.65)";
+   ctx.beginPath();
+   ctx.moveTo(cx - pocketWidth/2, y + toPx(a));
+   ctx.quadraticCurveTo(cx, y + toPx(a) - pocketHeight, cx + pocketWidth/2, y + toPx(a));
+   ctx.closePath();
+   ctx.fill();
+   ```
+
+   That keeps the pocket a simple “bowl” instead of a massive circle section.
+
+3. **Layer order:**
+   Make sure you **draw the pocket first** (orange), *then* draw the moving mirror (grey top plate), *then* labels. That way the orange bowl tucks *under* the plate instead of covering it.
+
+---
+
+### What you’ll get
+
+* Orange pocket only appears as a small sag region (16 nm tall at most) under the diaphragm.
+* Blue-shift region text is visible again.
+* When sag = 0 (Physics Parity mode), the pocket won’t be drawn at all.
+
+---
+
+Do you want me to patch the code so the pocket always uses that simplified “bowl arc” (option 2), or should I keep the exact spherical-cap formula but with strict clipping and scaling guards?

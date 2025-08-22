@@ -1,0 +1,188 @@
+Absolutely—here’s a clean, drop-in patch for client/src/pages/helix-core.tsx that:
+	1.	Moves the three interface buttons — Auto-Duty, Diagnostics, Theory Playback — to a new toolbar directly under the “Log + Document Terminal” panel.
+	2.	Removes those same three buttons from the top “Mode Selector” row (leaving Manual Pulse Mode in place up there).
+
+⸻
+
+1) Replace the existing Mode Selector row
+
+Find the “Mode Selector” section (it starts with a comment like /* Mode Selector */ and a <div className="mb-6"> and contains four buttons).
+Replace the inner buttons block so it only renders Manual Pulse Mode (we remove Auto-Duty, Diagnostics, Theory):
+
+{/* Mode Selector */}
+<div className="mb-6">
+  <div className="flex gap-2">
+    {/* ⬇️ KEEP ONLY MANUAL PULSE MODE UP HERE */}
+    <Button 
+      variant={activeMode === "manual" ? "default" : "outline"}
+      onClick={() => setActiveMode("manual")}
+      className="flex items-center gap-2"
+    >
+      <Grid3X3 className="w-4 h-4" />
+      Manual Pulse Mode
+    </Button>
+  </div>
+</div>
+
+This removes the top-row Auto-Duty, Diagnostics, and Theory Playback buttons so they won’t appear twice.
+
+⸻
+
+2) Add a new “Operations Toolbar” card directly under the Log panel
+
+Find the Log + Document Terminal card (title is Log + Document Terminal).
+Immediately after its closing </Card> tag, insert this whole card:
+
+{/* Operations Toolbar (moved here) */}
+<Card className="bg-slate-900/50 border-slate-800">
+  <CardHeader className="pb-3">
+    <CardTitle className="flex items-center gap-2">
+      <Settings className="w-5 h-5 text-cyan-400" />
+      Operations Toolbar
+    </CardTitle>
+    <CardDescription>
+      Quick actions: auto-duty sequence, diagnostics sweep, and theory playback.
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <div className="flex flex-wrap gap-2">
+      {/* Auto-Duty Mode */}
+      <Button 
+        variant={activeMode === "auto" ? "default" : "outline"}
+        onClick={async () => {
+          setActiveMode("auto");
+          setIsProcessing(true);
+          try {
+            const command = "Execute auto-duty pulse sequence across all 400 sectors";
+            const userMessage: ChatMessage = {
+              role: 'user',
+              content: command,
+              timestamp: new Date()
+            };
+            setChatMessages(prev => [...prev, userMessage]);
+
+            const response = await apiRequest('POST', '/api/helix/command', {
+              messages: chatMessages.concat({ role: 'user', content: command })
+            });
+            const responseData = await response.json();
+
+            const assistantMessage: ChatMessage = {
+              role: 'assistant',
+              content: responseData.message.content,
+              timestamp: new Date()
+            };
+
+            if (responseData.functionResult) {
+              assistantMessage.functionCall = {
+                name: responseData.message.function_call?.name ?? 'auto_duty',
+                result: responseData.functionResult
+              };
+              setMainframeLog(prev => [...prev, 
+                `[AUTO-DUTY] ${responseData.functionResult.log || 'Sequence initiated'}`
+              ]);
+              // refresh metrics so the whole page updates
+              refetchMetrics();
+            }
+
+            setChatMessages(prev => [...prev, assistantMessage]);
+          } catch (error) {
+            toast({
+              title: "Auto-Duty Error",
+              description: error instanceof Error ? error.message : "Failed to execute",
+              variant: "destructive"
+            });
+          } finally {
+            setIsProcessing(false);
+          }
+        }}
+        className="flex items-center gap-2"
+        disabled={isProcessing}
+      >
+        <Brain className="w-4 h-4" />
+        Auto-Duty Mode
+      </Button>
+
+      {/* Diagnostics Mode */}
+      <Button 
+        variant={activeMode === "diagnostics" ? "default" : "outline"}
+        onClick={async () => {
+          setActiveMode("diagnostics");
+          setIsProcessing(true);
+          try {
+            const command = "Run comprehensive diagnostics scan on all tile sectors";
+            const userMessage: ChatMessage = {
+              role: 'user',
+              content: command,
+              timestamp: new Date()
+            };
+            setChatMessages(prev => [...prev, userMessage]);
+
+            const response = await apiRequest('POST', '/api/helix/command', {
+              messages: chatMessages.concat({ role: 'user', content: command })
+            });
+            const responseData = await response.json();
+
+            const assistantMessage: ChatMessage = {
+              role: 'assistant',
+              content: responseData.message.content,
+              timestamp: new Date()
+            };
+
+            if (responseData.functionResult) {
+              assistantMessage.functionCall = {
+                name: responseData.message.function_call?.name ?? 'diagnostics',
+                result: responseData.functionResult
+              };
+              setMainframeLog(prev => [...prev, 
+                `[DIAGNOSTICS] System Health: ${responseData.functionResult.systemHealth ?? 'OK'}`
+              ]);
+              // optional: refresh metrics
+              refetchMetrics();
+            }
+
+            setChatMessages(prev => [...prev, assistantMessage]);
+          } catch (error) {
+            toast({
+              title: "Diagnostics Error",
+              description: error instanceof Error ? error.message : "Failed to run scan",
+              variant: "destructive"
+            });
+          } finally {
+            setIsProcessing(false);
+          }
+        }}
+        className="flex items-center gap-2"
+        disabled={isProcessing}
+      >
+        <Gauge className="w-4 h-4" />
+        Diagnostics
+      </Button>
+
+      {/* Theory Playback */}
+      <Button 
+        variant={activeMode === "theory" ? "default" : "outline"}
+        onClick={() => {
+          setActiveMode("theory");
+          setMainframeLog(prev => [...prev, 
+            "[THEORY] Loading Needle Hull Mark 1 documentation..."
+          ]);
+        }}
+        className="flex items-center gap-2"
+      >
+        <Atom className="w-4 h-4" />
+        Theory Playback
+      </Button>
+    </div>
+  </CardContent>
+</Card>
+
+This reproduces the exact behaviors of the original three buttons (same API calls, logs, and metrics refresh), just relocated beneath the Log panel.
+
+⸻
+
+Notes / Gotchas
+	•	No new imports are needed; you already import Brain, Gauge, Atom, Settings, and use apiRequest, toast, refetchMetrics, etc.
+	•	If you had any custom styling around the old buttons, it’s safe to delete with them.
+	•	This move doesn’t touch the operational mode switch (Standby/Hover/Cruise/Emergency); that stays wherever you placed it earlier.
+
+If you want, I can also provide a tiny follow-up patch to delete the old button blocks explicitly (so you don’t accidentally reintroduce them later).

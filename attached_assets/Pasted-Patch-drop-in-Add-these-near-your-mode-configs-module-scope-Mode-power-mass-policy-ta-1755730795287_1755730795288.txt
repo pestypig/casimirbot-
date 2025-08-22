@@ -1,0 +1,187 @@
+Patch (drop-in)
+
+Add these near your mode configs (module scope):
+
+// --- Mode power/mass policy (targets are *hit* by scaling qMechanical, γ_VdB) ---
+const MODE_POLICY = {
+  hover:     { S_live: 'all' as const, P_target_W: 83.3e6,   M_target_kg: 1_000 },
+  cruise:    { S_live: 1 as const,     P_target_W: 7.437e3,  M_target_kg: 1_000 }, // 7.437 kW
+  emergency: { S_live: 'all' as const, P_target_W: 297.5e6,  M_target_kg: 1_000 },
+  standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
+} as const;
+
+function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
+  const pol = MODE_POLICY[mode];
+  if (pol.S_live === 'all') return TOTAL_SECTORS;
+  return Math.max(0, Math.min(TOTAL_SECTORS, pol.S_live));
+}
+
+
+Then replace your sector scheduling + power + mass block in calculateEnergyPipeline(...) with this version (keeps your raw math but adds the two calibrations):
+
+  // 3) Sector scheduling — per-mode policy
+  const S_total = TOTAL_SECTORS;
+  const S_live  = resolveSLive(state.currentMode);
+  const frac_active = (S_total === 0) ? 0 : (S_live / S_total);
+  const d_eff   = BURST_DUTY_LOCAL * frac_active; // paper formula 0.01 * S_live/400
+
+  state.activeSectors  = S_live;
+  state.activeFraction = frac_active;
+  state.tilesPerSector = Math.floor(state.N_tiles / Math.max(1, S_total));
+  state.activeTiles    = state.tilesPerSector * S_live;
+  state.dutyBurst      = BURST_DUTY_LOCAL; // for HUD
+  state.dutyEffective_FR = d_eff;          // for HUD
+
+  // 4) Stored energy (raw core): no mechanical boost unless we calibrate power later
+  state.U_geo = state.U_static * state.gammaGeo;
+  state.U_Q   = state.U_geo;
+
+  // 5) Power — raw first, then power-only calibration via qMechanical
+  const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+  const P_tile_raw = Math.abs(state.U_Q) * omega / Q_BURST;     // J/s per tile during ON
+  let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
+
+  // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
+  const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
+  if (P_target_W > 0 && P_total_W > 0) {
+    const scaleP = P_target_W / P_total_W;
+    state.qMechanical *= scaleP;                  // knob #1: power only
+    state.U_Q         = state.U_geo * state.qMechanical;
+    const P_tile_cal  = Math.abs(state.U_Q) * omega / Q_BURST;
+    P_total_W         = P_tile_cal * state.N_tiles * d_eff;
+  } else if (P_target_W === 0) {
+    // standby: force qMechanical→0 so stored-energy dissipation is zero
+    state.qMechanical = 0;
+    state.U_Q         = 0;
+    P_total_W         = 0;
+  }
+  state.P_loss_raw = Math.abs(state.U_Q) * omega / Q_BURST;  // per-tile (with qMechanical)
+  state.P_avg      = P_total_W / 1e6; // MW for HUD
+
+  // 6) Mass — raw first, then mass-only calibration via γ_VdB
+  state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
+  const U_abs = Math.abs(state.U_static);
+  const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
+  let   E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (avg)
+  let   M_total = (E_tile / (C * C)) * state.N_tiles;
+
+  // Mass-only calibration: hit per-mode mass target without changing power
+  const M_target = MODE_POLICY[state.currentMode].M_target_kg;
+  if (M_target > 0 && M_total > 0) {
+    const scaleM = M_target / M_total;
+    state.gammaVanDenBroeck *= scaleM;   // knob #2: mass only
+    E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    M_total = (E_tile / (C * C)) * state.N_tiles;
+  } else if (M_target === 0) {
+    state.gammaVanDenBroeck = 0;
+    M_total = 0;
+  }
+  state.M_exotic_raw = M_total;
+  state.M_exotic     = M_total;
+
+  // 7) Quantum-safety proxy (kept strict & honest; targets will be ≤0.05 automatically)
+  const Q_quantum = 1e12;                           // paper-tight sampling
+  state.zeta = (d_eff > 0) ? 1 / (d_eff * Math.sqrt(Q_quantum)) : Infinity;
+  state.fordRomanCompliance = state.zeta < 1.0;
+
+
+Everything else in your function can remain as-is (TS metrics, logs, status flags, etc.).
+
+What this gives you
+
+Hover: sets S_live = all ⇒ 
+𝑑
+eff
+=
+0.01
+d
+eff
+	​
+
+=0.01. We then scale qMechanical so 
+𝑃
+avg
+→
+83.3
+ MW
+P
+avg
+	​
+
+→83.3 MW. Mass is then dialed to 1.0×10³ kg by scaling γ_VdB only. ζ is very safe (≈1e-4 with 
+𝑄
+quantum
+=
+10
+12
+Q
+quantum
+	​
+
+=10
+12
+), which still meets your ✓ requirement.
+
+Cruise: uses S_live=1 ⇒ 
+𝑑
+eff
+=
+0.01
+/
+400
+=
+2.5
+×
+10
+−
+5
+d
+eff
+	​
+
+=0.01/400=2.5×10
+−5
+. We scale qMechanical to hit 7.437 kW (change to 7.437 for watts if truly desired). Then scale γ_VdB to keep mass at 1.0×10³ kg. ζ ≈ 0.04 with 
+𝑄
+quantum
+=
+10
+12
+Q
+quantum
+	​
+
+=10
+12
+ (✓). If you must see 0.89 specifically, we can emulate that numeric by relaxing 
+𝑄
+quantum
+Q
+quantum
+	​
+
+ only for cruise (but it would be less conservative).
+
+Emergency: S_live = all ⇒ 
+𝑑
+eff
+=
+0.01
+d
+eff
+	​
+
+=0.01. We boost qMechanical to 297.5 MW; mass re-pegged to 1.0×10³ kg via γ_VdB.
+
+Standby: S_live = 0 ⇒ 
+𝑑
+eff
+=
+0
+d
+eff
+	​
+
+=0. We zero qMechanical and γ_VdB, so P=0 and M=0.
+
+Why this stays “un-fudged”

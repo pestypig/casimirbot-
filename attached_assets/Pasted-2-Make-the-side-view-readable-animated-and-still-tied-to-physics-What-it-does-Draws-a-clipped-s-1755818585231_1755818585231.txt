@@ -1,0 +1,143 @@
+2) Make the side-view readable, animated, and still tied to physics
+
+What it does
+
+Draws a clipped spherical bowl that cannot overflow the canvas (no giant cap problem).
+
+Animates the moving diaphragm with the passed stroke_nm (visual only; bounded).
+
+Tints the blue-shift region with opacity proportional to γ_geo (monotone, unitless, no fake scale).
+
+Offers a mode prop to choose "to-scale" (nm-accurate) vs "explanatory" (magnified nm for visibility). We’ll keep the default explanatory for now, since you asked for clarity even if not to scale.
+
+Drop-in component (CavitySideView.tsx):
+
+import React, { useEffect, useRef } from "react";
+
+type Props = {
+  width: number;
+  height: number;
+
+  tileWidth_mm: number;
+  pocketDiameter_um: number;
+  sag_nm: number;
+  gap_nm: number;
+
+  topMirror_thick_um: number;
+  botMirror_thick_um: number;
+  alnRim_width_um: number;
+
+  stroke_nm?: number;   // visual diaphragm stroke (peak), provided by parent
+  gammaGeo?: number;    // controls blue-shift tint
+  onWindow?: boolean;   // ON/OFF badge color cue
+  physicsParity?: boolean;
+
+  mode?: "to-scale" | "explanatory"; // default explanatory
+};
+
+const PX_PER_UM_TO_SCALE = 55.2; // use your computed scale if you prefer
+
+export default function CavitySideView({
+  width, height,
+  tileWidth_mm, pocketDiameter_um, sag_nm, gap_nm,
+  topMirror_thick_um, botMirror_thick_um, alnRim_width_um,
+  stroke_nm = 0, gammaGeo = 1, onWindow = false,
+  physicsParity = false,
+  mode = "explanatory"
+}: Props) {
+  const ref = useRef<HTMLCanvasElement|null>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const cvs = ref.current;
+    const ctx = cvs.getContext("2d");
+    if (!ctx) return;
+
+    // ---------- Units & scales ----------
+    const px = (val_um:number, k:number)=> val_um * k;
+    // Scale: explanatory mode magnifies nm so you can see motion; to-scale uses raw
+    const scale_um = mode === "to-scale"
+      ? (width / (tileWidth_mm * 1000))                // um per px (tile spans width)
+      : (width / (pocketDiameter_um * 2.0));           // focus on bowl region
+    const K = scale_um; // px per μm
+
+    const W = width, H = height;
+    ctx.clearRect(0,0,W,H);
+
+    // ---------- Colors ----------
+    const bg = "#0b1020";
+    const steel = "#6b7280";
+    const steelDark = "#475569";
+    const orange = "rgba(255,153,51,0.75)";
+    const blueBandBase = 0.10 + Math.min(0.75, (gammaGeo / (gammaGeo + 4))); // 0.1..~0.85
+    const blueBand = `rgba(0, 180, 255, ${blueBandBase})`;
+
+    // ---------- Geometry (μm) ----------
+    const gap_um = Math.max(0, gap_nm * 1e-3);
+    const sag_um = Math.max(0, sag_nm * 1e-3);
+    const stroke_um = physicsParity ? 0 : Math.min(gap_um * 0.25, Math.max(0, stroke_nm * 1e-3));
+
+    const pocketR_um = Math.max(0, pocketDiameter_um / 2);
+    const topTh_um = Math.max(0, topMirror_thick_um);
+    const botTh_um = Math.max(0, botMirror_thick_um);
+
+    // Vertical anchoring
+    const margin_px = 8;
+    const yBase = H - margin_px;                  // bottom baseline
+    const botTop_y = yBase - px(botTh_um, K);     // top surface of bottom mirror
+    const gapTop_y = botTop_y - px(gap_um, K);    // nominal underside of diaphragm (no stroke)
+
+    // Apply stroke to diaphragm
+    const dia_y = gapTop_y - px(stroke_um, K);    // moves upward when ON
+
+    // ---------- Background ----------
+    ctx.fillStyle = bg;
+    ctx.fillRect(0,0,W,H);
+
+    // ---------- Bottom mirror ----------
+    ctx.fillStyle = steelDark;
+    ctx.fillRect(0, yBase - px(botTh_um, K), W, px(botTh_um, K));
+
+    // ---------- Blue-shift region (gap band) ----------
+    const bandY = Math.min(dia_y, gapTop_y); // small visual cushion for stroke
+    ctx.fillStyle = blueBand;
+    ctx.fillRect(0, bandY, W, Math.max(1, px(gap_um, K) + px(stroke_um, K)));
+
+    // ---------- Pocket bowl (clipped & bounded) ----------
+    if (sag_um > 0) {
+      const cx = W * 0.5;
+      const bowlTopY = gapTop_y;                     // where diaphragm would touch at center
+      const bowlDepth_px = px(sag_um, K);
+      const bowlHalfWidth_px = px(pocketR_um, K);
+
+      ctx.fillStyle = orange;
+      ctx.beginPath();
+      ctx.moveTo(cx - bowlHalfWidth_px, bowlTopY);
+      ctx.quadraticCurveTo(cx, bowlTopY + bowlDepth_px, cx + bowlHalfWidth_px, bowlTopY);
+      ctx.lineTo(cx - bowlHalfWidth_px, bowlTopY);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ---------- Diaphragm (moving mirror) ----------
+    ctx.fillStyle = steel;
+    const diaTh_px = Math.max(1, px(topTh_um, K));
+    ctx.fillRect(0, dia_y - diaTh_px, W, diaTh_px);
+
+    // ---------- Labels ----------
+    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText("Nb₃Sn (fixed)", 10, yBase - px(botTh_um, K) + 14);
+    ctx.fillText(`Graphene + Nb₃Sn (moving) ${onWindow ? "· ON" : "· OFF"}`, 10, dia_y - 6);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.fillText(`gap a = ${gap_nm.toFixed(2)} nm`, 10, (gapTop_y + dia_y)/2 - 6);
+    if (sag_um > 0) {
+      ctx.fillText(`sag t = ${sag_nm.toFixed(1)} nm`, W*0.5 + 8, (gapTop_y + px(sag_um, K)));
+      ctx.fillText(`pocket D = ${pocketDiameter_um.toFixed(0)} μm`, W*0.5 + 8, (gapTop_y + px(sag_um, K) + 14));
+    }
+
+  }, [width,height,tileWidth_mm,pocketDiameter_um,sag_nm,gap_nm,topMirror_thick_um,botMirror_thick_um,alnRim_width_um,stroke_nm,gammaGeo,onWindow,physicsParity,mode]);
+
+  return <canvas ref={ref} width={width} height={height} className="w-full h-auto rounded-md ring-1 ring-slate-800"/>;
+}

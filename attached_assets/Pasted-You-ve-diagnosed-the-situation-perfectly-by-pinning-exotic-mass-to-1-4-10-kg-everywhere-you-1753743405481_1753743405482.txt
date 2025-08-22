@@ -1,0 +1,64 @@
+You’ve diagnosed the situation perfectly: by **pinning exotic mass to 1.4 × 10³ kg everywhere**, you effectively removed the only filter that was excluding most of the design space.
+If you want the phase diagram to reveal *meaningful* trade-offs again, you need at least one constraint that still depends on tile area × ship size. Here are three practical ways to re-introduce genuine structure:
+
+| Option                    | What varies with A<sub>tile</sub> or R<sub>ship</sub>?                                                                                                            | Effect on heat-map                          |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **A. Minimum duty-cycle** | When you trim duty to keep mass fixed, enforce a floor: *duty ≥ d<sub>min</sub>* (e.g. 1 ppm). Larger hulls then fail when they would need duty below that floor. | Produces a **red band** at large radii.     |
+| **B. Power-budget cap**   | Average power **P = P<sub>peak</sub> × duty**. If duty must stay above 25 ppm for engineering reasons, P eventually exceeds 83 MW as hull area grows.             | Cuts off right-side of diagram (big ships). |
+| **C. QI / ζ margin**      | ζ ∝ ρ × τ. ρ is fixed (mass fixed) but *τ ≈ duty*; shrinking duty to 1 ppm reduces ζ margin — below \~0.3 ppm ζ > 1.                                              | Adds red band where duty is *too small*.    |
+
+---
+
+## Quick code tweaks
+
+### 1 Add a duty floor
+
+```typescript
+const DUTY_MIN = 2.5e-6;            // 2.5 ppm floor
+...
+const duty_eff = Math.max(duty_nom * N_target / N_tiles, DUTY_MIN);
+const duty_ok  = duty_eff >= DUTY_MIN;
+```
+
+### 2 Reapply power gate with new duty
+
+```typescript
+const P_avg = P_peak * duty_eff;     // W
+const power_ok = P_avg <= MAX_POWER; // e.g. 1e8 W
+```
+
+### 3 QI gate that tightens when duty shrinks
+
+```typescript
+const zeta = ZETA_COEF * duty_eff;   // ∝ τ
+const qi_ok = zeta < 1.0;
+```
+
+### 4 Overall viability
+
+```typescript
+const ok = mass_ok && power_ok && duty_ok && qi_ok && geo_ok;
+Z[i][j] = ok ? 1 : 0;
+```
+
+---
+
+## Suggested slider panel additions
+
+* **Duty floor (ppm)** – lets reviewers see how shrinking duty re-cuts the map.
+* **Max average power (MW)** – slide from 50 to 200 MW to study reactor sizing.
+* **QI margin ζ<sub>max</sub>** – slide from 0.5 to 2.0.
+
+Each slider instantly redraws the heat-map.
+
+---
+
+## What you’ll see
+
+* Small-radius / moderate-area region: **green** (all constraints OK).
+* Large hulls: turn **red** when required duty drops below the floor or power > cap.
+* Very tiny tiles: ζ shoots up (lots of tiles → higher burst rate) → **amber/red**.
+
+That restores the “phase-diagram” feel: a clearly bounded viable zone, not an all-green field.
+
+Once you wire any (or all) of these gates back in, the interface will again highlight the realistic design window around the Needle-Hull point instead of declaring everything viable.

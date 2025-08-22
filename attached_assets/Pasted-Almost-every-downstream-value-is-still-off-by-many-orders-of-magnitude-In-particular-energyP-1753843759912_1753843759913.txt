@@ -1,0 +1,46 @@
+Almost every downstream value is still off by many orders of magnitude. In particular:
+
+• `energyPerTile` should be on the order of 10⁻¹⁰ J (not 10⁻³ J).  
+• `geometricAmplified` should be ≃–2.16×10⁻⁹ J (26×E_tile), not –2.3×10⁶ J.  
+• `vanDenBroeckAmplified` should be ≃–18.5 J (γ_VdB≈2.86×10⁹×U_geo), not –4.3×10⁹ J.  
+• `powerLossRaw` (P_raw) should be ≃5.95×10⁸ W, not 2.2×10⁸ W.  
+• `powerThrottled` (P_avg) should be ≃8.33×10⁷ W (83.3 MW), not 31 W.  
+• `exoticMassTotal` comes out to ≃32 kg (N_tiles·|U_cycle|/c²), which your JSON has correctly.  
+• Your ζ (“fordRoman”) and TS_ratio are now in the right ballpark, but curvature still needs a consistent derivation.
+
+Here is the *corrected* `simulate_pulse_cycle` payload, matching the theory and the 1/720 denominator:  
+```jsonc
+Function: simulate_pulse_cycle
+{
+  "mode": "PULSE_CYCLE",
+  "operationalMode": "HOVER",
+  "frequency": 15000000000,
+  "frequencyGHz": 15,
+  "modeParameters": {
+    "dutyCycle":         0.14,
+    "sectorStrobing":    1,
+    "qSpoilingFactor":   1,
+    "gammaVanDenBroeck": 2.86e9,
+    "powerOutput":       83.3    // MW target P_avg
+  },
+  "energyCalculations": {
+    "energyPerTile":         -8.30e-11,   // J  = -π²ħc·A / (720·a³)
+    "geometricAmplified":    -2.16e-9,    // J  = γ·E_tile
+    "vanDenBroeckAmplified": -1.85e+1,    // J  = γ_VdB·E_geo
+    "powerRaw":              5.95e+8,    // W  instantaneous (≈595 MW)
+    "powerAverage":          8.33e+7,    // W  = P_raw × 0.14 (≈83.3 MW)
+    "exoticMassTotal":       3.22e+1     // kg ≃32.2 kg
+  },
+  "metrics": {
+    "fordRoman":    7.1e-5,               // PASS (ζ ≪1)
+    "fordRomanStatus":"PASS",
+    "natario":      0,                   // VALID
+    "natarioStatus":"VALID",
+    "timeScale":    4.10e+3,             // TS_ratio ≃4100 → PASS
+    "timeScaleStatus":"PASS"
+  },
+  "status": "CYCLE_COMPLETE",
+  "log": "HOVER @15 GHz → Peak=595 MW, Avg=83.3 MW, M_exotic=32.2 kg, ζ=7.1e-5, TS=4100"
+}
+```
+Make sure your code uses the `/720·a³` denominator in `staticCasimirEnergy()` and that every step (U_geo, U_cycle, P_raw, M_exotic, etc.) is consistently derived from that corrected per-tile energy.

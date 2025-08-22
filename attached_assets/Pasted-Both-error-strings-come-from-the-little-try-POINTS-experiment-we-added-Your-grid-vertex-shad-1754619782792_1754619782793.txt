@@ -1,0 +1,66 @@
+Both error strings come from the **little “try-POINTS” experiment** we added.
+Your grid vertex shader is still the old *lines-only* version, but we sent the driver a `drawArrays(POINTS …)`. Because there’s no `gl_PointSize` write inside the vertex shader, the compiler injects it as a *const* float and then immediately complains when you try to assign to it (the *l-value required* bit).
+
+---
+
+## Two ways to put the build back in the green
+
+### 1 · Roll back to `LINES` (quickest)
+
+```js
+// _renderGrid()
+- gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
++ gl.drawArrays(gl.LINES,  0, this.gridVertexCount);
+```
+
+and keep the original shaders exactly as they were.
+If you’re happy with 1-pixel lines on Windows/ANGLE, you’re done.
+
+---
+
+### 2 · Keep the POINTS test (needs a 2-line shader tweak)
+
+#### grid vertex shader (WebGL 2 path shown, add the same line to the WebGL 1 branch)
+
+```glsl
+#version 300 es
+in vec3 a_position;
+uniform mat4 u_mvpMatrix;
+
+void main() {
+    gl_Position  = u_mvpMatrix * vec4(a_position, 1.0);
+    gl_PointSize = 4.0;                 //   ← add this
+}
+```
+
+*No* `const`, no declaration—just assign inside `main`.
+
+#### grid fragment shader
+
+Point sprites need a fragment shader even if you just want a coloured square:
+
+```glsl
+#version 300 es
+precision highp float;
+out vec4 frag;
+void main() {
+    frag = vec4(0.7, 0.9, 1.0, 0.8);
+}
+```
+
+Then keep the `gl.drawArrays(gl.POINTS …)` line.
+The build errors vanish, and you’ll get a speckled point cloud that’s easy to see on all platforms.
+
+---
+
+## Don’t forget to undo the exaggeration hack
+
+If you multiplied `push` / `dy` by ×10 earlier, roll them back to sensible values (≈0.1–0.2) after you confirm the grid wiggles.
+
+---
+
+### TL;DR
+
+* **Error cause:** Vertex shader never writes `gl_PointSize` but we asked WebGL for `POINTS`.
+* **Fix:** Either go back to `LINES` *or* add `gl_PointSize = …;` inside the vertex shader.
+* Optional: leave POINTS mode in only for debugging; ship with LINES + a thick-line shader later if you want beefier strokes.

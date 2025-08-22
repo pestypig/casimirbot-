@@ -1,0 +1,332 @@
+Absolutely—let’s make the cavity side-view readable at a glance without breaking “to-scale” discipline.
+
+Below is a compact patch that adds controlled vertical exaggeration, thicker strokes/fonts, and a gap/pocket zoom inset (all still driven by your pipeline values). It also keeps the ON/OFF animation you had, but makes it more obvious.
+
+1) Upgrade CavitySideView.tsx
+
+Add this new, drop-in version. The only “knobs” are UI-only (no physics magic numbers), and default to conservative values if you don’t pass them.
+
+// CavitySideView.tsx
+import * as React from "react";
+
+type Props = {
+  // Geometry (pipeline-driven)
+  pocketDiameter_um: number;   // e.g. 40
+  sag_nm: number;              // e.g. 16
+  gap_nm: number;              // e.g. 1
+  topMirror_thick_um: number;  // e.g. 1.5
+  botMirror_thick_um: number;  // e.g. 1.5
+  alnRim_width_um: number;     // e.g. 20 (piezo rim width)
+  tileWidth_mm: number;        // e.g. 50
+
+  // Visual/animation
+  physicsParity?: boolean;
+  onWindow?: boolean;
+
+  // Canvas
+  width?: number;
+  height?: number;
+
+  // NEW: readability controls (UI-only; do not affect physics)
+  /** X scale: pixels per micrometer across the tile plane (defaults to “fit”) */
+  pxPerUmX?: number;
+  /** Y vertical exaggeration (applies only to thickness/gap/sag). Keeps X to-scale. */
+  verticalExaggeration?: number; // e.g. 3000 makes nm-scale clearly visible
+  /** Zoom box magnification of the gap region (drawn as an inset). */
+  gapInsetMagnification?: number; // e.g. 8000
+  /** Optional font scale multiplier for labels. */
+  fontScale?: number;
+};
+
+export default function CavitySideView({
+  pocketDiameter_um,
+  sag_nm,
+  gap_nm,
+  topMirror_thick_um,
+  botMirror_thick_um,
+  alnRim_width_um,
+  tileWidth_mm,
+  physicsParity = false,
+  onWindow = false,
+  width = 960,
+  height = 320,
+  pxPerUmX,
+  verticalExaggeration,
+  gapInsetMagnification,
+  fontScale = 1.0,
+}: Props) {
+  // --- units & scales ---
+  const umPerMm = 1000;
+  const tileWidth_um = tileWidth_mm * umPerMm;
+
+  // Fit X automatically if not provided
+  const pxPerUmX_eff = pxPerUmX ?? (width - 48) / tileWidth_um; // 24px margin each side
+  // Make nm-scale visible vertically (exaggeration only on Y)
+  const veY = Math.max(100, verticalExaggeration ?? 4000);
+  // Zoom box magnification for the gap/pocket region
+  const insetMag = Math.max(100, gapInsetMagnification ?? 10000);
+
+  // Derived geometry
+  const pocketR_um = pocketDiameter_um / 2;
+  const sag_um = sag_nm * 1e-3;
+  const gap_um = gap_nm * 1e-3;
+
+  // Layout helpers
+  const margin = 24;
+  const W = width;
+  const H = height;
+  const X0 = margin;
+  const X1 = W - margin;
+
+  // Baseline (top of bottom mirror)
+  const baselineY = H - margin - botMirror_thick_um * veY * pxPerUmX_eff;
+
+  // Layers (Y thicknesses with vertical exaggeration)
+  const yBotMirrorTop = baselineY;
+  const yBotMirrorBottom = yBotMirrorTop + botMirror_thick_um * veY * pxPerUmX_eff;
+
+  const yGapTop    = yBotMirrorTop - gap_um * veY * pxPerUmX_eff;
+  const yTopMirror = yGapTop - topMirror_thick_um * veY * pxPerUmX_eff;
+
+  // Pocket profile (spherical cap approximation)
+  // draw as a circular arc inside the top mirror: center chosen to produce sag at midspan
+  const pocketCenterX = (X0 + X1) / 2;
+  const pocketSpanPx = pocketDiameter_um * pxPerUmX_eff;
+  const pocketSagPx  = sag_um * veY * pxPerUmX_eff;
+  const pocketRpx    = (pocketSpanPx ** 2) / (8 * pocketSagPx) + pocketSagPx / 2;
+  const pocketCenterY = yTopMirror + pocketRpx - pocketSagPx;
+
+  // Colors (UI)
+  const colTop = physicsParity ? "#6b7280" : "#f59e0b";   // gold when live, muted in parity
+  const colBot = "#94a3b8";
+  const colGap = physicsParity ? "rgba(30,58,138,0.25)" : "rgba(14,165,233,0.25)";
+  const colBlueShift = physicsParity ? "rgba(99,102,241,0.2)" : "rgba(56,189,248,0.22)";
+
+  // Animation pulse for ON window glow
+  const [pulse, setPulse] = React.useState(0);
+  React.useEffect(() => {
+    let raf = 0;
+    let t0: number | null = null;
+    const loop = (t: number) => {
+      if (t0 == null) t0 = t;
+      const dt = (t - t0) / 1000;
+      setPulse(Math.sin(dt * (onWindow ? 6 : 1)) * 0.5 + 0.5);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [onWindow]);
+
+  // Render
+  return (
+    <svg width={W} height={H} className="w-full rounded-xl ring-1 ring-slate-800 bg-[#0b1220]">
+      {/* Ruler & title strip */}
+      <g transform={`translate(${X0}, ${H - 8})`} opacity={0.6}>
+        <line x1={0} y1={0} x2={(tileWidth_um) * pxPerUmX_eff} y2={0} stroke="#334155" strokeWidth={2}/>
+        {[0, 0.25, 0.5, 0.75, 1].map((f, i) => (
+          <g key={i} transform={`translate(${f * tileWidth_um * pxPerUmX_eff}, 0)`}>
+            <line x1={0} y1={0} x2={0} y2={-6} stroke="#475569" strokeWidth={1}/>
+            <text x={0} y={-8} fill="#94a3b8" fontSize={10 * fontScale} textAnchor="middle">
+              {(tileWidth_mm * f).toFixed(0)} mm
+            </text>
+          </g>
+        ))}
+      </g>
+
+      {/* Bottom mirror (fixed) */}
+      <rect
+        x={X0}
+        y={yBotMirrorTop}
+        width={(tileWidth_um) * pxPerUmX_eff}
+        height={botMirror_thick_um * veY * pxPerUmX_eff}
+        fill={colBot}
+        opacity={0.9}
+      />
+      <text x={X0 + 8} y={yBotMirrorTop - 6} fill="#9ca3af" fontSize={11 * fontScale}>
+        Nb₃Sn (fixed)
+      </text>
+
+      {/* Gap region */}
+      <rect
+        x={X0}
+        y={yGapTop}
+        width={(tileWidth_um) * pxPerUmX_eff}
+        height={gap_um * veY * pxPerUmX_eff}
+        fill={colGap}
+      />
+      {/* Blue-shift visual region (between mirrors, under pocket footprint) */}
+      <rect
+        x={pocketCenterX - (pocketDiameter_um * pxPerUmX_eff) / 2}
+        y={yGapTop}
+        width={pocketDiameter_um * pxPerUmX_eff}
+        height={gap_um * veY * pxPerUmX_eff}
+        fill={colBlueShift}
+        opacity={0.8}
+      />
+
+      {/* Top mirror (moving diaphragm) */}
+      <rect
+        x={X0}
+        y={yTopMirror}
+        width={(tileWidth_um) * pxPerUmX_eff}
+        height={topMirror_thick_um * veY * pxPerUmX_eff}
+        fill={colTop}
+        opacity={0.88}
+      />
+      <text x={X0 + 8} y={yTopMirror - 8} fill="#e5e7eb" fontSize={11 * fontScale}>
+        Graphene + Nb₃Sn (moving) · {onWindow ? "ON" : "OFF"}
+      </text>
+
+      {/* Pocket spherical-cap arc cut into the top mirror */}
+      <path
+        d={describePocketArc(
+          pocketCenterX,
+          pocketCenterY,
+          pocketRpx,
+          pocketCenterX - pocketSpanPx / 2,
+          yTopMirror,
+          pocketCenterX + pocketSpanPx / 2,
+          yTopMirror
+        )}
+        fill="none"
+        stroke="#0ea5e9"
+        strokeWidth={Math.max(1.5, 1.5 + (onWindow ? pulse : 0))}
+        opacity={0.85}
+      />
+
+      {/* Rim annotation */}
+      <text
+        x={X1 - 10}
+        y={yTopMirror - 8}
+        textAnchor="end"
+        fill="#a5b4fc"
+        fontSize={10 * fontScale}
+      >
+        AlN rim (~{alnRim_width_um.toFixed(0)} μm)
+      </text>
+
+      {/* Right-side labels */}
+      <g fontSize={10 * fontScale} fill="#94a3b8">
+        <text x={X1 - 10} y={yGapTop - 6} textAnchor="end">gap a = {gap_nm.toFixed(1)} nm</text>
+        <text x={X1 - 10} y={yTopMirror + 14} textAnchor="end">sag t = {sag_nm.toFixed(1)} nm</text>
+        <text x={X1 - 10} y={yBotMirrorBottom + 12} textAnchor="end">pocket ⌀ = {pocketDiameter_um.toFixed(0)} μm</text>
+      </g>
+
+      {/* ON-OFF glow sweep inside the blue-shift region */}
+      {onWindow && (
+        <rect
+          x={pocketCenterX - (pocketDiameter_um * pxPerUmX_eff) / 2}
+          y={yGapTop}
+          width={(pocketDiameter_um * pxPerUmX_eff) * (0.15 + 0.85 * pulse)}
+          height={gap_um * veY * pxPerUmX_eff}
+          fill="url(#glow)"
+          opacity={0.65}
+        />
+      )}
+
+      {/* gradient defs */}
+      <defs>
+        <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.9"/>
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.1"/>
+        </linearGradient>
+      </defs>
+
+      {/* Gap zoom inset (magnified, with box and callout) */}
+      {insetMag > 0 && (
+        <GapInset
+          x={X0 + 14}
+          y={margin + 14}
+          w={Math.min(360, W * 0.42)}
+          h={110}
+          pxPerUmX={pxPerUmX_eff * (insetMag / veY)}   // keep X to-scale wrt global
+          magLabel={`${Math.round(insetMag)}× Y`}
+          gap_um={gap_um}
+          top_um={topMirror_thick_um}
+          bot_um={botMirror_thick_um}
+          pocketDiameter_um={pocketDiameter_um}
+          onWindow={onWindow}
+        />
+      )}
+    </svg>
+  );
+}
+
+/** Helper: describe the arc for the pocket spherical cap, between two endpoints on the mirror surface */
+function describePocketArc(
+  cx: number, cy: number, r: number,
+  xL: number, yL: number,
+  xR: number, yR: number
+) {
+  // Draw arc from left to right along the circle centered at (cx,cy)
+  // Using SVG large-arc-flag = 0, sweep-flag = 1
+  const a = `M ${xL} ${yL} A ${r} ${r} 0 0 1 ${xR} ${yR}`;
+  return a;
+}
+
+/** Small inset that magnifies the gap stack (top mirror, gap, bottom mirror) */
+function GapInset({
+  x, y, w, h,
+  pxPerUmX,
+  magLabel,
+  gap_um,
+  top_um,
+  bot_um,
+  pocketDiameter_um,
+  onWindow
+}: {
+  x: number; y: number; w: number; h: number;
+  pxPerUmX: number;
+  magLabel: string;
+  gap_um: number; top_um: number; bot_um: number;
+  pocketDiameter_um: number;
+  onWindow: boolean;
+}) {
+  const pad = 10;
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+
+  // use a canonical 120 μm window around pocket
+  const view_um = Math.max(120, pocketDiameter_um * 1.2);
+  const X0 = x + pad;
+  const Y0 = y + pad;
+
+  // to exaggerate vertically inside inset, just fill most of innerH by distributing thicknesses proportionally
+  const totalThickness_um = top_um + gap_um + bot_um;
+  const yScale = innerH / totalThickness_um;
+
+  const yTop = Y0;
+  const yGap = yTop + top_um * yScale;
+  const yBot = yGap + gap_um * yScale;
+
+  const pxPerUmInsetX = innerW / view_um;
+  const pocketW = pocketDiameter_um * pxPerUmInsetX;
+  const pocketX = X0 + (innerW - pocketW) / 2;
+
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="#0b1020" stroke="#334155" strokeWidth={1} rx={8}/>
+      <text x={x + 10} y={y + 16} fill="#cbd5e1" fontSize={11}>
+        Gap inset — {magLabel}
+      </text>
+
+      {/* stack */}
+      <rect x={X0} y={yTop} width={innerW} height={(yGap - yTop)} fill="#f59e0b" opacity={0.85}/>
+      <rect x={X0} y={yGap} width={innerW} height={(yBot - yGap)} fill="rgba(56,189,248,0.25)"/>
+      <rect x={X0} y={yBot} width={innerW} height={(Y0 + innerH - yBot)} fill="#94a3b8" opacity={0.9}/>
+
+      {/* pocket footprint */}
+      <rect x={pocketX} y={yGap} width={pocketW} height={(yBot - yGap)} fill="rgba(59,130,246,0.22)"/>
+      {onWindow && (
+        <rect x={pocketX} y={yGap} width={pocketW * 0.35} height={(yBot - yGap)} fill="url(#glow)" opacity={0.6}/>
+      )}
+
+      {/* labels */}
+      <g fill="#a3a3a3" fontSize={10}>
+        <text x={X0 + 6} y={yTop + 12}>top {top_um.toFixed(1)} μm</text>
+        <text x={X0 + 6} y={yGap + 12}>gap { (gap_um*1000).toFixed(1) } nm</text>
+        <text x={X0 + 6} y={yBot + 12}>bottom {bot_um.toFixed(1)} μm</text>
+      </g>
+    </g>
+  );
+}

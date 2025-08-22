@@ -1,0 +1,154 @@
+Short answer: your current patch is close, but there are two common reasons it would still have “no effect”:
+
+1. **The 3D engine never receives/uses the new gain** (the `WarpVisualizer` needs to react to `parameters.curvatureGainDec` or to a global setter).
+2. **The SliceViewer ignores the prop** (no `useEffect`/recalc on `curvatureGain`).
+
+Below is a clean, reliable wiring pattern you can drop in, plus two tiny safety fallbacks so you’ll actually see the slider move something.
+
+---
+
+# What to change in this file (HelixCore)
+
+### 1) Compute and display the *actual* visual multiplier (1× at min)
+
+Your label currently shows the raw slider value (`{curvatureGain.toFixed(1)}×`). That’s misleading and makes debugging harder. Map `0..8` → `1..40` (min = 1× “true physics”, max = 40×).
+
+```ts
+// put near other helpers
+const gainFromDecades = (dec: number, max = 40) => {
+  // Map 0..8 to 1..max with a simple linear ramp (keeps “0 = 1×” invariant)
+  const t = Math.max(0, Math.min(1, (dec ?? 0) / 8));
+  return (1 - t) + t * max;
+};
+```
+
+Then in the slider block:
+
+```tsx
+<Label htmlFor="curvature-gain" className="...">
+  Curvature Gain
+  <span className="text-cyan-400 font-mono">
+    {gainFromDecades(curvatureGain, 40).toFixed(1)}×
+  </span>
+</Label>
+```
+
+(If you truly want “decades” text, keep it, but the **effective multiplier** should be shown too; otherwise it looks broken even when it isn’t.)
+
+### 2) Tell the engine **every time the value changes**, not only inside `onChange`
+
+If `WarpVisualizer` mounts after an onChange (or the global setter is undefined during the very first call), you’ll miss the update. Add a tiny effect:
+
+```ts
+useEffect(() => {
+  (window as any).__warp_setGainDec?.(curvatureGain, 40);
+}, [curvatureGain]);
+```
+
+Keep your RAF-throttled `onChange` (it’s fine), but the effect guarantees late listeners also get the latest value.
+
+### 3) Ensure the visualizer remounts as a last-resort fallback (cheap & safe)
+
+If your engine only reads uniforms at init (some WebGL wrappers do), force a remount when the gain changes:
+
+```tsx
+<WarpVisualizer
+  key={`mode-${effectiveMode}-v${modeVersion}-g${curvatureGain.toFixed(1)}`}
+  parameters={{
+    curvatureGainDec: curvatureGain,
+    curvatureBoostMax: 40,
+    /* ... */
+  }}
+/>
+```
+
+This shouldn’t be necessary if the engine actually updates a uniform, but it guarantees a change while you align the internals.
+
+---
+
+# What must exist outside this file (but easy to check)
+
+### A) `WarpVisualizer` must **apply** the incoming gain
+
+Either via prop:
+
+```ts
+// inside WarpVisualizer
+useEffect(() => {
+  const dec = props.parameters?.curvatureGainDec ?? 0;
+  const max = props.parameters?.curvatureBoostMax ?? 40;
+  const gain = gainFromDecades(dec, max);
+  engine.setUniform?.('uDisplayGain', gain); // shader path
+  engine.setDisplayGain?.(gain);             // CPU path
+}, [props.parameters?.curvatureGainDec, props.parameters?.curvatureBoostMax]);
+```
+
+…and/or via the global hook you’re calling:
+
+```ts
+// set up once in WarpVisualizer mount
+useEffect(() => {
+  (window as any).__warp_setGainDec = (dec: number, max = 40) => {
+    const gain = gainFromDecades(dec, max);
+    engine.setUniform?.('uDisplayGain', gain);
+    engine.setDisplayGain?.(gain);
+  };
+  // seed true-physics on mount
+  (window as any).__warp_setGainDec?.(0, 40);
+  return () => { delete (window as any).__warp_setGainDec; };
+}, []);
+```
+
+> If neither of those exist in your engine/visualizer, the slider will **never** change the picture.
+
+### B) `SliceViewer` must actually use `curvatureGain`
+
+You’re already passing `curvatureGain` and `curvatureBoostMax={40}`. Inside `SliceViewer`, make sure a `useEffect` (or memo) recalculates whatever transfer/colormap/geometry amplitude uses those props. If it only reads them at mount: same fix as above (uniform update or force a remount on the key).
+
+---
+
+# Minimal diff for this file
+
+* Keep your `rafGateRef` and `onChange` block (good for buttery dragging).
+* Add the **effect** in step 2.
+* Add the **key fallback** in step 3.
+* Replace the label’s “×” readout with the computed multiplier from step 1.
+
+That’s it here.
+
+---
+
+# Quick debug checklist (zero guesswork)
+
+1. Drag to **0.0** → in console from `WarpVisualizer` log:
+
+   ```
+   [GAIN] dec=0, applied=1.0
+   ```
+
+   and the bubble/slice visibly relax.
+
+2. Drag to **8.0** → log:
+
+   ```
+   [GAIN] dec=8, applied=40.0
+   ```
+
+3. If logs print but visuals don’t move:
+
+   * Your engine isn’t reading `uDisplayGain` or equivalent. Wire the uniform/CPU multiplier in the final visualization step.
+
+4. If visuals only move after releasing the slider:
+
+   * Keep your RAF gate (already done) and **also** use the `useEffect([curvatureGain])` (added above).
+
+---
+
+### Why this is a better approach
+
+* **Deterministic:** updates on every state change; no reliance on timing of mounts.
+* **Honest physics:** we only scale the **display** (uniform), never `P_avg`, `U_Q`, or `M_exotic`.
+* **Testable:** single source-of-truth mapping `gainFromDecades()`, logs show the exact multiplier being applied.
+* **Backwards compatible:** works whether your engine prefers props, globals, or requires remounts.
+
+If you want, I can draft the tiny `WarpVisualizer`/`SliceViewer` snippets that apply `uDisplayGain` so you can paste them in.

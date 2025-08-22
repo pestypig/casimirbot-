@@ -1,0 +1,72 @@
+You’re not crazy—the proof panel is reading from the **wrong place** in the engine.
+
+In your `warp-engine-fixed.js` the diagnostics use `this.uniforms`, but you only ever put **viewer knobs** in `uniforms` (vizGain, colorByTheta, etc.). The pipeline numbers (mode, duty, γ, Q, etc.) are stored in `this.currentParams`. Result: the panel sees undefined → zeros, and `mode` defaults to “hover”.
+
+Two tiny fixes solve it:
+
+---
+
+### 1) Mirror pipeline fields into `uniforms` inside `updateUniforms`
+
+Add numeric coercion and write the pipeline values into `this.uniforms` (while keeping `currentParams` as-is).
+
+```js
+// inside updateUniforms(parameters) — after you merge into this.currentParams
+const N = v => (Number.isFinite(+v) ? +v : 0);
+const mode = parameters.currentMode || this.currentParams.currentMode || 'hover';
+
+// duty as fraction [0..1]
+const dutyFrac = (() => {
+  const d = parameters.dutyCycle;
+  if (d == null) return N(this.currentParams.dutyCycle);
+  return d > 1 ? d/100 : N(d);
+})();
+
+this.uniforms.currentMode   = mode;
+this.uniforms.dutyCycle     = dutyFrac;
+this.uniforms.gammaGeo      = N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y);
+this.uniforms.Qburst        = N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ);
+this.uniforms.deltaAOverA   = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1);
+this.uniforms.gammaVdB      = N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 1);
+this.uniforms.sectorCount   = N(parameters.sectorCount ?? parameters.sectorStrobing ?? 1);
+this.uniforms.phaseSplit    = N(
+  parameters.phaseSplit ??
+  (mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50)
+);
+
+// make sure these exist for diagnostics coloring too
+this.uniforms.axesClip    = this.uniforms.axesClip || [0.40, 0.22, 0.22];
+this.uniforms.wallWidth   = this.uniforms.wallWidth ?? 0.06;
+this.uniforms.vShip       = this.uniforms.vShip ?? 1.0;
+this.uniforms.driveDir    = this.uniforms.driveDir || [1,0,0];
+```
+
+---
+
+### 2) Make diagnostics look at both sources (belt + suspenders)
+
+Change the first line of `computeDiagnostics()`:
+
+```js
+computeDiagnostics(){
+  const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+  // (rest unchanged)
+}
+```
+
+---
+
+That’s it. After this:
+
+* Switching **hover/cruise/emergency** will change `mode`, `phase`, and the β numbers in the Proof Panel.
+* `β_inst`, `β_avg`, `β_net` will populate (no more zeros).
+* `duty:` will show 14.00%, 0.50%, 50.00%, etc.
+
+If anything still looks off, open the console right after `updateUniforms` in your React component and check both:
+
+```js
+console.table(engineRef.current.currentParams);
+console.table(engineRef.current.uniforms);
+```
+
+You should see numeric values for `dutyCycle`, `gammaGeo`, `Qburst`, `deltaAOverA`, `gammaVdB`, `sectorCount`, `phaseSplit`, and `currentMode`.

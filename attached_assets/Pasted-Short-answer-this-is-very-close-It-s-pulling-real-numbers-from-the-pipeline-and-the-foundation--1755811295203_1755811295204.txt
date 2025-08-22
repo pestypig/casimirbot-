@@ -1,0 +1,143 @@
+Short answer: this is very close! It’s pulling real numbers from the pipeline and the “foundation → ladders → cross-checks → field heatmap” flow is solid. There are a few physics nits and one important cavity-dynamics fix to get it fully “authentic” and slightly more efficient.
+
+What’s authentic already
+
+Casimir base uses the correct plate formula 
+𝑢
+=
+−
+𝜋
+2
+ℏ
+𝑐
+/
+(
+720
+𝑎
+4
+)
+u=−π
+2
+ℏc/(720a
+4
+) with live gap_nm, area conversion, and per-tile integration. ✅
+
+Amplification ladders are fed by live pipeline state (gammaGeo, gammaVanDenBroeck, qMechanical, dutyEffectiveFR, N_tiles) and compared against backend reports (P_avg, M_exotic). ✅
+
+Duty usage is coherent: you use d_eff = metrics.dutyEffectiveFR consistently. ✅
+
+The displacement heatmap is sampled from a live endpoint and clearly displays sector split. ✅
+
+Must-fix physics (cavity)
+
+Cavity time-constant
+You compute
+
+const tauQ_s = qCav / (Math.PI * f);
+
+
+but for a resonator 
+𝜏
+=
+𝑄
+/
+𝜔
+τ=Q/ω, and 
+𝜔
+=
+2
+𝜋
+𝑓
+ω=2πf.
+Fix
+
+const tauQ_s = qCav / (2 * Math.PI * f);
+
+
+This halves the ring-up/down time and makes the U(t) bar and the ON/OFF cadence physically consistent.
+
+Instantaneous power formula
+You compute per-tile ON power with a magic constant:
+
+const P_tile_on = Math.abs(U_Q) * omega / Q_BURST; // W
+
+
+This should be the canonical dissipation relation 
+𝑃
+=
+𝜔
+𝑈
+/
+𝑄
+P=ωU/Q using the cavity Q (not Q_BURST).
+Fix
+
+const P_tile_on = (omega * Math.abs(U_Q)) / qCav;
+const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6;
+
+
+…and then compare against state.P_avg. This removes the Q_BURST magic number entirely.
+
+Naming clarity (optional but recommended)
+Right now qMechanical is multiplied into the “power chain” as U_Q = U_geo * qMech. If qMechanical is a gain in stored energy (not a literal Q-factor), the math is okay, but the variable name is misleading next to qCavity. Consider renaming to mechGain (or pipe the actual mechanical Q and place it only in the 
+𝜔
+𝑈
+/
+𝑄
+ωU/Q term). This prevents future confusion where both “q*” symbols are Q-factors.
+
+Smaller authenticity tweaks
+
+Default frequency: you use state.modulationFreq_GHz ?? 15. That’s fine as a display fallback, but for physics paths (ω, τ), prefer a single authoritative value (state if present; otherwise metrics if present).
+
+const fGHz = isFiniteNumber(state?.modulationFreq_GHz) 
+    ? state!.modulationFreq_GHz 
+    : isFiniteNumber(metrics?.dutyInstant) /* or your metrics frequency field if you have one */ 
+    ? /* metrics freq */ 15 
+    : 15;
+const f = fGHz * 1e9;
+const omega = 2 * Math.PI * f;
+
+
+Units on ladder charts: your Power Ladder mixes J and W in one series (labels say “J or W”). Consider keeping the ladder entirely in energy (J) and show power only in the verification card—this avoids unit-mix signaling. Or label each stage explicitly in the tooltip (e.g., J, J, J, J/t), where the last is “per cycle” average energy.
+
+Casimir theory check tolerance: you flag “✓ Good” if <5%. Nice. Add a small guard for very small casimir_per_tile to avoid inflated % errors at tiny gaps (already unlikely here but safe).
+
+Efficiency tweaks (UI/paint)
+
+Heatmap drawing: you fill each rect one by one. If you ever push to 512×256, switch to ImageData and set pixels in one pass, then putImageData. It’s 3–5× faster on slower GPUs/CPUs.
+
+Polling cadence: metrics at 1.5 s and state at 3 s is fine. If you want smoother bars without more network load, keep polling as-is and interpolate visually between samples (you already do that in the cavity U(t) loop).
+
+Optional parity hook
+
+If you’ve enabled Physics Parity Debug Mode elsewhere, pass its boolean down and, when on, force:
+
+qSpoilingFactor → 1,
+
+visual boosts → 1×,
+
+hide or gray out ladder segments that represent purely visual multipliers (if any).
+Your current component doesn’t introduce boosts, so this is already clean.
+
+Quick patch set (minimal diffs)
+
+Replace the two snippets:
+
+// 1) omega & tauQ
+const fGHz = isFiniteNumber(state?.modulationFreq_GHz) ? state!.modulationFreq_GHz : 15;
+const f = fGHz * 1e9;
+const omega = 2 * Math.PI * f;
+const tauQ_s = qCav / (2 * Math.PI * f);
+
+// 2) instantaneous per-tile power (no Q_BURST)
+const P_tile_on = (omega * Math.abs(U_Q)) / qCav;
+const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6;
+
+
+And delete:
+
+const Q_BURST = 1e9;
+
+
+Everything else can stay. With those fixes, the feature is (a) authentically driven by the pipeline, (b) cavity physics is represented with correct time-constant and power relation, and (c) there are no lurking magic numbers affecting the physics.

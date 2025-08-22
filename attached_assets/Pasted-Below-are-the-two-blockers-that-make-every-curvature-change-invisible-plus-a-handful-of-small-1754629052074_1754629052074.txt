@@ -1,0 +1,89 @@
+Below are the **two blockers** that make every “curvature change” invisible, plus a handful of smaller things that will bite you once the main issue is fixed.
+
+---
+
+## 1 – Grid vertices are restored **after** you bend them
+
+```js
+// _warpGridVertices(...)
+vtx[i] = x * scale;
+…
+vtx[i + 1] = y_original + dy;
+
+/* you immediately undo everything 👇 */
+if (this.originalGridVertices) {
+    vtx.set(this.originalGridVertices);
+}
+```
+
+*Result:* `bufferSubData()` uploads the **un-warped** grid each frame, so nothing on-screen ever moves.
+
+**Fix**
+
+Move the reset to the *start* of the function (or work on a scratch copy):
+
+```js
+_warpGridVertices(vtx, halfSize, originalY, p) {
+    // reset first –––––––––––––––––––––––––––––––––
+    if (this.originalGridVertices) vtx.set(this.originalGridVertices);
+
+    const sagRclip = p.sagDepth_nm / halfSize * 0.8;
+    const beta0    = p.beta0 ?? p.dutyCycle * p.g_y;
+    …
+}
+```
+
+---
+
+## 2 – Fullscreen quad uses attribute 0 “by luck”
+
+```js
+// _renderQuad()
+gl.enableVertexAttribArray(0);
+gl.vertexAttribPointer(0, 2, …);
+```
+
+*Problem:*
+`a_position` in the vertex shader is **not guaranteed** to be at location 0 unless you:
+
+```glsl
+layout(location = 0) in vec2 a_position;   // WebGL 2 only
+```
+
+or explicitly bind it in JS *before* linking.
+
+If the driver maps it to 1, 2, … you end up feeding garbage and the quad never appears (exact symptom depends on GPU).
+
+**Fix**
+
+```js
+// after linking `this.program`
+const locQuadPos = gl.getAttribLocation(this.program, "a_position");
+…
+gl.enableVertexAttribArray(locQuadPos);
+gl.vertexAttribPointer  (locQuadPos, 2, gl.FLOAT, false, 0, 0);
+```
+
+(Or add `layout(location=0)` in the shader for WebGL2.)
+
+---
+
+## After those two are fixed …
+
+| Issue                                                                                                                                                                  | Why it matters                                       | Quick remedy                                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Sag-radius is microscopic**<br>`sagRclip = 16 nm / 20 000 nm * 0.8 ≈ 6.4 × 10⁻⁴`                                                                                     | `exp(-(r/R)²)` kills the profile ⇒ β ≈ 0 everywhere. | Use a *bubble radius* uniform, not the sag depth, e.g. `R_nm = 10 000` (10 µm) or make it user-selectable.       |
+| You now upload `u_beta0`, but the CPU side still falls back to `duty×γ` when `beta0` is undefined. Make sure **dashboard → updateUniforms()** sets `beta0` every time. | Consistency.                                         | `warp.updateUniforms({ … beta0 })`                                                                               |
+| `gl.lineWidth(3.0)` is silently clamped to **1 px** on almost all non-MSAA frame-buffers (Chrome, Firefox, Safari).                                                    | Grid still looks razor-thin.                         | Draw points (`gl.POINTS` + `gl_PointSize`) or instanced quads for wide lines.                                    |
+| You disable **depth-test** right before drawing the grid. Any self-overlap will look wrong once curvature is visible.                                                  | Visual artifacts.                                    | Leave depth-test enabled (and clear depth after the quad pass).                                                  |
+| Resize listener leak: `removeEventListener("resize", this._resize)` won’t match the original callback unless you `.bind`.                                              | Component re-mounts create multiple listeners.       | In the constructor:<br>`this._resize = this._resize.bind(this);`<br>… then add / remove with the same reference. |
+
+---
+
+### TL;DR
+
+1. **Don’t undo your own vertex warp** – reset the buffer *before* you modify it.
+2. **Bind the quad position attribute correctly**.
+3. Re-run: Stand-by mode (duty ≈ 0) should now flatten the red grid; Hover/Amplified should bulge it.
+
+Ping me once you see motion—happy to refine the physics scaling next!

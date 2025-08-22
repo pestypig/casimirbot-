@@ -1,0 +1,74 @@
+Porting-plan (pure WebGL, no GLM / WebAssembly)
+Below is a minimal recipe that plugs straight into the Natário Warp-Bubble Visualizer you already wrote.
+
+Static grid buffer
+
+js
+Copy
+Edit
+function createGrid(size=40_000, divisions=50) {
+  const verts = [];
+  const step   = size/divisions;
+  const half   = size/2;
+  const yPlane = -half*0.3 + 3*step;   // exactly the plane used in C++
+
+  for (let z=0; z<=divisions; ++z) {
+    const zPos = -half + z*step;
+    for (let x=0; x<divisions; ++x) {
+      const x0 = -half + x*step;
+      const x1 = x0 + step;
+      verts.push(x0,yPlane,zPos,  x1,yPlane,zPos);      // x–lines
+    }
+  }
+  for (let x=0; x<=divisions; ++x) {
+    const xPos = -half + x*step;
+    for (let z=0; z<divisions; ++z) {
+      const z0 = -half + z*step;
+      const z1 = z0 + step;
+      verts.push(xPos,yPlane,z0,   xPos,yPlane,z1);     // z–lines
+    }
+  }
+  return new Float32Array(verts);
+}
+Javascript replacement for UpdateGridVertices
+
+js
+Copy
+Edit
+const G = 6.6743e-11,  c = 2.99792458e8;
+
+// bubbleParams = {dutyCycle, g_y, sagDepth_nm, exoticMass_kg, ...}
+function warpGridVertices(vtx, halfSize, y0, bubbleParams) {
+  const sagR   = bubbleParams.sagDepth_nm * 1e-9;          // nm → m
+  const beta0  = bubbleParams.dutyCycle * bubbleParams.g_y;
+
+  for (let i=0; i<vtx.length; i+=3) {
+    const x = vtx[i],  z = vtx[i+2];
+
+    // --- simple Natário–style shift vector approximation ---
+    const r      = Math.hypot(x,z);           // radial distance in nm plane
+    const prof   = (r/sagR) * Math.exp(-(r*r)/(sagR*sagR));
+    const beta   = beta0 * prof;              // |β| at this point
+
+    // map |β| to a vertical displacement just for visualisation
+    const dy     = beta * sagR * 5;           // tuning factor ‘5’ is artistic
+
+    vtx[i+1] = y0 + dy;
+  }
+}
+If you also want to show GR curvature from a central mass, keep the
+rs = 2GM/c² block from the C++ code next to the Natário term and sum them.
+
+Feed into your existing fragment shader
+
+Because the visualiser already draws a dark-blue → orange gradient based on betaField, you can overlay the line-mesh by:
+
+js
+Copy
+Edit
+// after WarpEngine.render sets up program/uniforms
+gl.bindBuffer(gl.ARRAY_BUFFER, gridBuffer);
+gl.bufferSubData(gl.ARRAY_BUFFER, 0, warpedVerts);   // every frame
+gl.drawArrays(gl.LINES, 0, warpedVerts.length/3);
+Use a low-alpha grey so that the grid floats over the colour field.
+

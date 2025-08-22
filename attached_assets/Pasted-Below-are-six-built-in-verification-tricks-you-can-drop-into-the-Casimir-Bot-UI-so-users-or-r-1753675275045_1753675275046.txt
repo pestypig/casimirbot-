@@ -1,0 +1,38 @@
+Below are **six “built-in” verification tricks** you can drop into the Casimir-Bot UI so users (or reviewers) can prove to themselves that every headline number is real and numerically sound—without leaving the interface.
+
+| #     | Verification gadget               | What it proves                                                                                    | How to add it (Streamlit / Plotly snippet)                                                                                                                         |    |                     |
+| ----- | --------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -- | ------------------- |
+| **1** | **Mesh Snapshot + Sag Read-back** | Bowl curvature is *actually* 16 nm (not a flat plate).                                            | `python<br>st.image("geom/preview.png", caption=f"Sag depth {sag_nm} nm")<br>`<br>*Creates the PNG in `geom/make_bowl.py` with Gmsh’s `--format png --rotate 90`.* |    |                     |
+| **2** | **a⁻³ Scaling Check**             | Energy really follows Casimir law. Run at 0.8 nm & 1.2 nm gaps and verify <br>ΔE₁/ΔE₂ ≈ (a₂/a₁)³. | `python<br>ratio = E08/E12; law = (1.2/0.8)**3<br>st.metric("Scale check", f"{ratio:.2f}", delta=f"vs {law:.2f}")`                                                 |    |                     |
+| **3** | **Convergence vs Xi-points Plot** | Energy plateaus as you increase Matsubaras.                                                       | \`\`\`python<br>st.line\_chart(pd.DataFrame({'Xi'\:xi\_list,'                                                                                                      | ΔE | '\:E\_list}))\`\`\` |
+| **4** | **Flat-plate analytic overlay**   | Static energy halves to the textbook plate-plate value when sag→0.                                | `python<br>analytic = -np.pi**2*HBAR*C*A/(720*a**3)<br>st.write(f"Analytic ΔE = {analytic:.3e} J")`                                                                |    |                     |
+| **5** | **Dynamic “Energy Pipeline” bar** | Shows every multiplication: γ\_geo³ → Q↑ → duty → d\_eff. Users can eyeball each factor.          | (same stacked-bar snippet in previous message)                                                                                                                     |    |                     |
+| **6** | **Golden-file Regression**        | Confirms this run matches a saved “truth” case to ±1 %. Provide a *Verify* button.                | `python<br>truth = json.load(open("tests/flat_1nm_truth.json"))<br>if abs(E_static-truth['E'])/truth['E']<0.01: st.success("Matches golden file")`                 |    |                     |
+
+---
+
+### Where to place them
+
+```
+/ui
+  ├─ app.py        # existing main UI
+  └─ verify_tab.py # new “Verification” tab with widgets above
+/geom
+  └─ make_bowl.py  # add --preview png export
+/tests
+  └─ flat_1nm_truth.json
+```
+
+---
+
+### Quick sanity checklist (green lights = trustworthy run)
+
+| Card / Metric          | Green condition              |
+| ---------------------- | ---------------------------- |
+| **Xi Points Adequacy** | PASS (≥ 5 000, error < 1 %)  |
+| **Scale check**        | ratio within 5 % of (a₂/a₁)³ |
+| **γ<sub>geo</sub>**    | 24 – 26                      |
+| **Golden-file diff**   | < 1 %                        |
+| **Power Target**       | 83 MW ± 10 %                 |
+
+When every row is green and the verification tab plots look smooth (plateau, a⁻³ law), the Casimir-Bot numbers qualify as “paper-ready” evidence.

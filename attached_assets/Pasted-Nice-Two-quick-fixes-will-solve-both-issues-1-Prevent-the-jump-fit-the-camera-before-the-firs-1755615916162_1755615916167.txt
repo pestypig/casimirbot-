@@ -1,0 +1,132 @@
+Nice! Two quick fixes will solve both issues:
+	1.	Prevent the “jump” (fit the camera before the first frame)
+	2.	Raise the viewpoint (more overhead)
+
+Below are small patches for both warp-engine-fixed.js and WarpVisualizer.tsx. They make the engine compute canvas size and fit the camera before rendering, and they pitch the camera a bit higher.
+
+⸻
+
+Patch 1 — client/public/warp-engine-fixed.js
+
+A) Add a bootstrap method and use fit-at-setup
+
+Place near your class methods:
+
+// --- Bootstrap: set uniforms & fit camera before first frame ---------------
+bootstrap(initialParams = {}) {
+  // Ensure canvas size is correct before we compute FOV/dist
+  this._resizeCanvasToDisplaySize();
+
+  // Let updateUniforms compute/remember axesScene & span, then fit
+  this.updateUniforms(initialParams);
+
+  // Mark so we don’t rely on any legacy default camera
+  this._bootstrapped = true;
+}
+
+B) Use fit camera during setup (no low-angle default first)
+
+Replace your _setupCamera() with:
+
+_setupCamera() {
+  const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+  const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
+  const span = this._gridSpan || 1;
+
+  // Use the responsive fitter immediately (no interim low camera)
+  // _fitCameraToBubble also sets the projection
+  this._fitCameraToBubble(axes, span);
+}
+
+C) Raise the camera a bit in the fitter
+
+Update your _fitCameraToBubble to give more overhead:
+
+_fitCameraToBubble(axesScene, spanHint) {
+  const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+  const fov = this._fitFovForAspect(aspect);
+
+  const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+  const margin = 1.25;
+
+  const dist = (margin * R) / Math.tan(fov * 0.5);
+
+  // ↑ raised from ~0.22R to 0.32R for more overhead
+  const eye    = [0, 0.32 * R, -dist];
+  // look slightly down so the deck plane reads clearly
+  const center = [0, -0.06 * R, 0];
+  const up     = [0, 1, 0];
+
+  this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
+  this._lookAt(this.viewMatrix, eye, center, up);
+  this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+}
+
+D) Make resize “pre-frame” and refit (you likely have this; keep these lines)
+
+Ensure your resize code calls the fitter before drawing:
+
+_resizeCanvasToDisplaySize() {
+  const dprCap = (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) ? 1.5 : 2.0;
+  const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
+
+  const { clientWidth, clientHeight } = this.canvas;
+  const width  = Math.max(1, Math.floor(clientWidth  * dpr));
+  const height = Math.max(1, Math.floor(clientHeight * dpr));
+
+  if (this.canvas.width !== width || this.canvas.height !== height) {
+    this.canvas.width  = width;
+    this.canvas.height = height;
+    this.gl.viewport(0, 0, width, height);
+
+    const axes = this.uniforms?.axesScene || this._lastAxesScene || [0.45, 0.25, 0.25];
+    this._fitCameraToBubble(axes, this._gridSpan || 1);
+  }
+}
+
+
+⸻
+
+Patch 2 — client/src/components/WarpVisualizer.tsx
+
+Call bootstrap() with initial uniforms before starting animation, so there’s no visible jump.
+
+Find where you create the engine (after the script has loaded and canvasRef.current exists) and replace the initial kick-off with:
+
+// Build initial uniforms from current props/metrics (same data you pass into updateUniforms)
+const initialUniforms = {
+  dutyCycle: dutyFrac,
+  gammaGeo: Number(parameters.g_y ?? 26),
+  Qburst: Number(parameters.cavityQ ?? 1e9),
+  deltaAOverA: Number(parameters.qSpoilingFactor ?? 1),
+  gammaVdB: Number(parameters.gammaVanDenBroeck ?? 1),
+  currentMode: mode,
+  sectors,
+  split: phaseSplit,
+  // Prefer already-computed scene axes if you have them;
+  // otherwise pass hull in meters and the engine will convert.
+  axesScene: parameters.axesScene,         // optional, if you compute it
+  hullAxes: [hull.a, hull.b, hull.c],      // fallback if axesScene not present
+  wallWidth: wallWidth,
+  gridSpan: parameters.gridSpan            // optional if you compute it
+};
+
+// 1) Bootstrap (fits camera + sets uniforms) BEFORE first draw
+engineRef.current.bootstrap(initialUniforms);
+
+// 2) Start the animation loop after camera is already correct
+engineRef.current.start();
+
+(If you were previously calling updateUniforms(...) immediately, you can keep it for subsequent live updates; bootstrap is just for the first frame.)
+
+⸻
+
+Why this fixes both issues
+	•	No loading “jump”: we size the canvas and fit the camera before the first render (bootstrap() + _setupCamera() uses the fitter immediately).
+	•	Higher viewpoint: the camera eye.y is raised from ~0.22 R to 0.32 R, giving a cleaner overhead read on both desktop and mobile.
+
+If you want a touch more overhead, bump 0.32 → 0.36. If you want to keep more margin on phones, change:
+
+const margin = aspect < 1 ? 1.32 : 1.25;
+
+Want me to fold these into your files verbatim with your exact variable names?

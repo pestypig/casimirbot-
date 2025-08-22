@@ -1,0 +1,99 @@
+Here’s a revised `computeMetrics()` that explicitly pulls in both the cavity Q‐factor (`Qon`) and duty cycle (`d`) sliders (and any others) and uses them in *every* step:
+
+```js
+function computeMetrics({ geo, duty, Qon, /* add extras: Qidle, N_tiles, a, Δ_tile, c, etc */ }) {
+  // 1) Casimir‐based energy per tile
+  //    U_Casimir = -π² ħ c / (720 a³)
+  //    U_static  = U_Casimir * Δ_tile
+  //    U_geo     = geo * U_static
+  const U_Casimir = -Math.PI**2 * HBAR * C / (720 * a**3);
+  const U_static  = U_Casimir * deltaTile;
+  const U_geo     = geo * U_static;    // J per tile
+
+  // 2) Raw loss per tile: P_raw_tile = U_geo * ω / Qon
+  //    (ω = 2πf; you already know ω/Qon → use your ω constant)
+  const P_raw_tile = U_geo * omega / Qon;  // W per tile
+
+  // 3) Total raw hull power: P_raw = P_raw_tile * N_tiles
+  const P_raw = P_raw_tile * N_tiles;      // W
+
+  // 4) Throttle factor: f_th = d * (Qidle/Qon) * (1/S)
+  //    If Qidle==Qon and S==1: f_th = d
+  const f_throttle = duty/100 * (Qidle/Qon) * (1/S);
+
+  // 5) Average power: P_avg = P_raw * f_throttle
+  const P_avg = P_raw * f_throttle;        // W
+
+  // 6) Duty‐cycle averaged energy per tile: U_cycle = U_geo * (duty/100)
+  const U_cycle = U_geo * (duty/100);      // J per tile
+
+  // 7) Time‐scale ratio: TS = tau_LC / tau_m  (constants)
+  const TS = tauLC / tauM;
+
+  // 8) Quantum safety: ζ = 1 / ( (duty/100) * sqrt(Qon) )
+  const zeta = 1 / ( (duty/100) * Math.sqrt(Qon) );
+
+  // 9) Exotic mass: M_exotic = N_tiles * |U_cycle| / c²
+  const M_exotic = N_tiles * Math.abs(U_cycle) / (C**2);  // kg
+
+  return {
+    U_geo,
+    P_raw:  P_raw  / 1e6,      // convert to MW
+    f_throttle,
+    P_avg:   P_avg  / 1e6,      // MW
+    U_cycle,
+    TS,
+    zeta,
+    M_exotic
+  };
+}
+```
+
+And when you wire it up:
+
+```js
+function updateDashboard() {
+  // 1) Gather slider values
+  const inputs = {
+    geo:   +geoSlider.value,
+    duty:  +dutySlider.value,
+    Qon:   +qOnSlider.value,
+    // …any others like Qidle, a, Δ_tile, N_tiles, tauLC, tauM, S, c, HBAR, C, etc.
+  };
+
+  // 2) Compute
+  const m = computeMetrics(inputs);
+
+  // 3) Normalize & update chart
+  const norm = [
+    m.P_avg   / CONSTRAINTS.P_avg,
+    m.M_exotic/ CONSTRAINTS.M_exotic,
+    m.zeta    / CONSTRAINTS.zeta,
+    m.TS      / CONSTRAINTS.TS,
+    m.P_raw   / CONSTRAINTS.P_raw,
+    (inputs.duty/100) / CONSTRAINTS.d
+  ];
+  radarChart.data.datasets[0].data = norm;
+  radarChart.update();
+
+  // 4) Update numeric readouts…
+  avgPowerEl.textContent = m.P_avg.toFixed(2) + " MW";
+  exoticMassEl.textContent = m.M_exotic.toExponential(3) + " kg";
+  quantumZetaEl.textContent = m.zeta.toFixed(3);
+  // …
+}
+
+// 5) Hook sliders to updateDashboard()
+[ geoSlider, dutySlider, qOnSlider /*…*/ ].forEach(s => s.oninput = updateDashboard);
+
+// 6) Initial draw
+updateDashboard();
+```
+
+Key fixes:
+
+- **Pass `Qon` and `duty`** into *every* formula where they belong.
+- Convert units (W→MW) only at the end.
+- Keep your physical constants (`HBAR`, `C`, `tauLC`, `tauM`, `deltaTile`, `a`, `N_tiles`, `S`, `Qidle`) in scope.
+
+With this in place, you’ll see `P_raw`, `P_avg`, `ζ`, `U_cycle` and `M_exotic` all shift correctly as you move the “Cavity Q‐factor” and “Duty Cycle” sliders.

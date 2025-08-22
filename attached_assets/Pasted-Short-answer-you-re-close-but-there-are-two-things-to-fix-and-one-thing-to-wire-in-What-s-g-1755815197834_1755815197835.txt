@@ -1,0 +1,124 @@
+Short answer: you’re close, but there are two things to fix and one thing to wire in.
+
+## What’s good
+
+* ✅ Dropping `Q_BURST` and using the **actual cavity Q (`qCav`)** in **power** is correct:
+  `P_tile_on = (ω * |U_Q|) / qCav`
+* ✅ Your stage tables now show `×Q_cav` (instead of a non-existent `×Q_burst`).
+
+## What to fix
+
+1. **Don’t multiply exotic-mass energy by Q.**
+   `E_tile_mass` shouldn’t include `qCav`. Q governs **loss/power** in a resonator (P = ωU/Q). It’s not a multiplier of rest-energy. Keep your “geometry × VdB × duty” chain, but remove Q from **mass**:
+
+```ts
+// BEFORE (has qCav in mass)
+const E_tile_mass = Math.abs(U_static) * geo3 * qCav * (state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck) * d_eff;
+
+// AFTER (no qCav in mass)
+const E_tile_mass = Math.abs(U_static) * geo3 * (state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck) * d_eff;
+```
+
+Update the mass ladder label too (remove `×Q_cav` from the mass chain).
+
+2. **Your last mass ladder row is mislabeled.**
+   You labeled the final row “×d\_eff” but its `value` is already `E_tile_mass` **with** duty folded in. Either:
+
+* change the label to something like “= E\_tile\_mass (includes ×d\_eff)”, **or**
+* compute an intermediate without duty and show a final “×d\_eff” step. (Patch below shows the latter; it’s clearer.)
+
+## Wire to the light-crossing loop (physics vs UI)
+
+Use the loop you built to (a) gate **instantaneous** power physically, and (b) keep the **UI** readable.
+
+* **Physics gate (RAW):** only deliver instantaneous cavity power during the ON window *and* when the burst contains enough RF cycles.
+* **UI gate (LATCHED):** keep the status badge “ON” for \~200 ms so humans can see it; this does **not** change physics.
+
+### Drop-in patch for your `useMemo` block + ladders
+
+```ts
+// assume you have lc from useLightCrossingLoop(...)
+const MIN_CYCLES_PER_BURST = 10;                 // tune if needed
+const isBurstMeaningful = (lc?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
+const isOnRaw = !!lc?.onWindow && isBurstMeaningful;
+
+// effective duty for ship-averaged quantities:
+// prefer authoritative metrics.dutyEffectiveFR, else derive from loop
+const d_eff =
+  metrics.dutyEffectiveFR ??
+  (lc ? (lc.burst_ms / lc.dwell_ms) : 0);        // equals duty/sectorCount with τLC floor
+
+const derived = useMemo(() => {
+  if (!state || !metrics) return null;
+
+  // inputs
+  const U_static = state.U_static;                 // J per tile (signed)
+  const gammaGeo = state.gammaGeo;
+  const qMech    = state.qMechanical ?? 1;         // mech gain
+  const N_tiles  = state.N_tiles ?? metrics.totalTiles;
+  const gammaVdB = state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck ?? 1;
+
+  // power chain (per tile → ship)
+  const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
+  const U_Q       = U_geo * qMech;                 // per-tile stored energy proxy during ON
+  const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // instantaneous dissipation W when ON (P=ωU/Q)
+  const P_tile_instant_W = isOnRaw ? P_tile_on : 0; // physics gating by light-crossing window
+  const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
+  const P_ship_avg_report_MW = state.P_avg;        // authoritative calibration (if provided)
+
+  // mass chain (no Q in energy; Q is for power)
+  const geo3        = Math.pow(gammaGeo, 3);
+  const E_tile_geo3 = Math.abs(U_static) * geo3;             // step: ×γ_geo^3
+  const E_tile_VdB  = E_tile_geo3 * gammaVdB;                // step: ×γ_VdB
+  const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
+  const M_tile      = E_tile_mass / (C * C);                 // kg per tile
+  const M_total_calc   = M_tile * N_tiles;
+  const M_total_report = state.M_exotic ?? metrics.exoticMass;
+
+  // casimir foundation (unchanged)
+  const gap_m       = (state.gap_nm ?? 16) * 1e-9;
+  const tileA_m2    = (state.tileArea_cm2 ?? 25) * 1e-4;
+  const casimir_theory   = -(PI * PI / 720) * HBAR_C / Math.pow(gap_m, 4);
+  const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;
+
+  return {
+    U_static, gammaGeo, qMech, d_eff, N_tiles, omega, qCav, gammaVdB,
+    U_geo, U_Q,
+    P_tile_on, P_tile_instant_W, P_ship_avg_calc_MW, P_ship_avg_report_MW,
+    geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
+    gap_m, tileA_m2, casimir_theory, casimir_per_tile,
+    isOnRaw, isBurstMeaningful
+  };
+  // include lc-derived values in the deps so gating/duty react to the loop
+}, [state, metrics, omega, qCav, lc?.onWindow, lc?.cyclesPerBurst, lc?.burst_ms, lc?.dwell_ms]);
+
+// ----- Ladders (show the actual steps you compute) -----
+
+const powerLadder: LadderDatum[] = [
+  { stage: "|U_static|", value: Math.abs(derived.U_static) },
+  { stage: "×γ_geo",     value: Math.abs(derived.U_geo) },
+  { stage: "×q_mech",    value: Math.abs(derived.U_Q) },
+  // instantaneous power when ON: P = ωU/Q (display per tile)
+  { stage: "→P_tile_on (ωU/Q_cav)", value: derived.P_tile_on },
+  // ship-averaged power using d_eff
+  { stage: "×N_tiles × d_eff", value: derived.P_ship_avg_calc_MW * 1e6 } // back in watts for consistency
+];
+
+const massLadder: LadderDatum[] = [
+  { stage: "|U_static|", value: Math.abs(derived.U_static) },
+  { stage: "×γ_geo³",    value: derived.E_tile_geo3 },
+  { stage: "×γ_VdB",     value: derived.E_tile_VdB },
+  { stage: "×d_eff",     value: derived.E_tile_mass } // duty applied here (no Q_cav in mass)
+];
+
+// ----- UI status (readable) -----
+const statusText = lc?.onWindowDisplay ? "ON" : "OFF"; // purely visual badge
+```
+
+## Why this works
+
+* **Power:** Q belongs in **P = ωU/Q** and in how stored energy is replenished; gating by the light-crossing window makes instantaneous power disappear outside the ON burst. The ship average uses `d_eff` (derived from the loop or the authoritative metric).
+* **Mass/energy:** geometric/warp amplification & duty affect the energy budget; Q does not directly multiply rest-energy.
+* **UI:** the “ON” label is latched (human-readable), while the physics uses the raw window + cycles-per-burst guard.
+
+If you want, paste your current ladder rendering code and I’ll adapt the units/formatting so `P_tile_on` and ship totals show in W/kW/MW with tidy sig figs.

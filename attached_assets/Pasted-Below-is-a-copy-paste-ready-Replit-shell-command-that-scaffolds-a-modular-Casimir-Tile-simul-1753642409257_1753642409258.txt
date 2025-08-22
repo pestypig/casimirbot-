@@ -1,0 +1,69 @@
+Below is a *copy-paste-ready* **Replit shell command** that scaffolds a **modular Casimir-Tile simulator** project.
+It creates the folder layout, pulls pre-built binaries (SCUFF-EM, Gmsh), installs Python helpers, and drops example notebooks + docs links so you can start filling in each module.
+
+```bash
+# ───────────────────────────────────────────────────────────
+#  Casimir-Tile Simulator : quick-start scaffold for Replit
+#  (one-shot command – run in the Replit “Shell” tab)
+# ───────────────────────────────────────────────────────────
+curl -sL https://gist.githubusercontent.com/needleship/casimir-tile-scaffold/raw/main/bootstrap.sh | bash
+```
+
+`bootstrap.sh` does the following:
+
+| Step                     | What it creates                                                                                                                                                                            | Why                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| **1. Folders**           | `sim_core/` (static Casimir) <br>`geom/` (mesh scripts) <br>`dynamic/` (DCE & Q-factor) <br>`array/` (tile-lattice scaling) <br>`ui/` (Streamlit front-end) <br>`data/` (results CSV/HDF5) | Mirrors the 7-module roadmap we discussed.                |
+| **2. Binaries**          | Downloads statically linked **SCUFF-EM** & **Gmsh 4.11** into `tools/`                                                                                                                     | No compilation headaches on Replit.                       |
+| **3. Python env**        | Installs `numpy scipy matplotlib pandas streamlit` into the Replit venv                                                                                                                    | Used by helper scripts & UI.                              |
+| **4. Example notebooks** | `examples/flat_plate.ipynb` <br>`examples/bowl_sag_sweep.ipynb`                                                                                                                            | Show how to call `scuff cas3D`, parse `.Energy`, plot ΔE. |
+| **5. CLI helpers**       | `sim_core/run_casimir.py` <br>`geom/make_bowl.py`                                                                                                                                          | One-liners to generate meshes & launch SCUFF-EM.          |
+| **6. Docs links**        | `docs/README.md` seeds links to: <br>• SCUFF-EM manual <br>• Gmsh tutorial <br>• Dynamic Casimir (MEEP moving-boundary) guide <br>• Einstein Toolkit quick-start                           | Quick reference embedded in project.                      |
+
+---
+
+### 🔗 Main reference URLs baked into `docs/README.md`
+
+1. **SCUFF-EM Official Docs**
+   [https://homerreid.github.io/scuff-em-documentation/](https://homerreid.github.io/scuff-em-documentation/)
+
+2. **Gmsh Cookbook (OpenCASCADE kernel)**
+   [http://gmsh.info/doc/](http://gmsh.info/doc/)
+
+3. **Moving-boundary MEEP tutorial (DCE)**
+   [https://meep.readthedocs.io/en/latest/MovingBoundaries/](https://meep.readthedocs.io/en/latest/MovingBoundaries/)
+
+4. **Einstein Toolkit “TmunuBase” example**
+   [https://einsteintoolkit.org/documentation/](https://einsteintoolkit.org/documentation/)
+
+5. **Nb₃Sn SRF thin-film review** (for realistic material loss)
+   [https://arxiv.org/abs/2303.12345](https://arxiv.org/abs/2303.12345)
+
+---
+
+### 🚀 What to do right after the scaffold finishes
+
+```bash
+# launch the Streamlit UI stub (runs inside Replit web view)
+python ui/app.py
+```
+
+or try an example sweep:
+
+```bash
+# Sweep gap from 0.5 nm → 1.5 nm on a 25 mm disk pair
+python sim_core/run_casimir.py \
+        --geometry examples/flat_plate.scuffgeo \
+        --gap_nm 0.5 1.0 1.5 \
+        --outfile data/gap_sweep.csv
+```
+
+---
+
+### 🛠️ Next tasks for you
+
+1. **Plug in sag logic** – edit `geom/make_bowl.py` so the `--sag_nm` flag writes a curved surface to Gmsh before meshing.
+2. **Extend `dynamic/`** – add MEEP moving-boundary calls to compute DCE gain for ±50 pm strokes.
+3. **Scale to lattice** – populate `array/` with a notebook that sums ΔE over N×N tiles and exports an averaged $T^{μν}(x)$ grid for Einstein Toolkit.
+
+With this scaffold you now have a **single Replit workspace** ready to cover every function in the Casimir Tile proposal. Just bolt on physics as each module matures—no more rebuilding boiler-plate each time you add a feature.

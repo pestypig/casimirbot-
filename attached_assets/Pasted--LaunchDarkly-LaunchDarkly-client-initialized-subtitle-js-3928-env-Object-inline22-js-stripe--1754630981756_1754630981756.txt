@@ -1,0 +1,500 @@
+[LaunchDarkly] LaunchDarkly client initialized
+subtitle.js:3928 env Object
+ ## inline22 : js.stripe.com default
+subtitle.js:4010 local lang en
+subtitle.js:7642 auth:init isAuth undefined
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+ ## inline22 : www.google.com default
+ ## inline22 : www.googletagmanager.com default
+subtitle.js:4013 ## useLocalInfo Object uuid
+subtitle.js:4013 ## 2useLocalInfo Object
+ ## inline22 : td.doubleclick.net default
+CasimirBot#client/public/warp-engine.js:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ ## inline22 : js.stripe.com default
+rtcinjector.js:705 ## inline22 : m.stripe.network default
+subtitle.js:7741 Getted userconfig from local Object
+9Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'battery'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+framework-61d2f17a70fa8d11.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-61d2f17a70fa8d11.js:1Understand this warning
+subtitle.js:7741 Getted userconfig from local ObjectuserConfig: {autoSave: false, bothSubtitles: false, showFloatingSwitch: false, translateLang: 'en'}[[Prototype]]: Object
+subtitle.js:7741 Getted userconfig from local ObjectuserConfig: {autoSave: false, bothSubtitles: false, showFloatingSwitch: false, translateLang: 'en'}[[Prototype]]: Object
+subtitle.js:7741 Getted userconfig from local ObjectuserConfig: {autoSave: false, bothSubtitles: false, showFloatingSwitch: false, translateLang: 'en'}[[Prototype]]: Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local ObjectuserConfig: {autoSave: false, bothSubtitles: false, showFloatingSwitch: false, translateLang: 'en'}[[Prototype]]: Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local ObjectuserConfig: {autoSave: false, bothSubtitles: false, showFloatingSwitch: false, translateLang: 'en'}[[Prototype]]: Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+workspace_iframe.html:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+chunk-WERSD76P.js?v=bdf9b150:1232 Error: <polyline> attribute points: Expected number, "0%,-22.8000000000…".
+setValueForProperty @ chunk-WERSD76P.js?v=bdf9b150:1232Understand this error
+chunk-WERSD76P.js?v=bdf9b150:1232 Error: <polyline> attribute points: Expected number, "0%,13.59999999999…".
+setValueForProperty @ chunk-WERSD76P.js?v=bdf9b150:1232Understand this error
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Objectbeta: "3.507e+1"beta0: "2.662e+6"r_nm: 56.568542494923804s: "3.536"visualScale: 0.000001yShiftClip: "1.500000"[[Prototype]]: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: ObjectR_nm: 16beta0: 2661907.0835404424beta_magnitude: 35.072512174217074r_nm: 56.568542494923804s: 3.5355339059327378[[Prototype]]: Object
+Console.js:61 Warp Debug: Objectbeta: "3.507e+1"beta0: "2.662e+6"r_nm: 56.568542494923804s: "3.536"visualScale: 0.000001yShiftClip: "1.500000"[[Prototype]]: Object
+Console.js:61 Engine Uniforms: Objectamplifier_chain: {duty: 0.14, γ_geo: 26, Q_dyn: '1.0e+9', γ_VdB: '2.9e+5'}beta0: "2.662e+6"maxBeta: "3.507e+1"mode: "hover"sagDepth: 16[[Prototype]]: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: ObjectR_nm: 16VIEW_nm: 64metresPerClip: 4e-8zoom: "4×"[[Prototype]]: Object
+Console.js:61 β Debug: ObjectR_nm: 16beta0: 2661907.0835404424beta_magnitude: 35.072512174217074r_nm: 56.568542494923804s: 3.5355339059327378[[Prototype]]: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object
+Console.js:61 β Debug: Object
+Console.js:61 Warp Debug: Object
+Console.js:61 Engine Uniforms: Object
+Console.js:61 Natário params: R=16nm, β₀=2.662e+6, VIEW=64nm (ZOOMED)
+Console.js:61 Scale Debug: Object

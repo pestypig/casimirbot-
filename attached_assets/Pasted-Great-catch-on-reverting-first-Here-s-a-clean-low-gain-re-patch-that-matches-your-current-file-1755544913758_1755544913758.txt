@@ -1,0 +1,112 @@
+Great catch on reverting first. Here’s a **clean, low-gain** re-patch that matches your current files and keeps the interior tilt visible but subtle.
+
+# 1) `WarpVisualizer.tsx` — pass a tame tilt gain to the engine
+
+Add a small, mode-aware gain and be sure we always pass the tilt uniforms (with safe defaults). Put this where you call `engineRef.current.updateUniforms({...})`.
+
+```ts
+// choose a gentle visual gain per mode (not physics)
+const mode = (parameters.currentMode || 'hover').toLowerCase();
+const tiltGains: Record<string, number> = {
+  standby:   0.00,
+  cruise:    0.35,
+  hover:     0.55,
+  emergency: 0.80,
+};
+const tiltGain = Number.isFinite(parameters.tiltGain as any)
+  ? Number(parameters.tiltGain as any)
+  : (tiltGains[mode] ?? 0.55);
+
+engineRef.current.updateUniforms({
+  // (existing uniforms) ...
+  epsilonTilt: Number(parameters.epsilonTilt ?? 0),     // dimensionless (≪ 1e-6)
+  betaTiltVec: parameters.betaTiltVec ?? [0, -1, 0],    // unit direction for “down”
+  tiltGain,                                            // gentle visual scaling
+});
+```
+
+Also bump the script cache-buster if you use the loader (optional but handy):
+
+```ts
+script.src = '/warp-engine-fixed.js?v=tilt2';
+```
+
+> You’re already computing `epsilonTilt`/`betaTiltVec` in **`helix-core.tsx`** and passing them into `WarpVisualizer.parameters` (good!). Keep that as-is; this patch just ensures they are forwarded to the WebGL uniforms with sane gain.&#x20;
+
+# 2) `warp-engine-fixed.js` — apply the tilt inside the bubble with a soft window
+
+Add **defaults** to the engine’s uniforms (constructor or init):
+
+```js
+this.uniforms = Object.assign({
+  // ...existing defaults
+  epsilonTilt: 0.0,
+  betaTiltVec: [0, -1, 0],
+  tiltGain: 0.55
+}, this.uniforms || {});
+```
+
+Then, inside your grid warping loop (where you already compute `rho`, `w_rho`, normals, etc.), inject the **interior-only, C¹-smooth tilt**. Place this just before you write `vtx[i] = …`:
+
+```js
+// ----- Interior gravity (shift vector "tilt") -----
+// inputs
+const eps   = Math.max(0, this.uniforms?.epsilonTilt || 0); // ≪ 1e-6
+const btilt = this.uniforms?.betaTiltVec || [0, -1, 0];
+const gtilt = this.uniforms?.tiltGain || 0.55;
+
+// soft window that is ~1 inside and ~0 outside the shell
+const w = Math.max(1e-6, w_rho);                 // same wall scale you use for bell
+const t = Math.min(1, Math.max(0, (1.0 + w - rho) / (2.0 * w))); // linear window
+const winInterior = t*t*(3 - 2*t);               // smoothstep(t)
+
+// project point onto tilt direction (unit)
+const bmag = Math.hypot(btilt[0], btilt[1], btilt[2]) || 1;
+const bhat = [btilt[0]/bmag, btilt[1]/bmag, btilt[2]/bmag];
+
+// gentle displacement, bounded; factor 0.12 keeps it subtle
+const dispTilt = eps * gtilt * winInterior * 0.12;
+
+// nudge the vertex along the cabin “down” direction
+vtx[i    ] += bhat[0] * dispTilt;
+vtx[i + 1] += bhat[1] * dispTilt;
+vtx[i + 2] += bhat[2] * dispTilt;
+// ----- end interior gravity -----
+```
+
+This does three important things:
+
+1. **Interior-only**: `winInterior` is \~1 deep inside, fades to 0 across the wall; the outside grid stays coplanar—your exact complaint.
+2. **C¹ smooth**: no hard steps, so no ringing/ridges.
+3. **Tame visibility**: `tiltGain` 0.35–0.80 plus the `0.12` factor keeps tilt clearly visible without turning into a “basket”.
+
+# 3) (Optional) expose a tiny UI knob
+
+If you’d like to tweak without code, pass `tiltGain` through `WarpVisualizer.parameters` (you already pass `epsilonTilt`/`betaTiltVec` from **`helix-core.tsx`**). For example:
+
+```tsx
+<WarpVisualizer
+  parameters={{
+    // ...existing
+    epsilonTilt: shift.epsilonTilt,
+    betaTiltVec: shift.betaTiltVec,
+    tiltGain:    0.55, // try 0.35–0.80 across modes
+  }}
+/>
+```
+
+Your **Shift Vector panel** is already computing/printing the same epsilon and direction; that stays your single source of truth for the numbers surfaced to users.&#x20;
+
+---
+
+## Why this fixes “flat middle”
+
+Previously, the tilt likely added a global plane or was windowed too weakly, so the **interior and exterior moved together**, making the center look flat compared to the outer grid. The **soft interior window** above decouples them: the cabin region tilts; far field remains level; the wall transitions smoothly—exactly what we want for a Natário “whisper” β-gradient.
+
+If you still want a touch more visibility, nudge **only one** of these, in order:
+
+1. `tiltGain` per mode (e.g., 0.55 → 0.65 in Hover),
+2. the final constant `0.12` → `0.15`,
+3. keep `epsilonTilt` where it is (it’s physically motivated and also shown in your panel).
+
+That should give you a clear, mode-sensitive tilt inside the ship without the “wire basket” artifact.

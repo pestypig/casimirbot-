@@ -1,0 +1,56 @@
+function DisplacementHeatmap({ endpoint, metrics, state }: { endpoint: string; metrics?: HelixMetrics; state?: EnergyPipelineState; }) {
+  const [params, setParams] = useState({ nTheta: 128, nPhi: 64, sectors: 400, split: 200 });
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [data, setData] = useState<FieldResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  // observe visibility of the card
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!cardRef.current) return;
+    const io = new IntersectionObserver(([e]) => setVisible(!!e.isIntersecting), { threshold: 0.1 });
+    io.observe(cardRef.current);
+    return () => io.disconnect();
+  }, []);
+
+  // debounced fetch on param change & when visible
+  useEffect(() => {
+    if (!visible) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const q = new URLSearchParams({
+          nTheta: String(params.nTheta),
+          nPhi: String(params.nPhi),
+          sectors: String(params.sectors),
+          split: String(params.split)
+        }).toString();
+        const res = await fetch(`${endpoint}?${q}`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const json = await res.json();
+        setData(json);
+        setErr(null);
+      } catch (e: any) {
+        if (e.name !== "AbortError") setErr(e?.message ?? "fetch failed");
+      }
+    }, 300); // debounce user changes
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [endpoint, params, visible]);
+
+  // optional: light keep-alive every ~45s while visible
+  useEffect(() => {
+    if (!visible) return;
+    const id = setInterval(() => {
+      setParams(p => ({ ...p })); // retrigger effect w/ same params
+    }, 45000);
+    return () => clearInterval(id);
+  }, [visible]);
+
+  // …render: wrap the Card with ref={cardRef}
+  return (
+    <Card ref={cardRef} className="bg-slate-900/40 border-slate-800">
+      {/* unchanged content; just use `data` from local state */}
+    </Card>
+  );
+}

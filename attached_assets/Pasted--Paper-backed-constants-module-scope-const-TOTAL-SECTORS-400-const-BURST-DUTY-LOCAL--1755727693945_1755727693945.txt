@@ -1,0 +1,80 @@
+// ── Paper-backed constants (module scope)
+const TOTAL_SECTORS    = 400;
+const BURST_DUTY_LOCAL = 0.01;   // 10 µs / 1 ms
+const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
+const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
+const RADIAL_LAYERS    = 10;     // surface × radial lattice
+
+// In initializePipelineState(): change default qMechanical to 1
+// qMechanical: 1,
+
+// In calculateEnergyPipeline():
+
+// 1) N_tiles — include radial layering
+state.N_tiles = Math.max(1, Math.floor(hullArea_m2 / tileArea_m2) * RADIAL_LAYERS);
+
+// 2) Stored energy (raw core): remove mech boost from physics core
+state.U_geo = state.U_static * state.gammaGeo;
+state.U_Q   = state.U_geo; // no extra mechanical gain in raw core
+
+// 3) Sector scheduling — paper method: one-live-of-400
+const S         = TOTAL_SECTORS;
+const S_instant = 1;
+const frac_active = S_instant / S;
+const tilesPerSect = Math.floor(state.N_tiles / S);
+state.activeSectors  = S_instant;
+state.activeFraction = frac_active;
+state.tilesPerSector = tilesPerSect;
+state.activeTiles    = tilesPerSect * S_instant;
+
+// 4) Effective duty for ship-wide averages
+const d_eff = BURST_DUTY_LOCAL * frac_active; // 0.01 / 400 = 2.5e-5
+state.dutyEff = d_eff;
+
+// (optional guard) clamp qMechanical to 1 unless explicit cruise calibration enabled
+if (process.env.CRUISE_CALIBRATION !== '1') state.qMechanical = 1;
+
+// 5) Power (paper method): use Q_BURST and d_eff
+const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+const U_Q_store = Math.abs(state.U_Q);
+const P_loss_per_tile_raw = U_Q_store * omega / Q_BURST;
+const P_total_W = P_loss_per_tile_raw * state.N_tiles * d_eff;
+state.P_loss_raw = P_loss_per_tile_raw;
+state.P_avg      = P_total_W / 1e6; // MW
+
+// 6) Mass (paper method): DCE chain uses Q_BURST and d_eff; γ_VdB fixed seed
+state.gammaVanDenBroeck = GAMMA_VDB;
+const U_abs = Math.abs(state.U_static);
+const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
+const E_enh = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // per tile, J
+const m_tile = E_enh / (C * C);
+const M_total = m_tile * state.N_tiles;
+state.M_exotic_raw = M_total;
+state.M_exotic     = M_total;
+
+// 7) Remove femtosecond burst duty and any “dutyTile” terms
+// (Delete variables burst_s, dutyBurst, dutyTile and any use of them)
+
+// 8) Ford–Roman proxy uses d_eff (not UI duty) and Q_quantum=1e12
+const Q_quantum = 1e12;
+state.zeta = 1 / (d_eff * Math.sqrt(Q_quantum));
+state.fordRomanCompliance = state.zeta < 1.0;
+
+// 9) (Optional) cruise calibration knobs, if you need exact paper numbers in cruise:
+if (state.currentMode === 'cruise' && process.env.CRUISE_CALIBRATION === '1') {
+  // Power target: 7.4 MW → adjust qMechanical (power only)
+  const P_target_W = 7.4e6;
+  const scaleP = P_target_W / (P_total_W || 1e-30);
+  state.qMechanical *= scaleP;
+  state.U_Q = state.U_geo * state.qMechanical;
+  const P_tile_cal = Math.abs(state.U_Q) * omega / Q_BURST;
+  state.P_avg = (P_tile_cal * state.N_tiles * d_eff) / 1e6;
+
+  // Mass target: 1405 kg → adjust γ_VdB (mass only)
+  const M_target = 1405;
+  const scaleM   = M_target / (state.M_exotic_raw || 1e-30);
+  state.gammaVanDenBroeck *= scaleM;
+  const E_enh_cal = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+  state.M_exotic_raw = Math.max(0, (E_enh_cal / (C*C)) * state.N_tiles);
+  state.M_exotic = state.M_exotic_raw;
+}

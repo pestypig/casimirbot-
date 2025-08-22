@@ -1,0 +1,147 @@
+Awesome — here’s a clean, minimal patch to push the **gentle interior-gravity tilt** from metrics → React → WebGL so it’s both **displayed in the panel** and **visible in the 3D bubble**.
+
+---
+
+# 1) Wire the values through the visualizer
+
+### File: `client/src/components/WarpVisualizer.tsx`
+
+**What this does:**
+
+* Adds a `shift` prop (epsilon + vector) to the parameters type
+* Extracts safe defaults
+* Sends them to the WebGL engine via `updateUniforms`
+
+```tsx
+// ✅ 1) Extend the props type (add near your other parameter types)
+type ShiftParams = {
+  epsilonTilt?: number;                    // dimensionless ε_tilt
+  betaTiltVec?: [number, number, number];  // unit-ish direction for "down"
+  gTarget?: number;
+  R_geom?: number;
+  gEff_check?: number;
+};
+
+interface WarpVisualizerProps {
+  parameters: {
+    // …existing fields…
+    shift?: ShiftParams; // 👈 add this
+  };
+  // …existing props…
+}
+```
+
+```tsx
+// ✅ 2) Small helpers (top of file or near other helpers)
+const num = (v: any, d = 0) => (typeof v === "number" && isFinite(v) ? v : d);
+const arr3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
+  Array.isArray(v) && v.length === 3 && v.every(x => typeof x === "number" && isFinite(x))
+    ? (v as [number, number, number])
+    : d;
+```
+
+```tsx
+// ✅ 3) Inside your effect / on-metrics-change handler where you call updateUniforms:
+const epsilonTilt = num(parameters.shift?.epsilonTilt, 0);           // 0 = off
+const betaTiltVec = arr3(parameters.shift?.betaTiltVec, [0, -1, 0]); // default "down"
+
+// …existing uniforms…
+engineRef.current.updateUniforms({
+  // existing uniforms you already send (gammaGeo, sectors, etc) …
+
+  // 👇 NEW: gentle interior-gravity tilt uniforms
+  epsilonTilt,
+  betaTiltVec,
+});
+```
+
+> These values will now update live whenever `parameters.shift` changes (e.g., when the mode switches or you adjust the target g).
+
+---
+
+# 2) Pass `metrics.shift` into the visualizer
+
+### File: `client/src/pages/helix-core.tsx`
+
+Where you render the visualizer, **forward the shift block** from the metrics:
+
+```tsx
+<WarpVisualizer
+  parameters={{
+    // …existing parameters you pass…
+    shift: metrics?.shift,          // 👈 forward server/pipe values to the engine
+  }}
+/>
+```
+
+If you don’t yet place it here, do the same wherever the visualizer is currently used.
+
+---
+
+# 3) Use the uniforms in the WebGL engine
+
+You already have the uniforms declared in the engine:
+
+```js
+// warp-engine-fixed.js (constructor)
+this.uniforms = {
+  // …existing…
+  epsilonTilt: 0.0,          // strength
+  betaTiltVec: [0, -1, 0],   // direction
+};
+```
+
+Add **one gentle term** inside `_warpGridVertices` after you compute `rho` (ellipsoidal radius) and before you write the final position back. This creates a smooth interior “lean” that vanishes outside the wall:
+
+```js
+// warp-engine-fixed.js  — inside the vertex loop in _warpGridVertices
+
+// (you already have) const rho = rhoEllipsoidal(p);
+// (you already have) const sd = rho - 1.0;
+// (you already have) const w_rho = …  // your wall thickness in ρ-space
+
+// --- Smooth interior envelope: 1 at center, fades to 0 across the wall
+const smoothstep = (a, b, x) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+// Inside-amount (1 deep inside, 0 outside shell)
+const insideAmt = 1.0 - smoothstep(1.0 - 2.5 * w_rho, 1.0 + 0.5 * w_rho, rho);
+
+// Gentle interior "tilt" displacement (viewer-scale only; tiny by design)
+const eps = this.uniforms?.epsilonTilt || 0.0;               // dimensionless
+const btv = this.uniforms?.betaTiltVec || [0, -1, 0];        // 3-vector
+const tiltGain = 1.0;                                        // keep small; tune if needed
+const tiltDisp = eps * insideAmt * tiltGain;
+
+// Apply as a *positional bias* (not normal push) to softly lean the interior
+vtx[i    ] += btv[0] * tiltDisp;
+vtx[i + 1] += btv[1] * tiltDisp;
+vtx[i + 2] += btv[2] * tiltDisp;
+```
+
+* The **Natário shell deformation** you already compute stays intact.
+* This adds a **C¹-smooth, tiny interior bias** in the chosen “down” direction that gracefully fades at the wall.
+* Since `ε_tilt` is dimensionless (as per your panel), start with small values (e.g., 0.0005–0.005). The panel derivation gives you a principled ε from $g_{\text{target}}$ and $R_{\text{geom}}$; you can pass that straight through.
+
+---
+
+# 4) Panel: use merged fallbacks (you already applied)
+
+Keep the per-field fallback from the previous message in `ShiftVectorPanel.tsx` so the UI always shows values, even when the backend returns `{}` initially.
+
+---
+
+## What you’ll see
+
+* The **Shift Vector • Interior Gravity** panel fills with numbers immediately (thanks to fallbacks) and updates when actual `metrics.shift` arrives.
+* The **3D grid** will show a subtle cabin “down” when `epsilonTilt > 0`, vanishing at the wall and fully gone in standby (if you set ε to 0 in that mode).
+* Everything respects your current mode system; you can expose ε/β in the **Engineer** station for live tweaking.
+
+If you want the tilt strength to track the panel math exactly, set on the server (or client) something like:
+
+$$
+\varepsilon_{\text{tilt}} = \frac{g_{\text{target}}\; R_{\text{geom}}}{c^2}
+$$
+
+and ship that as `metrics.shift.epsilonTilt`. The visuals will mirror the derivation 1:1.

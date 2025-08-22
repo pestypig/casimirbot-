@@ -1,0 +1,88 @@
+Here’s how to wire up **Hover mode** so that as soon as you pick it (or load the page), you get the right Q and other parameters:
+
+1) Define your mode‐presets object up top:
+
+```js
+const modePresets = {
+  Hover: {
+    cavityQ:    1e9,     // 1.0×10⁹
+    mechQ:      5e4,     // 5.0×10⁴ (fixed)
+    duty:       0.14,    // 14 %
+    sectors:    1,       // no strobing
+    Q_idle:     1e9,     // no spoiling
+    pocketGamma:2e11,    // 2×10¹¹
+  },
+  Cruise: {
+    cavityQ:    1.6e6,
+    mechQ:      5e4,
+    duty:       0.005,
+    sectors:    400,
+    Q_idle:     1e6,
+    pocketGamma:8e10,
+  },
+  Emergency: {
+    cavityQ:    1e9,
+    mechQ:      5e4,
+    duty:       0.50,
+    sectors:    1,
+    Q_idle:     1e9,
+    pocketGamma:8e8,
+  },
+  Standby: {
+    cavityQ:    1e9,
+    mechQ:      5e4,
+    duty:       0.0,
+    sectors:    1,
+    Q_idle:     1e9,
+    pocketGamma:2e11,
+  }
+};
+```
+
+2) When the user selects “Hover” (or on initial mount), apply that preset:
+
+```js
+// State hooks
+const [mode, setMode]         = useState("Hover");
+const [cavityQ, setCavityQ]   = useState();
+const [mechQ, setMechQ]       = useState();
+const [duty, setDuty]         = useState();
+const [sectors, setSectors]   = useState();
+const [Q_idle, setQIdle]      = useState();
+const [pocketGamma, setPocket] = useState();
+
+// Helper to apply a preset
+function applyModePreset(m) {
+  const p = modePresets[m];
+  setCavityQ(p.cavityQ);
+  setMechQ(p.mechQ);
+  setDuty(p.duty);
+  setSectors(p.sectors);
+  setQIdle(p.Q_idle);
+  setPocket(p.pocketGamma);
+}
+
+// On mount, or when mode changes:
+useEffect(() => {
+  applyModePreset(mode);
+}, [mode]);
+```
+
+3) In your `<select>` or radio‐group for Operational Mode, do:
+
+```jsx
+<select value={mode} onChange={e => setMode(e.target.value)}>
+  <option>Hover</option>
+  <option>Cruise</option>
+  <option>Emergency</option>
+  <option>Standby</option>
+</select>
+```
+
+With that in place:
+
+- As soon as you load the page, `mode="Hover"` → `cavityQ=1e9`, `duty=0.14`, etc.
+- If you switch to “Emergency,” you’ll instantly get `cavityQ=1e9`, `duty=0.50`, ...
+- Cruise and Standby likewise pick up their own correct defaults.
+
+This guarantees **Hover mode** always shows **1.0×10⁹** Q, **14.0%** duty, **1 sector**, **no Q‐spoil**, and the proper `γ_pocket` from the paper.

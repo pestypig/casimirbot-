@@ -1,0 +1,110 @@
+**Why the whole grid collapsed into a single line**
+
+‣ **It isn’t the uniforms.**
+When a whole mesh degenerates to a single strip it’s almost always a *matrix* or *scaling* issue, not a bad β-field.
+
+| Symptom                              | Most common cause                                                         |
+| ------------------------------------ | ------------------------------------------------------------------------- |
+| Grid squashes into one flat line     | **Bad MVP matrix** (row/column order, wrong fov, or det ≈ 0)              |
+| Grid vanishes when you move a slider | Push / scale factor large enough to throw every vertex outside clip-space |
+| Only one red “edge” visible          | Camera is *inside* the grid and facing along the grid plane               |
+
+---
+
+## 1 – Re-establish a sane camera
+
+```js
+// put this at the very top of _renderGridPoints() just for a test
+const proj = mat4.perspective([], Math.PI/4,  // 45°
+                              this.canvas.width / this.canvas.height,
+                              0.01, 20.0);     // near / far
+
+const view = mat4.lookAt([],                   // eye, centre, up
+                         [0, 0.4, 1.4],        // pull back & tilt down
+                         [0, 0.0, 0.0],
+                         [0, 1.0, 0.0]);
+
+gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false,
+                    mat4.multiply([], proj, view));
+```
+
+*Use **gl-matrix** (already bundled by most bundlers) or copy its two tiny helpers — the important bit is that it produces a **column-major** WebGL matrix.*
+
+If the grid re-appears, the culprit was the home-made `_multiplyMatrices()` (row-major) or the extreme FOV you tried earlier.
+
+---
+
+## 2 – Clamp the deformation while you debug
+
+Inside `_warpGridVertices` temporarily replace:
+
+```js
+const push = beta * 0.05;
+```
+
+with
+
+```js
+const push = clamp(beta * 0.05, -0.1, 0.1);   // never more than ±0.1 clip-units
+```
+
+and likewise for `dy`.
+If the grid is now visible you know the physics code is fine; your earlier push simply flung every vertex outside the clip cube.
+
+---
+
+## 3 – Toggle warping on/off with a key
+
+Add once in `constructor`:
+
+```js
+window.addEventListener('keydown', e => {
+  if (e.key === 'w') this.debugDisableWarp = !this.debugDisableWarp;
+});
+```
+
+and at the top of `_warpGridVertices`:
+
+```js
+if (this.debugDisableWarp) return;  // renders the original stored grid
+```
+
+Press *W* → flat grid, press again → warped.
+If one state is a line and one is a grid, the issue is in the warp; if both are a line, it’s the camera / MVP.
+
+---
+
+## 4 – Sanity prints
+
+```js
+if (i === 0) {
+  console.log('r clip max', sagRclip,
+              'beta0', beta0,
+              'push range', push.toFixed(3));
+}
+```
+
+* push range should be ≪ 1 (clip-space units).
+* If you ever see values > 1 the warp will leave the frustum.
+
+---
+
+## 5 – When everything looks normal again
+
+* Put the *live* uniform uploads back (the code from the previous answer).
+* Remove the clamp and use the true physics values.
+* Decide how you want to make tiny curvatures visible:
+  – colour mapping in the fragment shader
+  – variable line-width (GL2)
+  – camera zoom
+
+---
+
+### TL;DR fix-sequence
+
+1. Replace the MVP calculation with a known-good `lookAt × perspective` from gl-matrix.
+2. Clamp the warp (`±0.1`) to prove the grid isn’t exiting clip-space.
+3. Re-enable uniforms upload every frame.
+4. Use *W* toggle to isolate camera vs warp problems.
+
+Do those in order and you’ll have a stable grid again, with each mode clearly driven by your dashboard values.

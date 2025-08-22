@@ -1,0 +1,169 @@
+Awesome—thanks for sending the actual files. I spot the two reasons your “Luma background” feels inconsistent and risks stepping on other UI:
+
+1. You render `<BackgroundLuma />` **inside** the Helix-Core page’s `relative z-10` wrapper, which creates a stacking/positioning context that can clip or cover other layers.&#x20;
+2. The background uses `bg-gradient-radial` (a Tailwind plugin class that might not exist in your build), plus the PNG is only `w-32 h-32`, so it’s easy to miss under 0.18 opacity + blur.&#x20;
+
+Below is a **safe, non-intrusive** fix that:
+
+* Mounts the background once for **all pages** (via a portal to `document.body`),
+* Keeps `pointer-events: none` so it never steals input,
+* Uses an inline radial-gradient (no Tailwind plugin needed),
+* Upscales the PNG so it’s visible (you can dial it back later),
+* Leaves your mission planner and other features untouched.
+
+---
+
+# 1) Add a background portal (global, zero interference)
+
+Create `client/src/components/LumaBackgroundPortal.tsx`:
+
+```tsx
+"use client";
+import * as React from "react";
+import { createPortal } from "react-dom";
+
+export default function LumaBackgroundPortal({ children }: { children: React.ReactNode }) {
+  const elRef = React.useRef<HTMLDivElement | null>(null);
+  const [mounted, setMounted] = React.useState(false);
+
+  if (!elRef.current) {
+    const el = document.createElement("div");
+    el.style.position = "fixed";
+    el.style.inset = "0";
+    el.style.zIndex = "0";             // under your app (which can be z-10)
+    el.style.pointerEvents = "none";   // never blocks interactions
+    elRef.current = el;
+  }
+
+  React.useEffect(() => {
+    document.body.appendChild(elRef.current!);
+    setMounted(true);
+    return () => { elRef.current && elRef.current.remove(); };
+  }, []);
+
+  return mounted ? createPortal(children, elRef.current!) : null;
+}
+```
+
+---
+
+# 2) Patch `BackgroundLuma.tsx` to be plugin-free + visible
+
+Replace the **return block** of `BackgroundLuma.tsx` with this (keep your imports and state):
+
+```tsx
+return (
+  <div
+    className="fixed inset-0 pointer-events-none"
+    style={{ zIndex: 0, filter: `blur(${blurPx}px)`, opacity }}
+  >
+    {/* inline radial gradient instead of 'bg-gradient-radial' */}
+    <div
+      className="absolute inset-0"
+      style={{
+        background:
+          "radial-gradient(40% 35% at 50% 40%, rgba(255,200,120,0.14), rgba(255,160,80,0.08) 40%, rgba(0,0,0,0) 70%)"
+      }}
+    >
+      {/* stars (cheap DOM dots are fine) */}
+      <div className="absolute inset-0">
+        {Array.from({ length: 60 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-[3px] h-[3px] bg-white/70 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              opacity: 0.5 + Math.random() * 0.5
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Luma PNG — make it large enough to read under blur */}
+      <img
+        src="/luma/Luma_29.png"
+        alt="Luma Guardian"
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        style={{ width: "60vmin", maxWidth: 900, opacity: 0.85, filter: "brightness(1.08) contrast(0.9)" }}
+        onError={(e) => {
+          console.warn("Luma PNG not found:", "/luma/Luma_29.png");
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+      />
+
+      <style>{`
+        @keyframes luma-float {
+          0%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+          50%{transform:translate(-50%,-50%) translateY(-12px) rotate(1.5deg) scale(1.02)}
+          100%{transform:translate(-50%,-50%) translateY(0) rotate(0) scale(1)}
+        }
+      `}</style>
+    </div>
+  </div>
+);
+```
+
+Why: your current file uses `bg-gradient-radial` (may not exist) and a very small PNG (`w-32 h-32`). This version uses an inline gradient and a larger PNG so it shows through your `opacity={0.18}` and blur.&#x20;
+
+---
+
+# 3) Mount once globally (not inside Helix-Core)
+
+Since you want Luma on **all pages**, mount via the portal **one time** in your top-level app shell (e.g., `client/src/App.tsx` or wherever you set up routes). Example (React SPA with Wouter):
+
+```tsx
+// client/src/App.tsx (example)
+import * as React from "react";
+import LumaBackgroundPortal from "@/components/LumaBackgroundPortal";
+import { BackgroundLuma } from "@/components/BackgroundLuma";
+// import { LumaOverlayHost } from "@/components/LumaOverlayHost"; // if you use whispers globally
+// ... your router setup ...
+
+export default function App() {
+  return (
+    <>
+      {/* Background behind everything, once */}
+      <LumaBackgroundPortal>
+        <BackgroundLuma opacity={0.18} blurPx={6} />
+      </LumaBackgroundPortal>
+
+      {/* Your entire app (router, pages, etc.) */}
+      <div className="relative z-10 min-h-screen">
+        {/* routes/pages go here */}
+      </div>
+
+      {/* Optional: whispers host once, on top */}
+      {/* <LumaOverlayHost /> */}
+    </>
+  );
+}
+```
+
+Then **remove** the page-local background from Helix-Core to avoid duplicates. In your current `helix-core.tsx`, you render `<BackgroundLuma />` at the bottom; delete that line so the global one is the only instance.&#x20;
+
+---
+
+# 4) (Optional) keep the whisper popup working everywhere
+
+If you already have `LumaWhisper` (you do) and a bus, mount the host once at the app shell top level, **not** per page. Your `LumaWhisper.tsx` is fine as-is.&#x20;
+If you don’t have a bus/host yet, I can drop a 20-line `luma-bus.ts` and `LumaOverlayHost.tsx`—but since Helix-Core already imports them, you likely have these elsewhere.
+
+---
+
+## Why this won’t break existing features
+
+* The background sits in its **own fixed portal layer** under your app (zIndex 0), never wraps your content, and has `pointer-events: none`. So OpenSeadragon, canvases, Galaxy/Solar maps, etc., keep working.
+* We didn’t touch your Helix-Core logic or layout; we only moved the background **out** of the Helix-Core page and into a global layer.
+
+---
+
+## Quick test steps
+
+1. Ensure assets exist: `/public/luma/Luma_29.png` (open it in the browser to verify 200).
+2. Mount the portal + background in the app shell.
+3. Remove the per-page `<BackgroundLuma />` call from `helix-core.tsx`.&#x20;
+4. Load any page—Luma should appear softly in the back everywhere.
+5. If it’s too strong, dial `opacity` down to `0.12` or increase `blurPx` to `8`.
+
+If you want to take the next step and switch this PNG to the GLB hover (real 3D) later, we’ll drop in the Drei/Fiber version inside the same portal—everything else stays identical.

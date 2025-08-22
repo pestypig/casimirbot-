@@ -1,0 +1,243 @@
+Absolutely—here’s a clean, unit-safe remake of your last patch that folds in the architecture you shared and the fixes we discussed:
+
+* single amplitude scalar computed **once** (outside the vertex loop)
+* correct local thickness mapping: `w_rho_local = w_rho * (aH / R_eff)`
+* no variable shadowing (`aWin`, `bWin` for the wall window)
+* remove unused params from `_warpGridVertices` and call site
+* drop `gl_PointSize` (you render LINES)
+* mirror `axesScene` onto `this.uniforms.axesScene` for camera consumers
+* comment/constant tidy-ups for normalized wall width (ρ-space)
+
+---
+
+### Patch (unified diff)
+
+```diff
+*** a/client/public/warp-engine-fixed.js
+--- b/client/public/warp-engine-fixed.js
+@@
+         const gridVs = isWebGL2 ?
+             "#version 300 es\n" +
+             "in vec3 a_position;\n" +
+             "uniform mat4 u_mvpMatrix;\n" +
+             "out vec3 v_pos;\n" +
+             "void main() {\n" +
+             "    v_pos = a_position;\n" +
+             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+-            "    gl_PointSize = 12.0;\n" +
+             "}"
+             :
+             "attribute vec3 a_position;\n" +
+             "uniform mat4 u_mvpMatrix;\n" +
+             "varying vec3 v_pos;\n" +
+             "void main() {\n" +
+             "    v_pos = a_position;\n" +
+             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
+-            "    gl_PointSize = 12.0;\n" +
+             "}";
+@@
+     _updateGrid() {
+         console.log("_updateGrid called");
+         console.log("Updating", this.gridVertices.length / 3, "grid vertices...");
+@@
+-        const vtx = this.gridVertices;
+-        const halfSize = 20000; // Half grid size in original units
+-        const originalY = -0.144; // Base Y coordinate
+-        
+-        this._warpGridVertices(vtx, halfSize, originalY, this.currentParams);
++        const vtx = this.gridVertices;
++        this._warpGridVertices(vtx, this.currentParams);
+@@
+-    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
++    _warpGridVertices(vtx, bubbleParams) {
+         // Get hull axes from uniforms or use needle hull defaults (in meters)
+         const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
+-        // Clean wall thickness handling - use either meters or ρ-units
++        // Clean wall thickness handling - use either meters or ρ-units
+         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
+         const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
+         const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m)   ? bubbleParams.wallWidth_m   : undefined;
+         const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho : undefined;
+-        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
++        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default ρ-width (~0.016)
+@@
+         const sceneScale = 1.0 / a;  // Make long semi-axis = 1 scene unit
+         const axesScene = [a * sceneScale, b * sceneScale, c * sceneScale]; // Exact aspect ratio [1, b/a, c/a]
++        // Mirror for camera consumers
++        this.uniforms.axesScene = axesScene;
+@@
+-        // ---- Physics-accurate amplitude calculation (matches energy pipeline) ----
+-        
+-        // 1) Same multiplicative chain as the physics pipeline (display model):
+-        //    A_total ~ (gammaGeo^3) * qSpoilingFactor * gammaVdB
+-        //    (q_cavity is kept out of the display amplitude; it lives in ζ and losses)
+-        const gammaGeo = bubbleParams.gammaGeo || bubbleParams.g_y || 26;
+-        const geoAmp = Math.pow(gammaGeo, 3);                               // γ_geo^3
+-        const qSpoil = Math.max(1e-9, (bubbleParams.qSpoilingFactor || bubbleParams.deltaAOverA || 1)); // [0..1]
+-        const vdbAmp = Math.max(1.0, bubbleParams.gammaVanDenBroeck || bubbleParams.gammaVdB || 3.83e1);
+-        
+-        // 2) Duty / strobing: use the same effective definitions the server uses
+-        const sectors = Math.max(1, bubbleParams.sectors || bubbleParams.sectorStrobing || 1);
+-        
+-        // Instantaneous (during a hot sector burst)
+-        const dutyBurst_fs = Math.max(1e-12, bubbleParams.dutyBurst || 5e-16); // e.g. 0.5 fs
+-        const dutyInstEff = dutyBurst_fs * (1 / sectors);
+-        
+-        // Time-averaged (what the UI cards show next to power)
+-        const dutyGlobal = Math.max(1e-12, bubbleParams.dutyCycle || 0.14);
+-        const dutyAvgEff = dutyGlobal * qSpoil * (1 / sectors);
+-        
+-        // 3) Build an amplitude consistent with the energy-side scaling.
+-        //    Keep purely visual normalization so it doesn't explode on screen.
+-        const A_phys = geoAmp * qSpoil * vdbAmp;    // physics-like chain
+-        const norm = (this.uniforms?.vizNorm || 1.0e-9);  // visual normalizer
+-        const A_vis_base = A_phys * norm;
+-        
+-        // 4) Choose instant vs average (no √duty hacks)
+-        const viewAvg = bubbleParams.viewAvg || 1.0;         // 1 = show GR average
+-        const A_inst = A_vis_base * dutyInstEff;
+-        const A_avg = A_vis_base * dutyAvgEff;
+-        const A_used = (viewAvg >= 0.5) ? A_avg : A_inst;
+-        
+-        // 5) Optional viewer gain (like your old betaGain) to make it legible
+-        const gain = (this.uniforms?.vizGain || 4.0);
+-        const betaVis = A_used * gain;
++        // ---- Visual amplitude scalar (computed ONCE) --------------------------
++        // Display model omits Q_cavity; uses γ_geo^3 · q_spoil · γ_VdB and duty/sectors
++        const u = this.uniforms || {};
++        const gammaGeo = (bubbleParams.gammaGeo ?? bubbleParams.g_y ?? u.gammaGeo ?? 26);
++        const qSpoil   = Math.max(1e-9, (bubbleParams.qSpoilingFactor ?? bubbleParams.deltaAOverA ?? u.deltaAOverA ?? 1.0));
++        const gammaVdB = Math.max(1.0, (bubbleParams.gammaVanDenBroeck ?? bubbleParams.gammaVdB ?? u.gammaVdB ?? 3.83e1));
++        const sectors  = Math.max(1, (bubbleParams.sectors ?? bubbleParams.sectorStrobing ?? u.sectors ?? 1));
++        const duty     = Math.max(1e-12, (bubbleParams.dutyCycle ?? u.dutyCycle ?? 0.14));
++        const viewAvg  = (bubbleParams.viewAvg ?? u.viewAvg ?? true) ? 1 : 0;
++
++        const A_geo   = gammaGeo ** 3;
++        const dutyEff = viewAvg ? (duty / sectors) : (1 / sectors);
++        const A_gross = A_geo * qSpoil * gammaVdB * dutyEff;
++        // log compression to keep modes visually separated without saturating
++        const knee = 1e10, slope = 1.0;
++        const A_log = Math.log10(1 + A_gross / knee) * slope; // ~0…few
++        const mode = (u.currentMode || 'hover').toLowerCase();
++        const modeScale =
++          mode === 'standby'   ? 0.05 :
++          mode === 'cruise'    ? 0.25 :
++          mode === 'hover'     ? 0.60 :
++          mode === 'emergency' ? 0.90 : 0.50;
++        const vizGainOverride = u.vizGainOverride ?? 0;
++        const vizGain = vizGainOverride > 0 ? vizGainOverride : modeScale;
++        const A_vis_scalar = Math.min(1.0, A_log * vizGain);
+@@
+-        console.log(`  🔬 PHYSICS SCALING: γ³=${geoAmp.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${vdbAmp.toExponential(2)}`);
+-        console.log(`  📊 DUTY FACTORS: instant=${dutyInstEff.toExponential(2)}, avg=${dutyAvgEff.toExponential(2)} (sectors=${sectors})`);
+-        console.log(`  β_phys=${A_phys.toExponential(2)} → β_vis=${betaVis.toExponential(2)} (norm=${norm.toExponential(0)})`);
++        console.log(`  🔬 PHYSICS SCALING: γ³=${A_geo.toExponential(2)}, qSpoil=${qSpoil.toFixed(3)}, γVdB=${gammaVdB.toExponential(2)}`);
++        console.log(`  📊 DUTY/SECTORS: duty=${duty.toFixed(3)}, sectors=${sectors}, viewAvg=${!!viewAvg}`);
++        console.log(`  A_vis (scalar) = ${A_vis_scalar.toFixed(3)} (log-compressed, mode='${mode}')`);
+@@
+-        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
++        const split = bubbleParams.split || Math.floor((bubbleParams.phaseSplit || 0.5) * sectors);
+@@
+-        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+-        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
+-        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+-        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
++        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
++        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
++        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
++        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 3.83e1;
+@@
+-        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
++        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // ρ-width default (~0.016)
+@@
+-        for (let i = 0; i < vtx.length; i += 3) {
++        for (let i = 0; i < vtx.length; i += 3) {
+             const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
+@@
+-            const w_rho_local = w_rho / R_eff;   // thickness in ρ-units
++            // orientation-dependent local rho-thickness (dimensionless)
++            const w_rho_local = w_rho * (aH / R_eff);
+@@
+-            const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
+-            const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
+-                           : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // gentle falloff
++            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
++            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
++                           : 0.5*(1 + Math.cos(Math.PI*(asd-aWin)/(bWin-aWin))); // gentle falloff
+@@
+-            // === LOGARITHMIC COMPRESSION TO PREVENT SATURATION ===
+-            // Pull uniforms for current mode and parameters
+-            const gammaGeo = this.uniforms?.gammaGeo ?? 26;
+-            const Qburst   = this.uniforms?.Qburst   ?? this.uniforms?.cavityQ ?? 1e9;
+-            const qSpoil   = this.uniforms?.deltaAOverA ?? this.uniforms?.qSpoilingFactor ?? 1.0;
+-            const gammaVdB = this.uniforms?.gammaVdB ?? 3.83e1;
+-            const duty     = Math.max(0, Math.min(1, this.uniforms?.dutyCycle ?? 0.14));
+-            const sectors  = Math.max(1, this.uniforms?.sectors ?? 1);
+-            const mode     = (this.uniforms?.currentMode || 'hover').toLowerCase();
+-
+-            // Physics amplitude (gross, unbounded)
+-            const A_geo   = gammaGeo * gammaGeo * gammaGeo; // γ^3
+-            const dutyEff = Math.sqrt(duty / sectors);      // visual proxy like before
+-            const A_gross = A_geo * Qburst * gammaVdB * qSpoil * dutyEff;
+-
+-            // Log compression so modes separate visually instead of saturating
+-            const k = 1e10;           // knee – prevents standby from saturating
+-            const s = 1.0;            // slope after log
+-            const A_log = Math.log10(1 + A_gross / k) * s; // 0 … ~few
+-
+-            // Mode-specific visual scaling (keeps standby very small)
+-            const modeScale =
+-              mode === 'standby'  ? 0.05 :
+-              mode === 'cruise'   ? 0.25 :
+-              mode === 'hover'    ? 0.60 :
+-              mode === 'emergency'? 0.90 : 0.50;
+-
+-            // Optional manual override from UI uniform (0 disables override)
+-            const gainOverride = this.uniforms?.vizGainOverride ?? 0;
+-            const vizGain = gainOverride > 0 ? gainOverride : modeScale;
+-
+-            // Final bounded visual amplitude 0..1
+-            const A_vis = Math.min(1.0, A_log * vizGain);
++            // Use the precomputed, log-compressed visual amplitude
++            const A_vis = A_vis_scalar;
+@@
+-                // Normal displacement calculation with compressed amplitude
+-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
++                // Normal displacement calculation with compressed amplitude
++                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+@@
+-        this.uniforms.wallWidth = w_rho;
++        this.uniforms.wallWidth = w_rho;
+         this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
+```
+
+---
+
+### React integration notes (WarpVisualizer.tsx)
+
+Your engine now prefers **normalized ρ-width** (`wallWidth_rho`) but also accepts meters (`wallWidth_m`). Pass whichever you have; the engine converts and prioritizes `wallWidth_rho` if both are present:
+
+```ts
+// Example mapping inside your effect that calls updateUniforms
+engine.updateUniforms({
+  currentMode,
+  dutyCycle,
+  hullAxes: [a_m, b_m, c_m],
+  // choose one:
+  wallWidth_rho: 0.016,        // preferred (dimensionless)
+  // or:
+  // wallWidth_m: 2.27,        // engine converts via aH
+  gammaGeo,
+  gammaVdB,
+  qSpoilingFactor,
+  sectors,
+  viewAvg: true,
+  driveDir: [1,0,0],
+});
+```
+
+No changes are required in `WarpDiagnostics.tsx` for this patch; its inputs are orthogonal (and it’s great that it’s mode-aware).
+
+---
+
+If you want, I can drop this in as a full file instead of a diff, but the changes above should apply cleanly to your current `warp-engine-fixed.js`.

@@ -1,0 +1,103 @@
+Great—thanks for pasting the loop. The jagged ridge is coming from two spots:
+
+* the **hard band cutoff** (`band = (|sd| <= 3 w_rho) ? 1 : 0`) which is only $C^0$;
+* the **step strobing sign** (`sgn = ±1`) which flips instantaneously by sector.
+
+Below is a drop-in replacement that keeps your Natário bell, but makes the wall **C¹/C²-smooth**, and softens strobing so adjacent vertices don’t jump different amounts.
+
+---
+
+## Replace the inner loop with this (commented)
+
+```js
+// helper
+const clamp01 = (x)=>Math.max(0, Math.min(1, x));
+const smoothstep = (a,b,x)=>{ const t = clamp01((x-a)/(b-a)); return t*t*(3-2*t); }; // C1
+const smootherstep = (a,b,x)=>{ const t = clamp01((x-a)/(b-a)); return t*t*t*(t*(t*6-15)+10); }; // C2
+const softSign = (x)=>Math.tanh(x); // smooth odd sign in (-1,1)
+
+// Core displacement calculation loop
+for (let i = 0; i < vtx.length; i += 3) {
+  const p = [vtx[i], vtx[i+1], vtx[i+2]];
+
+  // --- sector strobing: smooth, not step ---
+  const theta = Math.atan2(p[2], p[0]);
+  const u = (theta < 0 ? theta + 2*Math.PI : theta) / (2*Math.PI);
+  // map sector index to phase in [-1,1] and soften with tanh
+  const sectorIdx = Math.floor(u * sectors);
+  // distance from current split boundary in sector units
+  const distToSplit = (sectorIdx - split + 0.5);
+  // wider width => softer transition across boundary
+  const strobeWidth = 0.75;                 // tune: 0.5–1.0
+  const sgn = softSign(-distToSplit / strobeWidth); // smooth ±1
+
+  // --- ellipsoidal signed distance ---
+  const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
+  const sd  = rho - 1.0;                    // negative inside wall
+
+  // --- Natário bell with C2 window across wall ---
+  const s = sd / w_rho;                     // normalize to wall thickness
+  const gaussian = Math.exp(-s*s);          // your original bell
+  // replace hard band with C2 window of halfwidth ~ 3 w_rho
+  const window = smootherstep(-3.0, -2.0, s) * (1.0 - smootherstep( 2.0,  3.0, s)) +
+                 smootherstep(-2.0,  2.0, s); // compact, C2 across edges
+
+  // --- surface normal ---
+  const n = nEllipsoid(p, axesScene);
+
+  // --- front/back asymmetry: soften projection ---
+  const proj = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
+  const front = softSign(proj / 0.15);      // 0.1–0.2 gives gentle flip
+
+  // --- mode gains ---
+  const modeAmp = (this.currentParams.modeCurvatureAmplifier || 1.0);
+  const modeViz = (this.currentParams.modeVisualScale || 1.0);
+
+  // --- final displacement: smooth, odd across wall ---
+  // multiply by tanh(-s) to enforce smooth odd symmetry (compress/expand)
+  const odd = softSign(-s);
+  let disp = gridK * betaVis * modeAmp * modeViz
+           * gaussian * window * odd * sgn * front;
+
+  // viewer-only visual gain
+  disp *= (this.uniforms?.vizGain || 4.0);
+
+  // --- physically safe clamp (relative to local curvature radius) ---
+  const maxPush = 0.10;                     // 10% of nominal radius 1.0
+  disp = Math.max(-maxPush, Math.min(maxPush, disp));
+
+  vtx[i  ] = p[0] - n[0]*disp;
+  vtx[i+1] = p[1] - n[1]*disp;
+  vtx[i+2] = p[2] - n[2]*disp;
+}
+```
+
+### Why this removes the ridge
+
+* The **hard band** became a **C² window** (`smootherstep`), so the bell tapers continuously; no vertex falls abruptly to zero.
+* The **front/back** and **sector** signs use `tanh`, so the sign change is gradual over a small angular/normal span—adjacent vertices won’t flip opposite directions.
+* Keeping your **Gaussian bell** preserves the canonical Natário profile; `odd = tanh(-s)` maintains the compress/expand antisymmetry smoothly.
+
+---
+
+## Two quick renderer tweaks
+
+1. **Precision**
+   Ensure shaders use high precision to avoid quantization:
+
+```glsl
+precision highp float;
+precision highp int;
+```
+
+2. **Mesh density (if still “steppy”)**
+   Increase divisions when wall is thin:
+
+```js
+const baseDiv = 120;
+const divisions = Math.max(baseDiv, Math.floor(baseDiv * (0.06 / w_rho))); // thinner wall → more verts
+```
+
+---
+
+If you drop this in where your loop lives, the ridge should become “silky” without touching any upstream physics. If you still see artifacts after this, we can also switch the normal to a **finite-difference normal** sampled on the displaced surface; but in most cases, smoothing the profile and strobe is enough.

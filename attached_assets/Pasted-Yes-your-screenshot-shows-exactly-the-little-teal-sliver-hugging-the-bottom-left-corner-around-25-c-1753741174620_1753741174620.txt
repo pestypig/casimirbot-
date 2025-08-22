@@ -1,0 +1,61 @@
+Yes—your screenshot shows exactly the little teal sliver hugging the bottom‐left corner around (25 cm², 5 m) when all levers are at the Needle–Hull preset. That, combined with the “✅ Viable” badge in the Live Diagnostics, tells you the parameters are correctly identifying the viable region.
+
+To prove it by code, you can write a small test harness that calls your single‐source‐of‐truth `viability(...)` function over a few points and asserts the expected pass/fail. For example, in TypeScript:
+
+```ts
+import { viability }       from 'sim_core/viability';
+import { PipelineParams, ConstraintConfig } from 'sim_core/types';
+
+// 1) Re-declare the exact preset constants
+const pipe: PipelineParams = {
+  gap:       1e-9,
+  A_tile:    25e-4,          // 25 cm² → m²
+  gamma_geo: 25,
+  Q:         1e9,
+  duty:      0.01,
+  duty_eff:  0.01 / 400,
+  N_tiles:   1.96e9,
+  P_raw:     2e15
+};
+
+const cons: ConstraintConfig = {
+  massNominal: 1400,
+  massTolPct:  5,
+  maxPower:    100,  // MW
+  maxZeta:     1.0,
+  minGamma:    25
+};
+
+// 2) Sanity check: the preset point must be viable
+console.assert(
+  viability(25, 5.0, pipe, cons).ok,
+  'Needle–Hull preset should be viable'
+);
+
+// 3) Check a small patch around it
+for (let da of [20, 25, 30]) {
+  for (let R of [4.0, 5.0, 6.0]) {
+    const { ok, m_exotic, P_avg, zeta } = viability(da, R, pipe, cons);
+    console.log(`A=${da}cm², R=${R}m → ok=${ok}, m=${m_exotic.toFixed(1)}kg, P=${(P_avg/1e6).toFixed(1)}MW, ζ=${zeta.toFixed(3)}`);
+  }
+}
+```
+
+When you run this:
+
+- You should see `ok=true` only for (25, 5) (and maybe its immediate neighbors if your tolerances are wide).  
+- All other combos should print `ok=false`.  
+
+If that holds, then your heat‐map’s teal pixels exactly mirror the viability function. You can also:
+
+• Automate a full grid sweep test and assert the number of `ok` cells matches your on‐screen green count.  
+• Write Jest unit tests like  
+  ```ts
+  it('marks (25,5) viable and (7,1.5) non‐viable', () => {
+    expect(viability(25,5,pipe,cons).ok).toBe(true);
+    expect(viability(7,1.5,pipe,cons).ok).toBe(false);
+  });
+  ```  
+• Hook into your `PhaseDiagram` component’s internal Z‐matrix and test that `Z[i0][j0] === 1` for the index of (25 cm²,5 m).
+
+These code‐driven checks give you 100 % confidence that the plotted green sliver is not a display bug but a real map of your analytic pipeline.

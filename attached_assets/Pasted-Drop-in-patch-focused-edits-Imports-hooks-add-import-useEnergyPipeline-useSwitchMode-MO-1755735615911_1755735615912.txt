@@ -1,0 +1,160 @@
+Drop-in patch (focused edits)
+
+Imports & hooks
+
+// add
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { isFinite as _isFinite } from "lodash"; // optional; otherwise use Number.isFinite
+
+
+Pull live state once and map names
+
+// inside LiveEnergyPipeline()
+const { data: pipelineState } = useEnergyPipeline();  // authoritative operational values
+const switchMode = useSwitchMode();
+
+const P = pipelineState || {};
+const live = {
+  currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"cruise"|"emergency",
+  dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
+  sectorStrobing: Number.isFinite(P.sectorStrobing) ? P.sectorStrobing! : 1,
+  qSpoilingFactor: Number.isFinite(P.qSpoilingFactor) ? P.qSpoilingFactor! : 1,
+  qCavity:      Number.isFinite(P.qCavity) ? P.qCavity! : (qFactor ?? 1e9),
+  gammaGeo:     Number.isFinite(P.gammaGeo) ? P.gammaGeo! : (gammaGeo ?? 26),
+  gammaVanDenBroeck: Number.isFinite(P.gammaVanDenBroeck) ? P.gammaVanDenBroeck! : 2.86e5,
+  modulationFreq_GHz: Number.isFinite(P.modulationFreq_GHz) ? P.modulationFreq_GHz! : 15,
+  P_avg_MW:     Number.isFinite(P.P_avg) ? P.P_avg! : NaN,
+  M_exotic_kg:  Number.isFinite(P.M_exotic) ? P.M_exotic! : NaN,
+  zeta:         Number.isFinite(P.zeta) ? P.zeta! : NaN,
+  TS_ratio:     Number.isFinite(P.TS_ratio) ? P.TS_ratio! : NaN,
+};
+
+
+Replace local “mode presets” with MODE_CONFIGS and stop recomputing physics for descriptions
+
+// remove getModesWithDynamicDescriptions/calculateModeMetrics entirely
+
+const modes = MODE_CONFIGS; // { hover, cruise, emergency, standby }
+const currentModeCfg = modes[live.currentMode];
+
+// human-friendly description built from live values when viewing the current mode
+const liveDesc = [
+  Number.isFinite(live.P_avg_MW) ? `${live.P_avg_MW.toFixed(1)} MW` : "— MW",
+  Number.isFinite(live.M_exotic_kg) ? `${live.M_exotic_kg.toFixed(0)} kg` : "— kg",
+  Number.isFinite(live.zeta) ? `ζ=${live.zeta.toFixed(3)}` : "ζ=—"
+].join(" • ");
+
+
+Wire the mode switch to the pipeline (no in-component power math)
+
+<Select
+  value={live.currentMode}
+  onValueChange={(value) => {
+    switchMode.mutate(value as any); // authoritative mode change
+    onModeChange?.(value);
+    // optional toast can echo *live* numbers (no recompute)
+    zenLongToast("mode:switch", {
+      mode: modes[value].name,
+      duty: live.dutyCycle,
+      powerMW: live.P_avg_MW,
+      zeta: live.zeta,
+      tsRatio: live.TS_ratio,
+      exoticKg: live.M_exotic_kg,
+      gammaGeo: live.gammaGeo,
+      qFactor: live.qCavity,
+      freqGHz: live.modulationFreq_GHz,
+      sectors: live.sectorStrobing,
+      frOk: Number.isFinite(live.zeta) ? live.zeta <= (value==="hover"?0.05:value==="cruise"?1.0:0.02) : true,
+      natarioOk: Number.isFinite(live.TS_ratio) ? live.TS_ratio >= 100 : true,
+      curvatureOk: true
+    });
+  }}
+>
+  <SelectTrigger className="w-48">
+    <SelectValue placeholder="Select mode" />
+  </SelectTrigger>
+  <SelectContent>
+    {Object.entries(modes).map(([key, cfg]) => (
+      <SelectItem key={key} value={key}>
+        <div className="flex flex-col">
+          <span className="font-medium">{cfg.name}</span>
+          <span className="text-xs text-muted-foreground">
+            {key === live.currentMode ? liveDesc : `${cfg.powerTarget} MW target`}
+          </span>
+        </div>
+      </SelectItem>
+    ))}
+  </SelectContent>
+</Select>
+
+
+Show pipeline values, don’t recompute them
+
+Anywhere you currently compute:
+
+P_total_realistic → use live.P_avg_MW
+
+M_exotic_total → use live.M_exotic_kg
+
+zeta → use live.zeta
+
+TS_ratio → use live.TS_ratio
+
+qFactor → use live.qCavity
+
+duty → use live.dutyCycle
+
+sectors → use live.sectorStrobing
+
+qSpoiling → use live.qSpoilingFactor
+
+freqGHz → use live.modulationFreq_GHz
+
+Example replacements:
+
+{/* Realistic Average Power */}
+<div className="text-green-700 dark:text-green-300 font-semibold text-lg">
+  P_avg = {Number.isFinite(live.P_avg_MW) ? `${live.P_avg_MW.toFixed(1)} MW` : "—"}
+</div>
+
+{/* Quantum Safety */}
+<div className="text-primary font-semibold">
+  ζ = {Number.isFinite(live.zeta) ? live.zeta.toFixed(3) : "—"} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "✓" : "✗"}
+</div>
+
+{/* Time-scale */}
+<div className="text-primary font-semibold">
+  TS_ratio = {Number.isFinite(live.TS_ratio) ? live.TS_ratio.toFixed(1) : "—"} {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "✓" : "✗"}
+</div>
+
+{/* Use live duty & sectors in any tables */}
+<td className="text-center">{(live.dutyCycle*100).toFixed(1)}%</td>
+<td className="text-center">{live.sectorStrobing === 1 ? "1" : `1/${live.sectorStrobing}`}</td>
+<td className="text-center">{live.qSpoilingFactor === 1 ? "1" : (live.qSpoilingFactor.toExponential(0))}</td>
+
+
+Editable “exotic mass target” is fine—but don’t back-propagate it into power math
+
+Keep the input and toast, but don’t recalc gamma_pocket to invent a new U_cycle or P_avg. If you want to show the “required γ_VdB to hit target”, use pipeline’s U_cycle if exposed, otherwise show it as a what-if readout that doesn’t alter live P_avg.
+
+Example what-if line:
+
+<span className="text-xs text-muted-foreground ml-2">
+  (required γ_VdB to hit target ≈ {Number.isFinite(live.M_exotic_kg) && live.M_exotic_kg>0
+    ? (exoticMassTarget / live.M_exotic_kg * (live.gammaVanDenBroeck || 1)).toExponential(2)
+    : "—"})
+</span>
+
+
+Harden formatting
+Use guards anywhere you previously called .toExponential() or toFixed():
+
+const fmt = (v: unknown, d = "—", n?: number) => {
+  const x = Number(v);
+  if (!Number.isFinite(x)) return d;
+  return typeof n === "number" ? x.toFixed(n) : String(x);
+};
+const fexp = (v: unknown, d = "—", n = 1) => {
+  const x = Number(v);
+  return Number.isFinite(x) ? x.toExponential(n) : d;
+};

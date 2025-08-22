@@ -1,0 +1,54 @@
+You’re right: in this file the **Energy Output** line is hard-suffixing “MW”, so it will always render as MW even if the live number is small. You already added `fmtPowerUnit(...)` for the mode labels—let’s use the same smart formatter here too so it shows W / kW / MW correctly.
+
+### Patch (minimal + safe)
+
+**File:** `client/src/pages/helix-core.tsx`
+**Change:** replace the hardcoded “MW” display with `fmtPowerUnit(...)` (it expects the value in **MW**).
+
+```diff
+-                  <p className="text-lg font-mono text-yellow-400">
+-                    {fmt(pipeline?.P_avg ?? systemMetrics?.energyOutput, 1, '83.3')} MW
+-                  </p>
++                  <p className="text-lg font-mono text-yellow-400">
++                    {fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
++                  </p>
+```
+
+That will render:
+
+* 83.3 → `83.3 MW`
+* 0.297 → `297.0 kW`
+* 0.0000074 → `7.4 W`
+
+---
+
+### (Optional) Defensive auto-detect if your backend sometimes returns **watts**
+
+If you’ve got mixed units coming back (some codepaths returning W), add a tiny normalizer before calling `fmtPowerUnit`:
+
+```ts
+// value may be MW (preferred) or W (legacy); normalize to MW
+const normalizeToMW = (p?: number) => {
+  const x = Number(p);
+  if (!Number.isFinite(x)) return undefined;
+  // Heuristic: if it's between 5e3 W and 5e6 W, assume W and convert.
+  // Keeps normal MW values (e.g., 0.0074, 83.3, 297) untouched.
+  if (x > 5_000 && x < 5_000_000) return x / 1e6; // W → MW
+  return x; // already MW
+};
+```
+
+Then:
+
+```diff
+- {fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
++ {fmtPowerUnit(normalizeToMW(pipeline?.P_avg ?? systemMetrics?.energyOutput))}
+```
+
+---
+
+### Why you saw “7437.0 W”
+
+That exact W formatting likely comes from another component that deliberately converts MW→W for small values (e.g. your `MetricsDashboard` does `{P_avg >= 1 ? ... : P_avg*1e6 + ' W'}`), not from this `helix-core.tsx` block which was always appending “MW”. Unifying on `fmtPowerUnit(...)` across components will keep everything consistent.
+
+If you want, I can prep a quick follow-up patch for `MetricsDashboard` to use the same formatter so both pages match.

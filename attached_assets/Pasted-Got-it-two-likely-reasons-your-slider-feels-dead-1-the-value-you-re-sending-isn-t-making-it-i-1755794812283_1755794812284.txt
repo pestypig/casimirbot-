@@ -1,0 +1,157 @@
+Got it — two likely reasons your slider feels dead:
+
+1. the value you’re sending isn’t making it into the actual **gain** used (you’re clamping to 0..1 via `curvatureGainT`), and
+2. even when it *does* get through, the boost is too small compared to the tiny physical amplitude.
+
+Here’s a focused fix that makes the slider scream (but still stable), and works whether you drive it as “0→8” or “0→1”.
+
+---
+
+# Patch (minimal, high-impact)
+
+### A) Accept big slider values and turn them into decades
+
+Add this near where you compute `userGain` in `updateUniforms(...)`:
+
+```diff
+// NEW: accept either a normalized T (0..1) or a big numeric slider (0..8, 0..10, etc.)
+const gainInput =
+  Number.isFinite(parameters.userGain)            ? +parameters.userGain :      // absolute gain override (1..1e6)
+  Number.isFinite(parameters.curvatureGainDec)    ? +parameters.curvatureGainDec : // decades slider (0..8 => 10^dec)
+  Number.isFinite(parameters.curvatureGainT)      ? +parameters.curvatureGainT :
+  (this.uniforms?.curvatureGainT ?? 0.75);
+
+// Normalize into a usable gain:
+let userGain;
+if (gainInput > 1.5) {
+  // Treat as decades (e.g., 0..8): 10^dec, capped
+  const dec = Math.min(8, gainInput);            // cap to 8 decades => 1e8
+  userGain = Math.pow(10, dec);
+} else if (gainInput >= 0 && gainInput <= 1) {
+  // Treat as normalized T (0..1): blend 1..BoostMax
+  const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+    ? Math.max(1, parameters.curvatureBoostMax)
+    : (this.uniforms?.curvatureBoostMax ?? 40);
+  userGain = (1 - gainInput) + gainInput * boostMax;
+} else {
+  // Treat as absolute gain
+  userGain = Math.max(1, gainInput);
+}
+
+this.uniforms = {
+  ...this.uniforms,
+  ...
+  // keep for UI if you like
+  curvatureGainT: (Number.isFinite(parameters.curvatureGainT) ? Math.max(0, Math.min(1, parameters.curvatureGainT))
+                        : (this.uniforms?.curvatureGainT ?? 0.75)),
+  curvatureBoostMax: (Number.isFinite(parameters.curvatureBoostMax) ? Math.max(1, parameters.curvatureBoostMax)
+                        : (this.uniforms?.curvatureBoostMax ?? 40)),
+  // unified gain used everywhere
+  userGain,
+  ...
+};
+```
+
+**What this does**
+
+* If you pass `curvatureGainDec=8`, you get **10^8** gain.
+* If you pass `curvatureGainT=0..1`, you still get the 1..BoostMax blend.
+* If you pass `userGain` directly, we use it (≥1).
+
+> From your note (“slider from 8 to 0”), you were probably sending 8 into a param that was clamped to `[0,1]`. This fixes that.
+
+---
+
+### B) Make geometry displacement track gain harder (and still behave)
+
+In `_warpGridVertices(...)`, keep your unified amplitude but multiply by `userGain` directly and relax the ceiling just a bit. Also expand the **grid span** more so the effect stays in frame.
+
+```diff
+// --- Gain boost used for BOTH color & geometry ---
+-const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
+-const spanBoost = 1.0 + (userGain - 1.0) * 0.35;
++const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
++// Expand the grid more aggressively with gain so you actually see it
++const spanBoost = 1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5; // +0..1.5× span
+ targetSpan *= spanBoost;
+```
+
+And in the displacement block:
+
+```diff
+const thetaScale = Math.max(0, this.uniforms?.thetaScale || 0);
+const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
+-const A_base     = thetaScale;
+-const boost      = userGain;
++const A_base     = thetaScale;
++const boost      = userGain;                 // 1..1e8 (depending on your slider)
+const modeScale  =
+  mode === 'standby'   ? 0.95 :
+  mode === 'cruise'    ? 1.00 :
+  mode === 'hover'     ? 1.05 :
+  mode === 'emergency' ? 1.08 : 1.00;
+-const A_vis = Math.min(1.0, A_base * boost * modeScale);
++// keep geometry sane: compress *after* boosting
++const A_vis = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
+...
+-const maxPush = 0.15;
++// let curvature breathe more under big gain
++const maxPush = 0.22;
+```
+
+This **log10** compress at the very end keeps huge boosts legible without flattening everything at 1.0 instantly.
+
+---
+
+### C) Make the **shader** honor the same giant gain
+
+You already pass `u_userGain`. To mirror the geometry compression exactly, tweak the fragment shader mapping:
+
+```glsl
+// Before:
+float val = theta * u_thetaScale * max(1.0, u_userGain);
+float denom = log(1.0 + max(1.0, u_exposure));    // simpler norm is fine
+float mag = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));
+float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / denom), -1.0, 1.0);
+
+// After (match geometry’s log10 compression feel)
+float val = theta * u_thetaScale * max(1.0, u_userGain);
+float mag = log2(1.0 + abs(val) / max(u_zeroStop, 1e-18));   // base-2/log-like tone map
+float norm = max(1.0, u_exposure);                           // exposure widens range
+float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / log2(1.0 + norm)), -1.0, 1.0);
+```
+
+This makes very large `u_userGain` values obvious in color without washing out immediately.
+
+---
+
+### D) Driving it from UI
+
+You now have **three** entry points; pick one and stick to it:
+
+* **Decades slider** (recommended): send `curvatureGainDec` in `[0..8]` (e.g. `0 → real`, `2 → ×100`, `4 → ×10,000`, `8 → ×100M`).
+* **Normalized slider**: send `curvatureGainT` in `[0..1]` and set a `curvatureBoostMax` (e.g. 200–1000).
+* **Direct gain**: send `userGain` as an absolute multiplier (≥1).
+
+Example:
+
+```ts
+engine.updateUniforms({
+  // choose ONE of the following styles:
+  curvatureGainDec: 3,            // +3 decades ⇒ ×1000
+  // curvatureGainT: 0.9,         // 90% between 1..BoostMax
+  // userGain: 5_000,             // direct ×5000
+  curvatureBoostMax: 1_000,       // only used with T
+  ...
+});
+```
+
+---
+
+## Quick sanity checklist
+
+* If you move your slider **8 → 0** using `curvatureGainDec`, you should see a dramatic change (×10^8 down to ×1).
+* If you use `curvatureGainT`, set `curvatureBoostMax` high enough (e.g., 1000+).
+* Verify `this.uniforms.userGain` in console logs (dump it in `updateUniforms`) to confirm the value you expect is the one used.
+
+Want me to hand you a tiny UI snippet for a “Decades” slider (labels like ×1, ×10, ×100, … ×1e8) that writes `curvatureGainDec` so this is foolproof?

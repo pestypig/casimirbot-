@@ -1,0 +1,160 @@
+Short answer: not yet. A few of the big patches didn’t make it in, so the UI still diverges from the pipeline in places. Here’s a precise punch‑list with paste‑in fixes.
+
+# Must‑fix mismatches
+
+## 1) Instant “Active Tiles” ignores the 1% local burst window
+
+Your `deriveActiveTiles` still returns `totalTiles/sectors` (or `totalTiles*duty`) without the pipeline’s `BURST_DUTY_LOCAL = 0.01`.
+
+**Replace the whole helper** with:
+
+```ts
+// derive instantaneous active tiles from pipeline/system state
+const deriveActiveTiles = (
+  totalTiles?: number,
+  sectors?: number,
+  duty?: number,
+  mode?: 'standby'|'hover'|'cruise'|'emergency'
+) => {
+  if (!isFiniteNumber(totalTiles) || !isFiniteNumber(sectors) || sectors <= 0) return undefined;
+  if (mode === 'standby' || !isFiniteNumber(duty) || duty <= 0) return 0;
+
+  const BURST = 0.01; // pipeline's BURST_DUTY_LOCAL
+  if (sectors > 1) {
+    // one sector at a time; only 1% of that sector is ON in the local window
+    return Math.round((totalTiles / sectors) * BURST);
+  } else {
+    // no strobing; duty-eligible fraction, still burst-gated
+    return Math.round(totalTiles * duty * BURST);
+  }
+};
+```
+
+Also, in the footer text under the number, consider adding:
+
+```
+instant ≈ (N_tiles / S_live) × 0.01   (if S_live > 1)
+instant ≈ N_tiles × duty × 0.01       (if S_live = 1)
+```
+
+## 2) γ\_VdB defaults + tooltip text
+
+You still pass `gammaVanDenBroeck: pipeline?.gammaVanDenBroeck || 2.86e5` and the tooltip says it “doesn’t vary with duty/sectoring.”
+In the pipeline, γ\_VdB is the **mass‑only calibration** and **changes by mode** (e.g., \~3.83e1 in hover/emergency; \~1.53e4 in cruise).
+
+**Fix the tooltip copy** (keep it short and true):
+
+```tsx
+<p className="opacity-80">
+  Used here as a mass‑only calibration. It may vary by mode to hold the exotic‑mass target.
+</p>
+```
+
+**Fix the default sent to visualizers** (prefer live; otherwise neutral, not 2.86e5):
+
+```tsx
+gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
+```
+
+## 3) ε (epsilonTilt) fallback overwrites your physical value
+
+You compute a tiny `epsilonTilt` physically, then pass `systemMetrics?.shiftVector?.epsilonTilt ?? 0.012` (overwriting the small value).
+
+**Use the computed value as the fallback**:
+
+```tsx
+const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
+...
+epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+...
+shift: {
+  epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
+  betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+  gTarget: gTarget, R_geom: R_geom,
+  gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
+},
+```
+
+## 4) TS (time‑scale separation) semantics & defaults
+
+You still default to `4102.74` and mark **SAFE when TS < 1**, but the pipeline’s `TS_ratio = T_long/T_m` is **≫1** in normal ops (≈5.0×10⁴ at 15 GHz & 1007 m).
+
+**Make it consistent** (keep TS as pipeline defines it and flip the badge):
+
+```tsx
+// when passing to components
+tsRatio={pipeline?.TS_ratio ?? 5.03e4}
+
+// badge
+const ts = pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio;
+<Badge className={(ts ?? 0) > 1 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}>
+  {(ts ?? 0) > 1 ? 'SAFE' : 'CHECK'}
+</Badge>
+```
+
+## 5) ζ (Ford–Roman proxy) fallback “0.032”
+
+That hardcoded default is not a pipeline value (hover/emergency ≈ 0.0001; cruise ≈ 0.04).
+
+**Remove the magic default**:
+
+```tsx
+ζ = { fmt(pipelineState?.zeta ?? systemMetrics?.fordRoman?.value, 3, '—') }
+```
+
+And in `FuelGauge`/`TripPlayer` props, drop `|| 0.032` in favor of `—`/undefined or compute from `pipeline` if present.
+
+## 6) “Curvature Threshold” card shows mass proxy but is labeled R
+
+You compute `|U_cycle| / c²` (mass equivalent), not curvature.
+
+**Either relabel**, or compute a proper curvature proxy. Quick relabel:
+
+```tsx
+<span className="text-sm">Energy Budget Proxy</span>
+<span className="font-mono text-sm">
+  M_eq = {fexp(Math.abs(pipelineState?.U_cycle ?? 0) / 9e16, 0, '—')} kg
+</span>
+```
+
+## 7) Power/Mass fallbacks show hover numbers in other modes
+
+You send `powerAvg_MW: pipeline?.P_avg || 83.3` and `exoticMass_kg: pipeline?.M_exotic || 1405`. Those are hover targets.
+
+**Mode‑aware fallback** (if pipeline is missing), using the same targets the pipeline uses:
+
+```tsx
+const MODE_TARGET = {
+  hover:     { P_W: 83.3e6,   M_kg: 1000 },
+  cruise:    { P_W: 7.437e-6, M_kg: 1000 }, // 7.437 µW
+  emergency: { P_W: 297.5e6,  M_kg: 1000 },
+  standby:   { P_W: 0,        M_kg: 0 }
+}[effectiveMode];
+
+powerAvg_MW: isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : (MODE_TARGET.P_W / 1e6),
+exoticMass_kg: isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : MODE_TARGET.M_kg,
+```
+
+# Nice‑to‑have cleanups (keep drift at zero)
+
+* Centralize shared constants (400 sectors, 0.01 burst, 1e9 Q) in your pipeline hook and import here, instead of sprinkling literals:
+
+  ```ts
+  export const PIPE_CONST = { TOTAL_SECTORS: 400, BURST_DUTY_LOCAL: 0.01, Q_BURST: 1e9 };
+  ```
+
+  Then replace `400` and any implicit `0.01` usage.
+
+* In the “Active Tiles” percentage subtitle, reflect the burst window too (currently it prints `~(1/sectors)% of grid` without the ×0.01 factor). For example:
+
+  ```tsx
+  {sectorsLive > 1
+    ? `${sectorsLive} sectors • ~${(100 / sectorsLive / 100).toLocaleString(undefined, {maximumFractionDigits:2})}% of grid ON`
+    : `${(dutyLive * 1).toFixed(1)}% eligible • 1% local ON`}
+  ```
+
+  (Or explicitly show both: “eligible fraction” vs “local ON window”.)
+
+---
+
+If you apply the 7 must‑fixes above, the UI and the pipeline will be reading from the same hymn sheet. Want me to hand you a tiny `ui-physics.ts` with these getters so every panel imports the same formulas?

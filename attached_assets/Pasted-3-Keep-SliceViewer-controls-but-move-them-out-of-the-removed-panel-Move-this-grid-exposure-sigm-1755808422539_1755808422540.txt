@@ -1,0 +1,63 @@
+3) Keep SliceViewer controls, but move them out of the removed panel
+
+Move this grid (exposure, sigma range, diff mode, contours) into a small section just above/below the <SliceViewer />:
+
+{/* Slice settings (kept) */}
+<div className="p-3 bg-slate-950 rounded-lg border border-slate-700">
+  <div className="grid grid-cols-2 gap-3 text-xs">
+    <div className="space-y-1">
+      <Label htmlFor="exposure-slider" className="text-slate-300">Exposure ({exposure})</Label>
+      <Input
+        id="exposure-slider"
+        type="range"
+        min="1" max="12" step="1"
+        value={exposure}
+        onChange={(e) => update("exposure", parseFloat(e.target.value))}
+        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+      />
+    </div>
+
+    <div className="space-y-1">
+      <Label htmlFor="sigma-slider" className="text-slate-300">Sigma Range ({sigmaRange})</Label>
+      <Input
+        id="sigma-slider"
+        type="range"
+        min="2" max="12" step="1"
+        value={sigmaRange}
+        onChange={(e) => update("sigmaRange", parseInt(e.target.value))}
+        className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+      />
+    </div>
+
+    <div className="flex items-center space-x-2">
+      <Switch id="diff-mode" checked={diffMode} onCheckedChange={(checked) => update("diffMode", checked)} />
+      <Label htmlFor="diff-mode" className="text-slate-300">Diff Mode</Label>
+    </div>
+
+    <div className="flex items-center space-x-2">
+      <Switch id="show-contours" checked={showContours} onCheckedChange={(checked) => update("showContours", checked)} />
+      <Label htmlFor="show-contours" className="text-slate-300">Show Contours</Label>
+    </div>
+  </div>
+</div>
+
+
+Nothing else needs to reference a gain.
+
+4) Fix the mapMode initializer bug & keep map controls separate
+
+You’ve got a small logic bug:
+
+// current (buggy): always truthy due to ("solar")
+(stored === "galactic" || "solar") ? stored : "solar"
+
+
+Make it:
+
+const [mapMode, setMapMode] = useState<"galactic" | "solar">(() => {
+  const stored = localStorage.getItem("helix-mapMode");
+  return stored === "galactic" ? "galactic" : "solar";
+});
+
+
+Ensure the Galaxy map controls live near the Mission Planner card (not inside the Slice/Shell panel you removed). If they were nested by accident, move that <div className="flex items-center space-x-4">…</div> into the Mission Planner header where you already have them.

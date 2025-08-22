@@ -1,0 +1,69 @@
+Great—your ORTHO test proves beyond doubt that the grid data, shaders and draw calls are all correct. The fact that everything vanishes under your real perspective means your **projection matrix** is still wrong. Let’s isolate and fix that:
+
+1) Perspective-only MVP test  
+   Replace your real MVP with *just* the projection (no view) and draw the grid with depth‐test off:
+
+   ```js
+   // in _renderGridPoints() before draw:
+   gl.disable(gl.DEPTH_TEST);
+   const fov    = Math.PI/4;
+   const aspect = this.canvas.width/this.canvas.height;
+   const near   = 0.01, far = 10.0;
+   const f      = 1/Math.tan(fov/2);
+
+   // Correct projection parameters:
+   //   M[0,0]=f/aspect;  M[1,1]=f;
+   //   M[2,2]=(far+near)/(near-far);
+   //   M[2,3]=(2*far*near)/(near-far);
+   //   M[3,2]=-1;  all else 0
+   const proj = new Float32Array([
+     f/aspect, 0,        0,                             0,
+     0,        f,        0,                             0,
+     0,        0,   (far+near)/(near-far),  (2*far*near)/(near-far),
+     0,        0,       -1,                             0
+   ]);
+   gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, proj);
+
+   // Draw as LINES
+   gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+   gl.enableVertexAttribArray(this.gridUniforms.position);
+   gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+   gl.uniform3f(this.gridUniforms.sheetColor, 1,1,1);    // white for testing
+   gl.drawArrays(gl.LINES, 0, this.gridVertexCount);
+   ```
+
+   If **you now see** the three white wireframes at ±0.8 in X/Y, your projection is correct. If you **still see nothing**, double‐check your `near` vs. `far` signs:  
+   
+   • `(far+near)/(near-far)` must be **negative** (≈ –1.002)  
+   • `(2∙far∙near)/(near-far)` must be **negative** (≈ –0.0200)  
+
+2) Fix your existing projection  
+   In your code you likely have the last row as `[..., -0.2, 0]` instead of the correct `[..., -0.020, 0]`. That ten-fold error will collapse all Z into behind‐the‐camera. So simply:
+
+   ```diff
+   // before
+   const proj = new Float32Array([
+     2.4,0,0,0,
+     0,2.4,0,0,
+     0,0,-1.002,-1,
+     0,0,-0.2,0    // WRONG! -- pushes Z too far
+   ]);
+   // after
+   const proj = new Float32Array([
+     2.4,0,0,0,
+     0,2.4,0,0,
+     0,0,-1.002,-1,
+     0,0,-0.020,0  // CORRECT: (2*10*0.01)/(0.01−10) ≈ -0.0200
+   ]);
+   ```
+
+3) Re-enable your view  
+   Once the projection is right, re-apply your view matrix (with the positive Z-translation you added) and depth‐test on. You’ll instantly see your:
+
+   • Cyan floor  
+   • Magenta side-wall  
+   • Yellow end-wall  
+
+all curving around the orange bubble. 
+
+Give that a try—the projection fix is the last piece.

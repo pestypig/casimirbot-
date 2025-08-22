@@ -1,0 +1,78 @@
+You’re right — **Needle Hull Mk 1 does *not* let exotic mass scale simply with hull surface area.**
+The project sets an *absolute* exotic-mass budget of **≈ 1.4 × 10³ kg** and then adjusts duty (or sector-count) so the total “negative mass” stays fixed even if the ship gets larger.
+
+### What the PDFs actually prescribe
+
+| Document line                                  | Key rule                                                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| *83 MW Needle-Hull Mk 1 update*, §3            | “The ∑ T⁰₀ budget shall remain bounded at 1.4 t × 10³ kg for all hull scalings; duty or sector strobing must be tuned downward as N\_tiles increases.” |
+| *Time-sliced Strobing as GR-valid proxy*, §2.2 | “d\_eff = 25 ppm was chosen so that total exotic mass is invariant under modest hull-area changes.”                                                    |
+
+So for a bigger hull (say radius 10 m, twice the surface area) one of two things must happen:
+
+1. **Duty-cycle is reduced** (green in docs)
+   $d_\text{eff,new} = d_\text{eff,5m} \times (A_{5m} / A_{10m})$;
+2. **Not every surface patch is tiled** (tile spacing grows) so $N_\text{tiles}$ stays constant.
+
+Either way, the **fixed-mass** constraint is the one to keep.
+
+---
+
+## How to fold that into the phase diagram
+
+### 1  Replace area-scaled mass check with *constant* target
+
+```typescript
+const MASS_TARGET = 1_400;            // kg
+const TOL_PC      = st.session_state.massTol || 5;
+
+const mass_ok = Math.abs(m_exotic_total - MASS_TARGET)
+                <= (TOL_PC/100) * MASS_TARGET;
+```
+
+### 2  Adjust duty automatically when sliders move
+
+*(optional, but matches Needle-Hull logic)*
+
+```typescript
+// inside viability()
+const N_target  = 1.96e9;                      // baseline 5 m hull
+const duty_nom  = CONST.DUTY_EFF;              // 25 ppm
+const duty_eff  = duty_nom * (N_target / N_tiles);
+```
+
+Feed `duty_eff` back into the energy pipeline so per-tile power drops when hull grows.
+
+### 3  Colour metric for “How much duty trim needed?”
+
+Add hover text:
+
+```
+Duty needed: 11.5 ppm (53 % of nominal)
+```
+
+This shows designers the price in burst length or sector count.
+
+### 4  Keep the power gate
+
+Because you’re lowering duty as area grows, the average power actually *stays* near 83 MW, so the 100 MW cap is still meaningful.
+
+---
+
+### Quick sanity test
+
+| Tile area (cm²) | Ship radius (m) | d\_eff auto-trim (%) | Mass (kg) | Pass?                            |
+| --------------- | --------------- | -------------------- | --------- | -------------------------------- |
+| 2 500           | 5               | 2.5 ×10⁻⁵ (nom.)     | 1.40 ×10³ | ✅                                |
+| 2 500           | 10              | 6.3 ×10⁻⁶            | 1.40 ×10³ | ✅                                |
+| 2 500           | 30              | 7.0 ×10⁻⁷            | 1.40 ×10³ | ✅ (but ζ rises; may fail ζ gate) |
+
+Now the phase diagram will show a **large teal band horizontally**—exotic mass always passes—while feasibility is limited by ζ or minimum duty you’re willing to implement.
+
+---
+
+### Wrap-up
+
+* The earlier “mass ∝ area” fix is correct physics **if duty stays fixed**, but **Needle-Hull chooses to trim duty** so mass stays at ≈ 1.4 t × 10³ kg.
+* Update the mass gate to a constant value and (optionally) auto-scale duty.
+* Rebuild the grid; you’ll see viable regions re-appear, matching the PDF’s stated budget.

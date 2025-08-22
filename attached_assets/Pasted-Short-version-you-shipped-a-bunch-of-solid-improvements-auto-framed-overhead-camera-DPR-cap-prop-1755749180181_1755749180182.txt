@@ -1,0 +1,167 @@
+Short version: you shipped a bunch of solid improvements (auto-framed overhead camera, DPR cap, proper ellipsoidal normalization, interior “tilt” window, and cleaner York-time coloring). But there are 4 issues holding your “mode contrast” back—plus one hard bug that will actually break `_warpGridVertices` at runtime.
+
+Here’s the punch list, in priority order:
+
+---
+
+## 🔥 1) Hard bug: `const a` / `const b` name collision
+
+Inside `_warpGridVertices` you declare:
+
+```js
+const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2]; // meters
+…
+const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
+```
+
+That second `const a, b` redeclaration is in the same scope → **SyntaxError: Identifier 'a' has already been declared**. Rename those window parameters:
+
+```diff
+- const asd = Math.abs(sd), a = 3.5*w_rho_local, b = 5.0*w_rho_local;
+- const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0
+-                : 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a)));
++ const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
++ const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
++                : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin)));
+```
+
+(Keep `a,b,c` for hull axes as-is so later logs like `[…] for hull [${a}×${b}×${c}]m` remain correct.)
+
+---
+
+## 🎚 2) You compute curvature twice with different chains
+
+There’s an early “physics-accurate amplitude” (A\_phys → A\_used → betaVis) and later a second chain (A\_gross → log-compress → modeScale → A\_vis). These drift apart and visually cancel contrast.
+
+**Pick one chain** (recommend the later log-compressed one for on-screen separation) and delete the other. Then expose a single viewer gain knob and an “auto exposure” path in the shader (see next).
+
+---
+
+## 🌈 3) Add exposure & contours in the fragment shader (biggest visual win)
+
+Right now `tVis = clamp(theta, -1, 1)`, which hides small deltas. Add a symmetric log exposure and iso-contours:
+
+```diff
+ // inside the grid fragment shader after computing `theta`
+- float tVis = clamp(theta * 1.0, -1.0, 1.0);
++ // symmetric log exposure: maps tiny curvature to visible color
++ uniform float u_exposure;   // e.g. 3.0 .. 12.0 (UI slider)
++ uniform float u_zeroStop;   // ~1e-9 .. 1e-5 (prevents log blowup)
++ float sgn = sign(theta);
++ float mag = log(1.0 + abs(theta) / max(1e-20, u_zeroStop)) / max(1e-6, u_exposure);
++ float tVis = clamp(sgn * mag, -1.0, 1.0);
+
+  vec3 col = diverge(tVis);
+
++ // optional iso-contours to cue gradient (12 rings across range)
++ float iso = abs(fract( (tVis * 0.5 + 0.5) * 12.0 ) - 0.5);
++ float isoMask = smoothstep(0.49, 0.495, iso);
++ col = mix(col, vec3(1.0), isoMask);
+```
+
+And set the new uniforms:
+
+```diff
+// JS side in _renderGridPoints()
+gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
++ gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure ?? 6.0);
++ gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop ?? 1e-7);
+```
+
+Don’t forget to add `exposure` and `zeroStop` to `this.gridUniforms` lookups in `_compileGridShaders`.
+
+With this, you’ll see immediate separation between standby/hover/cruise/emergency without distorting geometry.
+
+---
+
+## 🧭 4) Mode contrast UX: gain mapping & reference-difference
+
+Add two tiny UX hooks:
+
+* **Mode → gain map:** give modes distinct default `vizGainOverride` (or just set `u_exposure`):
+
+  * standby: exposure 10–12, hover: 8, cruise: 6, emergency: 4
+
+* **Δθ toggle:** keep a “reference” scalar (capture `theta` in a tiny offscreen buffer or recompute in shader from a stored reference uniform set) and show **current − reference**. If you want zero new passes, add a boolean `u_diffMode` and a `u_refParams` struct; compute `theta_ref` alongside `theta` and subtract before exposure.
+
+This makes small operational shifts visually obvious.
+
+---
+
+## 🧼 5) Minor polish / perf nits
+
+* `_createGrid` returns a `Float32Array`, but you wrap it again:
+  `this.gridVertices = new Float32Array(gridData);`
+  **Remove the extra wrap** (`gridData` is already a `Float32Array`).
+
+* When updating vertices you call `bufferData` each time. For frequent small param nudges, **prefer `bufferSubData`** after `gl.bufferData` alloc once (keeps the same GPU allocation).
+
+* The baseline “wavy” Y variation in `_createGrid` improves 3D read but can mask subtle curvature. Consider a flag: `yVariation = this.uniforms?.gridWave ?? 0.05;` and set it to `0` when showcasing micro differences.
+
+* Camera: you do both `_fitCameraToBubble` and `_applyOverheadCamera` on bootstrap/update. You only need **one** (keep `_applyOverheadCamera({spanHint})` as single source).
+
+---
+
+## What went well
+
+* ✅ DPR cap prevents accidental “zoom-in” on phones.
+* ✅ Overhead fit picks a stable, readable pose.
+* ✅ Interior tilt window uses a clean C¹ smoothstep and doesn’t couple to the wall ring.
+* ✅ Diagnostics sampler (`_sampleYorkAndEnergy`) is a great source for setting auto-exposure targets.
+
+---
+
+## Tiny patch bundle (safe to drop in)
+
+**Add uniforms in shader creation:**
+
+```diff
+ this.gridUniforms = {
+   mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
+   colorByTheta: gl.getUniformLocation(this.gridProgram, 'u_colorByTheta'),
+   sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
+   axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
+   driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
+   wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
+   vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip'),
+   epsTilt: gl.getUniformLocation(this.gridProgram, 'u_epsTilt'),
+   intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
+   tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
++  exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
++  zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
+ };
+```
+
+**Set defaults in `this.uniforms`:**
+
+```diff
+ this.uniforms = {
+   vizGain: 4.0,
+   colorByTheta: 1.0,
+   vShip: 1.0,
+   wallWidth: 0.06,
+   axesClip: [0.40, 0.22, 0.22],
+   driveDir: [1, 0, 0],
+   epsilonTilt: 0.0,
+   betaTiltVec: [0, -1, 0],
+   tiltGain: 0.55,
++  exposure: 6.0,
++  zeroStop: 1e-7
+ };
+```
+
+**Bind them every draw:**
+
+```diff
+ gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
++gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure ?? 6.0);
++gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop ?? 1e-7);
+```
+
+**Fix the `a/b` collision as shown above.**
+
+---
+
+### Verdict
+
+The patches moved the architecture in the right direction (clean camera, stable ellipsoid normalization, smooth interior effects). To make mode changes unmistakable on the big model, you need **per-pixel exposure control and contours** (above), and to **remove the duplicate amplitude chain** so your contrast isn’t self-cancelled. Do those, plus the `a/b` bug fix, and you’ll immediately see crisp separation between modes—without cartooning the geometry.

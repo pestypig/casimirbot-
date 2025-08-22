@@ -1,0 +1,69 @@
+Great catch. You’ve got two places still expressing **7.437 W** as **7.437 kW**. Here are the exact fixes:
+
+# 1) `HelixCore` (first big file)
+
+**Problem:** `WarpVisualizer` is fed a cruise fallback of `7.437e-3` **MW** (= 7.437 kW).
+**Fix:** Use **7.437e-6 MW** (= 7.437 W).
+
+**Find:**
+
+```ts
+powerAvg_MW: pipeline?.P_avg || 7.437e-3, // Mode-aware cruise power
+```
+
+**Replace with:**
+
+```ts
+powerAvg_MW: pipeline?.P_avg || 7.437e-6, // Mode-aware cruise power (7.437 W)
+```
+
+(Everything else in this file that formats power assumes **MW** as the internal unit, so this single fallback constant is the one that needed correcting.)
+
+---
+
+# 2) `MetricsDashboard` (second file)
+
+**Problem:** `MODE_TARGET.cruise.P_W` is set to `7.437e3` (kW).
+**Fix:** Set it to **7.437** (W). The pipeline→display conversion already divides by `1e6`, so it will come out as MW correctly.
+
+**Find:**
+
+```ts
+const MODE_TARGET = {
+  hover:     { P_W: 83.3e6,   M_kg: 1000 },
+  cruise:    { P_W: 7.437e3,  M_kg: 1000 }, // 7.437 kW
+  emergency: { P_W: 297.5e6,  M_kg: 1000 },
+  standby:   { P_W: 0,        M_kg: 0 }
+} as const;
+```
+
+**Replace with:**
+
+```ts
+const MODE_TARGET = {
+  hover:     { P_W: 83.3e6,  M_kg: 1000 },
+  cruise:    { P_W: 7.437,   M_kg: 1000 }, // 7.437 W
+  emergency: { P_W: 297.5e6, M_kg: 1000 },
+  standby:   { P_W: 0,       M_kg: 0 }
+} as const;
+```
+
+*(No other changes needed here: `getPhysicsDefaults` already does `target.P_W / 1e6` → MW for the UI, and your local `fmtPowerUnit` formats that MW value into MW/kW/W correctly.)*
+
+---
+
+# Quick sanity checks (after the fix)
+
+* **Any place you pass a `powerAvg_MW` prop or store `P_avg`** → value should be in **MW**.
+
+  * 7.437 W in MW is **7.437e-6 MW**.
+* **Search the repo** for stray values that imply kW instead of W:
+
+  * `7.437e-3` (kW in MW units)
+  * `7.437e3` (kW in W units)
+  * `7.437 kW`
+* The common conversions you should see in the running UI now:
+
+  * Cruise P\_avg printed as **“7.4 W”** (rounded), not **kW**.
+
+If you want, I can also give you a tiny test helper that asserts the unit path (W → MW → formatted string) is consistent for each mode.

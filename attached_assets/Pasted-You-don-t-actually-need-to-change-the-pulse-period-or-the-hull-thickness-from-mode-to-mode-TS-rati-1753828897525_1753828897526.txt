@@ -1,0 +1,55 @@
+You don’t actually need to *change* the pulse period or the hull thickness from mode to mode—TS_ratio stays at ~4 100 in Hover, Cruise, Emergency and Standby. What you need to do is *display* it and *enforce* it exactly the same way you do P_avg, ζ, M_exotic, etc., in your Live Energy Pipeline. Here’s how to bolt it in:
+
+1) Add a “TS Threshold” constant  
+   In your constants block alongside `CONSTRAINTS.P_max` etc. insert:  
+   ```js
+   CONSTRAINTS.TS_min = 100;   // require TS_ratio ≥ 100
+   ```
+
+2) Compute TS_ratio in your pipeline function  
+   In `computeMetrics()` (or wherever you do step 6) return also:  
+   ```js
+   const TS_ratio = tauLC / tauPulse;   // ≃ 4103 for 82 m @ 15 GHz
+   return { …, TS_ratio };
+   ```
+
+3) Expose it in your Raw Metrics panel  
+   In your `updateDashboard()` add:  
+   ```js
+   tsEl.textContent = m.TS_ratio.toFixed(1);    // e.g. “4103.0”
+   ```
+   and hook `tsEl` to the TS field in your HTML.
+
+4) Normalize & plot it on the radar  
+   Still in `updateDashboard()` build your normalized array:  
+   ```js
+   const norm_TS = m.TS_ratio / CONSTRAINTS.TS_min;  
+   const normalized = [
+     m.P_avg/CONSTRAINTS.P_max,
+     m.M_exotic/CONSTRAINTS.M_target,
+     m.zeta/CONSTRAINTS.zeta_max,
+     norm_TS,                 // Time-Scale
+     m.P_raw/CONSTRAINTS.P_raw_max,
+     (inputs.duty/100)/CONSTRAINTS.d_max
+   ];
+   radarChart.data.datasets[0].data = normalized;
+   radarChart.update();
+   ```
+
+5) Show a pass/fail traffic-light  
+   Right next to your TS read-out, you can put a little ✓/✗ icon depending on  
+   ```js
+   tsStatusEl.textContent = (m.TS_ratio >= CONSTRAINTS.TS_min) ? '✓' : '✗';
+   ```
+
+6) Embed per-mode presets (optional)  
+   If you already have a `PRESETS` object for Hover, Cruise, etc., simply include the unchanged `TS_threshold: 100` value in each preset. When you load the preset you’ll automatically re-compute TS_ratio (same 4 100) and it will pass.
+
+Once you do steps 1–5, your Live Energy Pipeline will show, for *every* mode:
+
+ • Raw TS_ratio: 4103.0  
+ • TS threshold: 100  
+ • Normalized TS spoke: 41.03 (plotted far outside the green circle, which is fine—it just means you’re *very* deep in the homogenized regime)  
+ • A green check-mark ✓ next to “TS_ratio ≥ 100”
+
+Because TS_ratio never changes, you’ll see the same value in all four modes—but it will be explicitly displayed, normalized and validated just like P_avg and ζ. That way you—and anyone else—can immediately see that *every* operational mode lives in the GR-homogenized regime.

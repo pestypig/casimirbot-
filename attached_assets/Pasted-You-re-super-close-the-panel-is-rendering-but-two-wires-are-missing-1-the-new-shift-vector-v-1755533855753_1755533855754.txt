@@ -1,0 +1,112 @@
+You’re super close—the panel is rendering, but two wires are missing:
+
+1. the new “shift vector” values aren’t flowing from metrics → visualizer → engine, and
+2. the engine has uniforms for tilt but doesn’t actually *use* them in the displacement.
+
+Below is a compact patch that fixes both, plus a tiny safety default so the panel shows numbers as soon as metrics arrive.
+
+---
+
+# 1) Wire metrics → WarpVisualizer → engine
+
+### `client/src/pages/helix-core.tsx`
+
+You’re already rendering the panel and passing `shift={systemMetrics?.shiftVector}`. Keep that. The only addition is to pass the same values into the 3D visualizer via its `parameters`. (This keeps the panel, the equations, and the grid in lockstep.)
+
+Find where you render `<WarpVisualizer … />` and include the `shiftVector` parameters:
+
+```tsx
+<WarpVisualizer
+  key={`viz-${modeVersion}`}
+  parameters={{
+    // existing props...
+    currentMode: pipeline?.currentMode || 'hover',
+    sectorStrobing: pipeline?.sectorStrobing || 1,
+
+    // HULL (so R_geom can be computed for the panel & engine)
+    hull: hullMetrics?.hull || {
+      Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+      a: 503.5, b: 132.0, c: 86.5
+    },
+
+    // WALL
+    wallWidth_m: 6.0,    // your 16 nm canonical wall (adjust if you’re using 16 nm exactly)
+
+    // SHIFT VECTOR (new)
+    epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? 0,
+    betaTiltVec: systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0],
+  }}
+/>
+```
+
+(That page already hosts the visualizer and the new panel, so it’s the natural bridge between both. )
+
+---
+
+# 2) Engine: actually apply the tilt in the vertex warp
+
+### `client/public/warp-engine-fixed.js`
+
+You already declare `epsilonTilt` and `betaTiltVec` in `this.uniforms`. Now add a *small, smooth, interior-only* contribution so the bubble develops a gentle cabin “down”:
+
+Search in `_warpGridVertices` for the **core displacement loop** (where `sd`, `n`, `wallWin`, etc. are computed). Add the marked block:
+
+```js
+// --- (existing code) n = nEllipsoid(...), sd, wallWin, etc. ---
+
+// ===== NEW: Gentle interior tilt (shift-vector “gravity”) =====
+const eps = (this.uniforms?.epsilonTilt || 0.0);
+if (eps > 0.0) {
+  // unit tilt direction in scene space
+  const b = this.uniforms?.betaTiltVec || [0, -1, 0];
+  const bm = Math.hypot(b[0], b[1], b[2]) || 1;
+  const bhat = [b[0]/bm, b[1]/bm, b[2]/bm];
+
+  // interior window: only acts inside the wall, smooth to 0 at the wall
+  // use a C² envelope so there’s no ridge at the boundary
+  const innerA = -3.0 * w_rho_local;
+  const innerB = -0.5 * w_rho_local;
+  const tInterior = (sd < 0.0)
+    ? (function smootherstep(a,b,x){const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*t*(t*(t*6-15)+10);} (innerA, innerB, sd))
+    : 0.0;
+
+  // project surface normal onto "down" to bias the wall in that direction
+  const nDotDown = n[0]*bhat[0] + n[1]*bhat[1] + n[2]*bhat[2];
+
+  // couple tilt to the canonical bell & wall window so it’s physical and gentle
+  const tiltPush = eps * nDotDown * gaussian_local * wallWin * tInterior;
+
+  // add the interior tilt to the canonical displacement
+  disp += tiltPush;
+}
+// ===== END NEW =====
+```
+
+This produces a subtle, mode-compatible slope inside the cabin region without reintroducing the old C⁰ “ridge.” (And because it’s multiplied by the same bell/window terms you use for the wall, the effect remains canonically smooth.) The rest of the engine stays the same; uniforms are already declared and set up.&#x20;
+
+---
+
+# 3) Panel math: show values even before the backend fills them
+
+The panel’s equations are:
+
+* $R_{\text{geom}} = (a\,b\,c)^{1/3}$
+* $\epsilon_{\text{tilt}} = \dfrac{g_{\text{target}}\,R_{\text{geom}}}{c^2}$
+* $g_{\text{eff}} = \dfrac{\epsilon_{\text{tilt}}\,c^2}{R_{\text{geom}}}$  (sanity check)
+
+So if the API hasn’t provided `epsilonTilt` yet, compute it on the client from `g_target` and `R_geom` (which you can derive from `hull.a,b,c` already passed to the visualizer). That way your panel fields never sit blank.
+
+---
+
+# 4) Quick test checklist
+
+* Load **/helix-core**; open console.
+  You should see one uniform update log with `epsilonTilt` and `betaTiltVec`, and the grid gains a barely visible “down” in **HOVER**.
+* Change mode to **EMERGENCY**: curvature should swell, and the tilt persists (because the added term multiplies the same wall/bell envelope used for the bubble).
+* Slide `epsilonTilt` (in your metrics or a temporary UI knob) from `0 → 1e-8` to see the interior slope scale up smoothly.
+
+If anything still looks flat: confirm that `/api/helix/metrics` returns a `shiftVector` block (e.g., `{ epsilonTilt: number, betaTiltVec: [x,y,z] }`). If it doesn’t yet, the frontend will use the fallbacks above; once the API starts sending values the panel and the grid will update in sync.
+
+---
+
+If you want, I can also give you a tiny “tilt knob” in the ShiftVectorPanel to send a temporary override to the visualizer (without touching backend) so you can demo the effect live.

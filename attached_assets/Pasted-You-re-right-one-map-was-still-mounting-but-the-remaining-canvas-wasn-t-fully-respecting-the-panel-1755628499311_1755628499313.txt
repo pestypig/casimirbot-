@@ -1,0 +1,295 @@
+You’re right: one map was still mounting, but the remaining canvas wasn’t fully respecting the panel size and had no finger-zoom/pan. Below is a single, focused patch for SolarMap.tsx that:
+	1.	Fits to the panel size (no hidden zoom UI) using a ResizeObserver
+	2.	Starts further zoomed-out (configurable)
+	3.	Adds mobile gestures: one-finger pan, two-finger pinch zoom (keeps the pinch center stable)
+	4.	Keeps the desktop wheel-zoom and buttons working
+
+⸻
+
+Patch — client/src/components/SolarMap.tsx
+
+Replace your current wrapper/canvas + event handlers with this version (it keeps your drawing logic; only the view system and inputs change).
+
+import * as React from "react";
+
+type SolarMapProps = {
+  width?: number;              // optional; panel can drive size
+  height?: number;
+  routeIds: string[];
+  fitToIds?: string[];         // e.g., ["EARTH","SATURN"]
+  fitMarginPx?: number;        // ex: 28
+  centerOnId?: string;
+  centerBetweenIds?: [string,string] | undefined;
+  onPickBody?: (id: string) => void;
+};
+
+/* ----------------- helpers (you likely already have these) ----------------- */
+// world <-> screen helpers should use (offset, zoom)
+const clamp = (v:number, lo:number, hi:number)=>Math.max(lo,Math.min(hi,v));
+
+/** Computes a “fit” (zoom & offset) for a bounding box (in AU) into a viewport (px). */
+function fitBoxToViewport(
+  bbox: {minX:number; minY:number; maxX:number; maxY:number},
+  viewW: number,
+  viewH: number,
+  marginPx: number
+){
+  const boxW = bbox.maxX - bbox.minX;
+  const boxH = bbox.maxY - bbox.minY;
+  const sx = (viewW - 2*marginPx) / boxW;
+  const sy = (viewH - 2*marginPx) / boxH;
+  const zoom = Math.max(1, Math.min(sx, sy)); // px/AU
+  const cx = (bbox.minX + bbox.maxX) * 0.5;
+  const cy = (bbox.minY + bbox.maxY) * 0.5;
+  // screen center in px
+  const scrCx = viewW * 0.5;
+  const scrCy = viewH * 0.5;
+  // offset so that world (cx,cy) appears at screen center
+  const offset = { x: scrCx - cx * zoom, y: scrCy - cy * zoom };
+  return { zoom, offset };
+}
+
+/* ---------------------------------------------------------------------------- */
+
+export default function SolarMap(props: SolarMapProps) {
+  const {
+    width, height, routeIds,
+    fitToIds = [], fitMarginPx = 24,
+    centerOnId, centerBetweenIds, onPickBody
+  } = props;
+
+  /** Responsive size (fits the card) */
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const [size, setSize] = React.useState(() => ({
+    w: width ?? 720,
+    h: height ?? 360
+  }));
+
+  React.useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect;
+      // If explicit width/height props are given, honor them;
+      // otherwise use container width/height.
+      setSize({
+        w: width ?? Math.max(320, Math.floor(r.width)),
+        h: height ?? Math.max(240, Math.floor(r.height)),
+      });
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [width, height]);
+
+  /** View state */
+  const [zoom, setZoom] = React.useState(80); // px/AU
+  const [offset, setOffset] = React.useState({ x: 0, y: 0 });
+  const minZoom = 10, maxZoom = 500;
+
+  /** Track “base fit” so Reset returns to the fitted view */
+  const baseFitRef = React.useRef<{zoom:number; offset:{x:number;y:number}} | null>(null);
+
+  /** Mount diagnostics (optional) */
+  const instanceId = React.useRef(Math.random().toString(36).slice(2));
+  React.useEffect(() => {
+    console.count(`[SolarMap] mounted id=${instanceId.current}`);
+    return () => console.log(`[SolarMap] unmounted id=${instanceId.current}`);
+  }, []);
+
+  /** Canvas + drawing */
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  // ---- compute world bbox for fitToIds (stub: replace with your real bodies lookup) ----
+  function getBodiesAU(ids: string[]): {x:number;y:number}[] {
+    // TODO: use your actual ephemeris/positions
+    // return list of positions in AU for the requested bodies
+    return ids.map((_,i)=>({x: i*5, y: (i%2?1:-1)*3}));
+  }
+
+  React.useLayoutEffect(() => {
+    // initial fit or refit when size/targets change
+    if (size.w <= 0 || size.h <= 0) return;
+
+    if (fitToIds.length >= 1) {
+      const pts = getBodiesAU(fitToIds);
+      const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+      const bbox = {
+        minX: Math.min(...xs), maxX: Math.max(...xs),
+        minY: Math.min(...ys), maxY: Math.max(...ys),
+      };
+      let { zoom: z, offset: off } = fitBoxToViewport(bbox, size.w, size.h, fitMarginPx);
+
+      // start farther zoomed-out (e.g., 0.75×)
+      z = z * 0.75;
+
+      baseFitRef.current = { zoom: z, offset: off };
+      setZoom(z);
+      setOffset(off);
+    }
+  }, [size.w, size.h, fitToIds.join(","), fitMarginPx]);
+
+  // ---- input (mouse wheel + buttons) ----
+  const zoomAtPoint = React.useCallback((scrX:number, scrY:number, scale:number) => {
+    const newZoom = clamp(zoom * scale, minZoom, maxZoom);
+    const k = newZoom / zoom;
+    // keep the point under the cursor fixed
+    const newOff = {
+      x: scrX - (scrX - offset.x) * k,
+      y: scrY - (scrY - offset.y) * k,
+    };
+    setZoom(newZoom);
+    setOffset(newOff);
+  }, [zoom, offset]);
+
+  React.useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = cvs.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const scale = e.deltaY < 0 ? 1.12 : 1/1.12;
+      zoomAtPoint(x, y, scale);
+    };
+    cvs.addEventListener('wheel', onWheel, { passive: false });
+    return () => cvs.removeEventListener('wheel', onWheel as any);
+  }, [zoomAtPoint]);
+
+  // ---- touch: pan (1 finger) & pinch (2 fingers) ----
+  const pointers = React.useRef<Map<number,{x:number;y:number}>>(new Map());
+  const pinchStart = React.useRef<{
+    zoom:number; offset:{x:number;y:number};
+    dist:number; center:{x:number;y:number};
+  } | null>(null);
+  const dragStart = React.useRef<{x:number;y:number; offset:{x:number;y:number}} | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const el = e.currentTarget;
+    el.setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointers.current.size === 2) {
+      // begin pinch
+      const ps = Array.from(pointers.current.values());
+      const cx = (ps[0].x + ps[1].x) / 2;
+      const cy = (ps[0].y + ps[1].y) / 2;
+      const dx = ps[0].x - ps[1].x, dy = ps[0].y - ps[1].y;
+      pinchStart.current = {
+        zoom, offset, dist: Math.hypot(dx,dy),
+        center: { x: cx - el.getBoundingClientRect().left,
+                  y: cy - el.getBoundingClientRect().top }
+      };
+      dragStart.current = null;
+    } else if (pointers.current.size === 1) {
+      dragStart.current = { x: e.clientX, y: e.clientY, offset: { ...offset } };
+      pinchStart.current = null;
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const el = e.currentTarget;
+
+    if (pinchStart.current && pointers.current.size >= 2) {
+      const ps = Array.from(pointers.current.values());
+      const dx = ps[0].x - ps[1].x, dy = ps[0].y - ps[1].y;
+      const dist = Math.hypot(dx,dy);
+      const scale = clamp(dist / (pinchStart.current.dist || dist), 0.2, 5);
+      const newZoom = clamp(pinchStart.current.zoom * scale, minZoom, maxZoom);
+
+      // keep pinch center fixed
+      const k = newZoom / pinchStart.current.zoom;
+      const c = pinchStart.current.center;
+      const off = pinchStart.current.offset;
+      const newOff = { x: c.x - (c.x - off.x) * k, y: c.y - (c.y - off.y) * k };
+
+      setZoom(newZoom);
+      setOffset(newOff);
+      return;
+    }
+
+    if (dragStart.current && pointers.current.size === 1) {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setOffset({ x: dragStart.current.offset.x + dx, y: dragStart.current.offset.y + dy });
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const el = e.currentTarget;
+    if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinchStart.current = null;
+    if (pointers.current.size === 0) dragStart.current = null;
+  };
+
+  // ---- draw (use your existing draw; just honor size, zoom, offset) ----
+  React.useEffect(() => {
+    const cvs = canvasRef.current;
+    if (!cvs) return;
+    const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
+    cvs.width  = Math.floor(size.w * dpr);
+    cvs.height = Math.floor(size.h * dpr);
+    const ctx = cvs.getContext("2d")!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0,0,size.w,size.h);
+
+    // draw your orbits & bodies here using (zoom, offset)
+    // world (x_AU, y_AU) -> screen: X = x*zoom + offset.x
+    // example: a faint crosshair at screen center:
+    // ctx.strokeStyle = "rgba(255,255,255,.1)";
+    // ctx.beginPath(); ctx.moveTo(size.w/2,0); ctx.lineTo(size.w/2,size.h); ctx.stroke();
+    // ...
+  }, [size.w, size.h, zoom, offset, routeIds.join(",")]);
+
+  return (
+    <div ref={containerRef}
+         className="relative rounded-lg overflow-hidden border border-white/10"
+         style={{ width: width ? undefined : '100%', height: height ? undefined : 360 }}>
+      <canvas
+        ref={canvasRef}
+        style={{ width: size.w, height: size.h, display: 'block', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      />
+
+      {/* timestamp */}
+      <div className="absolute top-2 left-2 z-40 select-none text-white/90 text-xs">
+        {new Date().toLocaleString()}
+      </div>
+
+      {/* zoom controls */}
+      <div className="absolute top-2 right-2 z-50 pointer-events-auto flex gap-1">
+        <button className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
+          onClick={() => zoomAtPoint(size.w*0.5, size.h*0.5, 1/1.2)} title="Zoom out">−</button>
+        <button className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
+          onClick={() => zoomAtPoint(size.w*0.5, size.h*0.5, 1.2)} title="Zoom in">+</button>
+        <button className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
+          onClick={() => { if (baseFitRef.current) { setZoom(baseFitRef.current.zoom); setOffset(baseFitRef.current.offset); }}}
+          title="Reset view">⟲</button>
+      </div>
+
+      {/* scale footer */}
+      <div className="absolute inset-x-0 bottom-0 p-2 z-40
+                      bg-gradient-to-t from-black/60 to-transparent
+                      flex justify-between items-center text-xs text-white/80">
+        <div>Scale: {Math.round(zoom)} px/AU</div>
+      </div>
+    </div>
+  );
+}
+
+What this gives you
+	•	Initial view further out: z = z * 0.75 after fitting (tune that factor).
+	•	Pinch zoom: two-finger pinch; the pinch center stays anchored.
+	•	One-finger pan.
+	•	Buttons + wheel still work.
+	•	No hidden UI — the wrapper uses a ResizeObserver so the canvas always matches the panel; the overlay (zoom buttons) is positioned with z-50 and pointer-events-auto.
+
+If you draw with a separate “world scale” function, just ensure you use X = x_AU * zoom + offset.x and Y = y_AU * zoom + offset.y everywhere the planets/orbits are drawn.
+
+If anything still feels clipped on your device, nudge the container’s inline height (e.g., 340→380) or remove the fixed height and let the parent card control it.

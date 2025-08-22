@@ -1,0 +1,187 @@
+Great—thanks for pasting the whole TSX. I see a few places where `toFixed` / `toExponential` are called on possibly-undefined values (the earlier crash is the same pattern). Below is a **safe, minimal patch** that:
+
+* Adds tiny format helpers (`fmt`, `fexp`, `fint`)
+* Fixes all risky number renders (ζ, TS, curvature, tiles, energy, etc.)
+* Corrects flag types in your local `EnergyPipelineState` interface to booleans (they’re used as booleans later)
+
+You can paste these changes straight in.
+
+---
+
+### 1) Add helpers (right after imports, before components)
+
+```tsx
+// --- Safe numeric formatters ---
+const isFiniteNumber = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v);
+
+const fmt = (v: unknown, digits = 3, fallback = '—') =>
+  isFiniteNumber(v) ? v.toFixed(digits) : fallback;
+
+const fexp = (v: unknown, digits = 1, fallback = '—') =>
+  isFiniteNumber(v) ? v.toExponential(digits) : fallback;
+
+const fint = (v: unknown, fallback = '0') =>
+  isFiniteNumber(v) ? Math.round(v).toLocaleString() : fallback;
+```
+
+---
+
+### 2) Fix flag types in the local interface (so UI logic matches usage)
+
+```tsx
+interface EnergyPipelineState {
+  // ...
+  P_avg?: number;
+  zeta?: number;
+  TS_ratio?: number;
+  fordRomanCompliance?: boolean; // was string
+  natarioConstraint?: boolean;   // was string
+  curvatureLimit?: boolean;      // was string
+  // ...
+}
+```
+
+---
+
+### 3) Harden all risky number renders
+
+#### Ford–Roman (ζ) display and badge
+
+```tsx
+<span className="font-mono text-sm">
+  ζ = {fmt(pipelineState?.zeta ?? systemMetrics?.fordRoman?.value, 3, '0.032')}
+</span>
+<Badge
+  className={`${
+    (pipelineState?.fordRomanCompliance ?? (systemMetrics?.fordRoman?.status === 'PASS'))
+      ? 'bg-green-500/20 text-green-400'
+      : 'bg-red-500/20 text-red-400'
+  }`}
+>
+  {(pipelineState?.fordRomanCompliance ?? (systemMetrics?.fordRoman?.status === 'PASS')) ? 'PASS' : 'FAIL'}
+</Badge>
+```
+
+#### Natário line
+
+```tsx
+<span className="font-mono text-sm">∇·ξ = {fmt(systemMetrics?.natario?.value, 3, '0')}</span>
+<Badge
+  className={`${
+    (pipelineState?.natarioConstraint ?? (systemMetrics?.natario?.status === 'VALID'))
+      ? 'bg-green-500/20 text-green-400'
+      : 'bg-red-500/20 text-red-400'
+  }`}
+>
+  {(pipelineState?.natarioConstraint ?? (systemMetrics?.natario?.status === 'VALID')) ? 'VALID' : 'INVALID'}
+</Badge>
+```
+
+#### Curvature line (avoid calling on undefined)
+
+```tsx
+{(() => {
+  const R_est = isFiniteNumber(pipelineState?.U_cycle)
+    ? Math.abs(pipelineState!.U_cycle) / (9e16) // c^2 ≈ 9e16
+    : systemMetrics?.curvatureMax;
+  return (
+    <>
+      <span className="font-mono text-sm">
+        R {'<'} {fexp(R_est, 0, '1e-21')}
+      </span>
+      <Badge className={`${(pipelineState?.curvatureLimit ?? true) ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+        {(pipelineState?.curvatureLimit ?? true) ? 'SAFE' : 'WARN'}
+      </Badge>
+    </>
+  );
+})()}
+```
+
+#### Time-Scale line
+
+```tsx
+<span className="font-mono text-sm">
+  TS = {fmt(pipelineState?.TS_ratio ?? systemMetrics?.timeScaleRatio, 1, '4102.7')}
+</span>
+<Badge className={`${(pipelineState?.TS_ratio ?? 0) < 1 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+  {(pipelineState?.TS_ratio ?? 0) < 1 ? 'SAFE' : 'CHECK'}
+</Badge>
+```
+
+*(Note: your “SAFE if TS<1” logic seems inverted vs your goal of TS≥100; I left it unchanged, but flag if you want the condition flipped.)*
+
+#### “Energy Output” tile
+
+```tsx
+<p className="text-lg font-mono text-yellow-400">
+  {fmt(pipeline?.P_avg ?? systemMetrics?.energyOutput ?? 83.3, 1)} MW
+</p>
+```
+
+#### “Active Tiles (Energized)” tile
+
+```tsx
+<p className="text-lg font-mono text-cyan-400">
+  {fint(systemMetrics?.activeTiles, '2,800,000')}
+</p>
+```
+
+#### “Exotic Mass” tile
+
+```tsx
+<p className="text-lg font-mono text-purple-400">
+  {fint(pipeline?.M_exotic ?? systemMetrics?.exoticMass ?? 1405, '1,405')} kg
+</p>
+```
+
+#### Pulse trail log line (keep; already safe)
+
+```tsx
+`[DATA] Sector Index: ${sectorIndex}, Fade: ${trail[sectorIndex]?.toFixed(3) || '0.000'}`
+```
+
+#### “Pipeline Parameters” (keep; wrapped by `pipelineState &&`, so safe)
+
+No change needed there.
+
+#### “Resonance Scheduler” dashboard numbers
+
+```tsx
+<p className="font-mono text-slate-100">
+  {fmt((pipelineState?.dutyCycle ?? 0.14) * 100, 1, '14')}%
+</p>
+<p className="font-mono text-slate-100">
+  {pipelineState?.sectorStrobing ?? 1}
+</p>
+<p className="font-mono text-slate-100">
+  {fmt(pipelineState?.modulationFreq_GHz ?? 15, 1, '15')} GHz
+</p>
+```
+
+#### “Compliance HUD → Energy Pipeline Values” (safe already)
+
+It renders only when `pipelineState` exists; fine as-is.
+
+---
+
+### 4) (Optional) Normalize “WarpVisualizer” inputs
+
+These are fine, but you can keep them consistent with helpers:
+
+```tsx
+powerAvg_MW: pipeline?.P_avg ?? 83.3,
+exoticMass_kg: pipeline?.M_exotic ?? 1405,
+gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
+```
+
+---
+
+## Why this fixes the crash(s)
+
+* Every place that previously did `something?.toFixed(...)` or `something?.toExponential(...)` now formats through `fmt`/`fexp` with a safe fallback.
+* Every nested optional path uses `?.` all the way through (e.g., `systemMetrics?.fordRoman?.value`).
+* Flags are booleans where used as booleans, avoiding surprise truthiness.
+* Visual output is consistent (numbers always formatted) even when the backend hasn’t populated values yet.
+
+If you want, I can roll these changes into a single diff against your file, but the snippets above are drop-in replacements for the affected lines.

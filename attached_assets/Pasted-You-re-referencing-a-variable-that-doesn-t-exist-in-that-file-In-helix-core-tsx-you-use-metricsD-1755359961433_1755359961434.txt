@@ -1,0 +1,68 @@
+You’re referencing a variable that doesn’t exist in that file. In `helix-core.tsx` you use `metricsData?.hull` but the page never defines `metricsData`. You already have a metrics hook elsewhere—use it here too (or rename to the variable you *do* have).
+
+## Minimal, safe patch
+
+1. At the top of the component (inside `HelixCore()`), get metrics from the hook:
+
+```tsx
+import { useMetrics } from "@/hooks/use-metrics"; // add if not present
+
+export default function HelixCore() {
+  // ...
+  const { metrics } = useMetrics();  // <-- add this
+  // ...
+```
+
+2. Replace the crashing block (lines \~936–942) with a guarded use of `metrics?.hull`:
+
+```tsx
+// Natário/Warp visual params
+const natarioParams = {
+  dutyCycle: pipelineState?.dutyCycle ?? 0.14,
+  g_y: pipelineState?.gammaGeo ?? 26,
+  cavityQ: pipelineState?.qCavity ?? 1e9,
+  sagDepth_nm: pipelineState?.sag_nm ?? 16,
+  tsRatio: pipelineState?.TS_ratio ?? 4102.74,
+  powerAvg_MW: pipelineState?.P_avg ?? 83.3,
+  exoticMass_kg: pipelineState?.M_exotic ?? 1405,
+  currentMode: pipelineState?.currentMode ?? "hover",
+  sectorStrobing: pipelineState?.sectorStrobing ?? 1,
+  qSpoilingFactor: pipelineState?.qSpoilingFactor ?? 1,
+  gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck ?? 6.57e7,
+
+  // Hull geometry for ellipsoidal bell calculation
+  hull: (metrics && metrics.hull) ? metrics.hull : {
+    Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+    a: 503.5, b: 132, c: 86.5, // semi-axes fallbacks
+  },
+};
+```
+
+3. Pass `natarioParams` into your visualizer:
+
+```tsx
+<WarpVisualizer parameters={natarioParams} />
+```
+
+That’s it. No more `metricsData` references.
+
+### Notes
+
+* If your metrics payload doesn’t include `a,b,c`, compute them from `Lx_m, Ly_m, Lz_m` before passing:
+
+```tsx
+const hullFromMetrics = metrics?.hull
+  ? {
+      ...metrics.hull,
+      a: metrics.hull.a ?? metrics.hull.Lx_m / 2,
+      b: metrics.hull.b ?? metrics.hull.Ly_m / 2,
+      c: metrics.hull.c ?? metrics.hull.Lz_m / 2,
+    }
+  : undefined;
+```
+
+and then use `hull: hullFromMetrics ?? { /* fallback */ }`.
+
+* If you *already* have a different variable (e.g., `metricsState`, `bridgeMetrics`), rename the reference consistently. The key is: **use the real variable you have in scope** (likely `metrics` from `useMetrics`), not `metricsData`.
+
+This removes the runtime error and ensures the Natário visual gets the live hull dimensions coming from the server.

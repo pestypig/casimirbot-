@@ -1,0 +1,251 @@
+Yep—big galaxy images will choke the browser if you load the whole thing and then scale it. Two moves fix this:
+
+1. **Start “fit-to-screen,” not zoomed in** (so you don’t push millions of pixels right away).
+2. **Tile the image** so the browser only downloads/draws what’s on screen (Deep Zoom / quadtree tiles).
+
+I’ll give you both: a quick patch to your current pan/zoom so it **fits** on load, and a “real” solution using **OpenSeadragon** tiles so only visible tiles load.
+
+---
+
+# Quick win (today): fit-to-screen on mount
+
+Add this to your `GalaxyMapPanZoom` (or Layers) component right after you know the image’s natural size. It auto-sets the **initial zoom + center** so the whole map fits.
+
+```tsx
+// after you set `svgSize` (or base image size) and you know viewport {width,height}
+React.useEffect(() => {
+  if (!svgSize) return;
+  // compute zoom to fit entire image into viewport
+  const zx = width / svgSize.w;
+  const zy = height / svgSize.h;
+  const fitZoom = Math.min(zx, zy);
+
+  // center image
+  const ox = (width  - svgSize.w * fitZoom) / 2;
+  const oy = (height - svgSize.h * fitZoom) / 2;
+
+  setZoom(fitZoom);
+  setOffset({ x: ox, y: oy });
+}, [svgSize, width, height]);
+```
+
+This stops the “starts zoomed-in” behavior and reduces initial work. It won’t solve *memory* for a 100+ MP image though—that’s what tiling is for.
+
+---
+
+# Scalable fix: Deep Zoom tiles (only load what you see)
+
+Use **OpenSeadragon (OSD)**—battle-tested, tiny dependency, handles massive images with a tile pyramid. You’ll generate tiles once, then OSD requests only the tiles in view.
+
+## 1) Generate tiles once
+
+Pick either tool:
+
+### Using libvips (fast)
+
+```bash
+# macOS: brew install vips
+vips dzsave public/render_e_plus_dust_and_hii_regions_and_clusters.png public/galaxy_tiles \
+  --suffix .jpg[Q=85] --tile-size 512 --overlap 1
+```
+
+This creates:
+
+* `public/galaxy_tiles.dzi` (XML descriptor)
+* `public/galaxy_tiles_files/` (folders z/row\_col.jpg)
+
+### Using sharp (Node)
+
+```bash
+npm i sharp
+node -e "require('sharp')('public/render_e_plus_dust_and_hii_regions_and_clusters.png')
+  .tile({size:512, overlap:1, layout:'dz'})
+  .toFile('public/galaxy_tiles')"
+```
+
+> Keep your SVG labels/JSON separate; the tiled image is just the **visual**.
+
+## 2) Minimal React wrapper for OpenSeadragon
+
+```tsx
+// client/src/components/GalaxyDeepZoom.tsx
+import * as React from "react";
+import OpenSeadragon from "openseadragon";
+
+type Props = {
+  dziUrl: string;                 // e.g. "/galaxy_tiles.dzi"
+  width?: number; height?: number;
+  onViewport?: (viewport: OpenSeadragon.Viewport)=>void;
+};
+
+export function GalaxyDeepZoom({ dziUrl, width=1200, height=650, onViewport }: Props) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const viewerRef = React.useRef<OpenSeadragon.Viewer | null>(null);
+
+  React.useEffect(() => {
+    if (!ref.current) return;
+    const viewer = OpenSeadragon({
+      element: ref.current,
+      prefixUrl: "https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/images/",
+      tileSources: dziUrl,
+      showNavigator: true,
+      defaultZoomLevel: 0,        // OSD will auto-fit
+      minZoomLevel: 0.5,
+      maxZoomLevel: 20,
+      animationTime: 0.8,
+      gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true },
+    });
+    viewerRef.current = viewer;
+
+    const onUpdate = () => onViewport?.(viewer.viewport);
+    viewer.addHandler("animation", onUpdate);
+    viewer.addHandler("open", onUpdate);
+    return () => { viewer.destroy(); viewerRef.current = null; };
+  }, [dziUrl]);
+
+  return <div ref={ref} style={{ width, height }} className="rounded-lg overflow-hidden border bg-black" />;
+}
+```
+
+## 3) Draw routes & labels as an overlay
+
+OSD exposes transforms so you can render **only visible labels**. Use a single canvas overlay:
+
+```tsx
+// client/src/components/GalaxyOverlays.tsx
+import * as React from "react";
+import OpenSeadragon from "openseadragon";
+
+type Label = { text:string; x:number; y:number; kind?:string; fontSize?:number };
+type Body  = { id:string; name:string; x_pc:number; y_pc:number };
+
+const PC_TO_IMAGE = (originPx:{x:number;y:number}, pxPerPc:number) =>
+  (xpc:number, ypc:number) => ({ x: originPx.x + xpc*pxPerPc, y: originPx.y - ypc*pxPerPc });
+
+export function GalaxyOverlays({
+  viewer, labels, bodies, routeIds, originPx, pxPerPc
+}:{
+  viewer: OpenSeadragon.Viewer | null;
+  labels: Label[];
+  bodies: Body[];
+  routeIds: string[];
+  originPx: {x:number;y:number};
+  pxPerPc: number;
+}) {
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+
+  React.useEffect(()=>{
+    if (!viewer || !canvasRef.current) return;
+    const cvs = canvasRef.current;
+    const ctx = cvs.getContext("2d")!;
+    function draw() {
+      const tiled = viewer.world.getItemAt(0);
+      if (!tiled) return;
+      const { x:vw, y:vh } = viewer.viewport.getContainerSize();
+      cvs.width = vw; cvs.height = vh;
+      ctx.clearRect(0,0,vw,vh);
+
+      const imageToViewport = (pt:{x:number;y:number}) => {
+        const vp = tiled.imageToViewportCoordinates(pt.x, pt.y);
+        const px = viewer.viewport.pixelFromPoint(vp, true);
+        return { x: px.x, y: px.y };
+      };
+      const pcToImage = PC_TO_IMAGE(originPx, pxPerPc);
+
+      // ROUTE glow (draw only segments that land on-screen)
+      const routeBodies = routeIds.map(id=>bodies.find(b=>b.id===id)).filter(Boolean) as Body[];
+      if (routeBodies.length >= 2) {
+        for (const pass of [10,6,3]) {
+          ctx.beginPath();
+          routeBodies.forEach((b,i)=>{
+            const img = pcToImage(b.x_pc, b.y_pc);
+            const p = imageToViewport(img);
+            if (i===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+          });
+          ctx.strokeStyle = `rgba(120,90,255,${pass===10?0.08: pass===6?0.18:0.9})`;
+          ctx.lineWidth = pass;
+          ctx.stroke();
+        }
+      }
+
+      // LABELS (view culling)
+      const bounds = viewer.viewport.getBounds(true); // viewport coords
+      const minPx = viewer.viewport.pixelFromPoint(bounds.getTopLeft(), true);
+      const maxPx = viewer.viewport.pixelFromPoint(bounds.getBottomRight(), true);
+
+      ctx.textBaseline = "top";
+      labels.forEach(L=>{
+        const p = imageToViewport({ x:L.x, y:L.y });
+        if (p.x < minPx.x-100 || p.x > maxPx.x+100 || p.y < minPx.y-50 || p.y > maxPx.y+50) return;
+        const size = Math.max(10, Math.min(22, (L.fontSize ?? 12) * viewer.viewport.getZoom(true) * 0.5));
+        ctx.font = `${size}px ui-sans-serif, system-ui`;
+        ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillText(L.text, p.x+1, p.y+1);
+        ctx.fillStyle = "#f5e1ff";         ctx.fillText(L.text, p.x,   p.y);
+      });
+    }
+
+    const update = () => requestAnimationFrame(draw);
+    viewer.addHandler("animation", update);
+    viewer.addHandler("open", update);
+    viewer.addHandler("zoom", update);
+    viewer.addHandler("pan", update);
+    return () => {
+      viewer.removeAllHandlers("animation");
+      viewer.removeAllHandlers("open");
+      viewer.removeAllHandlers("zoom");
+      viewer.removeAllHandlers("pan");
+    };
+  }, [viewer, labels, bodies, routeIds, originPx, pxPerPc]);
+
+  return <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />;
+}
+```
+
+## 4) Put it together
+
+```tsx
+import OpenSeadragon from "openseadragon";
+import { GalaxyDeepZoom } from "@/components/GalaxyDeepZoom";
+import { GalaxyOverlays } from "@/components/GalaxyOverlays";
+import labelsJson from "/public/galaxy_labels.json"; // from your extractor
+import { BODIES } from "@/lib/galaxy-catalog";
+
+const [viewer, setViewer] = useState<OpenSeadragon.Viewer|null>(null);
+// set these once via calibration
+const originPx = { x: 8048, y: 4025 };
+const pxPerPc  = 25;
+
+<div className="relative" style={{width:1200, height:650}}>
+  <GalaxyDeepZoom
+    dziUrl="/galaxy_tiles.dzi"
+    width={1200}
+    height={650}
+    onViewport={(vp)=> setViewer(vp?.viewer as any || (vp as any))}
+  />
+  <GalaxyOverlays
+    viewer={viewer}
+    labels={(labelsJson as any).labels}
+    bodies={BODIES}
+    routeIds={route}
+    originPx={originPx}
+    pxPerPc={pxPerPc}
+  />
+</div>
+```
+
+Now the page:
+
+* **only loads tiles in view**, at the needed resolution,
+* starts **fit to screen**, and
+* still draws routes/labels perfectly aligned.
+
+---
+
+## Extra perf tips
+
+* **Downsample labels** at low zoom: only draw “region/arm” labels until zoom > 1.5, then show OB/SNR, etc.
+* Put labels in an **R-tree** (or simple grid) to cull faster if you have thousands.
+* Use `createImageBitmap` for any custom bitmaps you render repeatedly.
+* Keep your **PNG overlay** baked into the tiles (i.e., tile the composite image), so OSD handles everything.
+
+If you want, I can give you a tiny Node script to **pre-merge** the SVG+PNG into a single large PNG *before* tiling, so you don’t manage two layers in tiles.

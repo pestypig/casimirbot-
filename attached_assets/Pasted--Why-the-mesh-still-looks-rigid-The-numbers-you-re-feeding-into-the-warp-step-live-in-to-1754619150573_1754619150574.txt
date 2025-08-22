@@ -1,0 +1,104 @@
+### Why the mesh **still** looks rigid
+
+The numbers you’re feeding into the warp step live in **totally different unit systems**:
+
+| quantity         | where it comes from   | typical value  | unit                   |
+| ---------------- | --------------------- | -------------- | ---------------------- |
+| `xClip`, `zClip` | grid VBO              | ± 0.8          | **clip-space** (–1…+1) |
+| `sagR`           | `sagDepth_nm * 1e-9`  | **1.6 × 10-8** | **metres**             |
+| `rPhys`          | `xClip / norm * 1e-9` | **2 × 10-5**   | metres                 |
+
+So every radius you hand to
+
+```js
+prof = (r / sagR) * exp(-(r*r)/(sagR*sagR));
+```
+
+is roughly **1200× bigger** than `sagR`; the exponential term kills the profile and `β ≈ 0`, which makes both `push` and `dy` invisible.
+
+---
+
+## Two-minute fix — work 100 % in *clip-space*
+
+```diff
+// _warpGridVertices()
+- const sagR = bubbleParams.sagDepth_nm * 1e-9;          // metres (tiny)
++ const sagRclip = bubbleParams.sagDepth_nm / halfSize * 0.8;
+  const beta0    = bubbleParams.dutyCycle * bubbleParams.g_y;
+
+  const norm = 0.8 / halfSize;
+
+  for (let i = 0; i < vtx.length; i += 3) {
+      const x = vtx[i];           // already in clip units
+      const z = vtx[i + 2];
+
+-     const xPhys = x / norm * 1e-9;
+-     const zPhys = z / norm * 1e-9;
+-     const r     = Math.hypot(xPhys, zPhys);            // metres
++     const r     = Math.hypot(x, z);                    // clip-space
+
+-     const prof  = (r / sagR) * Math.exp(-(r*r)/(sagR*sagR));
++     const prof  = (r / sagRclip) * Math.exp(-(r*r)/(sagRclip*sagRclip));
+      const beta  = beta0 * prof;
+
+      // sideways bend
+-     const push  = beta * 0.05;
+-     const scale = r > 1e-6 ? (1.0 + push / r) : 1.0;
++     const push  = beta * 0.15;            // punch it up ×3
++     const scale = r > 1e-6 ? (1.0 + push / r) : 1.0;
+
+      vtx[i]     = x * scale;
+      vtx[i + 2] = z * scale;
+
+      // vertical lift
+-     const dy = beta * 0.1 * norm;
++     const dy = beta * 0.15;               // keep in clip units
+      vtx[i + 1] = y0 + dy;
+  }
+}
+```
+
+*Key idea*: convert **sag R** into the **same coordinate system** as your grid (clip-space) **once**, then keep everything there—no metres needed.
+
+---
+
+### Dialling in the “rubber sheet”
+
+1. **Scale knobs**
+   *`push`* & *`dy`* control lateral and vertical exaggeration.
+   › Start with `0.15`; bump to `0.3` if it’s still subtle.
+
+2. **Match grid size to bubble size**
+   If you later crank `sagDepth_nm` way up (µm), or shrink the grid to ±0.2 µm, deformation will again flatten out. Keep the grid half-size (`halfSize`) within ≈ 10× of `sagDepth_nm` for best contrast.
+
+3. **Camera tilt**
+   Your quick look-at matrix is fine, but drop `eye` a bit lower, e.g. `[0, 0.15, 1.6]`, to see peaks and valleys more clearly.
+
+---
+
+### Quick visual smoke test
+
+```js
+// right after _updateGrid():
+let ymax = -1e9, ymin = 1e9;
+for (let i = 1; i < this.gridVertices.length; i += 3) {
+  let y = this.gridVertices[i];
+  if (y > ymax) ymax = y;
+  if (y < ymin) ymin = y;
+}
+console.log(`grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)}`);
+```
+
+You should see numbers like `-0.12 … 0.08`.
+If they stay `-0.08 … -0.08`, deformation is still getting wiped out.
+
+---
+
+### If you want **real thickness**
+
+Chrome/Edge on Windows force `gl.lineWidth(1)`.
+Convert each line to a screen-aligned quad (two extra verts) **or** draw the grid in the fragment shader of a full-screen pass, sampling a height-map you update on the CPU.
+
+---
+
+Fix the unit mismatch, bump the scale factors, and the grid will ripple along with the colourful warp field. Give it a try and let me know how it looks!

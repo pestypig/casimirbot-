@@ -1,0 +1,181 @@
+You’re seeing the “ridge” because a few places in the visual pipeline introduce **hard sign flips or hard cut-offs**. Those create a C⁰ function with **discontinuous first derivative** right where you want a smooth transition between the contraction and expansion lobes.
+
+Below are the usual culprits and how to make each one C¹-smooth. You can implement any/all; each removes a different kink.
+
+---
+
+# 1) Sector strobing sign (±1) → smooth phase
+
+Today (renderer / sampler):
+
+```js
+const u = (theta < 0 ? theta + 2*Math.PI : theta) / (2*Math.PI);
+const sgn = (Math.floor(u * sectors) < split) ? +1 : -1; // hard jump
+```
+
+Replace the hard ±1 with a **continuous phase** and (optionally) a **window** so tiles near sector edges fade in/out:
+
+```js
+// Basic continuous phase
+const phase = 2*Math.PI*sectors*u + phase0;         // phase0 from time
+const sgn = Math.sin(phase);                         // ∈ [-1,1], smooth
+
+// Optional soft window for sector edges (Hann)
+function hannEdge(x, width=0.08) {                   // x ∈ [0,1), width∈(0,0.5)
+  const dist = Math.min(x, 1-x);                     // distance to edge
+  const t = Math.min(1, dist/width);
+  return 0.5 - 0.5*Math.cos(Math.PI*t);              // 0→1 smoothly
+}
+const windowA = hannEdge(u, 0.08);                   // soft coherence
+const sectorGain = windowA;                          // multiply disp by this
+```
+
+Use `sgn` (sinusoid) and `sectorGain` instead of the hard step. In your **averaged** view use the **RMS** ( √⟨sin²⟩ = 1/√2 ):
+
+```js
+const sgnAvg = 1/Math.sqrt(2);
+```
+
+---
+
+# 2) Front/back “polarity” with `Math.sign` → soft polarity
+
+Today:
+
+```js
+const front = Math.sign(n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]) || 1;
+```
+
+This is another discontinuity. Use a **soft sign** (tanh) with adjustable steepness:
+
+```js
+const dot = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+const front = Math.tanh(softK*dot); // softK≈4–8; front ∈ (-1,1) smoothly
+```
+
+Or a smoothstep:
+
+```js
+function smoothstep(a,b,x){ const t=Math.min(1,Math.max(0,(x-a)/(b-a))); return t*t*(3-2*t); }
+const front = 2*smoothstep(-eps,+eps,dot)-1;  // eps≈0.05
+```
+
+---
+
+# 3) Hard bell “band” gate → soft envelope
+
+Today:
+
+```js
+const band = (Math.abs(sd) <= 3.0*w_rho) ? 1.0 : 0.0; // hard cutoff
+```
+
+Use a **raised-cosine** taper outside your main wall:
+
+```js
+const a = 2.5*w_rho, b = 3.5*w_rho; // pass band, stop band
+let band;
+const asd = Math.abs(sd);
+if (asd <= a) band = 1.0;
+else if (asd >= b) band = 0.0;
+else band = 0.5*(1 + Math.cos(Math.PI*(asd-a)/(b-a))); // smooth to 0
+```
+
+---
+
+# 4) Wall thickness in ρ-space
+
+Make sure `w_rho` is derived **once** from real thickness (meters):
+
+```js
+// meters → rho-space
+const a_long = Math.max(axesScene[0], axesScene[1], axesScene[2]); // semi-major (m, scene units)
+const w_rho = wall_m / a_long; // use the longest semi-axis
+```
+
+If `w_rho` was a magic 0.06, you’ll get shape distortions.
+
+---
+
+# 5) Displacement ordering: smooth before clamp
+
+If you clamp first, you create flat shelves. Do:
+
+1. compute `disp0`
+2. **optional Laplacian/box blur** of the displacement field in grid space
+3. **then** clamp once:
+
+```js
+// (after a small smoothing pass)
+const maxPush = 0.10; // normalized
+let disp = dispSmoothed;
+disp = Math.max(-maxPush, Math.min(maxPush, disp));
+```
+
+A single 3×3 neighborhood average (or 2 passes) is enough.
+
+---
+
+# 6) Use γ\_geo³ and consistent duty averaging
+
+Renderer should match pipeline:
+
+```js
+// physics-consistent amplitude
+const A_geo = gammaGeo*gammaGeo*gammaGeo;          // γ_geo³
+const A_duty_inst = dutyCycle;                      // instantaneous
+const A_duty_avg  = dutyEffectiveFR;               // averaged (e.g., duty/sectors)
+const A_sector = sgn;                               // instantaneous phase or 1/√2 avg
+
+const betaUsed = (viewAvg ? A_duty_avg*A_sectorRMS : A_duty_inst*A_sector);
+const dispAmp  = gridK * betaGain * A_geo * qBurst * gammaVdB * beta_spoil * betaUsed;
+```
+
+(Use your latest choice for `qBurst`, `beta_spoil` (= Q\_spoil), etc.)
+
+---
+
+# 7) Minimal, drop-in replacements
+
+Put these *right where* you build `disp`:
+
+```js
+// --- smooth sector phase ---
+const phase = 2*Math.PI*sectors*u + (this.time * 2*Math.PI*f_m); // if you animate
+const sgn = viewAvg ? 1/Math.sqrt(2) : Math.sin(phase);
+
+// --- soft front/back ---
+const dot = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+const front = Math.tanh(6*dot);  // smooth polarity
+
+// --- soft wall window ---
+const asd = Math.abs(sd), a=2.5*w_rho, b=3.5*w_rho;
+const wallWin = (asd<=a) ? 1 : (asd>=b) ? 0 : 0.5*(1+Math.cos(Math.PI*(asd-a)/(b-a)));
+
+// --- amplitude (physics-consistent) ---
+const A_geo = gammaGeo*gammaGeo*gammaGeo;
+const betaUsed = viewAvg ? dutyEffectiveFR*1/Math.sqrt(2) : dutyCycle*sgn;
+let disp = gridK * betaGain * A_geo * qBurst * gammaVdB * qSpoil * wallWin * front * betaUsed * ring;
+
+// (optional) neighborhood blur of disp in grid space here
+
+// clamp once after smoothing
+const maxPush = 0.10;
+disp = Math.max(-maxPush, Math.min(maxPush, disp));
+```
+
+---
+
+# 8) How to prove the fix
+
+With your sampler/CSV:
+
+* Re-run **instantaneous** vs **averaged** modes and compute the per-point Δdisp.
+* Plot an **axial cut** (long axis): `disp(x)` should be **single-peaked and C¹** (no corners).
+* If Δdisp ≲ 5% in the wall band, any remaining “jagged” look will be **mesh resolution** → bump grid res 1.5–2×.
+
+---
+
+## TL;DR
+
+The jagged edge isn’t the bell itself—it’s the **hard logic around it** (sector step, `Math.sign`, hard band gate, pre-clamp). Make those four continuous, keep `γ_geo³` and duty handling identical to the pipeline, and the bubble will turn into a smooth, textbook Natário bell with a gentle hand-off from contraction to expansion.

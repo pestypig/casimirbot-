@@ -1,0 +1,105 @@
+Yeah—those “red spears” shooting out are almost always a **scale problem**, not a math one. In your current warp loop you’re doing:
+
+* a **linear displacement in clip-space** along the ellipsoid normal,
+* with a **huge β** (because you’re multiplying raw γ\_geo · Q\_burst · Δa/a),
+* and **no amplitude clamp** tied to the local radius,
+* sometimes **not resetting** to the original grid each frame.
+
+That combination will punt some vertices way outside the frustum, so you see long red lines blasting off from the shell region.
+
+Here’s the fix set I recommend (small, surgical):
+
+### 1) Reset the grid every frame
+
+Make sure you copy the pristine vertex array back before warping. If you skip this even once, the deformation compounds.
+
+```js
+// before _warpGridVertices(...)
+this.gridVertices.set(this.originalGridVertices);
+```
+
+### 2) Use the *averaged* β and renormalize it
+
+Your pipeline β is enormous numerically (e.g., 26 × 1e9 × 0.05 ≈ 1.3e9). Map it into a sane range for clip-space with a gain, then use the **GR-average** unless “instantaneous” view is active.
+
+```js
+const sectors  = Math.max(1, U.sectorCount||1);
+const betaInst = (U.gammaGeo||0)*(U.Qburst||0)*(U.deltaAOverA||0);
+const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle||0)/sectors));
+const betaUsed = (U.viewAvg>=0.5) ? betaAvg : betaInst;
+
+// normalize to a ~O(1) visual magnitude (tweak gain as needed)
+const betaGain = U.betaGain ?? 1e-10;          // << add a uniform
+const betaVis  = betaUsed * betaGain;
+```
+
+### 3) Clamp displacement to a fraction of the local radius
+
+Don’t let the normal push exceed \~5–10% of the shell radius at that point.
+
+```js
+function sdEllipsoid(p,a){ const q=[p[0]/a[0],p[1]/a[1],p[2]/a[2]]; return Math.hypot(...q) - 1.0; }
+function nEllipsoid(p,a){
+  const qa=[p[0]/(a[0]*a[0]), p[1]/(a[1]*a[1]), p[2]/(a[2]*a[2])];
+  const L = Math.max(1e-6, Math.hypot(p[0]/a[0], p[1]/a[1], p[2]/a[2]));
+  const n=[qa[0]/L, qa[1]/L, qa[2]/L]; const m=Math.hypot(...n)||1; return [n[0]/m,n[1]/m,n[2]/m];
+}
+
+const a = U.axesClip || [0.4,0.22,0.22];
+const w = Math.max(1e-4, U.wallWidth || 0.06);
+const d = U.driveDir || [1,0,0];
+const dN=(()=>{const t=[d[0]/a[0],d[1]/a[1],d[2]/a[2]]; const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m];})();
+
+const sectors = Math.max(1, U.sectorCount||1);
+const split   = Math.floor((U.phaseSplit||0.5)*sectors);
+
+for (let i=0;i<vtx.length;i+=3){
+  const p=[vtx[i],vtx[i+1],vtx[i+2]];
+  // sector sign (±β)
+  const t = Math.atan2(p[2],p[0]); const u=(t<0?t+2*Math.PI:t)/(2*Math.PI);
+  const sgn = (Math.floor(u*sectors) < split) ? +1 : -1;
+
+  const sd = sdEllipsoid(p,a);
+  // tight band: weight is strong only near the shell
+  const ring = Math.exp(-(sd*sd)/(w*w));
+  // optional hard gate to kill far-away outliers
+  const band = (Math.abs(sd) <= 3.0*w) ? 1.0 : 0.0;
+
+  const n = nEllipsoid(p,a);
+  const front = Math.sign(n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]) || 1;
+
+  // base displacement
+  let disp = (U.gridK||0.12) * betaVis * ring * band * sgn * front;
+
+  // clamp to ≤ 10% of local shell radius along the normal
+  const localR = Math.max(1e-3, Math.hypot(p[0]/a[0], p[1]/a[1], p[2]/a[2])); // ≈ rs
+  const maxPush = 0.10 * 1.0; // shell nominal radius is 1 in normalized coords
+  if (disp >  maxPush) disp =  maxPush;
+  if (disp < -maxPush) disp = -maxPush;
+
+  vtx[i  ] = p[0] - n[0]*disp;
+  vtx[i+1] = p[1] - n[1]*disp;
+  vtx[i+2] = p[2] - n[2]*disp;
+}
+```
+
+### 4) (Nice-to-have) Smooth the band and depth-order
+
+* Keep your `depthMask(false)` for the orange quad, then `true` for the grid.
+* For visibility while you tune, temporarily raise grid alpha (e.g., 0.8) and reduce `gridK` if you still see spikes.
+
+### 5) Quick sanity knobs (so you can prove it to yourself)
+
+* Set `betaGain = 1e-10`, `gridK = 0.08`, `wallWidth = 0.06`, `phaseSplit=0.50` (HOVER).
+  Result: symmetric bulge, no spears.
+* Change to `phaseSplit=0.65` (CRUISE).
+  Result: clear front compression/rear expansion, still well-behaved.
+* Double `betaGain`.
+  Result: same shape, larger bend—if spears reappear, you know it’s amplitude, not math.
+
+---
+
+**Why this fixes your screenshot:**
+Those long lines are just vertices getting pushed hundreds of clip units by an unbounded `disp = gridK * β * ring * …`. Normalizing β into a small visual range and clamping the push to a fraction of the shell radius keeps everything inside the frustum. You still get the physical story (pipeline → β → curvature), but the geometry stays readable and stable.
+
+If you want, paste your current `warp-engine-fixed.js` section around `_warpGridVertices` and I’ll drop the exact patched block back tailored to your variable names.

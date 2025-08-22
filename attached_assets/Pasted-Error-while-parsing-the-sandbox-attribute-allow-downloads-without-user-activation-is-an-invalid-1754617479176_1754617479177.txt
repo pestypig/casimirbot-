@@ -1,0 +1,171 @@
+Error while parsing the 'sandbox' attribute: 'allow-downloads-without-user-activation' is an invalid sandbox flag.Understand this error
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'ambient-light-sensor'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'battery'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'execution-while-not-rendered'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'execution-while-out-of-viewport'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'layout-animations'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'legacy-image-formats'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'navigation-override'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'oversized-images'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'publickey-credentials'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'speaker-selection'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'unoptimized-images'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'unsized-media'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Unrecognized feature: 'pointer-lock'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Allow attribute will take precedence over 'allowfullscreen'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+framework-407b112476a84bc8.js:1 Allow attribute will take precedence over 'allowpaymentrequest'.
+_ @ framework-407b112476a84bc8.js:1Understand this warning
+CasimirBot:1 Banner not shown: beforeinstallpromptevent.preventDefault() called. The page must call beforeinstallpromptevent.prompt() to show the banner.
+ ## inline22 : js.stripe.com default
+ ## inline22 : m.stripe.network default
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 119ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 60ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 72ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 25ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 51ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 47ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 63ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+_app-2be6b9d2c923db0f.js:13 task queue exceeded allotted deadline by 70ms
+(anonymous) @ _app-2be6b9d2c923db0f.js:13Understand this warning
+subtitle.js:7741 Getted userconfig from local Object
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+ ## inline22 : www.google.com default
+anchor:1 Uncaught (in promise) Error: Could not establish connection. Receiving end does not exist.Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+edge.microsoft.com/translate/auth:1 
+            
+            
+           Failed to load resource: net::ERR_CONNECTION_RESETUnderstand this error
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+subtitle.js:7741 Getted userconfig from local Object
+subtitle.js:7741 Getted userconfig from local Object
+_app-2be6b9d2c923db0f.js:13 Measure loop restarted more than 5 times
+(anonymous) @ _app-2be6b9d2c923db0f.js:13
+measure @ 275e5802-f81d32497f69aad8.js:1
+(anonymous) @ 275e5802-f81d32497f69aad8.js:1
+n @ _app-2be6b9d2c923db0f.js:13Understand this warning
+subtitle.js:7741 Getted userconfig from local Object
+api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&includeSentenceLength=true&from=&to=en&:1 
+            
+            
+           Failed to load resource: the server responded with a status of 401 ()Understand this error
+workspace_iframe.html:32 Unrecognized feature: 'ambient-light-sensor'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'battery'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-not-rendered'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'execution-while-out-of-viewport'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'layout-animations'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'legacy-image-formats'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'navigation-override'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'oversized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'publickey-credentials'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'speaker-selection'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unoptimized-images'.Understand this warning
+workspace_iframe.html:32 Unrecognized feature: 'unsized-media'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowfullscreen'.Understand this warning
+workspace_iframe.html:32 Allow attribute will take precedence over 'allowpaymentrequest'.Understand this warning
+1000Console.js:61 Rendered 24 grid vertices
+6050Console.js:61 Rendered 24 grid vertices

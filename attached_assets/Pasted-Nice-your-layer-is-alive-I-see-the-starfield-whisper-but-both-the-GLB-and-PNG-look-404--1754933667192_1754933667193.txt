@@ -1,0 +1,91 @@
+Nice—your layer is alive (I see the starfield + whisper), but both the **GLB** and **PNG** look 404/mis-pathed. Two quick fixes:
+
+## 1) Verify public paths
+
+Make sure these open in the browser directly (case-sensitive!):
+
+* `/luma/Butler.glb`
+* `/luma/Luma_29.png`
+
+If they 404, move the files into your app’s **public** folder as:
+
+```
+public/
+  luma/
+    Butler.glb
+    Luma_29.png
+```
+
+Then use exactly those paths in props:
+
+```tsx
+<BackgroundLuma glbUrl="/luma/Butler.glb" />
+<LumaWhisper  icon="/luma/Luma_29.png" text="..." />
+```
+
+## 2) Add tiny fallbacks + logging
+
+### BackgroundLuma: show a fallback star if GLB fails
+
+```tsx
+// inside BackgroundLuma Canvas, replace the Suspense block:
+<React.Suspense fallback={<CenteredHint />}>
+  <LumaModel url={glbUrl} paused={paused || visPaused} />
+</React.Suspense>
+
+// LumaModel:
+function LumaModel({ url, paused }: { url: string; paused?: boolean }) {
+  let loaded = true;
+  let scene: THREE.Object3D | null = null;
+  try {
+    const gltf = useGLTF(url) as any;
+    scene = gltf.scene || gltf.scenes?.[0];
+  } catch (e) {
+    loaded = false;
+  }
+
+  // …(normalize, animate)… same as before, but guard with `if (!loaded || !scene) return <FallbackStar />;`
+}
+
+function FallbackStar() {
+  return (
+    <group>
+      <mesh>
+        <icosahedronGeometry args={[2.4, 2]} />
+        <meshStandardMaterial emissive={"#ffe89b"} emissiveIntensity={0.8} color={"white"} roughness={0.5}/>
+      </mesh>
+    </group>
+  );
+}
+```
+
+### LumaWhisper: log image errors
+
+```tsx
+<img
+  src={icon}
+  alt="Luma"
+  className="w-8 h-8 drop-shadow"
+  onError={(e)=>{ console.warn("Luma icon not found:", icon); (e.currentTarget as HTMLImageElement).style.display="none"; }}
+/>
+```
+
+## 3) Quick z-index check
+
+Your background looks under the UI (good). Keep:
+
+```tsx
+// Background container
+className="fixed inset-0 pointer-events-none"  // no -z-10
+style={{ zIndex: 0, opacity, filter: `blur(${blurPx}px)` }}
+
+// Main app wrapper
+className="relative z-10"
+```
+
+## 4) Sanity test
+
+* Temporarily set `<BackgroundLuma opacity={0.6} blurPx={0} />` so you can see the model clearly.
+* Open DevTools → Network tab and reload. You should see **200** for `Butler.glb` and `Luma_29.png`. If not, it’s path/case.
+
+If you still don’t see the model with 200 responses, tell me the exact URLs you used and I’ll tweak the component (some hosts serve under a base path; we can prefix with `process.env.NEXT_PUBLIC_BASE_PATH` if needed).

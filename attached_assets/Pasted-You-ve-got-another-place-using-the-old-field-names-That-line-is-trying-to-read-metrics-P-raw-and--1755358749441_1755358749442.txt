@@ -1,0 +1,51 @@
+You’ve got another place using the old field names. That line is trying to read `metrics.P_raw` and `metrics.P_avg`, but your metrics payload exposes `energyOutput` (avg) and likely `P_loss_raw` (per-tile loss) rather than `P_raw`.
+
+### Quick fix (same file: `client/src/components/metrics-dashboard.tsx`)
+
+Add these **safe aliases** once near the top of the component (where you added the first set of guards), or extend the ones you already created:
+
+```tsx
+// ---- add/extend these guards once ----
+const P_avg   = metrics?.P_avg ?? metrics?.energyOutput ?? 0;          // MW (fleet avg)
+const P_raw   = metrics?.P_raw ?? metrics?.P_peak ?? metrics?.P_loss_raw ?? 0; // MW or W/tile see note
+// formatters
+const f1 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(1) : "—";
+const f3 = (n?: number) => Number.isFinite(n as number) ? (n as number).toFixed(3) : "—";
+```
+
+> **Note:** If `P_loss_raw` is **W per tile**, you may want to convert it to MW total before showing it as “Peak”, e.g.
+> `const P_raw = (metrics?.P_raw ?? (metrics?.P_loss_raw ?? 0) * (metrics?.activeTiles ?? 0)) / 1e6;`
+> For now I left it mapped with a best-effort fallback.
+
+Then replace the crashing block (around line \~400) with the safe vars/formatters:
+
+```tsx
+<p className="text-xs text-muted-foreground">
+  Peak: {f1(P_raw)} MW • Avg: {P_avg >= 1 ? `${f3(P_avg)} MW` : `${f1(P_avg * 1e3)} kW`}
+</p>
+```
+
+This removes all direct `.toFixed()` calls on possibly-undefined fields.
+
+### Optional (cleaner long-term)
+
+Normalize the server response in your metrics hook so the dashboard always gets a consistent shape:
+
+```tsx
+// client/src/hooks/use-metrics.ts
+const normalize = (m: any) => ({
+  P_avg: m.P_avg ?? m.energyOutput ?? 0,
+  P_raw: m.P_raw ?? m.P_peak ?? m.P_loss_raw ?? 0,
+  duty:  m.f_throttle ?? m.dutyGlobal ?? m.duty ?? 0,
+  M_exotic: m.M_exotic ?? m.exoticMass ?? 0,
+  TS_ratio: m.TS_ratio ?? m.timeScaleRatio ?? 0,
+  zeta: m.zeta ?? m.fordRoman?.value ?? 0,
+  qCavity: m.qCavity ?? 0,
+  activeTiles: m.activeTiles ?? 0,
+  // …copy through anything else you use
+});
+```
+
+Then return `normalize(data)` from the hook.
+
+Either way, the patch above will stop this crash immediately.

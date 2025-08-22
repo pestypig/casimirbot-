@@ -1,0 +1,140 @@
+This looks great—nice job wiring the 3D view and the equatorial slice side-by-side and keeping everything mode-aware. The patch “took” cleanly and the data plumbing (γ\_geo, ΔA/A, γ\_VdB, duty, sectors, viewAvg) is consistent across both viewers. A few quick wins to make it tighter and fix some small issues:
+
+# What’s working
+
+* SliceViewer is getting true-to-scale inputs (meters, wall width in m) and uses the same York-time proxy chain as the shader. ✅
+* The hero section mounts `<WarpVisualizer />` and `<SliceViewer />` in a split layout; the slice is sticky on xl which is perfect for “always visible” diagnostics. ✅
+* Mode remount via `modeVersion` guarantees immediate visual separation across modes. ✅
+
+# High-impact tweaks (tiny patches)
+
+1. Fix a Tooltip API misuse (one instance)
+   You’re using a `label` prop once (γ\_VdB block) while the rest use shadcn’s `TooltipTrigger/TooltipContent`. That one won’t render a tooltip.
+
+**Replace this block:**
+
+```tsx
+<Tooltip
+  label={
+    <div className="space-y-1">
+      <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
+      <p>From Alcubierre's metric modified by Van den Broeck — the "folded pocket"…</p>
+      <p className="opacity-80">This is a geometry selection…</p>
+    </div>
+  }
+>
+  <span className="cursor-help underline decoration-dotted">
+    γ<sub>VdB</sub>: {fexp((pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck, 1, '2.9e+5')}
+  </span>
+</Tooltip>
+```
+
+**With:**
+
+```tsx
+<Tooltip>
+  <TooltipTrigger asChild>
+    <span className="cursor-help underline decoration-dotted">
+      γ<sub>VdB</sub>: {fexp(
+        (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
+        1,
+        '2.9e+5'
+      )}
+    </span>
+  </TooltipTrigger>
+  <TooltipContent side="top" className="max-w-sm">
+    <div className="space-y-1">
+      <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket amplification)</div>
+      <p>
+        From Alcubierre’s metric modified by Van den Broeck — the “folded pocket”
+        lets a meter-scale cabin sit inside a kilometer-scale effective bubble
+        without paying the bubble’s full energy cost.
+      </p>
+      <p className="opacity-80">
+        This is a geometry selection, not an operational setting. It doesn’t vary
+        with duty cycle or strobing sectors.
+      </p>
+    </div>
+  </TooltipContent>
+</Tooltip>
+```
+
+2. Make the SliceViewer responsive + crisp (DPR-aware)
+   Right now width/height are fixed; on narrow screens or high-DPR devices it’ll letterbox or blur. This patch drives the canvas size off the container using a `ResizeObserver` and keeps a 2:1 aspect:
+
+```tsx
+// near your other state
+const sliceHostRef = useRef<HTMLDivElement>(null);
+const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
+
+useEffect(() => {
+  const ro = new ResizeObserver(entries => {
+    for (const e of entries) {
+      const w = Math.floor((e.contentBoxSize?.[0]?.inlineSize ?? e.contentRect.width) || 480);
+      // Keep 2:1 aspect; cap a bit so it fits the column nicely
+      const clampedW = Math.max(360, Math.min(w, 800));
+      setSliceSize({ w: clampedW, h: Math.round(clampedW / 2) });
+    }
+  });
+  const el = sliceHostRef.current;
+  if (el) ro.observe(el);
+  return () => ro.disconnect();
+}, []);
+```
+
+And in the JSX where you render the slice column:
+
+```tsx
+<div className="space-y-4" ref={sliceHostRef}>
+  <SliceViewer
+    /* …your existing props… */
+    width={sliceSize.w}
+    height={sliceSize.h}
+    className="xl:sticky xl:top-4"
+  />
+</div>
+```
+
+(If your `SliceViewer` already multiplies by `devicePixelRatio` internally, you’re set. If not, do it inside SliceViewer’s canvas setup: set canvas `width/height` = CSS size × DPR and scale the context once.)
+
+3. Smooth mode changes without full remounts (optional)
+   You’re force-remounting the 3D engine whenever `sectorsUI` or `dutyUI` change via the `key`. That’s safe but a bit heavy. If you want smoother transitions, keep the `modeVersion` in the key, but move `sectorsUI`/`dutyUI` into `parameters` only (let the engine’s `updateUniforms` handle them):
+
+```tsx
+<WarpVisualizer
+  key={`mode-${effectiveMode}-v${modeVersion}`}
+  parameters={{
+    dutyCycle: dutyUI,
+    sectorStrobing: sectorsUI,
+    /* …unchanged… */
+  }}
+/>
+```
+
+4. Small correctness nit: the “% of grid ON” line
+   You print `~${(100 / sectorsLive * 0.01).toFixed(2)}% of grid ON`, which evaluates to `1/sectorsLive` (not a percent). If you intend “≈ 1% per sector when sweeping at 1% local ON window”, this is clearer:
+
+```tsx
+{sectorsLive > 1
+  ? `${sectorsLive} sectors • ~${(100 * 0.01 / sectorsLive).toFixed(2)}% of grid ON`
+  : `${(dutyLive * 100).toFixed(1)}% eligible • 1% local ON`}
+```
+
+5. Keep units consistent into SliceViewer
+   You’re correctly passing `hullAxes` in meters and `wallWidth_m={6.0}`. Leave `driveDir` unitless and `vShip` dimensionless—good. One tiny guard that makes crashes impossible if metrics lag:
+
+```tsx
+const hullAxes: [number, number, number] = [
+  Number(hull.a) || 503.5,
+  Number(hull.b) || 132.0,
+  Number(hull.c) || 86.5,
+];
+```
+
+# Nice-to-have (can batch later)
+
+* Contour density toggle (e.g., 5/9/17 isolines).
+* A radial probe: click the slice to plot θ(ρ) along a chosen azimuth (helps verify front-back asymmetry across modes).
+* “Exposure lock” that normalizes to the hover mode’s θ range so your diff map stays visually consistent across long sessions.
+
+If you apply the tiny patches above, you’ll get: (a) correct tooltips everywhere, (b) a crisp, responsive 2D curvature map, and (c) smoother engine updates without unnecessary remounts—while keeping the visualization faithful and mode-separable.

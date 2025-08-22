@@ -1,0 +1,76 @@
+At this point you’ve proven beyond doubt that:
+
+• Your VBO is full of valid ±0.8 clip‐space coords  
+• Your shaders compile and bind correctly  
+• Your draw calls fire (121 200 vertices every frame!)  
+• Your projection matrix is now correct  
+
+Yet *no* grid ever appears in your real render. That can *only* mean your grid is still being *overdrawn* by something—or drawn so thin you cannot see it. Let’s slam-dunk the last two possibilities in one final “master‐switch”:
+
+1) Draw the grid *by itself*, *before* any quad, with a bright color and guaranteed visibility.  In your `_draw()` replace everything with:
+
+```js
+// 1) Clear the color buffer only
+gl.clearColor(0.0,0.0,0.0,1.0);
+gl.clear(gl.COLOR_BUFFER_BIT);
+
+// 2) Use the grid program
+gl.useProgram(this.gridProgram);
+
+// 3) Force a fat white point‐cloud
+gl.disable(gl.DEPTH_TEST);
+gl.disable(gl.BLEND);
+
+// 4) Identity MVP so points land at ±0.8 in NDC
+const I = new Float32Array([
+  1,0,0,0,
+  0,1,0,0,
+  0,0,1,0,
+  0,0,0,1
+]);
+gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, I);
+
+// 5) Bind VBO & attribute
+gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+gl.enableVertexAttribArray(this.gridUniforms.position);
+gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+
+// 6) In your VS set “gl_PointSize = 12.0;” (for WebGL2) or pass it via an attribute  
+//    And override sheetColor to white & energyFlag to 0
+gl.uniform1f(this.gridUniforms.energyFlag, 0.0);
+gl.uniform3f(this.gridUniforms.sheetColor, 1,1,1);
+
+// 7) Draw as POINTS for maximum visibility
+gl.drawArrays(gl.POINTS, 0, this.gridVertexCount);
+
+// 8) Cleanup
+gl.disableVertexAttribArray(this.gridUniforms.position);
+```
+
+You *must* see a cloud of *white dots* spanning from x,y=–0.8…+0.8 right now. If you still see nothing:
+
+– Your code isn’t actually calling `_draw()` at all (check for a hung render loop).  
+– Or your VBO binding/unbinding is happening out of order (confirm `gl.bindBuffer` immediately precedes the draw).
+
+2) Once the white‐dot cloud is visible, progressively re‐introduce:
+
+• Your real projection + view MVP  
+• `gl.enable(gl.DEPTH_TEST)` + `gl.clear(gl.DEPTH_BUFFER_BIT)` after the grid  
+• Back to your per‐sheet `u_sheetColor` and `gl.drawArrays(..., XY/XZ/YZ)`  
+
+and you will *instantly* see the three colored clouds:
+
+– Cyan for XY  
+– Magenta for XZ  
+– Yellow for YZ  
+
+If *this final white‐dot test* still fails, the culprit is not WebGL at all but the render‐loop or file‐loading: you’re simply not executing that code path. In that case:
+
+• Put a `console.log(">> TOP OF DRAW")` at the very top of `_draw()`.  
+• Ensure `requestAnimationFrame` is firing.  
+• Verify your patched JS bundle is actually loaded by sprinkling a `console.error("BUNDLE VERSION XYZ")` in the constructor.
+
+Let me know which of these two outcomes you hit:
+
+– **White dots appear**: we’ll reassemble the real scene.  
+– **No white dots**: your loop or bundle isn’t running, and we’ll debug that.

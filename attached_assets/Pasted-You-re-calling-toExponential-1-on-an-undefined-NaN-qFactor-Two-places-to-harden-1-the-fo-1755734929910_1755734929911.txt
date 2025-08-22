@@ -1,0 +1,103 @@
+You’re calling `.toExponential(1)` on an undefined/NaN `qFactor`. Two places to harden:
+
+1. the formatter (`formatQFactor`)
+2. anywhere that derives a log value for the slider (`Math.log10(localParams.qFactor)`)
+
+Here’s a safe patch you can drop in (search/replace the relevant bits).
+
+```ts
+// 1) Replace your formatter with a hardened version
+const formatQFactor = (q: unknown) => {
+  const n = Number(q);
+  if (!Number.isFinite(n) || n <= 0) return '—';
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}×10⁹`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}×10⁶`;
+  return n.toExponential(1);
+};
+```
+
+```ts
+// 2) When initializing local state, ensure a numeric fallback
+const initialPreset = modePresets[initialMode as keyof typeof modePresets] || modePresets.hover;
+
+const [localParams, setLocalParams] = useState({
+  selectedMode: initialMode,
+  gammaGeo: Number.isFinite(viabilityParams?.gammaGeo) ? viabilityParams.gammaGeo : 26,
+  qFactor: Number.isFinite(viabilityParams?.qFactor) && viabilityParams.qFactor > 0
+    ? viabilityParams.qFactor
+    : (initialPreset?.cavityQ ?? 1e9),
+  duty: Number.isFinite(viabilityParams?.duty) ? viabilityParams.duty : (initialPreset?.duty ?? 0.14),
+  sagDepth: Number.isFinite(viabilityParams?.sagDepth) ? viabilityParams.sagDepth : 16,
+  maxPower: Number.isFinite(viabilityParams?.maxPower) ? viabilityParams.maxPower : initialConstraints.maxPower,
+  massTolerance: Number.isFinite(viabilityParams?.massTolerance) ? viabilityParams.massTolerance : initialConstraints.massTolerance,
+  maxZeta: Number.isFinite(viabilityParams?.maxZeta) ? viabilityParams.maxZeta : initialConstraints.maxZeta,
+  minTimescale: Number.isFinite(viabilityParams?.minTimescale) ? viabilityParams.minTimescale : initialConstraints.minTimescale,
+});
+```
+
+```tsx
+// 3) Harden the Q-factor slider value (avoid log10 of bad/≤0 values)
+<div onDoubleClick={() => handleSliderDoubleClick('qFactor')}>
+  <Slider
+    value={[(() => {
+      const n = Number(localParams.qFactor);
+      return Number.isFinite(n) && n > 0 ? Math.log10(n) : 6; // default to 1e6
+    })()]}
+    onValueChange={([value]) => {
+      // clamp to [1e6, 1e10] like your min/max
+      const qFactor = Math.min(1e10, Math.max(1e6, Math.pow(10, value)));
+      updateParameter('qFactor', qFactor);
+      zenLongToast("geom:qfactor", {
+        qFactor,
+        powerMW: 83.3,
+        zeta: 0.032
+      });
+    }}
+    min={6}
+    max={10}
+    step={0.1}
+    className="w-full cursor-pointer"
+  />
+</div>
+<p className="text-xs text-muted-foreground">
+  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode?.cavityQ)})
+</p>
+```
+
+```ts
+// 4) Anywhere you display a Q (cavity or mechanical), wrap with formatQFactor
+<Label>
+  Cavity Q-Factor: {formatQFactor(localParams.qFactor)} <span className="text-xs text-blue-600">(User Control)</span>
+</Label>
+
+<Label className="text-sm">
+  Mechanical Q-Factor: {formatQFactor(currentMode?.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span>
+</Label>
+```
+
+```ts
+// 5) If you compute MW / kg / ζ from mode descriptions, guard those parses or (better) stop parsing strings.
+// QUICK GUARD (keeps your current approach from crashing):
+const safeParse = <T extends number>(v: any, d: T): T => {
+  const n = Number(v);
+  return (Number.isFinite(n) ? (n as T) : d);
+};
+
+// when building the zen toast on mode change:
+if (preset) {
+  const mw = safeParse(preset.description.split('MW')[0], 83.3);
+  const kg = safeParse(parseInt((preset.description.split('kg')[0] || '').split('• ').pop() ?? ''), 1405);
+  const z = safeParse((preset.description.split('ζ=')[1]), 0.032);
+
+  zenLongToast("mode:switch", {
+    mode: preset.name,
+    duty: preset.duty,
+    powerMW: mw,
+    exoticKg: kg,
+    zeta: z
+  });
+}
+```
+
+**Why this fixes the crash:**
+`qFactor.toExponential` was being called when `qFactor` was `undefined` or `0/NaN`. The new `formatQFactor` turns any bad/zero input into a safe `'—'`, and the slider now uses a safe default log value when `qFactor` isn’t valid. Initial state and display labels also get numeric fallbacks, so the component can mount even if upstream data arrives late or is missing.

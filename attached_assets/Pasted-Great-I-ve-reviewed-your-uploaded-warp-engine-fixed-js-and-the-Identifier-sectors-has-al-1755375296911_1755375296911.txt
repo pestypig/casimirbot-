@@ -1,0 +1,71 @@
+Great — I’ve reviewed your uploaded **`warp-engine-fixed.js`**, and the “Identifier `sectors` has already been declared” error makes sense.
+
+Here’s what’s happening:
+
+---
+
+## Why the Error Happens
+
+Inside your WebGL pipeline (`_warpGridVertices`), the new uniforms injection added this:
+
+```js
+const sectors = this.uniforms?.sectors || 1;
+```
+
+But the file already has an earlier declaration of `sectors` (likely in the same scope or a parent block).
+JavaScript doesn’t allow redeclaring the same identifier with `const` (or `let`) inside the same scope.
+
+---
+
+## Fixing It Cleanly
+
+You need to avoid redeclaration and instead **reuse or rename** the variable. Two safe options:
+
+### 1. Reuse the Existing `sectors`
+
+If the old declaration already exists in scope and is meant to represent the same value:
+
+```js
+// instead of redeclaring:
+const sectors = this.uniforms?.sectors || 1;
+
+// just reassign:
+sectors = this.uniforms?.sectors || sectors || 1;
+```
+
+This ensures the variable is updated from uniforms but not redeclared.
+
+---
+
+### 2. Rename the New Uniform Variable
+
+If the old `sectors` has a different role, you should keep them separate:
+
+```js
+const sectorsUniform = this.uniforms?.sectors || 1;
+```
+
+Then, wherever you reference mode-driven sectors, use `sectorsUniform`.
+
+---
+
+## Recommended Path for Mode → Visual Link
+
+Since your **goal** is to connect operational mode to the warp bubble, I recommend **renaming the uniform-derived one** (`sectorsUniform`) so you can clearly distinguish:
+
+* `sectorsUniform` = value passed from **WarpVisualizer.tsx** (`engineRef.current.updateUniforms({...})`)
+* `sectors` = internal grid / geometry loops that may already be in place
+
+Then, in your displacement calculation:
+
+```js
+disp *= sgn * front * wallWin * gaussian_local * sectorsUniform;
+```
+
+That way, the visual explicitly follows the operational mode’s sector count.
+
+---
+
+✅ This will both eliminate the error and make your operational mode → visual link explicit and safe.
+
+Would you like me to **edit your uploaded `warp-engine-fixed.js` directly** and send you back the corrected version with `sectorsUniform` integrated everywhere it’s needed?
