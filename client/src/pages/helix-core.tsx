@@ -717,9 +717,9 @@ export default function HelixCore() {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
-                      <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizer…</div>}>
+                      <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}>
                         <WarpBubbleCompare
-                        key={`mode-${effectiveMode}-v${modeVersion}-compare`}
+                        key={`compare-${effectiveMode}-v${modeVersion}`}
                         parameters={compareParams}
                         />
                       </Suspense>
