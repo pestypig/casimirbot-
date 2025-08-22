@@ -102,7 +102,6 @@ class WarpEngine {
         // Display-only controls (do NOT feed these back into pipeline math)
         this.uniforms = {
             vizGain: 4.0,        // how exaggerated the bend looks
-            colorByTheta: 1.0,   // 1=York colors, 0=solid sheet color
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
@@ -362,7 +361,6 @@ class WarpEngine {
         const gridFs = isWebGL2 ?
             "#version 300 es\n" +
             "precision highp float;\n" +
-            "uniform float u_colorByTheta;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "uniform vec3 u_axes;\n" +
             "uniform vec3 u_driveDir;\n" +
@@ -449,7 +447,6 @@ class WarpEngine {
             "}"
             :
             "precision highp float;\n" +
-            "uniform float u_colorByTheta;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "uniform vec3 u_axes;\n" +
             "uniform vec3 u_driveDir;\n" +
@@ -560,7 +557,6 @@ class WarpEngine {
         const gl = this.gl;
         this.gridUniforms = {
             mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
-            colorByTheta: gl.getUniformLocation(this.gridProgram, 'u_colorByTheta'),
             sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
             axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
             driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
@@ -663,14 +659,12 @@ class WarpEngine {
             ...this.uniforms,
             vizGain: Number.isFinite(parameters.vizGain) ? +parameters.vizGain
                    : (this.uniforms?.vizGain ?? 1.0),
-            colorByTheta: 1,
             vShip: parameters.vShip || 1,
             wallWidth: parameters.wallWidth || 0.06,
             axesClip: axesScene,
             driveDir: parameters.driveDir || [1, 0, 0],
             // NEW: Artificial gravity tilt parameters
             epsilonTilt: physicsParityMode ? 0 : N(parameters.epsilonTilt || 0), // 🔬 Force zero tilt in parity mode
-            epsilonTiltFloor: physicsParityMode ? 0 : N(parameters.epsilonTiltFloor || 0), // 🔬 Force zero tilt floor
             betaTiltVec: physicsParityMode ? [0, 0, 0] : (parameters.betaTiltVec || [0, -1, 0]), // 🔬 Force zero tilt vector
             tiltGain: N(parameters.tiltGain || 0.55),
             // NEW: Curvature Gain blend system (replaces vizGainOverride)
@@ -825,12 +819,10 @@ class WarpEngine {
             this.uniforms.cosmeticT = cosmeticT;
         }
 
-        // Auto-exposure: prevent colors from clamping at high gains
-        const autoExposureEnabled = parameters.autoExposure !== false;
-        if (autoExposureEnabled && !Number.isFinite(parameters.exposure)) {
+        // Auto-exposure: prevent colors from clamping at high gains (only when caller didn't set one)
+        if (!physicsParityMode && parameters.autoExposure !== false && !Number.isFinite(parameters.exposure)) {
             const g = Math.max(1, this.uniforms.userGain || 1);
-            // gentle roll-up; parity will stay low, hero will rise
-            this.uniforms.exposure = Math.min(12.0, 3.0 + 1.4 * Math.log10(g));
+            this.uniforms.exposure = Math.min(12, 3.0 + 1.4 * Math.log10(g));
         }
 
         // Expose exaggeration snapshot that UI can read per frame (for HUD)
@@ -1347,7 +1339,6 @@ class WarpEngine {
         
         // Set all uniforms for York-time visualization
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
-        gl.uniform1f(this.gridUniforms.colorByTheta, this.uniforms?.colorByTheta || 1.0);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
         gl.uniform3f(this.gridUniforms.axes, 
             this.uniforms?.axesClip[0] || 0.40,
