@@ -45,7 +45,7 @@ export interface FieldRequest {
   shellOffset?: number; // meters; 0 = on shell, >0 outside, <0 inside (default 0)
   // physics
   wallWidth_m?: number; // bell width wρ in meters (default from sag_nm)
-  sectors?: number;     // sector count (default state.sectorStrobing)
+  sectors?: number;     // sector count (default state.sectorCount)
   split?: number;       // (+)/(−) split index (default floor(sectors/2))
 }
 
