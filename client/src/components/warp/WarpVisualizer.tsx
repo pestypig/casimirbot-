@@ -678,22 +678,19 @@ useEffect(() => {
   useEffect(() => {
     if (!engineRef.current) return;
 
-    // If REAL, force unity and bail
     if (parameters.physicsParityMode) {
-      engineRef.current.setUniform?.('uDisplayGain', 1);
-      engineRef.current.setDisplayGain?.(1);
+      engineRef.current.setDisplayGain?.(1);              // userGain = 1
+      engineRef.current.updateUniforms?.({ displayGain: 1 });
       return;
     }
 
-    // SHOW viewer: apply decades boost
     const boost = computeDisplayBoost(
       parameters.curvatureGainDec ?? 0,
       parameters.curvatureBoostMax ?? 40
     );
-    engineRef.current.setUniform?.('uDisplayGain', boost);
-    engineRef.current.setDisplayGain?.(boost);
-
-    console.log(`🎛️ 3D DISPLAY GAIN: parity=${!!parameters.physicsParityMode} gain=${boost.toFixed(2)}×`);
+    engineRef.current.setDisplayGain?.(boost);            // userGain = boost (geometry + shader)
+    engineRef.current.updateUniforms?.({ displayGain: 1 }); // keep shader's u_displayGain neutral
+    console.log(`🎛️ EXAGGERATION (userGain): ×${boost.toFixed(2)}`);
   }, [
     parameters.physicsParityMode,
     parameters.curvatureGainDec,
