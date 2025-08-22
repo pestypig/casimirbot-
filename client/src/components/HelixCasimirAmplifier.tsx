@@ -757,20 +757,25 @@ export default function HelixCasimirAmplifier({
                 Pipeline-Driven Cavity Cross-Section (To Scale)
               </h4>
               <CavitySideView
-                width={800}
-                height={240}
-                tileWidth_mm={50}
                 pocketDiameter_um={40}
                 sag_nm={state.sag_nm ?? 16}
                 gap_nm={state.gap_nm ?? 1}
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
                 alnRim_width_um={20}
-                onWindow={lightCrossing?.onWindow ?? false}
+                tileWidth_mm={50}
                 physicsParity={false}
-                verticalExaggeration={4000}
-                gapInsetMagnification={10000}
-                fontScale={1.0}
+                onWindow={lightCrossing?.onWindow ?? false}
+
+                // Bigger canvas
+                width={1000}
+                height={360}
+
+                // READABILITY: keep X to-scale, exaggerate Y only, plus a gap zoom inset
+                pxPerUmX={undefined}           // auto-fit the 50 mm tile horizontally
+                verticalExaggeration={5000}    // make nm-scale clearly visible
+                gapInsetMagnification={12000}  // inset zoom of the stack
+                fontScale={1.15}
               />
             </div>
           </CardContent>
