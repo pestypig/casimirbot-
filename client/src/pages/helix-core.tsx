@@ -468,13 +468,24 @@ export default function HelixCore() {
     });
   }, [systemMetrics?.currentSector, systemMetrics?.sectorStrobing]);
 
-  // Sync 3D engine with strobing state
+  // Sync 3D engine with strobing state (defensive + sanitized)
   useEffect(() => {
-    if (!systemMetrics) return;
-    (window as any).setStrobingState?.({
-      sectorCount: systemMetrics.sectorStrobing,
-      currentSector: systemMetrics.currentSector
-    });
+    const sc = Number(systemMetrics?.sectorStrobing);
+    const cs = Number(systemMetrics?.currentSector);
+    const fn = (window as any).setStrobingState;
+
+    if (!Number.isFinite(sc) || sc <= 0 || !Number.isFinite(cs)) return;
+    if (typeof fn !== "function") return;
+
+    const sectorCount = Math.max(1, Math.floor(sc));
+    const currentSector = Math.max(0, Math.floor(cs)) % sectorCount;
+
+    try {
+      fn({ sectorCount, currentSector });
+    } catch (err) {
+      // If the visualizer has an internal bug (e.g., free `sceneScale`), we never let it take down the page.
+      console.warn("setStrobingState threw; skipped this tick:", err);
+    }
   }, [systemMetrics?.sectorStrobing, systemMetrics?.currentSector]);
 
   // Color mapper (blue→active; red if ζ breach)
