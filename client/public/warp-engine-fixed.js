@@ -1121,17 +1121,13 @@ class WarpEngine {
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
         
-        // Authoritative scene-normalized hull axes (single source of truth)
-        gl.uniform3f(this.gridUniforms.axesScene,
-            this.uniforms?.axesClip[0] || 0.0,
-            this.uniforms?.axesClip[1] || 0.0,
-            this.uniforms?.axesClip[2] || 0.0);
+        // Both uniforms get identical scene-normalized hull axes (eliminates dual ellipsoid)
+        const axesX = this.uniforms?.axesClip[0] || 0.0;
+        const axesY = this.uniforms?.axesClip[1] || 0.0;
+        const axesZ = this.uniforms?.axesClip[2] || 0.0;
         
-        // Legacy axes fallback (maintained for compatibility)
-        gl.uniform3f(this.gridUniforms.axes, 
-            this.uniforms?.axesClip[0] || 0.40,
-            this.uniforms?.axesClip[1] || 0.22, 
-            this.uniforms?.axesClip[2] || 0.22);
+        gl.uniform3f(this.gridUniforms.axesScene, axesX, axesY, axesZ);  // Authoritative
+        gl.uniform3f(this.gridUniforms.axes, axesX, axesY, axesZ);       // Same value!
         
         gl.uniform3f(this.gridUniforms.driveDir,
             this.uniforms?.driveDir[0] || 1.0,
