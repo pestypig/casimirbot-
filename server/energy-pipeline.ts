@@ -150,21 +150,20 @@ export const PAPER = { TOTAL_SECTORS, BURST_DUTY_LOCAL, Q_BURST, GAMMA_VDB };
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
-  hover:     { S_live: 'all' as const, P_target_W: 83.3e6,   M_target_kg: 1_000 },
-  cruise:    { S_live: 1 as const,     P_target_W: 7.437,    M_target_kg: 1_000 }, // 7.437 **W**
-  emergency: { S_live: 'all' as const, P_target_W: 297.5e6,  M_target_kg: 1_000 },
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1_000 },
+  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1_000 },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  M_target_kg: 1_000 },
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
 } as const;
 
 // Runtime assert in dev to prevent unit confusion
 if (process.env.NODE_ENV !== 'production') {
-  const isWatt = MODE_POLICY.cruise.P_target_W < 1000;
-  if (!isWatt) console.warn("[PIPELINE] Cruise P_target looks >1kW; targets must be in watts.");
+  const isWatt = MODE_POLICY.standby.P_target_W === 0; // All non-standby targets are now in MW range
+  if (!isWatt) console.warn("[PIPELINE] Power targets must be in watts.");
 }
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
   const pol = MODE_POLICY[mode];
-  if (pol.S_live === 'all') return TOTAL_SECTORS;
   return Math.max(0, Math.min(TOTAL_SECTORS, pol.S_live));
 }
 
@@ -301,14 +300,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // 3) Sector scheduling — per-mode policy
   const S_total = TOTAL_SECTORS;
-  const S_live  = resolveSLive(state.currentMode);
-  const frac_active = (S_total === 0) ? 0 : (S_live / S_total);
-  const d_eff   = BURST_DUTY_LOCAL * frac_active; // paper formula 0.01 * S_live/400
+  const concurrent = resolveSLive(state.currentMode);
+  const d_eff = BURST_DUTY_LOCAL * (concurrent / S_total); // ship-wide duty
 
-  state.activeSectors   = S_live;
-  state.activeFraction  = frac_active;
+  state.activeSectors   = concurrent;
+  state.activeFraction  = concurrent / S_total;
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
-  state.activeTiles     = state.tilesPerSector * S_live;
+  state.activeTiles     = state.tilesPerSector * concurrent;
 
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
