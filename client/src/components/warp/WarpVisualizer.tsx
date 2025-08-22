@@ -286,7 +286,8 @@ useEffect(() => {
       // camera/exposure defaults moved into single bootstrap
       exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
       zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
-      curvatureGainDec: 3,
+      curvatureGainDec: parameters.physicsParityMode ? 0 : 3,
+      curvatureBoostMax: parameters.physicsParityMode ? 1 : (parameters.curvatureBoostMax ?? 40),
 
       dutyCycle: dutyResolved,
       gammaGeo,
@@ -917,8 +918,8 @@ useEffect(() => {
                 <div>View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
                 <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
                 {(() => {
-                  const aH = parameters.hullDimensions?.aH || parameters.hullAxes?.[0] || 142.0;
-                  const w_rho = parameters.wallWidth ?? 0.016;
+                  const aH = parameters.hull?.a || 142.0;
+                  const w_rho = parameters.wallWidth_m ?? 0.016;
                   const w_m = Number.isFinite(aH) ? w_rho * aH : NaN;
                   return (
                     <div>wall width: w = {w_rho.toFixed(4)} ρ-units{Number.isFinite(w_m) ? ` ≈ ${w_m.toFixed(3)} m` : ''}</div>
