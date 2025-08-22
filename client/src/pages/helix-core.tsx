@@ -1590,7 +1590,7 @@ export default function HelixCore() {
             
             {/* Mission Fuel / Range Gauge */}
             <FuelGauge
-              mode={pipelineState?.currentMode || 'Hover'}
+              mode={(pipelineState?.currentMode || 'hover').replace(/^./, c => c.toUpperCase())}
               powerMW={pipelineState?.P_avg || 83.3}
               zeta={pipelineState?.zeta}
               tsRatio={pipelineState?.TS_ratio || 5.03e4}
@@ -1806,7 +1806,7 @@ export default function HelixCore() {
                   plan={{ waypoints: route }}
                   mode={mapMode}
                   perf={{
-                    mode: pipelineState?.currentMode || 'Hover',
+                    mode: (pipelineState?.currentMode || 'hover').replace(/^./, c => c.toUpperCase()),
                     powerMW: pipelineState?.P_avg || 83.3,
                     duty: pipelineState?.dutyCycle || 0.14,
                     gammaGeo: pipelineState?.gammaGeo || 26,
