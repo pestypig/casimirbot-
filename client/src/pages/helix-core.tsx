@@ -630,6 +630,7 @@ export default function HelixCore() {
                       switchMode.mutate(m.key as any);
                       setModeVersion(v => v + 1); // force visualizer remount for instant change
                       setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
+                      refetchMetrics(); // ⬅️ add
                     }
                   }}
                 >
