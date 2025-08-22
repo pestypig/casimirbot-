@@ -1040,7 +1040,7 @@ class WarpEngine {
             );
             const R_eff = 1.0 / Math.max(invR, 1e-6);
             // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
-            const w_rho_local = Math.max(1e-4, w_rho);
+            const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
             
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps
