@@ -846,11 +846,11 @@ useEffect(() => {
                   // reflect actual uniforms (after parity gating) when available
                   const u = engineRef.current?.uniforms ?? {};
                   const parity = !!u.physicsParityMode;
-                  const curvT   = parity ? 0 : (u.curvatureGainT ?? 0);
-                  const boost   = parity ? 1 : Math.max(1, u.curvatureBoostMax ?? 1);
-                  const disp    = parity ? 1 : (u.displayGain ?? 1);
-                  const vizG    = parity ? 1 : (u.vizGain ?? 1);
-                  const gain = disp * vizG * (1 + curvT * (boost - 1));
+                  const curvT  = parity ? 0 : (u.curvatureGainT ?? 0);
+                  const boostM = parity ? 1 : Math.max(1, u.curvatureBoostMax ?? 1);
+                  const userG  = parity ? 1 : Math.max(1, u.userGain ?? 1);  // ← geometry + shader
+                  const vizG   = parity ? 1 : (u.vizGain ?? 1);
+                  const gain   = userG * vizG * (1 + curvT * (boostM - 1));
                   return (
                     <>
                       exaggeration: ×{gain.toFixed(2)} ·
