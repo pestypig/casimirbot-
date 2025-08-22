@@ -72,12 +72,12 @@ export function WarpDiagnostics({
       <div className="grid grid-cols-2 gap-3 text-xs">
         {/* Energy Conditions */}
         <div className="space-y-1">
-          <div className="text-slate-300">Energy Conditions:</div>
-          <div className={`font-mono ${wecViolated ? 'text-red-400' : 'text-green-400'}`}>
-            WEC: {wecViolated ? 'VIOLATED' : 'SATISFIED'}
+          <div className="text-slate-300">Energy Conditions (notes):</div>
+          <div className={`font-mono text-xs ${zeta < 1 ? 'text-green-400' : 'text-yellow-400'}`}>
+            • Ford–Roman QI margin ζ = {zeta.toFixed(3)} {zeta < 1 ? '(PASS)' : '(WARN)'}
           </div>
-          <div className={`font-mono ${necViolated ? 'text-red-400' : 'text-green-400'}`}>
-            NEC: {necViolated ? 'VIOLATED' : 'SATISFIED'}
+          <div className="font-mono text-xs text-slate-400">
+            • Classical WEC/NEC: violated for warp metrics (expected); monitor QI instead.
           </div>
         </div>
         
@@ -124,7 +124,7 @@ export function WarpDiagnostics({
       </div>
       
       <div className="mt-2 text-xs text-slate-400 font-mono">
-        Mode: {mode} | β₀: {beta0.toExponential(2)} | R: {sagDepth}nm
+        Mode: {mode} | β₀: {beta0.toExponential(2)}
       </div>
 
       {/* Equations & Invariants Section */}

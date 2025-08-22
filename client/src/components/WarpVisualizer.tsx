@@ -826,7 +826,7 @@ useEffect(() => {
               </div>
               
               <div className="text-blue-300">
-                <div>R = {num(parameters.sagDepth_nm, 16)}nm | View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
+                <div>View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
                 <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
                 {(() => {
                   const aH = parameters.hullDimensions?.aH || parameters.hullAxes?.[0] || 142.0;
