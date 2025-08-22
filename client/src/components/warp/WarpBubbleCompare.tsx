@@ -196,6 +196,11 @@ export default function WarpBubbleCompare({
 
         const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
 
+        // normalize any global fallback the engine might use
+        (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
+        leftEngine.current?.setSceneScale?.((window as any).sceneScale);
+        rightEngine.current?.setSceneScale?.((window as any).sceneScale);
+
         // ensure only the calibrated hull model draws
         const killMixing = {
           modelMode: 'calibrated',   // engine will prefer calibrated chain
@@ -262,6 +267,11 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
     const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+
+    // normalize any global fallback the engine might use
+    (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
+    leftEngine.current?.setSceneScale?.((window as any).sceneScale);
+    rightEngine.current?.setSceneScale?.((window as any).sceneScale);
 
     // ensure only the calibrated hull model draws
     const killMixing = {
