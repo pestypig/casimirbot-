@@ -63,7 +63,7 @@ export interface TileParams {
 export interface EnergyPipelineState {
   // Input parameters
   tileArea_cm2: number;
-  shipRadius_m: number;
+  shipRadius_m: number;        // Legacy fallback for field sampler when hull geometry unavailable
   gap_nm: number;
   sag_nm: number;
   temperature_K: number;
@@ -424,6 +424,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
+  
+  /* ──────────────────────────────
+     "Explain-it" counters for HUD/debug
+  ──────────────────────────────── */
+  (state as any).E_tile_static_J = Math.abs(state.U_static);  // Static Casimir energy per tile
+  (state as any).E_tile_geo_J = Math.abs(state.U_geo);        // Geometric amplified energy per tile  
+  (state as any).E_tile_on_J = Math.abs(state.U_Q);           // Stored energy per tile in on-window
+  (state as any).P_tile_on_W = state.P_loss_raw;              // Power per tile during on-window
+  (state as any).d_eff = d_eff;                               // Ship-wide effective duty (first-class)
+  (state as any).M_per_tile_kg = state.N_tiles > 0 ? state.M_exotic / state.N_tiles : 0; // Mass per tile
 
   // 7) Quantum-safety proxy (scaled against baseline ship-wide duty)
   const d_ship = d_eff;                              // ship-wide
@@ -434,6 +444,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // Physics logging for debugging (before UI field updates)
   console.log("[PIPELINE]", {
+    mode: state.currentMode, model: MODEL_MODE,
     dutyShip: d_eff, dutyUI_before: state.dutyCycle, S_live, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
@@ -565,7 +576,7 @@ export function setGlobalPipelineState(state: EnergyPipelineState): void {
  */
 export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSample[] {
   // Hull geometry: convert from Needle Hull format to ellipsoid axes
-  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+  const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 }; // fallback only
   const a = hullGeom.Lx_m / 2;  // Semi-axis X (length/2)
   const b = hullGeom.Ly_m / 2;  // Semi-axis Y (width/2)
   const c = hullGeom.Lz_m / 2;  // Semi-axis Z (height/2)
