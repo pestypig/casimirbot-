@@ -125,6 +125,15 @@ interface WarpVisualizerProps {
     sectorStrobing?: number;
     qSpoilingFactor?: number;
     gammaVanDenBroeck?: number;
+    // Visualization overrides
+    viz?: {
+      colorMode?: 'solid'|'theta'|'shear'|0|1|2;
+      curvatureGainT?: number;       // 0..1
+      curvatureBoostMax?: number;    // ≥1
+      exposure?: number;             // ~3..12
+      zeroStop?: number;             // ~1e-9..1e-5
+      cosmeticLevel?: number;        // 1..10
+    };
     /** Optional: ship-effective duty (Ford–Roman sampled). Prefer this over dutyCycle when present. */
     dutyEffectiveFR?: number;
     /** Optional: live light crossing loop for synchronized strobing */
@@ -301,6 +310,16 @@ useEffect(() => {
 
     // single bootstrap: fit + all uniforms in one shot
     engine.bootstrap(uniforms);
+    
+    // Apply viz overrides if provided
+    engine.updateUniforms({
+      colorMode: parameters.viz?.colorMode ?? (parameters.curvatureGainDec != null ? undefined : 'theta'),
+      curvatureGainT: parameters.viz?.curvatureGainT ?? parameters.curvatureGainT,
+      curvatureBoostMax: parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax,
+      exposure: parameters.viz?.exposure ?? undefined,
+      zeroStop: parameters.viz?.zeroStop ?? undefined,
+      cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
+    });
 
     // Pipeline-timed gating
     if (lc) {
@@ -563,9 +582,16 @@ useEffect(() => {
           mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault
         ),
         
-        // Curvature controls
+        // Curvature controls (with viz overrides)
         curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
-        curvatureBoostMax: parity ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
+        curvatureBoostMax: parity ? 1 : Math.max(1, parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
+        curvatureGainT: parameters.viz?.curvatureGainT ?? parameters.curvatureGainT,
+        
+        // Viz overrides
+        colorMode: parameters.viz?.colorMode ?? (parameters.curvatureGainDec != null ? undefined : 'theta'),
+        exposure: parameters.viz?.exposure ?? undefined,
+        zeroStop: parameters.viz?.zeroStop ?? undefined,
+        cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined,
         
         // Optional view settings
         viewAvg: true,
@@ -781,15 +807,29 @@ useEffect(() => {
             </div>
           )}
           
-          {/* Live operational mode HUD (inspired by GPT's suggestion) */}
+          {/* Enhanced exaggeration HUD */}
           {isLoaded && (
-            <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono">
+            <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono space-y-0.5">
               <div className="text-cyan-400 font-semibold">
-                {parameters.currentMode?.toUpperCase() || 'HOVER'} MODE
+                {(parameters.currentMode?.toUpperCase() || 'HOVER')} MODE
+                {" · "}
+                {parameters.viz?.colorMode === 'shear' || parameters.viz?.colorMode===2 ? 'σ' : parameters.viz?.colorMode==='solid'||parameters.viz?.colorMode===0 ? 'solid' : 'θ'}
               </div>
               <div className="text-green-400">
-                P: {safeFix(parameters.powerAvg_MW, VIS.powerAvgFallback, 1)}MW | 
+                P: {safeFix(parameters.powerAvg_MW, VIS.powerAvgFallback, 1)}MW ·
                 D: {safeFix(parameters.dutyCycle * 100, 14, 1)}%
+              </div>
+              <div className="text-amber-300">
+                exaggeration: ×{(() => {
+                  const T = parameters.viz?.curvatureGainT ?? (parameters.curvatureGainDec??0)/8;
+                  const max = parameters.viz?.curvatureBoostMax ?? (parameters.curvatureBoostMax ?? 40);
+                  const gain = 1 + Math.max(0, Math.min(1, Number(T)||0)) * (Math.max(1, Number(max)||40) - 1);
+                  return gain.toFixed(2);
+                })()}
+                {" · "}
+                exp:{(parameters.viz?.exposure ?? 6.0).toFixed(1)}
+                {" · "}
+                z₀:{(parameters.viz?.zeroStop ?? 1e-7).toExponential(1)}
               </div>
             </div>
           )}
