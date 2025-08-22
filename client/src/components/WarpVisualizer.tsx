@@ -214,7 +214,12 @@ useEffect(() => {
     const splitResolved = Math.max(0, Math.min(sectorsResolved - 1, Math.floor(sectorsResolved / 2)));
     
     const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
-    const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
+    
+    // Harden unit/finite guards for Q, γ, wall width (no hidden magic)
+    const gammaGeo = Math.max(1, num(parameters.g_y, 26));
+    const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));    // never ≤0
+    const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
+    const wallNorm = Math.max(1e-5, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho));
 
     // replace the mode-based tiltGain with a scaling of epsilonTilt magnitude
     const epsilonTiltResolved = num(
@@ -233,16 +238,16 @@ useEffect(() => {
       curvatureGainDec: 3,
 
       dutyCycle: dutyResolved,
-      gammaGeo: num(parameters.g_y, 26),
-      Qburst: num(parameters.cavityQ, 1e9),
-      deltaAOverA: num(parameters.qSpoilingFactor, 1),
+      gammaGeo,
+      Qburst: qCavity,
+      deltaAOverA: qSpoil,
       gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1),
 
       currentMode: mode,
       sectors: sectorsResolved, split: splitResolved,
       axesScene: parameters.axesScene,
       hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
-      wallWidth: wallWidth_norm,
+      wallWidth: wallNorm,
 
       gridSpan: parameters.gridSpan,
       physicsParityMode: !!parameters.physicsParityMode,
@@ -415,16 +420,21 @@ useEffect(() => {
         Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
       );
 
+      // Harden unit/finite guards for Q, γ, wall width (no hidden magic)
+      const gammaGeo = Math.max(1, num(parameters.g_y, 26));
+      const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));    // never ≤0
+      const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
+
       const pipelineState = {
         // Core physics
         currentMode: parameters.currentMode || 'hover',
         dutyCycle: dutyResolved,
         dutyShip: dutyResolved, // Use resolved duty from pipeline
         sectorCount: sectorsResolved,
-        gammaGeo: parameters.g_y || 26,
+        gammaGeo,
         gammaVanDenBroeck: parameters.gammaVanDenBroeck || 3.83e1,
-        qCavity: parameters.cavityQ || 1e9,
-        qSpoilingFactor: parameters.qSpoilingFactor || 1,
+        qCavity,
+        qSpoilingFactor: qSpoil,
         sag_nm: parameters.sagDepth_nm || 16,
         
         // Hull geometry
