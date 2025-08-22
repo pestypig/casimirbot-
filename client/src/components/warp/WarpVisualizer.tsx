@@ -588,7 +588,7 @@ useEffect(() => {
         // Curvature controls (with viz overrides)
         curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
         curvatureBoostMax: parity ? 1 : Math.max(1, parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
-        curvatureGainT: parameters.viz?.curvatureGainT ?? parameters.curvatureGainT,
+        curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
         
         // Viz overrides
         colorMode: parameters.viz?.colorMode ?? (parameters.curvatureGainDec != null ? undefined : 'theta'),
