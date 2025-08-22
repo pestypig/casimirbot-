@@ -80,6 +80,10 @@ const num = (v: any, d = 0) => (isFiniteNum(v) ? v : d);
 const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
   Array.isArray(v) && v.length === 3 && v.every(isFiniteNum) ? (v as [number, number, number]) : d;
 
+// Unified physics tilt calculation
+const getUnifiedPhysicsTilt = (parameters: any, mode: string) => 
+  num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt, mode === 'standby' ? 0.0 : 5e-7);
+
 // Shift/tilt parameters for gentle interior gravity
 type ShiftParams = {
   epsilonTilt?: number;                    // dimensionless ε_tilt
@@ -180,9 +184,7 @@ useEffect(() => {
     const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
 
     // unified, physics-accurate tiny tilt (or pipeline-provided)
-    const epsilonTiltResolved =
-      num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
-          mode === 'standby' ? 0.0 : 5e-7);
+    const epsilonTiltResolved = getUnifiedPhysicsTilt(parameters, mode);
     const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
     const tiltGain = mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0;
 
@@ -340,8 +342,7 @@ useEffect(() => {
       const tiltGains: Record<string, number> = {
         standby: 0.00, cruise: 0.35, hover: 0.45, emergency: 0.65,
       };
-      const epsilonTilt = parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 
-        (mode === 'standby' ? 0.0 : 5e-7); // Use physics-accurate tiny value
+      const epsilonTilt = getUnifiedPhysicsTilt(parameters, mode);
       const betaTiltVec = parameters.shift?.betaTiltVec ?? parameters.betaTiltVec ?? [0, -1, 0];
       const tiltGain = typeof (parameters as any).tiltGain === 'number' ? 
         (parameters as any).tiltGain : (tiltGains[mode] ?? 0.35);
@@ -541,6 +542,21 @@ useEffect(() => {
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
                 <div className="text-sm">Loading Warp Engine...</div>
+              </div>
+            </div>
+          )}
+          {loadError && (
+            <div className="absolute inset-0 grid place-items-center bg-black/60 text-red-200 px-4">
+              <div className="max-w-md text-center space-y-3">
+                <div className="font-mono text-sm">{loadError}</div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setInitNonce(n => n + 1)}
+                  className="mx-auto"
+                >
+                  Retry Load
+                </Button>
               </div>
             </div>
           )}
