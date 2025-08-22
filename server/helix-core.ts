@@ -514,6 +514,7 @@ function setCors(res: Response) {
 
 // Tile status endpoint
 export function getTileStatus(req: Request, res: Response) {
+  if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const { sectorId } = req.params;
@@ -539,6 +540,7 @@ setGlobalPipelineState(pipelineState);
 
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
+  if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const s = getGlobalPipelineState();
@@ -662,6 +664,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
 // Get full pipeline state
 export function getPipelineState(req: Request, res: Response) {
+  if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const state = getGlobalPipelineState();
@@ -713,6 +716,7 @@ export function getHelixMetrics(req: Request, res: Response) {
 
 // Get displacement field samples for physics validation
 export function getDisplacementField(req: Request, res: Response) {
+  if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   try {
