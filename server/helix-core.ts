@@ -161,7 +161,6 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
   const totalSectors = 400;
   const pulsedSectors: any[] = [];
   let totalEnergy = 0;
-  let totalPower = 0;
   
   // Simulate pulsing each sector
   for (let i = 1; i <= totalSectors; i++) {
@@ -179,15 +178,14 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
     });
     
     totalEnergy += sectorResult.energy;
-    totalPower += sectorResult.powerLoss;
   }
   
-  // Get the correct exotic mass from the energy pipeline
+  // Get the correct values from the energy pipeline
   const state = getGlobalPipelineState();
-  const exoticMassTotal = state.M_exotic; // Already calibrated to ~32.2 kg
+  const exoticMassTotal = state.M_exotic;
   
-  // Calculate average power using duty cycle
-  const averagePower = totalPower * (duration / cycle);
+  // Use pipeline ship-wide average power
+  const averagePower = state.P_avg * 1e6; // W
   
   return {
     mode: "AUTO_DUTY",
