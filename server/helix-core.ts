@@ -131,7 +131,7 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
   
   // Use the corrected energy values from the pipeline
   // Energy per tile is already calculated with correct 1/720 denominator
-  const energyPerTile = state.U_static; // -8.305e-11 J
+  const energyPerTile = state.U_static;
   
   // Power loss per tile from the pipeline
   const powerLossPerTile = state.P_loss_raw; // W per tile
