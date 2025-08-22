@@ -514,7 +514,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const nTheta = req.nTheta ?? 64;
   const nPhi   = req.nPhi ?? 32;
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorStrobing ?? 1));
-  const split   = Math.max(1, Math.min(sectors - 1, Math.floor(req.split ?? sectors / 2)));
+  const split   = sectors > 1 ? Math.floor(sectors / 2) : 0;
 
   // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
   // Use a geometric-mean effective radius so width is scale-invariant with axes.
