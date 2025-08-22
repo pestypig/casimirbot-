@@ -497,12 +497,8 @@ class WarpEngine {
           return d > 1 ? d/100 : N(d);
         })();
 
-        // Derive scene axes used by the renderer
         const axesScene =
-            parameters.axesScene ||
-            parameters.axesClip ||
-            this.uniforms?.axesClip ||
-            (function resolveFromHull(p) {
+            parameters.axesScene || parameters.axesClip || this.uniforms?.axesClip || (function resolveFromHull(p){
                 if (!p) return null;
                 const a = (p.hullAxes?.[0] ?? p.hull?.a) || 503.5;
                 const b = (p.hullAxes?.[1] ?? p.hull?.b) || 132.0;
@@ -599,6 +595,13 @@ class WarpEngine {
                 Math.floor(N(parameters.split ?? ((mode === 'cruise' ? 0.65 : mode === 'emergency' ? 0.70 : 0.50) * N(parameters.sectors ?? parameters.sectorStrobing ?? 1))))
             )), // 🔬 Force 0 split in parity mode
             viewAvg: parameters.viewAvg !== undefined ? !!parameters.viewAvg : true
+        };
+
+        // pipeline drives hullAxes (meters); clip-axes are computed later in _warpGridVertices
+        const hullAxes = parameters.hullAxes || this.uniforms?.hullAxes || [503.5,132,86.5];
+        this.uniforms = {
+            ...this.uniforms,
+            hullAxes,
         };
 
         // 🔬 PHYSICS PARITY MODE: Hard disable cosmetics & boosts, keep real thetaScale above
