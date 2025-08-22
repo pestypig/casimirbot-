@@ -149,9 +149,8 @@ class WarpEngine {
         window.__warp_truePhysics = () => {
           this.updateUniforms({
             physicsParityMode: true,        // activates the clamp above
-            curvatureBoostMax: 1,
             curvatureGainT: 0,
-            // exposure/zeroStop are set in the parity block
+            // curvatureBoostMax preserved for headroom, exposure/zeroStop set in parity block
           });
           console.log("✅ True Physics: parity ON, no boosts/cosmetics");
         };
@@ -780,14 +779,14 @@ class WarpEngine {
         // 🔬 PHYSICS PARITY MODE: Hard disable cosmetics & boosts, keep real thetaScale above
         if (physicsParityMode) {
             // Hard disable cosmetics & boosts, keep real thetaScale above.
-            this.uniforms.userGain           = 1;
-            this.uniforms.curvatureBoostMax  = 1;
-            this.uniforms.curvatureGainT     = 0;
-            this.uniforms.exposure           = 3.0;    // lower contrast
-            this.uniforms.zeroStop           = 1e-5;   // less aggressive log pop
-            this.uniforms.epsilonTilt        = 0;      // no interior tilt visuals
-            this.uniforms.betaTiltVec        = [0,0,0];
-            this.uniforms.cosmeticT          = 0;
+            this.uniforms.userGain        = 1;   // no exaggeration
+            this.uniforms.curvatureGainT  = 0;   // slider at 0
+            // keep curvatureBoostMax as declared (e.g., 40) so normalization has range
+            this.uniforms.exposure        = 3.5; // modest contrast to avoid pegging
+            this.uniforms.zeroStop        = 1e-5;
+            this.uniforms.epsilonTilt     = 0;
+            this.uniforms.betaTiltVec     = [0,0,0];
+            this.uniforms.cosmeticT       = 0;
         }
 
         if (physicsParityMode && !Number.isFinite(parameters.exposure)) {
