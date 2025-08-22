@@ -324,7 +324,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.qMechanical = 1; // restore default
   }
 
-  state.U_geo = state.U_static * state.gammaGeo;
+  const gammaGeo3 = Math.pow(state.gammaGeo ?? 26, 3);
+  state.U_geo = state.U_static * gammaGeo3;
   state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
   // 5) Power — raw first, then power-only calibration via qMechanical
