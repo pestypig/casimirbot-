@@ -244,59 +244,46 @@ async function runDiagnosticsScan() {
 
 // Simulate a full pulse cycle using current operational mode
 async function simulatePulseCycle(args: { frequency_GHz: number }) {
-  const frequency = args.frequency_GHz * 1e9; // Convert to Hz
-  
-  // Get current pipeline state - this has all the corrected calculations
   const state = getGlobalPipelineState();
-  const currentMode = state.currentMode;
-  
-  // Use the corrected energy pipeline values directly
-  const energyPerTile = state.U_static; // Already calculated with 1/720 denominator
-  const geometricAmplified = state.U_geo; // γ³ × U_static
-  const vanDenBroeckAmplified = state.U_cycle; // Full amplification chain
-  const powerRaw = state.P_loss_raw * state.N_tiles; // Total raw power in W
-  const powerAverage = state.P_avg; // Average power in MW
-  const exoticMassTotal = state.M_exotic; // Already calibrated to ~32.2 kg
-  
-  // Use pipeline metrics
-  const fordRomanValue = state.zeta;
-  const timeScaleValue = state.TS_ratio;
-  
-  // Determine status based on constraints
-  const fordRomanStatus = fordRomanValue < 1.0 ? "PASS" : "FAIL";
-  const timeScaleStatus = timeScaleValue > 100 ? "PASS" : "FAIL";
-  
+  const frequency = args.frequency_GHz * 1e9;
+
+  const powerRaw_W = state.P_loss_raw * state.N_tiles; // on-window
+  const powerAvg_W = state.P_avg * 1e6;               // pipeline is MW
+  const fordRomanStatus = state.fordRomanCompliance ? "PASS" : "FAIL";
+  const timeScaleStatus = (state.TS_ratio > 100) ? "PASS" : "FAIL";
+
   return {
     mode: "PULSE_CYCLE",
-    operationalMode: currentMode.toUpperCase(),
-    frequency: frequency,
+    operationalMode: state.currentMode.toUpperCase(),
+    frequency,
     frequencyGHz: args.frequency_GHz,
     modeParameters: {
       dutyCycle: state.dutyCycle,
-      sectorStrobing: state.sectorStrobing,
+      sectorCount: state.sectorCount,
+      concurrentSectors: state.concurrentSectors,
       qSpoilingFactor: state.qSpoilingFactor,
       gammaVanDenBroeck: state.gammaVanDenBroeck,
-      powerOutput: powerAverage // MW
+      powerOutputMW: state.P_avg
     },
     energyCalculations: {
       energyPerTile: state.U_static,
       geometricAmplified: state.U_geo,
       U_Q: state.U_Q,
       U_cycle: state.U_cycle,
-      powerRaw: state.P_loss_raw * state.N_tiles, // W instantaneous (on-window)
-      powerAverage: state.P_avg * 1e6,            // W average (pipeline is MW)
-      exoticMassTotal: state.M_exotic
+      powerRaw_W,
+      powerAverage_W: powerAvg_W,
+      exoticMassTotal_kg: state.M_exotic
     },
     metrics: {
       fordRoman: state.zeta,
-      fordRomanStatus: state.fordRomanCompliance ? "PASS" : "FAIL",
+      fordRomanStatus,
       natario: 0,
       natarioStatus: state.natarioConstraint ? "VALID" : "WARN",
       timeScale: state.TS_ratio,
-      timeScaleStatus: state.TS_ratio > 100 ? "PASS" : "FAIL"
+      timeScaleStatus
     },
     status: "CYCLE_COMPLETE",
-    log: `${currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(state.P_loss_raw * state.N_tiles / 1e6).toFixed(1)} MW, Avg=${state.P_avg.toFixed(1)} MW, M_exotic=${Math.round(state.M_exotic)} kg, ζ=${state.zeta.toFixed(3)}, TS=${Math.round(state.TS_ratio)}`
+    log: `${state.currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${state.P_avg.toFixed(1)} MW, M_exotic=${Math.round(state.M_exotic)} kg, ζ=${state.zeta.toFixed(3)}, TS=${Math.round(state.TS_ratio)}`
   };
 }
 
