@@ -29,6 +29,20 @@ const checkMetricViolationSchema = z.object({
   metricType: z.enum(["ford-roman", "natario", "curvature", "timescale"])
 });
 
+// map name → schema
+const FN_SCHEMAS = {
+  pulse_sector: pulseSectorSchema,
+  execute_auto_pulse_sequence: z.object({
+    frequency_GHz: z.number().optional(),
+    duration_us: z.number().optional(),
+    cycle_ms: z.number().optional()
+  }),
+  run_diagnostics_scan: z.object({}),
+  simulate_pulse_cycle: z.object({ frequency_GHz: z.number() }),
+  load_document: loadDocumentSchema,
+  check_metric_violation: checkMetricViolationSchema
+} as const;
+
 // Build system prompt from live state
 function buildHelixCorePrompt(s: EnergyPipelineState) {
   return `You are HELIX-CORE, the central mainframe of the warp-capable Needle Hull ship.
@@ -368,42 +382,29 @@ export async function handleHelixCommand(req: Request, res: Response) {
 
     // Check if GPT wants to call a function
     if (message.function_call) {
-      const functionName = message.function_call.name;
-      const functionArgs = JSON.parse(message.function_call.arguments);
+      const functionName = message.function_call.name as keyof typeof FN_SCHEMAS;
+      const raw = (() => { try { return JSON.parse(message.function_call.arguments || "{}"); } catch { return {}; } })();
+      const schema = FN_SCHEMAS[functionName];
 
-      let functionResult;
-      switch (functionName) {
-        case "pulse_sector":
-          functionResult = await executePulseSector(functionArgs);
-          break;
-        case "execute_auto_pulse_sequence":
-          functionResult = await executeAutoPulseSequence(functionArgs);
-          break;
-        case "run_diagnostics_scan":
-          functionResult = await runDiagnosticsScan();
-          break;
-        case "simulate_pulse_cycle":
-          functionResult = await simulatePulseCycle(functionArgs);
-          break;
-        case "check_metric_violation":
-          functionResult = checkMetricViolation(functionArgs.metricType);
-          break;
-        case "load_document":
-          functionResult = { 
-            docId: functionArgs.docId, 
-            status: "LOADED",
-            message: "Document overlay ready for display" 
-          };
-          break;
-        default:
-          functionResult = { error: "Unknown function" };
+      if (!schema) {
+        return res.json({ message, functionResult: { error: "Unknown function" } });
+      }
+      const parsed = schema.safeParse(raw);
+      if (!parsed.success) {
+        return res.json({ message, functionResult: { error: "Invalid arguments", issues: parsed.error.issues } });
       }
 
-      // Return both the function call and result
-      return res.json({
-        message: message,
-        functionResult: functionResult
-      });
+      const args = parsed.data;
+      let functionResult;
+      switch (functionName) {
+        case "pulse_sector": functionResult = await executePulseSector(args); break;
+        case "execute_auto_pulse_sequence": functionResult = await executeAutoPulseSequence(args); break;
+        case "run_diagnostics_scan": functionResult = await runDiagnosticsScan(); break;
+        case "simulate_pulse_cycle": functionResult = await simulatePulseCycle(args); break;
+        case "check_metric_violation": functionResult = checkMetricViolation(args.metricType); break;
+        case "load_document": functionResult = { docId: args.docId, status: "LOADED", message: "Document overlay ready for display" }; break;
+      }
+      return res.json({ message, functionResult });
     }
 
     // Return the regular message
