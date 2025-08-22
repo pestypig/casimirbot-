@@ -185,28 +185,20 @@ function casimirForce(area_m2: number, gap_m: number): number {
 async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
   const s = getGlobalPipelineState();
 
-  // area: respect pipeline default unless you later add an explicit override param
-  const area_m2 = (s.tileArea_cm2 ?? 25) * 1e-4;
-  const gap_m   = args.gap_nm * 1e-9;
+  const area_m2 =
+    Number.isFinite(args.radius_mm) && args.radius_mm > 0
+      ? Math.PI * Math.pow(args.radius_mm * 1e-3, 2)  // tile radius override
+      : (s.tileArea_cm2 ?? 25) * 1e-4;                 // pipeline default
 
-  // tile energy for THIS gap (do not reuse s.U_static if gaps differ)
+  const gap_m = args.gap_nm * 1e-9;
   const energy_J = casimirEnergyPerTile(gap_m, area_m2);
   const force_N  = casimirForce(area_m2, gap_m);
 
-  // dissipation and proxies remain pipeline-coupled
   const powerLoss_W_per_tile = s.P_loss_raw;
   const curvatureMass_kg = Math.abs(energy_J) / (C*C);
 
-  return {
-    sectorId: args.sectorId,
-    gap_m,
-    area_m2,
-    energy_J,
-    force_N,
-    powerLoss_W_per_tile,
-    curvatureMass_kg,
-    status: "PULSED"
-  };
+  return { sectorId: args.sectorId, gap_m, area_m2, energy_J, force_N,
+           powerLoss_W_per_tile, curvatureMass_kg, status: "PULSED" };
 }
 
 // Execute automated pulse sequence across all sectors
