@@ -77,7 +77,7 @@ function useDriveEnvelope({ on, tauRise_s, tauFall_s }: {
 // Optional typing for WarpEngine integration
 declare global {
   interface Window {
-    setStrobingState?: (args: { sectorCount: number; currentSector: number }) => void;
+    setStrobingState?: (args: { sectorCount: number; currentSector: number; split?: number }) => void;
   }
 }
 
@@ -522,10 +522,14 @@ export default function HelixCasimirAmplifier({
       metrics?.activeSectors ?? 0;
 
     if (typeof window !== "undefined" && typeof window.setStrobingState === "function") {
-      window.setStrobingState({ 
-        sectorCount: Math.max(1, sectorCount), 
-        currentSector: Math.max(0, currentSector % Math.max(1, sectorCount)) 
-      });
+      try {
+        const sc = Math.max(1, Number(sectorCount) || 1);
+        const cs = Math.max(0, Number(currentSector) || 0) % sc;
+        window.setStrobingState({ sectorCount: sc, currentSector: cs });
+      } catch (err) {
+        // Prevent panel crash if the visualizer's handler references undefined globals (e.g., sceneScale)
+        console.warn("setStrobingState failed (visualizer will ignore this tick):", err);
+      }
     }
   }, [metrics?.totalSectors, metrics?.activeSectors, state?.sectorStrobing, lightCrossing?.sectorIdx, lightCrossing?.sectorCount]);
 
