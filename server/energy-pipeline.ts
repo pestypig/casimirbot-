@@ -384,9 +384,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
   state.fordRomanCompliance = state.zeta < 1.0;
 
-  // Physics logging for debugging (show both used and display duties)
+  // Physics logging for debugging (before UI field updates)
   console.log("[PIPELINE]", {
-    dutyShip: d_eff, dutyUI: state.dutyCycle, concurrent, N: state.N_tiles,
+    dutyShip: d_eff, dutyUI_before: state.dutyCycle, concurrent, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
@@ -472,6 +472,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.dutyCycle       = ui.dutyCycle;
   state.sectorStrobing  = resolveSLive(state.currentMode);  // ✅ Match physics concurrency (emergency=2, others=1)
   state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
+  
+  // UI field updates logging (after MODE_CONFIGS applied)
+  console.log("[PIPELINE_UI]", {
+    dutyUI_after: state.dutyCycle, 
+    sectorStrobing: state.sectorStrobing,
+    qSpoilingFactor: state.qSpoilingFactor
+  });
   
   return state;
 }
