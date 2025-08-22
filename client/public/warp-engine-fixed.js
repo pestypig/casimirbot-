@@ -15,7 +15,17 @@ const SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? s
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
-        this.gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+        this.gl = canvas.getContext('webgl2', {
+            alpha: false,
+            antialias: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        }) || canvas.getContext('webgl', {
+            alpha: false,
+            antialias: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        });
         
         if (!this.gl) {
             throw new Error('WebGL not supported');
