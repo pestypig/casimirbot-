@@ -81,6 +81,7 @@ class WarpEngine {
         this.gridProgram = null;
         this._vboBytes = 0; // Track VBO buffer size for efficient updates
         this._resizeRaf = 0; // Track resize throttling RAF ID
+        this._warnNoProgramOnce = false; // Warn-once flag for shader program availability
         
         // Camera and projection
         this.viewMatrix = new Float32Array(16);
@@ -1192,7 +1193,10 @@ class WarpEngine {
         
         // Use the properly compiled grid program
         if (!this.gridProgram) {
-            console.error("CRITICAL: Grid program not available in render!");
+            if (!this._warnNoProgramOnce) {
+                console.warn("Grid program not ready yet; waiting for shader link…");
+                this._warnNoProgramOnce = true;
+            }
             return;
         }
         
