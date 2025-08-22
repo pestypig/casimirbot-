@@ -595,7 +595,8 @@ class WarpEngine {
             
             // Mirror pipeline fields for diagnostics
             currentMode: mode,
-            dutyCycle: physicsParityMode ? 1 : dutyFrac, // 🔬 Force unity duty cycle in parity mode
+            // UI duty for HUD/visual seasoning; FR duty handled by thetaScale (server/viz)
+            dutyCycle: physicsParityMode ? 1 : dutyFrac,
             gammaGeo: physicsParityMode ? 1 : N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y), // 🔬 Force unity
             Qburst: physicsParityMode ? 1 : N(parameters.Qburst ?? parameters.cavityQ ?? this.currentParams.cavityQ), // 🔬 Force unity
             deltaAOverA: physicsParityMode ? 1 : N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1), // 🔬 Force unity
