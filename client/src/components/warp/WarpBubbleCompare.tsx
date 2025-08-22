@@ -38,85 +38,79 @@ function ensureStrobeMux() {
   w.__addStrobingListener = (fn: Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
 }
 
-// ==== helpers ====
-
 type Hull = { a:number; b:number; c:number };
 
-// derive identical framing for both canvases, fully sanitized
-const frameFromHull = (hull?: Partial<Hull>, gridSpan?: number) => {
-  const a = Number.isFinite(hull?.a) ? Number(hull!.a) : 503.5;
-  const b = Number.isFinite(hull?.b) ? Number(hull!.b) : 132.0;
-  const c = Number.isFinite(hull?.c) ? Number(hull!.c) : 86.5;
+const FIN = (v:any, d:number) => (Number.isFinite(v) ? Number(v) : d);
+const v3 = (v:any, d:[number,number,number]) =>
+  (Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)) ? (v as [number,number,number]) : d;
 
-  const s = 1 / 1200; // same scale the engine uses
-  const axesScene: [number, number, number] = [a * s, b * s, c * s];
-
+// Derive identical framing and **sanitize** everything
+const frameFromHull = (h?: Partial<Hull>, gridSpan?: number) => {
+  const a = FIN(h?.a, 503.5), b = FIN(h?.b, 132.0), c = FIN(h?.c, 86.5);
+  const s = 1/1200;
+  const axesScene: [number,number,number] = [a*s, b*s, c*s];
   const span = Number.isFinite(gridSpan)
-    ? (gridSpan as number)
-    : Math.max(2.6, Math.max(axesScene[0], axesScene[1], axesScene[2]) * 1.35);
+    ? Number(gridSpan)
+    : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
+  // Seed BOTH axesScene and axesClip; NEVER null
   return {
-    hullAxes: [a, b, c] as [number, number, number],
+    hullAxes: [a,b,c] as [number,number,number],
     axesScene,
+    axesClip: axesScene,
     gridSpan: span,
   };
 };
 
-// prime/seed engine once so its internals are ready
-const prime = (e: any, shared: ReturnType<typeof frameFromHull>) => {
-  // bootstrap calls updateUniforms internally—this guarantees axesClip etc. exist
-  e.bootstrap?.({ ...shared, colorMode: 'theta' });
+// Safe wrapper that strips nulls/undefined and revalidates arrays
+const seed = (shared: ReturnType<typeof frameFromHull>, extra: Record<string,any> = {}) => ({
+  colorMode: 'theta',
+  lockFraming: true,
+  ...shared,
+  axesScene: v3(shared.axesScene, [0.40,0.22,0.22]),
+  axesClip : v3(shared.axesClip , [0.40,0.22,0.22]),
+  hullAxes : v3(shared.hullAxes , [503.5,132.0,86.5]),
+  gridSpan : FIN(shared.gridSpan, 2.6),
+  ...extra,
+});
+
+const prime = (e:any, shared: ReturnType<typeof frameFromHull>) => {
+  const s = seed(shared);
+  // bootstrap guarantees internal state; follow with one more uniforms push
+  e.bootstrap?.(s);
+  e.updateUniforms?.(s);
 };
 
-// REAL = physics parity (no boosts/cosmetics), same framing
-const applyReal = (e: any, shared: ReturnType<typeof frameFromHull>) => {
+// REAL (parity) config
+const applyReal = (e:any, shared: ReturnType<typeof frameFromHull>) => {
   prime(e, shared);
   e.updateUniforms({
-    ...shared,
-    lockFraming: true,
-
-    physicsParityMode: true,   // <- the key bit
-    colorMode: 'theta',
-    vizGain: 1,
-    displayGain: 1,
-    curvatureBoostMax: 1,
-    curvatureGainT: 0,
-    userGain: 1,
-    exposure: 3.5,
-    zeroStop: 1e-5,
-
-    // keep baseline perfectly neutral inside
-    epsilonTilt: 0,
-    betaTiltVec: [0, 0, 0],
+    ...seed(shared),
+    physicsParityMode: true,
+    vizGain: 1, displayGain: 1,
+    curvatureBoostMax: 1, curvatureGainT: 0, userGain: 1,
+    exposure: 3.5, zeroStop: 1e-5,
+    epsilonTilt: 0, betaTiltVec: [0,0,0],
   });
   e.requestRewarp?.();
 };
 
-// SHOW = boosted/exaggerated, same framing
+// SHOW (boosted) config
 const applyShow = (
-  e: any,
+  e:any,
   shared: ReturnType<typeof frameFromHull>,
-  T = 0.55,                     // 0..1 (slider)
-  boostMax = 40,                // ≥1
-  vizGain = 1.0,
-  exposure = 6.0,
-  zeroStop = 1e-7
+  T=0.55, boostMax=40, vizGain=1.0, exposure=6.0, zeroStop=1e-7
 ) => {
   prime(e, shared);
+  const t = Math.max(0, Math.min(1, T));
+  const b = Math.max(1, boostMax);
   e.updateUniforms({
-    ...shared,
-    lockFraming: true,
-
+    ...seed(shared),
     physicsParityMode: false,
-    colorMode: 'theta',
-
-    curvatureGainT: Math.max(0, Math.min(1, T)),
-    curvatureBoostMax: Math.max(1, boostMax),
-    displayGain: 1 + Math.max(0, Math.min(1, T)) * (Math.max(1, boostMax) - 1),
-
-    vizGain,
-    exposure,
-    zeroStop,
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    displayGain: 1 + t*(b-1),
+    vizGain, exposure, zeroStop,
     cosmeticLevel: 10,
   });
   e.requestRewarp?.();
@@ -160,18 +154,20 @@ export default function WarpBubbleCompare({
         (window as any).__warp_setGainDec = () => {};
         (window as any).__warp_setCosmetic = () => {};
 
-        // wait one tick so GL resources are alive, then configure both sides
         requestAnimationFrame(() => {
-          applyReal(leftEngine.current, shared);
-          applyShow(
-            rightEngine.current,
-            shared,
-            parameters?.viz?.curvatureGainT ?? 0.55,
-            parameters?.viz?.curvatureBoostMax ?? 40,
-            1.0,
-            parameters?.viz?.exposure ?? 6.0,
-            parameters?.viz?.zeroStop ?? 1e-7
-          );
+          // one more tick keeps WebGL state happy on slower devices
+          requestAnimationFrame(() => {
+            applyReal(leftEngine.current, shared);
+            applyShow(
+              rightEngine.current,
+              shared,
+              parameters?.viz?.curvatureGainT ?? 0.55,
+              parameters?.viz?.curvatureBoostMax ?? 40,
+              1.0,
+              parameters?.viz?.exposure ?? 6.0,
+              parameters?.viz?.zeroStop ?? 1e-7
+            );
+          });
         });
       } catch (e) {
         console.error('[WarpBubbleCompare] init failed:', e);

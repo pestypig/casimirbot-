@@ -1,0 +1,109 @@
+Minimal, targeted patch for WarpBubbleCompare.tsx
+
+Drop these helpers near the top:
+
+type Hull = { a:number; b:number; c:number };
+
+const FIN = (v:any, d:number) => (Number.isFinite(v) ? Number(v) : d);
+const v3 = (v:any, d:[number,number,number]) =>
+  (Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)) ? (v as [number,number,number]) : d;
+
+// Derive identical framing and **sanitize** everything
+const frameFromHull = (h?: Partial<Hull>, gridSpan?: number) => {
+  const a = FIN(h?.a, 503.5), b = FIN(h?.b, 132.0), c = FIN(h?.c, 86.5);
+  const s = 1/1200;
+  const axesScene: [number,number,number] = [a*s, b*s, c*s];
+  const span = Number.isFinite(gridSpan)
+    ? Number(gridSpan)
+    : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+  // Seed BOTH axesScene and axesClip; NEVER null
+  return {
+    hullAxes: [a,b,c] as [number,number,number],
+    axesScene,
+    axesClip: axesScene,
+    gridSpan: span,
+  };
+};
+
+// Safe wrapper that strips nulls/undefined and revalidates arrays
+const seed = (shared: ReturnType<typeof frameFromHull>, extra: Record<string,any> = {}) => ({
+  colorMode: 'theta',
+  lockFraming: true,
+  ...shared,
+  axesScene: v3(shared.axesScene, [0.40,0.22,0.22]),
+  axesClip : v3(shared.axesClip , [0.40,0.22,0.22]),
+  hullAxes : v3(shared.hullAxes , [503.5,132.0,86.5]),
+  gridSpan : FIN(shared.gridSpan, 2.6),
+  ...extra,
+});
+
+const prime = (e:any, shared: ReturnType<typeof frameFromHull>) => {
+  const s = seed(shared);
+  // bootstrap guarantees internal state; follow with one more uniforms push
+  e.bootstrap?.(s);
+  e.updateUniforms?.(s);
+};
+
+// REAL (parity) config
+const applyReal = (e:any, shared: ReturnType<typeof frameFromHull>) => {
+  prime(e, shared);
+  e.updateUniforms({
+    ...seed(shared),
+    physicsParityMode: true,
+    vizGain: 1, displayGain: 1,
+    curvatureBoostMax: 1, curvatureGainT: 0, userGain: 1,
+    exposure: 3.5, zeroStop: 1e-5,
+    epsilonTilt: 0, betaTiltVec: [0,0,0],
+  });
+  e.requestRewarp?.();
+};
+
+// SHOW (boosted) config
+const applyShow = (
+  e:any,
+  shared: ReturnType<typeof frameFromHull>,
+  T=0.55, boostMax=40, vizGain=1.0, exposure=6.0, zeroStop=1e-7
+) => {
+  prime(e, shared);
+  const t = Math.max(0, Math.min(1, T));
+  const b = Math.max(1, boostMax);
+  e.updateUniforms({
+    ...seed(shared),
+    physicsParityMode: false,
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    displayGain: 1 + t*(b-1),
+    vizGain, exposure, zeroStop,
+    cosmeticLevel: 10,
+  });
+  e.requestRewarp?.();
+};
+
+
+After constructing your two engines, configure like this (unchanged idea, slightly tougher timing):
+
+const shared = frameFromHull(props?.hull, props?.gridSpan);
+
+// Neutralize any globals so REAL side stays real
+(window as any).__warp_setGainDec = () => {};
+(window as any).__warp_setCosmetic = () => {};
+
+requestAnimationFrame(() => {
+  // one more tick keeps WebGL state happy on slower devices
+  requestAnimationFrame(() => {
+    applyReal(leftEngine.current, shared);
+    applyShow(
+      rightEngine.current,
+      shared,
+      props?.viz?.curvatureGainT ?? 0.55,
+      props?.viz?.curvatureBoostMax ?? 40,
+      1.0,
+      props?.viz?.exposure ?? 6.0,
+      props?.viz?.zeroStop ?? 1e-7
+    );
+  });
+});
+
+
+Also update on prop changes the same way (configure each side separately with the same shared and never route both through a single adapter that might re-introduce boosts to the REAL side).
