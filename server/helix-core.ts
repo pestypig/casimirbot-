@@ -29,8 +29,9 @@ const checkMetricViolationSchema = z.object({
   metricType: z.enum(["ford-roman", "natario", "curvature", "timescale"])
 });
 
-// HELIX-CORE system prompt
-const HELIX_CORE_PROMPT = `You are HELIX-CORE, the central mainframe of the warp-capable Needle Hull ship.
+// Build system prompt from live state
+function buildHelixCorePrompt(s: EnergyPipelineState) {
+  return `You are HELIX-CORE, the central mainframe of the warp-capable Needle Hull ship.
 
 You manage Casimir tile operations, quantum strobing, and exotic energy flow. You calculate the force, energy, and curvature effects of tile configurations and ensure the ship remains compliant with general relativity, especially Ford-Roman quantum inequality and Natário constraints.
 
@@ -39,13 +40,14 @@ Respond to engineering commands like "pulse sector S3 with 1 nm gap", or "load m
 When appropriate, invoke functions like pulse_sector, check_metric_violation, or load_document.
 
 Current ship status:
-- Active Sectors: 1/400
-- Energy Generation: 83.3 MW
-- Exotic Mass: 1,405 kg
-- GR Compliance: PASS
-- Time-Scale Ratio: 4102.7
+- Active Sectors: ${s.concurrentSectors}/${s.sectorCount}
+- Energy Generation: ${s.P_avg.toFixed(1)} MW
+- Exotic Mass: ${Math.round(s.M_exotic)} kg
+- GR Compliance: ${s.fordRomanCompliance ? 'PASS' : 'FAIL'}
+- Time-Scale Ratio: ${s.TS_ratio?.toFixed(1) ?? '—'}
 
 Be technical but clear. Use scientific notation for values. Monitor safety limits.`;
+}
 
 // Function definitions for ChatGPT
 const AVAILABLE_FUNCTIONS = [
@@ -357,11 +359,12 @@ export async function handleHelixCommand(req: Request, res: Response) {
       });
     }
 
-    // Prepare the ChatGPT API request
+    // BEFORE sending to the API:
+    const liveState = getGlobalPipelineState();
     const chatGPTRequest = {
       model: "gpt-4-0613",
       messages: [
-        { role: "system", content: HELIX_CORE_PROMPT },
+        { role: "system", content: buildHelixCorePrompt(liveState) },
         ...chatMessages
       ],
       functions: AVAILABLE_FUNCTIONS,
