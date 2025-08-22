@@ -1665,20 +1665,25 @@ class WarpEngine {
         }
     }
 
-    // Display gain multiplier for visual scaling (matches SliceViewer)
     setDisplayGain(gain) {
-        // Store for future reference
+        // Store but respect parity
         this.uniforms.displayGain = gain;
-        
-        // Apply to any visual scaling parameters
-        if (this.uniforms.userGain !== undefined) {
-            // Scale the existing userGain by display gain
-            const originalUserGain = this.uniforms.userGain / (this.uniforms.displayGain || 1);
-            this.uniforms.userGain = originalUserGain * gain;
+
+        // If physics parity is active, force unity and stop
+        if (this.uniforms?.physicsParityMode) {
+            this.uniforms.userGain = 1;
             this._uniformsDirty = true;
+            return;
         }
-        
-        console.log(`🎛️ setDisplayGain: ${gain}× applied to visual scaling`);
+
+        // Correct scaling: use the PREVIOUS displayGain to get the base
+        const prev = this._prevDisplayGain || 1;
+        const base = (this.uniforms.userGain ?? 1) / prev; // remove previous scale
+        this.uniforms.userGain = base * gain;              // apply new scale
+
+        this._prevDisplayGain = gain;
+        this._uniformsDirty = true;
+        console.log(`🎛️ setDisplayGain: base=${base.toFixed(3)} prev=${prev} now=${gain}`);
     }
 
     destroy() {
