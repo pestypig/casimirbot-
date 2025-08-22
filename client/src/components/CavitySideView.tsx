@@ -46,6 +46,103 @@ export default function CavitySideView({
   gapInsetMagnification,
   fontScale = 1.0,
 }: Props) {
+  
+// ---- Helper functions ----
+function LabelChip({ x, y, text, tone = "neutral" }: { x:number; y:number; text:string; tone?: "neutral"|"on"|"off" }) {
+  const fill = tone === "on" ? "#06b6d4" : tone === "off" ? "#475569" : "#334155";
+  const textCol = tone === "on" ? "#e6ffff" : "#e5e7eb";
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      <rect x={-6} y={-12} width={text.length * 7.2 + 12} height={16} rx={6} fill={`${fill}CC`} />
+      <text x={0} y={0} fill={textCol} fontSize={11} dominantBaseline="central">{text}</text>
+    </g>
+  );
+}
+
+function DimArrow({ x, y0, y1, label }: { x:number; y0:number; y1:number; label:string }) {
+  const yTop = Math.min(y0,y1), yBot = Math.max(y0,y1);
+  return (
+    <g>
+      <line x1={x} y1={yTop} x2={x} y2={yBot} stroke="#94a3b8" strokeWidth={2}/>
+      <line x1={x-6} y1={yTop} x2={x+6} y2={yTop} stroke="#94a3b8" strokeWidth={2}/>
+      <line x1={x-6} y1={yBot} x2={x+6} y2={yBot} stroke="#94a3b8" strokeWidth={2}/>
+      <rect x={x - 70} y={yTop + (yBot-yTop)/2 - 9} width={140} height={18} rx={6} fill="#0b1220" stroke="#334155"/>
+      <text x={x} y={yTop + (yBot-yTop)/2} fill="#bfdbfe" fontSize={11} dominantBaseline="central" textAnchor="middle">{label}</text>
+    </g>
+  );
+}
+
+function Legend({ x, y, items }: { x:number; y:number; items:{c:string; label:string}[] }) {
+  const rowH = 18;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <rect x={-6} y={-6} width={180} height={rowH*items.length+12} rx={8} fill="#0b1220" stroke="#334155"/>
+      {items.map((it, i)=>(
+        <g key={i} transform={`translate(6, ${i*rowH})`}>
+          <rect x={0} y={4} width={14} height={10} rx={2} fill={it.c}/>
+          <text x={22} y={9} fill="#cbd5e1" fontSize={11} dominantBaseline="central">{it.label}</text>
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function LocalGapInset({
+  x, y, w, h,
+  gap_um,
+  top_um,
+  bot_um,
+  pocketDiameter_um,
+  onWindow
+}: {
+  x:number; y:number; w:number; h:number;
+  gap_um:number; top_um:number; bot_um:number;
+  pocketDiameter_um:number; onWindow:boolean;
+}) {
+  const pad = 10;
+  const innerW = w - pad * 2;
+  const innerH = h - pad * 2;
+  const X0 = x + pad;
+  const Y0 = y + pad;
+
+  const total = top_um + gap_um + bot_um;
+  const yScale = innerH / total;
+
+  const yTop = Y0;
+  const yGap = yTop + top_um * yScale;
+  const yBot = yGap + gap_um * yScale;
+
+  // show a canonical window of 120 μm centered under pocket
+  const view_um = Math.max(120, pocketDiameter_um * 1.2);
+  const pxPerUmInsetX = innerW / view_um;
+  const pocketW = pocketDiameter_um * pxPerUmInsetX;
+  const pocketX = X0 + (innerW - pocketW) / 2;
+
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} fill="#0b1220" stroke="#334155" rx={10}/>
+      <text x={x + 12} y={y + 18} fill="#e5e7eb" fontSize={12}>Gap inset</text>
+
+      {/* stack */}
+      <rect x={X0} y={yTop} width={innerW} height={(yGap - yTop)} fill="#f59e0b" opacity={0.95} stroke="#0f172a"/>
+      <rect x={X0} y={yGap} width={innerW} height={(yBot - yGap)} fill="rgba(56,189,248,0.28)" stroke="#0891b2"/>
+      <rect x={X0} y={yBot} width={innerW} height={(Y0 + innerH - yBot)} fill="#94a3b8" opacity={0.96} stroke="#0f172a"/>
+
+      {/* pocket footprint */}
+      <rect x={pocketX} y={yGap} width={pocketW} height={(yBot - yGap)} fill="rgba(59,130,246,0.28)" stroke="#22d3ee"/>
+      {onWindow && (
+        <rect x={pocketX} y={yGap} width={pocketW * 0.35} height={(yBot - yGap)} fill="url(#glow)" opacity={0.6}/>
+      )}
+
+      {/* labels */}
+      <g fill="#cbd5e1" fontSize={11}>
+        <text x={X0 + 8} y={yTop + 14}>top {top_um.toFixed(1)} μm</text>
+        <text x={X0 + 8} y={yGap + 14}>gap {(gap_um*1000).toFixed(2)} nm</text>
+        <text x={X0 + 8} y={yBot + 14}>bottom {bot_um.toFixed(1)} μm</text>
+      </g>
+    </g>
+  );
+}
   // --- units & scales ---
   const umPerMm = 1000;
   const tileWidth_um = tileWidth_mm * umPerMm;
@@ -111,13 +208,13 @@ export default function CavitySideView({
   // Render
   return (
     <svg width={W} height={H} className="w-full rounded-xl ring-1 ring-slate-800 bg-[#0b1220]">
-      {/* Ruler & title strip */}
-      <g transform={`translate(${X0}, ${H - 8})`} opacity={0.6}>
-        <line x1={0} y1={0} x2={(tileWidth_um) * pxPerUmX_eff} y2={0} stroke="#334155" strokeWidth={2}/>
+      {/* X ruler */}
+      <g transform={`translate(${X0}, ${H - 10})`} opacity={0.9}>
+        <line x1={0} y1={0} x2={(tileWidth_um) * pxPerUmX_eff} y2={0} stroke="#1f2937" strokeWidth={3}/>
         {[0, 0.25, 0.5, 0.75, 1].map((f, i) => (
           <g key={i} transform={`translate(${f * tileWidth_um * pxPerUmX_eff}, 0)`}>
-            <line x1={0} y1={0} x2={0} y2={-6} stroke="#475569" strokeWidth={1}/>
-            <text x={0} y={-8} fill="#94a3b8" fontSize={10 * fontScale} textAnchor="middle">
+            <line x1={0} y1={0} x2={0} y2={-7} stroke="#334155" strokeWidth={2}/>
+            <text x={0} y={-9} fill="#a3a3a3" fontSize={11 * fontScale} textAnchor="middle">
               {(tileWidth_mm * f).toFixed(0)} mm
             </text>
           </g>
@@ -131,11 +228,11 @@ export default function CavitySideView({
         width={(tileWidth_um) * pxPerUmX_eff}
         height={botMirror_thick_um * veY * pxPerUmX_eff}
         fill={colBot}
-        opacity={0.9}
+        opacity={0.95}
+        stroke="#0f172a"
+        strokeWidth={2}
       />
-      <text x={X0 + 8} y={yBotMirrorTop - 6} fill="#9ca3af" fontSize={11 * fontScale}>
-        Nb₃Sn (fixed)
-      </text>
+      <LabelChip x={X0 + 10} y={yBotMirrorTop - 10} text="Nb₃Sn (fixed)" />
 
       {/* Gap region */}
       <rect
@@ -144,15 +241,20 @@ export default function CavitySideView({
         width={(tileWidth_um) * pxPerUmX_eff}
         height={gap_um * veY * pxPerUmX_eff}
         fill={colGap}
+        stroke="#0891b2"
+        strokeWidth={1.5}
       />
-      {/* Blue-shift visual region (between mirrors, under pocket footprint) */}
+
+      {/* Blue-shift region under pocket footprint */}
       <rect
         x={pocketCenterX - (pocketDiameter_um * pxPerUmX_eff) / 2}
         y={yGapTop}
         width={pocketDiameter_um * pxPerUmX_eff}
         height={gap_um * veY * pxPerUmX_eff}
         fill={colBlueShift}
-        opacity={0.8}
+        opacity={0.9}
+        stroke="#22d3ee"
+        strokeWidth={1}
       />
 
       {/* Top mirror (moving diaphragm) */}
@@ -162,13 +264,18 @@ export default function CavitySideView({
         width={(tileWidth_um) * pxPerUmX_eff}
         height={topMirror_thick_um * veY * pxPerUmX_eff}
         fill={colTop}
-        opacity={0.88}
+        opacity={0.96}
+        stroke="#0f172a"
+        strokeWidth={2}
       />
-      <text x={X0 + 8} y={yTopMirror - 8} fill="#e5e7eb" fontSize={11 * fontScale}>
-        Graphene + Nb₃Sn (moving) · {onWindow ? "ON" : "OFF"}
-      </text>
+      <LabelChip
+        x={X0 + 10}
+        y={yTopMirror - 12}
+        text={`Graphene + Nb₃Sn (moving) · ${onWindow ? "ON" : "OFF"}`}
+        tone={onWindow ? "on" : "off"}
+      />
 
-      {/* Pocket spherical-cap arc cut into the top mirror */}
+      {/* Pocket spherical-cap cue (dashed arc) */}
       <path
         d={describePocketArc(
           pocketCenterX,
@@ -180,65 +287,66 @@ export default function CavitySideView({
           yTopMirror
         )}
         fill="none"
-        stroke="#0ea5e9"
-        strokeWidth={Math.max(1.5, 1.5 + (onWindow ? pulse : 0))}
-        opacity={0.85}
+        stroke="#67e8f9"
+        strokeDasharray="6 6"
+        strokeWidth={2}
+        opacity={0.9}
       />
 
-      {/* Rim annotation */}
-      <text
-        x={X1 - 10}
-        y={yTopMirror - 8}
-        textAnchor="end"
-        fill="#a5b4fc"
-        fontSize={10 * fontScale}
-      >
-        AlN rim (~{alnRim_width_um.toFixed(0)} μm)
-      </text>
+      {/* Gap dimension arrow + label (right side) */}
+      <DimArrow
+        x={X1 - 30}
+        y0={yGapTop}
+        y1={yGapTop + gap_um * veY * pxPerUmX_eff}
+        label={`a = ${gap_nm.toFixed(2)} nm`}
+      />
 
-      {/* Right-side labels */}
-      <g fontSize={10 * fontScale} fill="#94a3b8">
-        <text x={X1 - 10} y={yGapTop - 6} textAnchor="end">gap a = {gap_nm.toFixed(1)} nm</text>
-        <text x={X1 - 10} y={yTopMirror + 14} textAnchor="end">sag t = {sag_nm.toFixed(1)} nm</text>
-        <text x={X1 - 10} y={yBotMirrorBottom + 12} textAnchor="end">pocket ⌀ = {pocketDiameter_um.toFixed(0)} μm</text>
+      {/* Right-side numeric labels */}
+      <g fontSize={11 * fontScale} fill="#93c5fd">
+        <text x={X1 - 10} y={yTopMirror + 16} textAnchor="end">sag t = {sag_nm.toFixed(1)} nm</text>
+        <text x={X1 - 10} y={yBotMirrorBottom + 14} textAnchor="end">pocket ⌀ = {pocketDiameter_um.toFixed(0)} μm</text>
       </g>
 
-      {/* ON-OFF glow sweep inside the blue-shift region */}
+      {/* ON glow sweep (subtle) */}
       {onWindow && (
         <rect
           x={pocketCenterX - (pocketDiameter_um * pxPerUmX_eff) / 2}
           y={yGapTop}
-          width={(pocketDiameter_um * pxPerUmX_eff) * (0.15 + 0.85 * pulse)}
+          width={(pocketDiameter_um * pxPerUmX_eff) * (0.20 + 0.80 * pulse)}
           height={gap_um * veY * pxPerUmX_eff}
           fill="url(#glow)"
-          opacity={0.65}
+          opacity={0.55}
         />
       )}
+
+      {/* Legend (top-left) */}
+      <Legend x={X0 + 6} y={margin + 6} items={[
+        { c:"#f59e0b", label:"Moving diaphragm" },
+        { c:"#94a3b8", label:"Fixed mirror" },
+        { c:"#22d3ee", label:"Vacuum gap a" },
+        { c:"#38bdf8", label:"Blue-shift region" },
+      ]}/>
+
+      {/* Gap inset (top-right) */}
+      <LocalGapInset
+        x={W - (Math.min(380, W * 0.44)) - 12}
+        y={margin + 8}
+        w={Math.min(380, W * 0.44)}
+        h={120}
+        gap_um={gap_um}
+        top_um={topMirror_thick_um}
+        bot_um={botMirror_thick_um}
+        pocketDiameter_um={pocketDiameter_um}
+        onWindow={onWindow}
+      />
 
       {/* gradient defs */}
       <defs>
         <linearGradient id="glow" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.9"/>
-          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.1"/>
+          <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.95"/>
+          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.05"/>
         </linearGradient>
       </defs>
-
-      {/* Gap zoom inset (magnified, with box and callout) */}
-      {insetMag > 0 && (
-        <GapInset
-          x={X0 + 14}
-          y={margin + 14}
-          w={Math.min(360, W * 0.42)}
-          h={110}
-          pxPerUmX={pxPerUmX_eff * (insetMag / veY)}   // keep X to-scale wrt global
-          magLabel={`${Math.round(insetMag)}× Y`}
-          gap_um={gap_um}
-          top_um={topMirror_thick_um}
-          bot_um={botMirror_thick_um}
-          pocketDiameter_um={pocketDiameter_um}
-          onWindow={onWindow}
-        />
-      )}
     </svg>
   );
 }
@@ -255,69 +363,3 @@ function describePocketArc(
   return a;
 }
 
-/** Small inset that magnifies the gap stack (top mirror, gap, bottom mirror) */
-function GapInset({
-  x, y, w, h,
-  pxPerUmX,
-  magLabel,
-  gap_um,
-  top_um,
-  bot_um,
-  pocketDiameter_um,
-  onWindow
-}: {
-  x: number; y: number; w: number; h: number;
-  pxPerUmX: number;
-  magLabel: string;
-  gap_um: number; top_um: number; bot_um: number;
-  pocketDiameter_um: number;
-  onWindow: boolean;
-}) {
-  const pad = 10;
-  const innerW = w - pad * 2;
-  const innerH = h - pad * 2;
-
-  // use a canonical 120 μm window around pocket
-  const view_um = Math.max(120, pocketDiameter_um * 1.2);
-  const X0 = x + pad;
-  const Y0 = y + pad;
-
-  // to exaggerate vertically inside inset, just fill most of innerH by distributing thicknesses proportionally
-  const totalThickness_um = top_um + gap_um + bot_um;
-  const yScale = innerH / totalThickness_um;
-
-  const yTop = Y0;
-  const yGap = yTop + top_um * yScale;
-  const yBot = yGap + gap_um * yScale;
-
-  const pxPerUmInsetX = innerW / view_um;
-  const pocketW = pocketDiameter_um * pxPerUmInsetX;
-  const pocketX = X0 + (innerW - pocketW) / 2;
-
-  return (
-    <g>
-      <rect x={x} y={y} width={w} height={h} fill="#0b1020" stroke="#334155" strokeWidth={1} rx={8}/>
-      <text x={x + 10} y={y + 16} fill="#cbd5e1" fontSize={11}>
-        Gap inset — {magLabel}
-      </text>
-
-      {/* stack */}
-      <rect x={X0} y={yTop} width={innerW} height={(yGap - yTop)} fill="#f59e0b" opacity={0.85}/>
-      <rect x={X0} y={yGap} width={innerW} height={(yBot - yGap)} fill="rgba(56,189,248,0.25)"/>
-      <rect x={X0} y={yBot} width={innerW} height={(Y0 + innerH - yBot)} fill="#94a3b8" opacity={0.9}/>
-
-      {/* pocket footprint */}
-      <rect x={pocketX} y={yGap} width={pocketW} height={(yBot - yGap)} fill="rgba(59,130,246,0.22)"/>
-      {onWindow && (
-        <rect x={pocketX} y={yGap} width={pocketW * 0.35} height={(yBot - yGap)} fill="url(#glow)" opacity={0.6}/>
-      )}
-
-      {/* labels */}
-      <g fill="#a3a3a3" fontSize={10}>
-        <text x={X0 + 6} y={yTop + 12}>top {top_um.toFixed(1)} μm</text>
-        <text x={X0 + 6} y={yGap + 12}>gap { (gap_um*1000).toFixed(1) } nm</text>
-        <text x={X0 + 6} y={yBot + 12}>bottom {bot_um.toFixed(1)} μm</text>
-      </g>
-    </g>
-  );
-}
