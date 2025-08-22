@@ -88,7 +88,7 @@ class WarpEngine {
         this.projMatrix = new Float32Array(16);
         this.mvpMatrix = new Float32Array(16);
         
-        // Current warp parameters
+        // Current warp parameters (unchanged)
         this.currentParams = {
             dutyCycle: 0.14,
             g_y: 26,
@@ -99,19 +99,30 @@ class WarpEngine {
             exoticMass_kg: 1405
         };
 
-        // Display-only controls (do NOT feed these back into pipeline math)
+        // Display-only controls (safe defaults; no baked ring)
         this.uniforms = {
-            vizGain: 1.0,        // default to unity; opt-in via parameters.vizGain
-            vShip: 1.0,          // ship-frame speed scale for θ
+            vizGain: 1.0,
+            vShip: 1.0,
             wallWidth: 0.06,
-            axesClip: [0.40, 0.22, 0.22],
+
+            // IMPORTANT: don't seed a unit ellipsoid here – we compute it from the hull each update
+            axesClip: null,
+
             driveDir: [1, 0, 0],
-            // NEW: Artificial gravity tilt parameters
-            epsilonTilt: 0.0,    // gentle tilt strength (interior artificial gravity)
-            betaTiltVec: [0, -1, 0],  // tilt direction vector (default: -Y = "down")
-            tiltGain: 0.55,      // gentle visual scaling
-            // NEW: Cosmetic curvature control (1 = real physics, 10 = current visuals)
-            cosmeticLevel: 10    // default to current visual feel
+            epsilonTilt: 0.0,
+            betaTiltVec: [0, -1, 0],
+            tiltGain: 0.55,
+
+            // visual system
+            cosmeticLevel: 10,
+            colorMode: 'theta',
+            exposure: 6.0,
+            zeroStop: 1e-7,
+
+            // comparison helpers
+            physicsParityMode: false,
+            lockFraming: true,
+            cameraZ: null
         };
         
         // Initialize rendering pipeline
@@ -604,7 +615,7 @@ class WarpEngine {
         
         // Color mode parsing: accept strings or ints: 'solid'|'theta'|'shear' or 0|1|2
         const colorMode = (() => {
-            const cm = (parameters as any).colorMode;
+            const cm = parameters.colorMode;
             if (cm === 'solid' || cm === 0) return 0;
             if (cm === 'shear' || cm === 2) return 2;
             return 1; // default theta

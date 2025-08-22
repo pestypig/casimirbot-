@@ -1,0 +1,77 @@
+3) Always derive axesClip from the live hull; add parity gating
+
+Inside updateUniforms(parameters) (lines ~594–900) add the helpers at the top of the function:
+
+const N = (x, d=0) => (Number.isFinite(x) ? +x : d);
+const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+
+Then compute geometry before building this.uniforms:
+
+// --- Resolve hull + scene scaling ---
+const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? this.uniforms?.hullAxes?.[0], 503.5);
+const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? this.uniforms?.hullAxes?.[1], 132.0);
+const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? this.uniforms?.hullAxes?.[2], 86.5);
+const s = 1 / Math.max(a, b, c, 1e-9);
+const axesScene = [a*s, b*s, c*s];
+const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+// --- Parity / visualization ---
+const parity = !!parameters?.physicsParityMode;
+const colorMode = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
+const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
+const vizGain   = parity ? 1 : N(parameters?.vizGain, this.uniforms?.vizGain ?? 1);
+const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, this.uniforms?.curvatureGainT ?? 0));
+const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, this.uniforms?.curvatureBoostMax ?? 40));
+const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, this.uniforms?.cosmeticLevel ?? 10);
+
+// camera framing lock
+const lockFraming = parameters?.lockFraming ?? this.uniforms?.lockFraming ?? true;
+const cameraZ = (parameters?.cameraZ != null)
+  ? +parameters.cameraZ
+  : (lockFraming ? (this.uniforms?.cameraZ ?? null) : this.uniforms?.cameraZ ?? null);
+
+
+Now build the merged uniforms (replacing your existing “Build unified uniforms” block):
+
+this.currentParams = { ...this.currentParams, ...parameters };
+
+this.uniforms = {
+  ...this.uniforms,
+
+  // geometry (authoritative)
+  hullAxes: [a, b, c],
+  axesClip: axesScene,      // ← replaces the baked unit ring
+  gridSpan,
+
+  // camera/framing
+  lockFraming,
+  cameraZ,
+
+  // visualization / parity
+  physicsParityMode: parity,
+  colorMode, exposure, zeroStop,
+  vizGain,
+  curvatureGainT: curvT,
+  curvatureBoostMax: curvMax,
+  cosmeticLevel: cosmetic,
+
+  // existing fields (keep your defaults if caller didn’t supply)
+  vShip: parameters.vShip || this.uniforms.vShip || 1,
+  wallWidth: parameters.wallWidth || this.uniforms.wallWidth || 0.06,
+  driveDir: parameters.driveDir || this.uniforms.driveDir || [1,0,0],
+
+  // tilt (zeroed in parity mode)
+  epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || this.uniforms.epsilonTilt || 0),
+  betaTiltVec: Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length === 3
+    ? parameters.betaTiltVec
+    : (this.uniforms.betaTiltVec || [0,-1,0]),
+  tiltGain: this.uniforms.tiltGain ?? 0.55
+};
+
+// Rebuild mesh/attributes with the new geometry/camera assumptions
+this._updateGrid();
+
+
+(If updateUniforms also re-fits camera elsewhere in your file, guard it with if (!this.uniforms.lockFraming) { /* fit */ }.)
