@@ -44,6 +44,9 @@
       mode: 'hover',
       dutyCycle: 0.14,
       sectors: 1,
+      dutyEffectiveFR: undefined,   // ← FR window (burst/dwell)
+      lightCrossing: undefined,     // ← { tauLC_ms, dwell_ms, burst_ms } (shape-agnostic bag)
+      zeta: undefined,              // ← Ford–Roman ζ for HUD tint (optional)
       gammaGeo: 26,
       qSpoil: 1.0,
       qCavity: 1e9,
@@ -52,7 +55,7 @@
       fMod_Hz: 15e9,
       f0_Hz: 15e9,
       mechZeta: 0.005,
-      mechGain: 0.0                 // 0..~1 mechanical amplification scalar
+      mechGain: undefined           // compute if not provided
     };
     this._needsFrame = false;
     this._resize = this._resize.bind(this);
@@ -131,6 +134,7 @@
   OutlineEngine.prototype._draw = function () {
     const ctx = this.ctx;
     const p   = this.params;
+    const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
     // Clear
     const W = this.canvas.width / this.pixelRatio;
@@ -141,18 +145,34 @@
     const cam = this._camera();
 
     // Visual "curvature gain" proxy (purely presentational)
-    const gamma3   = Math.pow(p.gammaGeo ?? 26, 3);
-    const dutyEff  = Math.max(1e-6, (p.dutyCycle ?? 0.14) / Math.max(1, p.sectors ?? 1));
-    const qspoil   = Math.max(1e-3, p.qSpoil ?? 1.0);
-    const gainVis  = Math.pow(gamma3 * qspoil * dutyEff, 0.25); // gentle 1/4 power so it doesn't blow up
+    const gamma3  = Math.pow(p.gammaGeo ?? 26, 3);
+    // Prefer authoritative FR window if present; fall back to duty/sectors
+    const dutyEff = Number.isFinite(p.dutyEffectiveFR)
+      ? clamp01(p.dutyEffectiveFR)
+      : Math.max(1e-6, (p.dutyCycle ?? 0.14) / Math.max(1, p.sectors ?? 1));
+    const qspoil  = Math.max(1e-3, p.qSpoil ?? 1.0);
+    const gainVis = Math.pow(gamma3 * qspoil * dutyEff, 0.25);
 
-    // NEW: Mechanical response modulation (cavity "in band" status)
-    const mechGain = Math.max(0, Math.min(1, p.mechGain ?? 0));
-    const mechMod  = 1 + 2.5 * mechGain; // 1.0 to 3.5x mechanical amplification
+    // Mechanical response: compute from Q if mechGain not provided
+    let mechGain = p.mechGain;
+    if (!Number.isFinite(mechGain)) {
+      const qMech = Math.max(1e-6, p.qMechanical ?? 1);
+      const zeta  = 1 / (2 * qMech);
+      const f0    = Math.max(1e-12, p.f0_Hz ?? p.fMod_Hz ?? 15e9);
+      const fmod  = Math.max(1e-12, p.fMod_Hz ?? 15e9);
+      const omega = fmod / f0;
+      const denom = Math.sqrt((1 - omega*omega)**2 + (2 * zeta * omega)**2);
+      const Arel  = 1 / denom;         // amplitude ratio at drive
+      mechGain    = clamp01(Arel - 1); // 0..~ (soft normalized)
+    } else {
+      mechGain = clamp01(mechGain);
+    }
+    const mechMod  = 1 + 2.5 * mechGain;
     
     console.log(`🔧 OUTLINE ENGINE: mechGain=${mechGain.toFixed(3)}, mechMod=${mechMod.toFixed(2)}x, f_mod=${((p.fMod_Hz??15e9)/1e9).toFixed(1)}GHz, ζ=${(p.mechZeta??0.005).toFixed(3)}`);
 
-    // Mode tint/alpha
+    // Mode tint/alpha (flip to warning tint if ζ≥1)
+    const frBreach = Number.isFinite(p.zeta) && p.zeta >= 1.0;
     const modeAlpha =
       p.mode === 'standby'   ? 0.40 :
       p.mode === 'cruise'    ? 0.55 :
@@ -174,9 +194,10 @@
     
     // Base shell colors with optional cyan tint when "in band"
     const baseColors = {
-      inner:  [255, 176, 176], // red-ish
-      center: [200, 208, 220], // gray-ish  
-      outer:  [176, 208, 255]  // blue-ish
+      // shift palette slightly if FR breach
+      inner:  frBreach ? [255,120,120] : [255,176,176],
+      center:             [200,208,220],
+      outer:  frBreach ? [255,196,120] : [176,208,255]
     };
     const mechTint = [77, 230, 255]; // cyan tint (0.3, 0.9, 1.0 * 255)
     const tintStrength = 0.35 * mechGain;
@@ -279,7 +300,8 @@
     // Mini legend with mode indicator
     ctx.globalAlpha = 0.9;
     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(12, 12, 240, 76);
+    const legendW = 280, legendH = 96;
+    ctx.fillRect(12, 12, legendW, legendH);
     ctx.fillStyle = '#fff';
     ctx.font = '12px ui-sans-serif, system-ui, -apple-system';
     ctx.fillText(`Shell Outline • ${p.mode?.toUpperCase() || 'HOVER'} mode`, 18, 28);
@@ -290,7 +312,12 @@
     ctx.fillStyle = '#888';
     ctx.font = '10px ui-sans-serif, system-ui, -apple-system';
     const mechStatus = mechGain > 0.1 ? `IN-BAND` : `off-resonance`;
-    ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty=${(dutyEff*100).toFixed(2)}% • mechanical: ${mechStatus}`, 18, 74);
+    const lc = p.lightCrossing || {};
+    const tauLCs  = Number.isFinite(lc.tauLC_ms) ? `${(lc.tauLC_ms/1000).toFixed(3)}s` : '—';
+    const dwellMs = Number.isFinite(lc.dwell_ms) ? `${lc.dwell_ms.toFixed(2)}ms` : '—';
+    const frTxt   = Number.isFinite(p.zeta) ? `ζ=${p.zeta.toFixed(3)} ${p.zeta>=1?'(WARN)':'(PASS)'}` : 'ζ=—';
+    ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty_FR=${(dutyEff*100).toFixed(2)}% • mech:${mechStatus}`, 18, 74);
+    ctx.fillText(`τLC=${tauLCs} • Tsec=${dwellMs} • ${frTxt}`, 18, 88);
   };
 
   // expose
