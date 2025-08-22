@@ -84,6 +84,21 @@ const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
 const getUnifiedPhysicsTilt = (parameters: any, mode: string) => 
   num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt, mode === 'standby' ? 0.0 : 5e-7);
 
+// Light-crossing timing loop for synchronized strobing
+type LightCrossing = {
+  sectorIdx: number;
+  sectorCount: number;
+  phase: number;            // 0..1
+  dwell_ms: number;
+  tauLC_ms: number;
+  burst_ms: number;
+  duty: number;             // local window duty (burst_ms / dwell_ms)
+  freqGHz: number;
+  onWindow: boolean;        // physics gate
+  cyclesPerBurst: number;
+  onWindowDisplay: boolean; // display gate
+};
+
 // Shift/tilt parameters for gentle interior gravity
 type ShiftParams = {
   epsilonTilt?: number;                    // dimensionless ε_tilt
@@ -107,6 +122,10 @@ interface WarpVisualizerProps {
     sectorStrobing?: number;
     qSpoilingFactor?: number;
     gammaVanDenBroeck?: number;
+    /** Optional: ship-effective duty (Ford–Roman sampled). Prefer this over dutyCycle when present. */
+    dutyEffectiveFR?: number;
+    /** Optional: live light crossing loop for synchronized strobing */
+    lightCrossing?: LightCrossing;
     // Hull geometry data
     hull?: {
       Lx_m: number;
