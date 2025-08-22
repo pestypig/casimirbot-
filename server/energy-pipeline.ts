@@ -150,9 +150,9 @@ export const PAPER = { TOTAL_SECTORS, BURST_DUTY_LOCAL, Q_BURST, GAMMA_VDB };
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
-  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1_000 },
-  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1_000 },
-  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  M_target_kg: 1_000 },
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
+  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  M_target_kg: 1405 },
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
 } as const;
 
@@ -339,7 +339,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
   if (P_target_W > 0 && P_total_W > 0) {
     const scaleP = P_target_W / P_total_W;
-    state.qMechanical *= scaleP;                  // knob #1: power only
+    state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical * scaleP)); // knob #1: power only (clamped)
     state.U_Q         = state.U_geo * state.qMechanical;
     const P_tile_cal  = Math.abs(state.U_Q) * omega / Q;
     P_total_W         = P_tile_cal * state.N_tiles * d_eff;
@@ -363,7 +363,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const M_target = MODE_POLICY[state.currentMode].M_target_kg;
   if (M_target > 0 && M_total > 0) {
     const scaleM = M_target / M_total;
-    state.gammaVanDenBroeck *= scaleM;   // knob #2: mass only
+    state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck * scaleM)); // knob #2: mass only (clamped)
     E_tile  = U_abs * geo3 * Q * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
   } else if (M_target === 0) {
@@ -380,9 +380,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
   state.fordRomanCompliance = state.zeta < 1.0;
 
-  // Physics logging for debugging
+  // Physics logging for debugging (show concurrent sectors used in calculations)
   console.log("[PIPELINE]", {
-    duty: state.dutyCycle, sectors: state.sectorStrobing, N: state.N_tiles,
+    duty: d_eff, sectors: concurrent, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
