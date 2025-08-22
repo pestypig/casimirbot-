@@ -449,7 +449,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
-    massCal: 1
+    massCal: state.massCalibration
   });
   
   /* ──────────────────────────────
