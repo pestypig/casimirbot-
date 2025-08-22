@@ -318,6 +318,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // ✅ optional convenience for UI reducers that look for this name:
   (state as any).dutyEff = d_eff;
+  (state as any).dutyShip = d_eff; // alias for clients (ship-wide duty)
 
   // 4) Stored energy (raw core): ensure qMechanical starts with valid value
   // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
