@@ -1179,17 +1179,15 @@ class WarpEngine {
             const tBoost    = physicsParityMode ? 1.0 : boostMax; // for amplitude blend
             const tBoostNorm = physicsParityMode ? 1.0 : boostNow; // for normalization denominator (FIXED!)
             
-            // Parity-protected amplitude scaling (matching shader logic)
-            const amp = thetaScale * userGain * showGain * vizSeason * (1.0 + tBlend * (tBoost - 1.0));
-            const val = xs_over_rs * df * amp;
-            const num   = Math.log(1.0 + Math.abs(val) / zeroStop);
-            // FIXED: Use actual current gain (boostNow) for normalization, not fixed max (boostMax)
-            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * tBoostNorm) / zeroStop));
-            const A_geom = Math.pow(Math.min(1.0, num / denom), 0.85); // 0..1, tracks the UI gain with gentle curve
+            // Map 0..boostMax → 0..1 using the *current* gain (boostNow), not the theoretical max (tBoost)
+            const baseMag = Math.abs(xs_over_rs * df);
+            const magMax  = Math.log(1.0 + (baseMag * thetaScale * tBoost)   / zeroStop);   // slider at max
+            const magNow  = Math.log(1.0 + (baseMag * thetaScale * boostNow) / zeroStop);   // slider now
+            const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
             
-            // Keep A_vis for color (can saturate)
+            // Keep A_vis for color (can saturate) 
             const norm = Math.log(1.0 + exposure);
-            const A_vis = Math.min(1.0, num / norm);               // 0..1
+            const A_vis = Math.min(1.0, magNow / norm);            // 0..1
 
             // Special case: make standby perfectly flat if desired
             let disp;
@@ -1201,8 +1199,8 @@ class WarpEngine {
                 
                 // No fixed bump; slider controls all visual scaling
                 
-                // Let curvature breathe more under big gain
-                const maxPush = 0.22;                        // higher ceiling for decades slider
+                // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
+                const maxPush = 0.12 + 0.16 * (boostNow / Math.max(1, tBoost));  // 0.12→0.28 across the slider
                 const softClamp = (x, m) => m * Math.tanh(x / m);
                 disp = softClamp(disp, maxPush);
                 
