@@ -250,6 +250,18 @@ useEffect(() => {
     // single bootstrap: fit + all uniforms in one shot
     engine.bootstrap(uniforms);
 
+    // Pipeline-timed gating
+    if (lc) {
+      engine.updateUniforms({
+        phase: lc.phase,                  // 0..1 sweep position
+        onWindow: !!lc.onWindowDisplay,   // gate visuals to FR-compliant window
+        sectorIdx: Math.max(0, lc.sectorIdx % sectorsResolved),
+        tauLC_ms: lc.tauLC_ms,
+        dwell_ms: lc.dwell_ms,
+        burst_ms: lc.burst_ms,
+      });
+    }
+
     // visual knobs that aren't strictly physics
     engine.updateUniforms({
       vizGain:
@@ -330,6 +342,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (!isLoaded || !engineRef.current) return;
+    const lc = parameters.lightCrossing;
     try {
       console.log('🔄 Live operational mode update:', {
         mode: parameters.currentMode || 'hover',
@@ -346,7 +359,6 @@ useEffect(() => {
 
       // === NEW: Use pipeline adapter for single source of truth ===
       // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
-      const lc = parameters.lightCrossing;
       const dutyResolved =
         isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
         (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
@@ -381,6 +393,18 @@ useEffect(() => {
 
       // Drive engine with authentic pipeline values (no secret defaults)
       driveWarpFromPipeline(engineRef.current, pipelineState);
+
+      // Pipeline-timed gating (live sync)
+      if (lc) {
+        engineRef.current.updateUniforms({
+          phase: lc.phase,
+          onWindow: !!lc.onWindowDisplay,
+          sectorIdx: Math.max(0, lc.sectorIdx % (parameters.sectorStrobing || lc.sectorCount || 1)),
+          tauLC_ms: lc.tauLC_ms,
+          dwell_ms: lc.dwell_ms,
+          burst_ms: lc.burst_ms,
+        });
+      }
 
       // Add visual enhancements that aren't physics-driven
       const mode = parameters.currentMode || 'hover';
@@ -418,13 +442,11 @@ useEffect(() => {
         tsRatio: parameters.tsRatio || VIS.tsRatioDefault
       });
 
-      // CRITICAL: force immediate visual update on parameter change
       engineRef.current.requestRewarp?.();
-      console.table?.(engineRef.current.uniforms);
     } catch (e) {
       console.warn("WarpVisualizer live update failed:", e);
     }
-  }, [parameters, isLoaded]);
+  }, [parameters, parameters.lightCrossing, isLoaded]);
 
   useEffect(() => {
     const handleResize = () => {
