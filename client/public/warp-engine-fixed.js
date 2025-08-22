@@ -976,10 +976,12 @@ class WarpEngine {
         
         // --- Enhanced gain boost for BOTH color & geometry (decades slider support) ---
         const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
-        // FIXED: Don't auto-zoom out when gain increases - let the visual boost be actually visible
-        // const spanBoost = 1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5; // +0..1.5× span
-        // targetSpan *= spanBoost; // This was canceling the gain effect!
-        const spanBoost = 1.0; // Keep logging consistent
+        // keep framing stable so exaggeration remains visible
+        const spanBoost =
+          (bubbleParams.lockFraming === false)
+            ? (1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5)
+            : 1.0;
+        targetSpan *= spanBoost;
         
         // Higher resolution for smoother canonical curvature
         const gridDivisions = 120; // increased from default for smoother profiles
@@ -1005,7 +1007,7 @@ class WarpEngine {
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
         console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
-        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × gain×${userGain.toFixed(2)} [no zoom-out])`);
+        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
         console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${thetaScale.toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
         console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
