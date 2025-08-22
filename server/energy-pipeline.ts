@@ -553,11 +553,11 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       
       // --- Soft wall envelope (removes hard band cutoff) ---
       const asd = Math.abs(sd);
-      const a = 2.5 * w_rho, b = 3.5 * w_rho; // pass band, stop band
+      const a_band = 2.5 * w_rho, b_band = 3.5 * w_rho; // pass band, stop band
       let wallWin: number;
-      if (asd <= a) wallWin = 1.0;
-      else if (asd >= b) wallWin = 0.0;
-      else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a) / (b - a))); // smooth to 0
+      if (asd <= a_band) wallWin = 1.0;
+      else if (asd >= b_band) wallWin = 0.0;
+      else wallWin = 0.5 * (1 + Math.cos(Math.PI * (asd - a_band) / (b_band - a_band))); // smooth to 0
       
       const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
       
