@@ -273,13 +273,15 @@ useEffect(() => {
     }
 
     // visual knobs that aren't strictly physics
+    const parity = !!parameters.physicsParityMode;
     engine.updateUniforms({
-      vizGain:
+      vizGain: parity ? 1 : (
         mode === 'emergency' ? VIS_LOCAL.vizGainEmergency :
         mode === 'cruise'    ? VIS_LOCAL.vizGainCruise    :
-                               VIS_LOCAL.vizGainDefault,
-      curvatureGainDec: Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
-      curvatureBoostMax: parameters.physicsParityMode ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
+                               VIS_LOCAL.vizGainDefault
+      ),
+      curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
+      curvatureBoostMax: parity ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
 
       // legacy readouts (safe fallbacks)
       sagDepth_nm: parameters.sagDepth_nm || 16,
@@ -426,28 +428,19 @@ useEffect(() => {
       const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
 
       const pipelineState = {
-        // Core physics
         currentMode: parameters.currentMode || 'hover',
-        dutyCycle: dutyResolved,
-        dutyShip: dutyResolved, // Use resolved duty from pipeline
+        dutyCycle: parameters.dutyCycle,
+        dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
         sectorCount: sectorsResolved,
-        gammaGeo,
-        gammaVanDenBroeck: parameters.gammaVanDenBroeck || 3.83e1,
-        qCavity,
+        gammaGeo: gammaGeo,
+        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 3.83e1),
+        qCavity: qCavity,
         qSpoilingFactor: qSpoil,
-        sag_nm: parameters.sagDepth_nm || 16,
-        
-        // Hull geometry
-        hull: parameters.hull || {
-          Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-        },
-        shipRadius_m: 86.5, // fallback for legacy compatibility
-        
-        // Mode settings
-        modelMode: parameters.physicsParityMode ? 'raw' as const : 'calibrated' as const,
+        sag_nm: num(parameters.sagDepth_nm, 16),
+        hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+        shipRadius_m: parameters.hull?.c ?? 86.5,
+        modelMode: parity ? 'raw' as const : 'calibrated' as const,
       };
-
-      // Drive engine with authentic pipeline values (no secret defaults)
       driveWarpFromPipeline(engineRef.current, pipelineState);
 
       // Pipeline-timed gating (live sync)
@@ -476,6 +469,7 @@ useEffect(() => {
       const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
       // Apply visual-only enhancements
+      const parity = !!parameters.physicsParityMode;
       engineRef.current.updateUniforms({
         // Interior gravity visuals
         epsilonTilt: Number(epsilonTiltResolved || 0),
@@ -483,12 +477,14 @@ useEffect(() => {
         tiltGain: tiltGainResolved,
         
         // Visual scaling
-        vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : 
-                 mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
+        vizGain: parity ? 1 : (
+          mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : 
+          mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault
+        ),
         
         // Curvature controls
-        curvatureGainDec: Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
-        curvatureBoostMax: parameters.physicsParityMode ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
+        curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
+        curvatureBoostMax: parity ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
         
         // Optional view settings
         viewAvg: true,
