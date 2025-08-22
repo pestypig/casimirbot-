@@ -646,53 +646,46 @@ export default function HelixCore() {
                       <WarpVisualizer
                         key={`mode-${effectiveMode}-v${modeVersion}-parity-${localStorage.getItem('physics-parity-mode')}`}
                         parameters={(() => {
-                          // Compute physics parity from localStorage once per render
-                          const physicsParity = localStorage.getItem('physics-parity-mode') === 'true';
-                          
-                          return {
-                            // --- physics inputs (unchanged from pipeline) ---
-                            dutyCycle: dutyUI,
-                            g_y: pipeline?.gammaGeo || 26,
-                            cavityQ: pipeline?.qCavity || 1e9,
-                            sagDepth_nm: pipeline?.sagDepth_nm || 16,
-                            tsRatio: isFiniteNumber(pipeline?.TS_ratio) ? pipeline!.TS_ratio! : 5.03e4,
-                            powerAvg_MW: isFiniteNumber(pipeline?.P_avg) ? pipeline!.P_avg! : 83.3,
-                            exoticMass_kg: isFiniteNumber(pipeline?.M_exotic) ? pipeline!.M_exotic! : 1000,
+                          const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+                          // Build viz params purely from live pipeline / metrics
+                          const vizParams: any = {
                             currentMode: effectiveMode,
                             sectorStrobing: sectorsUI,
-                            qSpoilingFactor: qSpoilUI,
-                            gammaVanDenBroeck: isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1,
-                            
-                            // --- visual policy (clean approach) ---
-                            physicsParity,             // tells engine to render true-physics 1×
-                            curvatureGainDec: 0,       // no slider; keep at 0 decades (1×)
-                            curvatureBoostMax: 1,      // force visualBoost = 1× in parity mode anyway
-                            cosmeticLevel,             // 1..10 blend from real physics to current exaggeration
-                            
-                            // --- geometry (standard) ---
+                            cosmeticLevel,
+                            physicsParityMode: localStorage.getItem("physics-parity-mode") === "true",
+                            // geometry from live hull if present
                             hull: (hullMetrics && hullMetrics.hull) ? {
-                              ...hullMetrics.hull,
                               a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
                               b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
                               c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-                            } : {
-                              Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-                              a: 503.5, b: 132, c: 86.5,
-                              wallThickness_m: 6.0
-                            },
-                            wall: { w_norm: 0.016 },
-                            gridScale: 1.6,
+                            } : undefined,
+                            wallWidth_m: 6.0, // protocol constant in your codebase
                             epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                             betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                            wallWidth_m: 6.0,
-                            shift: {
-                              epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                              betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                              gTarget, R_geom,
-                              gEff_check: (systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt) * R_geom
-                            },
-                            physicsParityMode: physicsParity
+                            gridScale: 1.6
                           };
+
+                          // Only pass numeric fields if the pipeline actually provided them
+                          const maybe = {
+                            dutyCycle: num(pipeline?.dutyCycle),
+                            g_y:       num(pipeline?.gammaGeo),
+                            cavityQ:   num(pipeline?.qCavity),
+                            sagDepth_nm: num(pipeline?.sagDepth_nm),
+                            tsRatio:   num(pipeline?.TS_ratio),
+                            powerAvg_MW: num(pipeline?.P_avg),
+                            exoticMass_kg: num(pipeline?.M_exotic),
+                            qSpoilingFactor: num(pipeline?.qSpoilingFactor),
+                            gammaVanDenBroeck: num(pipeline?.gammaVanDenBroeck),
+                            curvatureBoostMax: 1,         // neutral (visual), but explicit
+                            curvatureGainDec:  0          // neutral (visual), but explicit
+                          };
+
+                          for (const k of Object.keys(maybe) as (keyof typeof maybe)[]) {
+                            if (maybe[k] !== undefined) vizParams[k] = maybe[k];
+                          }
+
+                          return vizParams;
                         })()}
                       />
                     </div>
