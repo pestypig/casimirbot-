@@ -47,6 +47,26 @@ import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 
+declare global {
+  interface Window {
+    setStrobingState?: (args: { sectorCount: number; currentSector: number }) => void;
+  }
+}
+
+// Install a safe wrapper once so any internal visualizer bug can't crash the page
+if (typeof window !== "undefined") {
+  const w = window as any;
+  const orig = w.setStrobingState;
+  if (typeof orig !== "function") {
+    w.setStrobingState = () => {}; // no-op until the visualizer mounts
+  } else {
+    w.setStrobingState = (args: any) => {
+      try { orig(args); }
+      catch (err) { console.warn("[WarpVisualizer] setStrobingState failed (ignored):", err); }
+    };
+  }
+}
+
 // --- Safe numeric formatters ---
 const isFiniteNumber = (v: unknown): v is number =>
   typeof v === 'number' && Number.isFinite(v);
