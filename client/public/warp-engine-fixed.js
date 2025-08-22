@@ -576,19 +576,14 @@ class WarpEngine {
                 return userGainFinal;
             })(),
             
-            // Calculate thetaScale for unified color mapping with SliceViewer
+            // HELIX drives a numeric thetaScale; fall back to local rebuild only if absent
             thetaScale: (() => {
-                // NOTE: Keep the *real* physics chain even in parity mode; only cosmetics turn off.
-                const gammaGeo = N(parameters.gammaGeo ?? parameters.g_y ?? this.currentParams.g_y ?? 26);
-                const qSpoil   = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1.0);
-                const gammaVdB = N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck ?? 3.83e1);
+                if (Number.isFinite(parameters.thetaScale)) return +parameters.thetaScale;
+                const gammaGeo = N(parameters.gammaGeo ?? this.currentParams.g_y ?? 26);
+                const gammaVdB = N(parameters.gammaVdB ?? this.currentParams.gammaVanDenBroeck ?? 1);
                 const duty     = Math.max(1e-12, N(dutyFrac));
-                const sectors  = Math.max(1, N(parameters.sectors ?? parameters.sectorStrobing ?? 1));
-
-                const chain = Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(duty / sectors);
-
-                // Parity mode = use real chain, but no extra boosts or cosmetics elsewhere.
-                return chain;
+                const sectors  = Math.max(1, N(parameters.sectors ?? 400));
+                return Math.pow(gammaGeo, 3) * gammaVdB * Math.sqrt(duty / sectors);
             })(),
             
             // Mirror pipeline fields for diagnostics
