@@ -547,6 +547,18 @@ useEffect(() => {
       };
       driveWarpFromPipeline(engineRef.current, pipelineState);
 
+      // Immediately enforce REAL state if parity
+      if (parity) {
+        engineRef.current.updateUniforms?.({
+          vizGain: 1,
+          curvatureGainDec: 0,
+          curvatureBoostMax: 1,
+          curvatureGainT: 0,
+          displayGain: 1
+        });
+        engineRef.current.setDisplayGain?.(1);
+      }
+
       // Pipeline-timed gating (live sync)
       if (lc) {
         engineRef.current.updateUniforms({
