@@ -80,14 +80,28 @@ const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,num
 };
 
 
-// Bootstrap exactly once; on later updates just push uniforms
+// Race-proof primeOnce
 const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
+  if (!e) return;
+  const payload = { ...shared, colorMode };
+
+  // First time: bootstrap (allocates grid), then push uniforms on next frame.
   if (!e._bootstrapped) {
-    e.bootstrap?.({ ...shared, colorMode });
+    e.bootstrap?.(payload);
     e._bootstrapped = true;
+    requestAnimationFrame(() => {
+      // one deferred push guarantees gridVBOs exist
+      try { e.updateUniforms?.(payload); }
+      catch {
+        // ultra-conservative: if the very first RAF still races, try once more
+        requestAnimationFrame(() => { try { e.updateUniforms?.(payload); } catch {} });
+      }
+    });
+    return;
   }
-  // ensure fresh shared values are mirrored even after bootstrap
-  e.updateUniforms?.({ ...shared, colorMode });
+
+  // Already bootstrapped: safe to push immediately
+  e.updateUniforms?.(payload);
 };
 
 // REAL = physics parity (no boosts), compact framing
@@ -201,7 +215,6 @@ export default function WarpBubbleCompare({
                     1.0,
                     parameters?.viz?.exposure ?? 6.0,
                     parameters?.viz?.zeroStop ?? 1e-7);
-          });
         });
       } catch (e) {
         console.error('[WarpBubbleCompare] init failed:', e);

@@ -1,0 +1,67 @@
+Good catch — that stack is a race: on the very first call, updateUniforms can run a tick too early (before the engine’s grid buffers are allocated), so this.gridVertices is still null inside the engine and it blows up when it tries to read .length.
+
+Fix is simple: on first prime, bootstrap and then push uniforms on the next frame. After that, call updateUniforms directly.
+
+Patch (drop-in replacements)
+1) Safer frameFromHull (keeps axesClip)
+
+No change if you already merged this; just keeping it here for completeness.
+
+const frameFromHull = (hull?: Partial<Hull>, gridSpan?: number) => {
+  const a = Number.isFinite(hull?.a) ? Number(hull!.a) : 503.5;
+  const b = Number.isFinite(hull?.b) ? Number(hull!.b) : 132.0;
+  const c = Number.isFinite(hull?.c) ? Number(hull!.c) : 86.5;
+  const s = 1 / 1200;
+  const axesScene: [number, number, number] = [a * s, b * s, c * s];
+
+  const span = Number.isFinite(gridSpan)
+    ? (gridSpan as number)
+    : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+  return {
+    hullAxes: [a, b, c] as [number, number, number],
+    axesScene,
+    axesClip: axesScene,   // ⬅️ important so the engine never sees null
+    gridSpan: span,
+  };
+};
+
+2) Race-proof primeOnce (this is the line-90 fix)
+
+Replace your current primeOnce with this exact version:
+
+const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
+  if (!e) return;
+  const payload = { ...shared, colorMode };
+
+  // First time: bootstrap (allocates grid), then push uniforms on next frame.
+  if (!e._bootstrapped) {
+    e.bootstrap?.(payload);
+    requestAnimationFrame(() => {
+      // one deferred push guarantees gridVBOs exist
+      try { e.updateUniforms?.(payload); }
+      catch {
+        // ultra-conservative: if the very first RAF still races, try once more
+        requestAnimationFrame(() => { try { e.updateUniforms?.(payload); } catch {} });
+      }
+    });
+    return;
+  }
+
+  // Already bootstrapped: safe to push immediately
+  e.updateUniforms?.(payload);
+};
+
+3) Keep the rest as-is
+
+Your applyReal / applyShow calls can stay the same (with primeOnce used inside them). If you adopted the compact camera override, keep passing cameraZ there — it won’t trigger this race.
+
+Why this works
+
+bootstrap() allocates the grid and sets up internal buffers.
+
+Deferring the first updateUniforms() to requestAnimationFrame guarantees those buffers exist before _updateGrid() runs (so nothing tries to read .length off null).
+
+Subsequent updates are immediate (no lag).
+
+Once you drop this in, the null/length error will stop, and you’ll still get the clear Parity vs Hero contrast we set up earlier.
