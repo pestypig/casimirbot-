@@ -1619,8 +1619,8 @@ class WarpEngine {
         
         // sets overhead once
         this._setupCamera();
-        // and again after uniforms are in
-        this._applyOverheadCamera();
+        // only auto-fit if not explicitly locked
+        if (!this.uniforms.lockFraming) this._applyOverheadCamera();
 
         // Mark so we don't rely on any legacy default camera
         this._bootstrapped = true;
