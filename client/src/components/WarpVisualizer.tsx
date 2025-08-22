@@ -202,6 +202,17 @@ useEffect(() => {
     
     // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
     const lc = parameters.lightCrossing;
+    
+    // ⬇️ add this
+    const dutyEffectiveFR = (() => {
+      const burst = Number(lc?.burst_ms);
+      const dwell = Number(lc?.dwell_ms);
+      if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+        return clamp01(burst / dwell);
+      }
+      return clamp01(isFiniteNum(parameters?.dutyCycle) ? parameters!.dutyCycle! : 0.14);
+    })();
+    
     const dutyResolved =
       isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
       (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
@@ -396,6 +407,17 @@ useEffect(() => {
   useEffect(() => {
     if (!isLoaded || !engineRef.current) return;
     const lc = parameters.lightCrossing;
+    
+    // ⬇️ add this
+    const dutyEffectiveFR = (() => {
+      const burst = Number(lc?.burst_ms);
+      const dwell = Number(lc?.dwell_ms);
+      if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+        return clamp01(burst / dwell);
+      }
+      return clamp01(isFiniteNum(parameters?.dutyCycle) ? parameters!.dutyCycle! : 0.14);
+    })();
+    
     try {
       console.log('🔄 Live operational mode update:', {
         mode: parameters.currentMode || 'hover',
@@ -426,6 +448,7 @@ useEffect(() => {
       const gammaGeo = Math.max(1, num(parameters.g_y, 26));
       const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));    // never ≤0
       const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
+      const parity = !!parameters.physicsParityMode;
 
       const pipelineState = {
         currentMode: parameters.currentMode || 'hover',
@@ -469,7 +492,6 @@ useEffect(() => {
       const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
       // Apply visual-only enhancements
-      const parity = !!parameters.physicsParityMode;
       engineRef.current.updateUniforms({
         // Interior gravity visuals
         epsilonTilt: Number(epsilonTiltResolved || 0),
