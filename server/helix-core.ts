@@ -440,28 +440,25 @@ export function getSystemMetrics(req: Request, res: Response) {
   const s = getGlobalPipelineState();
 
   const totalSectors = Math.max(1, s.sectorCount || 400);
-  const concurrent   = Math.max(0, s.concurrentSectors || 0);
-  const activeFraction = totalSectors ? (concurrent / totalSectors) : 0;
+  const concurrent = Math.max(0, s.concurrentSectors || 0);
+  const activeFraction = concurrent / totalSectors;
 
-  const strobeHz        = Number(s.strobeHz ?? 1000);
+  const strobeHz = Number(s.strobeHz ?? 1000);
   const sectorPeriod_ms = Number(s.sectorPeriod_ms ?? (1000 / Math.max(1, strobeHz)));
 
-  // current sector index for UI sweep: wrap over totalSectors at strobe rate
   const now = Date.now() / 1000;
   const sweepIdx = Math.floor(now * strobeHz) % totalSectors;
 
   const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
-  const activeTiles    = tilesPerSector * concurrent;
+  const activeTiles = tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
-
   const C = 299_792_458;
-  const tauLC = (Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m)) / C;
+  const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
+  const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;
   const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
   const T_m = 1 / f_m_Hz;
 
-  // interior tilt target (same as visualizer)
   const G = 9.80665;
   const gTargets: Record<string, number> = { hover:0.10*G, cruise:0.05*G, emergency:0.30*G, standby:0.00*G };
   const mode = (s.currentMode ?? 'hover').toLowerCase();
@@ -470,35 +467,26 @@ export function getSystemMetrics(req: Request, res: Response) {
   const betaTiltVec: [number, number, number] = [0, -1, 0];
 
   const C2 = 9e16;
-  const massPerTile_kg = Math.abs(s.U_cycle) / C2; // proxy that aligns with visual layer
+  const massPerTile_kg = Math.abs(s.U_cycle) / C2;
 
   res.json({
-    // sectors/tiles
+    totalTiles: Math.floor(s.N_tiles),
+    activeTiles, tilesPerSector,
     totalSectors, activeSectors: concurrent, activeFraction,
-    tilesPerSector, totalTiles: Math.floor(s.N_tiles), activeTiles,
-    sectorStrobing: concurrent, // legacy alias
-    currentSector: sweepIdx,
+    sectorStrobing: concurrent, currentSector: sweepIdx,
 
-    // timing
     strobeHz, sectorPeriod_ms,
 
-    // hull
     hull,
 
-    // shift vector (interior gravity)
-    shiftVector: {
-      epsilonTilt, betaTiltVec, gTarget, R_geom,
-      gEff_check: epsilonTilt * (C*C) / R_geom
-    },
+    shiftVector: { epsilonTilt, betaTiltVec, gTarget, R_geom, gEff_check: epsilonTilt * (C*C) / R_geom },
 
-    // power/mass
-    energyOutput: s.P_avg,                 // MW
-    exoticMass: Math.round(s.M_exotic),    // kg
-    exoticMassRaw: Math.round(s.M_exotic_raw ?? s.M_exotic),
+    energyOutput_MW: s.P_avg,
+    exoticMass_kg: Math.round(s.M_exotic),
+    exoticMassRaw_kg: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
-    // time-scale components
     timeScaleRatio: s.TS_ratio,
-    tauLC, T_m,
+    tauLC_s: tauLC, T_m_s: T_m,
     timescales: {
       f_m_Hz, T_m_s: T_m,
       L_long_m: Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m),
@@ -507,32 +495,22 @@ export function getSystemMetrics(req: Request, res: Response) {
       TS_geom: s.TS_geom ?? s.TS_ratio
     },
 
-    // GR / safety
-    dutyGlobal: s.dutyCycle,                // UI duty
-    dutyInstant: s.dutyEffective_FR,        // ship-wide FR duty (same as pipeline)
+    dutyGlobal_UI: s.dutyCycle,
     dutyEffectiveFR: s.dutyEffective_FR,
+
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     gammaGeo: s.gammaGeo,
     qCavity: s.qCavity,
+
     fordRoman: { value: s.zeta, limit: 1.0, status: s.fordRomanCompliance ? "PASS" : "FAIL" },
     natario:   { value: 0, status: s.natarioConstraint ? "VALID" : "WARN" },
 
-    // proxies used by UI
     massPerTile_kg,
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
-    // tiles meta
-    tiles: {
-      tileArea_cm2: s.tileArea_cm2,
-      hullArea_m2: s.hullArea_m2 ?? null,
-      N_tiles: s.N_tiles
-    },
+    tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
 
-    // legacy
-    geometry: {
-      Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m,
-      TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom
-    },
+    geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom },
 
     modelMode: s.modelMode ?? "calibrated"
   });
