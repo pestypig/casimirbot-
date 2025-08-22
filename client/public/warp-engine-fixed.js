@@ -376,6 +376,7 @@ class WarpEngine {
             "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
             "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
             "uniform float u_userGain;\n" +     // unified curvature gain from UI slider
+            "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -385,8 +386,13 @@ class WarpEngine {
             "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
             "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
             "}\n" +
+            "vec3 seqTealLime(float u) {\n" +
+            "    vec3 a = vec3(0.05, 0.30, 0.35);\n" + // dark teal
+            "    vec3 b = vec3(0.00, 1.00, 0.60);\n" + // lime-teal
+            "    return mix(a,b, pow(u, 0.8));\n" +     // slight gamma for pop
+            "}\n" +
             "void main() {\n" +
-            "    if (u_colorByTheta < 0.5) {\n" +
+            "    if (u_colorMode == 0) {\n" +
             "        frag = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
@@ -398,12 +404,26 @@ class WarpEngine {
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
-            "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val  = theta * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float mag  = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
+            "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
+            "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
+            "    // Shared amplitude/log mapping (both go through same chain so scales match)\n" +
+            "    float valTheta  = theta      * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    float valShear  = shearProxy * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
+            "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
+            "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
             "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
-            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / norm), -1.0, 1.0);\n" +
-            "    vec3 col = diverge(tVis);\n" +
+            "    // normalized visual values\n" +
+            "    float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);\n" +
+            "    float sVis = clamp( magS / norm, 0.0, 1.0);\n" +
+            "    // Choose color by mode\n" +
+            "    vec3 col;\n" +
+            "    if (u_colorMode == 1) {\n" +
+            "        col = diverge(tVis);\n" +       // θ front/back
+            "    } else {\n" +                       // 2 = shear
+            "        col = seqTealLime(sVis);\n" +   // |σ|
+            "    }\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
             "    float rs_int = length(pN_int) + 1e-6;\n" +
@@ -430,6 +450,7 @@ class WarpEngine {
             "uniform float u_zeroStop;\n" +
             "uniform float u_thetaScale;\n" +
             "uniform float u_userGain;\n" +
+            "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -438,8 +459,13 @@ class WarpEngine {
             "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
             "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
             "}\n" +
+            "vec3 seqTealLime(float u) {\n" +
+            "    vec3 a = vec3(0.05, 0.30, 0.35);\n" + // dark teal
+            "    vec3 b = vec3(0.00, 1.00, 0.60);\n" + // lime-teal
+            "    return mix(a,b, pow(u, 0.8));\n" +     // slight gamma for pop
+            "}\n" +
             "void main() {\n" +
-            "    if (u_colorByTheta < 0.5) {\n" +
+            "    if (u_colorMode == 0) {\n" +
             "        gl_FragColor = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
@@ -451,12 +477,26 @@ class WarpEngine {
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
             "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
-            "    // Apply SliceViewer's amplitude scaling and symmetric log mapping\n" +
-            "    float val  = theta * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float mag  = log(1.0 + abs(val) / max(u_zeroStop, 1e-18));\n" +
+            "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
+            "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
+            "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
+            "    // Shared amplitude/log mapping (both go through same chain so scales match)\n" +
+            "    float valTheta  = theta      * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    float valShear  = shearProxy * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
+            "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
+            "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
             "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
-            "    float tVis = clamp((val < 0.0 ? -1.0 : 1.0) * (mag / norm), -1.0, 1.0);\n" +
-            "    vec3 col = diverge(tVis);\n" +
+            "    // normalized visual values\n" +
+            "    float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);\n" +
+            "    float sVis = clamp( magS / norm, 0.0, 1.0);\n" +
+            "    // Choose color by mode\n" +
+            "    vec3 col;\n" +
+            "    if (u_colorMode == 1) {\n" +
+            "        col = diverge(tVis);\n" +       // θ front/back
+            "    } else {\n" +                       // 2 = shear
+            "        col = seqTealLime(sVis);\n" +   // |σ|
+            "    }\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
             "    vec3 pN_int = v_pos / u_axes;\n" +
             "    float rs_int = length(pN_int) + 1e-6;\n" +
@@ -507,7 +547,8 @@ class WarpEngine {
             exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
             zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
             thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
-            userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain')
+            userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain'),
+            colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode')
         };
         this.gridAttribs = {
             position: gl.getAttribLocation(this.gridProgram, 'a_position'),
@@ -1245,6 +1286,7 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
         gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
         gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
+        gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;

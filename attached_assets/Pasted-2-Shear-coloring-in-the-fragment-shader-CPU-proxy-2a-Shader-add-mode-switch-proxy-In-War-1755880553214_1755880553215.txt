@@ -1,0 +1,78 @@
+2) Shear coloring in the fragment shader (+ CPU proxy)
+2a) Shader: add mode switch + σ proxy
+
+In WarpEngine._compileGridShaders() update both WebGL2 and WebGL1 shader strings:
+
+Add uniforms & mode:
+
+// add near other uniforms
+uniform int   u_colorMode;   // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
+
+
+Compute both signals (keep your existing theta):
+
+// existing:
+float theta = u_vShip * (xs/rs) * dfdrs;
+
+// NEW: shear magnitude proxy (transverse gradient piece)
+// σ ~ |df/dr| * sin(phi); where cos(phi)=xs/rs
+float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));
+float shearProxy = abs(dfdrs) * sinphi * u_vShip;
+
+
+Shared amplitude/log mapping (use your chain & user gain):
+
+// both go through same chain so scales match
+float valTheta  = theta      * u_thetaScale * max(1.0, u_userGain);
+float valShear  = shearProxy * u_thetaScale * max(1.0, u_userGain);
+
+// symmetric log for theta (signed), simple log for shear (magnitude)
+float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
+float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
+
+float norm = log(1.0 + max(1.0, u_exposure));
+
+// normalized visual values
+float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);
+float sVis = clamp( magS / norm, 0.0, 1.0);
+
+
+Color maps (keep your diverging for θ, add sequential for σ):
+
+vec3 diverge(float t) {
+  float x = clamp((t+1.0)*0.5, 0.0, 1.0);
+  vec3 c1 = vec3(0.15, 0.45, 1.0);  // blue
+  vec3 c2 = vec3(1.0);              // white
+  vec3 c3 = vec3(1.0, 0.45, 0.0);   // orange-red
+  return (x < 0.5) ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);
+}
+
+// NEW: σ magnitude colormap (teal→lime)
+vec3 seqTealLime(float u) {
+  vec3 a = vec3(0.05, 0.30, 0.35); // dark teal
+  vec3 b = vec3(0.00, 1.00, 0.60); // lime-teal
+  return mix(a,b, pow(u, 0.8));    // slight gamma for pop
+}
+
+
+Choose by mode (and keep your violet interior tilt blend afterward):
+
+vec3 col;
+if (u_colorMode == 0) {
+  col = u_sheetColor;
+} else if (u_colorMode == 1) {
+  col = diverge(tVis);       // θ front/back
+} else { // 2 = shear
+  col = seqTealLime(sVis);   // |σ|
+}
+
+
+Uniform hookups (WebGL2 + WebGL1):
+In _setupUniformLocations() add:
+
+u_colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode'),
+
+
+In _renderGridPoints() set it (default theta=1):
+
+gl.uniform1i(this.gridUniforms.u_colorMode, (this.uniforms?.colorMode ?? 1)|0);
