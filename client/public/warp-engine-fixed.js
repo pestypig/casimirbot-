@@ -684,6 +684,7 @@ class WarpEngine {
             ...this.uniforms,
             hullAxes,
         };
+        this.currentParams.hullAxes = hullAxes;    // keep currentParams in sync
 
         // 🔬 PHYSICS PARITY MODE: Hard disable cosmetics & boosts, keep real thetaScale above
         if (physicsParityMode) {
@@ -856,7 +857,7 @@ class WarpEngine {
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
-        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // semi-axes [a,b,c] in meters
+        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
         // Clean wall thickness handling - use either meters or ρ-units
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
         const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
