@@ -324,13 +324,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.qMechanical = 1; // restore default
   }
 
-  const gammaGeo3 = Math.pow(state.gammaGeo ?? 26, 3);
-  state.U_geo = state.U_static * gammaGeo3;
+  const gamma3 = Math.pow(state.gammaGeo, 3);
+  state.U_geo = state.U_static * gamma3;
   state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
   // 5) Power — raw first, then power-only calibration via qMechanical
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  const P_tile_raw = Math.abs(state.U_Q) * omega / Q_BURST;     // J/s per tile during ON
+  const P_tile_raw = Math.abs(state.U_Q) * omega / state.qCavity; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
 
   // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
@@ -339,7 +339,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     const scaleP = P_target_W / P_total_W;
     state.qMechanical *= scaleP;                  // knob #1: power only
     state.U_Q         = state.U_geo * state.qMechanical;
-    const P_tile_cal  = Math.abs(state.U_Q) * omega / Q_BURST;
+    const P_tile_cal  = Math.abs(state.U_Q) * omega / state.qCavity;
     P_total_W         = P_tile_cal * state.N_tiles * d_eff;
   } else if (P_target_W === 0) {
     // standby: force qMechanical→0 so stored-energy dissipation is zero
@@ -347,14 +347,14 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.U_Q         = 0;
     P_total_W         = 0;
   }
-  state.P_loss_raw = Math.abs(state.U_Q) * omega / Q_BURST;  // per-tile (with qMechanical)
+  state.P_loss_raw = Math.abs(state.U_Q) * omega / state.qCavity;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
 
   // 6) Mass — raw first, then mass-only calibration via γ_VdB
   state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  let   E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (avg)
+  let   E_tile = U_abs * geo3 * state.qCavity * state.gammaVanDenBroeck * d_eff; // J per tile (avg)
   let   M_total = (E_tile / (C * C)) * state.N_tiles;
 
   // Mass-only calibration: hit per-mode mass target without changing power
@@ -362,7 +362,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   if (M_target > 0 && M_total > 0) {
     const scaleM = M_target / M_total;
     state.gammaVanDenBroeck *= scaleM;   // knob #2: mass only
-    E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    E_tile  = U_abs * geo3 * state.qCavity * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
   } else if (M_target === 0) {
     state.gammaVanDenBroeck = 0;
@@ -428,7 +428,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Audit guard (pipeline self-consistency check)
   (function audit() {
-    const P_tile = Math.abs(state.U_Q) * omega / Q_BURST;
+    const P_tile = Math.abs(state.U_Q) * omega / state.qCavity;
     const P_exp  = P_tile * state.N_tiles * d_eff / 1e6;
     if (Math.abs(state.P_avg - P_exp) > 1e-6 * Math.max(1, P_exp)) {
       console.warn("[AUDIT] P_avg drift; correcting", {reported: state.P_avg, expected: P_exp});
@@ -436,7 +436,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     }
 
     const E_tile = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
-                 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+                 * state.qCavity * state.gammaVanDenBroeck * d_eff;
     const M_exp  = (E_tile / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
