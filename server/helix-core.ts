@@ -607,21 +607,22 @@ export function getDisplacementField(req: Request, res: Response) {
     const data = sampleDisplacementField(state, {
       nTheta: q.nTheta ? Number(q.nTheta) : undefined,
       nPhi: q.nPhi ? Number(q.nPhi) : undefined,
-      sectors: q.sectors ? Number(q.sectors) : undefined,
-      split: q.split ? Number(q.split) : undefined,
+      sectors: q.sectors ? Number(q.sectors) : state.sectorCount, // ← use total wedges
+      split: q.split ? Number(q.split) : Math.floor((state.sectorCount||400)/2),
       wallWidth_m: q.wallWidth_m ? Number(q.wallWidth_m) : undefined,
       shellOffset: q.shellOffset ? Number(q.shellOffset) : undefined,
     });
-    res.json({ 
-      count: data.length, 
-      axes: state.hull, 
-      w_m: (state.sag_nm ?? 16) * 1e-9, 
+    res.json({
+      count: data.length,
+      axes: state.hull,
+      w_m: (state.sag_nm ?? 16) * 1e-9,
       physics: {
         gammaGeo: state.gammaGeo,
         qSpoiling: state.qSpoilingFactor,
-        sectorStrobing: state.sectorStrobing
+        sectorCount: state.sectorCount,
+        concurrentSectors: state.concurrentSectors
       },
-      data 
+      data
     });
   } catch (e) {
     console.error("field endpoint error:", e);
