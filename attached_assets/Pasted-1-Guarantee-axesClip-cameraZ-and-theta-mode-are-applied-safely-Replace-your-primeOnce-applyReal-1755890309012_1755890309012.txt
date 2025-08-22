@@ -1,0 +1,91 @@
+1) Guarantee axesClip, cameraZ, and theta mode are applied safely
+
+Replace your primeOnce, applyReal, and applyShow with these:
+
+// Race-proof primeOnce (ensures buffers exist before first update)
+const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
+  if (!e) return;
+  const payload = { ...shared, colorMode };
+
+  // First time: bootstrap then one deferred update
+  if (!e._bootstrapped) {
+    e.bootstrap?.(payload);
+    e._bootstrapped = true;
+    requestAnimationFrame(() => {
+      try { e.updateUniforms?.(payload); } catch {}
+    });
+    return;
+  }
+
+  // Already bootstrapped: push immediately
+  e.updateUniforms?.(payload);
+};
+
+// REAL = physics parity (no boosts), compact framing, theta color
+const applyReal = (
+  e: any,
+  shared: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid'
+) => {
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
+  e.updateUniforms({
+    ...shared,
+    cameraZ: camZ,
+    lockFraming: true,
+
+    physicsParityMode: true,   // 🔒 NO boosts/cosmetics
+    colorMode: 'theta',
+    vizGain: 1,
+    displayGain: 1,
+    userGain: 1,               // explicit (shader & CPU use this)
+    curvatureBoostMax: 1,
+    curvatureGainT: 0,
+    exposure: 4.0,             // subtler, but still shows sign
+    zeroStop: 1e-5,
+
+    epsilonTilt: 0,
+    betaTiltVec: [0, 0, 0],
+  });
+  e.requestRewarp?.();
+};
+
+// SHOW = boosted/exaggerated, same framing & color, very obvious split
+const applyShow = (
+  e: any,
+  shared: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid',
+  T = 0.70,
+  boostMax = 40,
+  vizGain = 1.25,             // slight seasoning so colors pop
+  exposure = 7.5,             // more contrast than parity
+  zeroStop = 1e-8             // deeper log for richer blues/reds
+) => {
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
+  const t = Math.max(0, Math.min(1, T));
+  const b = Math.max(1, boostMax);
+  const gainNow = 1 + t * (b - 1); // decades slider mapping
+
+  e.updateUniforms({
+    ...shared,
+    cameraZ: camZ,
+    lockFraming: true,
+
+    physicsParityMode: false,
+    colorMode: 'theta',
+
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    displayGain: gainNow,      // ⬅️ make it obvious
+    userGain: gainNow,         // ⬅️ explicit so geometry & color diverge
+
+    vizGain,
+    exposure,
+    zeroStop,
+    cosmeticLevel: 10,
+  });
+  e.requestRewarp?.();
+};

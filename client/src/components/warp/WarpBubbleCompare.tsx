@@ -80,45 +80,47 @@ const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,num
 };
 
 
-// Race-proof primeOnce
+// Race-proof primeOnce (ensures buffers exist before first update)
 const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
   if (!e) return;
   const payload = { ...shared, colorMode };
 
-  // First time: bootstrap (allocates grid), then push uniforms on next frame.
+  // First time: bootstrap then one deferred update
   if (!e._bootstrapped) {
     e.bootstrap?.(payload);
     e._bootstrapped = true;
     requestAnimationFrame(() => {
-      // one deferred push guarantees gridVBOs exist
-      try { e.updateUniforms?.(payload); }
-      catch {
-        // ultra-conservative: if the very first RAF still races, try once more
-        requestAnimationFrame(() => { try { e.updateUniforms?.(payload); } catch {} });
-      }
+      try { e.updateUniforms?.(payload); } catch {}
     });
     return;
   }
 
-  // Already bootstrapped: safe to push immediately
+  // Already bootstrapped: push immediately
   e.updateUniforms?.(payload);
 };
 
-// REAL = physics parity (no boosts), compact framing
-const applyReal = (e: any, shared: ReturnType<typeof frameFromHull>, canvas: HTMLCanvasElement, colorMode: 'theta'|'shear'|'solid') => {
+// REAL = physics parity (no boosts), compact framing, theta color
+const applyReal = (
+  e: any,
+  shared: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid'
+) => {
   primeOnce(e, shared, colorMode);
   const camZ = compactCameraZ(canvas, shared.axesScene);
   e.updateUniforms({
     ...shared,
-    cameraZ: camZ,               // 👈 compact camera override
+    cameraZ: camZ,
     lockFraming: true,
 
-    physicsParityMode: true,
-    vizGain: 1, displayGain: 1,
+    physicsParityMode: true,   // 🔒 NO boosts/cosmetics
+    colorMode: 'theta',
+    vizGain: 1,
+    displayGain: 1,
+    userGain: 1,               // explicit (shader & CPU use this)
     curvatureBoostMax: 1,
     curvatureGainT: 0,
-    userGain: 1,
-    exposure: 3.5,
+    exposure: 4.0,             // subtler, but still shows sign
     zeroStop: 1e-5,
 
     epsilonTilt: 0,
@@ -127,33 +129,36 @@ const applyReal = (e: any, shared: ReturnType<typeof frameFromHull>, canvas: HTM
   e.requestRewarp?.();
 };
 
-// SHOW = boosted/exaggerated, same framing
+// SHOW = boosted/exaggerated, same framing & color, very obvious split
 const applyShow = (
   e: any,
   shared: ReturnType<typeof frameFromHull>,
   canvas: HTMLCanvasElement,
   colorMode: 'theta'|'shear'|'solid',
-  T = 0.70,                       // push a bit harder so the difference is obvious
+  T = 0.70,
   boostMax = 40,
-  vizGain = 1.0,
-  exposure = 6.0,
-  zeroStop = 1e-7
+  vizGain = 1.25,             // slight seasoning so colors pop
+  exposure = 7.5,             // more contrast than parity
+  zeroStop = 1e-8             // deeper log for richer blues/reds
 ) => {
   primeOnce(e, shared, colorMode);
   const camZ = compactCameraZ(canvas, shared.axesScene);
   const t = Math.max(0, Math.min(1, T));
   const b = Math.max(1, boostMax);
+  const gainNow = 1 + t * (b - 1); // decades slider mapping
+
   e.updateUniforms({
     ...shared,
-    cameraZ: camZ,               // 👈 exact same camera as REAL
+    cameraZ: camZ,
     lockFraming: true,
 
     physicsParityMode: false,
-    colorMode,
+    colorMode: 'theta',
 
     curvatureGainT: t,
     curvatureBoostMax: b,
-    displayGain: 1 + t * (b - 1),
+    displayGain: gainNow,      // ⬅️ make it obvious
+    userGain: gainNow,         // ⬅️ explicit so geometry & color diverge
 
     vizGain,
     exposure,
