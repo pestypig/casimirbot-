@@ -977,7 +977,7 @@ export default function HelixCore() {
                   : (MODE_CONFIGS[effectiveMode]?.dutyCycle ?? 0);
 
                 // Derived count (mode-aware)
-                const derivedActiveTiles = deriveActiveTiles(totalTilesLive, sectorsLive, dutyLive, effectiveMode);
+                const derivedActiveTiles = deriveActiveTiles(totalTilesLive, sectorsLive, dutyEffectiveFR, effectiveMode);
 
                 // Prefer a sensible live server value, but override if it's missing or obviously stale
                 const activeTilesDisplay = (() => {
