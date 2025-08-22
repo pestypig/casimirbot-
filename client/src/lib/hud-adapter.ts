@@ -83,6 +83,7 @@ export type HUDModel = {
   qCavity: number;
   // Badges/helpers
   modeTag: string;           // from modelMode
+  parametersClamped: boolean; // any parameters hit policy limits during calibration
 };
 
 const SECTORS_TOTAL = 400;
@@ -132,7 +133,8 @@ export function toHUDModel(s: PipelineLike): HUDModel {
     gammaVdB: s.gammaVanDenBroeck ?? 0,
     qMech: s.qMechanical ?? 0,
     qCavity: s.qCavity ?? 0,
-    modeTag: s.modelMode === 'raw' ? 'RAW' : 'CAL'
+    modeTag: s.modelMode === 'raw' ? 'RAW' : 'CAL',
+    parametersClamped: (s as any).parametersClamped ?? false
   };
 }
 
@@ -204,7 +206,8 @@ export function fromRest(r: HelixMetricsResponse): HUDModel {
     gammaVdB: r.gammaVanDenBroeck,
     qMech: 0,
     qCavity: r.qCavity,
-    modeTag: r.modelMode === 'raw' ? 'RAW' : 'CAL'
+    modeTag: r.modelMode === 'raw' ? 'RAW' : 'CAL',
+    parametersClamped: (r as any).parametersClamped ?? false
   };
 }
 

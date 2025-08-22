@@ -369,7 +369,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
   if (CALIBRATED && P_target_W > 0 && P_total_W > 0) {
     const scaleP = P_target_W / P_total_W;
-    state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical * scaleP)); // knob #1: power only (clamped)
+    const qMech_raw = state.qMechanical * scaleP;
+    state.qMechanical = Math.max(1e-6, Math.min(1e6, qMech_raw)); // knob #1: power only (clamped)
     state.U_Q         = state.U_geo * state.qMechanical;
     const P_tile_cal  = Math.abs(state.U_Q) * omega / Q;
     P_total_W         = P_tile_cal * state.N_tiles * d_eff;
@@ -379,6 +380,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.U_Q         = 0;
     P_total_W         = 0;
   }
+  
+  // Post-calibration clamping check for qMechanical
+  const qMech_before = state.qMechanical;
+  state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical));
+  (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
 
@@ -394,7 +400,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const userM = state.exoticMassTarget_kg ?? M_target;
   if (CALIBRATED && userM > 0 && M_total > 0) {
     const scaleM = userM / M_total;
-    state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck * scaleM)); // knob #2: mass only (clamped)
+    const gammaVdB_raw = state.gammaVanDenBroeck * scaleM;
+    state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, gammaVdB_raw)); // knob #2: mass only (clamped)
     E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
   } else if (userM <= 0) {
@@ -404,8 +411,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
   
+  // Post-calibration clamping check for gammaVanDenBroeck
+  const gammaVdB_before = state.gammaVanDenBroeck;
+  state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck));
+  (state as any).gammaVanDenBroeckClamped = (state.gammaVanDenBroeck !== gammaVdB_before);
+  
   // Mass calibration readout
   state.massCalibration = state.gammaVanDenBroeck / GAMMA_VDB;
+  
+  // Overall clamping status for UI warnings
+  (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
 
   // 7) Quantum-safety proxy (scaled against baseline ship-wide duty)
   const d_ship = d_eff;                              // ship-wide
