@@ -341,10 +341,26 @@ useEffect(() => {
     return engine;
   };
 
+  // --- global strobing multiplexer (supports many viewers) ---
+  const ensureStrobeMux = () => {
+    const w = window as any;
+    if (w.__strobeListeners) return;
+    w.__strobeListeners = new Set();
+    w.setStrobingState = (payload: { sectorCount:number; currentSector:number; split?:number }) => {
+      for (const fn of w.__strobeListeners) {
+        try { fn(payload); } catch {}
+      }
+    };
+    w.__addStrobingListener = (fn:Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
+  };
+
   const init = async () => {
     // derive an initial scale (fallback to your parameters.gridScale or 1.0)
     const initialScale = Number(parameters.gridScale ?? 1.0);
     installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
+    
+    // Ensure strobing multiplexer is available
+    ensureStrobeMux();
 
     setLoadError(null);
     setIsLoaded(false);
@@ -358,21 +374,19 @@ useEffect(() => {
       if ((window as any).WarpEngine) {
         engineRef.current = makeEngine((window as any).WarpEngine);
         
-        // Install local strobing bridge for other panels
-        const prevSetter = (window as any).setStrobingState;
-        (window as any).setStrobingState = ({ sectorCount, currentSector }: { sectorCount:number; currentSector:number; }) => {
-          if (engineRef.current) {
-            const s = Math.max(1, Math.floor(sectorCount || 1));
-            engineRef.current.updateUniforms({
-              sectors: s,
-              split: Math.max(0, Math.min(s - 1, Math.floor(s / 2))),
-              sectorIdx: Math.max(0, currentSector % s)
-            });
-            engineRef.current.requestRewarp?.();
-          }
-          // optional: cascade if someone else was listening
-          if (typeof prevSetter === "function") prevSetter({ sectorCount, currentSector });
-        };
+        // Register with strobing multiplexer
+        const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+          if (!engineRef.current) return;
+          const s = Math.max(1, Math.floor(sectorCount||1));
+          engineRef.current.updateUniforms({
+            sectors: s,
+            split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+            sectorIdx: Math.max(0, currentSector % s)
+          });
+          engineRef.current.requestRewarp?.();
+        });
+        // Store cleanup function for later
+        (engineRef.current as any).__strobingCleanup = off;
         
         return;
       }
@@ -392,21 +406,19 @@ useEffect(() => {
         if ((window as any).WarpEngine) {
           engineRef.current = makeEngine((window as any).WarpEngine);
           
-          // Install local strobing bridge for other panels
-          const prevSetter = (window as any).setStrobingState;
-          (window as any).setStrobingState = ({ sectorCount, currentSector }: { sectorCount:number; currentSector:number; }) => {
-            if (engineRef.current) {
-              const s = Math.max(1, Math.floor(sectorCount || 1));
-              engineRef.current.updateUniforms({
-                sectors: s,
-                split: Math.max(0, Math.min(s - 1, Math.floor(s / 2))),
-                sectorIdx: Math.max(0, currentSector % s)
-              });
-              engineRef.current.requestRewarp?.();
-            }
-            // optional: cascade if someone else was listening
-            if (typeof prevSetter === "function") prevSetter({ sectorCount, currentSector });
-          };
+          // Register with strobing multiplexer
+          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+            if (!engineRef.current) return;
+            const s = Math.max(1, Math.floor(sectorCount||1));
+            engineRef.current.updateUniforms({
+              sectors: s,
+              split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+              sectorIdx: Math.max(0, currentSector % s)
+            });
+            engineRef.current.requestRewarp?.();
+          });
+          // Store cleanup function for later
+          (engineRef.current as any).__strobingCleanup = off;
           
           return;
         }
@@ -439,15 +451,14 @@ useEffect(() => {
   return () => {
     cancelled = true;
     if (watchdog) clearTimeout(watchdog);
+    
+    // cleanup strobing listener
+    try {
+      (engineRef.current as any)?.__strobingCleanup?.();
+    } catch {}
+    
     try { engineRef.current?.destroy?.(); } catch {}
     engineRef.current = null;
-    
-    // cleanup strobing bridge
-    const currentSetter = (window as any).setStrobingState;
-    if (typeof currentSetter === "function" && currentSetter.toString().includes('engineRef.current')) {
-      // restore previous setter if we installed one
-      (window as any).setStrobingState = undefined;
-    }
   };
   // re-run on retry
 }, [initNonce]);
