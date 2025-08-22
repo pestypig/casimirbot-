@@ -140,30 +140,34 @@ const AVAILABLE_FUNCTIONS = [
 
 // Function to execute pulse_sector
 async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
-  // Get the current energy pipeline state for accurate values
-  const state = getGlobalPipelineState();
-  
-  // Use the corrected energy values from the pipeline
-  // Energy per tile is already calculated with correct 1/720 denominator
-  const energyPerTile = state.U_static;
-  
-  // Power loss per tile from the pipeline
-  const powerLossPerTile = state.P_loss_raw; // W per tile
-  
-  // Calculate curvature contribution
-  const c = 3e8; // Speed of light
-  const curvatureContribution = Math.abs(energyPerTile) / (c * c);
-  
-  // Force calculation (approximate from energy gradient)
-  const gap = args.gap_nm * 1e-9; // Convert to meters
-  const force = -Math.abs(energyPerTile) / gap; // Approximate force
-  
+  const s = getGlobalPipelineState();
+
+  // tile area from pipeline (m²)
+  const A = (s.tileArea_cm2 ?? 25) * 1e-4;
+  const a = args.gap_nm * 1e-9;                  // meters
+  const HBAR = 1.054_571_8e-34;
+  const C = 299_792_458;
+  const PI = Math.PI;
+
+  // Energy per tile you already compute (J)
+  const energyPerTile = s.U_static;
+
+  // Correct pressure & force
+  const P = - (PI*PI*HBAR*C) / (240 * Math.pow(a, 4)); // N/m²
+  const force = P * A;                                  // N (negative = attractive)
+
+  // instantaneous (on-window) power per tile and ship-wide avg
+  const powerLossPerTile = s.P_loss_raw;        // W
+  const curvatureContribution = Math.abs(energyPerTile) / (C*C); // kg (mass-equivalent proxy)
+
   return {
     sectorId: args.sectorId,
-    energy: energyPerTile,
-    force: force,
-    powerLoss: powerLossPerTile,
-    curvatureContribution: curvatureContribution,
+    gap_m: a,
+    area_m2: A,
+    energy_J: energyPerTile,
+    force_N: force,
+    powerLoss_W_per_tile: powerLossPerTile,
+    curvatureMass_kg: curvatureContribution,
     status: "PULSED"
   };
 }
