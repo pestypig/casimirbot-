@@ -574,12 +574,23 @@ class WarpEngine {
             
             // HELIX drives a numeric thetaScale; fall back to local rebuild only if absent
             thetaScale: (() => {
+                // 1) If HELIX sent a viz block, honor its default choice (FR-like).
+                if (parameters?.viz?.thetaScale_FR_like != null &&
+                    (parameters?.viz?.defaultThetaScale === "FR_like" || !parameters?.viz?.defaultThetaScale)) {
+                  return +parameters.viz.thetaScale_FR_like;
+                }
+                if (parameters?.viz?.thetaScale_UI_like != null &&
+                    parameters?.viz?.defaultThetaScale === "UI_like") {
+                  return +parameters.viz.thetaScale_UI_like;
+                }
+                // 2) Else fall back to local rebuild, but include ΔA/A (qSpoilingFactor).
                 if (Number.isFinite(parameters.thetaScale)) return +parameters.thetaScale;
                 const gammaGeo = N(parameters.gammaGeo ?? this.currentParams.g_y ?? 26);
                 const gammaVdB = N(parameters.gammaVdB ?? this.currentParams.gammaVanDenBroeck ?? 1);
+                const dAa      = N(parameters.deltaAOverA ?? parameters.qSpoilingFactor ?? 1);
                 const duty     = Math.max(1e-12, N(dutyFrac));
                 const sectors  = Math.max(1, N(parameters.sectors ?? 400));
-                return Math.pow(gammaGeo, 3) * gammaVdB * Math.sqrt(duty / sectors);
+                return Math.pow(gammaGeo, 3) * dAa * gammaVdB * Math.sqrt(duty / sectors);
             })(),
             
             // Mirror pipeline fields for diagnostics
