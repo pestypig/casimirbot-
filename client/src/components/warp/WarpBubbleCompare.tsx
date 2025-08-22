@@ -1,5 +1,43 @@
 import React, { useEffect, useRef } from "react";
 
+// Robust engine loader
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+async function ensureWarpEngineCtor(): Promise<any> {
+  const w = window as any;
+  let Ctor = w.WarpEngine?.default || w.WarpEngine;
+  if (typeof Ctor === 'function') return Ctor;
+
+  // try fixed then fallback bundle—same paths your TSX loader uses
+  const candidates = ['/warp-engine-fixed.js?v=tilt2', '/warp-engine.js?v=fallback'];
+  for (const src of candidates) {
+    try { await loadScript(src); } catch { /* keep trying */ }
+    Ctor = (w.WarpEngine?.default || w.WarpEngine);
+    if (typeof Ctor === 'function') return Ctor;
+  }
+  throw new Error('WarpEngine constructor not found after script load');
+}
+
+function ensureStrobeMux() {
+  const w = window as any;
+  const prev = w.setStrobingState;
+  if (!w.__strobeListeners) w.__strobeListeners = new Set();
+  w.setStrobingState = (payload: any) => {
+    try { typeof prev === 'function' && prev(payload); } catch {}
+    for (const fn of w.__strobeListeners) { try { fn(payload); } catch {} }
+  };
+  w.__addStrobingListener = (fn: Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
+}
+
 type Props = {
   parameters: any;                 // your compareParams from HelixCore
   parityExaggeration?: number;     // default 1
@@ -22,31 +60,41 @@ export default function WarpBubbleCompare({
 
   // Bootstrap once
   useEffect(() => {
-    if (!leftRef.current || !rightRef.current) return;
-    leftEngine.current  = new window.WarpEngine(leftRef.current);
-    rightEngine.current = new window.WarpEngine(rightRef.current);
+    let cancelled = false;
+    (async () => {
+      if (!leftRef.current || !rightRef.current) return;
+      try {
+        const WarpCtor = await ensureWarpEngineCtor();
+        if (cancelled) return;
+        leftEngine.current  = new WarpCtor(leftRef.current);
+        rightEngine.current = new WarpCtor(rightRef.current);
+        ensureStrobeMux(); // wrap after engine creation
 
-    leftEngine.current.bootstrap({
-      ...parameters,
-      physicsParityMode: true,
-      colorMode,
-      lockFraming,
-      viewAvg: parameters?.viewAvg ?? true,
-      exaggeration: 1, // parity always flat
-    });
+        leftEngine.current.bootstrap({
+          ...parameters,
+          physicsParityMode: true,
+          colorMode,
+          lockFraming,
+          viewAvg: parameters?.viewAvg ?? true,
+          exaggeration: 1, // parity always flat
+        });
 
-    rightEngine.current.bootstrap({
-      ...parameters,
-      physicsParityMode: false,
-      colorMode,
-      lockFraming,
-      viewAvg: parameters?.viewAvg ?? true,
-      exaggeration: heroExaggeration,
-    });
-
+        rightEngine.current.bootstrap({
+          ...parameters,
+          physicsParityMode: false,
+          colorMode,
+          lockFraming,
+          viewAvg: parameters?.viewAvg ?? true,
+          exaggeration: heroExaggeration,
+        });
+      } catch (e) {
+        console.error('[WarpBubbleCompare] init failed:', e);
+      }
+    })();
     return () => {
-      leftEngine.current?.destroy?.();
-      rightEngine.current?.destroy?.();
+      cancelled = true;
+      try { leftEngine.current?.destroy?.(); } catch {}
+      try { rightEngine.current?.destroy?.(); } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // mount once
