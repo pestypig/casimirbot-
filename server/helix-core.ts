@@ -39,7 +39,7 @@ Respond to engineering commands like "pulse sector S3 with 1 nm gap", or "load m
 When appropriate, invoke functions like pulse_sector, check_metric_violation, or load_document.
 
 Current ship status:
-- Active Tiles: 312/400
+- Active Sectors: 1/400
 - Energy Generation: 83.3 MW
 - Exotic Mass: 1,405 kg
 - GR Compliance: PASS
@@ -486,14 +486,18 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
   const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, concurrent);
 
-  const sec = state.__sectors ?? { 
-    TOTAL_SECTORS: 400, 
-    activeSectors: 1, 
-    activeFraction: 1/400, 
-    tilesPerSector: Math.floor(state.N_tiles/400), 
-    activeTiles: Math.floor(state.N_tiles/400) 
+  const sec = state.__sectors ?? {
+    TOTAL_SECTORS: 400,
+    activeSectors: state.sectorStrobing ?? 1,
+    activeFraction: (state.sectorStrobing ?? 1) / 400,
+    tilesPerSector: Math.floor(state.N_tiles / 400),
+    activeTiles: Math.floor(state.N_tiles / 400) * (state.sectorStrobing ?? 1)
   };
-  const fr = state.__fr ?? { dutyInstant: dutyEffectiveFR, dutyEffectiveFR, Q_quantum: 1e12 };
+  const fr = state.__fr ?? {
+    dutyInstant: state.dutyEffective_FR ?? 0.01/400,
+    dutyEffectiveFR: state.dutyEffective_FR ?? 0.01/400,
+    Q_quantum: 1e12
+  };
 
   // Derive τLC and T_m once here from the pipeline state used to compute TS_ratio
   const f_m_Hz = state.modulationFreq_GHz * 1e9;   // Hz
@@ -580,13 +584,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
-    // hull geometry and time-scale metrics for Bridge cards
-    hull: { 
-      Lx_m, Ly_m, Lz_m,
-      a: Lx_m / 2,  // semi-axis x
-      b: Ly_m / 2,  // semi-axis y  
-      c: Lz_m / 2   // semi-axis z
-    },
+    // hull geometry (use pipeline state directly to avoid duplication)
     wall: { w_norm: 0.06 }, // normalized wall thickness for ellipsoidal bell
     tiles: {
       tileArea_cm2: state.tileArea_cm2,
