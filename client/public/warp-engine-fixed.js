@@ -576,6 +576,14 @@ class WarpEngine {
         const cosmeticT0 = Math.max(0, Math.min(1, (rawLevel - 1) / 9)); // 1→0, 10→1
         const cosmeticT = physicsParityMode ? 0 : cosmeticT0; // parity overrides to true-physics
         
+        // Color mode parsing: accept strings or ints: 'solid'|'theta'|'shear' or 0|1|2
+        const colorMode = (() => {
+            const cm = (parameters as any).colorMode;
+            if (cm === 'solid' || cm === 0) return 0;
+            if (cm === 'shear' || cm === 2) return 2;
+            return 1; // default theta
+        })();
+        
         if (physicsParityMode) {
             console.warn('🔬 PHYSICS PARITY MODE ACTIVE: All visual multipliers forced to unity for debug baseline');
             
@@ -724,6 +732,7 @@ class WarpEngine {
         this.uniforms = {
             ...this.uniforms,
             hullAxes,
+            colorMode,
         };
         this.currentParams.hullAxes = hullAxes;    // keep currentParams in sync
 
@@ -770,6 +779,14 @@ class WarpEngine {
             this.uniforms.zeroStop = Number.isFinite(parameters.zeroStop) ? +parameters.zeroStop : (this.uniforms?.zeroStop ?? 1e-7);
             this.uniforms.cosmeticT = cosmeticT;
         }
+
+        // Expose exaggeration snapshot that UI can read per frame (for HUD)
+        this.uniforms.__exaggeration = {
+            userGain: this.uniforms.userGain,
+            exposure: this.uniforms.exposure,
+            zeroStop: this.uniforms.zeroStop,
+            cosmeticT: this.uniforms.cosmeticT || 1
+        };
 
         // Update cached axes and refit camera if changed
         if (axesScene) {
