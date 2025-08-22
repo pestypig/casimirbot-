@@ -684,14 +684,14 @@ export default function HelixCasimirAmplifier({
                   </div>
                 </div>
                 
-                {/* Visual cavity energy bar with ON/OFF indication */}
+                {/* Energy bar driven by U(t)/U∞ so it matches the number */}
                 <div className="mt-3 flex items-center gap-2">
                   <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div 
+                    <div
                       className={`h-full transition-all duration-100 ${
                         onDisplay ? 'bg-cyan-400' : 'bg-slate-600'
                       }`}
-                      style={{ width: `${Math.min(100, driveEnv * 100)}%` }}
+                      style={{ width: `${Math.min(100, (U / Math.max(1e-12, U_inf || 1e-6)) * 100)}%` }}
                     />
                   </div>
                   <Badge 
