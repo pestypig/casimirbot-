@@ -358,6 +358,16 @@ export default function HelixCore() {
     ? pipeline!.qSpoilingFactor!
     : (modeCfg.qSpoilingFactor ?? 1);
 
+  // ⬇️ add this
+  const dutyEffectiveFR = (() => {
+    const burst = Number(lc?.burst_ms);
+    const dwell = Number(lc?.dwell_ms);
+    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+      return Math.max(0, Math.min(1, burst / dwell));
+    }
+    return Math.max(0, Math.min(1, isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : (modeCfg.dutyCycle ?? 0.14)));
+  })();
+
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
   
@@ -714,7 +724,7 @@ export default function HelixCore() {
                       qSpoilingFactor={qSpoilUI}
                       gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1}
                       dutyCycle={dutyUI}
-                      sectors={sectorsResolved}
+                      sectors={sectorsResolved}   // ⬅️ use resolved sectors
                       viewAvg={true}
                       diffMode={false}
                       refParams={{
