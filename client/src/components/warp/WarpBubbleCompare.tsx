@@ -24,11 +24,31 @@ export default function WarpBubbleCompare({
   const [showBoost, setShowBoost] = useState(0.5); // 0..1 blend (decades slider)
 
   // Defensive clone (we never mutate incoming props)
-  const base = useMemo(() => ({ ...(parameters || {}) }), [parameters]);
+  const compareParams = useMemo(() => ({ ...(parameters || {}) }), [parameters]);
+
+  // Create truly separate payloads (no shared nested refs)
+  const heroParams = useMemo(() => {
+    const p: any = structuredClone(compareParams);
+    // Hero/Show: leave boosts on (no parity)
+    p.physicsParityMode = false;
+    // If your engine reads curvature via viz overrides, keep them undefined here
+    // so WarpVisualizer decides (or set your desired show exaggeration explicitly)
+    return p;
+  }, [compareParams]);
+
+  const realParams = useMemo(() => {
+    const p: any = structuredClone(compareParams);
+    // Parity/Real: force unity
+    p.physicsParityMode = true;
+    p.viz = { ...(p.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1, colorMode: 'theta' };
+    p.curvatureGainDec = 0;
+    p.curvatureBoostMax = 1;
+    return p;
+  }, [compareParams]);
 
   // LEFT — REAL (parity): force unity scale + low-contrast + honest mapping
   const leftReal = useMemo(() => ({
-    ...base,
+    ...compareParams,
     physicsParityMode: true,            // ← hard ON for real
     // No decades boost to REAL:
     curvatureBoostMax: 1,
@@ -38,11 +58,11 @@ export default function WarpBubbleCompare({
       exposure: 3.0,
       zeroStop: 1e-5
     }
-  }), [base, realColorIsShear]);
+  }), [compareParams, realColorIsShear]);
 
   // RIGHT — SHOW (hero): boosted, easy to read differences
   const rightShow = useMemo(() => ({
-    ...base,
+    ...compareParams,
     physicsParityMode: false,           // ← OFF for show
     curvatureBoostMax: 40,
     curvatureGainDec: Math.floor(showBoost * 8),  // 0..8 range (pick your default exaggeration)
@@ -51,7 +71,7 @@ export default function WarpBubbleCompare({
       exposure: 6.0,
       zeroStop: 1e-7
     }
-  }), [base, showBoost]);
+  }), [compareParams, showBoost]);
 
   // Helpful label for the exaggeration factor we send to the SHOW view
   const showExaggeration = useMemo(() => {
