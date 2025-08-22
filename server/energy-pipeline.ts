@@ -308,7 +308,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
-  // 3) Sector scheduling — per-mode policy
+  // 3) Apply mode config EARLY (right after reading currentMode)
+  const ui = MODE_CONFIGS[state.currentMode];
+  state.dutyCycle = ui.dutyCycle;
+  state.qSpoilingFactor = ui.qSpoilingFactor;
+  // keep sector policy from resolveSLive just below; don't touch sectorCount here
+  
+  // 4) Sector scheduling — per-mode policy
   state.sectorCount = TOTAL_SECTORS;                     // ✅ Total sectors (always 400)
   state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
   const S_total = state.sectorCount;
@@ -323,13 +329,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
-  // (dutyCycle will be set from MODE_CONFIGS at end of function)
+  // (dutyCycle already set from MODE_CONFIGS above)
 
   // ✅ optional convenience for UI reducers that look for this name:
   (state as any).dutyEff = d_eff;
   (state as any).dutyShip = d_eff; // alias for clients (ship-wide duty)
 
-  // 4) Stored energy (raw core): ensure valid input values
+  // 5) Stored energy (raw core): ensure valid input values
   // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
   if (state.qMechanical === 0 && state.currentMode !== 'standby') {
     state.qMechanical = 1; // restore default
@@ -351,21 +357,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.U_geo = state.U_static * gamma3;
   state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
-  // 5) Power — raw first, then power-only calibration via qMechanical
+  // 6) Power — raw first, then power-only calibration via qMechanical
   const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
   const Q = state.qCavity ?? Q_BURST;
   const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
-  
-  // Cryo power calculation including idle Q-spoiling losses
-  const Q_on  = Q; // burst Q
-  const Q_off = Math.max(1, Q_on * (state.qSpoilingFactor ?? 0.1)); // spoiled → smaller Q
-  
-  const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;   // during burst
-  const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;  // idle bleed (amplitude effectively ≈0, but walls still have Rs)
-  
-  const P_avg_cold  = (P_tile_on * d_eff + P_tile_idle * (1 - d_eff)) * state.N_tiles; // W
-  (state as any).P_cryo_MW = P_avg_cold / 1e6;   // expose side-by-side with P_avg
 
   // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
   const CALIBRATED = (MODEL_MODE === 'calibrated');
@@ -390,8 +386,15 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
+  
+  // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
+  const Q_on  = Q;
+  const Q_off = Math.max(1, Q_on * state.qSpoilingFactor); // use mode-specific qSpoilingFactor
+  const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;
+  const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;
+  (state as any).P_cryo_MW = ((P_tile_on * d_eff + P_tile_idle * (1 - d_eff)) * state.N_tiles) / 1e6;
 
-  // 6) Mass — raw first, then mass-only calibration via γ_VdB
+  // 7) Mass — raw first, then mass-only calibration via γ_VdB
   state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
@@ -529,11 +532,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     state.overallStatus = 'NOMINAL';
   }
   
-  // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
-  const ui = MODE_CONFIGS[state.currentMode];
-  state.dutyCycle       = ui.dutyCycle;
+  // Mode configuration already applied early in function - no need to duplicate
   state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
-  state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   // UI field updates logging (after MODE_CONFIGS applied)
   console.log("[PIPELINE_UI]", {
