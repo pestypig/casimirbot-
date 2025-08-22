@@ -365,12 +365,13 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // Mass-only calibration: hit per-mode mass target without changing power
   const M_target = MODE_POLICY[state.currentMode].M_target_kg;
-  if (M_target > 0 && M_total > 0) {
-    const scaleM = M_target / M_total;
+  const userM = state.exoticMassTarget_kg ?? M_target;
+  if (userM > 0 && M_total > 0) {
+    const scaleM = userM / M_total;
     state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck * scaleM)); // knob #2: mass only (clamped)
     E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
-  } else if (M_target === 0) {
+  } else if (userM <= 0) {
     state.gammaVanDenBroeck = 0;
     M_total = 0;
   }
