@@ -1,0 +1,66 @@
+You’re hitting that because the cleanup is calling `controller.abort()` even when the fetch was never started (the controller is created before the 300 ms debounce fires), or after the request already settled. In your runtime, aborting a signal “without reason” throws.
+
+### Fix
+
+Create the controller **inside** the debounced callback, track whether the request actually started/finished, and only abort if needed. Also clear the timeout before touching the controller.
+
+Replace your debounced effect with this:
+
+```tsx
+useEffect(() => {
+  if (!visible) return;
+
+  let ctrl: AbortController | null = null;
+  let started = false;
+  let finished = false;
+
+  const timer = setTimeout(async () => {
+    ctrl = new AbortController();
+    started = true;
+    try {
+      const q = new URLSearchParams({
+        nTheta: String(params.nTheta),
+        nPhi: String(params.nPhi),
+        sectors: String(params.sectors),
+        split: String(params.split)
+      }).toString();
+
+      const res = await fetch(`${endpoint}?${q}`, { signal: ctrl.signal });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const json = await res.json();
+      setData(json);
+      setErr(null);
+    } catch (e: any) {
+      // Ignore intentional aborts across browsers/runtimes
+      const isAbort =
+        e?.name === "AbortError" ||
+        e?.code === "ABORT_ERR" ||
+        ctrl?.signal.aborted;
+      if (!isAbort) setErr(e?.message ?? "fetch failed");
+    } finally {
+      finished = true;
+    }
+  }, 300);
+
+  return () => {
+    clearTimeout(timer);
+    // Abort only if the fetch actually started and hasn't finished
+    if (started && !finished && ctrl && !ctrl.signal.aborted) {
+      // pass a reason to satisfy runtimes that require it
+      ctrl.abort("effect cleanup");
+    }
+  };
+}, [endpoint, params, visible]);
+```
+
+Why this works:
+
+* No abort is issued if the debounce hadn’t fired yet (`started === false`).
+* No abort after the request has settled (`finished === true`).
+* Passing a reason (`"effect cleanup"`) avoids the “aborted without reason” complaint in strict runtimes.
+* The catch block ignores `AbortError` across implementations.
+
+Optional hardening:
+
+* Add a per-request timeout: `const ctrl = AbortSignal.timeout(30_000)` (if your runtime supports it), or race `fetch` against a manual timer.
+* Guard state updates with an `isMounted` ref if this component unmounts frequently.
