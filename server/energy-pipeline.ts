@@ -347,6 +347,16 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const Q = state.qCavity ?? Q_BURST;
   const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
+  
+  // Cryo power calculation including idle Q-spoiling losses
+  const Q_on  = Q; // burst Q
+  const Q_off = Math.max(1, Q_on * (state.qSpoilingFactor ?? 0.1)); // spoiled → smaller Q
+  
+  const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;   // during burst
+  const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;  // idle bleed (amplitude effectively ≈0, but walls still have Rs)
+  
+  const P_avg_cold  = (P_tile_on * d_eff + P_tile_idle * (1 - d_eff)) * state.N_tiles; // W
+  (state as any).P_cryo_MW = P_avg_cold / 1e6;   // expose side-by-side with P_avg
 
   // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
   const CALIBRATED = (MODEL_MODE === 'calibrated');

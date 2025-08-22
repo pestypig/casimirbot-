@@ -53,6 +53,7 @@ export type PipelineLike = {
 export type HUDModel = {
   // Power
   powerMW: number;          // average ship power in MW
+  powerCryoMW: number;      // thermal load including idle losses in MW
   powerOnW: number;         // instantaneous ON power (ship) in W
   // Duty / sectors
   dutyShip: number;         // authoritative ship-wide duty
@@ -106,6 +107,7 @@ export function toHUDModel(s: PipelineLike): HUDModel {
 
   return {
     powerMW: s.P_avg ?? 0,
+    powerCryoMW: (s as any).P_cryo_MW ?? (s.P_avg ?? 0), // thermal load including idle losses
     powerOnW,
     dutyShip,
     dutyBurst,
@@ -176,6 +178,7 @@ export type HelixMetricsResponse = {
 export function fromRest(r: HelixMetricsResponse): HUDModel {
   return {
     powerMW: r.energyOutput,
+    powerCryoMW: r.energyOutput, // fallback to same value if not available
     powerOnW: 0, // server can add this later; keep 0 for now
     dutyShip: r.dutyEffectiveFR,
     dutyBurst: 0.01,
