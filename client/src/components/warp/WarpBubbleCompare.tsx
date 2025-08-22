@@ -240,8 +240,14 @@ export default function WarpBubbleCompare({
         // lock framing across resizes (prevents "camera pulled back")
         roRef.current = new ResizeObserver(() => {
           const fresh = frameFromHull(parameters?.hull, parameters?.gridSpan);
+          const L = leftRef.current!, R = rightRef.current!;
           const camL = compactCameraZ(L, fresh.axesScene);
           const camR = compactCameraZ(R, fresh.axesScene);
+
+          // make the GL viewport match CSS before re-locking framing
+          leftEngine.current?._resize?.();
+          rightEngine.current?._resize?.();
+
           pushUniformsWhenReady(leftEngine.current,  { ...fresh, cameraZ: camL, lockFraming: true });
           pushUniformsWhenReady(rightEngine.current, { ...fresh, cameraZ: camR, lockFraming: true });
         });
