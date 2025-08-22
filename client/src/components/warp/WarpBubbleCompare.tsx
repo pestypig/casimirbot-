@@ -44,73 +44,106 @@ const FIN = (v:any, d:number) => (Number.isFinite(v) ? Number(v) : d);
 const v3 = (v:any, d:[number,number,number]) =>
   (Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)) ? (v as [number,number,number]) : d;
 
-// Derive identical framing and **sanitize** everything
-const frameFromHull = (h?: Partial<Hull>, gridSpan?: number) => {
-  const a = FIN(h?.a, 503.5), b = FIN(h?.b, 132.0), c = FIN(h?.c, 86.5);
-  const s = 1/1200;
-  const axesScene: [number,number,number] = [a*s, b*s, c*s];
+// Add axesClip and compute a compact camera distance so the hull fills the view
+const frameFromHull = (hull?: Partial<Hull>, gridSpan?: number) => {
+  const a = Number.isFinite(hull?.a) ? Number(hull!.a) : 503.5;
+  const b = Number.isFinite(hull?.b) ? Number(hull!.b) : 132.0;
+  const c = Number.isFinite(hull?.c) ? Number(hull!.c) : 86.5;
+  const s = 1 / 1200;
+  const axesScene: [number, number, number] = [a * s, b * s, c * s];
+
+  // Grid span is kept, but we'll override the camera so minSpan can't push us far out
   const span = Number.isFinite(gridSpan)
-    ? Number(gridSpan)
+    ? (gridSpan as number)
     : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
-  // Seed BOTH axesScene and axesClip; NEVER null
   return {
-    hullAxes: [a,b,c] as [number,number,number],
+    hullAxes: [a, b, c] as [number, number, number],
     axesScene,
-    axesClip: axesScene,
+    axesClip: axesScene,             // 🔒 seed axesClip too (avoids null paths)
     gridSpan: span,
   };
 };
 
-// Safe wrapper that strips nulls/undefined and revalidates arrays
-const seed = (shared: ReturnType<typeof frameFromHull>, extra: Record<string,any> = {}) => ({
-  colorMode: 'theta',
-  lockFraming: true,
-  ...shared,
-  axesScene: v3(shared.axesScene, [0.40,0.22,0.22]),
-  axesClip : v3(shared.axesClip , [0.40,0.22,0.22]),
-  hullAxes : v3(shared.hullAxes , [503.5,132.0,86.5]),
-  gridSpan : FIN(shared.gridSpan, 2.6),
-  ...extra,
-});
-
-const prime = (e:any, shared: ReturnType<typeof frameFromHull>) => {
-  const s = seed(shared);
-  // bootstrap guarantees internal state; follow with one more uniforms push
-  e.bootstrap?.(s);
-  e.updateUniforms?.(s);
+// Use the same FOV math the engine uses; pick a tighter margin than the engine's 1.22
+const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,number]) => {
+  const w = canvas.width || canvas.clientWidth || 800;
+  const h = canvas.height || canvas.clientHeight || 320;
+  const aspect = w / Math.max(1, h);
+  const fovDesktop = Math.PI / 3.272; // ~55°
+  const fovPortrait = Math.PI / 2.65; // ~68°
+  const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6));
+  const fov = fovDesktop * (1 - t) + fovPortrait * t;
+  const R = Math.max(...axesScene);
+  const margin = 0.95;               // 👈 tighter than engine's base margin
+  return (margin * R) / Math.tan(fov * 0.5);
 };
 
-// REAL (parity) config
-const applyReal = (e:any, shared: ReturnType<typeof frameFromHull>) => {
-  prime(e, shared);
+
+// Bootstrap exactly once; on later updates just push uniforms
+const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
+  if (!e._bootstrapped) {
+    e.bootstrap?.({ ...shared, colorMode });
+    e._bootstrapped = true;
+  }
+  // ensure fresh shared values are mirrored even after bootstrap
+  e.updateUniforms?.({ ...shared, colorMode });
+};
+
+// REAL = physics parity (no boosts), compact framing
+const applyReal = (e: any, shared: ReturnType<typeof frameFromHull>, canvas: HTMLCanvasElement, colorMode: 'theta'|'shear'|'solid') => {
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
   e.updateUniforms({
-    ...seed(shared),
+    ...shared,
+    cameraZ: camZ,               // 👈 compact camera override
+    lockFraming: true,
+
     physicsParityMode: true,
     vizGain: 1, displayGain: 1,
-    curvatureBoostMax: 1, curvatureGainT: 0, userGain: 1,
-    exposure: 3.5, zeroStop: 1e-5,
-    epsilonTilt: 0, betaTiltVec: [0,0,0],
+    curvatureBoostMax: 1,
+    curvatureGainT: 0,
+    userGain: 1,
+    exposure: 3.5,
+    zeroStop: 1e-5,
+
+    epsilonTilt: 0,
+    betaTiltVec: [0, 0, 0],
   });
   e.requestRewarp?.();
 };
 
-// SHOW (boosted) config
+// SHOW = boosted/exaggerated, same framing
 const applyShow = (
-  e:any,
+  e: any,
   shared: ReturnType<typeof frameFromHull>,
-  T=0.55, boostMax=40, vizGain=1.0, exposure=6.0, zeroStop=1e-7
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid',
+  T = 0.70,                       // push a bit harder so the difference is obvious
+  boostMax = 40,
+  vizGain = 1.0,
+  exposure = 6.0,
+  zeroStop = 1e-7
 ) => {
-  prime(e, shared);
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
   const t = Math.max(0, Math.min(1, T));
   const b = Math.max(1, boostMax);
   e.updateUniforms({
-    ...seed(shared),
+    ...shared,
+    cameraZ: camZ,               // 👈 exact same camera as REAL
+    lockFraming: true,
+
     physicsParityMode: false,
+    colorMode,
+
     curvatureGainT: t,
     curvatureBoostMax: b,
-    displayGain: 1 + t*(b-1),
-    vizGain, exposure, zeroStop,
+    displayGain: 1 + t * (b - 1),
+
+    vizGain,
+    exposure,
+    zeroStop,
     cosmeticLevel: 10,
   });
   e.requestRewarp?.();
@@ -149,6 +182,12 @@ export default function WarpBubbleCompare({
         ensureStrobeMux(); // wrap after engine creation
 
         const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+        
+        // Additional safety check to ensure arrays are never null
+        if (!shared.axesScene || !shared.axesClip || !shared.hullAxes) {
+          console.error('❌ Null array detected in frameFromHull:', shared);
+          return;
+        }
 
         // neutralize any global demo controls so they don't cross-wire the pair
         (window as any).__warp_setGainDec = () => {};
@@ -157,11 +196,18 @@ export default function WarpBubbleCompare({
         requestAnimationFrame(() => {
           // one more tick keeps WebGL state happy on slower devices
           requestAnimationFrame(() => {
-            applyReal(leftEngine.current, shared);
+            if (!leftRef.current || !rightRef.current || !leftEngine.current || !rightEngine.current) {
+              console.error('❌ Missing refs during bootstrap:', { leftRef: !!leftRef.current, rightRef: !!rightRef.current, leftEngine: !!leftEngine.current, rightEngine: !!rightEngine.current });
+              return;
+            }
+            
+            applyReal(leftEngine.current, shared, leftRef.current, colorMode);
             applyShow(
               rightEngine.current,
               shared,
-              parameters?.viz?.curvatureGainT ?? 0.55,
+              rightRef.current,
+              colorMode,
+              parameters?.viz?.curvatureGainT ?? 0.70,
               parameters?.viz?.curvatureBoostMax ?? 40,
               1.0,
               parameters?.viz?.exposure ?? 6.0,
@@ -185,13 +231,21 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
     const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+    
+    // Safety check on prop updates too
+    if (!shared.axesScene || !shared.axesClip || !shared.hullAxes) {
+      console.error('❌ Null array in useEffect:', shared);
+      return;
+    }
 
-    applyReal(leftEngine.current, shared);
+    applyReal(leftEngine.current, shared, leftRef.current, colorMode);
 
     applyShow(
       rightEngine.current,
       shared,
-      parameters?.viz?.curvatureGainT ?? 0.55,
+      rightRef.current,
+      colorMode,
+      parameters?.viz?.curvatureGainT ?? 0.70,
       parameters?.viz?.curvatureBoostMax ?? 40,
       1.0,
       parameters?.viz?.exposure ?? 6.0,

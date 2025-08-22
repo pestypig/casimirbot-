@@ -1,0 +1,122 @@
+Yep—your compare file is the culprit for both symptoms:
+
+Camera looks “zoomed way out” because the engine enforces a fairly large minSpan (2.6). Your compare code never overrides the camera, so both canvases inherit that wide framing.
+
+Both sides look the same because you seed both with the same minimal set of uniforms, and the boosted/real deltas are small visually at that far framing. Also, you weren’t passing axesClip, which is one of the ways the earlier …reading 'length' error can pop up.
+
+Below is a tight patch that keeps your file short but makes the compare view do what we want:
+
+Seed both axesScene and axesClip (identical).
+
+Compact camera override (ignores the big engine min-span so the hull fills the view).
+
+Only bootstrap once per engine.
+
+REAL = strict parity; SHOW = big decades boost + cosmetic exposure.
+
+Allow colorMode prop to flow to both.
+
+Drop these helpers near the top (after the existing helpers)
+// Add axesClip and compute a compact camera distance so the hull fills the view
+const frameFromHull = (hull?: Partial<Hull>, gridSpan?: number) => {
+  const a = Number.isFinite(hull?.a) ? Number(hull!.a) : 503.5;
+  const b = Number.isFinite(hull?.b) ? Number(hull!.b) : 132.0;
+  const c = Number.isFinite(hull?.c) ? Number(hull!.c) : 86.5;
+  const s = 1 / 1200;
+  const axesScene: [number, number, number] = [a * s, b * s, c * s];
+
+  // Grid span is kept, but we'll override the camera so minSpan can't push us far out
+  const span = Number.isFinite(gridSpan)
+    ? (gridSpan as number)
+    : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+  return {
+    hullAxes: [a, b, c] as [number, number, number],
+    axesScene,
+    axesClip: axesScene,             // 🔒 seed axesClip too (avoids null paths)
+    gridSpan: span,
+  };
+};
+
+// Use the same FOV math the engine uses; pick a tighter margin than the engine’s 1.22
+const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,number]) => {
+  const w = canvas.width || canvas.clientWidth || 800;
+  const h = canvas.height || canvas.clientHeight || 320;
+  const aspect = w / Math.max(1, h);
+  const fovDesktop = Math.PI / 3.272; // ~55°
+  const fovPortrait = Math.PI / 2.65; // ~68°
+  const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6));
+  const fov = fovDesktop * (1 - t) + fovPortrait * t;
+  const R = Math.max(...axesScene);
+  const margin = 0.95;               // 👈 tighter than engine’s base margin
+  return (margin * R) / Math.tan(fov * 0.5);
+};
+
+// Bootstrap exactly once; on later updates just push uniforms
+const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
+  if (!e._bootstrapped) {
+    e.bootstrap?.({ ...shared, colorMode });
+  }
+  // ensure fresh shared values are mirrored even after bootstrap
+  e.updateUniforms?.({ ...shared, colorMode });
+};
+
+Update your config functions to (a) pass axesClip and (b) override the camera
+// REAL = physics parity (no boosts), compact framing
+const applyReal = (e: any, shared: ReturnType<typeof frameFromHull>, canvas: HTMLCanvasElement, colorMode: 'theta'|'shear'|'solid') => {
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
+  e.updateUniforms({
+    ...shared,
+    cameraZ: camZ,               // 👈 compact camera override
+    lockFraming: true,
+
+    physicsParityMode: true,
+    vizGain: 1, displayGain: 1,
+    curvatureBoostMax: 1,
+    curvatureGainT: 0,
+    userGain: 1,
+    exposure: 3.5,
+    zeroStop: 1e-5,
+
+    epsilonTilt: 0,
+    betaTiltVec: [0, 0, 0],
+  });
+  e.requestRewarp?.();
+};
+
+// SHOW = boosted/exaggerated, same framing
+const applyShow = (
+  e: any,
+  shared: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid',
+  T = 0.70,                       // push a bit harder so the difference is obvious
+  boostMax = 40,
+  vizGain = 1.0,
+  exposure = 6.0,
+  zeroStop = 1e-7
+) => {
+  primeOnce(e, shared, colorMode);
+  const camZ = compactCameraZ(canvas, shared.axesScene);
+  const t = Math.max(0, Math.min(1, T));
+  const b = Math.max(1, boostMax);
+  e.updateUniforms({
+    ...shared,
+    cameraZ: camZ,               // 👈 exact same camera as REAL
+    lockFraming: true,
+
+    physicsParityMode: false,
+    colorMode,
+
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    displayGain: 1 + t * (b - 1),
+
+    vizGain,
+    exposure,
+    zeroStop,
+    cosmeticLevel: 10,
+  });
+  e.requestRewarp?.();
+};
