@@ -38,6 +38,18 @@ export interface EnergyPipelineState {
 export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   if (!engine || !s) return;
 
+  // HARD parity kill switch
+  if (engine.uniforms?.physicsParityMode) {
+    engine.updateUniforms?.({
+      vizGain: 1,
+      curvatureGainDec: 0,
+      curvatureBoostMax: 1,
+      curvatureGainT: 0
+    });
+    engine.setDisplayGain?.(1);
+    return; // nothing visual is allowed to boost in REAL
+  }
+
   // --- Hull semi-axes in meters (renderer expects [a,b,c]) ---
   const a = (s.hull?.Lx_m ?? s.shipRadius_m * 2) / 2;
   const b = (s.hull?.Ly_m ?? s.shipRadius_m * 2) / 2;
