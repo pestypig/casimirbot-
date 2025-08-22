@@ -254,6 +254,25 @@ export default function WarpBubbleCompare({
     parameters?.viz?.zeroStop
   ]);
 
+  // Re-lock the camera after any resize/zoom
+  useEffect(() => {
+    const onResize = () => {
+      if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
+      const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+      // defer one frame so the engine finishes its own viewport math
+      requestAnimationFrame(() => {
+        const zL = compactCameraZ(leftRef.current!,  shared.axesScene);
+        const zR = compactCameraZ(rightRef.current!, shared.axesScene);
+        leftEngine.current.updateUniforms?.({ cameraZ: zL, lockFraming: true });
+        rightEngine.current.updateUniforms?.({ cameraZ: zR, lockFraming: true });
+        leftEngine.current.requestRewarp?.();
+        rightEngine.current.requestRewarp?.();
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c, parameters?.gridSpan]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40">
