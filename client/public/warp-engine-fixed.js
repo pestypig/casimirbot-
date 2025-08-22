@@ -267,11 +267,13 @@ class WarpEngine {
         
         // Create spacetime grid geometry
         // Start with default span, will be adjusted when hull params are available
-        const gridData = this._createGrid(GRID_DEFAULTS.minSpan, GRID_DEFAULTS.divisions);
+        const initialSpan = GRID_DEFAULTS.minSpan;
+        const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
         this.gridVertices = new Float32Array(gridData);
         
         // Store original vertex positions for warp calculations
         this.originalGridVertices = new Float32Array(gridData);
+        this.currentGridSpan = initialSpan;
         
         // Create VBO for grid
         this.gridVbo = gl.createBuffer();
@@ -1159,7 +1161,7 @@ class WarpEngine {
         this.uniforms.hullDimensions = { a, b, c, aH, SCENE_SCALE, wallWidth_m };
         
         // Regenerate grid with proper span for hull size
-        if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
+        if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
             console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
             this.currentGridSpan = targetSpan;
             const newGridData = this._createGrid(targetSpan, gridDivisions);
