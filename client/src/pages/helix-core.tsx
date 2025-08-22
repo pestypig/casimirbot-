@@ -16,7 +16,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
-const WarpVisualizer = lazy(() => import("@/components/warp/WarpVisualizer").then(m => ({ default: m.WarpVisualizer })));
+const WarpBubbleCompare = lazy(() =>
+  import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
+);
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
