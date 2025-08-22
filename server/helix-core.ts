@@ -181,32 +181,27 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
   const duration  = (args.duration_us ?? 10) * 1e-6;
   const cycle     = (args.cycle_ms   ?? 1)  * 1e-3;
 
-  // Pulse one canonical sector (identical parameters shipwide)
+  // simulate a canonical sector and scale results
   const base = await executePulseSector({
-    sectorId: `S1`,
+    sectorId: "S1",
     gap_nm: s.gap_nm ?? 1.0,
     radius_mm: 25,
     temperature_K: s.temperature_K ?? 20
   });
 
-  const pulsedSectors = Array.from({length: totalSectors}, (_,i)=>({
-    id: `S${i+1}`, energy: base.energy, status: "PULSED"
-  }));
-
-  const totalEnergy = base.energy * totalSectors;
-  const averagePower = s.P_avg * 1e6; // W
-  const exoticMassTotal = s.M_exotic;
+  // Scale results directly without creating O(n) array
+  const totalEnergy_J = base.energy_J * totalSectors;
 
   return {
     mode: "AUTO_DUTY",
     sectorsCompleted: totalSectors,
-    totalEnergy,
-    averagePower,
-    exoticMassGenerated: exoticMassTotal,
-    frequency,
-    dutyCycle: (duration / cycle) * 100,
+    totalEnergy_J,
+    averagePower_W: s.P_avg * 1e6,
+    exoticMassGenerated_kg: s.M_exotic,
+    frequency_Hz: frequency,
+    dutyCycle_pct: (duration / cycle) * 100,
     status: "SEQUENCE_COMPLETE",
-    log: `Pulsed ${totalSectors} sectors @ ${frequency/1e9} GHz. M_exotic=${exoticMassTotal.toFixed(1)} kg.`
+    log: `Pulsed ${totalSectors} sectors @ ${frequency/1e9} GHz. M_exotic=${s.M_exotic.toFixed(1)} kg.`
   };
 }
 
