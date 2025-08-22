@@ -548,30 +548,25 @@ export default function HelixCasimirAmplifier({
     let raf: number;
     const step = (t: number) => {
       if (!lightCrossing) { raf = requestAnimationFrame(step); return; }
-      const on = onDisplay && isBurstMeaningful;  // Use display gating consistently
-      const now = t / 1000;                       // s
+      const on = gateOn; // one source of truth
+      const now = t / 1000;
       const prev = lastT.current ?? now;
-      const dt = Math.min(0.05, Math.max(0, now - prev)); // clamp dt for stability
+      const dt = Math.min(0.05, Math.max(0, now - prev));
       lastT.current = now;
 
       setU((U0) => {
         if (tauQ_s <= 0) return U0;
         const alpha = dt / tauQ_s;
-        if (on) {
-          // ring-up toward U_inf (with fallback for safety)
-          const target = U_inf || 1e-6;
-          return U0 + (target - U0) * (1 - Math.exp(-alpha));
-        } else {
-          // ring-down toward 0
-          return U0 * Math.exp(-alpha);
-        }
+        return on
+          ? U0 + ((U_inf || 1e-6) - U0) * (1 - Math.exp(-alpha))   // ring-up
+          : U0 * Math.exp(-alpha);                       // ring-down
       });
 
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [onDisplay, isBurstMeaningful, tauQ_s, U_inf]);
+  }, [gateOn, tauQ_s, U_inf, lightCrossing]);
 
   // Use U to drive visuals / numbers
   const pInstant = U / Math.max(1e-9, lightCrossing?.dwell_ms ?? 1); // arbitrary proportional readout
