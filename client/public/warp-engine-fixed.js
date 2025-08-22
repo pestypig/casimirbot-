@@ -1177,9 +1177,6 @@ class WarpEngine {
             const boostMax = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
             const boostNow = 1 + T_gain * (boostMax - 1);
 
-            // Geometry must track *exaggeration* (userGain) as well:
-            const userGain = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
-
             // CPU-side parity protection (match shader's idea but keep it neutral by default)
             const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
 
@@ -1195,7 +1192,6 @@ class WarpEngine {
             const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
 
             // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
-            const exposure = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
             const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
 
             // Special case: make standby perfectly flat if desired
@@ -1203,8 +1199,8 @@ class WarpEngine {
             if (mode === 'standby') {
                 disp = 0; // perfectly flat grid for standby mode
             } else {
-                // Normal displacement calculation with normalized amplitude (A_geom tracks slider)
-                disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
+                // Normal displacement calculation synced to shader amplitude (A_vis)
+                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
                 
                 // No fixed bump; slider controls all visual scaling
                 
