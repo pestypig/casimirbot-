@@ -216,10 +216,15 @@ useEffect(() => {
     const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
     const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
 
-    // unified, physics-accurate tiny tilt (or pipeline-provided)
-    const epsilonTiltResolved = getUnifiedPhysicsTilt(parameters, mode);
+    // replace the mode-based tiltGain with a scaling of epsilonTilt magnitude
+    const epsilonTiltResolved = num(
+      parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+      mode === 'standby' ? 0.0 : 5e-7
+    );
     const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
-    const tiltGain = mode === 'emergency' ? 0.65 : mode === 'hover' ? 0.45 : mode === 'cruise' ? 0.35 : 0.0;
+    
+    // roughly normalize: 5e-7 → ~0.35, clamp at 0.65
+    const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
@@ -244,7 +249,7 @@ useEffect(() => {
 
       epsilonTilt: epsilonTiltResolved,
       betaTiltVec: betaTiltResolved,
-      tiltGain,
+      tiltGain: tiltGainResolved,
     };
 
     // single bootstrap: fit + all uniforms in one shot
@@ -449,20 +454,23 @@ useEffect(() => {
 
       // Add visual enhancements that aren't physics-driven
       const mode = parameters.currentMode || 'hover';
-      const tiltGains: Record<string, number> = {
-        standby: 0.00, cruise: 0.35, hover: 0.45, emergency: 0.65,
-      };
-      const epsilonTilt = getUnifiedPhysicsTilt(parameters, mode);
+      
+      // replace the mode-based tiltGain with a scaling of epsilonTilt magnitude
+      const epsilonTiltResolved = num(
+        parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
+        mode === 'standby' ? 0.0 : 5e-7
+      );
       const betaTiltVec = parameters.shift?.betaTiltVec ?? parameters.betaTiltVec ?? [0, -1, 0];
-      const tiltGain = typeof (parameters as any).tiltGain === 'number' ? 
-        (parameters as any).tiltGain : (tiltGains[mode] ?? 0.35);
+      
+      // roughly normalize: 5e-7 → ~0.35, clamp at 0.65
+      const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
       // Apply visual-only enhancements
       engineRef.current.updateUniforms({
         // Interior gravity visuals
-        epsilonTilt: Number(epsilonTilt || 0),
+        epsilonTilt: Number(epsilonTiltResolved || 0),
         betaTiltVec: betaTiltVec as [number, number, number],
-        tiltGain,
+        tiltGain: tiltGainResolved,
         
         // Visual scaling
         vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : 
