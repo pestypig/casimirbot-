@@ -11,7 +11,7 @@ export const PHYSICS_CONSTANTS = {
   PI: Math.PI,                   // Pi
   
   // Derived constants for Casimir calculations
-  HBAR_C: 1.98644586e-25, // ℏc (J⋅m) - corrected value for Casimir calculations
+  HBAR_C: 1.0545718176461565e-34 * 299792458, // ℏc ≈ 3.16152677e-26 (J⋅m) - corrected value for Casimir calculations
   
   // Casimir force prefactors
   PARALLEL_PLATE_PREFACTOR: Math.PI * Math.PI / 720, // π²/720 for Lifshitz formula (corrected)

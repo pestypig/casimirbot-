@@ -131,7 +131,7 @@ export interface EnergyPipelineState {
 // Physical constants
 const HBAR = 1.0545718e-34;          // Planck constant over 2π [J·s]
 const C = 299792458;                 // Speed of light [m/s]
-const HBAR_C = 1.98644586e-25;      // ℏc [J·m] for Casimir calculations
+const HBAR_C = HBAR * C;             // ℏc ≈ 3.16152677e-26 [J·m] for Casimir calculations
 const PI = Math.PI;
 const NM_TO_M = 1e-9;
 const MM_TO_M = 1e-3;
