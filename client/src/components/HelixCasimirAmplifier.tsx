@@ -766,11 +766,11 @@ export default function HelixCasimirAmplifier({
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
                 alnRim_width_um={20}
-                stroke_nm={stroke_nm_instant} // Pipeline-driven mechanical stroke
-                gammaGeo={derived?.gammaGeo ?? 1}
                 onWindow={lightCrossing?.onWindow ?? false}
                 physicsParity={false}
-                mode="explanatory" // Use explanatory mode for better visibility
+                verticalExaggeration={4000}
+                gapInsetMagnification={10000}
+                fontScale={1.0}
               />
             </div>
           </CardContent>

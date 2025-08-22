@@ -1,3 +1,12 @@
+Absolutely—let’s make the cavity side-view readable at a glance without breaking “to-scale” discipline.
+
+Below is a compact patch that adds controlled vertical exaggeration, thicker strokes/fonts, and a gap/pocket zoom inset (all still driven by your pipeline values). It also keeps the ON/OFF animation you had, but makes it more obvious.
+
+1) Upgrade CavitySideView.tsx
+
+Add this new, drop-in version. The only “knobs” are UI-only (no physics magic numbers), and default to conservative values if you don’t pass them.
+
+// CavitySideView.tsx
 import * as React from "react";
 
 type Props = {
@@ -19,7 +28,7 @@ type Props = {
   height?: number;
 
   // NEW: readability controls (UI-only; do not affect physics)
-  /** X scale: pixels per micrometer across the tile plane (defaults to "fit") */
+  /** X scale: pixels per micrometer across the tile plane (defaults to “fit”) */
   pxPerUmX?: number;
   /** Y vertical exaggeration (applies only to thickness/gap/sag). Keeps X to-scale. */
   verticalExaggeration?: number; // e.g. 3000 makes nm-scale clearly visible
