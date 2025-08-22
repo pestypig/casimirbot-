@@ -70,6 +70,31 @@ const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,num
   return (margin * R) / Math.tan(fov * 0.5);
 };
 
+/* ---------------- Overlay scrub (kills demo/ref/instant paths) ---------------- */
+function scrubOverlays(e: any) {
+  if (!e?.uniforms || !e.updateUniforms) return;
+  const u = e.uniforms;
+  const patch: any = {};
+
+  // Prefer calibrated geometry only
+  if ('modelMode' in u) patch.modelMode = 'calibrated';
+
+  // Kill common demo/unit/ref/instant paths (defensive — only if present)
+  for (const k of Object.keys(u)) {
+    if (/(^|_)unit(|_)?(bubble|ring|blend|weight)?/i.test(k)) patch[k] = 0;
+    if (/demo(|Mix|Blend|Weight|Ring|Layer)/i.test(k))        patch[k] = 0;
+    if (/(ref|reference).*(hull|ring|layer|alpha)/i.test(k))  patch[k] = 0;
+    if (/onWindow|showInst|instant/i.test(k))                  patch[k] = 0;
+    if (/avg|showAvg|viewAvg/i.test(k))                        patch[k] = 1;
+  }
+
+  // Make sure we don't accidentally switch cameras by reusing hull
+  if ('hullAxes' in u && !patch.hullAxes) patch.hullAxes = u.hullAxes;
+  if ('axesScene' in u && !patch.axesScene) patch.axesScene = u.axesScene;
+
+  e.updateUniforms(patch);
+}
+
 /* ---------------- Safe uniform push (fixes null.length) ---------------- */
 function pushUniformsWhenReady(e: any, payload: any, retries = 16) {
   if (!e) return;
@@ -221,6 +246,8 @@ export default function WarpBubbleCompare({
 
         requestAnimationFrame(() => {
           applyReal(leftEngine.current, shared, L, (parameters?.viz?.colorMode ?? colorMode) as any);
+          scrubOverlays(leftEngine.current);
+
           applyShow(
             rightEngine.current,
             shared,
@@ -235,6 +262,7 @@ export default function WarpBubbleCompare({
               zeroStop: parameters?.viz?.zeroStop ?? 1e-7,
             }
           );
+          scrubOverlays(rightEngine.current);
         });
 
         // lock framing across resizes (prevents "camera pulled back")
@@ -307,6 +335,9 @@ export default function WarpBubbleCompare({
         zeroStop: parameters?.viz?.zeroStop ?? 1e-7,
       }
     );
+
+    scrubOverlays(leftEngine.current);
+    scrubOverlays(rightEngine.current);
   }, [
     parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c,
     parameters?.gridSpan,
