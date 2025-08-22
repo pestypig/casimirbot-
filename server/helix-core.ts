@@ -445,153 +445,104 @@ setGlobalPipelineState(pipelineState);
 
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
-  const state = getGlobalPipelineState();
+  const s = getGlobalPipelineState();
 
-  const totalSectors = 400;                              // keep with pipeline constant
-  const concurrent = Math.max(1, state.sectorStrobing ?? 1);
-  const activeFraction = concurrent / totalSectors;      // ✅ sectors / sectors
+  const totalSectors = Math.max(1, s.sectorCount || 400);
+  const concurrent   = Math.max(0, s.concurrentSectors || 0);
+  const activeFraction = totalSectors ? (concurrent / totalSectors) : 0;
 
-  const dutyGlobal = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
-  const qSpoil     = state.qSpoilingFactor ?? 1;
+  const strobeHz        = Number(s.strobeHz ?? 1000);
+  const sectorPeriod_ms = Number(s.sectorPeriod_ms ?? (1000 / Math.max(1, strobeHz)));
 
-  // Effective duty relevant to Ford–Roman sampling (time-sliced exposure)
-  const dutyEffectiveFR = state.dutyEffective_FR ?? activeFraction * 0.01; // ✅ ship-wide d_eff from pipeline
+  // current sector index for UI sweep: wrap over totalSectors at strobe rate
+  const now = Date.now() / 1000;
+  const sweepIdx = Math.floor(now * strobeHz) % totalSectors;
 
-  // Optional timing hints (client can animate the grid with these)
-  const strobeHz        = Number(state.strobeHz ?? process.env.STROBE_HZ ?? 2000);
-  const sectorPeriod_ms = 1000 / Math.max(1, strobeHz);
+  const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
+  const activeTiles    = tilesPerSector * concurrent;
 
-  // Physics-timed sector sweep for UI sync
-  const f_m = (state.modulationFreq_GHz ?? 15) * 1e9;
-  const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
-  const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, concurrent);
+  const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
 
-  const sec = state.__sectors ?? {
-    TOTAL_SECTORS: 400,
-    activeSectors: state.sectorStrobing ?? 1,
-    activeFraction: (state.sectorStrobing ?? 1) / 400,
-    tilesPerSector: Math.floor(state.N_tiles / 400),
-    activeTiles: Math.floor(state.N_tiles / 400) * (state.sectorStrobing ?? 1)
-  };
-  const fr = state.__fr ?? {
-    dutyInstant: state.dutyEffective_FR ?? 0.01/400,
-    dutyEffectiveFR: state.dutyEffective_FR ?? 0.01/400,
-    Q_quantum: 1e12
-  };
+  const C = 299_792_458;
+  const tauLC = (Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m)) / C;
+  const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
+  const T_m = 1 / f_m_Hz;
 
-  // Derive τLC and T_m once here from the pipeline state used to compute TS_ratio
-  const f_m_Hz = state.modulationFreq_GHz * 1e9;   // Hz
-  const T_m = 1 / f_m_Hz;                           // s
-  const { Lx_m, Ly_m, Lz_m } = state.hull ?? { Lx_m: 82, Ly_m: 82, Lz_m: 82 };
-  const L_long = Math.max(Lx_m, Ly_m, Lz_m);
-  const tauLC = L_long / 299_792_458;               // s
-
-  // Calculate shift vector parameters (artificial gravity tilt)
-  const c = 299_792_458;  // m/s
-  const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));  // Geometric mean radius
-
-  // Per-mode gravity targets (matching WarpVisualizer)
+  // interior tilt target (same as visualizer)
   const G = 9.80665;
-  const gTargets: Record<string, number> = {
-    hover:     0.10 * G,
-    cruise:    0.05 * G,
-    emergency: 0.30 * G,
-    standby:   0.00 * G,
-  };
-  const mode = (state.currentMode ?? 'hover').toLowerCase();
+  const gTargets: Record<string, number> = { hover:0.10*G, cruise:0.05*G, emergency:0.30*G, standby:0.00*G };
+  const mode = (s.currentMode ?? 'hover').toLowerCase();
   const gTarget = gTargets[mode] ?? 0;
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (C*C)));
+  const betaTiltVec: [number, number, number] = [0, -1, 0];
 
-  // Calculate tilt parameters (identical to visualizer)
-  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
-  const betaTiltVec: [number, number, number] = [0, -1, 0]; // default "down"
-  const gEff_check = epsilonTilt * (c * c) / R_geom;
+  const C2 = 9e16;
+  const massPerTile_kg = Math.abs(s.U_cycle) / C2; // proxy that aligns with visual layer
 
   res.json({
-    // tile/sector truth (these are what your Tile Grid should use)
-    totalTiles: Math.floor(state.N_tiles),
-    activeTiles: Math.floor(sec.activeTiles),
-    tilesPerSector: sec.tilesPerSector,
-    totalSectors: sec.TOTAL_SECTORS,
-    activeSectors: sec.activeSectors,
-    activeFraction: sec.activeFraction,
-    sectorStrobing: state.sectorStrobing,
-    currentSector: currentSector,
+    // sectors/tiles
+    totalSectors, activeSectors: concurrent, activeFraction,
+    tilesPerSector, totalTiles: Math.floor(s.N_tiles), activeTiles,
+    sectorStrobing: concurrent, // legacy alias
+    currentSector: sweepIdx,
 
-    // timing (optional but nice for the HUD)
-    strobeHz: state.modulationFreq_GHz * 1e9 / sec.TOTAL_SECTORS,        // per sector sweep rate
-    sectorPeriod_ms: 1000 * sec.TOTAL_SECTORS / (state.modulationFreq_GHz * 1e9),
+    // timing
+    strobeHz, sectorPeriod_ms,
 
-    // hull geometry
+    // hull
     hull,
 
-    // shift vector for artificial gravity tilt
+    // shift vector (interior gravity)
     shiftVector: {
-      epsilonTilt,
-      betaTiltVec,
-      gTarget,
-      R_geom,
-      gEff_check
+      epsilonTilt, betaTiltVec, gTarget, R_geom,
+      gEff_check: epsilonTilt * (C*C) / R_geom
     },
 
-    // core outputs
-    energyOutput: state.P_avg,                 // MW (your calibrated target)
-    exoticMass: Math.round(state.M_exotic),    // kg (calibrated/paper value)
-    exoticMassRaw: Math.round(state.M_exotic_raw ?? state.M_exotic), // if you keep a raw
+    // power/mass
+    energyOutput: s.P_avg,                 // MW
+    exoticMass: Math.round(s.M_exotic),    // kg
+    exoticMassRaw: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
-    // NEW: time scale components (authoritative from server)
-    timeScaleRatio: state.TS_ratio,            // dimensionless
-    tauLC,                                     // light-crossing time actually used (s)
-    T_m,                                       // modulation period actually used (s)
-
-    // FR & friends
-    dutyGlobal: state.dutyCycle,
-    dutyInstant: fr.dutyInstant,
-    dutyEffectiveFR: fr.dutyEffectiveFR,
-    gammaVanDenBroeck: state.gammaVanDenBroeck,
-    gammaGeo: state.gammaGeo,
-    qCavity: state.qCavity,
-
-    fordRoman: {
-      value: state.zeta,
-      limit: 1.0,
-      status: state.fordRomanCompliance ? "PASS" : "FAIL"
-    },
-    natario: {
-      value: 0,
-      status: state.natarioConstraint ? "VALID" : "WARN"
-    },
-    curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
-    overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
-
-    // hull geometry (use pipeline state directly to avoid duplication)
-    wall: { w_norm: 0.06 }, // normalized wall thickness for ellipsoidal bell
-    tiles: {
-      tileArea_cm2: state.tileArea_cm2,
-      hullArea_m2: state.hullArea_m2 ?? null,
-      N_tiles: state.N_tiles
-    },
+    // time-scale components
+    timeScaleRatio: s.TS_ratio,
+    tauLC, T_m,
     timescales: {
-      f_m_Hz: (state.modulationFreq_GHz ?? 15) * 1e9,
-      T_m_s: 1 / ((state.modulationFreq_GHz ?? 15) * 1e9),
-      L_long_m: Math.max(state.hull?.Lx_m ?? 1007, state.hull?.Ly_m ?? 264, state.hull?.Lz_m ?? 173),
-      T_long_s: Math.max(state.hull?.Lx_m ?? 1007, state.hull?.Ly_m ?? 264, state.hull?.Lz_m ?? 173) / 299792458,
-      TS_long: state.TS_long ?? state.TS_ratio,
-      TS_geom: state.TS_geom ?? state.TS_ratio
+      f_m_Hz, T_m_s: T_m,
+      L_long_m: Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m),
+      T_long_s: tauLC,
+      TS_long: s.TS_long ?? s.TS_ratio,
+      TS_geom: s.TS_geom ?? s.TS_ratio
     },
 
-    // hull geometry (legacy field for backward compatibility)
+    // GR / safety
+    dutyGlobal: s.dutyCycle,                // UI duty
+    dutyInstant: s.dutyEffective_FR,        // ship-wide FR duty (same as pipeline)
+    dutyEffectiveFR: s.dutyEffective_FR,
+    gammaVanDenBroeck: s.gammaVanDenBroeck,
+    gammaGeo: s.gammaGeo,
+    qCavity: s.qCavity,
+    fordRoman: { value: s.zeta, limit: 1.0, status: s.fordRomanCompliance ? "PASS" : "FAIL" },
+    natario:   { value: 0, status: s.natarioConstraint ? "VALID" : "WARN" },
+
+    // proxies used by UI
+    massPerTile_kg,
+    overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
+
+    // tiles meta
+    tiles: {
+      tileArea_cm2: s.tileArea_cm2,
+      hullArea_m2: s.hullArea_m2 ?? null,
+      N_tiles: s.N_tiles
+    },
+
+    // legacy
     geometry: {
-      Lx_m: state.hull?.Lx_m ?? 1007,
-      Ly_m: state.hull?.Ly_m ?? 264,
-      Lz_m: state.hull?.Lz_m ?? 173,
-      TS_ratio: state.TS_ratio,
-      TS_long: state.TS_long,
-      TS_geom: state.TS_geom
+      Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m,
+      TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom
     },
 
-    // optional debugging breadcrumbs
-    modelMode: state.modelMode ?? "calibrated"
+    modelMode: s.modelMode ?? "calibrated"
   });
 }
 
