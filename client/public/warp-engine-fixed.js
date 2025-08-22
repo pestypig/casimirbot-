@@ -699,6 +699,14 @@ class WarpEngine {
                 if (physicsParityMode) {
                     return 1;
                 }
+
+                // Direct override from UI exaggeration display (e.g. "×82.00")
+                if (Number.isFinite(parameters.exaggeration)) {
+                    const ex = Math.max(1, +parameters.exaggeration);
+                    // Keep max >= current desired gain so normalization has headroom
+                    this.uniforms.curvatureBoostMax = Math.max(ex, this.uniforms?.curvatureBoostMax ?? 40);
+                    return ex;
+                }
                 
                 const clamp01 = t => Math.max(0, Math.min(1, t));
                 const boostMax = Number.isFinite(parameters.curvatureBoostMax)
