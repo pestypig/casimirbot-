@@ -478,6 +478,17 @@ export function getSystemMetrics(req: Request, res: Response) {
   const activeTiles = tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  
+  // Canonical geometry fields for visualizer
+  const a = hull.Lx_m/2, b = hull.Ly_m/2, c = hull.Lz_m/2;
+  const aEff_geo = Math.cbrt(a*b*c);                  // geometric mean (matches sampler)
+  const w_m = (s.sag_nm ?? 16) * 1e-9;
+  const w_rho = w_m / aEff_geo;
+  
+  // Optional scene scale helper (if your viewer wants precomputed clip axes):
+  const sceneScale = 1 / a;                           // long semi-axis → 1.0
+  const axesScene = [a*sceneScale, b*sceneScale, c*sceneScale];
+  
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
   const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;
   const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
@@ -535,6 +546,12 @@ export function getSystemMetrics(req: Request, res: Response) {
     tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
 
     geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom },
+
+    axes_m: [a, b, c],
+    axesScene,                // for immediate camera fit
+    wallWidth_m: w_m,
+    wallWidth_rho: w_rho,     // use this in shaders & geometry
+    aEff_geo_m: aEff_geo,
 
     modelMode: s.modelMode ?? "calibrated"
   });
