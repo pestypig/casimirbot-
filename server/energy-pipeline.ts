@@ -331,6 +331,12 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Clamp modulationFreq_GHz to prevent divide-by-zero in TS calculations
   state.modulationFreq_GHz = Math.max(0.001, Math.min(1000, state.modulationFreq_GHz ?? 15));
+  
+  // Clamp gap_nm to physically reasonable range for Casimir calculations
+  state.gap_nm = Math.max(0.1, Math.min(1000, state.gap_nm));
+  
+  // Clamp tileArea_cm2 to prevent invalid tile counting
+  state.tileArea_cm2 = Math.max(0.01, Math.min(10000, state.tileArea_cm2));
 
   const gamma3 = Math.pow(state.gammaGeo, 3);
   state.U_geo = state.U_static * gamma3;
