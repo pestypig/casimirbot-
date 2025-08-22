@@ -296,7 +296,7 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
 
   return {
     mode: "PULSE_CYCLE",
-    operationalMode: s.currentMode.toUpperCase(),
+    operationalMode: s.currentMode?.toUpperCase?.() ?? "HOVER",
     frequency_Hz,
     frequency_GHz: args.frequency_GHz,
     modeParameters: {
@@ -325,7 +325,7 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
       timeScaleStatus: s.TS_ratio > 100 ? "PASS" : "FAIL"
     },
     status: "CYCLE_COMPLETE",
-    log: `${s.currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${s.P_avg.toFixed(1)} MW, M_exotic=${Math.round(s.M_exotic)} kg, ζ=${s.zeta.toFixed(3)}, TS=${Math.round(s.TS_ratio)}`
+    log: `${s.currentMode?.toUpperCase?.() ?? "HOVER"} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${s.P_avg.toFixed(1)} MW, M_exotic=${Math.round(s.M_exotic)} kg, ζ=${s.zeta.toFixed(3)}, TS=${Math.round(s.TS_ratio)}`
   };
 }
 
@@ -551,7 +551,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const w_rho = w_m / aEff_geo;
   
   // Optional scene scale helper (if your viewer wants precomputed clip axes):
-  const sceneScale = 1 / a;                           // long semi-axis → 1.0
+  const sceneScale = 1 / Math.max(a, 1e-9);           // long semi-axis → 1.0
   const axesScene = [a*sceneScale, b*sceneScale, c*sceneScale];
   
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
