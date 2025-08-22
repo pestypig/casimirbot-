@@ -705,7 +705,7 @@ class WarpEngine {
         if (physicsParityMode) {
             console.warn('🔬 PHYSICS PARITY UNIFORM LOGGING:', {
                 A_geoUniform: this.uniforms?.gammaGeo || 1,
-                QburstUniform: this.uniforms?.Qburst || 1,
+                // QburstUniform: removed from curvature chain,
                 gammaVdBUniform: this.uniforms?.gammaVdB || 1,
                 qSpoilUniform: this.uniforms?.deltaAOverA || 1,
                 dutyCycleUniform: this.uniforms?.dutyCycle || 1,
@@ -897,7 +897,6 @@ class WarpEngine {
         const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
 
         const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
-        const QburstUniform   = this.uniforms?.Qburst   ?? 1e9;
         const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
         const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
@@ -908,7 +907,7 @@ class WarpEngine {
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
         const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
         
-        const betaInstUniform = A_geoUniform * QburstUniform * gammaVdBUniform * qSpoilUniform;
+        const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
 
@@ -1397,9 +1396,8 @@ class WarpEngine {
 
     // === Natário Diagnostics (viewer-only, does not affect physics) ===
     _computePipelineBetas(U){
-        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || 1);
+        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || U.sectors || 1);
         const gammaGeo     = U.gammaGeo || 0;
-        const Qburst       = (U.Qburst ?? U.cavityQ) || 0;
         const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
         const gammaVdB     = U.gammaVdB || 1.0;
 
