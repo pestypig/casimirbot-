@@ -437,7 +437,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Compliance flags (physics-based safety)
   state.natarioConstraint   = true;
-  state.curvatureLimit      = state.zeta < 1.0;  // Ford-Roman compliance (not arbitrary energy threshold)
+  state.curvatureLimit      = state.fordRomanCompliance; // explicit alias
   
   // Audit guard (pipeline self-consistency check)
   (function audit() {
