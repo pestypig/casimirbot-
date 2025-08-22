@@ -700,34 +700,35 @@ class WarpEngine {
                     return 1;
                 }
 
-                // Direct override from UI exaggeration display (e.g. "×82.00")
+                // First-class exaggeration input (takes priority)
                 if (Number.isFinite(parameters.exaggeration)) {
                     const ex = Math.max(1, +parameters.exaggeration);
-                    // Keep max >= current desired gain so normalization has headroom
-                    this.uniforms.curvatureBoostMax = Math.max(ex, this.uniforms?.curvatureBoostMax ?? 40);
+                    this.uniforms.curvatureBoostMax = Math.max(ex, this.uniforms?.curvatureBoostMax ?? 40); // keep headroom
+                    this.uniforms.userGain = ex;
                     return ex;
+                } else {
+                    // Existing curvatureGainT → [1..boostMax] mapping
+                    const clamp01 = t => Math.max(0, Math.min(1, t));
+                    const boostMax = Number.isFinite(parameters.curvatureBoostMax)
+                        ? Math.max(1, parameters.curvatureBoostMax)
+                        : (this.uniforms?.curvatureBoostMax ?? 40);
+                    
+                    const T_from_props =
+                        Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
+                        Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
+                        Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
+                        (this.uniforms?.curvatureGainT ?? 0.375);
+
+                    // Blend 1→boostMax exactly like SliceViewer
+                    const userGainFromT = 1 + T_from_props * (boostMax - 1);
+
+                    // Allow absolute override if caller passes userGain directly
+                    const userGainFinal = Number.isFinite(parameters.userGain)
+                        ? Math.max(1, +parameters.userGain)
+                        : userGainFromT;
+
+                    return userGainFinal;
                 }
-                
-                const clamp01 = t => Math.max(0, Math.min(1, t));
-                const boostMax = Number.isFinite(parameters.curvatureBoostMax)
-                    ? Math.max(1, parameters.curvatureBoostMax)
-                    : (this.uniforms?.curvatureBoostMax ?? 40);
-                
-                const T_from_props =
-                    Number.isFinite(parameters.curvatureGainT)   ? clamp01(+parameters.curvatureGainT) :
-                    Number.isFinite(parameters.curvatureGain)    ? clamp01(+parameters.curvatureGain / 8) :
-                    Number.isFinite(parameters.curvatureGainDec) ? clamp01(+parameters.curvatureGainDec / 8) :
-                    (this.uniforms?.curvatureGainT ?? 0.375);
-
-                // Blend 1→boostMax exactly like SliceViewer
-                const userGainFromT = 1 + T_from_props * (boostMax - 1);
-
-                // Allow absolute override if caller passes userGain directly
-                const userGainFinal = Number.isFinite(parameters.userGain)
-                    ? Math.max(1, +parameters.userGain)
-                    : userGainFromT;
-
-                return userGainFinal;
             })(),
             
             // HELIX drives a numeric thetaScale; fall back to local rebuild only if absent
