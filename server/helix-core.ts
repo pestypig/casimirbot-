@@ -368,17 +368,20 @@ const RATE_LIMIT_WINDOW = 60000; // 1 minute
 
 function checkRateLimit(clientId: string): boolean {
   const now = Date.now();
+  const rec = rateLimitMap.get(clientId);
+
+  if (rec && now > rec.resetTime) {
+    rateLimitMap.delete(clientId); // drop stale record
+  }
+
   const record = rateLimitMap.get(clientId) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
-  
+
   if (now > record.resetTime) {
     record.count = 0;
     record.resetTime = now + RATE_LIMIT_WINDOW;
   }
-  
-  if (record.count >= RATE_LIMIT_PER_MINUTE) {
-    return false;
-  }
-  
+  if (record.count >= RATE_LIMIT_PER_MINUTE) return false;
+
   record.count++;
   rateLimitMap.set(clientId, record);
   return true;
