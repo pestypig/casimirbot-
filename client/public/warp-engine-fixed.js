@@ -1149,7 +1149,7 @@ class WarpEngine {
             this.uniforms?.driveDir[0] || 1.0,
             this.uniforms?.driveDir[1] || 0.0,
             this.uniforms?.driveDir[2] || 0.0);
-        gl.uniform1f(this.gridUniforms.wallWidth, this.uniforms?.wallWidth || 0.06);
+        gl.uniform1f(this.gridUniforms.wallWidth, Math.max(1e-4, this.uniforms?.wallWidth ?? 0.016));
         gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
         
         // Violet interior tilt tint (visual-only)
