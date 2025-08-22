@@ -257,46 +257,44 @@ async function runDiagnosticsScan() {
 
 // Simulate a full pulse cycle using current operational mode
 async function simulatePulseCycle(args: { frequency_GHz: number }) {
-  const state = getGlobalPipelineState();
-  const frequency = args.frequency_GHz * 1e9;
+  const s = getGlobalPipelineState();
+  const frequency_Hz = args.frequency_GHz * 1e9;
 
-  const powerRaw_W = state.P_loss_raw * state.N_tiles; // on-window
-  const powerAvg_W = state.P_avg * 1e6;               // pipeline is MW
-  const fordRomanStatus = state.fordRomanCompliance ? "PASS" : "FAIL";
-  const timeScaleStatus = (state.TS_ratio > 100) ? "PASS" : "FAIL";
+  const powerRaw_W  = s.P_loss_raw * s.N_tiles; // on-window
+  const powerAvg_W  = s.P_avg * 1e6;            // pipeline stores MW
 
   return {
     mode: "PULSE_CYCLE",
-    operationalMode: state.currentMode.toUpperCase(),
-    frequency,
-    frequencyGHz: args.frequency_GHz,
+    operationalMode: s.currentMode.toUpperCase(),
+    frequency_Hz,
+    frequency_GHz: args.frequency_GHz,
     modeParameters: {
-      dutyCycle: state.dutyCycle,
-      sectorCount: state.sectorCount,
-      concurrentSectors: state.concurrentSectors,
-      qSpoilingFactor: state.qSpoilingFactor,
-      gammaVanDenBroeck: state.gammaVanDenBroeck,
-      powerOutputMW: state.P_avg
+      dutyCycle_UI: s.dutyCycle,
+      sectorCount: s.sectorCount,
+      concurrentSectors: s.concurrentSectors,
+      qSpoilingFactor: s.qSpoilingFactor,
+      gammaVanDenBroeck: s.gammaVanDenBroeck,
+      powerOutput_MW: s.P_avg
     },
     energyCalculations: {
-      energyPerTile: state.U_static,
-      geometricAmplified: state.U_geo,
-      U_Q: state.U_Q,
-      U_cycle: state.U_cycle,
+      energyPerTile_J: s.U_static,
+      geometricAmplified_J: s.U_geo,
+      U_Q_J: s.U_Q,
+      U_cycle_J: s.U_cycle,
       powerRaw_W,
       powerAverage_W: powerAvg_W,
-      exoticMassTotal_kg: state.M_exotic
+      exoticMassTotal_kg: s.M_exotic
     },
     metrics: {
-      fordRoman: state.zeta,
-      fordRomanStatus,
+      fordRoman: s.zeta,
+      fordRomanStatus: s.fordRomanCompliance ? "PASS" : "FAIL",
       natario: 0,
-      natarioStatus: state.natarioConstraint ? "VALID" : "WARN",
-      timeScale: state.TS_ratio,
-      timeScaleStatus
+      natarioStatus: s.natarioConstraint ? "VALID" : "WARN",
+      timeScale: s.TS_ratio,
+      timeScaleStatus: s.TS_ratio > 100 ? "PASS" : "FAIL"
     },
     status: "CYCLE_COMPLETE",
-    log: `${state.currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${state.P_avg.toFixed(1)} MW, M_exotic=${Math.round(state.M_exotic)} kg, ζ=${state.zeta.toFixed(3)}, TS=${Math.round(state.TS_ratio)}`
+    log: `${s.currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(powerRaw_W/1e6).toFixed(1)} MW, Avg=${s.P_avg.toFixed(1)} MW, M_exotic=${Math.round(s.M_exotic)} kg, ζ=${s.zeta.toFixed(3)}, TS=${Math.round(s.TS_ratio)}`
   };
 }
 
