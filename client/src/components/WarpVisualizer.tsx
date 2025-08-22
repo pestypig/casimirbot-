@@ -186,6 +186,28 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   // Default cabin "down" (can be overridden via props.parameters.betaTiltVec)
   const defaultBetaTilt: [number, number, number] = [0, -1, 0];
 
+function installWarpPrelude(initialScale = 1.0) {
+  if (typeof window === 'undefined') return;
+
+  // Avoid double-injection on rerenders
+  if ((window as any).__warpPreludeInstalled) return;
+
+  // Create a <script> whose top-level runs in the global scope
+  const prelude = document.createElement('script');
+  prelude.id = 'warp-prelude';
+  prelude.text = `
+    // Ensure a real global variable (not just window.sceneScale)
+    if (typeof sceneScale === 'undefined') { var sceneScale = ${Number.isFinite(initialScale) ? initialScale : 1.0}; }
+
+    // Make setStrobingState a safe global, too (engine may call it)
+    if (typeof setStrobingState === 'undefined') {
+      function setStrobingState(_) { /* no-op until Helix wires it */ }
+    }
+  `;
+  document.head.appendChild(prelude);
+  (window as any).__warpPreludeInstalled = true;
+}
+
 useEffect(() => {
   let cancelled = false;
   let watchdog: number | undefined;
@@ -311,6 +333,10 @@ useEffect(() => {
   };
 
   const init = async () => {
+    // derive an initial scale (fallback to your parameters.gridScale or 1.0)
+    const initialScale = Number(parameters.gridScale ?? 1.0);
+    installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
+
     setLoadError(null);
     setIsLoaded(false);
 
