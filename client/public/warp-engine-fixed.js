@@ -398,6 +398,7 @@ class WarpEngine {
             "uniform float u_curvatureGainT;\n" + // time blending factor
             "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
+            "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
             "vec3 diverge(float t) {\n" +
@@ -433,16 +434,21 @@ class WarpEngine {
             "    vec3 dN = normalize(u_driveDir / axes);\n" +
             "    float xs = dot(pN, dN);\n" +
             "    float w = max(1e-4, u_wallWidth);\n" +
-            "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
+            "    float delta = (rs - 1.0) / w;\n" +
+            "    float f     = exp(-delta*delta);                    // single-lobe pulse at ρ=1\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
-            "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
+            "    float thetaField = (u_ridgeMode == 0)\n" +
+            "      ? u_vShip * (xs/rs) * dfdrs          // physics (double-lobe)\n" +
+            "      : u_vShip * (xs/rs) * f;             // single crest at ρ=1 (oriented by drive)\n" +
             "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
             "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
-            "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
+            "    float shearProxy = (u_ridgeMode == 0)\n" +
+            "      ? abs(dfdrs) * sinphi * u_vShip      // physics (double-lobe magnitude)\n" +
+            "      : f * sinphi * u_vShip;              // single crest magnitude\n" +
             "    // Parity-protected amplitude scaling\n" +
             "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
             "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
-            "    float valTheta  = theta      * amp;\n" +
+            "    float valTheta  = thetaField * amp;\n" +
             "    float valShear  = shearProxy * amp;\n" +
             "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
             "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
@@ -490,6 +496,7 @@ class WarpEngine {
             "uniform float u_curvatureGainT;\n" + // time blending factor
             "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
+            "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -524,16 +531,21 @@ class WarpEngine {
             "    vec3 dN = normalize(u_driveDir / axes);\n" +
             "    float xs = dot(pN, dN);\n" +
             "    float w = max(1e-4, u_wallWidth);\n" +
-            "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
+            "    float delta = (rs - 1.0) / w;\n" +
+            "    float f     = exp(-delta*delta);                    // single-lobe pulse at ρ=1\n" +
             "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
-            "    float theta = u_vShip * (xs/rs) * dfdrs;\n" +
+            "    float thetaField = (u_ridgeMode == 0)\n" +
+            "      ? u_vShip * (xs/rs) * dfdrs          // physics (double-lobe)\n" +
+            "      : u_vShip * (xs/rs) * f;             // single crest at ρ=1 (oriented by drive)\n" +
             "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
             "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
-            "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
+            "    float shearProxy = (u_ridgeMode == 0)\n" +
+            "      ? abs(dfdrs) * sinphi * u_vShip      // physics (double-lobe magnitude)\n" +
+            "      : f * sinphi * u_vShip;              // single crest magnitude\n" +
             "    // Parity-protected amplitude scaling\n" +
             "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
             "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
-            "    float valTheta  = theta      * amp;\n" +
+            "    float valTheta  = thetaField * amp;\n" +
             "    float valShear  = shearProxy * amp;\n" +
             "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
             "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
@@ -605,7 +617,8 @@ class WarpEngine {
             vizGain: gl.getUniformLocation(this.gridProgram, 'u_vizGain'),
             curvatureGainT: gl.getUniformLocation(this.gridProgram, 'u_curvatureGainT'),
             curvatureBoostMax: gl.getUniformLocation(this.gridProgram, 'u_curvatureBoostMax'),
-            colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode')
+            colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode'),
+            ridgeMode: gl.getUniformLocation(this.gridProgram, 'u_ridgeMode')
         };
         this.gridAttribs = {
             position: gl.getAttribLocation(this.gridProgram, 'a_position'),
@@ -1164,6 +1177,7 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
         gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
         gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
+        gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;
@@ -1538,6 +1552,8 @@ class WarpEngine {
         if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
             delete window.__warp_setCosmetic;
         }
+        delete window.__warp_singleRidge;
+        delete window.__warp_physicsRidge;
         delete window.setStrobingState;
         
         // Clean up WebGL resources
