@@ -156,59 +156,51 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
 
 // Execute automated pulse sequence across all sectors
 async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration_us?: number; cycle_ms?: number }) {
-  const frequency = (args.frequency_GHz || 15) * 1e9; // Convert GHz to Hz
-  const duration = (args.duration_us || 10) * 1e-6; // Convert μs to seconds
-  const cycle = (args.cycle_ms || 1) * 1e-3; // Convert ms to seconds
-  
-  const totalSectors = 400;
-  const pulsedSectors: any[] = [];
-  let totalEnergy = 0;
-  
-  // Simulate pulsing each sector
-  for (let i = 1; i <= totalSectors; i++) {
-    const sectorResult = await executePulseSector({
-      sectorId: `S${i}`,
-      gap_nm: 1.0, // Standard 1nm gap
-      radius_mm: 25, // Standard 25mm radius
-      temperature_K: 20 // Standard 20K
-    });
-    
-    pulsedSectors.push({
-      id: sectorResult.sectorId,
-      energy: sectorResult.energy,
-      status: sectorResult.status
-    });
-    
-    totalEnergy += sectorResult.energy;
-  }
-  
-  // Get the correct values from the energy pipeline
-  const state = getGlobalPipelineState();
-  const exoticMassTotal = state.M_exotic;
-  
-  // Use pipeline ship-wide average power
-  const averagePower = state.P_avg * 1e6; // W
-  
+  const s = getGlobalPipelineState();
+  const totalSectors = Math.max(1, s.sectorCount || 400);
+
+  const frequency = (args.frequency_GHz ?? s.modulationFreq_GHz ?? 15) * 1e9;
+  const duration  = (args.duration_us ?? 10) * 1e-6;
+  const cycle     = (args.cycle_ms   ?? 1)  * 1e-3;
+
+  // Pulse one canonical sector (identical parameters shipwide)
+  const base = await executePulseSector({
+    sectorId: `S1`,
+    gap_nm: s.gap_nm ?? 1.0,
+    radius_mm: 25,
+    temperature_K: s.temperature_K ?? 20
+  });
+
+  const pulsedSectors = Array.from({length: totalSectors}, (_,i)=>({
+    id: `S${i+1}`, energy: base.energy, status: "PULSED"
+  }));
+
+  const totalEnergy = base.energy * totalSectors;
+  const averagePower = s.P_avg * 1e6; // W
+  const exoticMassTotal = s.M_exotic;
+
   return {
     mode: "AUTO_DUTY",
     sectorsCompleted: totalSectors,
-    totalEnergy: totalEnergy,
-    averagePower: averagePower,
+    totalEnergy,
+    averagePower,
     exoticMassGenerated: exoticMassTotal,
-    frequency: frequency,
+    frequency,
     dutyCycle: (duration / cycle) * 100,
     status: "SEQUENCE_COMPLETE",
-    log: `Pulsed all ${totalSectors} sectors at ${frequency/1e9} GHz. Generated ${exoticMassTotal.toFixed(1)} kg exotic mass.`
+    log: `Pulsed ${totalSectors} sectors @ ${frequency/1e9} GHz. M_exotic=${exoticMassTotal.toFixed(1)} kg.`
   };
 }
 
 // Run diagnostics scan on all sectors
 async function runDiagnosticsScan() {
+  const s = getGlobalPipelineState();
+  const totalSectors = Math.max(1, s.sectorCount || 400);
   const sectors = [];
   const issues = [];
   
   // Check each sector
-  for (let i = 1; i <= 400; i++) {
+  for (let i = 1; i <= totalSectors; i++) {
     const qFactor = 5e4 + Math.random() * 1e5;
     const errorRate = Math.random() * 0.05;
     const temperature = 20 + Math.random() * 5;
@@ -242,10 +234,10 @@ async function runDiagnosticsScan() {
   
   return {
     mode: "DIAGNOSTICS",
-    totalSectors: 400,
-    healthySectors: 400 - issues.length,
+    totalSectors,
+    healthySectors: totalSectors - issues.length,
     faultySectors: issues.length,
-    systemHealth: ((400 - issues.length) / 400 * 100).toFixed(1) + "%",
+    systemHealth: ((totalSectors - issues.length) / totalSectors * 100).toFixed(1) + "%",
     criticalIssues: issues.filter(i => i.issues.includes("CURVATURE_LIMIT")),
     warnings: issues.filter(i => !i.issues.includes("CURVATURE_LIMIT")),
     recommendations: [
