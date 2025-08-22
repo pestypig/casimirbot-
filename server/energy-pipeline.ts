@@ -75,6 +75,7 @@ export interface EnergyPipelineState {
   // Mode parameters
   currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
+  dutyShip: number;           // Ship-wide effective duty (promoted from any)
   sectorCount: number;        // Total sectors (always 400)
   concurrentSectors: number; // Live concurrent sectors (1-2)
   sectorStrobing: number;     // Legacy alias for UI compatibility
@@ -236,6 +237,7 @@ export function initializePipelineState(): EnergyPipelineState {
     // Mode defaults (hover)
     currentMode: 'hover',
     dutyCycle: 0.14,
+    dutyShip: 0.000025,      // Ship-wide effective duty (will be recalculated)
     sectorCount: 400,        // Total sectors (always 400)
     concurrentSectors: 1,    // Live concurrent sectors (default 1)
     sectorStrobing: 1,       // Legacy alias
@@ -331,9 +333,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
   // (dutyCycle already set from MODE_CONFIGS above)
 
-  // ✅ optional convenience for UI reducers that look for this name:
-  (state as any).dutyEff = d_eff;
-  (state as any).dutyShip = d_eff; // alias for clients (ship-wide duty)
+  // ✅ First-class fields for UI display
+  state.dutyShip = d_eff;          // Ship-wide effective duty (promoted from any)
+  (state as any).dutyEff = d_eff;  // Legacy alias
 
   // 5) Stored energy (raw core): ensure valid input values
   // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
@@ -386,6 +388,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
+  
+  // Expose labeled electrical power for dual-bar dashboards
+  (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)
   
   // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
   const Q_on  = Q;
