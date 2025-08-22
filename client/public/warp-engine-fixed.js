@@ -23,6 +23,16 @@ class WarpEngine {
 
         console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
         
+        // Check for non-blocking shader compilation support
+        this.parallelShaderExt = this.gl.getExtension('KHR_parallel_shader_compile');
+        if (this.parallelShaderExt) {
+            console.log("⚡ Non-blocking shader compilation available");
+        }
+        
+        // Loading state management
+        this.isLoaded = false;
+        this.onLoadingStateChange = null; // callback for loading progress
+        
         // Strobing state for sector sync
         this.strobingState = {
             sectorCount: 1,
@@ -437,14 +447,29 @@ class WarpEngine {
             "    gl_FragColor = vec4(col, 0.9);\n" +
             "}";
 
-        this.gridProgram = this._createShaderProgram(gridVs, gridFs);
+        // Use async shader compilation if available
+        const onShaderReady = (program) => {
+            if (!program) {
+                console.error("CRITICAL: Failed to compile grid shaders!");
+                return;
+            }
+            
+            this.gridProgram = program;
+            this._setupUniformLocations();
+            this._setLoaded(true);
+            console.log("Grid shader program compiled successfully with York-time coloring support");
+        };
         
-        if (!this.gridProgram) {
-            console.error("CRITICAL: Failed to compile grid shaders!");
-            return;
+        // Try async compilation first, fallback to sync
+        if (this.parallelShaderExt) {
+            this.gridProgram = this._createShaderProgram(gridVs, gridFs, onShaderReady);
+        } else {
+            this.gridProgram = this._createShaderProgram(gridVs, gridFs);
+            onShaderReady(this.gridProgram);
         }
-        
-        // Cache uniform locations for York-time coloring
+    }
+    
+    _setupUniformLocations() {
         const gl = this.gl;
         this.gridUniforms = {
             mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
@@ -462,8 +487,16 @@ class WarpEngine {
             thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
             userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain')
         };
-        
-        console.log("Grid shader program compiled successfully with York-time coloring support");
+    }
+    
+    _setLoaded(loaded) {
+        this.isLoaded = loaded;
+        if (this.onLoadingStateChange) {
+            this.onLoadingStateChange({ 
+                type: loaded ? 'ready' : 'loading',
+                message: loaded ? 'Warp engine ready' : 'Initializing...'
+            });
+        }
     }
 
     updateUniforms(parameters) {
@@ -1214,7 +1247,7 @@ class WarpEngine {
 
 
     // Matrix math utilities
-    _createShaderProgram(vertexSource, fragmentSource) {
+    _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
         const gl = this.gl;
         
         const vertexShader = this._compileShader(gl.VERTEX_SHADER, vertexSource);
@@ -1229,6 +1262,14 @@ class WarpEngine {
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
         
+        // Non-blocking compilation if available
+        if (this.parallelShaderExt && onReady) {
+            console.log("⚡ Starting non-blocking shader compilation...");
+            this._pollShaderCompletion(program, onReady);
+            return program; // Return immediately, will be ready asynchronously
+        }
+        
+        // Synchronous fallback
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error('Shader program link error:', gl.getProgramInfoLog(program));
             gl.deleteProgram(program);
@@ -1236,6 +1277,37 @@ class WarpEngine {
         }
         
         return program;
+    }
+    
+    _pollShaderCompletion(program, onReady) {
+        const gl = this.gl;
+        const ext = this.parallelShaderExt;
+        
+        const poll = () => {
+            const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
+            
+            if (done) {
+                // Check if linking was successful
+                if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                    console.log("⚡ Shader compilation completed successfully");
+                    onReady(program);
+                } else {
+                    console.error('Shader program link error:', gl.getProgramInfoLog(program));
+                    gl.deleteProgram(program);
+                    onReady(null);
+                }
+            } else {
+                // Still compiling, check again next frame
+                requestAnimationFrame(poll);
+                
+                // Update loading state if callback is available
+                if (this.onLoadingStateChange) {
+                    this.onLoadingStateChange({ type: 'compiling', message: 'Compiling shaders...' });
+                }
+            }
+        };
+        
+        poll();
     }
 
     _compileShader(type, source) {

@@ -106,6 +106,11 @@ type ShiftParams = {
   gEff_check?: number;
 };
 
+interface LoadingState {
+  type: 'loading' | 'compiling' | 'ready';
+  message: string;
+}
+
 interface WarpVisualizerProps {
   parameters: {
     dutyCycle: number;
@@ -163,6 +168,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [diag, setDiag] = useState<any|null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'loading', message: 'Initializing...' });
   const [initNonce, setInitNonce] = useState(0); // bump to retry
 
   // --- Simple per-mode defaults for interior tilt (demo-friendly) ---
@@ -213,6 +219,14 @@ useEffect(() => {
   const makeEngine = (EngineCtor: any) => {
     if (!canvasRef.current) throw new Error("canvas missing");
     const engine = new EngineCtor(canvasRef.current);
+    
+    // Setup loading state callback for non-blocking shader compilation
+    engine.onLoadingStateChange = (state: LoadingState) => {
+      setLoadingState(state);
+      if (state.type === 'ready') {
+        setIsLoaded(true);
+      }
+    };
 
     // Build sanitized uniforms once
     const mode = (parameters.currentMode || 'hover').toLowerCase();
@@ -718,7 +732,12 @@ useEffect(() => {
             <div className="absolute inset-0 flex items-center justify-center text-white/70">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
-                <div className="text-sm">Loading Warp Engine...</div>
+                <div className="text-sm">{loadingState.message}</div>
+                {loadingState.type === 'compiling' && (
+                  <div className="text-xs text-yellow-400 mt-1">
+                    ⚡ Non-blocking shader compilation in progress...
+                  </div>
+                )}
               </div>
             </div>
           )}
