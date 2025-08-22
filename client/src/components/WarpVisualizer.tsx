@@ -800,7 +800,7 @@ useEffect(() => {
             </div>
             <div>• <span className="text-orange-400">Sector Strobing</span>: {parameters.sectorStrobing || 1}× spatial coherence</div>
             <div>• <span className="text-yellow-400">Q Spoiling</span>: {((parameters.qSpoilingFactor || 1) * 100).toFixed(0)}% cavity efficiency</div>
-            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {(parameters.gammaVanDenBroeck || 6.57e7).toExponential(1)} curvature amplifier</div>
+            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {Number(parameters.gammaVanDenBroeck ?? 1).toExponential(2)} curvature amplifier</div>
             <div className="mt-2 text-slate-500">
               <span className="font-semibold">3D Grid:</span> Live Natário spacetime curvature with mode-specific deformation scaling
             </div>
