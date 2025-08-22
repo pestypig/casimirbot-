@@ -1397,8 +1397,8 @@ class WarpEngine {
         const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
         const gammaVdB     = U.gammaVdB || 1.0;
 
-        const betaInst = gammaGeo * Qburst * dAa * Math.pow(gammaVdB, 0.25);
-        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-9, (U.dutyCycle || 0) / sectors));
+        const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-12, (U.dutyCycle || 0) / sectors));
         const phase    = (U.phaseSplit != null) ? U.phaseSplit :
                         (U.currentMode === 'cruise' ? 0.65 : 0.50);
         const betaNet  = betaAvg * (2*phase - 1);
