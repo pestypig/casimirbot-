@@ -84,6 +84,9 @@ const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
 const getUnifiedPhysicsTilt = (parameters: any, mode: string) => 
   num(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt, mode === 'standby' ? 0.0 : 5e-7);
 
+// Helper for clamping values to 0-1 range
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
 // Light-crossing timing loop for synchronized strobing
 type LightCrossing = {
   sectorIdx: number;
@@ -196,9 +199,20 @@ useEffect(() => {
 
     // Build sanitized uniforms once
     const mode = (parameters.currentMode || 'hover').toLowerCase();
-    const dutyFrac = Math.max(0, Math.min(1, num(parameters.dutyCycle, 0.14)));
-    const sectors = Math.max(1, Math.floor(num(parameters.sectorStrobing, 1)));
-    const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
+    
+    // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
+    const lc = parameters.lightCrossing;
+    const dutyResolved =
+      isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
+      (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
+       clamp01(num(parameters.dutyCycle, 0.14)));
+
+    const sectorsResolved = Math.max(
+      1,
+      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
+    );
+    const splitResolved = Math.max(0, Math.min(sectorsResolved - 1, Math.floor(sectorsResolved / 2)));
+    
     const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
     const wallWidth_norm = num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho);
 
@@ -213,14 +227,14 @@ useEffect(() => {
       zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
       curvatureGainDec: 3,
 
-      dutyCycle: dutyFrac,
+      dutyCycle: dutyResolved,
       gammaGeo: num(parameters.g_y, 26),
       Qburst: num(parameters.cavityQ, 1e9),
       deltaAOverA: num(parameters.qSpoilingFactor, 1),
       gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1),
 
       currentMode: mode,
-      sectors, split: phaseSplit,
+      sectors: sectorsResolved, split: splitResolved,
       axesScene: parameters.axesScene,
       hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
       wallWidth: wallWidth_norm,
@@ -331,12 +345,24 @@ useEffect(() => {
       });
 
       // === NEW: Use pipeline adapter for single source of truth ===
+      // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
+      const lc = parameters.lightCrossing;
+      const dutyResolved =
+        isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
+        (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
+         clamp01(num(parameters.dutyCycle, 0.14)));
+
+      const sectorsResolved = Math.max(
+        1,
+        Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
+      );
+
       const pipelineState = {
         // Core physics
         currentMode: parameters.currentMode || 'hover',
-        dutyCycle: parameters.dutyCycle,
-        dutyShip: (parameters as any).dutyShip ?? parameters.dutyCycle, // Use dutyShip if available
-        sectorCount: parameters.sectorStrobing || 1,
+        dutyCycle: dutyResolved,
+        dutyShip: dutyResolved, // Use resolved duty from pipeline
+        sectorCount: sectorsResolved,
         gammaGeo: parameters.g_y || 26,
         gammaVanDenBroeck: parameters.gammaVanDenBroeck || 3.83e1,
         qCavity: parameters.cavityQ || 1e9,
