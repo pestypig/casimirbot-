@@ -302,6 +302,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const PACKING = 0.88; // edge/packing factor to match paper's ~1.96e9
   state.N_tiles = Math.max(1, Math.round(surfaceTiles * RADIAL_LAYERS * PACKING));
   
+  // Surface packing factor for future geometry modules to replace fudge
+  (state as any).__packing = PACKING;
+  
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
   
