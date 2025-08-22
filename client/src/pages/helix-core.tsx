@@ -330,12 +330,17 @@ export default function HelixCore() {
     ? pipeline!.dutyCycle!
     : (modeCfg.dutyCycle ?? 0.14);
 
-  const sectorsResolved = Math.max(
-    1,
-    Math.floor(isFiniteNumber(pipeline?.sectorStrobing) 
-      ? pipeline!.sectorStrobing! 
-      : (modeCfg.sectorStrobing ?? 1))
-  );
+  // ⬇️ put this near dutyEffectiveFR (or right after sectorsUI)
+  const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing) 
+    ? pipeline!.sectorStrobing! 
+    : (modeCfg.sectorStrobing ?? 1);
+  
+  const sectorsResolved = useMemo(() => {
+    const s = Number(systemMetrics?.sectorStrobing);
+    if (Number.isFinite(s) && s > 0) return Math.max(1, Math.floor(s));
+    const u = Number(sectorsUI);
+    return Math.max(1, Math.floor(Number.isFinite(u) ? u : 1));
+  }, [systemMetrics?.sectorStrobing, sectorsUI]);
 
   // Calculate hull geometry before using it
   const hull = (hullMetrics && hullMetrics.hull) ? {
