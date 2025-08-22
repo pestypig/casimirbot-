@@ -194,25 +194,13 @@ export default function WarpBubbleCompare({
         (window as any).__warp_setCosmetic = () => {};
 
         requestAnimationFrame(() => {
-          // one more tick keeps WebGL state happy on slower devices
-          requestAnimationFrame(() => {
-            if (!leftRef.current || !rightRef.current || !leftEngine.current || !rightEngine.current) {
-              console.error('❌ Missing refs during bootstrap:', { leftRef: !!leftRef.current, rightRef: !!rightRef.current, leftEngine: !!leftEngine.current, rightEngine: !!rightEngine.current });
-              return;
-            }
-            
-            applyReal(leftEngine.current, shared, leftRef.current, colorMode);
-            applyShow(
-              rightEngine.current,
-              shared,
-              rightRef.current,
-              colorMode,
-              parameters?.viz?.curvatureGainT ?? 0.70,
-              parameters?.viz?.curvatureBoostMax ?? 40,
-              1.0,
-              parameters?.viz?.exposure ?? 6.0,
-              parameters?.viz?.zeroStop ?? 1e-7
-            );
+          applyReal(leftEngine.current,  shared, leftRef.current!,  colorMode);
+          applyShow(rightEngine.current, shared, rightRef.current!, colorMode,
+                    parameters?.viz?.curvatureGainT ?? 0.70,
+                    parameters?.viz?.curvatureBoostMax ?? heroExaggeration,
+                    1.0,
+                    parameters?.viz?.exposure ?? 6.0,
+                    parameters?.viz?.zeroStop ?? 1e-7);
           });
         });
       } catch (e) {
@@ -229,28 +217,16 @@ export default function WarpBubbleCompare({
 
   // Update when parameters change
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
+    if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
     const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
-    
-    // Safety check on prop updates too
-    if (!shared.axesScene || !shared.axesClip || !shared.hullAxes) {
-      console.error('❌ Null array in useEffect:', shared);
-      return;
-    }
 
-    applyReal(leftEngine.current, shared, leftRef.current, colorMode);
-
-    applyShow(
-      rightEngine.current,
-      shared,
-      rightRef.current,
-      colorMode,
-      parameters?.viz?.curvatureGainT ?? 0.70,
-      parameters?.viz?.curvatureBoostMax ?? 40,
-      1.0,
-      parameters?.viz?.exposure ?? 6.0,
-      parameters?.viz?.zeroStop ?? 1e-7
-    );
+    applyReal(leftEngine.current,  shared, leftRef.current,  colorMode);
+    applyShow(rightEngine.current, shared, rightRef.current, colorMode,
+              parameters?.viz?.curvatureGainT ?? 0.70,
+              parameters?.viz?.curvatureBoostMax ?? heroExaggeration,
+              1.0,
+              parameters?.viz?.exposure ?? 6.0,
+              parameters?.viz?.zeroStop ?? 1e-7);
   }, [
     parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c,
     parameters?.gridSpan,
