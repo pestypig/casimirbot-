@@ -888,7 +888,7 @@ class WarpEngine {
         
         // Higher resolution for smoother canonical curvature
         const gridDivisions = 120; // increased from default for smoother profiles
-        const driveDir = [1, 0, 0];               // +x is "aft" by convention
+        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1, 0, 0];
         const gridK = 0.10;                       // mild base (acts as unit scale)
         
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
