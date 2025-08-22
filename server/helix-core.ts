@@ -81,7 +81,7 @@ const AVAILABLE_FUNCTIONS = [
   },
   {
     name: "execute_auto_pulse_sequence",
-    description: "Execute automated pulse sequence across all 400 sectors",
+    description: "Execute automated pulse sequence across all sectors",
     parameters: {
       type: "object",
       properties: {
@@ -175,7 +175,7 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
 // Execute automated pulse sequence across all sectors
 async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration_us?: number; cycle_ms?: number }) {
   const s = getGlobalPipelineState();
-  const totalSectors = Math.max(1, s.sectorCount || 400);
+  const totalSectors = Math.max(1, s.sectorCount);
 
   const frequency = (args.frequency_GHz ?? s.modulationFreq_GHz ?? 15) * 1e9;
   const duration  = (args.duration_us ?? 10) * 1e-6;
@@ -208,7 +208,7 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
 // Run diagnostics scan on all sectors
 async function runDiagnosticsScan() {
   const s = getGlobalPipelineState();
-  const totalSectors = Math.max(1, s.sectorCount || 400);
+  const totalSectors = Math.max(1, s.sectorCount);
   const baseQ   = s.qCavity || 1e9;
   const baseT_K = s.temperature_K ?? 20;
   const massPerTile = (s.N_tiles > 0) ? (s.M_exotic / s.N_tiles) : 0; // proxy
@@ -443,7 +443,7 @@ setGlobalPipelineState(pipelineState);
 export function getSystemMetrics(req: Request, res: Response) {
   const s = getGlobalPipelineState();
 
-  const totalSectors = Math.max(1, s.sectorCount || 400);
+  const totalSectors = Math.max(1, s.sectorCount);
   const concurrent = Math.max(0, s.concurrentSectors || 0);
   const activeFraction = concurrent / totalSectors;
 
@@ -579,7 +579,7 @@ export function getDisplacementField(req: Request, res: Response) {
     const s = getGlobalPipelineState();
     const q = req.query;
     const sectors = q.sectors ? Number(q.sectors) : s.sectorCount;
-    const split = q.split ? Number(q.split) : Math.floor((s.sectorCount||400)/2);
+    const split = q.split ? Number(q.split) : Math.floor(s.sectorCount/2);
     const data = sampleDisplacementField(s, {
       nTheta: q.nTheta ? Number(q.nTheta) : undefined,
       nPhi: q.nPhi ? Number(q.nPhi) : undefined,
