@@ -659,22 +659,32 @@ useEffect(() => {
     return (1 - t) + t * curvatureBoostMax; // 1..curvatureBoostMax
   }
 
-  // Display gain multiplier effect (matches SliceViewer)
+  // Display gain multiplier effect - respects physics parity mode
   useEffect(() => {
     if (!engineRef.current) return;
-    const boost = computeDisplayBoost(parameters.curvatureGainDec ?? 0, parameters.curvatureBoostMax ?? 40);
-    
-    // Send to shader(s) or CPU deformation code
-    if (engineRef.current.setUniform) {
-      engineRef.current.setUniform('uDisplayGain', boost);
+
+    // If REAL, force unity and bail
+    if (parameters.physicsParityMode) {
+      engineRef.current.setUniform?.('uDisplayGain', 1);
+      engineRef.current.setDisplayGain?.(1);
+      return;
     }
-    // If your geometry CPU path uses an amplitude, multiply there as well
-    if (engineRef.current.setDisplayGain) {
-      engineRef.current.setDisplayGain(boost);
-    }
-    
-    console.log(`🎛️ 3D DISPLAY GAIN: curvatureGainDec=${parameters.curvatureGainDec} → displayBoost=${boost.toFixed(2)}× (matches SliceViewer)`);
-  }, [parameters.curvatureGainDec, parameters.curvatureBoostMax, isLoaded]);
+
+    // SHOW viewer: apply decades boost
+    const boost = computeDisplayBoost(
+      parameters.curvatureGainDec ?? 0,
+      parameters.curvatureBoostMax ?? 40
+    );
+    engineRef.current.setUniform?.('uDisplayGain', boost);
+    engineRef.current.setDisplayGain?.(boost);
+
+    console.log(`🎛️ 3D DISPLAY GAIN: parity=${!!parameters.physicsParityMode} gain=${boost.toFixed(2)}×`);
+  }, [
+    parameters.physicsParityMode,
+    parameters.curvatureGainDec,
+    parameters.curvatureBoostMax,
+    isLoaded
+  ]);
 
   useEffect(() => {
     const s = Number(parameters.gridScale ?? 1.0);
