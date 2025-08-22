@@ -80,6 +80,7 @@ class WarpEngine {
         this.gridVbo = null;
         this.gridProgram = null;
         this._vboBytes = 0; // Track VBO buffer size for efficient updates
+        this._resizeRaf = 0; // Track resize throttling RAF ID
         
         // Camera and projection
         this.viewMatrix = new Float32Array(16);
@@ -169,8 +170,14 @@ class WarpEngine {
         // default to "current visuals" feel
         this.setCosmeticLevel(10);
         
-        // Bind responsive resize handler
-        this._resize = () => this._resizeCanvasToDisplaySize();
+        // Bind throttled resize handler
+        this._resize = () => {
+            if (this._resizeRaf) return;
+            this._resizeRaf = requestAnimationFrame(() => { 
+                this._resizeRaf = 0; 
+                this._resizeCanvasToDisplaySize(); 
+            });
+        };
         window.addEventListener('resize', this._resize);
         this._resizeCanvasToDisplaySize(); // Initial setup
         
