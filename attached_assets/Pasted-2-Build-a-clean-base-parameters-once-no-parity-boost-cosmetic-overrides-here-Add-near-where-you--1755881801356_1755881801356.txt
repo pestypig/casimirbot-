@@ -1,0 +1,55 @@
+2) Build a clean base parameters once (no parity/boost/cosmetic overrides here)
+
+Add near where you compute hull, lc, dutyEffectiveFR, etc.:
+
+const compareParams = useMemo(() => {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+  // Use the same authoritative numbers you were pushing into WarpVisualizer,
+  // but DO NOT pin physicsParityMode / cosmeticLevel / curvatureGain* here.
+  const base: any = {
+    currentMode: effectiveMode,
+    sectorStrobing: sectorsResolved,
+
+    // live hull geometry
+    hull,
+
+    // timing + FR window (authoritative)
+    dutyEffectiveFR,
+    lightCrossing: lc,
+
+    // interior tilt (small, visual-only; wrapper will treat appropriately)
+    epsilonTilt,
+    betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+
+    wallWidth_m: 6.0,
+    gridScale: 1.6,
+
+    // pipeline physics scalars (only when present)
+    dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,
+    g_y:              num(pipeline?.gammaGeo)         ?? 26,
+    cavityQ:          num(pipeline?.qCavity)          ?? 1e9,
+    sagDepth_nm:      num(pipeline?.sagDepth_nm)      ?? 16,
+    tsRatio:          num(pipeline?.TS_ratio)         ?? 5.03e4,
+    powerAvg_MW:      num(pipeline?.P_avg)            ?? 83.3,
+    exoticMass_kg:    num(pipeline?.M_exotic)         ?? 1405,
+    qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
+    gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 3.83e1,
+  };
+
+  return base;
+}, [
+  effectiveMode, sectorsResolved, hull, dutyEffectiveFR, lc,
+  epsilonTilt, systemMetrics?.shiftVector?.betaTiltVec,
+  pipeline?.dutyCycle, pipeline?.gammaGeo, pipeline?.qCavity, pipeline?.sagDepth_nm,
+  pipeline?.TS_ratio, pipeline?.P_avg, pipeline?.M_exotic,
+  pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
+]);
+
+
+Note: this removes the page-level forcing of:
+
+physicsParityMode (leave that to the left “REAL” pane inside the wrapper),
+
+cosmeticLevel, curvatureBoostMax, curvatureGainDec, and viz.colorMode.
+The wrapper sets those independently for the REAL vs SHOW panes.

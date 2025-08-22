@@ -402,7 +402,51 @@ export default function HelixCore() {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
   
-  // REMOVED: Legacy global function call - now using unified visual boost system via WarpVisualizer uniforms
+  const compareParams = useMemo(() => {
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+    // Use the same authoritative numbers you were pushing into WarpVisualizer,
+    // but DO NOT pin physicsParityMode / cosmeticLevel / curvatureGain* here.
+    const base: any = {
+      currentMode: effectiveMode,
+      sectorStrobing: sectorsResolved,
+
+      // live hull geometry
+      hull,
+
+      // timing + FR window (authoritative)
+      dutyEffectiveFR,
+      lightCrossing: lc,
+
+      // interior tilt (small, visual-only; wrapper will treat appropriately)
+      epsilonTilt,
+      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+
+      wallWidth_m: 6.0,
+      gridScale: 1.6,
+
+      // pipeline physics scalars (only when present)
+      dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,
+      g_y:              num(pipeline?.gammaGeo)         ?? 26,
+      cavityQ:          num(pipeline?.qCavity)          ?? 1e9,
+      sagDepth_nm:      num(pipeline?.sagDepth_nm)      ?? 16,
+      tsRatio:          num(pipeline?.TS_ratio)         ?? 5.03e4,
+      powerAvg_MW:      num(pipeline?.P_avg)            ?? 83.3,
+      exoticMass_kg:    num(pipeline?.M_exotic)         ?? 1405,
+      qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
+      gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 3.83e1,
+    };
+
+    return base;
+  }, [
+    effectiveMode, sectorsResolved, hull, dutyEffectiveFR, lc,
+    epsilonTilt, systemMetrics?.shiftVector?.betaTiltVec,
+    pipeline?.dutyCycle, pipeline?.gammaGeo, pipeline?.qCavity, pipeline?.sagDepth_nm,
+    pipeline?.TS_ratio, pipeline?.P_avg, pipeline?.M_exotic,
+    pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
+  ]);
+  
+  // REMOVED: Legacy global function call - now using unified visual boost system via WarpBubbleCompare uniforms
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -674,57 +718,10 @@ export default function HelixCore() {
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizer…</div>}>
-                        <WarpVisualizer
-                        key={`mode-${effectiveMode}-v${modeVersion}-parity-${localStorage.getItem('physics-parity-mode')}`}
-                        parameters={(() => {
-                          const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-
-                          const vizParams: any = {
-                            currentMode: effectiveMode,
-                            // ⬇️ use the resolved sectors (metrics wins)
-                            sectorStrobing: sectorsResolved,
-
-                            // 🔑 physics parity & cosmetics (neutral by default; engine handles parity correctly)
-                            physicsParityMode: localStorage.getItem("physics-parity-mode") === "true",
-                            cosmeticLevel,
-
-                            // 🔧 geometry — pass the full live hull object (includes Lx/Ly/Lz and a/b/c)
-                            hull,
-
-                            wallWidth_m: 6.0,
-                            epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                            betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-
-                            gridScale: 1.6,
-
-                            // 🧠 pipeline timing + FR window (authoritative)
-                            dutyEffectiveFR,
-                            lightCrossing: lc,
-
-                            // visual curvature knobs set neutral; engine can boost if parity off
-                            curvatureBoostMax: 1,
-                            curvatureGainDec: 0,
-                          };
-
-                          // Only pass numeric pipeline fields when present (no magic defaults)
-                          const maybe = {
-                            dutyCycle:        num(pipeline?.dutyCycle),
-                            g_y:              num(pipeline?.gammaGeo),
-                            cavityQ:          num(pipeline?.qCavity),
-                            sagDepth_nm:      num(pipeline?.sagDepth_nm),
-                            tsRatio:          num(pipeline?.TS_ratio),
-                            powerAvg_MW:      num(pipeline?.P_avg),
-                            exoticMass_kg:    num(pipeline?.M_exotic),
-                            qSpoilingFactor:  num(pipeline?.qSpoilingFactor),
-                            gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck),
-                          };
-                          for (const k of Object.keys(maybe) as (keyof typeof maybe)[]) {
-                            if (maybe[k] !== undefined) vizParams[k] = maybe[k];
-                          }
-
-                          return vizParams;
-                        })()}
-                      />
+                        <WarpBubbleCompare
+                        key={`mode-${effectiveMode}-v${modeVersion}-compare`}
+                        parameters={compareParams}
+                        />
                       </Suspense>
                     </div>
                   </div>
