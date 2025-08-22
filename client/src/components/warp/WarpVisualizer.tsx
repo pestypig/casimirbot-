@@ -282,12 +282,15 @@ useEffect(() => {
     // roughly normalize: 5e-7 → ~0.35, clamp at 0.65
     const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
+    const parity = !!parameters.physicsParityMode; // hoist this near the top
+
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
       exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
       zeroStop: Math.max(1e-18, VIS_LOCAL.zeroStopDefault),
-      curvatureGainDec: parameters.physicsParityMode ? 0 : 3,
-      curvatureBoostMax: parameters.physicsParityMode ? 1 : (parameters.curvatureBoostMax ?? 40),
+      curvatureGainDec: parity ? 0 : 3,
+      curvatureBoostMax: parity ? 1 : (parameters.curvatureBoostMax ?? 40),
+      curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
 
       dutyCycle: dutyResolved,
       gammaGeo,
@@ -335,7 +338,6 @@ useEffect(() => {
     }
 
     // visual knobs that aren't strictly physics
-    const parity = !!parameters.physicsParityMode;
     engine.updateUniforms({
       vizGain: parity ? 1 : (
         mode === 'emergency' ? VIS_LOCAL.vizGainEmergency :
