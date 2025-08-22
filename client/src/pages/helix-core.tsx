@@ -16,7 +16,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
-import { WarpVisualizer } from "@/components/warp/WarpVisualizer";
 const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
 );
@@ -447,27 +446,7 @@ export default function HelixCore() {
     pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
   ]);
   
-  // Create truly separate payloads (no shared nested refs)
-  const heroParams = useMemo(() => {
-    const p: any = structuredClone(compareParams);
-    // Hero/Show: leave boosts on (no parity)
-    p.physicsParityMode = false;
-    // If your engine reads curvature via viz overrides, keep them undefined here
-    // so WarpVisualizer decides (or set your desired show exaggeration explicitly)
-    return p;
-  }, [compareParams]);
-
-  const realParams = useMemo(() => {
-    const p: any = structuredClone(compareParams);
-    // Parity/Real: force unity
-    p.physicsParityMode = true;
-    p.viz = { ...(p.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1, colorMode: 'theta' };
-    p.curvatureGainDec = 0;
-    p.curvatureBoostMax = 1;
-    return p;
-  }, [compareParams]);
-  
-  // REMOVED: Legacy global function call - now using unified visual boost system via direct WarpVisualizer calls
+  // REMOVED: Legacy global function call - now using unified visual boost system via WarpBubbleCompare uniforms
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -737,19 +716,13 @@ export default function HelixCore() {
               return (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="rounded-lg overflow-hidden bg-slate-950">
-                        <WarpVisualizer
-                          key={`hero-${effectiveMode}-v${modeVersion}`}
-                          parameters={heroParams}
+                    <div className="rounded-lg overflow-hidden bg-slate-950">
+                      <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}>
+                        <WarpBubbleCompare
+                        key={`compare-${effectiveMode}-v${modeVersion}`}
+                        parameters={compareParams}
                         />
-                      </div>
-                      <div className="rounded-lg overflow-hidden bg-slate-950">
-                        <WarpVisualizer
-                          key={`real-${effectiveMode}-v${modeVersion}`}
-                          parameters={realParams}
-                        />
-                      </div>
+                      </Suspense>
                     </div>
                   </div>
 
