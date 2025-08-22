@@ -74,6 +74,7 @@ export type HUDModel = {
   TS_long: number;
   TS_geom: number;
   TS_wall: number;           // if caller provides, otherwise derived from wallThickness
+  isHomogenized: boolean;    // TS_long > 1e3 (fast-average regime vs borderline)
   // Mass/knobs
   exoticMassKg: number;
   gammaGeo: number;
@@ -125,6 +126,7 @@ export function toHUDModel(s: PipelineLike): HUDModel {
     TS_long,
     TS_geom,
     TS_wall,
+    isHomogenized: (s as any).isHomogenized ?? (TS_long > 1e3), // fast-average regime flag
     exoticMassKg: s.M_exotic ?? 0,
     gammaGeo: s.gammaGeo ?? 0,
     gammaVdB: s.gammaVanDenBroeck ?? 0,
@@ -196,6 +198,7 @@ export function fromRest(r: HelixMetricsResponse): HUDModel {
     TS_long: r.TS_long,
     TS_geom: r.TS_geom,
     TS_wall: r.TS_wall ?? r.TS_long, // fallback
+    isHomogenized: (r as any).isHomogenized ?? (r.TS_long > 1e3), // fast-average regime flag
     exoticMassKg: r.exoticMass,
     gammaGeo: r.gammaGeo,
     gammaVdB: r.gammaVanDenBroeck,

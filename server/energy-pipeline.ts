@@ -447,6 +447,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   const w = state.hull?.wallThickness_m ?? 1.0;
   const T_wall = w / C;
   (state as any).TS_wall = T_wall / T_m_ts;
+  
+  // Homogenization status for UI badging
+  (state as any).isHomogenized = state.TS_long! > 1e3; // fast-average regime vs borderline
 
   // Keep these around for the metrics + HUD
   state.__fr = {
