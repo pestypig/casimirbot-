@@ -469,15 +469,15 @@ setGlobalPipelineState(pipelineState);
 export function getSystemMetrics(req: Request, res: Response) {
   const state = getGlobalPipelineState();
 
-  const N = Math.max(1, Math.round(state.N_tiles ?? 0));          // total tiles
-  const S = Math.max(1, Math.round(state.sectorStrobing ?? 1));   // concurrent sectors
-  const activeFraction = Math.min(1, S / N);
+  const totalSectors = 400;                              // keep with pipeline constant
+  const concurrent = Math.max(1, state.sectorStrobing ?? 1);
+  const activeFraction = concurrent / totalSectors;      // ✅ sectors / sectors
 
   const dutyGlobal = Math.max(0, Math.min(1, state.dutyCycle ?? 0.14));
   const qSpoil     = state.qSpoilingFactor ?? 1;
 
   // Effective duty relevant to Ford–Roman sampling (time-sliced exposure)
-  const dutyEffectiveFR = dutyGlobal * qSpoil * activeFraction;
+  const dutyEffectiveFR = state.dutyEffective_FR ?? activeFraction * 0.01; // ✅ ship-wide d_eff from pipeline
 
   // Optional timing hints (client can animate the grid with these)
   const strobeHz        = Number(state.strobeHz ?? process.env.STROBE_HZ ?? 2000);
@@ -486,7 +486,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   // Physics-timed sector sweep for UI sync
   const f_m = (state.modulationFreq_GHz ?? 15) * 1e9;
   const sectorPeriod_s = (1 / f_m) / Math.max(state.dutyCycle ?? 0.14, 1e-6);
-  const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, S);
+  const currentSector = Math.floor((Date.now() / 1000 / sectorPeriod_s)) % Math.max(1, concurrent);
 
   const sec = state.__sectors ?? { 
     TOTAL_SECTORS: 400, 
@@ -495,11 +495,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     tilesPerSector: Math.floor(state.N_tiles/400), 
     activeTiles: Math.floor(state.N_tiles/400) 
   };
-  const fr = state.__fr ?? { 
-    dutyInstant: state.dutyCycle * state.qSpoilingFactor, 
-    dutyEffectiveFR: (state.dutyCycle * state.qSpoilingFactor) * sec.activeFraction, 
-    Q_quantum: 1e10 
-  };
+  const fr = state.__fr ?? { dutyInstant: dutyEffectiveFR, dutyEffectiveFR, Q_quantum: 1e12 };
 
   // Derive τLC and T_m once here from the pipeline state used to compute TS_ratio
   const f_m_Hz = state.modulationFreq_GHz * 1e9;   // Hz
@@ -510,8 +506,8 @@ export function getSystemMetrics(req: Request, res: Response) {
 
   // Calculate shift vector parameters (artificial gravity tilt)
   const c = 299_792_458;  // m/s
-  const hull = state.hull ?? { a: 503.5, b: 132, c: 86.5, Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);  // Geometric mean radius
+  const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
+  const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));  // Geometric mean radius
 
   // Per-mode gravity targets (matching WarpVisualizer)
   const G = 9.80665;
@@ -584,7 +580,6 @@ export function getSystemMetrics(req: Request, res: Response) {
       status: state.natarioConstraint ? "VALID" : "WARN"
     },
     curvatureMax: Math.abs(state.U_cycle) / (3e8 * 3e8),
-    timeScaleRatio: state.TS_ratio,
     overallStatus: state.overallStatus ?? (state.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     // hull geometry and time-scale metrics for Bridge cards
