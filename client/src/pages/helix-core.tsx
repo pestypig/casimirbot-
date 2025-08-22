@@ -740,8 +740,16 @@ export default function HelixCore() {
                       <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}>
                         <WarpBubbleCompare
                           key={`compare-${effectiveMode}-v${modeVersion}`}
-                          hero={heroParams}
-                          real={realParams}
+                          parameters={{
+                            ...compareParams,
+                            viewAvg: true,              // keep FR-averaged amplitude in both panes
+                            colorMode: "theta",         // consistent color
+                            lockFraming: true,          // no auto zoom change with gain
+                          }}
+                          parityExaggeration={1}
+                          heroExaggeration={82}         // or wire to a slider/HUD
+                          colorMode="theta"
+                          lockFraming={true}
                         />
                       </Suspense>
                     </div>

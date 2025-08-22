@@ -1,8 +1,5 @@
 import React, { useEffect, useRef } from "react";
 
-// declare global WarpEngine if you export it to window
-declare global { interface Window { WarpEngine: any } }
-
 type Props = {
   parameters: any;                 // your compareParams from HelixCore
   parityExaggeration?: number;     // default 1
