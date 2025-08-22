@@ -349,6 +349,16 @@ export default function WarpBubbleCompare({
     colorMode
   ]);
 
+  // Fix black bands/duplicated rows after layout changes
+  useEffect(() => {
+    const onResize = () => {
+      leftEngine.current?._resize?.();
+      rightEngine.current?._resize?.();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40">
