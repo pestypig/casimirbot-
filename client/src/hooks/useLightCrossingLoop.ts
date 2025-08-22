@@ -18,7 +18,7 @@ export function useLightCrossingLoop({
   duty = 0.14,
   freqGHz = 15,
   hull,
-  wallWidth_m = 6.0,
+  wallWidth_m = 1.0,  // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
 }: Args) {
   // --- Light-crossing estimate (choose the *shortest relevant* length scale)
   // Using the wall thickness gives a strict local bound; feel free to swap

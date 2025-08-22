@@ -70,7 +70,7 @@ export interface EnergyPipelineState {
   modulationFreq_GHz: number;
   
   // Hull geometry
-  hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
+  hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
   
   // Mode parameters
   currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
@@ -158,8 +158,8 @@ const MODE_POLICY = {
 
 // Runtime assert in dev to prevent unit confusion
 if (process.env.NODE_ENV !== 'production') {
-  const isWatt = MODE_POLICY.standby.P_target_W === 0; // All non-standby targets are now in MW range
-  if (!isWatt) console.warn("[PIPELINE] Power targets must be in watts.");
+  const powerTargetsInWatts = MODE_POLICY.hover.P_target_W >= 1e3; // Check non-standby targets are >= 1kW
+  if (!powerTargetsInWatts) console.warn("[PIPELINE] Power targets must be in watts (found values < 1kW).");
 }
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
@@ -177,7 +177,7 @@ export const MODE_CONFIGS = {
   },
   cruise: {
     dutyCycle: 0.005,
-    sectorStrobing: 400,
+    sectorStrobing: 1,       // Consistent with MODE_POLICY.cruise.S_live: 1 (concurrent sectors)
     qSpoilingFactor: 0.625,  // keep this consistent with UI defaults below
     description: "Low-power cruise mode for sustained travel"
   },
@@ -419,7 +419,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.U_cycle = state.U_Q * d_eff;
   
   // Expose timing details for metrics API (corrected naming)
-  state.strobeHz            = Number(process.env.STROBE_HZ ?? 2000); // sectors/sec
+  state.strobeHz            = Number(process.env.STROBE_HZ ?? 1000); // sectors/sec (1ms macro-tick)
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.modelMode           = MODEL_MODE; // for client consistency
   
@@ -448,7 +448,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Overall status
   if (!state.fordRomanCompliance || !state.curvatureLimit) {
     state.overallStatus = 'CRITICAL';
-  } else if (state.P_avg > 100 || state.zeta > 0.8) {
+  } else if (state.zeta > 0.8 || (state.currentMode !== 'emergency' && state.P_avg > 100)) {
     state.overallStatus = 'WARNING';
   } else {
     state.overallStatus = 'NOMINAL';
@@ -457,7 +457,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
   const ui = MODE_CONFIGS[state.currentMode];
   state.dutyCycle       = ui.dutyCycle;
-  state.sectorStrobing  = ui.sectorStrobing;   // ✅ Use mode-specific value (hover=1, cruise=400)
+  state.sectorStrobing  = ui.sectorStrobing;   // ✅ Use mode-specific value (hover=1, cruise=1, emergency=1)
   state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   return state;
