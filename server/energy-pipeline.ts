@@ -356,7 +356,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  let   E_tile = U_abs * geo3 * Q * state.gammaVanDenBroeck * d_eff; // J per tile (avg)
+  let   E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (burst-window Q for mass)
   let   M_total = (E_tile / (C * C)) * state.N_tiles;
 
   // Mass-only calibration: hit per-mode mass target without changing power
@@ -364,7 +364,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   if (M_target > 0 && M_total > 0) {
     const scaleM = M_target / M_total;
     state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck * scaleM)); // knob #2: mass only (clamped)
-    E_tile  = U_abs * geo3 * Q * state.gammaVanDenBroeck * d_eff;
+    E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
   } else if (M_target === 0) {
     state.gammaVanDenBroeck = 0;
@@ -426,9 +426,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.sectorPeriod_ms     = 1000 / Math.max(1, state.strobeHz);
   state.modelMode           = MODEL_MODE; // for client consistency
   
-  // Compliance flags (corrected curvature check)
+  // Compliance flags (physics-based safety)
   state.natarioConstraint   = true;
-  state.curvatureLimit      = Math.abs(state.U_cycle ?? 0) < 1e-10;
+  state.curvatureLimit      = state.zeta < 1.0;  // Ford-Roman compliance (not arbitrary energy threshold)
   
   // Audit guard (pipeline self-consistency check)
   (function audit() {
@@ -440,7 +440,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     }
 
     const E_tile = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
-                 * Q * state.gammaVanDenBroeck * d_eff;
+                 * Q_BURST * state.gammaVanDenBroeck * d_eff;
     const M_exp  = (E_tile / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
