@@ -95,9 +95,14 @@ class WarpEngine {
         this._initializeGrid();
         
         // Expose strobing sync function globally
-        window.setStrobingState = ({ sectorCount, currentSector }) => {
-            this.strobingState.sectorCount = sectorCount;
-            this.strobingState.currentSector = currentSector;
+        window.setStrobingState = ({ sectorCount, currentSector, split }) => {
+            this.strobingState.sectorCount  = sectorCount;
+            this.strobingState.currentSector= currentSector;
+            // update visual strobing immediately
+            this.updateUniforms({
+              sectors: Math.max(1, sectorCount|0),
+              split: Number.isFinite(split) ? Math.max(0, Math.min((sectorCount|0)-1, split|0)) : this.uniforms?.split
+            });
         };
         // Expose curvature gain setter for the UI slider (0..8 decades)
         this.__warp_setGainDec = (dec, max = 40) => {
