@@ -653,7 +653,10 @@ class WarpEngine {
         // --- Parity / visualization ---
         const parity = !!parameters?.physicsParityMode;
         const ridgeMode = (parameters?.ridgeMode ?? this.uniforms?.ridgeMode ?? 0)|0;
-        const colorMode = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+        const CM = { solid:0, theta:1, shear:2 };
+        let colorModeRaw = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+        const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
+                                                              : (colorModeRaw|0);
         const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
         const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
         const vizGain   = parity ? 1 : N(parameters?.vizGain, this.uniforms?.vizGain ?? 1);
@@ -989,8 +992,12 @@ class WarpEngine {
             // CPU-side parity protection (match shader's idea but keep it neutral by default)
             const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
 
-            // Vertex-local base magnitude (no viz seasoning here)
-            const baseMag = Math.abs(xs_over_rs * df);
+            const useSingleRidge = ((this.uniforms?.ridgeMode|0) === 1);
+
+            // 🔑 this is the switch that removes the geometric double ridge
+            const baseMag = useSingleRidge
+              ? Math.abs(xs_over_rs) * f               // single crest at ρ=1
+              : Math.abs(xs_over_rs * df);             // physics double-lobe (current)
 
             // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
             // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
@@ -1176,7 +1183,7 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
         gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
         gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
-        gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
+        gl.uniform1i(this.gridUniforms.colorMode, this.uniforms?.colorMode ?? 1);
         gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
         
         // Render as lines for better visibility
