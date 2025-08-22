@@ -317,9 +317,9 @@ useEffect(() => {
     
     // Apply viz overrides if provided
     engine.updateUniforms({
-      colorMode: parameters.viz?.colorMode ?? (parameters.curvatureGainDec != null ? undefined : 'theta'),
-      curvatureGainT: parameters.viz?.curvatureGainT ?? parameters.curvatureGainT,
-      curvatureBoostMax: parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax,
+      colorMode: parameters.viz?.colorMode ?? 'theta',
+      curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
+      curvatureBoostMax: parity ? 1 : (parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax),
       exposure: parameters.viz?.exposure ?? undefined,
       zeroStop: parameters.viz?.zeroStop ?? undefined,
       cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
