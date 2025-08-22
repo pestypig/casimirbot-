@@ -451,7 +451,11 @@ export default function HelixCore() {
         
         // Log function calls
         setMainframeLog(prev => [...prev, 
-          `[FUNCTION] ${responseData.message.function_call.name}(${JSON.stringify(JSON.parse(responseData.message.function_call.arguments))})`,
+          (() => {
+            let args = responseData.message.function_call.arguments;
+            try { args = JSON.stringify(JSON.parse(args)); } catch { /* already a string or malformed */ }
+            return `[FUNCTION] ${responseData.message.function_call.name}(${args})`;
+          })(),
           `[RESULT] ${JSON.stringify(responseData.functionResult)}`
         ]);
         
