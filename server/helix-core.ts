@@ -13,6 +13,17 @@ import {
   type EnergyPipelineState 
 } from "./energy-pipeline.js";
 
+// ── simple async mutex ───────────────────────────────────────────────────────
+class Mutex {
+  private p = Promise.resolve();
+  lock<T>(fn: () => Promise<T> | T): Promise<T> {
+    const run = this.p.then(fn, fn);
+    this.p = run.then(() => void 0, () => void 0);
+    return run;
+  }
+}
+const pipeMutex = new Mutex();
+
 // Schema for ChatGPT function calls
 const pulseSectorSchema = z.object({
   sectorId: z.string(),
@@ -532,44 +543,37 @@ export function getPipelineState(req: Request, res: Response) {
 }
 
 // Update pipeline parameters
-export function updatePipelineParams(req: Request, res: Response) {
+export async function updatePipelineParams(req: Request, res: Response) {
   try {
     const params = req.body;
-    const currentState = getGlobalPipelineState();
-    const newState = updateParameters(currentState, params);
-    setGlobalPipelineState(newState);
+    const newState = await pipeMutex.lock(() => {
+      const curr = getGlobalPipelineState();
+      const next = updateParameters(curr, params);
+      setGlobalPipelineState(next);
+      return next;
+    });
     res.json(newState);
   } catch (error) {
-    res.status(400).json({ 
-      error: "Failed to update parameters",
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    res.status(400).json({ error: "Failed to update parameters", details: error instanceof Error ? error.message : "Unknown error" });
   }
 }
 
 // Switch operational mode
-export function switchOperationalMode(req: Request, res: Response) {
+export async function switchOperationalMode(req: Request, res: Response) {
   try {
     const { mode } = req.body;
-    if (!['hover', 'cruise', 'emergency', 'standby'].includes(mode)) {
+    if (!['hover','cruise','emergency','standby'].includes(mode)) {
       return res.status(400).json({ error: "Invalid mode" });
     }
-    
-    const currentState = getGlobalPipelineState();
-    const newState = switchMode(currentState, mode as EnergyPipelineState['currentMode']);
-    setGlobalPipelineState(newState);
-    
-    res.json({
-      success: true,
-      mode,
-      state: newState,
-      config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS]
+    const newState = await pipeMutex.lock(() => {
+      const curr = getGlobalPipelineState();
+      const next = switchMode(curr, mode as EnergyPipelineState['currentMode']);
+      setGlobalPipelineState(next);
+      return next;
     });
+    res.json({ success: true, mode, state: newState, config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS] });
   } catch (error) {
-    res.status(400).json({ 
-      error: "Failed to switch mode",
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    res.status(400).json({ error: "Failed to switch mode", details: error instanceof Error ? error.message : "Unknown error" });
   }
 }
 
