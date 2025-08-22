@@ -833,16 +833,23 @@ useEffect(() => {
                 D: {safeFix(parameters.dutyCycle * 100, 14, 1)}%
               </div>
               <div className="text-amber-300">
-                exaggeration: ×{(() => {
-                  const T = parameters.viz?.curvatureGainT ?? (parameters.curvatureGainDec??0)/8;
-                  const max = parameters.viz?.curvatureBoostMax ?? (parameters.curvatureBoostMax ?? 40);
-                  const gain = 1 + Math.max(0, Math.min(1, Number(T)||0)) * (Math.max(1, Number(max)||40) - 1);
-                  return gain.toFixed(2);
+                {(() => {
+                  // reflect actual uniforms (after parity gating) when available
+                  const u = engineRef.current?.uniforms ?? {};
+                  const parity = !!u.physicsParityMode;
+                  const curvT   = parity ? 0 : (u.curvatureGainT ?? 0);
+                  const boost   = parity ? 1 : Math.max(1, u.curvatureBoostMax ?? 1);
+                  const disp    = parity ? 1 : (u.displayGain ?? 1);
+                  const vizG    = parity ? 1 : (u.vizGain ?? 1);
+                  const gain = disp * vizG * (1 + curvT * (boost - 1));
+                  return (
+                    <>
+                      exaggeration: ×{gain.toFixed(2)} ·
+                      {' '}exp:{(parameters.viz?.exposure ?? 6.0).toFixed(1)} ·
+                      {' '}z₀:{(parameters.viz?.zeroStop ?? 1e-7).toExponential(1)}
+                    </>
+                  );
                 })()}
-                {" · "}
-                exp:{(parameters.viz?.exposure ?? 6.0).toFixed(1)}
-                {" · "}
-                z₀:{(parameters.viz?.zeroStop ?? 1e-7).toExponential(1)}
               </div>
             </div>
           )}
