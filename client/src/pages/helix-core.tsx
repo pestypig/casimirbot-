@@ -328,9 +328,12 @@ export default function HelixCore() {
     ? pipeline!.dutyCycle!
     : (modeCfg.dutyCycle ?? 0.14);
 
-  const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing)
-    ? pipeline!.sectorStrobing!
-    : (modeCfg.sectorStrobing ?? 1);
+  const sectorsResolved = Math.max(
+    1,
+    Math.floor(isFiniteNumber(pipeline?.sectorStrobing) 
+      ? pipeline!.sectorStrobing! 
+      : (modeCfg.sectorStrobing ?? 1))
+  );
 
   // Calculate hull geometry before using it
   const hull = (hullMetrics && hullMetrics.hull) ? {
@@ -342,7 +345,7 @@ export default function HelixCore() {
 
   // Shared light-crossing loop for synchronized strobing across all visual components  
   const lc = useLightCrossingLoop({
-    sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsUI,
+    sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsResolved,
     currentSector: systemMetrics?.currentSector ?? 0,
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,  // Restored authentic physics timing
     duty: dutyUI,
@@ -651,7 +654,7 @@ export default function HelixCore() {
                           // Build viz params purely from live pipeline / metrics
                           const vizParams: any = {
                             currentMode: effectiveMode,
-                            sectorStrobing: sectorsUI,
+                            sectorStrobing: sectorsResolved,
                             cosmeticLevel,
                             physicsParityMode: localStorage.getItem("physics-parity-mode") === "true",
                             // geometry from live hull if present
@@ -705,7 +708,7 @@ export default function HelixCore() {
                       qSpoilingFactor={qSpoilUI}
                       gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1}
                       dutyCycle={dutyUI}
-                      sectors={sectorsUI}
+                      sectors={sectorsResolved}
                       viewAvg={true}
                       diffMode={false}
                       refParams={{
@@ -774,7 +777,7 @@ export default function HelixCore() {
                 // Mode coupling from live pipeline data
                 mode: effectiveMode,
                 dutyCycle: dutyUI,
-                sectors: sectorsUI,
+                sectors: sectorsResolved,
                 gammaGeo: pipeline?.gammaGeo ?? 26,
                 qSpoil: qSpoilUI,
                 qCavity: pipeline?.qCavity ?? 1e9,
@@ -1050,7 +1053,7 @@ export default function HelixCore() {
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
                     <div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
-                    <div>Sectors: {fint(sectorsUI, '0')}</div>
+                    <div>Sectors: {fint(sectorsResolved, '0')}</div>
                     <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1304,7 +1307,7 @@ export default function HelixCore() {
             <ResonanceSchedulerTile
               mode={effectiveMode}
               duty={dutyUI}
-              sectors={sectorsUI}
+              sectors={sectorsResolved}
               freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
               sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
               currentSector={systemMetrics?.currentSector}
