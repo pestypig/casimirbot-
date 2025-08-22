@@ -151,10 +151,9 @@ type HelixMetrics = {
 };
 
 // --------------------------- Constants (UI only) ---------------------------
+import { HBAR, C, PI } from '@/lib/physics-const';
 
-const HBAR_C = 3.16152677e-26; // ħc (corrected from hc) J·m
-const PI = Math.PI;
-const C = 299_792_458;
+const HBAR_C = HBAR * C; // ħc J·m for Casimir calculations
 // Q_BURST removed - using cavity Q directly in physics calculations
 
 // ---------------------------- Helper utilities ----------------------------

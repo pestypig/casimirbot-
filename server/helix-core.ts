@@ -165,9 +165,7 @@ const AVAILABLE_FUNCTIONS = [
 ];
 
 // ── Local Casimir helpers (plates) ───────────────────────────────────────────
-const HBAR = 1.054_571_8e-34;           // J·s
-const C    = 299_792_458;               // m/s
-const PI   = Math.PI;
+import { HBAR, C, PI } from "./physics-const.js";
 
 // Energy per area:  E/A = −π² ℏ c / (720 a³)
 function casimirEnergyPerTile(gap_m: number, area_m2: number): number {
@@ -480,7 +478,6 @@ export function getSystemMetrics(req: Request, res: Response) {
   const activeTiles = tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  const C = 299_792_458;
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
   const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;
   const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
