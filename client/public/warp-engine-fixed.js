@@ -1173,27 +1173,30 @@ class WarpEngine {
 
             // Geometry amplitude should be monotonic with the slider and not instantly saturate.
             // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
-            const T_gain     = this.uniforms?.curvatureGainT ?? 0.375;
-            const boostMax   = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
-            const boostNow   = 1 + T_gain * (boostMax - 1);
+            const T_gain   = this.uniforms?.curvatureGainT ?? 0.375;
+            const boostMax = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
+            const boostNow = 1 + T_gain * (boostMax - 1);
 
-            // CPU-side parity protection (same as shader logic)
+            // Geometry must track *exaggeration* (userGain) as well:
+            const userGain = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+
+            // CPU-side parity protection (match shader's idea but keep it neutral by default)
             const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
-            const showGain  = physicsParityMode ? 1.0 : (this.uniforms?.displayGain ?? 1.0);
-            const vizSeason = physicsParityMode ? 1.0 : (this.uniforms?.vizGain ?? 1.0);
-            const tBlend    = physicsParityMode ? 0.0 : Math.max(0, Math.min(1, T_gain));
-            const tBoost    = physicsParityMode ? 1.0 : boostMax; // for amplitude blend
-            const tBoostNorm = physicsParityMode ? 1.0 : boostNow; // for normalization denominator (FIXED!)
-            
-            // Map 0..boostMax → 0..1 using the *current* gain (boostNow), not the theoretical max (tBoost)
+
+            // Vertex-local base magnitude (no viz seasoning here)
             const baseMag = Math.abs(xs_over_rs * df);
-            const magMax  = Math.log(1.0 + (baseMag * thetaScale * tBoost)   / zeroStop);   // slider at max
-            const magNow  = Math.log(1.0 + (baseMag * thetaScale * boostNow) / zeroStop);   // slider now
+
+            // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
+            // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
+            const magMax  = Math.log(1.0 + (baseMag * thetaScale * boostMax)          / zeroStop);      // slider @ max, no userGain
+            const magNow  = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);    // current slider × exaggeration
+
+            // Normalized geometry amplitude (monotonic in userGain AND boostNow)
             const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
-            
-            // Keep A_vis for color (can saturate) 
-            const norm = Math.log(1.0 + exposure);
-            const A_vis = Math.min(1.0, magNow / norm);            // 0..1
+
+            // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
+            const exposure = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+            const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
 
             // Special case: make standby perfectly flat if desired
             let disp;
@@ -1206,7 +1209,9 @@ class WarpEngine {
                 // No fixed bump; slider controls all visual scaling
                 
                 // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
-                const maxPush = 0.12 + 0.16 * (boostNow / Math.max(1, tBoost));  // 0.12→0.28 across the slider
+                // Let exaggeration raise the ceiling too, but gently (log so it doesn't jump)
+                const exgLog  = Math.log10(Math.max(1, userGain));
+                const maxPush = 0.12 + 0.10 * (boostNow / Math.max(1, boostMax)) + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
                 const softClamp = (x, m) => m * Math.tanh(x / m);
                 disp = softClamp(disp, maxPush);
                 

@@ -1,0 +1,65 @@
+1) Make geometry respond to userGain (core fix)
+
+File: the class you pasted, method _warpGridVertices
+
+Find this block (around where baseMag, magMax, magNow, and A_geom are computed):
+
+const T_gain     = this.uniforms?.curvatureGainT ?? 0.375;
+const boostMax   = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
+const boostNow   = 1 + T_gain * (boostMax - 1);
+
+// CPU-side parity protection (same as shader logic)
+const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
+const showGain  = physicsParityMode ? 1.0 : (this.uniforms?.displayGain ?? 1.0);
+const vizSeason = physicsParityMode ? 1.0 : (this.uniforms?.vizGain ?? 1.0);
+const tBlend    = physicsParityMode ? 0.0 : Math.max(0, Math.min(1, T_gain));
+const tBoost    = physicsParityMode ? 1.0 : boostMax; // for amplitude blend
+const tBoostNorm = physicsParityMode ? 1.0 : boostNow; // for normalization denominator (FIXED!)
+
+const baseMag = Math.abs(xs_over_rs * df);
+const magMax  = Math.log(1.0 + (baseMag * thetaScale * tBoost)   / zeroStop);
+const magNow  = Math.log(1.0 + (baseMag * thetaScale * boostNow) / zeroStop);
+const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
+
+
+Replace it with this:
+
+const T_gain   = this.uniforms?.curvatureGainT ?? 0.375;
+const boostMax = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
+const boostNow = 1 + T_gain * (boostMax - 1);
+
+// Geometry must track *exaggeration* (userGain) as well:
+const userGain = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+
+// CPU-side parity protection (match shader’s idea but keep it neutral by default)
+const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
+
+// Vertex-local base magnitude (no viz seasoning here)
+const baseMag = Math.abs(xs_over_rs * df);
+
+// IMPORTANT: include userGain in the *current* magnitude but NOT in the “max slider” denominator.
+// That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
+const magMax  = Math.log(1.0 + (baseMag * thetaScale * boostMax)          / zeroStop);      // slider @ max, no userGain
+const magNow  = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);    // current slider × exaggeration
+
+// Normalized geometry amplitude (monotonic in userGain AND boostNow)
+const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
+
+// For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
+const exposure = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
+
+
+Then scroll a bit lower and update the displacement ceiling to breathe with exaggeration as well (you already tied it to boostNow only). Replace this:
+
+const maxPush = 0.12 + 0.16 * (boostNow / Math.max(1, tBoost));  // 0.12→0.28 across the slider
+
+
+with this:
+
+// Let exaggeration raise the ceiling too, but gently (log so it doesn’t jump)
+const exgLog  = Math.log10(Math.max(1, userGain));
+const maxPush = 0.12 + 0.10 * (boostNow / Math.max(1, boostMax)) + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
+
+
+Everything else in the loop can stay the same (still using disp = gridK * A_geom * wallWin * front * sgn * ... and the softClamp).
