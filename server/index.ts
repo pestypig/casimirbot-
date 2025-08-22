@@ -9,6 +9,12 @@ app.use(express.urlencoded({ extended: false }));
 // Serve PDF files from attached_assets folder
 app.use('/attached_assets', express.static('attached_assets'));
 
+// Cache headers for warp engine bundles
+app.use('/warp-engine*.js', (req, res, next) => {
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  next();
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
