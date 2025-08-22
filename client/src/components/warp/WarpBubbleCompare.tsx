@@ -80,23 +80,34 @@ const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,num
 };
 
 
-// Race-proof primeOnce (ensures buffers exist before first update)
+function pushUniformsWhenReady(e: any, payload: any, retries = 12) {
+  if (!e) return;
+  const ready = !!(e.gridVertices && e.originalGridVertices);
+  if (ready) {
+    try { e.updateUniforms?.(payload); return; }
+    catch { /* fall through to retry */ }
+  }
+  if (retries > 0) {
+    requestAnimationFrame(() => pushUniformsWhenReady(e, payload, retries - 1));
+  } else {
+    console.warn('[WarpBubbleCompare] uniforms push timed out; engine not ready yet');
+  }
+}
+
 const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
   if (!e) return;
   const payload = { ...shared, colorMode };
 
-  // First time: bootstrap then one deferred update
+  // first boot: bootstrap, then defer one frame and push when ready
   if (!e._bootstrapped) {
     e.bootstrap?.(payload);
     e._bootstrapped = true;
-    requestAnimationFrame(() => {
-      try { e.updateUniforms?.(payload); } catch {}
-    });
+    requestAnimationFrame(() => pushUniformsWhenReady(e, payload));
     return;
   }
 
-  // Already bootstrapped: push immediately
-  e.updateUniforms?.(payload);
+  // already bootstrapped: still guard against early calls during async shader/link
+  pushUniformsWhenReady(e, payload);
 };
 
 // REAL = physics parity (no boosts), compact framing, theta color
@@ -108,7 +119,7 @@ const applyReal = (
 ) => {
   primeOnce(e, shared, colorMode);
   const camZ = compactCameraZ(canvas, shared.axesScene);
-  e.updateUniforms({
+  pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -147,7 +158,7 @@ const applyShow = (
   const b = Math.max(1, boostMax);
   const gainNow = 1 + t * (b - 1); // decades slider mapping
 
-  e.updateUniforms({
+  pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -263,8 +274,8 @@ export default function WarpBubbleCompare({
       requestAnimationFrame(() => {
         const zL = compactCameraZ(leftRef.current!,  shared.axesScene);
         const zR = compactCameraZ(rightRef.current!, shared.axesScene);
-        leftEngine.current.updateUniforms?.({ cameraZ: zL, lockFraming: true });
-        rightEngine.current.updateUniforms?.({ cameraZ: zR, lockFraming: true });
+        pushUniformsWhenReady(leftEngine.current, { cameraZ: zL, lockFraming: true });
+        pushUniformsWhenReady(rightEngine.current, { cameraZ: zR, lockFraming: true });
         leftEngine.current.requestRewarp?.();
         rightEngine.current.requestRewarp?.();
       });
