@@ -617,6 +617,18 @@ useEffect(() => {
     console.log(`🎛️ 3D DISPLAY GAIN: curvatureGainDec=${parameters.curvatureGainDec} → displayBoost=${boost.toFixed(2)}× (matches SliceViewer)`);
   }, [parameters.curvatureGainDec, parameters.curvatureBoostMax, isLoaded]);
 
+  useEffect(() => {
+    const s = Number(parameters.gridScale ?? 1.0);
+    // Update both the property and (for engines that re-read) the var
+    (window as any).sceneScale = Number.isFinite(s) ? s : 1.0;
+
+    // Optional: also poke the engine if it exposes a setter
+    if (engineRef.current?.setSceneScale) {
+      engineRef.current.setSceneScale((window as any).sceneScale);
+      engineRef.current.requestRewarp?.();
+    }
+  }, [parameters.gridScale, isLoaded]);
+
   // REMOVED: Global bridge - now using unified visual boost system passed via uniforms
 
   const toggleAnimation = () => {
