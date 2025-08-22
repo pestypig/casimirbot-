@@ -1,55 +1,47 @@
 import * as React from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
-import { toHUDModel, si, zetaStatusColor } from "@/lib/hud-adapter";
+import { toHUDModel } from "@/lib/hud-adapter";
 
-function fmtSI(t: number) {
-  if (!Number.isFinite(t)) return "—";
-  if (t >= 1) return `${t.toFixed(2)} s`;
-  if (t >= 1e-3) return `${(t*1e3).toFixed(2)} ms`;
-  if (t >= 1e-6) return `${(t*1e6).toFixed(2)} µs`;
-  if (t >= 1e-9) return `${(t*1e9).toFixed(2)} ns`;
-  return `${(t*1e12).toFixed(2)} ps`;
-}
+type ScaleProps = {
+  dwellMs?: number;
+  tauLcMs?: number;
+  burstMs?: number;
+  sectorIdx?: number;
+  sectorCount?: number;
+  phase?: number;
+};
 
-// linear map [0,max] -> [0,100%]
-function pct(v: number, max: number) {
-  return `${Math.min(100, Math.max(0, (v / max) * 100)).toFixed(3)}%`;
-}
-
-export default function LightSpeedStrobeScale() {
+export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const { data: metrics } = useMetrics();
   const { data: pipeline } = useEnergyPipeline();
-
-  // Use HUD adapter for drift-proof field access
   const hud = toHUDModel({ ...(pipeline || {}), ...(metrics || {}) } as any);
-  
-  // --- Inputs with graceful fallbacks ---
-  const fGHz = (pipeline as any)?.modulationFreq_GHz ?? 15.0;              // 15 GHz default
-  const Tm   = 1 / (fGHz * 1e9);                                   // s
-  const tauLC = hud.TS_long * Tm;                                   // s (conservative long axis)
-  const Tsec = hud.sectorPeriod_ms / 1000;                        // s per sector
-  const sectors = hud.sectorsConcurrent;                          // concurrent live sectors
-  const dutyFR = hud.dutyShip;                                     // authoritative ship-wide duty
 
-  // pick a shared max for the bar
-  const tMax = Math.max(tauLC, Tm, Tsec) || 1;
+  // Prefer props; fall back to HUD
+  const fGHz  = (pipeline as any)?.modulationFreq_GHz ?? 15.0;
+  const Tm    = 1 / (fGHz * 1e9);
 
-  // tiny animation 0..1 on ~2 second cycle (doesn't affect physics)
+  const tauLC = Number.isFinite(props.tauLcMs) ? props.tauLcMs! / 1000 : (hud.TS_long * Tm);
+  const Tsec  = Number.isFinite(props.dwellMs) ? props.dwellMs! / 1000 : (hud.sectorPeriod_ms / 1000);
+  const burst = Number.isFinite(props.burstMs) ? props.burstMs! / 1000 : (hud.dutyShip * Tsec);
+
+  const sectors   = hud.sectorsConcurrent;
+  const dutyFR    = hud.dutyShip;
+
+  const tMax = Math.max(tauLC || 0, Tm || 0, Tsec || 0) || 1;
+
+  const passBurstVsTau = Number.isFinite(burst) && Number.isFinite(tauLC) ? (burst < tauLC) : false;
+  const passDwellVsTau = Number.isFinite(Tsec)  && Number.isFinite(tauLC) ? (Tsec  >= tauLC) : false;
+
+  // small animation
   const [tick, setTick] = React.useState(0);
   React.useEffect(() => {
-    let raf = 0;
-    let t0 = performance.now();
-    const loop = (t: number) => {
-      const dt = (t - t0) / 2000; // 2s
-      setTick((dt % 1 + 1) % 1);
-      raf = requestAnimationFrame(loop);
-    };
+    let raf = 0, t0 = performance.now();
+    const loop = (t: number) => { setTick((((t - t0) / 2000) % 1 + 1) % 1); raf = requestAnimationFrame(loop); };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  // Mode tint
   const mode = ((pipeline as any)?.currentMode ?? "hover").toLowerCase();
   const modeTint =
     mode === "standby"   ? "from-slate-700/40 to-slate-800/40" :
@@ -57,6 +49,18 @@ export default function LightSpeedStrobeScale() {
     mode === "hover"     ? "from-sky-700/30 to-slate-800/40"   :
     mode === "emergency" ? "from-rose-700/30 to-slate-800/40"  :
                            "from-slate-700/40 to-slate-800/40";
+
+  const pct = (v: number, max: number) =>
+    `${Math.min(100, Math.max(0, (v / (max || 1)) * 100)).toFixed(3)}%`;
+
+  const fmtSI = (t: number) => {
+    if (!Number.isFinite(t)) return "—";
+    if (t >= 1) return `${t.toFixed(2)} s`;
+    if (t >= 1e-3) return `${(t*1e3).toFixed(2)} ms`;
+    if (t >= 1e-6) return `${(t*1e6).toFixed(2)} µs`;
+    if (t >= 1e-9) return `${(t*1e9).toFixed(2)} ns`;
+    return `${(t*1e12).toFixed(2)} ps`;
+  };
 
   return (
     <div className={`rounded-lg border bg-gradient-to-br ${modeTint} p-4`}>
@@ -67,73 +71,64 @@ export default function LightSpeedStrobeScale() {
         </div>
       </div>
 
-      {/* Ruler */}
       <div className="relative h-16 rounded-md bg-black/40 border border-white/10 overflow-hidden">
-        {/* base track */}
-        <div className="absolute inset-y-0 left-0 right-0">
-          <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white/10" />
-        </div>
+        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white/10" />
 
-        {/* τ_LC marker (gold dot + label) */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: pct(tauLC, tMax) }}
-        >
+        {/* τ_LC */}
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(tauLC, tMax) }}>
           <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-yellow-300">
             τₗc {fmtSI(tauLC)}
           </div>
         </div>
 
-        {/* T_m marker (cyan) */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: pct(Tm, tMax) }}
-        >
+        {/* T_m */}
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tm, tMax) }}>
           <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-cyan-300">
             Tₘ {fmtSI(Tm)}
           </div>
         </div>
 
-        {/* T_sec marker (violet) */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: pct(Tsec, tMax) }}
-        >
+        {/* T_sec */}
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tsec, tMax) }}>
           <div className="w-2 h-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-violet-300">
             Tₛₑc {fmtSI(Tsec)}
           </div>
         </div>
 
-        {/* animated tracer along the ruler */}
+        {/* Burst window (drawn as a faint span starting at sector start) */}
         <div
-          className="absolute top-1/2 -translate-y-1/2"
-          style={{ left: `${tick * 100}%` }}
-        >
+          className="absolute top-1/2 -translate-y-1/2 h-[6px] bg-white/10 rounded-sm"
+          style={{ left: pct(0, tMax), width: pct(burst, tMax) }}
+          title="Local FR window (burst)"
+        />
+
+        {/* tracer */}
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `${tick * 100}%` }}>
           <div className="w-[6px] h-[6px] rounded-full bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend + compliance */}
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />
-          τₗc: light-crossing time (long axis)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-cyan-400" />
-          Tₘ: modulation period (1/fₘ)
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-violet-400" />
-          Tₛₑc: per-sector dwell
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-white/70" />
-          Duty (FR proxy): {(dutyFR*100).toFixed(3)}%
-        </div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />τₗc: light-crossing</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-cyan-400" />Tₘ: modulation</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" />Tₛₑc: dwell per sector</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-white/70" />Duty (FR): {(dutyFR*100).toFixed(3)}%</div>
+      </div>
+
+      <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
+        <span className={`px-2 py-0.5 rounded border ${passBurstVsTau ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-red-500/15 border-red-500/30 text-red-300'}`}>
+          burst &lt; τₗc: {passBurstVsTau ? 'PASS' : 'WARN'}
+        </span>
+        <span className={`px-2 py-0.5 rounded border ${passDwellVsTau ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300'}`}>
+          Tₛₑc ≥ τₗc: {passDwellVsTau ? 'PASS' : 'CHECK'}
+        </span>
+        <span className="px-2 py-0.5 rounded border border-white/10 text-slate-300">
+          sectors: {sectors}
+        </span>
       </div>
     </div>
   );
