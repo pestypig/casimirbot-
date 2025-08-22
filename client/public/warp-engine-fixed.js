@@ -1174,14 +1174,15 @@ class WarpEngine {
             const showGain  = physicsParityMode ? 1.0 : (this.uniforms?.displayGain ?? 1.0);
             const vizSeason = physicsParityMode ? 1.0 : (this.uniforms?.vizGain ?? 1.0);
             const tBlend    = physicsParityMode ? 0.0 : Math.max(0, Math.min(1, T_gain));
-            const tBoost    = physicsParityMode ? 1.0 : boostMax;
+            const tBoost    = physicsParityMode ? 1.0 : boostMax; // for amplitude blend
+            const tBoostNorm = physicsParityMode ? 1.0 : boostNow; // for normalization denominator (FIXED!)
             
             // Parity-protected amplitude scaling (matching shader logic)
             const amp = thetaScale * userGain * showGain * vizSeason * (1.0 + tBlend * (tBoost - 1.0));
             const val = xs_over_rs * df * amp;
             const num   = Math.log(1.0 + Math.abs(val) / zeroStop);
-            // Remove mode scaling from geometry - keep modes visual-only elsewhere
-            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * tBoost) / zeroStop));
+            // FIXED: Use actual current gain (boostNow) for normalization, not fixed max (boostMax)
+            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * tBoostNorm) / zeroStop));
             const A_geom = Math.pow(Math.min(1.0, num / denom), 0.85); // 0..1, tracks the UI gain with gentle curve
             
             // Keep A_vis for color (can saturate)
