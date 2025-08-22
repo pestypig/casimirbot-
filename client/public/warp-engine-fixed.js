@@ -779,7 +779,7 @@ class WarpEngine {
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
-        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // Semi-axes in meters
+        const hullAxes = bubbleParams.hullAxes || [503.5, 132, 86.5]; // semi-axes [a,b,c] in meters
         // Clean wall thickness handling - use either meters or ρ-units
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
         const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
@@ -787,9 +787,15 @@ class WarpEngine {
         const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho : undefined;
         const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
         
-        // Single scene scale based on long semi-axis (scientifically faithful)
-        const sceneScale = 1.0 / a;  // Make long semi-axis = 1 scene unit
-        const axesScene = [a * sceneScale, b * sceneScale, c * sceneScale]; // Exact aspect ratio [1, b/a, c/a]
+        // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.
+        const axesScene =
+          (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
+            ? this.uniforms.axesClip
+            : (() => {
+                const aMax = Math.max(a, b, c);
+                const s    = 1.0 / Math.max(aMax, 1e-9);
+                return [a * s, b * s, c * s];
+              })();
         
         // Use the computed w_rho from above
         
