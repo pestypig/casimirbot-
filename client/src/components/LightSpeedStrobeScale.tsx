@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { toHUDModel, si, zetaStatusColor } from "@/lib/hud-adapter";
 
 function fmtSI(t: number) {
   if (!Number.isFinite(t)) return "—";
@@ -20,22 +21,16 @@ export default function LightSpeedStrobeScale() {
   const { data: metrics } = useMetrics();
   const { data: pipeline } = useEnergyPipeline();
 
+  // Use HUD adapter for drift-proof field access
+  const hud = toHUDModel({ ...(pipeline || {}), ...(metrics || {}) } as any);
+  
   // --- Inputs with graceful fallbacks ---
   const fGHz = (pipeline as any)?.modulationFreq_GHz ?? 15.0;              // 15 GHz default
   const Tm   = 1 / (fGHz * 1e9);                                   // s
-  const TS   = (metrics as any)?.TS_ratio ?? 1;                              // τlc / Tm
-  const tauLC = TS * Tm;                                            // s (conservative long axis)
-  // Sector dwell (per active slice)
-  const sectorPeriod_ms = (metrics as any)?.sectorPeriod_ms;                 // ms if provided
-  // If not provided, estimate from sectors & a sweep-rate hint (strobeHz)
-  const sectors = (metrics as any)?.sectorStrobing ?? (pipeline as any)?.sectorStrobing ?? 1;
-  const strobeHz = (metrics as any)?.strobeHz ?? 2000;                       // Hz sweep (fallback)
-  const Tsec = Number.isFinite(sectorPeriod_ms)
-    ? (sectorPeriod_ms! / 1000)
-    : 1 / Math.max(1, strobeHz) / Math.max(1, sectors);             // s per sector (est.)
-
-  // Duty proxy the Ford–Roman way (instantaneous, not averaged)
-  const dutyFR = (metrics as any)?.dutyEffectiveFR ?? ((pipeline as any)?.dutyCycle ?? 0.14);
+  const tauLC = hud.TS_long * Tm;                                   // s (conservative long axis)
+  const Tsec = hud.sectorPeriod_ms / 1000;                        // s per sector
+  const sectors = hud.sectorsConcurrent;                          // concurrent live sectors
+  const dutyFR = hud.dutyShip;                                     // authoritative ship-wide duty
 
   // pick a shared max for the bar
   const tMax = Math.max(tauLC, Tm, Tsec) || 1;

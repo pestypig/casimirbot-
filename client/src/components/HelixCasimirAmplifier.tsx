@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Activity, Zap, Sigma, Atom, Gauge, RadioReceiver, Thermometer, CircuitBoard, ScanSearch, ShieldCheck } from "lucide-react";
+import { toHUDModel, si, zetaStatusColor } from "@/lib/hud-adapter";
 import CavitySideView from "./CavitySideView";
 import { usePollingSmart } from "@/lib/usePollingSmart";
 import {
@@ -402,6 +403,9 @@ export default function HelixCasimirAmplifier({
     minMs: 10000, maxMs: 30000, dedupeKey: "helix:state"
   });
 
+  // Use HUD adapter for drift-proof field access
+  const hud = toHUDModel({ ...(state || {}), ...(metrics || {}) } as any);
+
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   
@@ -445,10 +449,10 @@ export default function HelixCasimirAmplifier({
 
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
-    const gammaGeo = state.gammaGeo;
-    const qMech    = state.qMechanical ?? 1;         // mech gain
-    const N_tiles  = state.N_tiles ?? metrics.totalTiles;
-    const gammaVdB = state.gammaVanDenBroeck ?? metrics.gammaVanDenBroeck ?? 1;
+    const gammaGeo = hud.gammaGeo;
+    const qMech    = hud.qMech;                      // mech gain
+    const N_tiles  = hud.tilesTotal;
+    const gammaVdB = hud.gammaVdB;
 
     // power chain (per tile → ship)
     const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
@@ -456,7 +460,7 @@ export default function HelixCasimirAmplifier({
     const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // physics
     const P_tile_instant_W = gateOn ? P_tile_on : 0;  // display-gated
     const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
-    const P_ship_avg_report_MW = state.P_avg;        // authoritative calibration (if provided)
+    const P_ship_avg_report_MW = hud.powerMW;        // authoritative calibration (if provided)
 
     // mass chain (no Q in energy; Q is for power)
     const geo3        = Math.pow(gammaGeo, 3);
@@ -465,7 +469,7 @@ export default function HelixCasimirAmplifier({
     const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
     const M_tile      = E_tile_mass / (C * C);                 // kg per tile
     const M_total_calc   = M_tile * N_tiles;
-    const M_total_report = state.M_exotic ?? metrics.exoticMass;
+    const M_total_report = hud.exoticMassKg;
 
     // casimir foundation (unchanged)
     const gap_m       = Math.max(1e-12, (state.gap_nm ?? 16) * 1e-9);
