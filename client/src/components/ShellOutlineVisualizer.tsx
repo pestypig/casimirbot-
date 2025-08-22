@@ -28,6 +28,10 @@ type Props = {
     qMechanical?: number;
     modulationHz?: number;        // convenience (else derive from pipeline GHz)
     mech?: MechanicalParams;
+    // Ford-Roman window + light-crossing data
+    dutyEffectiveFR?: number;     // authoritative burst/dwell ratio
+    lightCrossing?: { tauLC_ms?: number; dwell_ms?: number; burst_ms?: number; };
+    zeta?: number;                // Ford-Roman ζ for breach warnings
   };
 };
 
@@ -88,6 +92,11 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
       f0_Hz: f0,
       mechZeta: zeta,
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
+      
+      // Ford-Roman window + light-crossing data
+      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
+      lightCrossing: parameters?.lightCrossing,
+      zeta: parameters?.zeta
     };
     engineRef.current.bootstrap(initialUniforms);
   }, [ready]);
@@ -113,9 +122,14 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
       f0_Hz: f0,
       mechZeta: zeta,
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
+      
+      // Ford-Roman window + light-crossing data
+      dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
+      lightCrossing: parameters?.lightCrossing,
+      zeta: parameters?.zeta
     };
     engineRef.current.updateUniforms(updatedUniforms);
-  }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain]);
+  }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain, parameters?.dutyEffectiveFR, parameters?.lightCrossing, parameters?.zeta]);
 
   return (
     <div className="rounded-xl overflow-hidden bg-black">

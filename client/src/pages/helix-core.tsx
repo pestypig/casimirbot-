@@ -820,6 +820,10 @@ export default function HelixCore() {
                   mechZeta: undefined,          // infer from qMechanical if omitted
                   mechCoupling: 0.65,           // tweak visual strength 0..1
                 },
+                // 🔽 Ford-Roman window + light-crossing data
+                dutyEffectiveFR,
+                lightCrossing: lc,
+                zeta: pipeline?.zeta,
               }}
             />
             
