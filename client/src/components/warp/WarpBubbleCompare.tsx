@@ -196,6 +196,18 @@ export default function WarpBubbleCompare({
 
         const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
 
+        // ensure only the calibrated hull model draws
+        const killMixing = {
+          modelMode: 'calibrated',   // engine will prefer calibrated chain
+          // defensively zero any demo weights if the engine exposes them:
+          unitBubbleWeight: 0,
+          demoBubbleWeight: 0,
+          refHullAlpha: 0,
+          onWindow: false,           // no instantaneous overlay
+        };
+        pushUniformsWhenReady(leftEngine.current,  killMixing);
+        pushUniformsWhenReady(rightEngine.current, killMixing);
+
         // neutralize stray demo globals
         (window as any).__warp_setGainDec = () => {};
         (window as any).__warp_setCosmetic = () => {};
@@ -250,6 +262,18 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
     const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+
+    // ensure only the calibrated hull model draws
+    const killMixing = {
+      modelMode: 'calibrated',   // engine will prefer calibrated chain
+      // defensively zero any demo weights if the engine exposes them:
+      unitBubbleWeight: 0,
+      demoBubbleWeight: 0,
+      refHullAlpha: 0,
+      onWindow: false,           // no instantaneous overlay
+    };
+    pushUniformsWhenReady(leftEngine.current,  killMixing);
+    pushUniformsWhenReady(rightEngine.current, killMixing);
 
     applyReal(leftEngine.current,  shared, leftRef.current,  (parameters?.viz?.colorMode ?? colorMode) as any);
 
