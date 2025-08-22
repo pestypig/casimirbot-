@@ -141,6 +141,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const [isRunning, setIsRunning] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [diag, setDiag] = useState<any|null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [initNonce, setInitNonce] = useState(0); // bump to retry
 
   // --- Simple per-mode defaults for interior tilt (demo-friendly) ---
   // You can later replace this with the exact value from the Shift Vector panel
