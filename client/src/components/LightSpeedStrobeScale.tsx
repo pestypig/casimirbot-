@@ -29,6 +29,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const dutyFR    = hud.dutyShip;
 
   const tMax = Math.max(tauLC || 0, Tm || 0, Tsec || 0) || 1;
+  const tPad = tMax * 1.08; // 8% headroom so labels don't clip
 
   const passBurstVsTau = Number.isFinite(burst) && Number.isFinite(tauLC) ? (burst < tauLC) : false;
   const passDwellVsTau = Number.isFinite(Tsec)  && Number.isFinite(tauLC) ? (Tsec  >= tauLC) : false;
@@ -75,7 +76,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-white/10" />
 
         {/* τ_LC */}
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(tauLC, tMax) }}>
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(tauLC, tPad) }} aria-label={`tauLC ${fmtSI(tauLC)}`}>
           <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-yellow-300">
             τₗc {fmtSI(tauLC)}
@@ -83,7 +84,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         </div>
 
         {/* T_m */}
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tm, tMax) }}>
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tm, tPad) }} aria-label={`Tm ${fmtSI(Tm)}`}>
           <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-cyan-300">
             Tₘ {fmtSI(Tm)}
@@ -91,7 +92,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         </div>
 
         {/* T_sec */}
-        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tsec, tMax) }}>
+        <div className="absolute top-1/2 -translate-y-1/2" style={{ left: pct(Tsec, tPad) }} aria-label={`Tsec ${fmtSI(Tsec)}`}>
           <div className="w-2 h-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.9)]" />
           <div className="absolute top-2 left-1 translate-x-1 text-[10px] text-violet-300">
             Tₛₑc {fmtSI(Tsec)}
@@ -101,7 +102,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         {/* Burst window (drawn as a faint span starting at sector start) */}
         <div
           className="absolute top-1/2 -translate-y-1/2 h-[6px] bg-white/10 rounded-sm"
-          style={{ left: pct(0, tMax), width: pct(burst, tMax) }}
+          style={{ left: pct(0, tPad), width: pct(burst, tPad) }}
           title="Local FR window (burst)"
         />
 
@@ -116,7 +117,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />τₗc: light-crossing</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-cyan-400" />Tₘ: modulation</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" />Tₛₑc: dwell per sector</div>
-        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-white/70" />Duty (FR): {(dutyFR*100).toFixed(3)}%</div>
+        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-white/70" />Duty (FR): {(dutyFR*100).toFixed(3)}% • burst {fmtSI(burst)}</div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
