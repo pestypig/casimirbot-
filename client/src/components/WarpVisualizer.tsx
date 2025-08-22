@@ -954,7 +954,7 @@ useEffect(() => {
                 <div>mode: {diag.mode}</div>
                 <div>sectors: {diag.sectors}</div>
                 <div>phase: {diag.phase?.toFixed?.(2) ?? '—'}</div>
-                <div>duty: {diag.duty != null ? (diag.duty*100).toFixed(2)+'%' : '—'}</div>
+                <div>duty: {(100 * (diag.duty ?? 0)).toFixed(2)}%</div>
               </div>
               <div>
                 <div>β_inst: {diag.beta_inst?.toExponential?.(2) ?? '—'}</div>
