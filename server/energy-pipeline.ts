@@ -412,8 +412,8 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // Keep these around for the metrics + HUD
   state.__fr = {
-    dutyInstant: d_eff,     // Paper-authentic d_eff (was UI duty)
-    dutyEffectiveFR: d_eff, // Same as dutyInstant (no scaling)
+    dutyShip: d_eff,        // Ship-wide effective duty (averaged over sectors)
+    dutyEffectiveFR: d_eff, // Same as dutyShip (Ford-Roman compliance)
     zeta_baseline: zeta0,   // Baseline ζ = 0.84 for scaling reference
   };
   
