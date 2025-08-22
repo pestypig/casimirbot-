@@ -10,6 +10,8 @@ const GRID_DEFAULTS = {
   divisions: 100       // more lines so a larger grid still looks dense
 };
 
+const SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
+
 class WarpEngine {
     constructor(canvas) {
         this.canvas = canvas;
@@ -1096,7 +1098,7 @@ class WarpEngine {
         // Update uniforms for scientific consistency (using scene-scaled axes)
         this.uniforms.axesClip = axesScene;
         this.uniforms.wallWidth = w_rho;
-        this.uniforms.hullDimensions = { a, b, c, aH, sceneScale, wallWidth_m };
+        this.uniforms.hullDimensions = { a, b, c, aH, SCENE_SCALE, wallWidth_m };
         
         // Regenerate grid with proper span for hull size
         if (Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
