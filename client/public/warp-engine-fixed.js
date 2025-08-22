@@ -662,7 +662,8 @@ class WarpEngine {
         // Mirror pipeline fields into uniforms for diagnostics
         this.uniforms = {
             ...this.uniforms,
-            vizGain: 4,
+            vizGain: Number.isFinite(parameters.vizGain) ? +parameters.vizGain
+                   : (this.uniforms?.vizGain ?? 1.0),
             colorByTheta: 1,
             vShip: parameters.vShip || 1,
             wallWidth: parameters.wallWidth || 0.06,
