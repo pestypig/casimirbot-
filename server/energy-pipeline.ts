@@ -349,8 +349,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
 
   // Power-only calibration (qMechanical): hit per-mode target *without* touching mass
+  const CALIBRATED = (MODEL_MODE === 'calibrated');
   const P_target_W = MODE_POLICY[state.currentMode].P_target_W;
-  if (P_target_W > 0 && P_total_W > 0) {
+  if (CALIBRATED && P_target_W > 0 && P_total_W > 0) {
     const scaleP = P_target_W / P_total_W;
     state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical * scaleP)); // knob #1: power only (clamped)
     state.U_Q         = state.U_geo * state.qMechanical;
@@ -375,7 +376,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Mass-only calibration: hit per-mode mass target without changing power
   const M_target = MODE_POLICY[state.currentMode].M_target_kg;
   const userM = state.exoticMassTarget_kg ?? M_target;
-  if (userM > 0 && M_total > 0) {
+  if (CALIBRATED && userM > 0 && M_total > 0) {
     const scaleM = userM / M_total;
     state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, state.gammaVanDenBroeck * scaleM)); // knob #2: mass only (clamped)
     E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
@@ -386,6 +387,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   }
   state.M_exotic_raw = M_total;
   state.M_exotic     = M_total;
+  
+  // Mass calibration readout
+  state.massCalibration = state.gammaVanDenBroeck / GAMMA_VDB;
 
   // 7) Quantum-safety proxy (scaled against baseline ship-wide duty)
   const d_ship = d_eff;                              // ship-wide
@@ -480,7 +484,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
   const ui = MODE_CONFIGS[state.currentMode];
   state.dutyCycle       = ui.dutyCycle;
-  state.sectorStrobing  = resolveSLive(state.currentMode);  // ✅ Match physics concurrency (emergency=2, others=1)
+  state.sectorCount     = TOTAL_SECTORS;                    // ✅ Total sectors for sampling (always 400)
+  state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
+  state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
   state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   // UI field updates logging (after MODE_CONFIGS applied)
@@ -530,7 +536,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
 
   const nTheta = req.nTheta ?? 64;
   const nPhi   = req.nPhi ?? 32;
-  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorStrobing ?? 1));
+  const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
   const split   = sectors > 1 ? Math.floor(sectors / 2) : 0;
 
   // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
