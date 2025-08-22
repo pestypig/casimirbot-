@@ -591,7 +591,7 @@ useEffect(() => {
         curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
         
         // Viz overrides
-        colorMode: parameters.viz?.colorMode ?? (parameters.curvatureGainDec != null ? undefined : 'theta'),
+        colorMode: parameters.viz?.colorMode ?? 'theta',
         exposure: parameters.viz?.exposure ?? undefined,
         zeroStop: parameters.viz?.zeroStop ?? undefined,
         cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined,
