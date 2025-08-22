@@ -36,7 +36,7 @@ class WarpEngine {
         this._uniformsDirty = false;
         
         // Debug mode and performance tracking
-        this._debugMode = false;
+        this._debugMode = !!(location.search && /debug=1/.test(location.search));
         this._lastDebugTime = 0;
         this._lastRenderLog = 0;
         
