@@ -376,6 +376,11 @@ class WarpEngine {
             "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
             "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
             "uniform float u_userGain;\n" +     // unified curvature gain from UI slider
+            "uniform bool  u_physicsParityMode;\n" + // parity mode flag
+            "uniform float u_displayGain;\n" +   // display gain multiplier
+            "uniform float u_vizGain;\n" +       // visual mode seasoning
+            "uniform float u_curvatureGainT;\n" + // time blending factor
+            "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
@@ -396,6 +401,12 @@ class WarpEngine {
             "        frag = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
+            "    // derive effective gains (parity protection)\n" +
+            "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
+            "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
+            "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
+            "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
+            "    \n" +
             "    vec3 pN = v_pos / u_axes;\n" +
             "    float rs = length(pN) + 1e-6;\n" +
             "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
@@ -407,9 +418,11 @@ class WarpEngine {
             "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
             "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
             "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
-            "    // Shared amplitude/log mapping (both go through same chain so scales match)\n" +
-            "    float valTheta  = theta      * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float valShear  = shearProxy * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    // Parity-protected amplitude scaling\n" +
+            "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
+            "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
+            "    float valTheta  = theta      * amp;\n" +
+            "    float valShear  = shearProxy * amp;\n" +
             "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
             "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
             "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
@@ -450,6 +463,11 @@ class WarpEngine {
             "uniform float u_zeroStop;\n" +
             "uniform float u_thetaScale;\n" +
             "uniform float u_userGain;\n" +
+            "uniform bool  u_physicsParityMode;\n" + // parity mode flag
+            "uniform float u_displayGain;\n" +   // display gain multiplier
+            "uniform float u_vizGain;\n" +       // visual mode seasoning
+            "uniform float u_curvatureGainT;\n" + // time blending factor
+            "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
@@ -469,6 +487,12 @@ class WarpEngine {
             "        gl_FragColor = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
+            "    // derive effective gains (parity protection)\n" +
+            "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
+            "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
+            "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
+            "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
+            "    \n" +
             "    vec3 pN = v_pos / u_axes;\n" +
             "    float rs = length(pN) + 1e-6;\n" +
             "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
@@ -480,9 +504,11 @@ class WarpEngine {
             "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
             "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
             "    float shearProxy = abs(dfdrs) * sinphi * u_vShip;\n" +
-            "    // Shared amplitude/log mapping (both go through same chain so scales match)\n" +
-            "    float valTheta  = theta      * u_thetaScale * max(1.0, u_userGain);\n" +
-            "    float valShear  = shearProxy * u_thetaScale * max(1.0, u_userGain);\n" +
+            "    // Parity-protected amplitude scaling\n" +
+            "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
+            "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
+            "    float valTheta  = theta      * amp;\n" +
+            "    float valShear  = shearProxy * amp;\n" +
             "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
             "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
             "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
@@ -548,6 +574,11 @@ class WarpEngine {
             zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
             thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
             userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain'),
+            physicsParityMode: gl.getUniformLocation(this.gridProgram, 'u_physicsParityMode'),
+            displayGain: gl.getUniformLocation(this.gridProgram, 'u_displayGain'),
+            vizGain: gl.getUniformLocation(this.gridProgram, 'u_vizGain'),
+            curvatureGainT: gl.getUniformLocation(this.gridProgram, 'u_curvatureGainT'),
+            curvatureBoostMax: gl.getUniformLocation(this.gridProgram, 'u_curvatureBoostMax'),
             colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode')
         };
         this.gridAttribs = {
@@ -1137,11 +1168,19 @@ class WarpEngine {
             const boostMax   = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
             const boostNow   = 1 + T_gain * (boostMax - 1);
 
-            // Use natural log like the shader, but normalize by the "max boost" so result is in [0,1]
-            const val = xs_over_rs * df * thetaScale * userGain;
+            // CPU-side parity protection (same as shader logic)
+            const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
+            const showGain  = physicsParityMode ? 1.0 : (this.uniforms?.displayGain ?? 1.0);
+            const vizSeason = physicsParityMode ? 1.0 : (this.uniforms?.vizGain ?? 1.0);
+            const tBlend    = physicsParityMode ? 0.0 : Math.max(0, Math.min(1, T_gain));
+            const tBoost    = physicsParityMode ? 1.0 : boostMax;
+            
+            // Parity-protected amplitude scaling (matching shader logic)
+            const amp = thetaScale * userGain * showGain * vizSeason * (1.0 + tBlend * (tBoost - 1.0));
+            const val = xs_over_rs * df * amp;
             const num   = Math.log(1.0 + Math.abs(val) / zeroStop);
             // Remove mode scaling from geometry - keep modes visual-only elsewhere
-            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * boostMax) / zeroStop));
+            const denom = Math.max(1e-12, Math.log(1.0 + (xs_over_rs * df * thetaScale * tBoost) / zeroStop));
             const A_geom = Math.pow(Math.min(1.0, num / denom), 0.85); // 0..1, tracks the UI gain with gentle curve
             
             // Keep A_vis for color (can saturate)
@@ -1310,6 +1349,11 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
         gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
         gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
+        gl.uniform1i(this.gridUniforms.physicsParityMode, this.uniforms?.physicsParityMode ? 1 : 0);
+        gl.uniform1f(this.gridUniforms.displayGain, this.uniforms?.displayGain || 1.0);
+        gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
+        gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
+        gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
         gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
         
         // Render as lines for better visibility
