@@ -784,7 +784,7 @@ class WarpEngine {
         }
 
         // Log tilt uniforms for diagnostics
-        if (this._diagEnabled || true) {  // Always log for now
+        if (this._diagEnabled) {
           console.log('🎛️ Tilt uniforms:', {
             epsilonTilt: this.uniforms?.epsilonTilt,
             tiltGain: this.uniforms?.tiltGain,
