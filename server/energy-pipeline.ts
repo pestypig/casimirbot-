@@ -462,7 +462,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // Apply mode configuration directly from MODE_CONFIGS (eliminates duplicate table and drift)
   const ui = MODE_CONFIGS[state.currentMode];
   state.dutyCycle       = ui.dutyCycle;
-  state.sectorStrobing  = ui.sectorStrobing;   // ✅ Use mode-specific value (hover=1, cruise=1, emergency=1)
+  state.sectorStrobing  = resolveSLive(state.currentMode);  // ✅ Match physics concurrency (emergency=2, others=1)
   state.qSpoilingFactor = ui.qSpoilingFactor;  // ✅ Use consistent value (cruise=0.625)
   
   return state;
