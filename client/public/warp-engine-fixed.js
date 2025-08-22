@@ -122,7 +122,10 @@ class WarpEngine {
             // comparison helpers
             physicsParityMode: false,
             lockFraming: true,
-            cameraZ: null
+            cameraZ: null,
+            
+            // ridge visualization mode
+            ridgeMode: 0  // 0 = physics df (double-lobe), 1 = single crest at ρ=1
         };
         
         // Initialize rendering pipeline
@@ -154,6 +157,10 @@ class WarpEngine {
             try { this.setCosmeticLevel(level); } catch(e){ console.warn(e); }
         };
         window.__warp_setCosmetic = this.__warp_setCosmetic;
+
+        // Ridge mode toggles (optional quick access)
+        window.__warp_singleRidge = () => this.updateUniforms({ ridgeMode: 1 });
+        window.__warp_physicsRidge = () => this.updateUniforms({ ridgeMode: 0 });
 
         // One-click presets
         window.__warp_truePhysics = () => {
@@ -632,6 +639,7 @@ class WarpEngine {
 
         // --- Parity / visualization ---
         const parity = !!parameters?.physicsParityMode;
+        const ridgeMode = (parameters?.ridgeMode ?? this.uniforms?.ridgeMode ?? 0)|0;
         const colorMode = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
         const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
         const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
@@ -663,6 +671,7 @@ class WarpEngine {
 
           // visualization / parity
           physicsParityMode: parity,
+          ridgeMode,
           colorMode, exposure, zeroStop,
           vizGain,
           curvatureGainT: curvT,
