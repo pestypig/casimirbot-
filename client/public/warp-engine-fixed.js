@@ -96,13 +96,17 @@ class WarpEngine {
         
         // Expose strobing sync function globally
         window.setStrobingState = ({ sectorCount, currentSector, split }) => {
-            this.strobingState.sectorCount  = sectorCount;
-            this.strobingState.currentSector= currentSector;
-            // update visual strobing immediately
-            this.updateUniforms({
-              sectors: Math.max(1, sectorCount|0),
-              split: Number.isFinite(split) ? Math.max(0, Math.min((sectorCount|0)-1, split|0)) : this.uniforms?.split
-            });
+            try {
+                this.strobingState.sectorCount  = Math.max(1, sectorCount|0);
+                this.strobingState.currentSector= Math.max(0, currentSector|0) % this.strobingState.sectorCount;
+                // update visual strobing immediately
+                this.updateUniforms({
+                  sectors: this.strobingState.sectorCount,
+                  split: Number.isFinite(split) ? Math.max(0, Math.min(this.strobingState.sectorCount-1, split|0)) : this.uniforms?.split
+                });
+            } catch (e) {
+                console.warn("WarpEngine.setStrobingState error:", e);
+            }
         };
         // Expose curvature gain setter for the UI slider (0..8 decades)
         this.__warp_setGainDec = (dec, max = 40) => {
