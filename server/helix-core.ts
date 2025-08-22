@@ -371,6 +371,15 @@ const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_PER_MINUTE = 10;
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 
+function clientKey(req: Request) {
+  const h = req.headers;
+  return (h['cf-connecting-ip'] as string)
+      || (h['x-forwarded-for'] as string)?.split(',')[0]?.trim()
+      || req.ip
+      || (req.socket as any).remoteAddress
+      || 'unknown';
+}
+
 function checkRateLimit(clientId: string): boolean {
   const now = Date.now();
   const rec = rateLimitMap.get(clientId);
@@ -405,7 +414,7 @@ export async function handleHelixCommand(req: Request, res: Response) {
     }
     
     // Rate limiting
-    const clientId = req.ip || req.socket.remoteAddress || 'unknown';
+    const clientId = clientKey(req);
     if (!checkRateLimit(clientId)) {
       res.setHeader('X-RateLimit-Limit', RATE_LIMIT_PER_MINUTE.toString());
       res.setHeader('X-RateLimit-Remaining', '0');
