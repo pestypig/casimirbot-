@@ -302,35 +302,32 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
 function checkMetricViolation(metricType: string) {
   const s = getGlobalPipelineState();
   const C2 = 9e16;
-  const massPerTile = Math.abs(s.U_cycle) / C2;
+  const massPerTile_kg = Math.abs(s.U_cycle) / C2;
 
-  const metrics: Record<string, { value: number; limit: number; status: string; equation: string }> = {
+  const map = {
     "ford-roman": {
-      value: s.zeta,
-      limit: 1.0,
+      value: s.zeta, limit: 1.0,
       status: s.fordRomanCompliance ? "PASS" : "FAIL",
-      equation: `ζ = ${s.zeta.toPrecision(3)} ${s.zeta<1?'<' : '>='} 1.0`
+      equation: `ζ = ${s.zeta.toPrecision(3)} ${s.zeta < 1 ? "<" : "≥"} 1.0`
     },
     "natario": {
-      value: 0,
-      limit: 0,
+      value: 0, limit: 0,
       status: s.natarioConstraint ? "VALID" : "WARN",
       equation: "∇·ξ = 0"
     },
     "curvature": {
-      value: massPerTile,
-      limit: massPerTile * 1.2, // placeholder policy: 20% headroom per tile
+      value: massPerTile_kg, limit: massPerTile_kg * 1.2,
       status: "PASS",
-      equation: `m_tile ≈ ${massPerTile.toExponential(2)} kg`
+      equation: `m_tile ≈ ${massPerTile_kg.toExponential(2)} kg`
     },
     "timescale": {
-      value: s.TS_ratio,
-      limit: 100,
+      value: s.TS_ratio, limit: 100,
       status: s.TS_ratio > 100 ? "SAFE" : "WARN",
-      equation: `TS = ${s.TS_ratio.toFixed(1)} ${s.TS_ratio>100?'>>' : '<'} 100`
+      equation: `TS = ${s.TS_ratio.toFixed(1)}`
     }
-  };
-  return metrics[metricType] || { status: "UNKNOWN", equation: "Metric not found" };
+  } as const;
+
+  return (map as any)[metricType] || { status: "UNKNOWN", equation: "Metric not found" };
 }
 
 // Main ChatGPT interaction handler
