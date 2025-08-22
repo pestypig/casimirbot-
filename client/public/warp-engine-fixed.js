@@ -101,7 +101,7 @@ class WarpEngine {
 
         // Display-only controls (do NOT feed these back into pipeline math)
         this.uniforms = {
-            vizGain: 4.0,        // how exaggerated the bend looks
+            vizGain: 1.0,        // default to unity; opt-in via parameters.vizGain
             vShip: 1.0,          // ship-frame speed scale for θ
             wallWidth: 0.06,
             axesClip: [0.40, 0.22, 0.22],
