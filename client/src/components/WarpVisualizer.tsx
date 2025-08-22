@@ -12,6 +12,7 @@ import { Play, Pause, RotateCcw } from 'lucide-react';
 import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 import * as VIS from '@/constants/VIS';
+import { driveWarpFromPipeline } from '@/lib/warp-pipeline-adapter';
 
 // ---- Visualization & Physics-Bridge Constants (no hidden magic) ----
 const VIS_LOCAL = {
@@ -325,121 +326,72 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         gammaVanDenBroeck: parameters.gammaVanDenBroeck
       });
 
-      // === COMPREHENSIVE MODE TRACKING: push all mode-related uniforms ===
-      const mode = parameters.currentMode ?? "hover";
-      
-      // Helper to ensure numeric values (avoid shadowing)
-      const n = (v: any, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
+      // === NEW: Use pipeline adapter for single source of truth ===
+      const pipelineState = {
+        // Core physics
+        currentMode: parameters.currentMode || 'hover',
+        dutyCycle: parameters.dutyCycle,
+        dutyShip: (parameters as any).dutyShip ?? parameters.dutyCycle, // Use dutyShip if available
+        sectorCount: parameters.sectorStrobing || 1,
+        gammaGeo: parameters.g_y || 26,
+        gammaVanDenBroeck: parameters.gammaVanDenBroeck || 3.83e1,
+        qCavity: parameters.cavityQ || 1e9,
+        qSpoilingFactor: parameters.qSpoilingFactor || 1,
+        sag_nm: parameters.sagDepth_nm || 16,
+        
+        // Hull geometry
+        hull: parameters.hull || {
+          Lx_m: 1007, Ly_m: 264, Lz_m: 173,
+        },
+        shipRadius_m: 86.5, // fallback for legacy compatibility
+        
+        // Mode settings
+        modelMode: parameters.physicsParityMode ? 'raw' as const : 'calibrated' as const,
+      };
 
-      // Duty as fraction [0..1]
-      const dutyFrac = Math.max(0, Math.min(1, n(parameters.dutyCycle, 0.14)));
-      
-      // Sector count (hover=1, cruise=400, etc.)
-      const sectors = Math.max(1, Math.floor(n(parameters.sectorStrobing, 1)));
-      
-      // Optional view selection (avg vs instantaneous)
-      const viewAvg = true; // Default to averaged view
-      
-      // Smooth strobe split phase
-      const phaseSplit = Math.max(0, Math.min(sectors - 1, Math.floor(sectors / 2)));
-      
-      // Visual scaling (tilt strength per mode)
-      // Raised slightly from previous values for better visibility
+      // Drive engine with authentic pipeline values (no secret defaults)
+      driveWarpFromPipeline(engineRef.current, pipelineState);
+
+      // Add visual enhancements that aren't physics-driven
+      const mode = parameters.currentMode || 'hover';
       const tiltGains: Record<string, number> = {
-        standby:   0.00,  // still flat
-        cruise:    0.35,  // was 0.20
-        hover:     0.45,  // was 0.35
-        emergency: 0.65,  // was 0.55
+        standby: 0.00, cruise: 0.35, hover: 0.45, emergency: 0.65,
       };
-      // Visual scaling (can be given by panel; otherwise per-mode)
-      const tiltGain =
-        typeof (parameters as any).tiltGain === 'number'
-          ? Number((parameters as any).tiltGain)
-          : Number(tiltGains[mode] ?? 0.35);
-      
-      // --- Resolve interior tilt from Shift panel OR per-mode default ---
-      const epsFromPanel = Number(
-        (parameters.shift?.epsilonTilt ?? parameters.epsilonTilt)
-      );
-      const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
+      const epsilonTilt = parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 
+        (mode === 'standby' ? 0.0 : 5e-7); // Use physics-accurate tiny value
+      const betaTiltVec = parameters.shift?.betaTiltVec ?? parameters.betaTiltVec ?? [0, -1, 0];
+      const tiltGain = typeof (parameters as any).tiltGain === 'number' ? 
+        (parameters as any).tiltGain : (tiltGains[mode] ?? 0.35);
 
-      // Per-mode demo defaults (used only if panel isn't supplying a usable value)
-      const modeTiltDefaults: Record<string, number> = {
-        emergency: 0.035,
-        hover:     0.020,
-        cruise:    0.012,
-        standby:   0.000,
-      };
-
-      const epsilonTilt = hasGoodPanelEps
-        ? epsFromPanel
-        : (modeTiltDefaults[mode] ?? 0.0);
-
-      // Direction
-      const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
-        ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
-        : defaultBetaTilt;
-
-      console.log("🎛️ uniforms-to-engine (tilt resolve)", {
-        mode, epsilonTilt, tiltGain, betaTiltVec, fromPanel: hasGoodPanelEps,
-        userGain: n((parameters as any).vizGainOverride ?? (parameters as any).userColorGain, 1.0)
-      });
-
-      // Hull geometry from parameters or use needle hull defaults
-      const hull = parameters.hull || {
-        Lx_m: 1007, Ly_m: 264, Lz_m: 173,
-        a: 503.5, b: 132, c: 86.5
-      };
-      const wallWidth = Math.max(0.05, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho)); // Ensure visible wall width (≥0.05 for clear curvature)
-
-      // Enhanced mode reconnection: push all mode-related uniforms with exact names
+      // Apply visual-only enhancements
       engineRef.current.updateUniforms({
-        // Mode knobs (exact names the engine reads)
-        currentMode: mode,
-        dutyCycle: dutyFrac,
-        sectors,              // ✅ exact name (NOT sectorCount)
-        split: phaseSplit,
-        viewAvg,              // ✅ exact name (NOT useAvg)
-
-        // Amplification chain
-        gammaGeo: n(parameters.g_y, 26),
-        Qburst: n(parameters.cavityQ, 1e9),
-        deltaAOverA: n(parameters.qSpoilingFactor, 1),
-        gammaVdB: n(parameters.gammaVanDenBroeck, 3.83e1),
-
-        // Hull / wall
-        hullAxes: [n(hull.a), n(hull.b), n(hull.c)],
-        wallWidth,
-
-        // NEW: interior gravity uniforms
-        epsilonTilt: Number(epsilonTilt || 0),     // dimensionless (≪ 1e-6)
-        betaTiltVec: betaTiltVec || [0, -1, 0],    // unit direction for "down"
-        tiltGain,                                  // gentle visual scaling
+        // Interior gravity visuals
+        epsilonTilt: Number(epsilonTilt || 0),
+        betaTiltVec: betaTiltVec as [number, number, number],
+        tiltGain,
         
-        // Visual scaling for clear mode differences
-        vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
+        // Visual scaling
+        vizGain: mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : 
+                 mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault,
         
-        // NEW: Unified visual boost system (shared with SliceViewer)
-        curvatureGainDec: (() => {
-          const gain = Number.isFinite(parameters.curvatureGainDec) ? +parameters.curvatureGainDec! : 0; // Default to 0 = 1×
-          console.log(`🎛️ CURVATURE GAIN DEBUG: curvatureGainDec=${parameters.curvatureGainDec}, resolved=${gain}`);
-          return Math.max(0, Math.min(8, gain));
-        })(),
+        // Curvature controls
+        curvatureGainDec: Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
+        curvatureBoostMax: parameters.physicsParityMode ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
         
-        physicsParity: parameters.physicsParityMode || false, // Renamed from physicsParityMode
-        curvatureBoostMax: (parameters.physicsParityMode) ? 1 : Math.max(1, Number(parameters.curvatureBoostMax) || 40),
+        // Optional view settings
+        viewAvg: true,
         _debugHUD: true,
         
-        // Legacy parameters for backward compatibility
-        sagDepth_nm: n(parameters.sagDepth_nm, 16),
-        powerAvg_MW: n(parameters.powerAvg_MW, VIS.powerAvgFallback),
-        exoticMass_kg: n(parameters.exoticMass_kg, VIS.exoticMassFallback),
-        tsRatio: n(parameters.tsRatio, VIS.tsRatioDefault)
+        // Legacy compatibility
+        sagDepth_nm: parameters.sagDepth_nm || 16,
+        powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
+        exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
+        tsRatio: parameters.tsRatio || VIS.tsRatioDefault
       });
 
       // CRITICAL: force immediate visual update on parameter change
       if (engineRef.current.requestRewarp) {
-        console.log('🔄 Forcing rewarp after uniform update');
+        console.log('🔄 Forcing rewarp after pipeline adapter update');
         engineRef.current.requestRewarp();
       }
 
