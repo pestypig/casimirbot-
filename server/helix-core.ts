@@ -351,10 +351,49 @@ function checkMetricViolation(metricType: string) {
   return (map as any)[metricType] || { status: "UNKNOWN", equation: "Metric not found" };
 }
 
+// Rate limiting for OpenAI API calls
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const RATE_LIMIT_PER_MINUTE = 10;
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+
+function checkRateLimit(clientId: string): boolean {
+  const now = Date.now();
+  const record = rateLimitMap.get(clientId) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+  
+  if (now > record.resetTime) {
+    record.count = 0;
+    record.resetTime = now + RATE_LIMIT_WINDOW;
+  }
+  
+  if (record.count >= RATE_LIMIT_PER_MINUTE) {
+    return false;
+  }
+  
+  record.count++;
+  rateLimitMap.set(clientId, record);
+  return true;
+}
+
 // Main ChatGPT interaction handler
 export async function handleHelixCommand(req: Request, res: Response) {
   try {
-    const { message: userMessage, messages, functions, function_call } = req.body;
+    // CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+    
+    // Rate limiting
+    const clientId = req.ip || req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(clientId)) {
+      return res.status(429).json({ 
+        error: `Rate limit exceeded. Maximum ${RATE_LIMIT_PER_MINUTE} requests per minute.` 
+      });
+    }
+    const { message: userMessage, messages, function_call } = req.body;
     
     // Handle both single message and messages array formats
     const chatMessages = messages || (userMessage ? [{ role: "user", content: userMessage }] : []);
@@ -439,6 +478,7 @@ export async function handleHelixCommand(req: Request, res: Response) {
 
 // Tile status endpoint
 export function getTileStatus(req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
   const { sectorId } = req.params;
   
   // Mock tile data for demo
@@ -462,6 +502,7 @@ setGlobalPipelineState(pipelineState);
 
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
   const s = getGlobalPipelineState();
 
   const totalSectors = Math.max(1, s.sectorCount);
@@ -582,6 +623,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
 // Get full pipeline state
 export function getPipelineState(req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
   const state = getGlobalPipelineState();
   res.json(state);
 }
@@ -631,6 +673,7 @@ export function getHelixMetrics(req: Request, res: Response) {
 
 // Get displacement field samples for physics validation
 export function getDisplacementField(req: Request, res: Response) {
+  res.setHeader("Cache-Control", "no-store");
   try {
     const s = getGlobalPipelineState();
     const q = req.query;
