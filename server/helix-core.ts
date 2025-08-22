@@ -203,6 +203,8 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
 async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration_us?: number; cycle_ms?: number }) {
   const s = getGlobalPipelineState();
   const totalSectors = Math.max(1, s.sectorCount);
+  const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
+  const totalTiles = tilesPerSector * totalSectors;
 
   const frequency_Hz = (args.frequency_GHz ?? s.modulationFreq_GHz ?? 15) * 1e9;
 
@@ -213,16 +215,24 @@ async function executeAutoPulseSequence(args: { frequency_GHz?: number; duration
     temperature_K: s.temperature_K ?? 20
   });
 
+  const energyPerTile_J    = base.energy_J;
+  const energyPerSector_J  = energyPerTile_J * tilesPerSector;
+  const totalEnergy_J      = energyPerSector_J * totalSectors;
+
   return {
     mode: "AUTO_DUTY",
     sectorsCompleted: totalSectors,
-    totalEnergy_J: base.energy_J * totalSectors,
+    tilesPerSector,
+    totalTiles,
+    energyPerTile_J,
+    energyPerSector_J,
+    totalEnergy_J,
     averagePower_W: s.P_avg * 1e6,
     exoticMassGenerated_kg: s.M_exotic,
     frequency_Hz,
-    dutyCycle_ship_pct: (Math.max(0, s.dutyEffective_FR ?? 0) * 100),
+    dutyCycle_ship_pct: Math.max(0, (s.dutyEffective_FR ?? 0)) * 100,
     status: "SEQUENCE_COMPLETE",
-    log: `Pulsed ${totalSectors} sectors @ ${frequency_Hz/1e9} GHz. M_exotic=${s.M_exotic.toFixed(1)} kg.`
+    log: `Pulsed ${totalSectors} sectors (${totalTiles} tiles) @ ${frequency_Hz/1e9} GHz. M_exotic=${s.M_exotic.toFixed(1)} kg.`
   };
 }
 
