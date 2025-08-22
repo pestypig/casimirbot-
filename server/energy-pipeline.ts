@@ -593,8 +593,8 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const split   = Math.floor(sectors / 2); // always use proper split for wedge boundaries
 
   // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
-  // Use a geometric-mean effective radius so width is scale-invariant with axes.
-  const aEff = Math.cbrt(axes.a * axes.b * axes.c);
+  // Use harmonic-mean effective radius to match viewer/renderer ρ-units.
+  const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // ✅ harmonic mean (matches viewer)
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
   const w_rho = Math.max(1e-6, w_m / aEff);
 

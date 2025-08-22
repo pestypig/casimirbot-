@@ -563,15 +563,32 @@ export function getSystemMetrics(req: Request, res: Response) {
   
   // Canonical geometry fields for visualizer
   const a = hull.Lx_m/2, b = hull.Ly_m/2, c = hull.Lz_m/2;
-  const aEff_geo = Math.cbrt(a*b*c);                  // geometric mean (matches sampler)
-  const w_m = (s.sag_nm ?? 16) * 1e-9;
-  const w_rho = w_m / aEff_geo;
+  const aEff_geo  = Math.cbrt(a*b*c);                 // geometric mean (legacy)
+  const aEff_harm = 3 / (1/a + 1/b + 1/c);            // ✅ harmonic mean — matches viewer
+  const w_m       = (s.sag_nm ?? 16) * 1e-9;
+  const w_rho_harm = w_m / aEff_harm;
+  const w_rho_geo  = w_m / aEff_geo;
   
   // Optional scene scale helper (if your viewer wants precomputed clip axes):
   const sceneScale = 1 / Math.max(a, 1e-9);           // long semi-axis → 1.0
   const axesScene = [a*sceneScale, b*sceneScale, c*sceneScale];
   
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
+
+  // Compute viz scales once so we can also emit viewer hints
+  const viz = (() => {
+    const gammaGeo = s.gammaGeo ?? 26;
+    const dAa      = s.qSpoilingFactor ?? 1;
+    const gammaVdB = s.gammaVanDenBroeck ?? 1;
+    const sectors  = Math.max(1, s.concurrentSectors || 1);
+    const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
+    const thetaScale_UI_like =
+      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyUI / sectors);
+    const dutyFR   = Math.max(1e-12, s.dutyEffective_FR ?? dutyUI / sectors);
+    const thetaScale_FR_like =
+      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyFR);
+    return { thetaScale_UI_like, thetaScale_FR_like, dutyUI, dutyFR, sectors, defaultThetaScale: "FR_like" as const };
+  })();
   const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;
   const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
   const T_m = 1 / f_m_Hz;
@@ -630,36 +647,23 @@ export function getSystemMetrics(req: Request, res: Response) {
     geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom },
 
     axes_m: [a, b, c],
-    axesScene,                // for immediate camera fit
+    axesScene,                         // for immediate camera fit
     wallWidth_m: w_m,
-    wallWidth_rho: w_rho,     // use this in shaders & geometry
+    wallWidth_rho: w_rho_harm,         // ✅ unified with renderer (harmonic-mean ρ)
+    wallWidth_rho_geo: w_rho_geo,      // legacy (do not use for viewer)
     aEff_geo_m: aEff_geo,
+    aEff_harm_m: aEff_harm,
 
-    viz: (() => {
-      const gammaGeo = s.gammaGeo ?? 26;
-      const dAa      = s.qSpoilingFactor ?? 1;
-      const gammaVdB = s.gammaVanDenBroeck ?? 1;
-      const sectors  = Math.max(1, s.concurrentSectors || 1);
-
-      // "UI-like" (what your current shader expects if it divides by sectors)
-      const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
-      const thetaScale_UI_like =
-        Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyUI / sectors);
-
-      // "FR-like" (ship-wide exposure already averaged)
-      const dutyFR   = Math.max(1e-12, s.dutyEffective_FR ?? dutyUI / sectors);
-      const thetaScale_FR_like =
-        Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyFR);
-
-      return {
-        thetaScale_UI_like,
-        thetaScale_FR_like,
-        dutyUI, dutyFR, sectors,
-        defaultThetaScale: "FR_like" as const
-      };
-    })(),
-
-    modelMode: s.modelMode ?? "calibrated"
+    viz,
+    modelMode: "calibrated-single-pass",
+    // 🔎 Viewer hints to prevent accidental multi-layer/df overlays
+    viewer: {
+      overlayMode: "single-pass",
+      ridgeMode: 1,                    // 0=physics(df), 1=single crest f(ρ)
+      colorMode: "theta",
+      physicsParityMode: false,
+      thetaScale: viz.thetaScale_FR_like
+    }
   });
 }
 
@@ -736,6 +740,7 @@ export function getDisplacementField(req: Request, res: Response) {
       count: data.length,
       axes: s.hull,
       w_m: (s.sag_nm ?? 16) * 1e-9,
+      rhoMetric: "harmonic",   // ✅ matches viewer/shader conversion
       physics: {
         gammaGeo: s.gammaGeo,
         qSpoiling: s.qSpoilingFactor,
