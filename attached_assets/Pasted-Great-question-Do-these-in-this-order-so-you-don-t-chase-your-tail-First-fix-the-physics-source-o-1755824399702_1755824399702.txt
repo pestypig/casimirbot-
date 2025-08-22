@@ -1,0 +1,107 @@
+Great question. Do these in this order so you don’t chase your tail. First fix the physics “source of truth”, then let the server/UI simply read it.
+
+# Phase 1 — Hard physics fixes (blocking)
+
+1. **ℏc constant (must-do first).**
+   This flips all Casimir energies by \~1/2π vs your current numbers, so fix it before anything else.
+
+   ```ts
+   // energy-pipeline.ts
+   // const HBAR_C = 1.98644586e-25; // hc  ❌
+   const HBAR_C = HBAR * C;           // ℏc ≈ 3.16152677e-26 ✅
+   ```
+
+2. **Carry γ³\_geo through the power path.**
+   Stored energy that feeds dissipation needs γ\_geo³, not γ¹.
+
+   ```ts
+   const gammaGeo3 = Math.pow(state.gammaGeo ?? 26, 3);
+   state.U_geo = state.U_static * gammaGeo3;
+   state.U_Q   = state.U_geo * state.qMechanical;
+   ```
+
+3. **Duty math = 1-of-400 by default (ship-wide).**
+   Keep `S_total=400` fixed; set concurrent live sectors small (usually 1).
+
+   ```ts
+   const S_total = TOTAL_SECTORS;         // 400
+   const S_live  = MODE_POLICY[state.currentMode].S_live === 'all' ? 1
+                  : MODE_POLICY[state.currentMode].S_live; // prefer 1
+   const d_eff   = BURST_DUTY_LOCAL * (S_live / S_total);  // 0.01 * (1/400)
+   ```
+
+   Also set `strobeHz` to **1000** to match 10 µs-in-1 ms.
+
+   ```ts
+   state.strobeHz = 1000;
+   ```
+
+4. **Unify constants.**
+   Use the exact `C = 299_792_458` everywhere (no `3e8` anywhere else).
+
+# Phase 2 — Remove “lying by target” (calibration)
+
+5. **Disable/neutralize hard retargeting (temporarily).**
+   Comment out the “scale qMechanical to hit P\_target” and “scale γVdB to hit M\_target” blocks to see the true physics after steps 1–3. If you need targets later, re-enable them with documented values (e.g., keep both hover/cruise at the same bus power or use MODE\_POLICY only to choose S\_live).
+   Minimal alternative if you keep them: set **cruise P\_target\_W ≈ 83.3e6** (not 7.437 W) and **S\_live=1**.
+
+# Phase 3 — Safety proxy consistent with duty
+
+6. **Make ζ come from ship-wide duty (quick stub).**
+   Until you wire the full sampling, scale from the nominal d/S:
+
+   ```ts
+   const dShip = d_eff;            // 0.01/400 nominal
+   const zeta0 = 0.84;             // baseline
+   state.zeta = zeta0 * (dShip / (0.01/400));
+   state.fordRomanCompliance = state.zeta < 1.0;
+   ```
+
+# Phase 4 — Server layer fixes (so the API/HUD stop drifting)
+
+7. **Per-sector math and duty in `executeAutoPulseSequence`.**
+   Multiply by tiles/sector, and use ship-wide duty:
+
+   ```ts
+   const st = getGlobalPipelineState();
+   const tilesPerSector = Math.floor(st.N_tiles / 400);
+   totalEnergy += sectorResult.energy * tilesPerSector;
+   totalPower  += sectorResult.powerLoss * tilesPerSector;  // ON power
+   const d_eff = 0.01 * ((MODE_CONFIGS[st.currentMode]?.sectorStrobing ?? 1) / 400);
+   const averagePower = (st.P_loss_raw * st.N_tiles) * d_eff; // prefer pipeline truth
+   ```
+
+8. **Force formula 3× in `executePulseSector`.**
+
+   ```ts
+   const force = -3 * Math.abs(energyPerTile) / gap;
+   ```
+
+9. **Make `simulatePulseCycle` 100% state-driven (no hard-coded numbers).**
+   Replace the `energyCalculations` and `metrics` object with values read from `state` (and keep units consistent).
+
+10. **Fix FR duty & duplicates in `getSystemMetrics`.**
+
+* `activeFraction = S_live / 400` (not `S/N_tiles`).
+* `dutyEffectiveFR = 0.01 * activeFraction`.
+* Remove duplicate `hull` and duplicate `timeScaleRatio` fields.
+
+# Phase 5 — Secondary cleanups
+
+11. **Wall thickness to spec (if you use it):** `wallThickness_m: 1.0`.
+12. **Either wire `qCavity` into dissipation or drop it from responses.**
+13. **Curvature/limits:** replace arbitrary `|U_cycle|<1e-10` with ζ<1 and a hoop-stress check when you add it.
+
+---
+
+## Quick sanity loop after each phase
+
+* After **Phase 1–3**: `calculateEnergyPipeline(initializePipelineState())`
+
+  * Expect: `N_tiles ≈ 1.9e9`, `dutyEffective_FR ≈ 2.5e-5` (with S\_live=1), `P_avg` in the tens of MW (depending on whether you re-enable targeting), `ζ ~ 0.8–0.9`.
+* After **Phase 4**: hit `GET /metrics`
+
+  * `powerAverage` (if in W) equals `state.P_avg*1e6`, `force` is 3× your previous number, no conflicting fields, FR duty matches pipeline.
+* If you re-enable targets (Phase 2 alt): hover/cruise both \~83.3 MW until you intentionally change S\_live or q-spoiling.
+
+If you apply nothing else, **do 1→3→7→8→9→10** in that order. That stabilizes physics and stops the API from returning contradictory numbers. The rest are polish.

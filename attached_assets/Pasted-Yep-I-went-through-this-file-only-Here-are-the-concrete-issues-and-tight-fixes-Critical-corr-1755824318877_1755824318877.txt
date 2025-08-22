@@ -1,0 +1,132 @@
+Yep—I went through this file only. Here are the concrete issues and tight fixes.
+
+## Critical correctness bugs
+
+1. **ℏc is wrong (you used hc).**
+
+```ts
+// current
+const HBAR_C = 1.98644586e-25; // this is hc, not ħc
+// fix
+const HBAR   = 1.054571817e-34;   // J·s
+const C      = 299_792_458;       // m/s
+const HBAR_C = HBAR * C;          // 3.16152677e-26 J·m (ħc)
+```
+
+2. **Ship-wide duty is wrong in hover/emergency.**
+   You compute `d_eff = 0.01 * (S_live / 400)` and set `S_live: 'all'` for hover/emergency ⇒ `d_eff = 0.01` (as if all 400 sectors fire concurrently). Paper math uses **1-of-S** scheduling, so ship-wide duty is `d/S`.
+   **Fix either the policy or the formula**. Safer is to **keep 1-of-S** and compute:
+
+```ts
+const S_total = TOTAL_SECTORS;              // 400
+const concurrent = resolveSLive(state.currentMode); // 1 (hover/cruise), 2 for overlap, etc.
+const d_eff = BURST_DUTY_LOCAL * (concurrent / S_total); // ship-wide duty
+```
+
+…and set:
+
+```ts
+const MODE_POLICY = {
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,  M_target_kg: 1_000 },
+  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,  M_target_kg: 1_000 },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6, M_target_kg: 1_000 },
+  standby:   { S_live: 0 as const,     P_target_W: 0,       M_target_kg: 0     },
+} as const;
+```
+
+3. **Power path silently drops two γ\_geo factors.**
+   You use `U_geo = U_static * γ_geo` then `P ∝ ω U_Q / Q`. If stored energy scales as **γ\_geo³**, you should:
+
+```ts
+const gamma3 = Math.pow(state.gammaGeo, 3);
+state.U_geo  = state.U_static * gamma3;
+state.U_Q    = state.U_geo * state.qMechanical;
+const P_tile_raw = Math.abs(state.U_Q) * omega / state.qCavity; // also use state.qCavity
+```
+
+(If you intended `qMechanical` to hide γ², document it and leave as-is; right now it’s ambiguous.)
+
+4. **`qCavity` is defined but ignored in power.**
+   You hard-code `Q_BURST` in the dissipation; use the value already in state:
+
+```ts
+const Q = state.qCavity ?? Q_BURST;
+const P_tile_raw = Math.abs(state.U_Q) * omega / Q;
+```
+
+5. **Ford–Roman proxy ζ has the wrong scale.**
+   `zeta = 1 / (d_eff * √Q_quantum)` gives ζ≈0.0001 for hover with your (incorrect) `d_eff=0.01`. The paper’s baseline is \~0.8–0.9 with `d/S = 2.5e-5`. Either move ζ computation server-side using the paper’s sampling recipe, or at minimum scale against the nominal ship-wide duty:
+
+```ts
+const d_ship = d_eff;                // ship-wide
+const d0 = BURST_DUTY_LOCAL / TOTAL_SECTORS; // 0.01/400
+const zeta0 = 0.84;                  // baseline fit
+state.zeta = zeta0 * (d_ship / d0);  // keeps ζ≈0.84 at baseline
+state.fordRomanCompliance = state.zeta < 1;
+```
+
+(Placeholder but at least the magnitude is sane until you wire the real sampler.)
+
+## Dubious / magic numbers to tame
+
+* `wallThickness_m: 6.0` (paper uses \~1.0 m stack).
+* `PACKING = 0.88` and `RADIAL_LAYERS = 10` (document or move to a single `PAPER` export).
+* `strobeHz` default 2000 while the paper uses 1000 Hz macro-tick.
+* `curvatureLimit = |U_cycle| < 1e-10` is arbitrary; prefer hoop-stress/QI checks.
+
+## Smaller correctness/consistency nits
+
+* **Mass path includes Q\_BURST.** If your convention is “Q only in power, not mass,” drop `Q_BURST` from the mass chain:
+
+  ```ts
+  let E_tile = U_abs * Math.pow(state.gammaGeo,3) * state.gammaVanDenBroeck * d_eff;
+  ```
+* `state.dutyCycle = state.dutyCycle;` is a no-op; later you overwrite from `MODE_CONFIGS` anyway.
+* The **cruise target** `P_target_W: 7.437` is almost certainly a unit slip. Use a documented target or remove per-mode power retargeting and let physics determine P.
+
+## Minimal patch set (drop-in)
+
+```ts
+// constants
+const HBAR   = 1.054571817e-34;
+const C      = 299_792_458;
+const HBAR_C = HBAR * C; // 3.16152677e-26 J·m
+
+// mode policy (1-of-S by default)
+const MODE_POLICY = {
+  hover:     { S_live: 1 as const,     P_target_W: 83.3e6,  M_target_kg: 1_000 },
+  cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,  M_target_kg: 1_000 },
+  emergency: { S_live: 2 as const,     P_target_W: 297.5e6, M_target_kg: 1_000 },
+  standby:   { S_live: 0 as const,     P_target_W: 0,       M_target_kg: 0     },
+} as const;
+
+// duty
+const S_total = TOTAL_SECTORS;
+const concurrent = resolveSLive(state.currentMode);
+const d_eff = BURST_DUTY_LOCAL * (concurrent / S_total);
+state.dutyBurst        = BURST_DUTY_LOCAL;
+state.dutyEffective_FR = d_eff;
+
+// power path (γ³ and state.qCavity)
+const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+const gamma3 = Math.pow(state.gammaGeo, 3);
+state.U_geo  = state.U_static * gamma3;
+state.U_Q    = state.U_geo * Math.max(0, state.qMechanical);
+const Q = state.qCavity ?? Q_BURST;
+const P_tile_raw = Math.abs(state.U_Q) * omega / Q;
+let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;
+
+// (optional) mass path without Q if that’s your convention
+// let E_tile = Math.abs(state.U_static) * gamma3 * state.gammaVanDenBroeck * d_eff;
+
+// ζ placeholder scaled to nominal duty
+const d0 = BURST_DUTY_LOCAL / TOTAL_SECTORS; // 0.01/400
+state.zeta = 0.84 * (d_eff / d0);
+state.fordRomanCompliance = state.zeta < 1;
+
+// strobe default to 1000 for paper parity
+state.strobeHz        = Number(process.env.STROBE_HZ ?? 1000);
+state.sectorPeriod_ms = 1000 / Math.max(1, state.strobeHz);
+```
+
+If you want, I can also remove/centralize the magic numbers (`PACKING`, `RADIAL_LAYERS`, `wallThickness_m`) and add comments so the next pass stays aligned with the paper.
