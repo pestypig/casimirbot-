@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Cpu, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
-import { WarpVisualizer } from "@/components/warp/WarpVisualizer";
+const WarpVisualizer = lazy(() => import("@/components/warp/WarpVisualizer").then(m => ({ default: m.WarpVisualizer })));
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -671,7 +671,8 @@ export default function HelixCore() {
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   <div className="space-y-4">
                     <div className="rounded-lg overflow-hidden bg-slate-950">
-                      <WarpVisualizer
+                      <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizer…</div>}>
+                        <WarpVisualizer
                         key={`mode-${effectiveMode}-v${modeVersion}-parity-${localStorage.getItem('physics-parity-mode')}`}
                         parameters={(() => {
                           const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
@@ -722,6 +723,7 @@ export default function HelixCore() {
                           return vizParams;
                         })()}
                       />
+                      </Suspense>
                     </div>
                   </div>
 
