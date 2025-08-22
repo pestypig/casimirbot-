@@ -366,9 +366,10 @@ useEffect(() => {
   // --- global strobing multiplexer (supports many viewers) ---
   const ensureStrobeMux = () => {
     const w = window as any;
-    if (w.__strobeListeners) return;
-    w.__strobeListeners = new Set();
+    const prev = w.setStrobingState;                    // capture whatever is installed (engine or placeholder)
+    if (!w.__strobeListeners) w.__strobeListeners = new Set();
     w.setStrobingState = (payload: { sectorCount:number; currentSector:number; split?:number }) => {
+      try { typeof prev === 'function' && prev(payload); } catch {}
       for (const fn of w.__strobeListeners) {
         try { fn(payload); } catch {}
       }
@@ -381,8 +382,6 @@ useEffect(() => {
     const initialScale = Number(parameters.gridScale ?? 1.0);
     installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
     
-    // Ensure strobing multiplexer is available
-    ensureStrobeMux();
 
     setLoadError(null);
     setIsLoaded(false);
@@ -395,6 +394,7 @@ useEffect(() => {
     try {
       if ((window as any).WarpEngine) {
         engineRef.current = makeEngine((window as any).WarpEngine);
+        ensureStrobeMux(); // wrap the engine's handler into the mux
         
         // Register with strobing multiplexer
         const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
@@ -427,6 +427,7 @@ useEffect(() => {
 
         if ((window as any).WarpEngine) {
           engineRef.current = makeEngine((window as any).WarpEngine);
+          ensureStrobeMux(); // wrap the engine's handler into the mux
           
           // Register with strobing multiplexer
           const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
