@@ -373,7 +373,8 @@ class WarpEngine {
             "#version 300 es\n" +
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
-            "uniform vec3 u_axes;\n" +
+            "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
+            "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
             "uniform float u_wallWidth;\n" +
             "uniform float u_vShip;\n" +
@@ -409,15 +410,20 @@ class WarpEngine {
             "        frag = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
+            "    // Authoritative axes: use scene-normalized hull or fallback to legacy\n" +
+            "    vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0\n" +
+            "      ? u_axesScene\n" +
+            "      : u_axes;\n" +
+            "    \n" +
             "    // derive effective gains (parity protection)\n" +
             "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
             "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
             "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
             "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
             "    \n" +
-            "    vec3 pN = v_pos / u_axes;\n" +
+            "    vec3 pN = v_pos / axes;\n" +
             "    float rs = length(pN) + 1e-6;\n" +
-            "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
+            "    vec3 dN = normalize(u_driveDir / axes);\n" +
             "    float xs = dot(pN, dN);\n" +
             "    float w = max(1e-4, u_wallWidth);\n" +
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
@@ -446,7 +452,7 @@ class WarpEngine {
             "        col = seqTealLime(sVis);\n" +   // |σ|
             "    }\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
-            "    vec3 pN_int = v_pos / u_axes;\n" +
+            "    vec3 pN_int = v_pos / axes;\n" +
             "    float rs_int = length(pN_int) + 1e-6;\n" +
             "    float wInt = max(1e-4, u_intWidth);\n" +
             "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
@@ -459,7 +465,8 @@ class WarpEngine {
             :
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
-            "uniform vec3 u_axes;\n" +
+            "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
+            "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
             "uniform float u_wallWidth;\n" +
             "uniform float u_vShip;\n" +
@@ -494,15 +501,20 @@ class WarpEngine {
             "        gl_FragColor = vec4(u_sheetColor, 0.85);\n" +
             "        return;\n" +
             "    }\n" +
+            "    // Authoritative axes: use scene-normalized hull or fallback to legacy\n" +
+            "    vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0\n" +
+            "      ? u_axesScene\n" +
+            "      : u_axes;\n" +
+            "    \n" +
             "    // derive effective gains (parity protection)\n" +
             "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
             "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
             "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
             "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
             "    \n" +
-            "    vec3 pN = v_pos / u_axes;\n" +
+            "    vec3 pN = v_pos / axes;\n" +
             "    float rs = length(pN) + 1e-6;\n" +
-            "    vec3 dN = normalize(u_driveDir / u_axes);\n" +
+            "    vec3 dN = normalize(u_driveDir / axes);\n" +
             "    float xs = dot(pN, dN);\n" +
             "    float w = max(1e-4, u_wallWidth);\n" +
             "    float f = exp(-pow(rs - 1.0, 2.0) / (w*w));\n" +
@@ -531,7 +543,7 @@ class WarpEngine {
             "        col = seqTealLime(sVis);\n" +   // |σ|
             "    }\n" +
             "    // ----- interior tilt violet blend (visual only) -----\n" +
-            "    vec3 pN_int = v_pos / u_axes;\n" +
+            "    vec3 pN_int = v_pos / axes;\n" +
             "    float rs_int = length(pN_int) + 1e-6;\n" +
             "    float wInt = max(1e-4, u_intWidth);\n" +
             "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
@@ -569,6 +581,7 @@ class WarpEngine {
         this.gridUniforms = {
             mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
             sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
+            axesScene: gl.getUniformLocation(this.gridProgram, 'u_axesScene'),
             axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
             driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
             wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
@@ -1107,10 +1120,19 @@ class WarpEngine {
         // Set all uniforms for York-time visualization
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
+        
+        // Authoritative scene-normalized hull axes (single source of truth)
+        gl.uniform3f(this.gridUniforms.axesScene,
+            this.uniforms?.axesClip[0] || 0.0,
+            this.uniforms?.axesClip[1] || 0.0,
+            this.uniforms?.axesClip[2] || 0.0);
+        
+        // Legacy axes fallback (maintained for compatibility)
         gl.uniform3f(this.gridUniforms.axes, 
             this.uniforms?.axesClip[0] || 0.40,
             this.uniforms?.axesClip[1] || 0.22, 
             this.uniforms?.axesClip[2] || 0.22);
+        
         gl.uniform3f(this.gridUniforms.driveDir,
             this.uniforms?.driveDir[0] || 1.0,
             this.uniforms?.driveDir[1] || 0.0,
