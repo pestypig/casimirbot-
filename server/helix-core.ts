@@ -402,6 +402,9 @@ export async function handleHelixCommand(req: Request, res: Response) {
     // Rate limiting
     const clientId = req.ip || req.socket.remoteAddress || 'unknown';
     if (!checkRateLimit(clientId)) {
+      res.setHeader('X-RateLimit-Limit', RATE_LIMIT_PER_MINUTE.toString());
+      res.setHeader('X-RateLimit-Remaining', '0');
+      res.setHeader('Retry-After', (RATE_LIMIT_WINDOW / 1000).toString());
       return res.status(429).json({ 
         error: `Rate limit exceeded. Maximum ${RATE_LIMIT_PER_MINUTE} requests per minute.` 
       });
@@ -634,7 +637,8 @@ export function getSystemMetrics(req: Request, res: Response) {
       return {
         thetaScale_UI_like,
         thetaScale_FR_like,
-        dutyUI, dutyFR, sectors
+        dutyUI, dutyFR, sectors,
+        defaultThetaScale: "FR_like" as const
       };
     })(),
 
