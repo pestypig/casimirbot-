@@ -1088,7 +1088,7 @@ export default function HelixCore() {
                           γ<sub>VdB</sub>: {fexp(
                             (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
                             1,
-                            '2.9e+5'
+                            '3.8e+1'
                           )}
                         </span>
                       </TooltipTrigger>
