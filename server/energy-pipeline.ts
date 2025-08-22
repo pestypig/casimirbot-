@@ -473,9 +473,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
 
   // Overall status (mode-aware power thresholds)
   const P_warn = MODE_POLICY[state.currentMode].P_target_W * 1.2 / 1e6; // +20% headroom in MW
-  if (!state.fordRomanCompliance || !state.curvatureLimit) {
+  if (!state.fordRomanCompliance || !state.curvatureLimit || state.zeta >= 1.0) {
     state.overallStatus = 'CRITICAL';
-  } else if (state.zeta > 0.8 || (state.currentMode !== 'emergency' && state.P_avg > P_warn)) {
+  } else if (state.zeta >= 0.95 || (state.currentMode !== 'emergency' && state.P_avg > P_warn)) {
     state.overallStatus = 'WARNING';
   } else {
     state.overallStatus = 'NOMINAL';
