@@ -294,7 +294,8 @@ useEffect(() => {
 }, [initNonce]);
 
   useEffect(() => {
-    if (engineRef.current && isLoaded) {
+    if (!isLoaded || !engineRef.current) return;
+    try {
       console.log('🔄 Live operational mode update:', {
         mode: parameters.currentMode || 'hover',
         dutyCycle: parameters.dutyCycle,
@@ -372,13 +373,10 @@ useEffect(() => {
       });
 
       // CRITICAL: force immediate visual update on parameter change
-      if (engineRef.current.requestRewarp) {
-        console.log('🔄 Forcing rewarp after pipeline adapter update');
-        engineRef.current.requestRewarp();
-      }
-
-      // Debug output to console
-      console.table(engineRef.current.uniforms);
+      engineRef.current.requestRewarp?.();
+      console.table?.(engineRef.current.uniforms);
+    } catch (e) {
+      console.warn("WarpVisualizer live update failed:", e);
     }
   }, [parameters, isLoaded]);
 
