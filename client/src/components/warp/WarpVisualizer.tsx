@@ -421,6 +421,19 @@ useEffect(() => {
     }
   };
 
+  const el = canvasRef.current;
+  if (!el) return;
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        init();
+        io.disconnect();
+      }
+    }, { root: null, rootMargin: '200px 0px', threshold: 0.01 });
+    io.observe(el);
+    return () => io.disconnect();
+  }
+  // Fallback for very old browsers
   init();
 
   return () => {
