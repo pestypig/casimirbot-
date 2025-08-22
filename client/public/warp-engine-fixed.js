@@ -789,6 +789,11 @@ class WarpEngine {
             this.uniforms.cosmeticT          = 0;
         }
 
+        if (physicsParityMode && !Number.isFinite(parameters.exposure)) {
+            // push colors away from ±1 saturation in parity
+            this.uniforms.exposure = 4.0;
+        }
+
         // 🎨 COSMETIC BLENDING: Apply visual parameter interpolation based on cosmeticLevel
         if (cosmeticT < 1 && !physicsParityMode) {
             // Baselines for a "real physics" look
