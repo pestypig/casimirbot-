@@ -55,7 +55,9 @@
       fMod_Hz: 15e9,
       f0_Hz: 15e9,
       mechZeta: 0.005,
-      mechGain: undefined           // compute if not provided
+      mechGain: undefined,          // compute if not provided
+      debug: false,
+      animate: false
     };
     this._needsFrame = false;
     this._resize = this._resize.bind(this);
@@ -169,7 +171,9 @@
     }
     const mechMod  = 1 + 2.5 * mechGain;
     
-    console.log(`🔧 OUTLINE ENGINE: mechGain=${mechGain.toFixed(3)}, mechMod=${mechMod.toFixed(2)}x, f_mod=${((p.fMod_Hz??15e9)/1e9).toFixed(1)}GHz, ζ=${(p.mechZeta??0.005).toFixed(3)}`);
+    if (p.debug) {
+      console.log(`🔧 OUTLINE: mechGain=${mechGain.toFixed(3)}, mechMod=${mechMod.toFixed(2)}x, f_mod=${((p.fMod_Hz??15e9)/1e9).toFixed(1)}GHz, ζ=${(p.mechZeta??0.005).toFixed(3)}`);
+    }
 
     // Mode tint/alpha (flip to warning tint if ζ≥1)
     const frBreach = Number.isFinite(p.zeta) && p.zeta >= 1.0;
@@ -190,7 +194,7 @@
     const thicknessMod = 1.0 + 0.5 * mechGain; // 1.0 to 1.5x thickness multiplier
     
     // Mechanical response alpha modulation
-    const mechAlpha = finalAlpha * alphaMod;
+    const shellAlpha = finalAlpha * alphaMod;
     
     // Base shell colors with optional cyan tint when "in band"
     const baseColors = {
@@ -213,9 +217,9 @@
     const centerColor = mixColor(baseColors.center, mechTint, tintStrength);
     const outerColor = mixColor(baseColors.outer, mechTint, tintStrength);
     
-    const baseInner = `rgba(${innerColor[0]},${innerColor[1]},${innerColor[2]},${0.60 * mechAlpha})`;
-    const baseCenter= `rgba(${centerColor[0]},${centerColor[1]},${centerColor[2]},${0.45 * mechAlpha})`;
-    const baseOuter = `rgba(${outerColor[0]},${outerColor[1]},${outerColor[2]},${0.60 * mechAlpha})`;
+    const baseInner = `rgba(${innerColor[0]},${innerColor[1]},${innerColor[2]},${0.60 * shellAlpha})`;
+    const baseCenter= `rgba(${centerColor[0]},${centerColor[1]},${centerColor[2]},${0.45 * shellAlpha})`;
+    const baseOuter = `rgba(${outerColor[0]},${outerColor[1]},${outerColor[2]},${0.60 * shellAlpha})`;
     const colShift  = `rgba(180,120,255,${0.90})`;              // violet (shift vector)
 
     // Apply mechanical response thickness modulation: thickness *= (1.0 + 0.5 * mechGain)
@@ -234,9 +238,10 @@
 
     const Nθ = 96, Nφ = 40;
 
+    // Use per-color alpha; no global alpha for shells
     shells.forEach(s => {
       const a = a0 * s.scale, b = b0 * s.scale, c = c0 * s.scale;
-      ctx.globalAlpha = finalAlpha;
+      ctx.globalAlpha = 1.0;
       ctx.strokeStyle = s.color;
       ctx.lineWidth   = s.line;
 
@@ -315,9 +320,13 @@
     const lc = p.lightCrossing || {};
     const tauLCs  = Number.isFinite(lc.tauLC_ms) ? `${(lc.tauLC_ms/1000).toFixed(3)}s` : '—';
     const dwellMs = Number.isFinite(lc.dwell_ms) ? `${lc.dwell_ms.toFixed(2)}ms` : '—';
+    const burstMs = Number.isFinite(lc.burst_ms) ? `${lc.burst_ms.toFixed(2)}ms` : '—';
     const frTxt   = Number.isFinite(p.zeta) ? `ζ=${p.zeta.toFixed(3)} ${p.zeta>=1?'(WARN)':'(PASS)'}` : 'ζ=—';
     ctx.fillText(`γ³=${gamma3.toExponential(1)} • duty_FR=${(dutyEff*100).toFixed(2)}% • mech:${mechStatus}`, 18, 74);
-    ctx.fillText(`τLC=${tauLCs} • Tsec=${dwellMs} • ${frTxt}`, 18, 88);
+    ctx.fillText(`τLC=${tauLCs} • Tsec=${dwellMs} • burst=${burstMs} • ${frTxt}`, 18, 88);
+
+    // Keep animating if requested (for breathing/tilt shimmer)
+    if (p.animate) this._requestDraw();
   };
 
   // expose
