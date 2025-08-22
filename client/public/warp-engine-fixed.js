@@ -893,7 +893,7 @@ class WarpEngine {
         
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
         // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
-        const thetaScale = Math.max(0, this.uniforms?.thetaScale || 0);
+        const thetaScale = this.uniforms?.thetaScale ?? 1.0;
         const mode = (bubbleParams.currentMode || 'hover').toLowerCase();
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
         const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
@@ -1056,7 +1056,6 @@ class WarpEngine {
             const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
 
             // Same amplitude chain + user gain as the shader
-            const thetaScale = this.uniforms?.thetaScale ?? 1.0;
             const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
             const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
             const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
