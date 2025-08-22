@@ -572,25 +572,26 @@ export function getHelixMetrics(req: Request, res: Response) {
 // Get displacement field samples for physics validation
 export function getDisplacementField(req: Request, res: Response) {
   try {
-    const state = getGlobalPipelineState();
+    const s = getGlobalPipelineState();
     const q = req.query;
-    const data = sampleDisplacementField(state, {
+    const sectors = q.sectors ? Number(q.sectors) : s.sectorCount;
+    const split = q.split ? Number(q.split) : Math.floor((s.sectorCount||400)/2);
+    const data = sampleDisplacementField(s, {
       nTheta: q.nTheta ? Number(q.nTheta) : undefined,
       nPhi: q.nPhi ? Number(q.nPhi) : undefined,
-      sectors: q.sectors ? Number(q.sectors) : state.sectorCount, // ← use total wedges
-      split: q.split ? Number(q.split) : Math.floor((state.sectorCount||400)/2),
+      sectors, split,
       wallWidth_m: q.wallWidth_m ? Number(q.wallWidth_m) : undefined,
       shellOffset: q.shellOffset ? Number(q.shellOffset) : undefined,
     });
     res.json({
       count: data.length,
-      axes: state.hull,
-      w_m: (state.sag_nm ?? 16) * 1e-9,
+      axes: s.hull,
+      w_m: (s.sag_nm ?? 16) * 1e-9,
       physics: {
-        gammaGeo: state.gammaGeo,
-        qSpoiling: state.qSpoilingFactor,
-        sectorCount: state.sectorCount,
-        concurrentSectors: state.concurrentSectors
+        gammaGeo: s.gammaGeo,
+        qSpoiling: s.qSpoilingFactor,
+        sectorCount: s.sectorCount,
+        concurrentSectors: s.concurrentSectors
       },
       data
     });
