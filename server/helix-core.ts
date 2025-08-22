@@ -288,28 +288,28 @@ async function simulatePulseCycle(args: { frequency_GHz: number }) {
       dutyCycle: state.dutyCycle,
       sectorStrobing: state.sectorStrobing,
       qSpoilingFactor: state.qSpoilingFactor,
-      gammaVanDenBroeck: 2.86e5,
+      gammaVanDenBroeck: state.gammaVanDenBroeck,
       powerOutput: powerAverage // MW
     },
     energyCalculations: {
-      energyPerTile: -2.168e-4,            // J = -π²ħc·A/(720·a³)
-      geometricAmplified: -5.636e-3,       // J = 26×E_tile
-      U_Q: -2.818e+2,                      // J = Q_mech×U_geo
-      U_cycle: -3.945e+1,                  // J = γ_pocket×U_Q×duty
-      powerRaw: 5.95e+8,                   // W ≃595 MW instantaneous
-      powerAverage: 8.33e+7,               // W ≃83.3 MW average
-      exoticMassTotal: 1.405e+3            // kg ≃1,405 kg
+      energyPerTile: state.U_static,
+      geometricAmplified: state.U_geo,
+      U_Q: state.U_Q,
+      U_cycle: state.U_cycle,
+      powerRaw: state.P_loss_raw * state.N_tiles, // W instantaneous (on-window)
+      powerAverage: state.P_avg * 1e6,            // W average (pipeline is MW)
+      exoticMassTotal: state.M_exotic
     },
     metrics: {
-      fordRoman: 3.2e-2,                   // ζ = 1/(d√Q) ≃0.032
-      fordRomanStatus: "PASS",
+      fordRoman: state.zeta,
+      fordRomanStatus: state.fordRomanCompliance ? "PASS" : "FAIL",
       natario: 0,
-      natarioStatus: "VALID",
-      timeScale: 4.10e+3,                  // TS_ratio ≃4100
-      timeScaleStatus: "PASS"
+      natarioStatus: state.natarioConstraint ? "VALID" : "WARN",
+      timeScale: state.TS_ratio,
+      timeScaleStatus: state.TS_ratio > 100 ? "PASS" : "FAIL"
     },
     status: "CYCLE_COMPLETE",
-    log: "HOVER @15 GHz → Peak=595 MW, Avg=83.3 MW, M_exotic=1,405 kg, ζ=0.032, TS=4100"
+    log: `${currentMode.toUpperCase()} @${args.frequency_GHz} GHz → Peak=${(state.P_loss_raw * state.N_tiles / 1e6).toFixed(1)} MW, Avg=${state.P_avg.toFixed(1)} MW, M_exotic=${Math.round(state.M_exotic)} kg, ζ=${state.zeta.toFixed(3)}, TS=${Math.round(state.TS_ratio)}`
   };
 }
 
