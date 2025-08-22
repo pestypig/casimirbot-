@@ -509,6 +509,9 @@ class WarpEngine {
             thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
             userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain')
         };
+        this.gridAttribs = {
+            position: gl.getAttribLocation(this.gridProgram, 'a_position'),
+        };
     }
     
     _setLoaded(loaded) {
@@ -1209,9 +1212,9 @@ class WarpEngine {
         
         // Bind vertex data
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        const positionLocation = gl.getAttribLocation(this.gridProgram, 'a_position');
-        gl.enableVertexAttribArray(positionLocation);
-        gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+        const loc = this.gridAttribs.position;
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
         
         // Set all uniforms for York-time visualization
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
@@ -1253,7 +1256,7 @@ class WarpEngine {
         }
         
         // Clean up
-        gl.disableVertexAttribArray(positionLocation);
+        gl.disableVertexAttribArray(loc);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
