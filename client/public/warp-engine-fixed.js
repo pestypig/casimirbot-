@@ -811,6 +811,14 @@ class WarpEngine {
             this.uniforms.cosmeticT = cosmeticT;
         }
 
+        // Auto-exposure: prevent colors from clamping at high gains
+        const autoExposureEnabled = parameters.autoExposure !== false;
+        if (autoExposureEnabled && !Number.isFinite(parameters.exposure)) {
+            const g = Math.max(1, this.uniforms.userGain || 1);
+            // gentle roll-up; parity will stay low, hero will rise
+            this.uniforms.exposure = Math.min(12.0, 3.0 + 1.4 * Math.log10(g));
+        }
+
         // Expose exaggeration snapshot that UI can read per frame (for HUD)
         this.uniforms.__exaggeration = {
             userGain: this.uniforms.userGain,
