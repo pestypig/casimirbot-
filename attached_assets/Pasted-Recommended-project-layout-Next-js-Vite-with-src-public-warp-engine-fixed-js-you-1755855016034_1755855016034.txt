@@ -1,0 +1,163 @@
+Recommended project layout (Next.js / Vite with src/)
+/public
+  ├─ warp-engine-fixed.js        ← your current WebGL engine bundle (primary)
+  └─ warp-engine.js              ← fallback build
+
+/src
+  ├─ app/ or pages/
+  │   └─ warp/
+  │      └─ page.tsx             ← demo page that renders <WarpVisualizer />
+  │
+  ├─ components/
+  │   ├─ ui/
+  │   │   ├─ tooltip.tsx         ← shadcn/ui Tooltip wrapper (Tooltip, TooltipTrigger, TooltipContent)
+  │   │   ├─ card.tsx            ← shadcn/ui Card
+  │   │   └─ button.tsx          ← shadcn/ui Button
+  │   ├─ Eq.tsx                  ← lightweight KaTeX/MathJax wrapper used by <WarpDiagnostics />
+  │   └─ warp/
+  │       ├─ WarpVisualizer.tsx  ← your big React wrapper that boots the engine (the second file you pasted)
+  │       └─ WarpDiagnostics.tsx ← “WarpFactory Diagnostics” panel (the first file you pasted)
+  │
+  ├─ constants/
+  │   └─ VIS.ts                  ← all visual constants used by the visualizer
+  │
+  ├─ lib/
+  │   ├─ warp-pipeline-adapter.ts← driveWarpFromPipeline(engine, state) bridge
+  │   └─ zen-long-toasts.ts      ← toast helpers (zenLongToast)
+  │
+  ├─ hooks/
+  │   └─ (optional, if you later re-use) use-metrics.ts / use-energy-pipeline.ts
+  │
+  ├─ types/
+  │   └─ globals.d.ts            ← Window.WarpEngine / setStrobingState declarations
+  │
+  └─ styles/
+      └─ globals.css             ← Tailwind + shadcn base (if not already present)
+
+Path ↔ import map
+
+@/components/ui/tooltip → src/components/ui/tooltip.tsx
+
+@/components/ui/card → src/components/ui/card.tsx
+
+@/components/ui/button → src/components/ui/button.tsx
+
+@/components/Eq → src/components/Eq.tsx
+
+@/constants/VIS → src/constants/VIS.ts
+
+@/lib/warp-pipeline-adapter → src/lib/warp-pipeline-adapter.ts
+
+@/lib/zen-long-toasts → src/lib/zen-long-toasts.ts
+
+Minimal scaffolds (so nothing 404s)
+
+src/types/globals.d.ts
+
+export {};
+
+declare global {
+  interface Window {
+    WarpEngine?: any;
+    setStrobingState?: (opts: { sectorCount: number; currentSector: number; split?: number }) => void;
+    sceneScale?: number;
+    __warp_setGainDec?: (dec: number, max?: number) => void;
+    __warp_setCosmetic?: (level: number) => void;
+  }
+}
+
+
+tsconfig.json (aliases)
+
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": { "@/*": ["*"] }
+  }
+}
+
+
+src/constants/VIS.ts (fill in your true values later; these keep the app running)
+
+export const spanPaddingDesktop = 1.35;
+export const minSpan = 2.6;
+export const fovDesktopRad = Math.PI / 3.272;
+export const fovPortraitRad = Math.PI / 2.65;
+
+export const defaultWallWidthRho = 0.016;
+
+export const vizGainDefault = 4.0;
+export const vizGainEmergency = 6.0;
+export const vizGainCruise = 3.0;
+
+export const exposureDefault = 6.0;
+export const zeroStopDefault = 1e-7;
+
+export const powerAvgFallback = 83.3;
+export const exoticMassFallback = 1405;
+export const tsRatioDefault = 4102.7;
+export const tsRatioFallback = 100;     // safe floor
+export const zetaDefault = 0.032;
+
+export const canvasWidthDefault = 1280;
+export const canvasHeightDefault = 720;
+
+
+src/lib/warp-pipeline-adapter.ts (thin bridge used by your visualizer)
+
+type PipelineState = {
+  currentMode: string;
+  dutyCycle: number;
+  dutyShip?: number;
+  sectorCount: number;
+  gammaGeo: number;
+  gammaVanDenBroeck: number;
+  qCavity: number;
+  qSpoilingFactor: number;
+  sag_nm: number;
+  hull?: { Lx_m: number; Ly_m: number; Lz_m: number };
+  shipRadius_m?: number;
+  modelMode: 'raw' | 'calibrated';
+};
+
+export function driveWarpFromPipeline(engine: any, s: PipelineState) {
+  if (!engine) return;
+  const dutyEff = Math.max(1e-12, (s.dutyShip ?? s.dutyCycle) / Math.max(1, s.sectorCount));
+  const thetaScale =
+    Math.pow(Math.max(1, s.gammaGeo), 3) *
+    Math.max(1e-6, s.qSpoilingFactor) *
+    Math.max(1, s.gammaVanDenBroeck) *
+    Math.sqrt(dutyEff);
+
+  engine.updateUniforms({
+    currentMode: s.currentMode,
+    dutyCycle: s.dutyCycle,
+    sectors: s.sectorCount,
+    gammaGeo: s.gammaGeo,
+    gammaVdB: s.gammaVanDenBroeck,
+    Qburst: s.qCavity,
+    deltaAOverA: s.qSpoilingFactor,
+    thetaScale,
+  });
+}
+
+
+src/lib/zen-long-toasts.ts (stub so calls succeed)
+
+export function zenLongToast(kind: string, payload: Record<string, unknown>) {
+  // wire to your real toaster; for now just log
+  console.info(`[toast:${kind}]`, payload);
+}
+
+
+src/components/Eq.tsx (simple TeX renderer placeholder)
+
+import 'katex/dist/katex.min.css';
+import TeX from '@matejmazur/react-katex';
+
+export function Eq({ tex, className }: { tex: string; className?: string }) {
+  return <TeX className={className} math={tex} />;
+}
+
+
+If you’re not using KaTeX already: npm i @matejmazur/react-katex katex.
