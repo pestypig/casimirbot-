@@ -1101,6 +1101,13 @@ class WarpEngine {
             // ≈ cos between surface normal and drive direction
             const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
 
+            // CPU shear proxy (for diagnostics/labels)
+            const sinphi = Math.sqrt(Math.max(0, 1 - xs_over_rs*xs_over_rs));
+            const shearProxy = Math.abs(df) * sinphi * (this.uniforms?.vShip ?? 1.0);
+            // Accumulate quick average for the proof panel
+            this._accumShear = (this._accumShear||0) + shearProxy;
+            this._accumShearN = (this._accumShearN||0) + 1;
+
             // Same amplitude chain + user gain as the shader
             const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
             const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
@@ -1602,6 +1609,11 @@ class WarpEngine {
         const Y=this._sampleYorkAndEnergy(U);
         const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
         const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+        // Calculate shear average proxy and reset accumulators
+        const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
+        this._accumShear = 0; 
+        this._accumShearN = 0;
+
         return {
             mode: U.currentMode||'hover',
             duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
@@ -1611,6 +1623,7 @@ class WarpEngine {
             theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
             theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
             T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+            shear_avg_proxy: shear_avg_proxy,
             york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
             hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6)
         };
