@@ -453,7 +453,8 @@ export default function HelixCasimirAmplifier({
     // power chain (per tile → ship)
     const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
     const U_Q       = U_geo * qMech;                 // per-tile stored energy proxy during ON
-    const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // instantaneous dissipation W when ON (P=ωU/Q)
+    const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // physics
+    const P_tile_instant_W = gateOn ? P_tile_on : 0;  // display-gated
     const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
     const P_ship_avg_report_MW = state.P_avg;        // authoritative calibration (if provided)
 
@@ -475,17 +476,15 @@ export default function HelixCasimirAmplifier({
     return {
       U_static, gammaGeo, qMech, d_eff, N_tiles, omega, qCav, gammaVdB,
       U_geo, U_Q,
-      P_tile_on, P_ship_avg_calc_MW, P_ship_avg_report_MW,
+      P_tile_on, P_tile_instant_W, P_ship_avg_calc_MW, P_ship_avg_report_MW,
       geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
       gap_m, tileA_m2, casimir_theory, casimir_per_tile,
-      P_tile_instant_W: P_tile_on, // Add missing field
-      isBurstMeaningful // Add missing field
+      isBurstMeaningful
     };
     // include lc-derived values in the deps so gating/duty react to the loop
-  }, [state, metrics, omega, qCav, lightCrossing?.onWindow, lightCrossing?.cyclesPerBurst, lightCrossing?.burst_ms, lightCrossing?.dwell_ms]);
+  }, [state, metrics, omega, qCav, gateOn, d_eff]);
 
-  // ---- DISPLAY gating: use onWindowDisplay (UI truth) ----
-  const P_tile_instant_W_display = onDisplay ? (derived?.P_tile_on ?? 0) : 0;
+  // ---- CAVITY ENERGY INTEGRATION ----
 
   // A gentle visual envelope (rise ~ two τ_Q, fall ~ one τ_Q)
   const driveEnv = useDriveEnvelope({
@@ -714,7 +713,7 @@ export default function HelixCasimirAmplifier({
                       {lightCrossing.onWindowDisplay ? "ON" : "OFF"}
                     </span>
                     <span className="text-slate-400 text-xs">
-                      {derived?.isBurstMeaningful ? `${fmtNum(P_tile_instant_W_display, "W")}` : "insufficient cycles"}
+                      {derived?.isBurstMeaningful ? `${fmtNum(derived.P_tile_instant_W, "W")}` : "insufficient cycles"}
                     </span>
                   </div>
                 </div>
