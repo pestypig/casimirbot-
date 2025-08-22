@@ -348,7 +348,7 @@ function checkMetricViolation(metricType: string) {
     },
     "natario": {
       value: 0, limit: 0,
-      status: s.natarioConstraint ? "VALID" : "WARN",
+      status: s.natarioConstraint ? "PASS" : "WARN",
       equation: "∇·ξ = 0"
     },
     "curvature": {
@@ -358,7 +358,7 @@ function checkMetricViolation(metricType: string) {
     },
     "timescale": {
       value: s.TS_ratio, limit: 100,
-      status: s.TS_ratio > 100 ? "SAFE" : "WARN",
+      status: s.TS_ratio > 100 ? "PASS" : "FAIL",
       equation: `TS = ${s.TS_ratio.toFixed(1)}`
     }
   } as const;
@@ -608,7 +608,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     qCavity: s.qCavity,
 
     fordRoman: { value: s.zeta, limit: 1.0, status: s.fordRomanCompliance ? "PASS" : "FAIL" },
-    natario:   { value: 0, status: s.natarioConstraint ? "VALID" : "WARN" },
+    natario:   { value: 0, status: s.natarioConstraint ? "PASS" : "WARN" },
 
     massPerTile_kg,
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
