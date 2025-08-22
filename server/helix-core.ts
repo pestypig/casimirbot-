@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import fetch from "node-fetch";
+// Use built-in fetch when available (Node ≥18), fallback to node-fetch
 import { 
   initializePipelineState, 
   calculateEnergyPipeline, 
@@ -196,7 +196,7 @@ async function executePulseSector(args: z.infer<typeof pulseSectorSchema>) {
   const curvatureMass_kg = Math.abs(energy_J) / (C*C);
 
   return { sectorId: args.sectorId, gap_m, area_m2, energy_J, force_N,
-           powerLoss_W_per_tile, curvatureMass_kg, status: "PULSED" };
+           powerLoss_W_per_tile, curvatureMass_kg, temperature_K: args.temperature_K, status: "PULSED" };
 }
 
 // Execute automated pulse sequence across all sectors
@@ -448,7 +448,8 @@ export async function handleHelixCommand(req: Request, res: Response) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(process.env.HELIX_OPENAI_TIMEOUT_MS || 30000));
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const _fetch = globalThis.fetch ?? (await import('node-fetch')).default as typeof fetch;
+    const response = await _fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY!}`,
