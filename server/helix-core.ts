@@ -354,15 +354,19 @@ export async function handleHelixCommand(req: Request, res: Response) {
       temperature: 0.7
     };
 
-    // Call ChatGPT API
+    // Call ChatGPT API with timeout protection
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), Number(process.env.HELIX_OPENAI_TIMEOUT_MS || 30000));
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY!}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(chatGPTRequest)
-    });
+      body: JSON.stringify(chatGPTRequest),
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeout));
 
     if (!response.ok) {
       const error = await response.text();
