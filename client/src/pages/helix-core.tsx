@@ -360,15 +360,18 @@ export default function HelixCore() {
     ? pipeline!.qSpoilingFactor!
     : (modeCfg.qSpoilingFactor ?? 1);
 
-  // ⬇️ add this
-  const dutyEffectiveFR = (() => {
+  // ⬇️ add this block
+  const dutyEffectiveFR = useMemo(() => {
     const burst = Number(lc?.burst_ms);
     const dwell = Number(lc?.dwell_ms);
     if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
-      return Math.max(0, Math.min(1, burst / dwell));
+      return clamp01(burst / dwell);
     }
-    return Math.max(0, Math.min(1, isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : (modeCfg.dutyCycle ?? 0.14)));
-  })();
+    const ui = isFiniteNumber(pipeline?.dutyCycle)
+      ? pipeline!.dutyCycle!
+      : (modeCfg.dutyCycle ?? 0.14);
+    return clamp01(ui);
+  }, [lc?.burst_ms, lc?.dwell_ms, pipeline?.dutyCycle, modeCfg.dutyCycle]);
 
   // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
   const [modeVersion, setModeVersion] = useState(0);
