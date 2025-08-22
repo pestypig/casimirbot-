@@ -29,37 +29,35 @@ export default function WarpBubbleCompare({
   // LEFT — REAL (parity): force unity scale + low-contrast + honest mapping
   const leftReal = useMemo(() => ({
     ...base,
-    physicsParityMode: true, // hard parity inside engine
+    physicsParityMode: true,            // ← hard ON for real
+    // No decades boost to REAL:
+    curvatureBoostMax: 1,
+    curvatureGainDec: 0,
     viz: {
-      colorMode: realColorIsShear ? "shear" : "theta",
-      curvatureGainT: 0, // unity
-      curvatureBoostMax: 1,
+      colorMode: realColorIsShear ? 'shear' : 'theta',  // σ-coloring (shear) by default on REAL
       exposure: 3.0,
-      zeroStop: 1e-5,
-      cosmeticLevel: 1,
-    },
+      zeroStop: 1e-5
+    }
   }), [base, realColorIsShear]);
 
   // RIGHT — SHOW (hero): boosted, easy to read differences
   const rightShow = useMemo(() => ({
     ...base,
-    physicsParityMode: false,
+    physicsParityMode: false,           // ← OFF for show
+    curvatureBoostMax: 40,
+    curvatureGainDec: Math.floor(showBoost * 8),  // 0..8 range (pick your default exaggeration)
     viz: {
-      colorMode: "theta",
-      curvatureGainT: Math.max(0, Math.min(1, showBoost)),
-      curvatureBoostMax: Math.max(1, base?.curvatureBoostMax ?? 40),
-      exposure: base?.viz?.exposure ?? 6.0,
-      zeroStop: base?.viz?.zeroStop ?? 1e-7,
-      cosmeticLevel: 10,
-    },
+      colorMode: 'theta',               // θ coloring on SHOW
+      exposure: 6.0,
+      zeroStop: 1e-7
+    }
   }), [base, showBoost]);
 
   // Helpful label for the exaggeration factor we send to the SHOW view
   const showExaggeration = useMemo(() => {
-    const T = Math.max(0, Math.min(1, showBoost));
-    const max = Math.max(1, rightShow?.viz?.curvatureBoostMax ?? 40);
-    return 1 + T * (max - 1);
-  }, [showBoost, rightShow?.viz?.curvatureBoostMax]);
+    const decadeLevel = Math.floor(showBoost * 8); // 0..8 range
+    return Math.pow(10, decadeLevel / 4); // exponential scaling
+  }, [showBoost]);
 
   return (
     <Card className="h-full">
@@ -98,7 +96,7 @@ export default function WarpBubbleCompare({
             </div>
             <div style={{ height: "min(56vh, 520px)" }}>
               {/* key ensures separate engines */}
-              <WarpVisualizer key="real" parameters={leftReal} />
+              <WarpVisualizer key="real-parity" parameters={leftReal} />
             </div>
           </div>
 
@@ -106,10 +104,10 @@ export default function WarpBubbleCompare({
           <div className="rounded-lg border border-slate-700 overflow-hidden">
             <div className="px-3 py-2 text-xs font-mono bg-slate-900/80 text-amber-300 flex items-center justify-between">
               <span>SHOW (Hero) • θ coloring • boosted</span>
-              <div className="opacity-70">exp {(rightShow?.viz?.exposure ?? 6.0).toFixed(1)} · z₀ {(rightShow?.viz?.zeroStop ?? 1e-7).toExponential(1)} · ×{showExaggeration.toFixed(2)}</div>
+              <div className="opacity-70">exp {rightShow?.viz?.exposure?.toFixed(1) ?? '6.0'} · z₀ {(rightShow?.viz?.zeroStop ?? 1e-7).toExponential(1)} · dec{rightShow.curvatureGainDec ?? 0} · ×{showExaggeration.toFixed(1)}</div>
             </div>
             <div style={{ height: "min(56vh, 520px)" }}>
-              <WarpVisualizer key="show" parameters={rightShow} />
+              <WarpVisualizer key="show-hero" parameters={rightShow} />
             </div>
           </div>
         </div>
