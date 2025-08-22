@@ -882,12 +882,12 @@ export default function HelixCore() {
           </CardHeader>
           <CardContent>
             <LightSpeedStrobeScale 
-              dwellMs={lc.dwell_ms}
-              tauLcMs={lc.tauLC_ms}
+              dwellMs={Number.isFinite(lc.dwell_ms) ? lc.dwell_ms : 0}
+              tauLcMs={Number.isFinite(lc.tauLC_ms) ? lc.tauLC_ms : 0}
               sectorIdx={lc.sectorIdx}
               sectorCount={lc.sectorCount}
               phase={lc.phase}
-              burstMs={lc.burst_ms}
+              burstMs={Number.isFinite(lc.burst_ms) ? lc.burst_ms : 0}
             />
           </CardContent>
         </Card>
