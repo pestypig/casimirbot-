@@ -328,6 +328,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Clamp gammaGeo to sane range for UI inputs
   state.gammaGeo = Math.max(1, Math.min(1e3, state.gammaGeo));
+  
+  // Clamp modulationFreq_GHz to prevent divide-by-zero in TS calculations
+  state.modulationFreq_GHz = Math.max(0.001, Math.min(1000, state.modulationFreq_GHz ?? 15));
 
   const gamma3 = Math.pow(state.gammaGeo, 3);
   state.U_geo = state.U_static * gamma3;
