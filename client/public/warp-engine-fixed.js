@@ -69,6 +69,7 @@ class WarpEngine {
         this.originalGridVertices = null; // Store original positions for warp calculations
         this.gridVbo = null;
         this.gridProgram = null;
+        this._vboBytes = 0; // Track VBO buffer size for efficient updates
         
         // Camera and projection
         this.viewMatrix = new Float32Array(16);
@@ -259,6 +260,7 @@ class WarpEngine {
         this.gridVbo = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        this._vboBytes = this.gridVertices.byteLength;
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
         // Compile grid shader program
@@ -812,10 +814,17 @@ class WarpEngine {
         
         this._warpGridVertices(vtx, this.currentParams);
         
-        // Upload updated vertices to GPU
+        // Upload updated vertices to GPU efficiently
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        if (this._vboBytes !== this.gridVertices.byteLength) {
+            // Buffer size changed, need full reallocation
+            gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+            this._vboBytes = this.gridVertices.byteLength;
+        } else {
+            // Buffer size unchanged, use cheaper subdata update
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
         console.log("Grid vertices updated and uploaded to GPU");
@@ -1142,9 +1151,16 @@ class WarpEngine {
             this.gridVertices = newGridData;
             this.originalGridVertices = new Float32Array(newGridData);
             
-            // Upload new geometry to GPU
+            // Upload new geometry to GPU efficiently
             this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
-            this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+            if (this._vboBytes !== this.gridVertices.byteLength) {
+                // Buffer size changed, need full reallocation
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+                this._vboBytes = this.gridVertices.byteLength;
+            } else {
+                // Buffer size unchanged, use cheaper subdata update
+                this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
+            }
             
             console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a}×${b}×${c}]m`);
             
