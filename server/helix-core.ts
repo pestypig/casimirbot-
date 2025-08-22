@@ -24,6 +24,21 @@ class Mutex {
 }
 const pipeMutex = new Mutex();
 
+// Schema for pipeline parameter updates
+const UpdateSchema = z.object({
+  tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
+  gap_nm: z.number().min(0.1).max(1000).optional(),
+  sag_nm: z.number().min(0).max(1000).optional(),
+  temperature_K: z.number().min(0).max(400).optional(),
+  modulationFreq_GHz: z.number().min(0.001).max(1000).optional(),
+  gammaGeo: z.number().min(1).max(1e3).optional(),
+  qMechanical: z.number().min(0).max(1e6).optional(),
+  qCavity: z.number().min(1).max(1e12).optional(),
+  gammaVanDenBroeck: z.number().min(0).max(1e16).optional(),
+  exoticMassTarget_kg: z.number().min(0).max(1e9).optional(),
+  currentMode: z.enum(['hover','cruise','emergency','standby']).optional()
+}).strict();
+
 // Schema for ChatGPT function calls
 const pulseSectorSchema = z.object({
   sectorId: z.string(),
@@ -545,10 +560,13 @@ export function getPipelineState(req: Request, res: Response) {
 // Update pipeline parameters
 export async function updatePipelineParams(req: Request, res: Response) {
   try {
-    const params = req.body;
+    const parsed = UpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid parameters", issues: parsed.error.issues });
+    }
     const newState = await pipeMutex.lock(() => {
       const curr = getGlobalPipelineState();
-      const next = updateParameters(curr, params);
+      const next = updateParameters(curr, parsed.data);
       setGlobalPipelineState(next);
       return next;
     });
