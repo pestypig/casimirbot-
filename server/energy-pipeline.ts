@@ -315,7 +315,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
   
   // 4) Sector scheduling — per-mode policy
-  state.sectorCount = TOTAL_SECTORS;                     // ✅ Total sectors (always 400)
+  state.sectorCount = Math.max(1, state.sectorCount || TOTAL_SECTORS); // respect override; else default to 400
   state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
   const S_total = state.sectorCount;
   const S_live = state.concurrentSectors;
