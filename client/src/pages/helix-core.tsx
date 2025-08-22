@@ -651,39 +651,45 @@ export default function HelixCore() {
                         parameters={(() => {
                           const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
-                          // Build viz params purely from live pipeline / metrics
                           const vizParams: any = {
                             currentMode: effectiveMode,
+                            // ⬇️ use the resolved sectors (metrics wins)
                             sectorStrobing: sectorsResolved,
-                            cosmeticLevel,
+
+                            // 🔑 physics parity & cosmetics (neutral by default; engine handles parity correctly)
                             physicsParityMode: localStorage.getItem("physics-parity-mode") === "true",
-                            // geometry from live hull if present
-                            hull: (hullMetrics && hullMetrics.hull) ? {
-                              a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                              b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                              c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2
-                            } : undefined,
-                            wallWidth_m: 6.0, // protocol constant in your codebase
+                            cosmeticLevel,
+
+                            // 🔧 geometry — pass the full live hull object (includes Lx/Ly/Lz and a/b/c)
+                            hull,
+
+                            wallWidth_m: 6.0,
                             epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
                             betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
-                            gridScale: 1.6
+
+                            gridScale: 1.6,
+
+                            // 🧠 pipeline timing + FR window (authoritative)
+                            dutyEffectiveFR,
+                            lightCrossing: lc,
+
+                            // visual curvature knobs set neutral; engine can boost if parity off
+                            curvatureBoostMax: 1,
+                            curvatureGainDec: 0,
                           };
 
-                          // Only pass numeric fields if the pipeline actually provided them
+                          // Only pass numeric pipeline fields when present (no magic defaults)
                           const maybe = {
-                            dutyCycle: num(pipeline?.dutyCycle),
-                            g_y:       num(pipeline?.gammaGeo),
-                            cavityQ:   num(pipeline?.qCavity),
-                            sagDepth_nm: num(pipeline?.sagDepth_nm),
-                            tsRatio:   num(pipeline?.TS_ratio),
-                            powerAvg_MW: num(pipeline?.P_avg),
-                            exoticMass_kg: num(pipeline?.M_exotic),
-                            qSpoilingFactor: num(pipeline?.qSpoilingFactor),
-                            gammaVanDenBroeck: num(pipeline?.gammaVanDenBroeck),
-                            curvatureBoostMax: 1,         // neutral (visual), but explicit
-                            curvatureGainDec:  0          // neutral (visual), but explicit
+                            dutyCycle:        num(pipeline?.dutyCycle),
+                            g_y:              num(pipeline?.gammaGeo),
+                            cavityQ:          num(pipeline?.qCavity),
+                            sagDepth_nm:      num(pipeline?.sagDepth_nm),
+                            tsRatio:          num(pipeline?.TS_ratio),
+                            powerAvg_MW:      num(pipeline?.P_avg),
+                            exoticMass_kg:    num(pipeline?.M_exotic),
+                            qSpoilingFactor:  num(pipeline?.qSpoilingFactor),
+                            gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck),
                           };
-
                           for (const k of Object.keys(maybe) as (keyof typeof maybe)[]) {
                             if (maybe[k] !== undefined) vizParams[k] = maybe[k];
                           }
