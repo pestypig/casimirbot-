@@ -320,11 +320,14 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   (state as any).dutyEff = d_eff;
   (state as any).dutyShip = d_eff; // alias for clients (ship-wide duty)
 
-  // 4) Stored energy (raw core): ensure qMechanical starts with valid value
+  // 4) Stored energy (raw core): ensure valid input values
   // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
   if (state.qMechanical === 0 && state.currentMode !== 'standby') {
     state.qMechanical = 1; // restore default
   }
+  
+  // Clamp gammaGeo to sane range for UI inputs
+  state.gammaGeo = Math.max(1, Math.min(1e3, state.gammaGeo));
 
   const gamma3 = Math.pow(state.gammaGeo, 3);
   state.U_geo = state.U_static * gamma3;
@@ -381,9 +384,9 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
   state.fordRomanCompliance = state.zeta < 1.0;
 
-  // Physics logging for debugging (show concurrent sectors used in calculations)
+  // Physics logging for debugging (show both used and display duties)
   console.log("[PIPELINE]", {
-    duty: d_eff, sectors: concurrent, N: state.N_tiles,
+    dutyShip: d_eff, dutyUI: state.dutyCycle, concurrent, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
     U_static: state.U_static, U_Q: state.U_Q, P_loss_raw: state.P_loss_raw,
     P_avg_MW: state.P_avg, M_raw: state.M_exotic_raw, M_final: state.M_exotic,
@@ -409,6 +412,11 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   state.TS_long = T_long / T_m_ts;   // most conservative
   state.TS_geom = T_geom / T_m_ts;   // typical
   state.TS_ratio = state.TS_long;    // keep existing field = conservative
+  
+  // Wall-scale TS (often more relevant than hull-scale)
+  const w = state.hull?.wallThickness_m ?? 1.0;
+  const T_wall = w / C;
+  (state as any).TS_wall = T_wall / T_m_ts;
 
   // Keep these around for the metrics + HUD
   state.__fr = {
