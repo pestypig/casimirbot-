@@ -325,23 +325,23 @@ const applyShow = (
   }
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
-
   const t = clamp01(T);
   const b = Math.max(1, boostMax);
 
-  console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'dec', decades, 'viz', vizGain, 'exp', exposure, 'zstop', zeroStop);
+  // If your engine prefers numeric color modes, optionally map:
+  // const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
 
   pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
-    physicsParityMode: false,
-    colorMode,
+    physicsParityMode: false,   // enable amplification
+    colorMode,                  // or colorModeIndex
     curvatureGainT: t,
     curvatureBoostMax: b,
     curvatureGainDec: Math.max(0, Math.min(8, decades)),
     vizGain,
-    exposure,
+    exposure: Math.max(0.1, exposure),
     zeroStop,
     cosmeticLevel: 10,
   }, 60);
@@ -350,10 +350,9 @@ const applyShow = (
   e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
   e.requestRewarp?.();
 
-  // context check
   if (e?.gl?.isContextLost?.()) {
     console.warn('[SHOW] context lost – attempting restore');
-    e.gl.getExtension('WEBGL_lose_context')?.restoreContext?.();
+    e.gl.getExtension?.('WEBGL_lose_context')?.restoreContext?.();
   }
 };
 

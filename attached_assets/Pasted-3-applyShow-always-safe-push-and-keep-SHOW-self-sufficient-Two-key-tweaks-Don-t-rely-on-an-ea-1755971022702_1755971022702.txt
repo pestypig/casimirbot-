@@ -1,0 +1,67 @@
+3) applyShow — always safe-push, and keep SHOW self-sufficient
+
+Two key tweaks:
+
+Don’t rely on an earlier push having set physics; push every time.
+
+Keep the camera/axes safety, but don’t silently end up with zero exposure or a bogus colorMode.
+
+Patch:
+
+const applyShow = (
+  e: any,
+  sharedIn: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid',
+  opts: { T?: number; boostMax?: number; decades?: number; vizGain?: number; exposure?: number; zeroStop?: number; }
+) => {
+  const { T=0.70, boostMax=40, decades=3, vizGain=1.25, exposure=7.5, zeroStop=1e-7 } = opts || {};
+  primeOnce(e, sharedIn, colorMode);
+
+  let shared = sharedIn;
+  const axesOK = shared?.axesScene?.every?.((n:any)=>Number.isFinite(n)&&Math.abs(n)>0);
+  if (!axesOK) {
+    console.warn('[SHOW] invalid axesScene, fixing');
+    shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+  }
+
+  const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
+  const t = clamp01(T);
+  const b = Math.max(1, boostMax);
+
+  // If your engine prefers numeric color modes, optionally map:
+  // const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
+
+  pushUniformsWhenReady(e, {
+    ...shared,
+    cameraZ: camZ,
+    lockFraming: true,
+    physicsParityMode: false,   // enable amplification
+    colorMode,                  // or colorModeIndex
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    curvatureGainDec: Math.max(0, Math.min(8, decades)),
+    vizGain,
+    exposure: Math.max(0.1, exposure),
+    zeroStop,
+    cosmeticLevel: 10,
+  }, 60);
+
+  const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b;
+  e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
+  e.requestRewarp?.();
+
+  if (e?.gl?.isContextLost?.()) {
+    console.warn('[SHOW] context lost – attempting restore');
+    e.gl.getExtension?.('WEBGL_lose_context')?.restoreContext?.();
+  }
+};
+
+
+Tip: Right before calling applyShow, re-push the UI-duty physics payload (your showPhys) so SHOW never depends on earlier timing:
+
+pushUniformsWhenReady(rightEngine.current, showPhys);
+applyShow(...);
+
+
+(You’re already doing this in init and live update; keep it.)
