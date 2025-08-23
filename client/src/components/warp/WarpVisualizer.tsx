@@ -268,16 +268,6 @@ useEffect(() => {
     // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
     const lc = parameters.lightCrossing;
     
-    // ⬇️ add this
-    const dutyEffectiveFR = (() => {
-      const burst = Number(lc?.burst_ms);
-      const dwell = Number(lc?.dwell_ms);
-      if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
-        return clamp01(burst / dwell);
-      }
-      return clamp01(isFiniteNum(parameters?.dutyCycle) ? parameters!.dutyCycle! : 0.14);
-    })();
-    
     const dutyResolved =
       isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
       (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
@@ -532,16 +522,6 @@ useEffect(() => {
   useEffect(() => {
     if (!isLoaded || !engineRef.current) return;
     const lc = parameters.lightCrossing;
-    
-    // ⬇️ add this
-    const dutyEffectiveFR = (() => {
-      const burst = Number(lc?.burst_ms);
-      const dwell = Number(lc?.dwell_ms);
-      if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
-        return clamp01(burst / dwell);
-      }
-      return clamp01(isFiniteNum(parameters?.dutyCycle) ? parameters!.dutyCycle! : 0.14);
-    })();
     
     try {
       console.log('🔄 Live operational mode update:', {
@@ -932,8 +912,8 @@ useEffect(() => {
                   return (
                     <>
                       exaggeration: ×{gain.toFixed(2)} ·
-                      {' '}exp:{(parameters.viz?.exposure ?? 6.0).toFixed(1)} ·
-                      {' '}z₀:{(parameters.viz?.zeroStop ?? 1e-7).toExponential(1)}
+                      {' '}exp:{(u.exposure ?? 6.0).toFixed(1)} ·
+                      {' '}z₀:{(u.zeroStop ?? 1e-7).toExponential(1)}
                     </>
                   );
                 })()}
