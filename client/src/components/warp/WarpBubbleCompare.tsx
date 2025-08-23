@@ -39,8 +39,18 @@ function resolveThetaScale(p: any) {
   const gammaGeo = Number(p?.gammaGeo ?? 26);
   const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
   const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
-  const duty     = Number(p?.dutyCycle ?? 0.14);
-  const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? 1));
+  const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? p?.sectorStrobing ?? 1));
+  
+  // Prefer FR-sampled duty if available
+  let duty = Number(p?.dutyCycle ?? 0.14);
+  if (Number.isFinite(p?.dutyEffectiveFR)) {
+    duty = Number(p.dutyEffectiveFR);
+  } else if (p?.lightCrossing &&
+             Number.isFinite(p.lightCrossing.burst_ms) &&
+             Number.isFinite(p.lightCrossing.dwell_ms) &&
+             p.lightCrossing.dwell_ms > 0) {
+    duty = p.lightCrossing.burst_ms / p.lightCrossing.dwell_ms;
+  }
   const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
   const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
   const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
@@ -232,6 +242,22 @@ export default function WarpBubbleCompare({
 }: Props) {
   // Explicitly construct separate payloads for airtight mode control
   const base = parameters ? JSON.parse(JSON.stringify(parameters)) : {};
+
+  // Fingerprint of physics inputs that should re-push uniforms
+  const physicsKey = JSON.stringify({
+    duty: base.dutyEffectiveFR ?? base.dutyCycle,
+    sectors: base.sectorStrobing ?? base.sectors ?? base.sectorCount,
+    gammaGeo: base.g_y ?? base.gammaGeo,
+    qSpoil: base.qSpoilingFactor ?? base.deltaAOverA,
+    gammaVdB: base.gammaVanDenBroeck ?? base.gammaVdB,
+    lc: base.lightCrossing ? {
+      phase: base.lightCrossing.phase,
+      sectorIdx: base.lightCrossing.sectorIdx,
+      dwell_ms: base.lightCrossing.dwell_ms,
+      burst_ms: base.lightCrossing.burst_ms,
+      tauLC_ms: base.lightCrossing.tauLC_ms
+    } : null
+  });
   
   const parityParams = {
     ...base,
@@ -361,6 +387,23 @@ export default function WarpBubbleCompare({
     const showPhys = physicsPayload(showParams);
     pushUniformsWhenReady(leftEngine.current,  parityPhys);
     pushUniformsWhenReady(rightEngine.current, showPhys);
+    
+    // Also push FR-window/light-crossing controls if present
+    if (base.lightCrossing) {
+      const lc = base.lightCrossing;
+      const s = Math.max(1, Number(base.sectorStrobing ?? lc.sectorCount ?? showPhys.sectors ?? 1));
+      const lcPayload = {
+        phase: lc.phase,
+        onWindow: !!lc.onWindowDisplay,
+        sectorIdx: Math.max(0, lc.sectorIdx % s),
+        tauLC_ms: lc.tauLC_ms,
+        dwell_ms: lc.dwell_ms,
+        burst_ms: lc.burst_ms,
+        sectors: s
+      };
+      pushUniformsWhenReady(leftEngine.current,  lcPayload);
+      pushUniformsWhenReady(rightEngine.current, lcPayload);
+    }
 
     // normalize any global fallback the engine might use
     (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
@@ -407,7 +450,8 @@ export default function WarpBubbleCompare({
     parityParams?.viz?.exposure, showParams?.viz?.exposure,
     parityParams?.viz?.zeroStop, showParams?.viz?.zeroStop,
     parityParams?.curvatureGainDec, showParams?.curvatureGainDec,
-    colorMode, heroX, parityX
+    colorMode, heroX, parityX,
+    physicsKey                       // new: react to mode/duty/sectors/LC
   ]);
 
   // Fix black bands/duplicated rows after layout changes
