@@ -521,7 +521,7 @@ export default function WarpBubbleCompare({
           
           // Runtime proof it's the right file
           console.log('[WARP PROBE]', {
-            scriptTags: [...document.scripts].filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
+            scriptTags: Array.from(document.scripts).filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
             hasCtor: !!(window as any).WarpEngine,
             build: (window as any).__WarpEngineBuild || (window as any).WarpEngine?.BUILD,
             ctorName: ((window as any).WarpEngine?.name)
@@ -560,7 +560,7 @@ export default function WarpBubbleCompare({
         } finally {
           busyRef.current = false;
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('[WARP ENGINE] Creation failed:', { error: e, message: e?.message, stack: e?.stack, constructor: typeof (window as any).WarpEngine, leftCanvas: !!leftRef.current, rightCanvas: !!rightRef.current });
       } finally {
         (window as any).__warpCompareBusy = false;

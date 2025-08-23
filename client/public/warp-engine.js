@@ -3,15 +3,21 @@
 
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
-const GRID_DEFAULTS = {
-  spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
-    ? 1.45   // a touch more padding on phones so the first fit is perfect
-    : 1.35,  // tighter framing for closer view on desktop
-  minSpan: 2.6,        // never smaller than this (in clip-space units)
-  divisions: 100       // more lines so a larger grid still looks dense
-};
+if (typeof window.GRID_DEFAULTS === 'undefined') {
+  window.GRID_DEFAULTS = {
+    spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
+      ? 1.45   // a touch more padding on phones so the first fit is perfect
+      : 1.35,  // tighter framing for closer view on desktop
+    minSpan: 2.6,        // never smaller than this (in clip-space units)
+    divisions: 100       // more lines so a larger grid still looks dense
+  };
+}
+const GRID_DEFAULTS = window.GRID_DEFAULTS;
 
-const SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
+if (typeof window.SCENE_SCALE === 'undefined') {
+  window.SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
+}
+const SCENE_SCALE = window.SCENE_SCALE;
 
 class WarpEngine {
     constructor(canvas) {
