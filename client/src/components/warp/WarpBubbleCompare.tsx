@@ -316,10 +316,11 @@ function compatifyUniforms(raw: any) {
 }
 
 function pushUniformsWhenReady(engine: any, payload: any, retries = 24) {
-  if (!engine) return;
+  if (!engine || (engine._destroyed === true)) return;
   const bundle = compatifyUniforms(payload);
 
   const tryPush = () => {
+    if (!engine || engine._destroyed) return;
     try { engine.updateUniforms?.(bundle); } catch {}
     try { engine.setParams?.(bundle); }      catch {}
   };
@@ -329,7 +330,10 @@ function pushUniformsWhenReady(engine: any, payload: any, retries = 24) {
 
   // push again on a few frames (late init, async resize, etc.)
   if (retries > 0) {
-    requestAnimationFrame(() => pushUniformsWhenReady(engine, payload, retries - 1));
+    requestAnimationFrame(() => {
+      if (!engine || engine._destroyed) return;
+      pushUniformsWhenReady(engine, payload, retries - 1);
+    });
   }
 }
 
@@ -543,8 +547,8 @@ export default function WarpBubbleCompare({
           // });
           
           // Add WebGL context guards for resilience
-          attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._resize?.());
-          attachGLContextGuards(rightRef.current!, () => rightEngine.current?._resize?.());
+          attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._recreateGL?.());
+          attachGLContextGuards(rightRef.current!, () => rightEngine.current?._recreateGL?.());
           
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();

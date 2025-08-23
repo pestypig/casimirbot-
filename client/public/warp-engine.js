@@ -37,6 +37,7 @@ class WarpEngine {
         }
         window.__WARP_ENGINES.add(canvas);
         
+        this._destroyed = false;
         this.canvas = canvas;
         this.gl = canvas.getContext('webgl2', {
             alpha: false,
@@ -55,6 +56,17 @@ class WarpEngine {
         }
 
         console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
+        
+        // Handle GL context loss/recovery internally
+        canvas.addEventListener('webglcontextlost', (e) => {
+            try { e.preventDefault(); } catch {}
+            this._setLoaded(false);
+            console.warn('[WarpEngine] WebGL context lost');
+        }, false);
+        canvas.addEventListener('webglcontextrestored', () => {
+            console.warn('[WarpEngine] WebGL context restored; rebuilding GL resources');
+            try { this._recreateGL(); } catch (e) { console.error(e); }
+        }, false);
         
         // Check for non-blocking shader compilation support
         this.parallelShaderExt = this.gl.getExtension('KHR_parallel_shader_compile');
@@ -215,6 +227,18 @@ class WarpEngine {
         // Start render loop
         console.log('[WarpEngine] Starting render loop...');
         this._renderLoop();
+    }
+    
+    _recreateGL() {
+        // Reacquire context, rebuild buffers & shaders
+        this.gl = this.canvas.getContext('webgl2', { alpha:false, antialias:false, powerPreference:'high-performance', desynchronized:true })
+            || this.canvas.getContext('webgl', { alpha:false, antialias:false, powerPreference:'high-performance', desynchronized:true });
+        if (!this.gl) throw new Error('WebGL not supported after restore');
+        this.gridProgram = null;
+        this.gridVbo = null;
+        this._initializeGrid();        // re-create VBO + compile shaders
+        this._setLoaded(false);        // will flip to true in _compileGridShaders on ready
+        this._resizeCanvasToDisplaySize();
     }
 
     // --- central overhead camera (single place to change the pose) ---
@@ -702,6 +726,7 @@ class WarpEngine {
     }
     
     updateUniforms(parameters) {
+        if (this._destroyed) return;
         // Don't apply while program not ready
         if (!this.isLoaded || !this.gridProgram) { return; }
         this._enqueueUniforms(parameters);
@@ -1288,7 +1313,13 @@ class WarpEngine {
     }
 
     _render() {
+        if (this._destroyed) return;
         const gl = this.gl;
+        // Guard: if program got torn down, try to rebuild once
+        if (!this.gridProgram && gl) {
+            try { this._compileGridShaders(); } catch (e) { console.warn('Autorelink failed:', e); }
+            return; // wait for shaders to (a)synchronously link
+        }
         // Add safety checks to prevent "stuck black" state
         if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
             console.warn('[WarpEngine] Render blocked - missing requirements:', {
@@ -1670,6 +1701,8 @@ class WarpEngine {
     }
 
     destroy() {
+        if (this._destroyed) return;
+        this._destroyed = true;
         // Clean up per-canvas guard
         if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
             window.__WARP_ENGINES.delete(this.canvas);
