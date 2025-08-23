@@ -8,6 +8,7 @@ const MODEL_MODE: 'calibrated' | 'raw' =
 
 // ── Physics Constants (centralized) ──────────────────────────────────────────
 import { HBAR, C, PI } from "./physics-const.js";
+import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
 export type HullAxes = { a: number; b: number; c: number };
@@ -548,6 +549,38 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     sectorStrobing: state.sectorStrobing,
     qSpoilingFactor: state.qSpoilingFactor
   });
+  
+  // Calculate Natário metrics using pipeline state
+  const natario = calculateNatarioMetric(
+    {
+      gap: state.gap_nm,
+      hull: state.hull ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 } : { a: 503.5, b: 132, c: 86.5 },
+      N_tiles: state.N_tiles,
+      tileArea_m2: state.tileArea_cm2 * CM2_TO_M2,
+      dutyEffectiveFR: d_eff,
+      lightCrossing: { tauLC_ms: (state as any).TS_wall || 1.0, burst_ms: 0.01, dwell_ms: 0.99 },
+      gammaGeo: state.gammaGeo,
+      gammaVanDenBroeck: state.gammaVanDenBroeck,
+      qSpoilingFactor: state.qSpoilingFactor,
+      cavityQ: state.qCavity,
+      modulationFreq_GHz: state.modulationFreq_GHz,
+      sectorStrobing: state.sectorStrobing,
+      dynamicConfig: {
+        sectorCount: state.sectorStrobing,
+        sectorDuty: state.dutyCycle,
+        cavityQ: state.qCavity,
+        qSpoilingFactor: state.qSpoilingFactor,
+        gammaGeo: state.gammaGeo,
+        gammaVanDenBroeck: state.gammaVanDenBroeck,
+        pulseFrequencyGHz: state.modulationFreq_GHz,
+        lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6
+      }
+    } as any,
+    state.U_static * state.N_tiles   // pipeline total Casimir energy this tick
+  );
+  
+  // Store Natário metrics in state for API access
+  (state as any).natario = natario;
   
   return state;
 }
