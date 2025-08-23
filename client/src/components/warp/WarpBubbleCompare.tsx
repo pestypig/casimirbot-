@@ -534,8 +534,9 @@ export default function WarpBubbleCompare({
           
           // Force immediate initialization with bulletproof cameraZ
           const initCamZ = safeCamZ(2.0);  // fallback to safe default
-          leftEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: initCamZ});
-          rightEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: initCamZ});
+          const initColor = 0; // theta
+          leftEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
+          rightEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
           
           console.log('[WARP ENGINE] Initialization complete, both engines ready');
           
