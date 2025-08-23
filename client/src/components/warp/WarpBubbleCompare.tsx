@@ -1,41 +1,53 @@
 import React, { useEffect, useRef } from "react";
 
+// at top-level, set a build token (replace with your commit/ts)
+const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || "dev-" + Date.now();
+
 /* ---------------- Script loader & strobe mux ---------------- */
 function loadScript(src: string) {
   return new Promise<void>((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = src; s.async = true;
+    s.src = src; s.async = true; s.crossOrigin = "anonymous";
     s.onload = () => resolve();
     s.onerror = () => reject(new Error(`Failed to load ${src}`));
     document.head.appendChild(s);
   });
 }
-async function ensureWarpEngineCtor(): Promise<any> {
+
+function removeOldWarpScripts() {
+  Array.from(document.querySelectorAll('script[src*="warp-engine.js"]'))
+    .forEach(n => n.parentNode?.removeChild(n));
+}
+
+async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
+  const { requiredBuild = APP_WARP_BUILD, forceReload = false } = opts;
   const w = window as any;
+
+  // If an engine is already present, verify its build token
   let Ctor = w.WarpEngine?.default || w.WarpEngine;
-  if (typeof Ctor === 'function') return Ctor;
-
-  const candidates = [
-    '/warp-engine.js?v=canonical',
-    '/warp-engine.js',
-    '/WarpEngine.js',
-    '/Warp_engine.js',
-    '/warp_engine.js',
-    '/assets/warp-engine.js',
-    '/static/warp-engine.js'
-  ];
-
-  for (const src of candidates) {
-    try {
-      console.log('[WarpLoader] trying', src);
-      await loadScript(src);
-      Ctor = w.WarpEngine?.default || w.WarpEngine;
-      if (typeof Ctor === 'function') return Ctor;
-    } catch (e) {
-      console.warn('[WarpLoader] failed', src, e);
+  const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
+  if (Ctor && !forceReload) {
+    if (!requiredBuild || currentBuild === requiredBuild) {
+      console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
+      return Ctor;
     }
+    console.warn('[WARP LOADER] Build mismatch; reloading engine', { currentBuild, requiredBuild });
   }
-  throw new Error('WarpEngine constructor not found (check filename/path/CSP/MIME type)');
+
+  // Remove any old <script> tags and load a fresh one with cache-bust
+  removeOldWarpScripts();
+  const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
+  await loadScript(url);
+
+  // Re-check
+  Ctor = w.WarpEngine?.default || w.WarpEngine;
+  if (Ctor) {
+    // Stamp a build token so we can verify later even if the engine lacks BUILD
+    w.__WarpEngineBuild = w.WarpEngine?.BUILD || requiredBuild;
+    console.log('[WARP LOADER] Loaded WarpEngine', { src: url, build: w.__WarpEngineBuild });
+    return Ctor;
+  }
+  throw new Error('WarpEngine constructor not found after reload');
 }
 function ensureStrobeMux() {
   const w = window as any;
@@ -375,7 +387,7 @@ export default function WarpBubbleCompare({
     (async () => {
       if (!leftRef.current || !rightRef.current) return;
       try {
-        const WarpCtor = await ensureWarpEngineCtor();
+        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
         if (cancelled) return;
 
         // StrictMode re-mount guard (prevents double constructor crashes in dev)
