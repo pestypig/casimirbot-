@@ -685,7 +685,7 @@ export default function WarpBubbleCompare({
           
           // Apply show with cosmetic safety fallback
           applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
-          const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode] ?? 1;
+          const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode as keyof { solid:0, theta:1, shear:2 }] ?? 1;
           applyShowSafe(rightEngine.current, {
             ...showPayload,
             colorMode: colorModeIndex,
@@ -695,8 +695,8 @@ export default function WarpBubbleCompare({
           scrubOverlays(rightEngine.current);
           
           // Verify final physics scalars (catch NaNs that yield black)
-          check('REAL',  { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(L, shared.axesScene)) });
-          check('SHOW',  { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(R, shared.axesScene)) });
+          check('REAL',  { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(L, shared.axesScene)) });
+          check('SHOW',  { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(R, shared.axesScene)) });
         });
 
         // lock framing across resizes (prevents "camera pulled back")
@@ -745,6 +745,7 @@ export default function WarpBubbleCompare({
     
     // Fix D: Seed framing first to prevent transient nulls during mode flip
     const hull = parityParams?.hull || showParams?.hull;
+    const num = (x: any, d: number) => (Number.isFinite(x) ? +x : d);
     const ah = num(hull?.a, 503.5), bh = num(hull?.b, 132), ch = num(hull?.c, 86.5);
     const sh = 1 / Math.max(ah, bh, ch, 1e-9);
     const axesSceneNow = [ah*sh, bh*sh, ch*sh] as [number,number,number];
@@ -766,6 +767,17 @@ export default function WarpBubbleCompare({
     const showPhys = physicsPayload(showParams, 'ui');
     pushUniformsWhenReady(leftEngine.current,  parityPhys);
     pushUniformsWhenReady(rightEngine.current, showPhys);
+    
+    // Debug mode change
+    if (parityParams?.currentMode || showParams?.currentMode) {
+      console.log('[WarpBubbleCompare] Mode update:', {
+        mode: parityParams?.currentMode || showParams?.currentMode,
+        leftEngine: !!leftEngine.current,
+        rightEngine: !!rightEngine.current,
+        parityPhys: parityPhys,
+        showPhys: showPhys
+      });
+    }
     
     // Also push FR-window/light-crossing controls if present
     if (base.lightCrossing) {

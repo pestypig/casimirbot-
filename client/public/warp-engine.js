@@ -653,6 +653,12 @@ class WarpEngine {
             const p = this._pendingUpdate || {};
             this._pendingUpdate = null;
             this._flushId = 0;
+            
+            // Debug mode switch
+            if (p.currentMode) {
+                console.log('[WarpEngine] Mode switch detected:', p.currentMode);
+            }
+            
             try { 
                 this._applyUniformsNow(p); 
             } catch(e) { 
