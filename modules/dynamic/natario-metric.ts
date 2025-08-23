@@ -33,25 +33,33 @@ export function calculateNatarioMetric(
   params: SimulationParameters,
   casimirEnergy: number
 ): NatarioMetricResult {
-  const { dynamicConfig } = params;
-  
-  if (!dynamicConfig) {
-    throw new Error('Dynamic configuration required for Natário metric');
-  }
-  
-  // Calculate effective duty (pipeline-true approach)
-  const sectors = Math.max(1, dynamicConfig.sectorCount ?? 400);
-  const duty = dynamicConfig.sectorDuty ?? 0.01; // Use default from dynamic config
-  const d_eff = duty / sectors; // Effective duty per sector
-  
-  // Temporal parameters for GR validation
-  const pulsePeriodS = 1 / (dynamicConfig.pulseFrequencyGHz * 1e9); // τ_pulse
-  const lightCrossingTimeS = (dynamicConfig.lightCrossingTimeNs || 100) * 1e-9; // τ_LC
-  const homogenizationRatio = pulsePeriodS / lightCrossingTimeS;
-  
-  // Configurable GR validity thresholds (use defaults if config not available)
-  const maxRatio = 1e-3; // Default homogenization threshold
-  const grValidityCheck = homogenizationRatio < maxRatio;
+  // ---- Resolve from pipeline names first, then dynamicConfig fallbacks
+  const dc = params.dynamicConfig ?? {};
+  const sectorCount = Math.max(1, dc.sectorCount ?? (params as any).sectorStrobing ?? 1);
+  const dutyLocal   = Math.max(0, Math.min(1, dc.sectorDuty ?? (params as any).dutyCycle ?? 0.14));
+
+  // Prefer Ford–Roman window if provided (burst/dwell), else local/sector
+  const dutyEffFR = (() => {
+    const lc = (params as any).lightCrossing;
+    const burst = Number(lc?.burst_ms), dwell = Number(lc?.dwell_ms);
+    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) return Math.max(0, Math.min(1, burst/dwell));
+    return Math.max(0, Math.min(1, ((params as any).dutyEffectiveFR ?? dutyLocal / sectorCount)));
+  })();
+
+  const freqGHz = dc.pulseFrequencyGHz ?? (params as any).modulationFreq_GHz ?? 15;
+  const tauLC_s = (() => {
+    const ms = (dc.lightCrossingTimeNs != null) ? (dc.lightCrossingTimeNs * 1e-9) :
+               ((params as any).lightCrossing?.tauLC_ms != null ? (params as any).lightCrossing.tauLC_ms * 1e-3 : 1e-7);
+    return Math.max(1e-12, ms);
+  })();
+
+  const pulsePeriodS = 1 / (Math.max(1e3, freqGHz) * 1e9);
+  const homogenizationRatio = pulsePeriodS / tauLC_s;
+  const grValidityCheck = homogenizationRatio < (dc.maxHomogenizationRatio ?? 1e-3);
+
+  // Aliases for downstream compatibility
+  const sectors = sectorCount;
+  const d_eff = dutyEffFR;
   
   // Calculate stress-energy tensor using pipeline energy
   const { stressEnergyT00, stressEnergyT11 } = calculateStressEnergyTensor(
