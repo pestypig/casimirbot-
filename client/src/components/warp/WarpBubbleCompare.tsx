@@ -609,17 +609,23 @@ export default function WarpBubbleCompare({
         roRef.current = new ResizeObserver(() => {
           const fresh = frameFromHull(parameters?.hull, parameters?.gridSpan);
           const L = leftRef.current!, R = rightRef.current!;
-          const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
-          const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
 
-          // make the GL viewport match CSS before re-locking framing
+          // 🔧 make sure canvases have pixels that match CSS box
+          ensureCanvasSize(L);
+          ensureCanvasSize(R);
+
+          // rebind GL viewport to new pixel size before camera update
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
+
+          const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
+          const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
 
           pushUniformsWhenReady(leftEngine.current,  { ...fresh, cameraZ: camL, lockFraming: true });
           pushUniformsWhenReady(rightEngine.current, { ...fresh, cameraZ: camR, lockFraming: true });
         });
-        roRef.current.observe(L); roRef.current.observe(R);
+        roRef.current.observe(leftRef.current!);
+        roRef.current.observe(rightRef.current!);
 
       } catch (e) {
         console.error('[WarpBubbleCompare] init failed:', e);
