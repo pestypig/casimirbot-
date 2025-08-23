@@ -14,7 +14,7 @@ async function ensureWarpEngineCtor(): Promise<any> {
   const w = window as any;
   let Ctor = w.WarpEngine?.default || w.WarpEngine;
   if (typeof Ctor === 'function') return Ctor;
-  for (const src of ['/warp-engine-fixed.js?v=tilt2','/warp-engine.js?v=fallback']) {
+  for (const src of ['/warp-engine.js?v=canonical']) {
     try { await loadScript(src); } catch {}
     Ctor = w.WarpEngine?.default || w.WarpEngine;
     if (typeof Ctor === 'function') return Ctor;

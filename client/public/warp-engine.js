@@ -1,487 +1,364 @@
-//====================================================================
-//  Natário Warp‑Bubble Visualiser (3D Volumetric Cage v2.1 CACHE-BUST)
-//  ------------------------------------------------------------------
-//  Real-time WebGL visualization with authentic parameter mapping
-//  Now featuring: Three orthogonal sheets for full 3D warp perception
-//  URGENT: DEBUG STAMPS ADDED FOR PIPELINE DIAGNOSTICS
-//====================================================================
+// Optimized 3D spacetime curvature visualization engine
+// Authentic Natário warp bubble physics with WebGL rendering
 
-class WarpCage {
+// Runtime guard to prevent double-renders
+if (window.__WARP_ENGINE_ACTIVE && !window.__WARP_ENGINE_ALLOW_MULTI) {
+  console.warn('Duplicate warp engine blocked. Active:', window.__WARP_ENGINE_ACTIVE);
+  throw new Error('Second WarpEngine prevented from starting');
+}
+window.__WARP_ENGINE_ACTIVE = 'warp-engine';
+
+// --- Grid defaults (scientifically scaled for needle hull) ---
+const GRID_DEFAULTS = {
+  spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
+    ? 1.45   // a touch more padding on phones so the first fit is perfect
+    : 1.35,  // tighter framing for closer view on desktop
+  minSpan: 2.6,        // never smaller than this (in clip-space units)
+  divisions: 100       // more lines so a larger grid still looks dense
+};
+
+const SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
+
+class WarpEngine {
     constructor(canvas) {
-        try {
-            // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
-            console.error('🚨 CACHE-BUST-STAMP-v2.5-AGGRESSIVE-RELOAD-NATARIO 🚨');
-            console.error('🏷️ WARP-ENGINE-PIPELINE-DIAGNOSTICS-ACTIVE');
-            console.error('✅ 3D WebGL WarpEngine with fallback compatibility loaded');
-            
-            console.log("WarpEngine v2.0: Starting 3D volumetric cage initialization...");
-            this.canvas = canvas;
-            
-            // Gate this legacy cage behind a URL flag
-            this.enabled = /\bcage=1\b/.test(location.search);
-            if (!this.enabled) {
-                console.warn('CAGE DISABLED (enable with ?cage=1). Skipping quad+grid render.');
-            }
-            // Try WebGL2 first, then WebGL1, then experimental contexts
-            this.gl = canvas.getContext("webgl2") || 
-                     canvas.getContext("webgl") || 
-                     canvas.getContext("experimental-webgl");
-            
-            if (!this.gl) {
-                console.error("WebGL not supported - browser compatibility issue");
-                // Create a simplified fallback instead of throwing
-                this.createFallbackRenderer();
-                return;
-            }
-
-            // Enable derivatives extension for WebGL1 compatibility
-            this.hasDerivatives = true;
-            if (!this.gl.getExtension("OES_standard_derivatives")) {
-                console.warn("OES_standard_derivatives extension not available – grid lines disabled for WebGL1");
-                this.hasDerivatives = false;
-            }
-
-            // Default Natário parameters (Hover mode defaults)
-            this.uniforms = {
-                dutyCycle: 0.14,        // 14% duty cycle
-                g_y: 26.0,              // geometric amplification
-                cavityQ: 1e9,           // electromagnetic Q-factor
-                sagDepth_nm: 16.0,      // sag depth in nanometers
-                tsRatio: 4102.74,       // time-scale separation
-                powerAvg_MW: 83.3,      // average power (MW)
-                exoticMass_kg: 1405     // exotic mass (kg)
-            };
-
-            this.showQuad = false; // default: no orange background field
-
-            console.log("WarpEngine: Compiling shaders...");
-            this._compileShaders();
-            
-            console.log("WarpEngine: Initializing quad and grid...");
-            this._initQuad();
-            
-            console.log("WarpEngine: Caching uniform locations...");
-            this._cacheUniformLocations();
-            
-            console.log("WarpEngine: Resizing...");
-            this._resize();
-            
-            // Enable depth buffer for 3D grid rendering
-            this.gl.enable(this.gl.DEPTH_TEST);
-            
-            // Auto-resize and continuous rendering
-            window.addEventListener("resize", () => this._resize());
-            
-            console.log("WarpEngine: Starting render loop...");
-            this._startRenderLoop();
-            
-            console.log("WarpEngine: Initialization completed successfully!");
-        console.log(`Canvas dimensions: ${this.canvas.width}x${this.canvas.height}`);
-        console.log(`WebGL context: ${this.gl ? 'OK' : 'FAILED'}`);
-        console.log(`Grid vertices: ${this.gridVertexCount} points`);
-        console.log(`Grid VBO created: ${this.gridVbo ? 'YES' : 'NO'}`);
-        console.log(`Grid program created: ${this.gridProgram ? 'YES' : 'NO'}`);
-        } catch (error) {
-            console.error("WarpEngine initialization failed:", error);
-            console.error("Error stack:", error.stack);
-            // Create fallback instead of throwing - maintain functionality
-            this.createFallbackRenderer();
+        this.canvas = canvas;
+        this.gl = canvas.getContext('webgl2', {
+            alpha: false,
+            antialias: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        }) || canvas.getContext('webgl', {
+            alpha: false,
+            antialias: false,
+            powerPreference: 'high-performance',
+            desynchronized: true
+        });
+        
+        if (!this.gl) {
+            throw new Error('WebGL not supported');
         }
-    }
 
-    // Fallback renderer for WebGL compatibility issues
-    createFallbackRenderer() {
-        console.log("🔧 Creating fallback 2D renderer for compatibility");
-        this.isWebGLFallback = true;
+        console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
+        
+        // Check for non-blocking shader compilation support
+        this.parallelShaderExt = this.gl.getExtension('KHR_parallel_shader_compile');
+        if (this.parallelShaderExt) {
+            console.log("⚡ Non-blocking shader compilation available");
+        }
+        
+        // Loading state management
+        this.isLoaded = false;
+        this.onLoadingStateChange = null; // callback for loading progress
+        
+        // Strobing state for sector sync
+        this.strobingState = {
+            sectorCount: 1,
+            currentSector: 0
+        };
+        
+        // Initialize WebGL state
+        this.gl.clearColor(0.0, 0.0, 0.3, 1.0); // Dark blue background
+        this.gl.enable(this.gl.DEPTH_TEST);
+        this.gl.depthFunc(this.gl.LEQUAL);
+        
+        // Initialize uniform dirty flag
+        this._uniformsDirty = false;
+        
+        // Debug mode and performance tracking
+        this._debugMode = !!(location.search && /debug=1/.test(location.search));
+        this._lastDebugTime = 0;
+        this._lastRenderLog = 0;
+        
+        // Cache for responsive camera
+        this._lastAxesScene = null;
+        this._gridSpan = null;
+        
+        // Camera system
+        this.cameraMode = 'overhead';         // single source of truth for camera pose
+        this._lastFittedR = 1;                // cache last fit radius for stability
+        
+        // Temporal smoothing for visual calm (canonical Natário)
+        this._dispAlpha = 0.25; // blend factor (0=no change, 1=instant)
+        this._prevDisp = [];     // per-vertex displacement history
+        
+        // Grid rendering resources
+        this.gridVertices = null;
+        this.originalGridVertices = null; // Store original positions for warp calculations
+        this.gridVbo = null;
+        this.gridProgram = null;
+        this._vboBytes = 0; // Track VBO buffer size for efficient updates
+        this._resizeRaf = 0; // Track resize throttling RAF ID
+        this._warnNoProgramOnce = false; // Warn-once flag for shader program availability
+        
+        // Camera and projection
+        this.viewMatrix = new Float32Array(16);
+        this.projMatrix = new Float32Array(16);
+        this.mvpMatrix = new Float32Array(16);
+        
+        // Current warp parameters (unchanged)
+        this.currentParams = {
+            dutyCycle: 0.14,
+            g_y: 26,
+            cavityQ: 1e9,
+            sagDepth_nm: 16,
+            tsRatio: 4102.74,
+            powerAvg_MW: 83.3,
+            exoticMass_kg: 1405
+        };
+
+        // Display-only controls (safe defaults; no baked ring)
         this.uniforms = {
-            dutyCycle: 0.14, g_y: 26, cavityQ: 1e9, sagDepth_nm: 16,
-            powerAvg_MW: 83.3, exoticMass_kg: 1405, beta0: 0
+            vizGain: 1.0,
+            vShip: 1.0,
+            wallWidth: 0.06,
+
+            // IMPORTANT: don't seed a unit ellipsoid here – we compute it from the hull each update
+            axesClip: null,
+
+            driveDir: [1, 0, 0],
+            epsilonTilt: 0.0,
+            betaTiltVec: [0, -1, 0],
+            tiltGain: 0.55,
+
+            // visual system
+            cosmeticLevel: 10,
+            colorMode: 'theta',
+            exposure: 6.0,
+            zeroStop: 1e-7,
+
+            // comparison helpers
+            physicsParityMode: false,
+            lockFraming: true,
+            cameraZ: null,
+            
+            // ridge visualization mode
+            ridgeMode: 0  // 0 = physics df (double-lobe), 1 = single crest at ρ=1
         };
         
-        // Create 2D context for basic visualization
-        const ctx = this.canvas.getContext('2d');
-        if (ctx) {
-            this.ctx2d = ctx;
-            this.startFallbackRender();
-        }
-    }
-
-    startFallbackRender() {
-        const animate = () => {
-            if (this.ctx2d && this.isWebGLFallback) {
-                this.drawFallback();
-                requestAnimationFrame(animate);
+        // Initialize rendering pipeline
+        this._setupCamera();
+        this._initializeGrid();
+        
+        // Expose strobing sync function globally
+        window.setStrobingState = ({ sectorCount, currentSector, split }) => {
+            try {
+                this.strobingState.sectorCount  = Math.max(1, sectorCount|0);
+                this.strobingState.currentSector= Math.max(0, currentSector|0) % this.strobingState.sectorCount;
+                // update visual strobing immediately
+                this.updateUniforms({
+                  sectors: this.strobingState.sectorCount,
+                  split: Number.isFinite(split) ? Math.max(0, Math.min(this.strobingState.sectorCount-1, split|0)) : this.uniforms?.split
+                });
+            } catch (e) {
+                console.warn("WarpEngine.setStrobingState error:", e);
             }
         };
-        requestAnimationFrame(animate);
+        // Expose curvature gain setter for the UI slider (0..8 decades)
+        this.__warp_setGainDec = (dec, max = 40) => {
+            try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
+        };
+        window.__warp_setGainDec = this.__warp_setGainDec;
+
+        // Expose cosmetic curvature level API (1 = real physics, 10 = current visuals)
+        this.__warp_setCosmetic = (level /* 1..10 */) => {
+            try { this.setCosmeticLevel(level); } catch(e){ console.warn(e); }
+        };
+        window.__warp_setCosmetic = this.__warp_setCosmetic;
+
+        // Ridge mode toggles (optional quick access)
+        window.__warp_singleRidge = () => this.updateUniforms({ ridgeMode: 1 });
+        window.__warp_physicsRidge = () => this.updateUniforms({ ridgeMode: 0 });
+
+        // One-click presets
+        window.__warp_truePhysics = () => {
+          this.updateUniforms({
+            physicsParityMode: true,        // activates the clamp above
+            curvatureGainT: 0,
+            // curvatureBoostMax preserved for headroom, exposure/zeroStop set in parity block
+          });
+          console.log("✅ True Physics: parity ON, no boosts/cosmetics");
+        };
+
+        window.__warp_showcase = () => {
+          this.updateUniforms({
+            physicsParityMode: false,
+            cosmeticLevel: 10,
+            curvatureBoostMax: 40,
+            curvatureGainT: 0.50,          // "demo" mid-boost; adjust to taste
+            exposure: 6.0,
+            zeroStop: 1e-7,
+          });
+          console.log("🎨 Showcase: parity OFF, cosmetics/boosts ON");
+        };
+
+        // default to "current visuals" feel
+        this.setCosmeticLevel(10);
+        
+        // Bind throttled resize handler
+        this._resize = () => {
+            if (this._resizeRaf) return;
+            this._resizeRaf = requestAnimationFrame(() => { 
+                this._resizeRaf = 0; 
+                this._resizeCanvasToDisplaySize(); 
+            });
+        };
+        window.addEventListener('resize', this._resize);
+        this._resizeCanvasToDisplaySize(); // Initial setup
+        
+        // Prime the engine with initial visible curvature using T+boostMax pattern
+        this.updateUniforms({
+            curvatureGainT: 0.0,     // 0 → 1× (true-physics visual scale)
+            curvatureBoostMax: 40,   // same as SliceViewer
+            exposure: 6.0,
+            zeroStop: 1e-7,
+            wallWidth: 0.05,         // fatten the wall to catch more vertices
+        });
+        
+        // Start render loop
+        this._renderLoop();
     }
 
-    drawFallback() {
-        const ctx = this.ctx2d;
-        if (!ctx) return;
-        
-        ctx.fillStyle = '#0A1420';
-        ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Show energy pipeline values as text
-        ctx.fillStyle = '#00FFFF';
-        ctx.font = '12px monospace';
-        ctx.fillText(`WebGL Fallback - Pipeline Connected`, 10, 30);
-        ctx.fillText(`β₀: ${(this.uniforms.beta0 || 0).toExponential(2)}`, 10, 50);
-        ctx.fillText(`sagDepth: ${this.uniforms.sagDepth_nm}nm`, 10, 70);
-        ctx.fillText(`Power: ${this.uniforms.powerAvg_MW}MW`, 10, 90);
-        
-        // Draw basic warp representation
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const radius = Math.min(this.canvas.width, this.canvas.height) * 0.3;
-        
-        ctx.strokeStyle = '#00FFFF';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        ctx.stroke();
-    }
-
-    // Maintain API compatibility for React integration
-    updateUniforms(params) {
-        if (this.isWebGLFallback) {
-            // 🔍 DEBUG CHECKPOINT 2: Uniforms changing verification (fallback mode)
-            console.log('🔧 updateUniforms called (FALLBACK MODE):', params);
-            Object.assign(this.uniforms, params);
-            console.table(this.uniforms);
-            return;
-        }
-        
-        // Normal WebGL path
-        Object.assign(this.uniforms, params);
-        console.log('🔧 updateUniforms called with:', params);
-        console.table(this.uniforms);
-    }
-
-    //----------------------------------------------------------------
-    //  Enhanced shader compilation with visual physics mapping
-    //----------------------------------------------------------------
-    _compileShaders() {
-        const isWebGL2 = this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0");
-        
-        const vs = isWebGL2 ? 
-            "#version 300 es\n" +
-            "in vec2 a_position;\n" +
-            "out vec2 v_uv;\n" +
-            "void main() {\n" +
-            "    v_uv = a_position * 0.5 + 0.5;\n" +
-            "    gl_Position = vec4(a_position, 0.0, 1.0);\n" +
-            "}"
-            :
-            "attribute vec2 a_position;\n" +
-            "varying vec2 v_uv;\n" +
-            "void main() {\n" +
-            "    v_uv = a_position * 0.5 + 0.5;\n" +
-            "    gl_Position = vec4(a_position, 0.0, 1.0);\n" +
-            "}";
-
-        const fs = isWebGL2 ?
-            "#version 300 es\n" +
-            "precision highp float;\n" +
-            "in vec2 v_uv;\n" +
-            "out vec4 frag;\n" +
-            "\n" +
-            "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time, u_beta0;\n" +
-            "\n" +
-            "// Natário β‑field with authentic physics\n" +
-            "vec3 betaField(vec3 x) {\n" +
-            "    float R = u_sagDepth_nm * 1e-9;  // nm → m conversion\n" +
-            "    float r = length(x);\n" +
-            "    if (r < 1e-9) return vec3(0.0);\n" +
-            "    \n" +
-            "    float beta0 = u_beta0;  // Use directly injected β₀ from amplifier chain\n" +
-            "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
-            "    return beta0 * prof * (x / r);\n" +
-            "}\n" +
-            "\n" +
-            "// Enhanced color mapping with physics-based intensity\n" +
-            "vec3 warpColor(float b) {\n" +
-            "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
-            "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
-            "}\n" +
-            "\n" +
-            "void main() {\n" +
-            "    vec2 center = v_uv - 0.5;\n" +
-            "    vec3 pos = vec3(center * 2.0e-8, 0.0);  // 20nm field of view\n" +
-            "    \n" +
-            "    float bmag = length(betaField(pos));\n" +
-            "    \n" +
-            "    // Enhanced ripple: Power controls speed, tsRatio controls animation rate\n" +
-            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0 / max(u_tsRatio / 1000.0, 1.0);\n" +
-            "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
-            "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
-            "    \n" +
-            "    vec3 color = warpColor(bmag);\n" +
-            "    \n" +
-            "    // Q-Factor driven halo/bloom effect\n" +
-            "    float halo = smoothstep(8.0, 10.0, log(u_cavityQ) / log(10.0));\n" +
-            "    color += halo * vec3(1.0, 0.8, 0.3) * 0.4;\n" +
-            "    \n" +
-            "    // Exotic Mass shock ring visualization\n" +
-            "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1.0e-8;\n" +
-            "    float distFromCenter = length(pos);\n" +
-            "    float shock = step(shockRadius, distFromCenter) * \n" +
-            "                 (1.0 - step(shockRadius * 1.3, distFromCenter));\n" +
-            "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.25 * shock);\n" +
-            "    \n" +
-            (this.hasDerivatives ?
-            "    // Grid overlay with derivatives\n" +
-            "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
-            "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
-            "    color = mix(color, vec3(0.5), gridLine * 0.15);\n"
-            :
-            "    // Grid disabled for WebGL1 compatibility\n") +
-            "    \n" +
-            "    frag = vec4(color, 1.0);\n" +
-            "}"
-            :
-            (this.hasDerivatives ? "#extension GL_OES_standard_derivatives : enable\n" : "") +
-            "precision highp float;\n" +
-            "varying vec2 v_uv;\n" +
-            "\n" +
-            "uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,\n" +
-            "              u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time, u_beta0;\n" +
-            "\n" +
-            "vec3 betaField(vec3 x) {\n" +
-            "    float R = u_sagDepth_nm * 1e-9;\n" +
-            "    float r = length(x);\n" +
-            "    if (r < 1e-9) return vec3(0.0);\n" +
-            "    \n" +
-            "    float beta0 = u_beta0;  // Use directly injected β₀ from amplifier chain\n" +
-            "    float prof = (r / R) * exp(-(r * r) / (R * R));\n" +
-            "    return beta0 * prof * (x / r);\n" +
-            "}\n" +
-            "\n" +
-            "vec3 warpColor(float b) {\n" +
-            "    float intensity = clamp(b * 100.0, 0.0, 1.0);\n" +
-            "    return mix(vec3(0.1, 0.2, 0.8), vec3(0.9, 0.3, 0.1), intensity);\n" +
-            "}\n" +
-            "\n" +
-            "void main() {\n" +
-            "    vec2 center = v_uv - 0.5;\n" +
-            "    vec3 pos = vec3(center * 2.0e-8, 0.0);\n" +
-            "    \n" +
-            "    float bmag = length(betaField(pos));\n" +
-            "    \n" +
-            "    // Enhanced ripple effects with tsRatio scaling\n" +
-            "    float rippleSpeed = sqrt(u_powerAvg_MW / 100.0) * 2.0 / max(u_tsRatio / 1000.0, 1.0);\n" +
-            "    float rippleAmplitude = 0.15 * u_dutyCycle;\n" +
-            "    bmag += sin(u_time * rippleSpeed + length(center) * 20.0) * rippleAmplitude;\n" +
-            "    \n" +
-            "    vec3 color = warpColor(bmag);\n" +
-            "    \n" +
-            "    // Q-Factor halo\n" +
-            "    float halo = smoothstep(8.0, 10.0, log(u_cavityQ) / log(10.0));\n" +
-            "    color += halo * vec3(1.0, 0.8, 0.3) * 0.4;\n" +
-            "    \n" +
-            "    // Exotic Mass shock ring\n" +
-            "    float shockRadius = pow(u_exoticMass_kg / 1000.0, 0.333) * 1.0e-8;\n" +
-            "    float distFromCenter = length(pos);\n" +
-            "    float shock = step(shockRadius, distFromCenter) * \n" +
-            "                 (1.0 - step(shockRadius * 1.3, distFromCenter));\n" +
-            "    color = mix(color, vec3(0.9, 0.9, 1.0), 0.25 * shock);\n" +
-            "    \n" +
-            (this.hasDerivatives ?
-            "    vec2 grid = abs(fract(center * 50.0) - 0.5) / fwidth(center * 50.0);\n" +
-            "    float gridLine = 1.0 - min(min(grid.x, grid.y), 1.0);\n" +
-            "    color = mix(color, vec3(0.5), gridLine * 0.15);\n"
-            : "") +
-            "    \n" +
-            "    gl_FragColor = vec4(color, 1.0);\n" +
-            "}";
-
-        this.program = this._linkProgram(vs, fs);
-    }
-
-    _linkProgram(vsrc, fsrc) {
+    // --- central overhead camera (single place to change the pose) ---
+    _applyOverheadCamera(opts = {}) {
         const gl = this.gl;
-        const vs = this._compile(gl.VERTEX_SHADER, vsrc);
-        const fs = this._compile(gl.FRAGMENT_SHADER, fsrc);
-        const prog = gl.createProgram();
+        if (!gl) return;
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const fov = this._fitFovForAspect(aspect);      // existing helper
+
+        // bubble radius in scene units
+        const axes = this.uniforms?.axesScene || this._lastAxesScene || [1,1,1];
+        const R = Math.max(axes[0], axes[1], axes[2], opts.spanHint || 1);
+        this._lastFittedR = R;
+
+        const baseMargin = 1.22;
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // ↑ raise camera; ↓ look slightly down so bubble isn't on the horizon
+        const eye    = [0, 0.62 * R, -dist];   // higher overhead
+        const center = [0, -0.12 * R, 0];      // look further down
+        const up     = [0, 1, 0];
+
+        this._perspective(this.projMatrix, fov, aspect, 0.08, 100.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
         
-        gl.attachShader(prog, vs);
-        gl.attachShader(prog, fs);
-        gl.linkProgram(prog);
-        
-        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-            throw new Error("Program link error: " + gl.getProgramInfoLog(prog));
-        }
-        
-        // Clean up shaders after linking
-        gl.deleteShader(vs);
-        gl.deleteShader(fs);
-        return prog;
+        console.log(`📷 Overhead fit: R=${R.toFixed(2)}, eye=[${eye.map(v=>v.toFixed(2)).join(',')}], center=[${center.map(v=>v.toFixed(2)).join(',')}]`);
     }
 
-    _compile(type, src) {
-        const gl = this.gl;
-        const sh = gl.createShader(type);
-        gl.shaderSource(sh, src);
-        gl.compileShader(sh);
-        
-        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-            throw new Error("Shader compile error: " + gl.getShaderInfoLog(sh));
-        }
-        return sh;
+    _setupCamera() {
+        // always start in the overhead fitted view
+        this._applyOverheadCamera();
     }
 
-    //----------------------------------------------------------------
-    //  Optimized geometry setup
-    //----------------------------------------------------------------
-    _initQuad() {
-        try {
-            const gl = this.gl;
-            const vbo = gl.createBuffer();
-            if (!vbo) throw new Error("Failed to create VBO");
-            
-            gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-                -1, -1,  1, -1,  -1, 1,  1, 1
-            ]), gl.STATIC_DRAW);
-            gl.bindBuffer(gl.ARRAY_BUFFER, null);
-            this.vbo = vbo;
-            
-            console.log("Quad VBO created successfully");
-            
-            // Initialize 3D grid for spacetime curvature visualization
-            console.log("Initializing 3D grid...");
-            this._initGrids();
-            console.log("3D grid initialized successfully");
-        } catch (error) {
-            console.error("Failed to initialize quad:", error);
-            throw error;
+    _resizeCanvasToDisplaySize() {
+        // Cap DPR on phones so we don't oversample and "zoom in"
+        const dprCap = (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) ? 1.5 : 2.0;
+        const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
+
+        const { clientWidth, clientHeight } = this.canvas;
+        const width  = Math.max(1, Math.floor(clientWidth  * dpr));
+        const height = Math.max(1, Math.floor(clientHeight * dpr));
+
+        if (this.canvas.width !== width || this.canvas.height !== height) {
+            this.canvas.width  = width;
+            this.canvas.height = height;
+            this.gl.viewport(0, 0, width, height);
+
+            // after resize, reapply overhead fit (no low pose flash)
+            this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
+        }
+    }
+    
+    _adjustCameraForSpan(span) {
+        // prefer overhead fit unless the user explicitly set cameraZ
+        if (Number.isFinite(this.currentParams?.cameraZ)) {
+            const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+            const eye = [0, 0.50, -this.currentParams.cameraZ];
+            const center = [0, -0.08, 0];
+            const up = [0, 1, 0];
+            this._perspective(this.projMatrix, this._fitFovForAspect(aspect), aspect, 0.08, 100.0);
+            this._lookAt(this.viewMatrix, eye, center, up);
+            this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+            console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
+        } else {
+            this._applyOverheadCamera({ spanHint: span });
         }
     }
 
-    _initGrids() {
+    _initializeGrid() {
         const gl = this.gl;
         
-        console.log("Initializing 3D volumetric spacetime cage...");
+        // Create spacetime grid geometry
+        // Start with default span, will be adjusted when hull params are available
+        const initialSpan = GRID_DEFAULTS.minSpan;
+        const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
+        this.gridVertices = new Float32Array(gridData);
         
-        // Three orthogonal sheets for full 3D perception of warp bubble
-        const size_nm = 40000;  // 40 μm viewing volume
-        const divisions = 50;   // Grid resolution
+        // Store original vertex positions for warp calculations
+        this.originalGridVertices = new Float32Array(gridData);
+        this.currentGridSpan = initialSpan;
         
-        const sheetXY = this._createGrid(size_nm, divisions, 'XY');  // Floor (original)
-        const sheetXZ = this._createGrid(size_nm, divisions, 'XZ');  // Side wall  
-        const sheetYZ = this._createGrid(size_nm, divisions, 'YZ');  // End wall
-        
-        // Combine into single buffer for efficient rendering
-        this.gridVertices = new Float32Array([
-            ...sheetXY, ...sheetXZ, ...sheetYZ
-        ]);
-        this.gridVertexCount = this.gridVertices.length / 3;
-        
-        // Store sheet boundaries for colored rendering
-        this.sheetXY_count = sheetXY.length / 3;
-        this.sheetXZ_count = sheetXZ.length / 3;  
-        this.sheetYZ_count = sheetYZ.length / 3;
-        
-        // Store original for reset operations
-        this.originalGridVertices = new Float32Array(this.gridVertices);
-        
-        // Store grid parameters for warping
-        this.gridSize = size_nm;
-        this.gridHalf = this.gridSize / 2;
-        
-        // Y coordinate baseline (kept from original system)
-        const step = this.gridSize / divisions;
-        const norm = 0.8 / this.gridHalf;
-        this.gridY0 = (-this.gridHalf * 0.3 + 3 * step) * norm;
-        
-        console.log(`3D Cage created: XY(${this.sheetXY_count}) + XZ(${this.sheetXZ_count}) + YZ(${this.sheetYZ_count}) = ${this.gridVertexCount} vertices`);
-        console.log(`Grid parameters: size=${this.gridSize}nm, Y0=${this.gridY0}`);
-        console.log(`Sheet arrays - XY: ${sheetXY.length}, XZ: ${sheetXZ.length}, YZ: ${sheetYZ.length}`);
-        
-        // Create dynamic grid buffer
+        // Create VBO for grid
         this.gridVbo = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        this._vboBytes = this.gridVertices.byteLength;
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        // Compile grid shader program with multi-sheet support
+        // Compile grid shader program
         this._compileGridShaders();
     }
 
-    // 3D volumetric grid generator - creates orthogonal sheets for full warp bubble visualization
-    _createGrid(size = 40_000, divisions = 50, plane = 'XY') {
+    // Authentic spacetime grid from gravity_sim.cpp with proper normalization
+    _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
+        // Adaptive mesh density for thin walls (smoother displacement)
+        const baseDiv = Math.max(divisions, 160);
+        const targetVertsAcrossWall = 12;
+        const hullAxes = this.currentParams?.hullAxes || [503.5, 132, 86.5];
+        const wallWidth_m = this.currentParams?.wallWidth_m || 6.0;
+        
+        // ρ-span of ±3σ wall thickness
+        const span_rho = Math.max(1e-3, (3 * wallWidth_m) / Math.min(...hullAxes));
+        const scale = Math.max(1.0, targetVertsAcrossWall / (span_rho * baseDiv));
+        divisions = Math.min(320, Math.floor(baseDiv * scale)); // Higher cap for smoother walls
         const verts = [];
-        const step = size / divisions;
-        const half = size / 2;
-        const norm = 0.8 / half;  // Normalize to clip space
+        const step = (span * 2) / divisions;  // Full span width divided by divisions
+        const half = span;  // Half-extent
         
-        console.log(`Generating ${plane} sheet with ${divisions}x${divisions} grid`);
-        
-        if (plane === 'XY') {
-            // Floor grid - lines parallel to X and Y axes (original sheet)
-            for (let z = 0; z <= divisions; ++z) {
-                const zPos = (-half + z * step) * norm;
-                for (let x = 0; x < divisions; ++x) {
-                    const x0 = (-half + x * step) * norm;
-                    const x1 = (-half + (x + 1) * step) * norm;
-                    const yBase = 0.0 + 0.05 * Math.sin(x0 * 2) * Math.cos(zPos * 3);
-                    verts.push(x0, yBase, zPos, x1, yBase, zPos);  // X-lines
-                }
-            }
-            for (let x = 0; x <= divisions; ++x) {
-                const xPos = (-half + x * step) * norm;
-                for (let z = 0; z < divisions; ++z) {
-                    const z0 = (-half + z * step) * norm;
-                    const z1 = (-half + (z + 1) * step) * norm;
-                    const yBase = 0.0 + 0.05 * Math.sin(xPos * 2) * Math.cos(z0 * 3);
-                    verts.push(xPos, yBase, z0, xPos, yBase, z1);  // Z-lines
-                }
+        // Create a slight height variation across the grid for proper 3D visualization
+        const yBase = -0.15;  // Base Y level
+        const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
+
+        for (let z = 0; z <= divisions; ++z) {
+            const zPos = -half + z * step;
+            for (let x = 0; x < divisions; ++x) {
+                const x0 = -half + x * step;
+                const x1 = -half + (x + 1) * step;
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                const y1 = yBase + yVariation * Math.sin(x1 * 2) * Math.cos(zPos * 3);
+                
+                verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
             }
         }
-        else if (plane === 'XZ') {
-            // Side wall grid - vertical sheet, offset from camera axis for visibility
-            const ySheet = 0.0;
-            for (let z = 0; z <= divisions; ++z) {
-                const zPos = (-half + z * step) * norm;
-                for (let x = 0; x < divisions; ++x) {
-                    const x0 = (-half + x * step) * norm;
-                    const x1 = (-half + (x + 1) * step) * norm;
-                    verts.push(x0, ySheet, zPos, x1, ySheet, zPos);  // X-lines at elevated y
-                }
-            }
-            for (let x = 0; x <= divisions; ++x) {
-                const xPos = (-half + x * step) * norm;
-                for (let z = 0; z < divisions; ++z) {
-                    const z0 = (-half + z * step) * norm;
-                    const z1 = (-half + (z + 1) * step) * norm;
-                    verts.push(xPos, ySheet, z0, xPos, ySheet, z1);  // Z-lines at elevated y
-                }
-            }
-        }
-        else if (plane === 'YZ') {
-            // End wall grid - vertical sheet, offset from camera axis for visibility
-            const xSheet = 0.0;
-            for (let z = 0; z <= divisions; ++z) {
-                const zPos = (-half + z * step) * norm;
-                for (let y = 0; y < divisions; ++y) {
-                    const y0 = (-half * 0.3 + y * step) * norm;
-                    const y1 = (-half * 0.3 + (y + 1) * step) * norm;
-                    verts.push(xSheet, y0, zPos, xSheet, y1, zPos);  // Y-lines at offset x
-                }
-            }
-            for (let y = 0; y <= divisions; ++y) {
-                const yPos = (-half * 0.3 + y * step) * norm;
-                for (let z = 0; z < divisions; ++z) {
-                    const z0 = (-half + z * step) * norm;
-                    const z1 = (-half + (z + 1) * step) * norm;
-                    verts.push(xSheet, yPos, z0, xSheet, yPos, z1);  // Z-lines at offset x
-                }
+        for (let x = 0; x <= divisions; ++x) {
+            const xPos = -half + x * step;
+            for (let z = 0; z < divisions; ++z) {
+                const z0 = -half + z * step;
+                const z1 = -half + (z + 1) * step;
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                const y1 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z1 * 3);
+                
+                verts.push(xPos, y0, z0, xPos, y1, z1);     // z–lines with height variation
             }
         }
         
-        console.log(`${plane} sheet: ${verts.length/6} lines generated`);
+        console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
+        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${span*2})`);
         return new Float32Array(verts);
     }
 
@@ -492,346 +369,763 @@ class WarpCage {
             "#version 300 es\n" +
             "in vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
+            "out vec3 v_pos;\n" +
             "void main() {\n" +
+            "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 12.0;\n" +
             "}"
             :
             "attribute vec3 a_position;\n" +
             "uniform mat4 u_mvpMatrix;\n" +
+            "varying vec3 v_pos;\n" +
             "void main() {\n" +
+            "    v_pos = a_position;\n" +
             "    gl_Position = u_mvpMatrix * vec4(a_position, 1.0);\n" +
-            "    gl_PointSize = 12.0;\n" +
             "}";
 
         const gridFs = isWebGL2 ?
             "#version 300 es\n" +
             "precision highp float;\n" +
-            "uniform float u_energyFlag;\n" +  // WarpFactory energy condition flag
-            "uniform vec3 u_sheetColor;\n" +    // Different color per sheet
+            "uniform vec3 u_sheetColor;\n" +
+            "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
+            "uniform vec3 u_axes;\n" +        // Legacy fallback
+            "uniform vec3 u_driveDir;\n" +
+            "uniform float u_wallWidth;\n" +
+            "uniform float u_vShip;\n" +
+            "uniform float u_epsTilt;\n" +      // ε_tilt (dimensionless)
+            "uniform float u_intWidth;\n" +     // interior window width in ρ-units
+            "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
+            "uniform float u_exposure;\n" +     // logarithmic exposure control (3.0 .. 12.0)
+            "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
+            "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
+            "uniform float u_userGain;\n" +     // unified curvature gain from UI slider
+            "uniform bool  u_physicsParityMode;\n" + // parity mode flag
+            "uniform float u_displayGain;\n" +   // display gain multiplier
+            "uniform float u_vizGain;\n" +       // visual mode seasoning
+            "uniform float u_curvatureGainT;\n" + // time blending factor
+            "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
+            "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
+            "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
+            "in vec3 v_pos;\n" +
             "out vec4 frag;\n" +
+            "vec3 diverge(float t) {\n" +
+            "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
+            "    vec3 c1 = vec3(0.15, 0.45, 1.0);\n" +  // blue
+            "    vec3 c2 = vec3(1.0);\n" +               // white  
+            "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
+            "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
+            "}\n" +
+            "vec3 seqTealLime(float u) {\n" +
+            "    vec3 a = vec3(0.05, 0.30, 0.35);\n" + // dark teal
+            "    vec3 b = vec3(0.00, 1.00, 0.60);\n" + // lime-teal
+            "    return mix(a,b, pow(u, 0.8));\n" +     // slight gamma for pop
+            "}\n" +
             "void main() {\n" +
-            "    // WarpFactory-inspired: Color-code energy condition violations\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations (exotic matter)\n" +
-            "        u_sheetColor;           // Sheet-specific color for normal matter\n" +
-            "    frag = vec4(baseColor, 0.7);\n" +  // Semi-transparent for 3D depth
+            "    if (u_colorMode == 0) {\n" +
+            "        frag = vec4(u_sheetColor, 0.85);\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    // Authoritative axes: use scene-normalized hull or fallback to legacy\n" +
+            "    vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0\n" +
+            "      ? u_axesScene\n" +
+            "      : u_axes;\n" +
+            "    \n" +
+            "    // derive effective gains (parity protection)\n" +
+            "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
+            "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
+            "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
+            "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
+            "    \n" +
+            "    vec3 pN = v_pos / axes;\n" +
+            "    float rs = length(pN) + 1e-6;\n" +
+            "    vec3 dN = normalize(u_driveDir / axes);\n" +
+            "    float xs = dot(pN, dN);\n" +
+            "    float w = max(1e-4, u_wallWidth);\n" +
+            "    float delta = (rs - 1.0) / w;\n" +
+            "    float f     = exp(-delta*delta);                    // single-lobe pulse at ρ=1\n" +
+            "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
+            "    float thetaField = (u_ridgeMode == 0)\n" +
+            "      ? u_vShip * (xs/rs) * dfdrs          // physics (double-lobe)\n" +
+            "      : u_vShip * (xs/rs) * f;             // single crest at ρ=1 (oriented by drive)\n" +
+            "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
+            "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
+            "    float shearProxy = (u_ridgeMode == 0)\n" +
+            "      ? abs(dfdrs) * sinphi * u_vShip      // physics (double-lobe magnitude)\n" +
+            "      : f * sinphi * u_vShip;              // single crest magnitude\n" +
+            "    // Parity-protected amplitude scaling\n" +
+            "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
+            "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
+            "    float valTheta  = thetaField * amp;\n" +
+            "    float valShear  = shearProxy * amp;\n" +
+            "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
+            "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
+            "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
+            "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
+            "    // normalized visual values\n" +
+            "    float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);\n" +
+            "    float sVis = clamp( magS / norm, 0.0, 1.0);\n" +
+            "    // Choose color by mode\n" +
+            "    vec3 col;\n" +
+            "    if (u_colorMode == 1) {\n" +
+            "        col = diverge(tVis);\n" +       // θ front/back
+            "    } else {\n" +                       // 2 = shear
+            "        col = seqTealLime(sVis);\n" +   // |σ|
+            "    }\n" +
+            "    // ----- interior tilt violet blend (visual only) -----\n" +
+            "    vec3 pN_int = v_pos / axes;\n" +
+            "    float rs_int = length(pN_int) + 1e-6;\n" +
+            "    float wInt = max(1e-4, u_intWidth);\n" +
+            "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
+            "    float interior = s*s*(3.0 - 2.0*s);          // C¹ smoothstep\n" +
+            "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
+            "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
+            "    col = mix(col, violet, blendAmt);\n" +
+            "    frag = vec4(col, 0.9);\n" +
             "}"
             :
             "precision highp float;\n" +
-            "uniform float u_energyFlag;\n" +  // WarpFactory energy condition flag
-            "uniform vec3 u_sheetColor;\n" +    // Different color per sheet
+            "uniform vec3 u_sheetColor;\n" +
+            "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
+            "uniform vec3 u_axes;\n" +        // Legacy fallback
+            "uniform vec3 u_driveDir;\n" +
+            "uniform float u_wallWidth;\n" +
+            "uniform float u_vShip;\n" +
+            "uniform float u_epsTilt;\n" +
+            "uniform float u_intWidth;\n" +
+            "uniform float u_tiltViz;\n" +
+            "uniform float u_exposure;\n" +
+            "uniform float u_zeroStop;\n" +
+            "uniform float u_thetaScale;\n" +
+            "uniform float u_userGain;\n" +
+            "uniform bool  u_physicsParityMode;\n" + // parity mode flag
+            "uniform float u_displayGain;\n" +   // display gain multiplier
+            "uniform float u_vizGain;\n" +       // visual mode seasoning
+            "uniform float u_curvatureGainT;\n" + // time blending factor
+            "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
+            "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
+            "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
+            "varying vec3 v_pos;\n" +
+            "vec3 diverge(float t) {\n" +
+            "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
+            "    vec3 c1 = vec3(0.15, 0.45, 1.0);\n" +  // blue
+            "    vec3 c2 = vec3(1.0);\n" +               // white  
+            "    vec3 c3 = vec3(1.0, 0.45, 0.0);\n" +    // orange-red
+            "    return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);\n" +
+            "}\n" +
+            "vec3 seqTealLime(float u) {\n" +
+            "    vec3 a = vec3(0.05, 0.30, 0.35);\n" + // dark teal
+            "    vec3 b = vec3(0.00, 1.00, 0.60);\n" + // lime-teal
+            "    return mix(a,b, pow(u, 0.8));\n" +     // slight gamma for pop
+            "}\n" +
             "void main() {\n" +
-            "    // WarpFactory-inspired: Color-code energy condition violations\n" +
-            "    vec3 baseColor = (u_energyFlag > 0.5) ? \n" +
-            "        vec3(1.0, 0.0, 1.0) :  // Magenta for WEC violations (exotic matter)\n" +
-            "        u_sheetColor;           // Sheet-specific color for normal matter\n" +
-            "    gl_FragColor = vec4(baseColor, 0.7);\n" +  // Semi-transparent for 3D depth
+            "    if (u_colorMode == 0) {\n" +
+            "        gl_FragColor = vec4(u_sheetColor, 0.85);\n" +
+            "        return;\n" +
+            "    }\n" +
+            "    // Authoritative axes: use scene-normalized hull or fallback to legacy\n" +
+            "    vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0\n" +
+            "      ? u_axesScene\n" +
+            "      : u_axes;\n" +
+            "    \n" +
+            "    // derive effective gains (parity protection)\n" +
+            "    float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;\n" +
+            "    float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;\n" +
+            "    float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);\n" +
+            "    float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);\n" +
+            "    \n" +
+            "    vec3 pN = v_pos / axes;\n" +
+            "    float rs = length(pN) + 1e-6;\n" +
+            "    vec3 dN = normalize(u_driveDir / axes);\n" +
+            "    float xs = dot(pN, dN);\n" +
+            "    float w = max(1e-4, u_wallWidth);\n" +
+            "    float delta = (rs - 1.0) / w;\n" +
+            "    float f     = exp(-delta*delta);                    // single-lobe pulse at ρ=1\n" +
+            "    float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;\n" +
+            "    float thetaField = (u_ridgeMode == 0)\n" +
+            "      ? u_vShip * (xs/rs) * dfdrs          // physics (double-lobe)\n" +
+            "      : u_vShip * (xs/rs) * f;             // single crest at ρ=1 (oriented by drive)\n" +
+            "    // NEW: shear magnitude proxy (transverse gradient piece)\n" +
+            "    float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));\n" +
+            "    float shearProxy = (u_ridgeMode == 0)\n" +
+            "      ? abs(dfdrs) * sinphi * u_vShip      // physics (double-lobe magnitude)\n" +
+            "      : f * sinphi * u_vShip;              // single crest magnitude\n" +
+            "    // Parity-protected amplitude scaling\n" +
+            "    float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;\n" +
+            "    amp *= (1.0 + tBlend * (tBoost - 1.0));\n" +
+            "    float valTheta  = thetaField * amp;\n" +
+            "    float valShear  = shearProxy * amp;\n" +
+            "    // symmetric log for theta (signed), simple log for shear (magnitude)\n" +
+            "    float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));\n" +
+            "    float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));\n" +
+            "    float norm = log(1.0 + max(1.0, u_exposure));\n" +
+            "    // normalized visual values\n" +
+            "    float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);\n" +
+            "    float sVis = clamp( magS / norm, 0.0, 1.0);\n" +
+            "    // Choose color by mode\n" +
+            "    vec3 col;\n" +
+            "    if (u_colorMode == 1) {\n" +
+            "        col = diverge(tVis);\n" +       // θ front/back
+            "    } else {\n" +                       // 2 = shear
+            "        col = seqTealLime(sVis);\n" +   // |σ|
+            "    }\n" +
+            "    // ----- interior tilt violet blend (visual only) -----\n" +
+            "    vec3 pN_int = v_pos / axes;\n" +
+            "    float rs_int = length(pN_int) + 1e-6;\n" +
+            "    float wInt = max(1e-4, u_intWidth);\n" +
+            "    float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);\n" +
+            "    float interior = s*s*(3.0 - 2.0*s);\n" +
+            "    float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);\n" +
+            "    vec3 violet = vec3(0.70, 0.30, 1.00);\n" +
+            "    col = mix(col, violet, blendAmt);\n" +
+            "    gl_FragColor = vec4(col, 0.9);\n" +
             "}";
 
-        console.log("Compiling grid shaders for POINTS rendering...");
-        console.log("Grid vertex shader with gl_PointSize:", gridVs.substring(0, 200));
-        console.log("Grid fragment shader with red color:", gridFs.substring(0, 200));
-        
-        this.gridProgram = this._linkProgram(gridVs, gridFs);
-        
-        if (!this.gridProgram) {
-            console.error("CRITICAL: Grid shader program compilation failed!");
-            return;
-        }
-        
-        const gl = this.gl;
-        gl.useProgram(this.gridProgram);
-        this.gridUniforms = {
-            mvpMatrix: gl.getUniformLocation(this.gridProgram, "u_mvpMatrix"),
-            position: gl.getAttribLocation(this.gridProgram, "a_position"),
-            energyFlag: gl.getUniformLocation(this.gridProgram, "u_energyFlag"),  // WarpFactory energy condition
-            sheetColor: gl.getUniformLocation(this.gridProgram, "u_sheetColor")   // Sheet-specific coloring
+        // Use async shader compilation if available
+        const onShaderReady = (program) => {
+            if (!program) {
+                console.error("CRITICAL: Failed to compile grid shaders!");
+                return;
+            }
+            
+            this.gridProgram = program;
+            this._setupUniformLocations();
+            this._setLoaded(true);
+            console.log("Grid shader program compiled successfully with York-time coloring support");
         };
         
-        console.log("Grid shader compiled successfully!");
-        console.log("Grid uniform mvpMatrix location:", this.gridUniforms.mvpMatrix);
-        console.log("Grid attribute position location:", this.gridUniforms.position);
-        
-        if (this.gridUniforms.mvpMatrix === null) {
-            console.error("CRITICAL: u_mvpMatrix uniform not found!");
+        // Try async compilation first, fallback to sync
+        if (this.parallelShaderExt) {
+            this.gridProgram = this._createShaderProgram(gridVs, gridFs, onShaderReady);
+        } else {
+            this.gridProgram = this._createShaderProgram(gridVs, gridFs);
+            onShaderReady(this.gridProgram);
         }
-        if (this.gridUniforms.position === -1) {
-            console.error("CRITICAL: a_position attribute not found!");
-        }
-    }
-
-    //----------------------------------------------------------------
-    //  Cached uniform locations for performance
-    //----------------------------------------------------------------
-    _cacheUniformLocations() {
-        const gl = this.gl;
-        gl.useProgram(this.program);
-        this.uLoc = {
-            dutyCycle: gl.getUniformLocation(this.program, "u_dutyCycle"),
-            g_y: gl.getUniformLocation(this.program, "u_g_y"),
-            cavityQ: gl.getUniformLocation(this.program, "u_cavityQ"),
-            sagDepth_nm: gl.getUniformLocation(this.program, "u_sagDepth_nm"),
-            tsRatio: gl.getUniformLocation(this.program, "u_tsRatio"),
-            powerAvg_MW: gl.getUniformLocation(this.program, "u_powerAvg_MW"),
-            exoticMass_kg: gl.getUniformLocation(this.program, "u_exoticMass_kg"),
-            time: gl.getUniformLocation(this.program, "u_time"),
-            beta0: gl.getUniformLocation(this.program, "u_beta0")
-        };
-    }
-
-    //----------------------------------------------------------------
-    //  Public API for React integration
-    //----------------------------------------------------------------
-    updateUniforms(params) {
-        Object.assign(this.uniforms, params);
-        
-        // 🔍 DEBUG CHECKPOINT 2: Uniforms changing verification
-        console.log('🔧 updateUniforms called with:', params);
-        console.table(this.uniforms);
-    }
-
-    //----------------------------------------------------------------
-    //  Optimized render loop with high-DPI support
-    //----------------------------------------------------------------
-    _startRenderLoop() {
-        const animate = (time) => {
-            this._draw(time * 0.001);
-            this.animationId = requestAnimationFrame(animate);
-        };
-        this.animationId = requestAnimationFrame(animate);
-    }
-
-    _draw(time) {
-        if (!this.enabled) return; // hard skip all drawing from this file
-        
-        const gl = this.gl;
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Clear with dark blue background for contrast
-        gl.clearColor(0.05, 0.1, 0.15, 1.0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        
-        // CRITICAL FIX: Upload time uniform to enable animation
-        gl.useProgram(this.program);
-        gl.uniform1f(this.uLoc.time, time);
-        
-        // Upload all uniforms for the warp field shader
-        gl.uniform1f(this.uLoc.dutyCycle, this.uniforms.dutyCycle || 0.14);
-        gl.uniform1f(this.uLoc.g_y, this.uniforms.g_y || 26);
-        gl.uniform1f(this.uLoc.cavityQ, this.uniforms.cavityQ || 1e9);
-        gl.uniform1f(this.uLoc.sagDepth_nm, this.uniforms.sagDepth_nm || 16);
-        gl.uniform1f(this.uLoc.tsRatio, this.uniforms.tsRatio || 4100);  // Time-scale ratio for animation speed
-        gl.uniform1f(this.uLoc.powerAvg_MW, this.uniforms.powerAvg_MW || 83.3);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
-        
-        // CRITICAL FIX: Upload directly injected β₀ from amplifier chain
-        const currentBeta0 = (this.uniforms.beta0 != null)
-          ? +this.uniforms.beta0
-          : (this.uniforms.dutyCycle * this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.beta0, currentBeta0);
-        
-        // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification + Beta0 shader check
-        console.log("🔍 BETA0 SHADER DEBUG: currentBeta0 =", currentBeta0, "(should be > 0)");
-        if (performance.now() % 1000 < 16) {  // Log every second
-            console.log(`🎮 GPU Uniforms: β₀=${currentBeta0.toExponential(2)}, sagDepth=${this.uniforms.sagDepth_nm}nm, power=${this.uniforms.powerAvg_MW}MW`);
-        }
-        
-        // Render main warp field visualization first
-        if (this.showQuad && currentBeta0 !== 0) {
-            gl.depthMask(false);
-            this._renderQuad();
-            gl.depthMask(true);
-        }
-        
-        // Enable depth testing for 3D grid overlay
-        gl.enable(gl.DEPTH_TEST);
-        
-        // Now render the full grid with proper physics
-        this._updateGrid();
-        this._renderGridPoints();
-        
-        gl.disable(gl.DEPTH_TEST);
     }
     
-    _drawSimpleTest() {
+    _setupUniformLocations() {
         const gl = this.gl;
-        
-        // Create simple 4-corner test pattern
-        if (!this.testVbo) {
-            const testVertices = new Float32Array([
-                -0.8, -0.8, 0.0,    // bottom left
-                 0.8, -0.8, 0.0,    // bottom right
-                 0.8,  0.8, 0.0,    // top right
-                -0.8,  0.8, 0.0     // top left
-            ]);
-            
-            this.testVbo = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, this.testVbo);
-            gl.bufferData(gl.ARRAY_BUFFER, testVertices, gl.STATIC_DRAW);
-            console.log("Test VBO created with 4 corner points");
+        this.gridUniforms = {
+            mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
+            sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
+            axesScene: gl.getUniformLocation(this.gridProgram, 'u_axesScene'),
+            axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
+            driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
+            wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
+            vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip'),
+            epsTilt: gl.getUniformLocation(this.gridProgram, 'u_epsTilt'),
+            intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
+            tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
+            exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
+            zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
+            thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
+            userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain'),
+            physicsParityMode: gl.getUniformLocation(this.gridProgram, 'u_physicsParityMode'),
+            displayGain: gl.getUniformLocation(this.gridProgram, 'u_displayGain'),
+            vizGain: gl.getUniformLocation(this.gridProgram, 'u_vizGain'),
+            curvatureGainT: gl.getUniformLocation(this.gridProgram, 'u_curvatureGainT'),
+            curvatureBoostMax: gl.getUniformLocation(this.gridProgram, 'u_curvatureBoostMax'),
+            colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode'),
+            ridgeMode: gl.getUniformLocation(this.gridProgram, 'u_ridgeMode')
+        };
+        this.gridAttribs = {
+            position: gl.getAttribLocation(this.gridProgram, 'a_position'),
+        };
+    }
+    
+    _setLoaded(loaded) {
+        this.isLoaded = loaded;
+        if (this.onLoadingStateChange) {
+            this.onLoadingStateChange({ 
+                type: loaded ? 'ready' : 'loading',
+                message: loaded ? 'Warp engine ready' : 'Initializing...'
+            });
         }
-        
-        // Use grid shader (which should work for simple points)
-        gl.useProgram(this.gridProgram);
-        
-        // Identity matrix (no transformations)
-        const identity = new Float32Array([
-            1,0,0,0,
-            0,1,0,0,
-            0,0,1,0,
-            0,0,0,1
-        ]);
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, identity);
-        
-        // Bind test vertices and draw
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.testVbo);
-        gl.enableVertexAttribArray(this.gridUniforms.position);
-        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
-        
-        console.log("Drawing 4 red corner dots...");
-        gl.drawArrays(gl.POINTS, 0, 4);
-        
-        // Check for errors
-        const error = gl.getError();
-        if (error !== gl.NO_ERROR) {
-            console.error("WebGL error in simple test:", error);
-        } else {
-            console.log("Simple test completed - should see 4 red dots in corners");
-        }
-        
-        gl.disableVertexAttribArray(this.gridUniforms.position);
     }
 
-    // Exact warpGridVertices implementation from the minimal recipe
-    _updateGrid() {
-        // 🔍 DEBUG CHECKPOINT 3: _updateGrid entry verification
-        console.log('📊 _updateGrid called - Grid warping initiated');
+    updateUniforms(parameters) {
+        if (!parameters) return;
         
-        if (!this.gridVertices) {
-            console.warn("Grid vertices not initialized!");
+        // Helper functions
+        const N = (x, d=0) => (Number.isFinite(x) ? +x : d);
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+        // --- Resolve hull + scene scaling ---
+        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? this.uniforms?.hullAxes?.[0], 503.5);
+        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? this.uniforms?.hullAxes?.[1], 132.0);
+        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? this.uniforms?.hullAxes?.[2], 86.5);
+        const s = 1 / Math.max(a, b, c, 1e-9);
+        const axesScene = [a*s, b*s, c*s];
+        const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+        // --- Parity / visualization ---
+        const parity = !!parameters?.physicsParityMode;
+        const ridgeMode = (parameters?.ridgeMode ?? this.uniforms?.ridgeMode ?? 0)|0;
+        const CM = { solid:0, theta:1, shear:2 };
+        let colorModeRaw = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+        const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
+                                                              : (colorModeRaw|0);
+        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
+        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
+        const vizGain   = parity ? 1 : N(parameters?.vizGain, this.uniforms?.vizGain ?? 1);
+        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, this.uniforms?.curvatureGainT ?? 0));
+        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, this.uniforms?.curvatureBoostMax ?? 40));
+        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, this.uniforms?.cosmeticLevel ?? 10);
+
+        // camera framing lock
+        const lockFraming = parameters?.lockFraming ?? this.uniforms?.lockFraming ?? true;
+        const cameraZ = (parameters?.cameraZ != null)
+          ? +parameters.cameraZ
+          : (lockFraming ? (this.uniforms?.cameraZ ?? null) : this.uniforms?.cameraZ ?? null);
+
+        // Update internal parameters
+        this.currentParams = { ...this.currentParams, ...parameters };
+
+        this.uniforms = {
+          ...this.uniforms,
+
+          // geometry (authoritative)
+          hullAxes: [a, b, c],
+          axesClip: axesScene,      // ← replaces the baked unit ring
+          gridSpan,
+
+          // camera/framing
+          lockFraming,
+          cameraZ,
+
+          // visualization / parity
+          physicsParityMode: parity,
+          ridgeMode,
+          colorMode, exposure, zeroStop,
+          vizGain,
+          curvatureGainT: curvT,
+          curvatureBoostMax: curvMax,
+          cosmeticLevel: cosmetic,
+
+          // existing fields (keep your defaults if caller didn't supply)
+          vShip: parameters.vShip || this.uniforms.vShip || 1,
+          wallWidth: parameters.wallWidth || this.uniforms.wallWidth || 0.06,
+          driveDir: parameters.driveDir || this.uniforms.driveDir || [1,0,0],
+
+          // tilt (zeroed in parity mode)
+          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || this.uniforms.epsilonTilt || 0),
+          betaTiltVec: Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length === 3
+            ? parameters.betaTiltVec
+            : (this.uniforms.betaTiltVec || [0,-1,0]),
+          tiltGain: this.uniforms.tiltGain ?? 0.55
+        };
+
+        // Rebuild mesh/attributes with the new geometry/camera assumptions
+        this._updateGrid();
+    }
+    
+    _calculateModeEffects(params) {
+        // visual-only seasoning; geometry ignores this
+        const mode = (params.currentMode || 'hover').toLowerCase();
+        const config = {
+            hover:     { baseScale: 1.0, strobingViz: 0.8 },
+            cruise:    { baseScale: 1.0, strobingViz: 0.6 },
+            emergency: { baseScale: 1.0, strobingViz: 1.0 },
+            standby:   { baseScale: 1.0, strobingViz: 0.3 }
+        }[mode] || { baseScale: 1.0, strobingViz: 0.8 };
+
+        return {
+            visualScale: config.baseScale,
+            curvatureAmplifier: 1.0,   // <- neutralized for geometry
+            strobingFactor: config.strobingViz
+        };
+    }
+
+    _updateGrid() {
+        console.log("_updateGrid called");
+        console.log("Updating", this.gridVertices.length / 3, "grid vertices...");
+        
+        if (!this.originalGridVertices) {
+            console.error("No original vertices stored!");
             return;
         }
         
-        // CRITICAL BUG FIX: Reset vertices to original BEFORE warping
-        // CRITICAL BUG FIX: Reset vertices to original BEFORE warping
-        if (this.originalGridVertices) {
-            this.gridVertices.set(this.originalGridVertices);
-            console.log("✅ Grid reset to original before warping");
-        }
+        // Copy original vertices
+        this.gridVertices.set(this.originalGridVertices);
         
-        console.log(`Updating ${this.gridVertices.length / 3} grid vertices...`);
-        this._warpGridVertices(this.gridVertices, this.gridHalf, this.gridY0, this.uniforms);
+        // Apply warp field deformation
+        const vtx = this.gridVertices;
         
-        // Upload all three sheets (XY, XZ, YZ) to GPU
+        this._warpGridVertices(vtx, this.currentParams);
+        
+        // Upload updated vertices to GPU efficiently
         const gl = this.gl;
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        
-        // Upload the whole vertex array (works for all three sheets) - CACHE BUSTER v2
-        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
+        if (this._vboBytes !== this.gridVertices.byteLength) {
+            // Buffer size changed, need full reallocation
+            gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+            this._vboBytes = this.gridVertices.byteLength;
+        } else {
+            // Buffer size unchanged, use cheaper subdata update
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
+        }
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
         
-        // 🔍 DEBUG CHECKPOINT 4: VBO re-upload verification
-        console.log(`💾 VBO Upload: ${this.gridVertices.length} floats = ${this.gridVertices.byteLength} bytes`);
-        console.log("✅ FULL BUFFER UPDATE: All three sheets uploaded to GPU (XY, XZ, YZ)");
+        console.log("Grid vertices updated and uploaded to GPU");
     }
 
     // Authentic Natário spacetime curvature implementation
-    _warpGridVertices(vtx, halfSize, originalY, bubbleParams) {
-        // CRITICAL BUG FIX: Remove the reset that was happening AFTER warping
-        // (Reset now happens in _updateGrid BEFORE calling this function)
-
-        // Use energy pipeline bubble radius instead of hardcoded value
-        const bubbleRadius_nm = bubbleParams.sagDepth_nm || 10000;  // From pipeline or fallback
-        const sagRclip = bubbleRadius_nm / halfSize * 0.4;  // keeps the warp inside ±0.8
+    _warpGridVertices(vtx, bubbleParams) {
+        // Get hull axes from uniforms or use needle hull defaults (in meters)
+        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
+        // Clean wall thickness handling - use either meters or ρ-units
+        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
+        const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
+        const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m)   ? bubbleParams.wallWidth_m   : undefined;
+        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho : undefined;
+        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
         
-        // Use computed β₀ from amplifier chain (duty × γ_geo × √Q_dyn × γ_VdB^0.25)
-        const beta0 = bubbleParams.beta0;
-        if (beta0 === undefined) {
-            console.warn("No beta0 supplied to _warpGridVertices - skipping warp");
-            return; // Early out to prevent using stale values
+        // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.
+        const axesScene =
+          (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
+            ? this.uniforms.axesClip
+            : (() => {
+                const aMax = Math.max(a, b, c);
+                const s    = 1.0 / Math.max(aMax, 1e-9);
+                return [a * s, b * s, c * s];
+              })();
+        
+        // Use the computed w_rho from above
+        
+        // Compute a grid span that comfortably contains the whole bubble
+        const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
+        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        let targetSpan = Math.max(
+          GRID_DEFAULTS.minSpan,
+          hullMaxClip * spanPadding
+        );
+        
+        // --- Enhanced gain boost for BOTH color & geometry (decades slider support) ---
+        const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
+        // keep framing stable so exaggeration remains visible
+        const spanBoost =
+          (bubbleParams.lockFraming === false)
+            ? (1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5)
+            : 1.0;
+        targetSpan *= spanBoost;
+        
+        // Higher resolution for smoother canonical curvature
+        const gridDivisions = 120; // increased from default for smoother profiles
+        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1, 0, 0];
+        const gridK = 0.10;                       // mild base (acts as unit scale)
+        
+        // === Unified "SliceViewer-consistent" amplitude for geometry ===
+        // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
+        const thetaScale = this.uniforms?.thetaScale ?? 1.0;
+        const mode = (bubbleParams.currentMode || 'hover').toLowerCase();
+        const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
+        const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
+        // Small per-mode seasoning only, so we don't hide the physics
+        // Keep mode scale only for non-geometry uses (colors, display), not geometry amplitude
+        const modeScale =
+            mode === 'standby'   ? 0.95 :
+            mode === 'cruise'    ? 1.00 :
+            mode === 'hover'     ? 1.05 :
+            mode === 'emergency' ? 1.08 : 1.00;
+        // Enhanced amplitude compression for decades-scale gains: compress *after* boosting
+        const A_vis = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
+        
+        console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
+        console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
+        console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
+        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
+        console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${thetaScale.toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
+        console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
+        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
+
+        // Ellipsoid utilities (using consistent scene-scaled axes)
+        const rhoEllipsoidal = (p) => {
+            return Math.hypot(p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]);
+        };
+        
+        const sdEllipsoid = (p, axes) => {
+            return rhoEllipsoidal(p) - 1.0;
+        };
+        
+        const nEllipsoid = (p, axes) => {
+            const qa = [p[0]/(axes[0]*axes[0]), p[1]/(axes[1]*axes[1]), p[2]/(axes[2]*axes[2])];
+            const rho = Math.max(1e-6, rhoEllipsoidal(p));
+            const n = [qa[0]/rho, qa[1]/rho, qa[2]/rho];
+            const m = Math.hypot(n[0], n[1], n[2]) || 1;
+            return [n[0]/m, n[1]/m, n[2]/m];
+        };
+        
+        // Normalize drive direction (using scene-scaled axes)
+        const dN = (() => {
+            const t = [driveDir[0]/axesScene[0], driveDir[1]/axesScene[1], driveDir[2]/axesScene[2]];
+            const m = Math.hypot(...t) || 1;
+            return [t[0]/m, t[1]/m, t[2]/m];
+        })();
+
+        // Smooth helper functions for C²-continuous displacement
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const smoothstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * (3 - 2 * t); 
+        }; // C¹
+        const smootherstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * t * (t * (t * 6 - 15) + 10); 
+        }; // C²
+        const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
+
+        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
+        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
+        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
+
+        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
+
+        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
+
+        // ---- Existing physics chain (do not change) ----
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
+        
+        const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
+        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+
+        // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
+        const betaVisUniform = betaUsedUniform;
+
+        // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
+        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🧪 warp-mode", {
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                betaVis: betaVisUniform.toExponential(2),
+                cosmeticLevel: this.uniforms?.cosmeticLevel || 10
+            });
         }
         
-        // Get realistic power for scaling deformation amplitude
-        const powerAvg_MW = bubbleParams.powerAvg_MW || 100;
-        
-        // WarpFactory energy condition flags simulation (future: load from pre-computed texture)
-        const energyConditionViolated = beta0 > 1000;  // Simplified WEC check
-        
-        const tsRatio = bubbleParams.tsRatio || 4100;
-        console.log(`🔗 ENERGY PIPELINE → GRID CONNECTION:`);
-        console.log(`  β₀=${beta0.toExponential(2)} (from amplifier chain)`);
-        console.log(`  sagDepth=${bubbleRadius_nm}nm (from pipeline, not hardcoded)`);
-        console.log(`  powerAvg=${powerAvg_MW}MW (log-scaled deformation)`);
-        console.log(`  tsRatio=${tsRatio} (animation speed scaling)`);
-        console.log(`  sagRclip=${sagRclip.toFixed(4)} (clip-space radius) - NORMALIZED SCALING`);
-        console.log(`  🔧 AMPLITUDE CLAMP: lateralK=${(0.10 * sagRclip).toFixed(4)}, verticalK=${(0.10 * sagRclip).toFixed(4)}`);
+        // Check for uniform updates
+        if (this._uniformsDirty) {
+            // (nothing special needed, just consume fresh uniforms)
+            this._uniformsDirty = false;
+        }
 
+        // Core displacement calculation loop (C²-smooth)
         for (let i = 0; i < vtx.length; i += 3) {
-            // Work directly in clip-space coordinates
-            const x = vtx[i];
-            const z = vtx[i + 2];
-            const r = Math.hypot(x, z);              // radius in clip-space
+            const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
             
-            // Use original Y coordinate for each vertex, not a single constant
-            const y_original = this.originalGridVertices ? this.originalGridVertices[i + 1] : originalY;
+            // --- Smooth strobing sign using uniform sectors/split (C¹) ---
+            const theta = Math.atan2(p[2], p[0]);
+            const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+            const sectorIdx = Math.floor(u * sectorsUniform);
             
-            // Natário warp bubble profile (now with correct units)
-            const prof = (r / sagRclip) * Math.exp(-(r * r) / (sagRclip * sagRclip));
-            const beta = beta0 * prof;              // |β| shift vector magnitude
+            // Distance from the split boundary in sector units
+            const dist = (sectorIdx - splitUniform + 0.5);
+            const strobeWidth = 1.5; // wider for smoother canonical profile
+            const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
+            
+            // --- Ellipsoidal signed distance ---
+            const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
+            const sd = rho - 1.0;                     // negative inside wall
+            
 
-            // -------- AMPLITUDE CLAMPING: Limit warp to 10% of bubble radius --------
-            const lateralK = 0.10 * sagRclip;       // max 10% of radius
-            const verticalK = 0.10 * sagRclip;      // max 10% of radius
             
-            // -------- LATERAL DEFORMATION: Bend X and Z with clamped coefficients --------
-            const push = beta * lateralK;           // use clamped coefficient
-            const scale = (r > 1e-6) ? (1.0 + push / r) : 1.0;
+            // --- Surface normal ---
+            const n = nEllipsoid(p, axesScene);
+            
+            // --- (B) Soft front/back polarity (C¹-continuous) ---
+            const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+            const front = Math.tanh(dotND / 0.15);          // softer front polarity for canonical smoothness
+            
+            // --- Mode gains removed (cosmetic slider controls all exaggeration) ---
+            
+            // --- Local wall thickness in ellipsoidal ρ (correct units) ---
+            // Semi-axes in meters (not the clip-scaled ones)
+            const a_m = hullAxes[0]; // 503.5
+            const b_m = hullAxes[1]; // 132.0
+            const c_m = hullAxes[2]; // 86.5
+            
+            // Direction-dependent mapping of meters → Δρ
+            const invR = Math.sqrt(
+                (n[0]/a_m)*(n[0]/a_m) +
+                (n[1]/b_m)*(n[1]/b_m) +
+                (n[2]/c_m)*(n[2]/c_m)
+            );
+            const R_eff = 1.0 / Math.max(invR, 1e-6);
+            // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
+            const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
+            
+            // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
+            // For canonical Natário bubble, disable local gaussian bumps
+            const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
+            
+            // --- (C) Gentler wall window for canonical smoothness ---
+            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
+            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
+                           : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
+            
+            // Local θ proxy (same kernel as shader)
+            const rs = rho;
+            const w  = Math.max(1e-6, w_rho_local);
+            const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
+            const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
 
-            vtx[i] = x * scale;                      // X warped laterally
-            vtx[i + 2] = z * scale;                  // Z warped laterally
+            // ≈ cos between surface normal and drive direction
+            const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
+
+            // CPU shear proxy (for diagnostics/labels)
+            const sinphi = Math.sqrt(Math.max(0, 1 - xs_over_rs*xs_over_rs));
+            const shearProxy = Math.abs(df) * sinphi * (this.uniforms?.vShip ?? 1.0);
+            // Accumulate quick average for the proof panel
+            this._accumShear = (this._accumShear||0) + shearProxy;
+            this._accumShearN = (this._accumShearN||0) + 1;
+
+            // Same amplitude chain + user gain as the shader
+            const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+            const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+            const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+            const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
+
+            // Geometry amplitude should be monotonic with the slider and not instantly saturate.
+            // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
+            const T_gain   = this.uniforms?.curvatureGainT ?? 0.375;
+            const boostMax = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
+            const boostNow = 1 + T_gain * (boostMax - 1);
+
+            // CPU-side parity protection (match shader's idea but keep it neutral by default)
+            const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
+
+            const useSingleRidge = ((this.uniforms?.ridgeMode|0) === 1);
+
+            // 🔑 this is the switch that removes the geometric double ridge
+            const baseMag = useSingleRidge
+              ? Math.abs(xs_over_rs) * f               // single crest at ρ=1
+              : Math.abs(xs_over_rs * df);             // physics double-lobe (current)
+
+            // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
+            // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
+            const magMax  = Math.log(1.0 + (baseMag * thetaScale * boostMax)          / zeroStop);      // slider @ max, no userGain
+            const magNow  = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);    // current slider × exaggeration
+
+            // Normalized geometry amplitude (monotonic in userGain AND boostNow)
+            const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
+
+            // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
+            const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
+
+            // Special case: make standby perfectly flat if desired
+            let disp;
+            if (mode === 'standby') {
+                disp = 0; // perfectly flat grid for standby mode
+            } else {
+                // Normal displacement calculation synced to shader amplitude (A_vis)
+                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+                
+                // No fixed bump; slider controls all visual scaling
+                
+                // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
+                // Let exaggeration raise the ceiling too, but gently (log so it doesn't jump)
+                const exgLog  = Math.log10(Math.max(1, userGain));
+                const maxPush = 0.12 + 0.10 * (boostNow / Math.max(1, boostMax)) + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
+                const softClamp = (x, m) => m * Math.tanh(x / m);
+                disp = softClamp(disp, maxPush);
+                
+                // Optional temporal smoothing for canonical visual calm
+                const vertIndex = i / 3;
+                const prev = this._prevDisp[vertIndex] ?? disp;
+                const blended = prev + this._dispAlpha * (disp - prev);
+                this._prevDisp[vertIndex] = blended;
+                disp = blended;
+            }
             
-            // -------- VERTICAL DEFORMATION: Y displacement with clamped coefficients --------
-            const powerScale = Math.max(0.1, Math.min(5.0, powerAvg_MW / 100.0)); // linear, clamped
-            const timeScale = 1.0 / Math.max(1, tsRatio / 1000);  // Slow animation for high tsRatio
-            const dy = beta * verticalK * powerScale * timeScale;  // use clamped coefficient
-            vtx[i + 1] = y_original + dy;                         // Y warped vertically from original position
+            // ----- Interior gravity (shift vector "tilt") -----
+            // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
+            const w_int = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // ~few cm in normalized space
+            const interior = (() => {
+              // 1 inside the cabin (rho <= 1 - w_int), 0 outside; smooth edge within w_int
+              const t = (1.0 - rho) / Math.max(w_int, 1e-6);
+              // smoothstep(0→1): 3t² − 2t³, clamped
+              const s = Math.max(0, Math.min(1, t));
+              return s * s * (3 - 2 * s);
+            })();
+
+            // NEW: interior tilt displacement — do NOT multiply by 'ring'
+            const epsTilt   = this.uniforms?.epsilonTilt ?? 0.0;
+            const tiltGain  = this.uniforms?.tiltGain ?? 0.25;     // gentle default
+            const betaTilt  = this.uniforms?.betaTiltVec || [0, -1, 0];
+            // project normal onto "down" and keep sign stable
+            const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
+            // scale small, interior-only, soft-clamped
+            let dispTilt = epsTilt * tiltGain * interior * downDot;
+            const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
+            dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
+            // ----- end interior gravity -----
+
+            // apply both curvature and tilt
+            vtx[i]     = p[0] - n[0] * (disp + dispTilt);
+            vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
+            vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
         }
         
-        // DIAGNOSTIC 1: Confirm CPU is mutating the vertex array
-        let maxDrift = 0;
+        // Enhanced diagnostics - check for amplitude overflow
+        let maxRadius = 0, maxDisp = 0;
         for (let i = 0; i < vtx.length; i += 3) {
-            maxDrift = Math.max(maxDrift, Math.abs(vtx[i] - vtx[i+2]));
+            const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
+            maxRadius = Math.max(maxRadius, r);
+            // Check displacement from original
+            if (this.originalGridVertices) {
+                const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
+                maxDisp = Math.max(maxDisp, Math.abs(r - origR));
+            }
         }
-        console.log("Max lateral drift =", maxDrift.toFixed(4), "(target ≈ 0.08 for needle-hull pinch)");
+        console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
+        console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
         
-        // Visual smoke test - check Y range after warping
         let ymax = -1e9, ymin = 1e9;
         for (let i = 1; i < vtx.length; i += 3) {
             const y = vtx[i];
             if (y > ymax) ymax = y;
             if (y < ymin) ymin = y;
         }
-        console.log(`Grid Y range after warp: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (should show variation)`);
-        console.log(`✅ ENERGY PIPELINE CONNECTED: β₀=${beta0.toExponential(1)}, Power=${powerAvg_MW}MW → Visual Deformation`);
-    }
-
-    _renderQuad() {
-        const gl = this.gl;
+        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
+        console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
+        console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
         
-        // CRITICAL FIX 2: Get correct attribute location (not hardcoded 0)
-        const positionLoc = gl.getAttribLocation(this.program, "a_position");
-        if (positionLoc === -1) {
-            console.error("a_position attribute not found in shader!");
-            return;
+        // Update uniforms for scientific consistency (using scene-scaled axes)
+        this.uniforms.axesClip = axesScene;
+        this.uniforms.wallWidth = w_rho;
+        this.uniforms.hullDimensions = { a, b, c, aH, SCENE_SCALE, wallWidth_m };
+        
+        // Regenerate grid with proper span for hull size
+        if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
+            console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
+            this.currentGridSpan = targetSpan;
+            const newGridData = this._createGrid(targetSpan, gridDivisions);
+            
+            // Update both current and original vertices
+            this.gridVertices = newGridData;
+            this.originalGridVertices = new Float32Array(newGridData);
+            
+            // Upload new geometry to GPU efficiently
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
+            if (this._vboBytes !== this.gridVertices.byteLength) {
+                // Buffer size changed, need full reallocation
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+                this._vboBytes = this.gridVertices.byteLength;
+            } else {
+                // Buffer size unchanged, use cheaper subdata update
+                this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
+            }
+            
+            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a}×${b}×${c}]m`);
+            
+            // Adjust camera framing for larger grids
+            this._adjustCameraForSpan(targetSpan);
         }
-        
-        // Render fullscreen quad for warp field visualization
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(positionLoc);
-        gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-        gl.disableVertexAttribArray(positionLoc);
     }
 
     _renderGridPoints() {
@@ -839,208 +1133,472 @@ class WarpCage {
         
         // Use the properly compiled grid program
         if (!this.gridProgram) {
-            console.error("CRITICAL: Grid program not available in render!");
+            if (!this._warnNoProgramOnce) {
+                console.warn("Grid program not ready yet; waiting for shader link…");
+                this._warnNoProgramOnce = true;
+            }
             return;
         }
         
-        console.log("Using grid program for rendering...");
-        
+        // Throttled logging for performance
+        if (this._debugMode && Date.now() - (this._lastDebugTime || 0) > 1000) {
+            console.log("Using grid program for rendering...");
+            this._lastDebugTime = Date.now();
+        }
         gl.useProgram(this.gridProgram);
         
-        // Debug: Check if we have valid grid data
-        if (!this.gridVbo || this.gridVertexCount === 0) {
-            console.warn("Grid VBO not initialized properly");
-            return;
-        }
-        
-        // Add perspective camera to reveal 3D warp deformation
-        const fov = Math.PI / 4;                    // 45°
-        const aspect = this.canvas.width / this.canvas.height;
-        const near = 0.01, far = 10.0;
-
-        // Simple perspective matrix (without gl-matrix dependency)
-        const f = 1.0 / Math.tan(fov / 2);
-        const proj = new Float32Array([
-            f / aspect, 0, 0, 0,
-            0, f, 0, 0,
-            0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
-            0, 0, -1, 0
-        ]);
-
-        // Look-at view matrix (lower camera to see peaks and valleys better)
-        const eye = [0, 0.15, 1.6];
-        const view = new Float32Array([
-            1, 0, 0, 0,
-            0, 1, 0, -0.15,
-            0, 0, 1, -1.6,
-            0, 0, 0, 1
-        ]);
-
-        // Combine projection and view
-        const mvp = this._multiplyMatrices(proj, view);
-        
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
-        
-        // Keep depth testing enabled for proper 3D overlay
-        gl.enable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
-        
-        // Use POINTS instead of LINES for visible thick grid (lineWidth is clamped to 1px)
-        if (this.gl.getParameter(this.gl.ALIASED_POINT_SIZE_RANGE)[1] >= 5.0) {
-            // GPU supports large points - use them for visibility
-            console.log("Using POINTS for visible grid rendering");
-        }
-        
-        // Grid rendering
+        // Bind vertex data
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.enableVertexAttribArray(this.gridUniforms.position);
-        gl.vertexAttribPointer(this.gridUniforms.position, 3, gl.FLOAT, false, 0, 0);
+        const loc = this.gridAttribs.position;
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
         
-        // Render grid as points with proper 3D perspective
-        if (this.gridUniforms.position !== -1) {
-            // Set up 3D perspective camera (moderate zoom)
-            const proj = new Float32Array([
-                2.4, 0, 0, 0,
-                0, 2.4, 0, 0,
-                0, 0, -1.002, -1,
-                0, 0, -0.2, 0
-            ]);
-            
-            // Add 15° yaw so camera isn't orthogonal to walls
-            const yaw = 15.0 * Math.PI / 180.0;     // 15°
-            const cy = Math.cos(yaw), sy = Math.sin(yaw);
-            
-            const view = new Float32Array([
-                 cy, 0,  sy, 0,
-                  0, 1,   0, -0.15,   // slightly elevated camera
-                -sy, 0,  cy, -1.6,   // camera with yaw rotation
-                  0, 0,   0, 1
-            ]);
-            
-            const mvp = this._multiplyMatrices(proj, view);
-            gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, mvp);
-            
-            // WarpFactory-inspired: Upload energy condition flag for color coding
-            const energyFlag = this.uniforms.beta0 > 100000 ? 1.0 : 0.0;  // WEC violation threshold
-            gl.uniform1f(this.gridUniforms.energyFlag, energyFlag);
-            
-            // Enable blending for transparent overlapping sheets
-            gl.enable(gl.BLEND);
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-            
-            // Render each sheet with different colors for 3D perception
-            let offset = 0;
-            
-            console.log(`Rendering 3D cage - XY: ${this.sheetXY_count}, XZ: ${this.sheetXZ_count}, YZ: ${this.sheetYZ_count}`);
-            
-            // XY Floor sheet - cyan
-            gl.uniform3f(this.gridUniforms.sheetColor, 0.1, 0.8, 1.0);
-            gl.drawArrays(gl.LINES, offset, this.sheetXY_count);
-            console.log(`XY sheet drawn: offset=${offset}, count=${this.sheetXY_count}`);
-            offset += this.sheetXY_count;  // Move to start of XZ data
-            
-            // XZ Side wall - magenta  
-            gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.1, 0.8);
-            gl.drawArrays(gl.LINES, offset, this.sheetXZ_count);
-            console.log(`XZ sheet drawn: offset=${offset}, count=${this.sheetXZ_count}`);
-            offset += this.sheetXZ_count;  // Move to start of YZ data
-            
-            // YZ End wall - yellow
-            gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 1.0, 0.1);
-            gl.drawArrays(gl.LINES, offset, this.sheetYZ_count);
-            console.log(`YZ sheet drawn: offset=${offset}, count=${this.sheetYZ_count}`);
-            
-            gl.disable(gl.BLEND);
-            
-            console.log(`Rendered ${this.gridVertexCount} grid lines with 3D perspective - should now be visible!`);
-        } else {
-            console.warn("Grid attribute position not found, skipping render");
+        // Set all uniforms for York-time visualization
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
+        
+        // Both uniforms get identical scene-normalized hull axes (eliminates dual ellipsoid)
+        const axesX = this.uniforms?.axesClip[0] || 0.0;
+        const axesY = this.uniforms?.axesClip[1] || 0.0;
+        const axesZ = this.uniforms?.axesClip[2] || 0.0;
+        
+        gl.uniform3f(this.gridUniforms.axesScene, axesX, axesY, axesZ);  // Authoritative
+        gl.uniform3f(this.gridUniforms.axes, axesX, axesY, axesZ);       // Same value!
+        
+        gl.uniform3f(this.gridUniforms.driveDir,
+            this.uniforms?.driveDir[0] || 1.0,
+            this.uniforms?.driveDir[1] || 0.0,
+            this.uniforms?.driveDir[2] || 0.0);
+        gl.uniform1f(this.gridUniforms.wallWidth, Math.max(1e-4, this.uniforms?.wallWidth ?? 0.016));
+        gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
+        
+        // Violet interior tilt tint (visual-only)
+        const epsTilt = (this.uniforms?.epsilonTilt || 0) * (this.uniforms?.tiltGain || 0);
+        const wInt = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // same window as geometry
+        const tintViz = 8.0;  // purely visual: raise/lower if you want the violet to pop more/less
+        gl.uniform1f(this.gridUniforms.epsTilt, epsTilt);
+        gl.uniform1f(this.gridUniforms.intWidth, wInt);
+        gl.uniform1f(this.gridUniforms.tiltViz, tintViz);
+        
+        // Exposure controls for enhanced mode contrast
+        gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
+        gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
+        gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
+        gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
+        gl.uniform1i(this.gridUniforms.physicsParityMode, this.uniforms?.physicsParityMode ? 1 : 0);
+        gl.uniform1f(this.gridUniforms.displayGain, this.uniforms?.displayGain || 1.0);
+        gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
+        gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
+        gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
+        gl.uniform1i(this.gridUniforms.colorMode, this.uniforms?.colorMode ?? 1);
+        gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
+        
+        // Render as lines for better visibility
+        const vertexCount = this.gridVertices.length / 3;
+        gl.drawArrays(gl.LINES, 0, vertexCount);
+        
+        // Throttled render logging
+        if (this._debugMode && Date.now() - (this._lastRenderLog || 0) > 1000) {
+            console.log(`Rendered ${vertexCount} grid lines with 3D perspective - should now be visible!`);
+            this._lastRenderLog = Date.now();
         }
         
-        // Check for WebGL errors after drawing
-        const error = gl.getError();
-        if (error !== gl.NO_ERROR) {
-            console.error(`WebGL error during grid rendering: ${error}`);
-        }
-        
-        gl.disableVertexAttribArray(this.gridUniforms.position);
+        // Clean up
+        gl.disableVertexAttribArray(loc);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        gl.lineWidth(1.0);
-        
-        console.log(`3D spacetime grid rendered with authentic Natário warp bubble physics`);
     }
 
-    // Helper function for matrix multiplication
-    _multiplyMatrices(a, b) {
-        const result = new Float32Array(16);
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
-                result[i * 4 + j] = 
-                    a[i * 4 + 0] * b[0 * 4 + j] +
-                    a[i * 4 + 1] * b[1 * 4 + j] +
-                    a[i * 4 + 2] * b[2 * 4 + j] +
-                    a[i * 4 + 3] * b[3 * 4 + j];
+    _renderLoop() {
+        this._raf = requestAnimationFrame(() => this._renderLoop());
+        this._render();
+    }
+
+    _render() {
+        const gl = this.gl;
+        
+        // Clear the screen
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        
+        // Render the spacetime grid
+        this._renderGridPoints();
+        
+        // Emit diagnostics for proof panel
+        if (this.onDiagnostics) {
+            try { 
+                const diag = this.computeDiagnostics();
+                this.onDiagnostics(diag);
+            } catch(e){
+                console.warn('Diagnostics error:', e);
             }
         }
-        return result;
     }
 
-    //----------------------------------------------------------------
-    //  High-DPI responsive resize
-    //----------------------------------------------------------------
-    _resize() {
-        const dpr = window.devicePixelRatio || 1;
-        const displayWidth = this.canvas.clientWidth * dpr;
-        const displayHeight = this.canvas.clientHeight * dpr;
+
+
+    // Matrix math utilities
+    _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
+        const gl = this.gl;
         
-        if (this.canvas.width !== displayWidth || this.canvas.height !== displayHeight) {
-            this.canvas.width = displayWidth;
-            this.canvas.height = displayHeight;
+        const vertexShader = this._compileShader(gl.VERTEX_SHADER, vertexSource);
+        const fragmentShader = this._compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+        
+        if (!vertexShader || !fragmentShader) {
+            return null;
+        }
+        
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+        
+        // Non-blocking compilation if available
+        if (this.parallelShaderExt && onReady) {
+            console.log("⚡ Starting non-blocking shader compilation...");
+            this._pollShaderCompletion(program, onReady);
+            return program; // Return immediately, will be ready asynchronously
+        }
+        
+        // Synchronous fallback
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Shader program link error:', gl.getProgramInfoLog(program));
+            gl.deleteProgram(program);
+            return null;
+        }
+        
+        return program;
+    }
+    
+    _pollShaderCompletion(program, onReady) {
+        const gl = this.gl;
+        const ext = this.parallelShaderExt;
+        
+        const poll = () => {
+            const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
+            
+            if (done) {
+                // Check if linking was successful
+                if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                    console.log("⚡ Shader compilation completed successfully");
+                    onReady(program);
+                } else {
+                    console.error('Shader program link error:', gl.getProgramInfoLog(program));
+                    gl.deleteProgram(program);
+                    onReady(null);
+                }
+            } else {
+                // Still compiling, check again next frame
+                requestAnimationFrame(poll);
+                
+                // Update loading state if callback is available
+                if (this.onLoadingStateChange) {
+                    this.onLoadingStateChange({ type: 'compiling', message: 'Compiling shaders...' });
+                }
+            }
+        };
+        
+        poll();
+    }
+
+    _compileShader(type, source) {
+        const gl = this.gl;
+        const shader = gl.createShader(type);
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+        
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+        
+        return shader;
+    }
+
+    _perspective(out, fovy, aspect, near, far) {
+        const f = 1.0 / Math.tan(fovy / 2);
+        const nf = 1.0 / (near - far);
+        
+        out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+        out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+        out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+        out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+    }
+
+    _lookAt(out, eye, center, up) {
+        const x0 = eye[0], x1 = eye[1], x2 = eye[2];
+        const y0 = center[0], y1 = center[1], y2 = center[2];
+        const u0 = up[0], u1 = up[1], u2 = up[2];
+        
+        let z0 = x0 - y0, z1 = x1 - y1, z2 = x2 - y2;
+        let len = 1 / Math.hypot(z0, z1, z2);
+        z0 *= len; z1 *= len; z2 *= len;
+        
+        let x0_ = u1 * z2 - u2 * z1;
+        let x1_ = u2 * z0 - u0 * z2;
+        let x2_ = u0 * z1 - u1 * z0;
+        len = Math.hypot(x0_, x1_, x2_);
+        if (!len) {
+            x0_ = 0; x1_ = 0; x2_ = 0;
+        } else {
+            len = 1 / len;
+            x0_ *= len; x1_ *= len; x2_ *= len;
+        }
+        
+        let y0_ = z1 * x2_ - z2 * x1_;
+        let y1_ = z2 * x0_ - z0 * x2_;
+        let y2_ = z0 * x1_ - z1 * x0_;
+        
+        out[0] = x0_; out[1] = y0_; out[2] = z0; out[3] = 0;
+        out[4] = x1_; out[5] = y1_; out[6] = z1; out[7] = 0;
+        out[8] = x2_; out[9] = y2_; out[10] = z2; out[11] = 0;
+        out[12] = -(x0_ * x0 + x1_ * x1 + x2_ * x2);
+        out[13] = -(y0_ * x0 + y1_ * x1 + y2_ * x2);
+        out[14] = -(z0 * x0 + z1 * x1 + z2 * x2);
+        out[15] = 1;
+    }
+
+    _multiply(out, a, b) {
+        const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+        const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+        const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+        const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+        let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+        out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+        out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+        out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+        out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    }
+
+    // === Responsive camera helpers =============================================
+    _fitFovForAspect(aspect) {
+        // Wider FOV when the canvas is tall (phones/portrait)
+        // desktop ~55°, phone ~68°
+        const fovDesktop = Math.PI / 3.272;  // ~55°
+        const fovPortrait = Math.PI / 2.65;  // ~68°
+        const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
+        return fovDesktop * (1 - t) + fovPortrait * t;
+    }
+
+    // axesScene is the ellipsoid semi-axes in scene units (what the renderer already uses)
+    // spanHint is optional fallback (grid span in scene units)
+    _fitCameraToBubble(axesScene, spanHint) {
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const fov = this._fitFovForAspect(aspect);
+
+        // Bounding sphere radius of the ellipsoid (in scene units)
+        const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+        const baseMargin = 1.22;                        // a hair more breathing room
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+
+        // Distance along -Z so bubble fits vertically
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // Higher overhead perspective for better visualization
+        const eye = [0, 0.62 * R, -dist];      // match overhead height
+        // look further down to clearly show deck plane and interior effects
+        const center = [0, -0.12 * R, 0];      // match overhead look-down
+        const up = [0, 1, 0];
+
+        // Update projection & view
+        this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+        
+        console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
+    }
+
+    // --- Bootstrap: set uniforms & fit camera before first frame ---------------
+    bootstrap(initialParams = {}) {
+        this.currentParams = Object.assign({}, initialParams);
+        // Ensure canvas size is correct before we compute FOV/dist
+        this._resizeCanvasToDisplaySize();
+
+        // Let updateUniforms compute/remember axesScene & span, then fit
+        this.updateUniforms(initialParams);
+        
+        // sets overhead once
+        this._setupCamera();
+        // only auto-fit if not explicitly locked
+        if (!this.uniforms.lockFraming) this._applyOverheadCamera();
+
+        // Mark so we don't rely on any legacy default camera
+        this._bootstrapped = true;
+    }
+
+    // --- Convenience method: Set curvature gain from 0-8 slider value --------
+    setCurvatureGainDec(slider0to8, boostMax = 40) {
+        const T = Math.max(0, Math.min(1, slider0to8 / 8));
+        this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
+    }
+
+    setCosmeticLevel(level /* 1..10 */) {
+        const L = Math.max(1, Math.min(10, level));
+        this.updateUniforms({ cosmeticLevel: L });
+    }
+
+    // === Natário Diagnostics (viewer-only, does not affect physics) ===
+    _computePipelineBetas(U){
+        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || U.sectors || 1);
+        const gammaGeo     = U.gammaGeo || 0;
+        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+        const gammaVdB     = U.gammaVdB || 1.0;
+
+        const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-12, (U.dutyCycle || 0) / sectors));
+        const phase    = (U.phaseSplit != null) ? U.phaseSplit :
+                        (U.currentMode === 'cruise' ? 0.65 : 0.50);
+        const betaNet  = betaAvg * (2*phase - 1);
+
+        return { betaInst, betaAvg, betaNet, sectors, phase };
+    }
+
+    _sampleYorkAndEnergy(U){
+        const axes  = U.axesClip || [0.40,0.22,0.22];
+        const w     = Math.max(1e-4, U.wallWidth || 0.06);   // shell width
+        const vShip = U.vShip || 1.0;
+        const d     = U.driveDir || [1,0,0];
+        const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
+                            const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
+
+        let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
+        const N=64;
+        for(let k=0;k<N;k++){
+            const ang=2*Math.PI*k/N;
+            const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
+            const rs=Math.hypot(...pN);
+            const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
+            const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
+            const dfdr=(-2.0*(rs-1)/(w*w))*f;
+
+            const theta = vShip * (xs/rs) * dfdr;               // York-time proxy
+            const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
+
+            if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
+            else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
+
+            eSum+=T00; n++;
+        }
+        return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
+                T00avg:(n?eSum/n:0) };
+    }
+
+    computeDiagnostics(){
+        const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+        const P=this._computePipelineBetas(U);
+        const Y=this._sampleYorkAndEnergy(U);
+        const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
+        const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+        // Calculate shear average proxy and reset accumulators
+        const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
+        this._accumShear = 0; 
+        this._accumShearN = 0;
+
+        return {
+            mode: U.currentMode||'hover',
+            duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+            sectors:P.sectors, phase:P.phase,
+            beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+            theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
+            theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
+            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+            shear_avg_proxy: shear_avg_proxy,
+            york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
+            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6)
+        };
+    }
+
+    // Generic uniform setter for display gain and other shader uniforms
+    setUniform(name, value) {
+        if (!this.gl || !this.gridProgram) return;
+        
+        const gl = this.gl;
+        const location = gl.getUniformLocation(this.gridProgram, name);
+        if (location !== null) {
+            gl.useProgram(this.gridProgram);
+            if (typeof value === 'number') {
+                gl.uniform1f(location, value);
+            } else if (Array.isArray(value)) {
+                if (value.length === 2) gl.uniform2fv(location, value);
+                else if (value.length === 3) gl.uniform3fv(location, value);
+                else if (value.length === 4) gl.uniform4fv(location, value);
+            }
+            console.log(`🎛️ setUniform: ${name} = ${value}`);
         }
     }
 
-    //----------------------------------------------------------------
-    //  Cleanup for component unmounting
-    //----------------------------------------------------------------
+    setDisplayGain(gain) {
+        this.updateUniforms({ userGain: Math.max(1, +gain) });
+    }
+
     destroy() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
+        // Cancel animation frame
+        if (this._raf) {
+            cancelAnimationFrame(this._raf);
+            this._raf = null;
         }
-        window.removeEventListener("resize", this._resize);
         
-        if (this.gl && this.program) {
-            this.gl.deleteProgram(this.program);
+        // Clean up event listeners
+        window.removeEventListener('resize', this._resize);
+        // Remove globals we installed
+        if (window.__warp_setGainDec === this.__warp_setGainDec) {
+            delete window.__warp_setGainDec;
         }
-        if (this.gl && this.gridProgram) {
-            this.gl.deleteProgram(this.gridProgram);
+        if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
+            delete window.__warp_setCosmetic;
         }
-        if (this.gl && this.vbo) {
-            this.gl.deleteBuffer(this.vbo);
+        delete window.__warp_singleRidge;
+        delete window.__warp_physicsRidge;
+        delete window.setStrobingState;
+        
+        // Clean up WebGL resources
+        const gl = this.gl;
+        if (gl) {
+            if (this.gridProgram) {
+                gl.deleteProgram(this.gridProgram);
+                this.gridProgram = null;
+            }
+            
+            if (this.gridVbo) {
+                gl.deleteBuffer(this.gridVbo);
+                this.gridVbo = null;
+            }
         }
-        if (this.gl && this.gridVbo) {
-            this.gl.deleteBuffer(this.gridVbo);
-        }
+        
+        // Clear callbacks
+        this.onDiagnostics = null;
+        
+        // Clear vertex arrays
+        this.gridVertices = null;
+        this.originalGridVertices = null;
+        
+        console.log("WarpEngine resources cleaned up");
     }
 }
 
-// Optional toggles in dev console for cage renderer
-window.__cage_on  = () => {
-    if (window.warpCage) {
-        window.warpCage.enabled = true;
-        console.log('🔓 CAGE ENABLED: Legacy volumetric cage renderer activated');
-    }
-};
-window.__cage_off = () => {
-    if (window.warpCage) {
-        window.warpCage.enabled = false;
-        console.log('🔒 CAGE DISABLED: Legacy volumetric cage renderer deactivated');
-    }
-};
-
 // Export for both ES modules and CommonJS
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WarpCage;
+    module.exports = WarpEngine;
 } else {
-    window.WarpCage = WarpCage;
-    console.log("WarpCage loaded (legacy visualizer) - gated by ?cage=1", Date.now());
+    window.WarpEngine = WarpEngine;
+    console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
 }

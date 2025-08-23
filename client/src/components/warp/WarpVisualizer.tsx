@@ -388,7 +388,7 @@ useEffect(() => {
 
     // 6s watchdog to avoid infinite spinner
     watchdog = window.setTimeout(() => {
-      setFailed("Timeout waiting for WarpEngine. Check /public/warp-engine-fixed.js and WebGL support.");
+      setFailed("Timeout waiting for WarpEngine. Check /public/warp-engine.js and WebGL support.");
     }, 6000) as any;
 
     try {
@@ -414,7 +414,7 @@ useEffect(() => {
       }
 
       // Try fixed bundle, then fall back
-      const trySrcs = ['/warp-engine-fixed.js?v=tilt2', '/warp-engine.js?v=fallback'];
+      const trySrcs = ['/warp-engine.js?v=canonical'];
       for (const src of trySrcs) {
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement('script');
