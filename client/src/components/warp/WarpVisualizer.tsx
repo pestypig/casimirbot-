@@ -625,7 +625,14 @@ useEffect(() => {
           curvatureGainDec: 0,
           curvatureBoostMax: 1,
           curvatureGainT: 0,
-          displayGain: 1
+          displayGain: 1,
+          thetaScale: resolveThetaScale({  // still computed, just no exaggeration
+            dutyCycle: dutyResolved,
+            sectors: sectorsResolved,
+            gammaGeo,
+            qSpoilingFactor: qSpoil,
+            gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5)
+          }),
         });
         engineRef.current.setDisplayGain?.(1);
       }
