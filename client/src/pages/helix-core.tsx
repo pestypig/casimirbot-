@@ -428,12 +428,7 @@ export default function HelixCore() {
       // geometry
       hull,
 
-      // timing
-      lightCrossing: {
-        phase: 0, sectorIdx: systemMetrics?.currentSector ?? 0,
-        sectorCount: pipeline?.sectorCount ?? 400,       // total sectors
-        burst_ms, dwell_ms, tauLC_ms
-      },
+      // timing (removed ad-hoc lightCrossing - use live lc instead)
 
       // --- BOTH duties so Real/Show can choose ---
       dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,        // UI duty (visible)
@@ -761,6 +756,7 @@ export default function HelixCore() {
                         <WarpBubbleCompare
                           parameters={{
                             ...compareParams,
+                            lightCrossing: lc,                  // ✅ use the live loop
                             sectorCount: totalSectors,          // TOTAL (averaging)
                             sectors: concurrentSectors,         // concurrent (sweep)
                             dutyEffectiveFR,                    // already computed
