@@ -226,7 +226,9 @@ class WarpEngine {
 
         // bubble radius in scene units
         const axes = this.uniforms?.axesScene || this._lastAxesScene || [1,1,1];
-        const R = Math.max(axes[0], axes[1], axes[2], opts.spanHint || 1);
+        const axesMax = Math.max(axes[0], axes[1], axes[2]);
+        const hint = Math.max(1, opts.spanHint || 0);
+        const R = Math.min(hint, Math.max(axesMax, 1)); // never larger than hull radius
         this._lastFittedR = R;
 
         const baseMargin = 1.22;
@@ -675,16 +677,17 @@ class WarpEngine {
                 console.error("[WarpEngine] Uniform flush failed during mode switch:", e); 
             }
             
-            // For mode switches, skip the camera reset - it causes black screens
-            if (!isModeSwitch) {
-                // After big bursts (non-mode switches) ensure camera is sane
-                try { 
-                    this._resizeCanvasToDisplaySize(); 
-                    this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); 
-                } catch(e) {
-                    console.warn("[WarpEngine] Camera update failed:", e);
-                }
-            }
+            // After big bursts ensure camera is sane — fit to hull, not grid
+            try {
+                this._resizeCanvasToDisplaySize();
+                const axesR = (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
+                    ? Math.max(this.uniforms.axesClip[0], this.uniforms.axesClip[1], this.uniforms.axesClip[2])
+                    : (this._lastFittedR || 1);
+                const hasCamZ = Number.isFinite(this.currentParams?.cameraZ);
+                // _adjustCameraForSpan respects cameraZ if present, otherwise overhead-fit
+                hasCamZ ? this._adjustCameraForSpan(axesR)
+                        : this._applyOverheadCamera({ spanHint: axesR });
+            } catch {}
             
             // Always render immediately so we don't present a black frame
             try { 
