@@ -1110,9 +1110,9 @@ class WarpEngine {
 
             // Geometry amplitude should be monotonic with the slider and not instantly saturate.
             // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
-            const T_gain   = this.uniforms?.curvatureGainT ?? 0.375;
-            const boostMax = Math.max(1, this.uniforms?.curvatureBoostMax ?? 40);
-            const boostNow = 1 + T_gain * (boostMax - 1);
+            const T_gain       = this.uniforms?.curvatureGainT ?? 0.375;
+            const REF_BOOSTMAX = 40.0;                                  // fixed reference for "max slider"
+            const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
 
             // CPU-side parity protection (match shader's idea but keep it neutral by default)
             const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
@@ -1126,11 +1126,11 @@ class WarpEngine {
 
             // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
             // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
-            const magMax  = Math.log(1.0 + (baseMag * thetaScale * boostMax)          / zeroStop);      // slider @ max, no userGain
-            const magNow  = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);    // current slider × exaggeration
+            const magMax       = Math.log(1.0 + (baseMag * thetaScale * REF_BOOSTMAX) / zeroStop);
+            const magNow       = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);
 
             // Normalized geometry amplitude (monotonic in userGain AND boostNow)
-            const A_geom  = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
+            const A_geom       = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
 
             // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
             const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
@@ -1140,8 +1140,8 @@ class WarpEngine {
             if (mode === 'standby') {
                 disp = 0; // perfectly flat grid for standby mode
             } else {
-                // Normal displacement calculation synced to shader amplitude (A_vis)
-                disp = gridK * A_vis * wallWin * front * sgn * gaussian_local;
+                // geometry should follow A_geom (independent of exposure tone-mapping)
+                disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
                 
                 // No fixed bump; slider controls all visual scaling
                 
