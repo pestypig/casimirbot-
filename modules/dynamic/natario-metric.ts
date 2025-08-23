@@ -207,19 +207,13 @@ function calculateTimeAveragedCurvature(
  */
 function calculateStrobingEfficiency(
   sectorCount: number,
-  sectorDutyEff: number, // d_eff = duty/sectors
+  sectorDutyEff: number, // This is the FR duty (burst/dwell or duty/sectors)
   homogenizationRatio: number
 ): number {
-  // Base efficiency from sector tessellation
-  const tessellationEfficiency = Math.min(1.0, sectorCount / 100); // Saturates at 100 sectors
-  
-  // Effective duty cycle efficiency 
-  const dutyEfficiency = sectorDutyEff * Math.sqrt(sectorCount);
-  
-  // Default temporal efficiency penalty
+  const tessellationEfficiency = Math.min(1.0, sectorCount / 400); // saturate at your grid size
+  const dutyEfficiency = Math.sqrt(Math.max(0, sectorDutyEff));    // use √d, not d, to match β scaling
   const kTemp = 10.0;
   const temporalEfficiency = Math.exp(-kTemp * homogenizationRatio);
-  
   return tessellationEfficiency * dutyEfficiency * temporalEfficiency;
 }
 
