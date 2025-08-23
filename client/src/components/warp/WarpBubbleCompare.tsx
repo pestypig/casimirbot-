@@ -492,6 +492,10 @@ export default function WarpBubbleCompare({
     (async () => {
       if (!leftRef.current || !rightRef.current) return;
       try {
+        // StrictMode/HMR guard
+        if ((window as any).__warpCompareBusy) return;
+        (window as any).__warpCompareBusy = true;
+        
         const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
         if (cancelled) return;
 
@@ -556,8 +560,13 @@ export default function WarpBubbleCompare({
         } finally {
           busyRef.current = false;
         }
+      } catch (e) {
+        console.error('[WARP ENGINE] Creation failed:', { error: e, message: e?.message, stack: e?.stack, constructor: typeof (window as any).WarpEngine, leftCanvas: !!leftRef.current, rightCanvas: !!rightRef.current });
+      } finally {
+        (window as any).__warpCompareBusy = false;
+      }
         
-        ensureStrobeMux();
+      ensureStrobeMux();
 
         // Keep both panes in lockstep with Helix strobing
         const off = (window as any).__addStrobingListener?.(
