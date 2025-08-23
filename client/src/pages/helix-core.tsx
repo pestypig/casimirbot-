@@ -415,6 +415,7 @@ export default function HelixCore() {
     const base: any = {
       currentMode: effectiveMode,
       sectorStrobing: sectorsResolved,
+      sectors: sectorsResolved,                    // explicit sectors for proper scale divisor
 
       // live hull geometry
       hull,
@@ -432,7 +433,8 @@ export default function HelixCore() {
 
       // pipeline physics scalars (only when present)
       dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,
-      g_y:              num(pipeline?.gammaGeo)         ?? 26,
+      gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,      // ← add this for shader thetaScale
+      g_y:              num(pipeline?.gammaGeo)         ?? 26,      // (keep for backward compat)
       cavityQ:          num(pipeline?.qCavity)          ?? 1e9,
       sagDepth_nm:      num(pipeline?.sagDepth_nm)      ?? 16,
       tsRatio:          num(pipeline?.TS_ratio)         ?? 5.03e4,
