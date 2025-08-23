@@ -719,7 +719,6 @@ export default function HelixCore() {
                           queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
                         }
                       });
-                      setModeVersion(v => v + 1);
                       refetchMetrics();
                       setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
                     }
