@@ -441,8 +441,9 @@ export default function HelixCore() {
       dutyEffectiveFR:  num((pipeline as any)?.dutyEffective_FR) ?? num(pipeline?.dutyShip),
 
       // --- BOTH sector numbers ---
-      sectorCount:      num(pipeline?.sectorCount)      ?? 400,         // total (averaging)
-      sectorStrobing:   num(pipeline?.sectorStrobing)   ?? 1,           // concurrent (sweep)
+      sectorCount: totalSectors,          // TOTAL (averaging)
+      sectors: concurrentSectors,         // concurrent (sweep)
+      sectorStrobing: sectorsUI,          // legacy compatibility
 
       // physics amps
       gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
@@ -455,10 +456,10 @@ export default function HelixCore() {
       lockFraming: true,
     };
   }, [
-    effectiveMode, hull, systemMetrics?.currentSector,
+    effectiveMode, hull, systemMetrics?.currentSector, totalSectors, concurrentSectors,
     pipeline?.modulationFreq_GHz, pipeline?.hull?.wallThickness_m,
     pipeline?.dutyCycle, pipeline?.dutyShip, pipeline?.sectorCount, pipeline?.sectorStrobing,
-    pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
+    pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck, sectorsUI
   ]);
 
   // Create truly separate payloads (no shared nested refs)
@@ -763,6 +764,10 @@ export default function HelixCore() {
                           key={`compare-${effectiveMode}-v${modeVersion}`}
                           parameters={{
                             ...compareParams,
+                            sectorCount: totalSectors,          // TOTAL (averaging)
+                            sectors: concurrentSectors,         // concurrent (sweep)
+                            dutyEffectiveFR,                    // already computed
+                            dutyCycle: dutyUI,                  // UI duty
                             viewAvg: true,              // keep FR-averaged amplitude in both panes
                             colorMode: "theta",         // consistent color
                             lockFraming: true,          // no auto zoom change with gain
