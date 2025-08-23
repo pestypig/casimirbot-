@@ -387,15 +387,17 @@ const applyShow = (
   const t = clamp01(T);
   const b = Math.max(1, boostMax);
 
-  // If your engine prefers numeric color modes, optionally map:
-  // const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
+  // Use numeric color mode for engine compatibility
+  const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
+
+  console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
 
   pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
     physicsParityMode: false,   // enable amplification
-    colorMode,                  // or colorModeIndex
+    colorMode: colorModeIndex,  // use numeric index
     curvatureGainT: t,
     curvatureBoostMax: b,
     curvatureGainDec: Math.max(0, Math.min(8, decades)),
@@ -413,6 +415,11 @@ const applyShow = (
     console.warn('[SHOW] context lost – attempting restore');
     e.gl.getExtension?.('WEBGL_lose_context')?.restoreContext?.();
   }
+
+  // Debug uniforms that actually landed
+  setTimeout(() => {
+    console.log('[SHOW] engine uniforms:', e?.uniforms || e?.params || 'no uniforms found');
+  }, 100);
 };
 
 /* ---------------- Component ---------------- */
