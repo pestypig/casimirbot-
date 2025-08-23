@@ -799,7 +799,7 @@ class WarpEngine {
         
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
         // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
-        const thetaScale = this.uniforms?.thetaScale ?? 1.0;
+        const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
         const mode = (bubbleParams.currentMode || 'hover').toLowerCase();
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
         const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
@@ -1174,7 +1174,7 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
         gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
         gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
-        gl.uniform1i(this.gridUniforms.colorMode, this.uniforms?.colorMode ?? 1);
+        gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
         gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
         
         // Render as lines for better visibility
