@@ -245,14 +245,19 @@ function scrubOverlays(e: any) {
 }
 
 /* ---------------- Safe uniform push (fixes null.length) ---------------- */
-function pushUniformsWhenReady(e: any, payload: any, retries = 60) {
+function pushUniformsWhenReady(e: any, payload: any, retries = 24) {
   if (!e) return;
-  const ready = !!(e.gridVertices && e.originalGridVertices);
-  if (ready) {
-    try { e.updateUniforms?.(payload); return; } catch (err) { console.warn('[pushUniforms] update failed', err); }
-  }
+
+  const tryPush = () => {
+    try { e.updateUniforms?.(payload); } catch {}
+    try { e.setParams?.(payload); }      catch {}
+  };
+
+  // Push immediately (don't gate on internal fields)
+  tryPush();
+
+  // And again for a few frames to catch late init / resize
   if (retries > 0) requestAnimationFrame(() => pushUniformsWhenReady(e, payload, retries - 1));
-  else console.warn('[pushUniforms] gave up pushing uniforms');
 }
 
 /* ---------------- Pane configurators ---------------- */
@@ -270,17 +275,18 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
 
 const applyReal = (
   e: any,
-  shared: ReturnType<typeof frameFromHull>,
+  sharedIn: ReturnType<typeof frameFromHull>,
   canvas: HTMLCanvasElement,
   colorMode: 'theta'|'shear'|'solid'
 ) => {
-  primeOnce(e, shared, colorMode);
+  primeOnce(e, sharedIn, colorMode);
 
+  let shared = sharedIn;
   const axesOK = shared?.axesScene?.every?.(n => Number.isFinite(n) && Math.abs(n) > 0);
   if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
-  // parity: absolutely neutral
+
   pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
@@ -289,14 +295,13 @@ const applyReal = (
     colorMode,
     vizGain: 1,
     displayGain: 1,
-    exposure: 5.0,         // was 3.8 - temporary debug visibility boost
-    zeroStop: 1e-7,        // was 1e-6 - capture smaller values
+    exposure: 4.2,      // slightly up from 3.8 but not blinding
+    zeroStop: 1e-6,     // restore parity default
     cosmeticLevel: 0,
     curvatureGainDec: 0,
     curvatureGainT: 0,
     curvatureBoostMax: 1,
-    epsilonTilt: 0,
-    betaTiltVec: [0,0,0],
+    // ⚠ don't override tilt here; let upstream params decide
   });
   e.setDisplayGain?.(1);
   e.requestRewarp?.();
