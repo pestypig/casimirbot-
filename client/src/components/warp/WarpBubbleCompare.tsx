@@ -59,6 +59,18 @@ function ensureCanvasSize(canvas: HTMLCanvasElement) {
 
 const safeCamZ = (cv: number) => (Number.isFinite(cv) && Math.abs(cv) > 1e-9) ? cv : 2.0;
 
+function attachGLContextGuards(canvas: HTMLCanvasElement, recreate: () => void) {
+  canvas.addEventListener('webglcontextlost', (ev:any) => {
+    ev.preventDefault?.();
+    console.warn('[WARP] WebGL context lost — recreating…');
+    recreate();
+  }, false);
+  canvas.addEventListener('webglcontextrestored', () => {
+    console.warn('[WARP] WebGL context restored');
+    recreate();
+  }, false);
+}
+
 let showSafeFallbackDone = false;
 
 function applyShowSafe(e:any, payload:any) {
@@ -387,6 +399,10 @@ export default function WarpBubbleCompare({
           
           leftEngine.current  = new WarpCtor(leftRef.current);
           rightEngine.current = new WarpCtor(rightRef.current);
+          
+          // Add WebGL context guards for resilience
+          attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._resize?.());
+          attachGLContextGuards(rightRef.current!, () => rightEngine.current?._resize?.());
           
           console.log('[WARP ENGINE] Engines created, triggering resize');
           leftEngine.current?._resize?.();
