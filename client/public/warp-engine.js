@@ -167,20 +167,25 @@ class WarpEngine {
         this._setupCamera();
         this._initializeGrid();
         
-        // Expose strobing sync function globally
-        window.setStrobingState = ({ sectorCount, currentSector, split }) => {
-            try {
-                this.strobingState.sectorCount  = Math.max(1, sectorCount|0);
-                this.strobingState.currentSector= Math.max(0, currentSector|0) % this.strobingState.sectorCount;
-                // update visual strobing immediately
-                this.updateUniforms({
-                  sectors: this.strobingState.sectorCount,
-                  split: Number.isFinite(split) ? Math.max(0, Math.min(this.strobingState.sectorCount-1, split|0)) : this.uniforms?.split
-                });
-            } catch (e) {
-                console.warn("WarpEngine.setStrobingState error:", e);
-            }
+        const strobeHandler = ({ sectorCount, currentSector, split }) => {
+          try {
+            this.strobingState.sectorCount   = Math.max(1, sectorCount|0);
+            this.strobingState.currentSector = Math.max(0, currentSector|0) % this.strobingState.sectorCount;
+            this.updateUniforms({
+              sectors: this.strobingState.sectorCount,
+              split: Number.isFinite(split) ? Math.max(0, Math.min(this.strobingState.sectorCount-1, split|0)) : this.uniforms?.split
+            });
+          } catch(e){ console.warn("WarpEngine strobe error:", e); }
         };
+        if (typeof window.__addStrobingListener === 'function') {
+          this._offStrobe = window.__addStrobingListener(strobeHandler);
+        } else {
+          // create a mux once
+          const listeners = (window.__strobeListeners = new Set());
+          window.setStrobingState = payload => { for (const fn of listeners) { try{ fn(payload); }catch{} } };
+          window.__addStrobingListener = fn => { listeners.add(fn); return () => listeners.delete(fn); };
+          this._offStrobe = window.__addStrobingListener(strobeHandler);
+        }
         // Expose curvature gain setter for the UI slider (0..8 decades)
         this.__warp_setGainDec = (dec, max = 40) => {
             try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
@@ -1745,7 +1750,7 @@ class WarpEngine {
         if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
             delete window.__warp_setCosmetic;
         }
-        delete window.setStrobingState;
+        try { this._offStrobe?.(); } catch {}
         
         // Clean up WebGL resources
         const gl = this.gl;
