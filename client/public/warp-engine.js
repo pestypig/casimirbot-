@@ -664,12 +664,18 @@ class WarpEngine {
             } catch(e) { 
                 console.warn("uniform flush failed", e); 
             }
-            // After big bursts (e.g., mode switch) ensure camera is sane
-            try { 
-                this._resizeCanvasToDisplaySize(); 
-                this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); 
-            } catch {}
-            // Draw immediately so we don't present a black frame
+            
+            // For mode switches, skip the camera reset - it causes black screens
+            const isModeSwitch = !!p.currentMode;
+            if (!isModeSwitch) {
+                // After big bursts (non-mode switches) ensure camera is sane
+                try { 
+                    this._resizeCanvasToDisplaySize(); 
+                    this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); 
+                } catch {}
+            }
+            
+            // Always render immediately so we don't present a black frame
             try { 
                 this._render(); 
             } catch {}
@@ -755,8 +761,21 @@ class WarpEngine {
           tiltGain: this.uniforms.tiltGain ?? 0.55
         };
 
-        // Rebuild mesh/attributes with the new geometry/camera assumptions
-        this._updateGrid();
+        // Only rebuild mesh if geometry actually changed (not for mode switches)
+        const geoChanged = (
+            parameters.hullAxes && (
+                parameters.hullAxes[0] !== this.uniforms.hullAxes[0] ||
+                parameters.hullAxes[1] !== this.uniforms.hullAxes[1] ||
+                parameters.hullAxes[2] !== this.uniforms.hullAxes[2]
+            )
+        ) || (
+            parameters.gridSpan && parameters.gridSpan !== this.uniforms.gridSpan
+        );
+        
+        if (geoChanged) {
+            console.log('[WarpEngine] Geometry changed, rebuilding grid');
+            this._updateGrid();
+        }
     }
     
     _calculateModeEffects(params) {
@@ -777,9 +796,6 @@ class WarpEngine {
     }
 
     _updateGrid() {
-        console.log("_updateGrid called");
-        console.log("Updating", this.gridVertices.length / 3, "grid vertices...");
-        
         if (!this.originalGridVertices) {
             console.error("No original vertices stored!");
             return;
@@ -805,8 +821,6 @@ class WarpEngine {
             gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         }
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        
-        console.log("Grid vertices updated and uploaded to GPU");
     }
 
     // Authentic Natário spacetime curvature implementation
