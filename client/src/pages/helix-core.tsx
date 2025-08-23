@@ -58,14 +58,17 @@ declare global {
 // Install a safe wrapper once so any internal visualizer bug can't crash the page
 if (typeof window !== "undefined") {
   const w = window as any;
-  const orig = w.setStrobingState;
-  if (typeof orig !== "function") {
-    w.setStrobingState = () => {}; // no-op until the visualizer mounts
-  } else {
-    w.setStrobingState = (args: any) => {
-      try { orig(args); }
-      catch (err) { console.warn("[WarpVisualizer] setStrobingState failed (ignored):", err); }
-    };
+  if (!w.__strobePatched) {
+    const orig = w.setStrobingState;
+    if (typeof orig !== "function") {
+      w.setStrobingState = () => {}; // no-op until a visualizer mounts
+    } else {
+      w.setStrobingState = (args: any) => {
+        try { orig(args); }
+        catch (err) { console.warn("[HELIX] setStrobingState wrapper swallowed error:", err); }
+      };
+    }
+    w.__strobePatched = true;
   }
 }
 
