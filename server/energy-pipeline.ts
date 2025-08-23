@@ -11,6 +11,7 @@ import { HBAR, C, PI } from "./physics-const.js";
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
 import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
+import { toPipelineStressEnergy } from '../modules/dynamic/stress-energy-equations.js';
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
 export type HullAxes = { a: number; b: number; c: number };
@@ -622,6 +623,33 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     (state as any).dynamic = dyn;
   } catch (e) {
     console.warn('Dynamic Casimir calculation failed:', e);
+  }
+  
+  // Calculate stress-energy tensor from pipeline parameters
+  try {
+    const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+    const a = hullGeom.Lx_m / 2;
+    const b = hullGeom.Ly_m / 2;
+    const c = hullGeom.Lz_m / 2;
+    const geomR = Math.cbrt(a * b * c); // meters
+    
+    const SE = toPipelineStressEnergy({
+      gap_nm: state.gap_nm ?? 1,
+      gammaGeo: state.gammaGeo ?? 26,
+      cavityQ: state.qCavity ?? 1e9,
+      gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
+      qSpoilingFactor: state.qSpoilingFactor ?? 1,
+      dutyCycle: state.dutyCycle,
+      sectorStrobing: state.sectorStrobing,
+      dutyEffectiveFR: (state as any).dutyEffectiveFR,
+      lightCrossing: (state as any).lightCrossing,
+      R_geom_m: geomR
+    });
+    
+    // Expose stress-energy tensor components in the shared snapshot
+    (state as any).stressEnergy = SE;
+  } catch (e) {
+    console.warn('Stress-energy calculation failed:', e);
   }
   
   return state;
