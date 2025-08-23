@@ -68,16 +68,14 @@ export function calculateNatarioMetric(
     d_eff
   );
   
-  // Natário shift amplitude β with hull geometry
-  const hullDimensions = { 
-    a: 503.5, b: 132, c: 86.5 // Default needle hull dimensions
-  };
-  const hullRadius = params.radius * PHYSICS_CONSTANTS.UM_TO_M;
+  // --- hull geometry in meters from pipeline
+  const hull = (params as any).hull ?? { a: 503.5, b: 132, c: 86.5 };
+  const hullRadiusM = Math.cbrt(hull.a * hull.b * hull.c); // effective radius ~ geometric mean
   const natarioShiftAmplitude = calculateNatarioShift(
     stressEnergyT00,
-    hullRadius,
+    hullRadiusM,
     d_eff,
-    hullDimensions
+    { a: hull.a, b: hull.b, c: hull.c }
   );
   
   // Time-averaged curvature with configurable kernel
@@ -113,13 +111,13 @@ function calculateStressEnergyTensor(
   params: SimulationParameters,
   sectorDutyEff: number // effective duty d_eff = duty/sectors
 ): { stressEnergyT00: number; stressEnergyT11: number } {
-  // Extract tile geometry from parameters
-  const tileArea = 0.05 * 0.05; // 5cm × 5cm tile from config
-  const gapM = params.gap * PHYSICS_CONSTANTS.NM_TO_M;
-  const tileVolume = Math.max(1e-18, tileArea * gapM); // clamp to avoid division by zero
+  // --- tile geometry (prefer pipeline)
+  const tileArea = (params as any).tileArea_m2 ?? 0.05 * 0.05;
+  const gapM     = Number(params.gap ?? (params as any).gap_nm) * PHYSICS_CONSTANTS.NM_TO_M;
+  const tileVolume = Math.max(1e-18, tileArea * gapM);
+  const totalTiles = Math.max(1, (params as any).N_tiles ?? 1.96e9);
   
   // Signed energy density from pipeline (negative for Casimir)
-  const totalTiles = Math.max(1, 1.96e9); // Default tile count
   const rho = casimirEnergy / totalTiles / tileVolume;
   
   const gammaGeo  = params.dynamicConfig?.gammaGeo  ?? (params as any).gammaGeo  ?? 26;
