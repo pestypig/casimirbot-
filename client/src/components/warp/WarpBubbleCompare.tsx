@@ -397,7 +397,10 @@ const applyShow = (
     cameraZ: camZ,
     lockFraming: true,
     physicsParityMode: false,   // enable amplification
-    colorMode: colorModeIndex,  // use numeric index
+    // Force numeric (engine canonical) + provide synonyms
+    colorMode: colorModeIndex,
+    colorModeIndex,
+    colorModeName: colorMode,
     curvatureGainT: t,
     curvatureBoostMax: b,
     curvatureGainDec: Math.max(0, Math.min(8, decades)),
