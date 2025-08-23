@@ -437,7 +437,7 @@ export default function HelixCore() {
       powerAvg_MW:      num(pipeline?.P_avg)            ?? 83.3,
       exoticMass_kg:    num(pipeline?.M_exotic)         ?? 1405,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 3.83e1,
+      gammaVanDenBroeck: num(pipeline?.gammaVanDenBroeck) ?? 2.86e5,
     };
 
     return base;
@@ -770,7 +770,7 @@ export default function HelixCore() {
                       vShip={1.0}
                       gammaGeo={pipeline?.gammaGeo ?? 26}
                       qSpoilingFactor={qSpoilUI}
-                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 3.83e1}
+                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 2.86e5}
                       dutyCycle={dutyUI}
                       sectors={sectorsResolved}   // ⬅️ use resolved sectors
                       viewAvg={true}
@@ -778,7 +778,7 @@ export default function HelixCore() {
                       refParams={{
                         gammaGeo: 26,
                         qSpoilingFactor: 1,
-                        gammaVdB: 3.83e1,
+                        gammaVdB: 2.86e5,
                         dutyCycle: 0.14,
                         sectors: 1,
                         viewAvg: true,
@@ -1129,7 +1129,7 @@ export default function HelixCore() {
                           γ<sub>VdB</sub>: {fexp(
                             (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
                             1,
-                            '3.8e+1'
+                            '2.86e+5'
                           )}
                         </span>
                       </TooltipTrigger>
