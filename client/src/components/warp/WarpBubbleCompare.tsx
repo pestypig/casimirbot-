@@ -770,13 +770,23 @@ export default function WarpBubbleCompare({
     
     // Debug mode change
     if (parityParams?.currentMode || showParams?.currentMode) {
+      const currentMode = parityParams?.currentMode || showParams?.currentMode;
       console.log('[WarpBubbleCompare] Mode update:', {
-        mode: parityParams?.currentMode || showParams?.currentMode,
+        mode: currentMode,
         leftEngine: !!leftEngine.current,
         rightEngine: !!rightEngine.current,
         parityPhys: parityPhys,
-        showPhys: showPhys
+        showPhys: showPhys,
+        shared: shared,
+        leftCanvasVisible: leftRef.current?.style.display !== 'none',
+        rightCanvasVisible: rightRef.current?.style.display !== 'none'
       });
+      
+      // Add currentMode to the physics payload for debugging
+      if (currentMode) {
+        (parityPhys as any).currentMode = currentMode;
+        (showPhys as any).currentMode = currentMode;
+      }
     }
     
     // Also push FR-window/light-crossing controls if present
@@ -837,7 +847,7 @@ export default function WarpBubbleCompare({
     
     // Apply show with cosmetic safety fallback
     applyShow(rightEngine.current, shared, rightRef.current!, showPayload.colorMode, showPayload);
-    const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode] ?? 1;
+    const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode as keyof { solid:0, theta:1, shear:2 }] ?? 1;
     applyShowSafe(rightEngine.current, {
       ...showPayload,
       colorMode: colorModeIndex,
@@ -849,8 +859,8 @@ export default function WarpBubbleCompare({
     scrubOverlays(rightEngine.current);
     
     // Verify physics scalars on updates
-    check('REAL-UPDATE', { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene)) });
-    check('SHOW-UPDATE', { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(rightRef.current!, shared.axesScene)) });
+    check('REAL-UPDATE', { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene)) });
+    check('SHOW-UPDATE', { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(rightRef.current!, shared.axesScene)) });
   }, [
     parityParams?.hull?.a, parityParams?.hull?.b, parityParams?.hull?.c,
     showParams?.hull?.a, showParams?.hull?.b, showParams?.hull?.c,
@@ -877,6 +887,57 @@ export default function WarpBubbleCompare({
   // Debug probe to verify physics parameters are changing with mode switches
   useEffect(() => {
     if (!leftEngine.current) return;
+    
+    // Add diagnostic function to window for debugging
+    (window as any).__debugWarpEngines = () => {
+      const leftState = leftEngine.current ? {
+        isLoaded: leftEngine.current.isLoaded,
+        hasProgram: !!leftEngine.current.gridProgram,
+        uniforms: leftEngine.current.uniforms,
+        isRendering: leftEngine.current._raf !== null,
+        canvas: {
+          width: leftRef.current?.width,
+          height: leftRef.current?.height,
+          display: leftRef.current?.style.display
+        }
+      } : null;
+      
+      const rightState = rightEngine.current ? {
+        isLoaded: rightEngine.current.isLoaded,
+        hasProgram: !!rightEngine.current.gridProgram,
+        uniforms: rightEngine.current.uniforms,
+        isRendering: rightEngine.current._raf !== null,
+        canvas: {
+          width: rightRef.current?.width,
+          height: rightRef.current?.height,
+          display: rightRef.current?.style.display
+        }
+      } : null;
+      
+      console.log('=== WARP ENGINE DEBUG ===');
+      console.log('LEFT (REAL/Parity):', leftState);
+      console.log('RIGHT (SHOW/Boosted):', rightState);
+      
+      // Try to force a render
+      console.log('Attempting force render...');
+      leftEngine.current?._render?.();
+      rightEngine.current?._render?.();
+      
+      return { left: leftState, right: rightState };
+    };
+    
+    // Also add a force restart function
+    (window as any).__restartWarpEngines = () => {
+      console.log('Force restarting warp engines...');
+      leftEngine.current?.stop?.();
+      rightEngine.current?.stop?.();
+      setTimeout(() => {
+        leftEngine.current?.start?.();
+        rightEngine.current?.start?.();
+        console.log('Engines restarted');
+      }, 100);
+    };
+    
     const p = physicsPayload(parityParams, 'fr');
     console.log('[REAL] thetaScale=', p.thetaScale,
                 'γ_geo=', p.gammaGeo,

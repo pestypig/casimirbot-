@@ -655,30 +655,46 @@ class WarpEngine {
             this._flushId = 0;
             
             // Debug mode switch
-            if (p.currentMode) {
-                console.log('[WarpEngine] Mode switch detected:', p.currentMode);
+            const isModeSwitch = !!p.currentMode;
+            if (isModeSwitch) {
+                console.log('[WarpEngine] Mode switch detected:', {
+                    mode: p.currentMode,
+                    canvas: this.canvas?.id || 'unknown',
+                    isLoaded: this.isLoaded,
+                    hasProgram: !!this.gridProgram,
+                    uniforms: this.uniforms
+                });
             }
             
             try { 
                 this._applyUniformsNow(p); 
+                if (isModeSwitch) {
+                    console.log('[WarpEngine] Uniforms applied after mode switch');
+                }
             } catch(e) { 
-                console.warn("uniform flush failed", e); 
+                console.error("[WarpEngine] Uniform flush failed during mode switch:", e); 
             }
             
             // For mode switches, skip the camera reset - it causes black screens
-            const isModeSwitch = !!p.currentMode;
             if (!isModeSwitch) {
                 // After big bursts (non-mode switches) ensure camera is sane
                 try { 
                     this._resizeCanvasToDisplaySize(); 
                     this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); 
-                } catch {}
+                } catch(e) {
+                    console.warn("[WarpEngine] Camera update failed:", e);
+                }
             }
             
             // Always render immediately so we don't present a black frame
             try { 
                 this._render(); 
-            } catch {}
+                if (isModeSwitch) {
+                    console.log('[WarpEngine] Render completed after mode switch');
+                }
+            } catch(e) {
+                console.error("[WarpEngine] Render failed after mode switch:", e);
+            }
         });
     }
     
@@ -775,6 +791,8 @@ class WarpEngine {
         if (geoChanged) {
             console.log('[WarpEngine] Geometry changed, rebuilding grid');
             this._updateGrid();
+        } else if (parameters.currentMode) {
+            console.log('[WarpEngine] Mode change without geometry change - skipping grid rebuild');
         }
     }
     
@@ -1270,6 +1288,13 @@ class WarpEngine {
         const gl = this.gl;
         // Add safety checks to prevent "stuck black" state
         if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+            console.warn('[WarpEngine] Render blocked - missing requirements:', {
+                gl: !!gl,
+                isLoaded: this.isLoaded,
+                gridProgram: !!this.gridProgram,
+                gridUniforms: !!this.gridUniforms,
+                gridAttribs: !!this.gridAttribs
+            });
             return;
         }
         // Check for lost context and try to restore
