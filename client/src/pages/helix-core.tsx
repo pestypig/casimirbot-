@@ -430,9 +430,8 @@ export default function HelixCore() {
 
       // timing (removed ad-hoc lightCrossing - use live lc instead)
 
-      // --- BOTH duties so Real/Show can choose ---
+      // --- UI duty (FR duty computed separately and added at call-site) ---
       dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,        // UI duty (visible)
-      dutyEffectiveFR:  num((pipeline as any)?.dutyEffective_FR) ?? num(pipeline?.dutyShip),
 
       // --- BOTH sector numbers ---
       sectorCount: totalSectors,          // TOTAL (averaging)
@@ -452,7 +451,7 @@ export default function HelixCore() {
   }, [
     effectiveMode, hull, systemMetrics?.currentSector, totalSectors, concurrentSectors,
     pipeline?.modulationFreq_GHz, pipeline?.hull?.wallThickness_m,
-    pipeline?.dutyCycle, pipeline?.dutyShip, pipeline?.sectorCount, pipeline?.sectorStrobing,
+    pipeline?.dutyCycle, pipeline?.sectorCount, pipeline?.sectorStrobing,
     pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck, sectorsUI
   ]);
 
