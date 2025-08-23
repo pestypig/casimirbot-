@@ -1,0 +1,49 @@
+Make compareParams carry everything the engine needs
+
+Patch (HelixCore): enrich your compareParams so both duty paths and both sector numbers are present, plus a correct light-crossing object built from pipeline timing.
+
+const compareParams = useMemo(() => {
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+
+  // Light-crossing from pipeline (wall scale) + macro timing
+  const fHz = num(pipeline?.modulationFreq_GHz) ? (pipeline!.modulationFreq_GHz! * 1e9) : 15e9;
+  const Tm_ms = 1000 / fHz;                         // mechanical period (ms)
+  const burst_ms = 0.01 * Tm_ms;                    // 1% local ON-window (paper)
+  const dwell_ms = Tm_ms;                           // “cycle” here = modulation period
+  const tauLC_ms = ((pipeline?.hull?.wallThickness_m ?? 1.0) / 299792458) * 1000;
+
+  return {
+    currentMode: effectiveMode,
+
+    // geometry
+    hull,
+
+    // timing
+    lightCrossing: {
+      phase: 0, sectorIdx: systemMetrics?.currentSector ?? 0,
+      sectorCount: pipeline?.sectorCount ?? 400,       // total sectors
+      burst_ms, dwell_ms, tauLC_ms
+    },
+
+    // --- BOTH duties so Real/Show can choose ---
+    dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,        // UI duty (visible)
+    dutyEffectiveFR:  num((pipeline as any)?.dutyEffective_FR) ?? num(pipeline?.dutyShip),
+
+    // --- BOTH sector numbers ---
+    sectorCount:      num(pipeline?.sectorCount)      ?? 400,         // total (averaging)
+    sectorStrobing:   num(pipeline?.sectorStrobing)   ?? 1,           // concurrent (sweep)
+
+    // physics amps
+    gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
+    qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
+    gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 2.86e5,
+
+    // viewer niceties
+    viewAvg: true,
+    colorMode: "theta" as const,
+    lockFraming: true,
+  };
+}, [/* same deps as you already have, plus pipeline?.sectorCount, pipeline?.dutyShip */]);
+
+
+And keep your split real/show payloads as you do now (with physicsParityMode set appropriately).

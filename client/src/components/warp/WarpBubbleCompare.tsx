@@ -49,44 +49,49 @@ function ensureStrobeMux() {
 }
 
 /* ---------------- Physics scalar helpers ---------------- */
-function resolveThetaScale(p: any) {
+type DutySource = 'fr' | 'ui';
+
+function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
   if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
 
   const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
   const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
   const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
-  const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? p?.sectorStrobing ?? 1));
-  
-  // Prefer FR-sampled duty if available
-  let duty = Number(p?.dutyCycle ?? 0.14);
-  if (Number.isFinite(p?.dutyEffectiveFR)) {
-    duty = Number(p.dutyEffectiveFR);
-  } else if (p?.lightCrossing &&
-             Number.isFinite(p.lightCrossing.burst_ms) &&
-             Number.isFinite(p.lightCrossing.dwell_ms) &&
-             p.lightCrossing.dwell_ms > 0) {
-    duty = p.lightCrossing.burst_ms / p.lightCrossing.dwell_ms;
+
+  // choose duty based on source
+  let duty = Number(p?.dutyCycle ?? 0.14);            // UI duty (visible)
+  if (dutySource === 'fr') {
+    if (Number.isFinite(p?.dutyEffectiveFR)) duty = Number(p.dutyEffectiveFR);
+    else if (Number.isFinite(p?.dutyEffective_FR)) duty = Number(p.dutyEffective_FR);
+    else if (p?.lightCrossing && Number.isFinite(p.lightCrossing.burst_ms) &&
+             Number.isFinite(p.lightCrossing.dwell_ms) && p.lightCrossing.dwell_ms > 0) {
+      duty = p.lightCrossing.burst_ms / p.lightCrossing.dwell_ms / Math.max(1, (p.sectorCount ?? p.sectors ?? 1));
+    }
   }
+
+  // IMPORTANT: use total sectors for averaging, not concurrent strobing
+  const sectors  = Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400));
   const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
   const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
   const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
   const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
   
   // Debug: Track exact thetaScale calculation
-  console.log('[REAL] thetaScale=' + result.toExponential(2) + 
+  console.log(`[${dutySource.toUpperCase()}] thetaScale=` + result.toExponential(2) + 
     ` (γGeo=${gammaGeo}, qSpoil=${qSpoil}, γVdB=${gammaVdB.toExponential(2)}, duty=${duty}, sectors=${sectors})`);
   
   return result;
 }
 
-function physicsPayload(p: any) {
+function physicsPayload(p: any, dutySource: DutySource = 'fr') {
   return {
     // the scalar the engine/shader both expect
-    thetaScale: resolveThetaScale(p),
+    thetaScale: resolveThetaScale(p, dutySource),
 
     // pieces (the CPU path in WarpEngine logs/uses these for diagnostics)
     dutyCycle: Number(p?.dutyCycle ?? 0.14),
-    sectors: Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? 1)),
+    sectors: Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400)), // total
+    sectorCount: Math.max(1, Number(p?.sectorCount ?? 400)),
     viewAvg: p?.viewAvg ?? true,
     gammaGeo: Number(p?.gammaGeo ?? p?.g_y ?? 26),
     deltaAOverA: Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
@@ -357,8 +362,10 @@ export default function WarpBubbleCompare({
 
         const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
 
-        const parityPhys = physicsPayload(parityParams);
-        const showPhys = physicsPayload(showParams);
+        // REAL (parity): FR duty (conservative)
+        const parityPhys = physicsPayload(parityParams, 'fr');
+        // SHOW (boosted): UI duty (visibly mode-dependent)  
+        const showPhys = physicsPayload(showParams, 'ui');
         
         // Debug: Track exact physics parameters being passed
         console.log('[REAL] parityParams gammaGeo/g_y/sectors:', parityParams?.gammaGeo, parityParams?.g_y, parityParams?.sectors);
