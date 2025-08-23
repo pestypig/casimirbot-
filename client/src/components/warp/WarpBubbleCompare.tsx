@@ -456,9 +456,10 @@ export default function WarpBubbleCompare({
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
           
-          // Force immediate initialization
-          leftEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: 2.0});
-          rightEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: 2.0});
+          // Force immediate initialization with bulletproof cameraZ
+          const initCamZ = safeCamZ(2.0);  // fallback to safe default
+          leftEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: initCamZ});
+          rightEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: initCamZ});
           
           console.log('[WARP ENGINE] Initialization complete, both engines ready');
           
