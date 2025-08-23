@@ -309,6 +309,15 @@ useEffect(() => {
 
     const parity = !!parameters.physicsParityMode; // hoist this near the top
 
+    // Derive seeded axes/clip/span from hull (prevents first-frame NaNs/black)
+    const a = num(hull.a, 503.5), b = num(hull.b, 132), c = num(hull.c, 86.5);
+    const s = 1 / Math.max(a, b, c, 1e-9);
+    const axesSceneSeed: [number,number,number] = [a*s, b*s, c*s];
+    const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
+
+    // Harden gammaVdB default (match AmplificationPanel & pipeline)
+    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 2.86e5);
+
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
       exposure: Math.max(1.0, VIS_LOCAL.exposureDefault),
@@ -321,15 +330,15 @@ useEffect(() => {
       gammaGeo,
       Qburst: qCavity,
       deltaAOverA: qSpoil,
-      gammaVdB: num(parameters.gammaVanDenBroeck, 3.83e1),
+      gammaVdB: gammaVdBDefault,           // << was 3.83e1; now 2.86e5 default
 
-      currentMode: mode,
-      sectors: sectorsResolved, split: splitResolved,
-      axesScene: parameters.axesScene,
-      hullAxes: [num(hull.a), num(hull.b), num(hull.c)],
+      // Seed framing so engine has non-null axes in first frame
+      axesScene: axesSceneSeed,
+      axesClip:  axesSceneSeed,
+      hullAxes:  [a,b,c] as [number,number,number],
+      gridSpan:  parameters.gridSpan ?? spanSeed,
+
       wallWidth: wallNorm,
-
-      gridSpan: parameters.gridSpan,
       physicsParityMode: !!parameters.physicsParityMode,
 
       epsilonTilt: epsilonTiltResolved,
@@ -339,6 +348,15 @@ useEffect(() => {
 
     // single bootstrap: fit + all uniforms in one shot
     engine.bootstrap(uniforms);
+    
+    // Prime θ-scale for the first frame (single source of truth)
+    engine.updateUniforms({ thetaScale: resolveThetaScale({
+      dutyCycle: dutyResolved,
+      sectors: sectorsResolved,
+      gammaGeo,
+      qSpoilingFactor: qSpoil,
+      gammaVdB: gammaVdBDefault
+    })});
     
     // Apply viz overrides if provided
     engine.updateUniforms({
