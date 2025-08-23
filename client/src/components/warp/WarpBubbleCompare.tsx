@@ -339,12 +339,39 @@ export default function WarpBubbleCompare({
         const WarpCtor = await ensureWarpEngineCtor();
         if (cancelled) return;
 
-        leftEngine.current  = new WarpCtor(leftRef.current);
-        rightEngine.current = new WarpCtor(rightRef.current);
+        try {
+          console.log('[WARP ENGINE] Attempting to create engines with:', {
+            constructor: typeof WarpCtor,
+            leftCanvas: !!leftRef.current,
+            rightCanvas: !!rightRef.current,
+            leftCanvasSize: leftRef.current ? `${leftRef.current.width}x${leftRef.current.height}` : 'N/A',
+            rightCanvasSize: rightRef.current ? `${rightRef.current.width}x${rightRef.current.height}` : 'N/A'
+          });
+          
+          leftEngine.current  = new WarpCtor(leftRef.current);
+          console.log('[WARP ENGINE] Left engine created:', !!leftEngine.current);
+          
+          rightEngine.current = new WarpCtor(rightRef.current);
+          console.log('[WARP ENGINE] Right engine created:', !!rightEngine.current);
+          
+          // Force immediate initialization
+          leftEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: 2.0});
+          rightEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: 2.0});
+          
+          console.log('[WARP ENGINE] Initialization complete, both engines ready');
+          
+        } catch (error) {
+          console.error('[WARP ENGINE] Creation failed:', {
+            error: error,
+            message: error?.message,
+            stack: error?.stack,
+            constructor: typeof WarpCtor,
+            leftCanvas: !!leftRef.current,
+            rightCanvas: !!rightRef.current
+          });
+          return;
+        }
         
-        // Debug: Constructor and engine creation
-        console.log('[SHOW] Ctor?', typeof WarpCtor, 'engine?', !!rightEngine.current);
-        console.log('[SHOW] script present?', !!(window as any).WarpEngine);
         ensureStrobeMux();
 
         // Keep both panes in lockstep with Helix strobing
@@ -366,18 +393,30 @@ export default function WarpBubbleCompare({
         (leftEngine.current  as any).__strobeOff = off;
         (rightEngine.current as any).__strobeOff = off;
 
-        const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
+        const shared = frameFromHull(base?.hull, base?.gridSpan);
 
-        // REAL (parity): FR duty (conservative)
-        const parityPhys = physicsPayload(parityParams, 'fr');
-        // SHOW (boosted): UI duty (visibly mode-dependent)  
-        const showPhys = physicsPayload(showParams, 'ui');
+        // REAL (parity): FR duty (conservative) - use base parameters with FR source
+        const parityPhys = physicsPayload(base, 'fr');
+        // SHOW (boosted): UI duty (visibly mode-dependent) - use base parameters with UI source
+        const showPhys = physicsPayload(base, 'ui');
         
         // Debug: Track exact physics parameters being passed
-        console.log('[REAL] parityParams gammaGeo/g_y/sectors:', parityParams?.gammaGeo, parityParams?.g_y, parityParams?.sectors);
-        console.log('[REAL] parityPhys:', parityPhys);
-        console.log('[SHOW] showParams gammaGeo/g_y/sectors:', showParams?.gammaGeo, showParams?.g_y, showParams?.sectors);  
-        console.log('[SHOW] showPhys:', showPhys);
+        console.log('[WARP DEBUG] Base params:', {
+          mode: base?.currentMode,
+          dutyCycle: base?.dutyCycle, 
+          dutyFR: base?.dutyEffectiveFR,
+          sectors: base?.sectorCount,
+          gammaGeo: base?.gammaGeo
+        });
+        console.log('[WARP DEBUG] REAL physics (FR):', {
+          thetaScale: parityPhys?.thetaScale,
+          sectors: parityPhys?.sectors
+        });
+        console.log('[WARP DEBUG] SHOW physics (UI):', {
+          thetaScale: showPhys?.thetaScale,
+          sectors: showPhys?.sectors
+        });
+        console.log('[WARP DEBUG] Engines ready?', !!leftEngine.current, !!rightEngine.current);
         
         pushUniformsWhenReady(leftEngine.current,  parityPhys);
         pushUniformsWhenReady(rightEngine.current, showPhys);
