@@ -345,8 +345,9 @@ export default function WarpBubbleCompare({
         // Keep both panes in lockstep with Helix strobing
         const off = (window as any).__addStrobingListener?.(
           ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
-            const s = Math.max(1, Math.floor(sectorCount||1));
+            const s = Math.max(1, Math.floor(sectorCount||1));   // concurrent sectors in the sweep loop
             const payload = {
+              // these are for the animation/sweep, not for averaging
               sectors: s,
               split: Math.max(0, Math.min(s-1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
               sectorIdx: Math.max(0, currentSector % s)
