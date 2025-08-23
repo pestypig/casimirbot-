@@ -68,39 +68,7 @@ const VIS_LOCAL = {
 };
 
 // --- Pipeline θ-scale (unified) ----------------------------------------------
-function resolveThetaScale(p: any) {
-  // Prefer direct scalar if upstream provided it
-  if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
-
-  const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
-  const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
-  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
-
-  // duty: prefer FR-sampled, else lightCrossing, else dutyCycle
-  const duty = ((): number => {
-    const lc = p?.lightCrossing;
-    if (Number.isFinite(p?.dutyEffectiveFR)) return Math.max(0, Math.min(1, Number(p.dutyEffectiveFR)));
-    if (lc && Number.isFinite(lc.burst_ms) && Number.isFinite(lc.dwell_ms) && lc.dwell_ms > 0) {
-      return Math.max(0, Math.min(1, lc.burst_ms / lc.dwell_ms));
-    }
-    return Math.max(0, Math.min(1, Number(p?.dutyCycle ?? 0.14)));
-  })();
-
-  // IMPORTANT: use total sectorCount for averaging (strobing count is for viz only)
-  const sectors = Math.max(
-    1,
-    Number(
-      p?.sectorCount ??
-      p?.sectors ??                   // fallback
-      p?.sectorStrobing ??            // last resort (viz)
-      p?.lightCrossing?.sectorCount ??
-      1
-    )
-  );
-  const A_geo   = Math.pow(Math.max(1, gammaGeo), 3);
-  const dutyAvg = Math.sqrt(Math.max(1e-12, duty / sectors));
-  return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyAvg;
-}
+import { resolveThetaScale } from '@/lib/warp-theta';
 
 // Safe formatters and parameter extractors (fixes accuracy/safety during mode switches)
 const isFiniteNum = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);

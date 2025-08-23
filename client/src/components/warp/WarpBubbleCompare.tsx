@@ -152,39 +152,7 @@ function applyShowSafe(e:any, payload:any) {
 }
 
 /* ---------------- Physics scalar helpers ---------------- */
-type DutySource = 'fr' | 'ui';
-
-function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
-  if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
-
-  const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
-  const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
-  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
-
-  // choose duty based on source
-  let duty = Number(p?.dutyCycle ?? 0.14);            // UI duty (visible)
-  if (dutySource === 'fr') {
-    if (Number.isFinite(p?.dutyEffectiveFR)) duty = Number(p.dutyEffectiveFR);
-    else if (Number.isFinite(p?.dutyEffective_FR)) duty = Number(p.dutyEffective_FR);
-    else if (p?.lightCrossing && Number.isFinite(p.lightCrossing.burst_ms) &&
-             Number.isFinite(p.lightCrossing.dwell_ms) && p.lightCrossing.dwell_ms > 0) {
-      duty = p.lightCrossing.burst_ms / p.lightCrossing.dwell_ms / Math.max(1, (p.sectorCount ?? p.sectors ?? 1));
-    }
-  }
-
-  // IMPORTANT: use total sectors for averaging, not concurrent strobing
-  const sectors  = Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400));
-  const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
-  const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
-  const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
-  const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
-  
-  // Debug: Track exact thetaScale calculation
-  console.log(`[${dutySource.toUpperCase()}] thetaScale=` + result.toExponential(2) + 
-    ` (γGeo=${gammaGeo}, qSpoil=${qSpoil}, γVdB=${gammaVdB.toExponential(2)}, duty=${duty}, sectors=${sectors})`);
-  
-  return result;
-}
+import { resolveThetaScale, type DutySource } from '@/lib/warp-theta';
 
 function physicsPayload(p: any, dutySource: DutySource = 'fr') {
   return {
