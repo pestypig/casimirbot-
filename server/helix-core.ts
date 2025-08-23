@@ -608,8 +608,17 @@ export function getSystemMetrics(req: Request, res: Response) {
   res.json({
     totalTiles: Math.floor(s.N_tiles),
     activeTiles, tilesPerSector,
-    totalSectors, activeSectors: concurrent, activeFraction,
-    sectorStrobing: concurrent, currentSector: sweepIdx,
+    totalSectors,
+    activeSectors: concurrent,
+    activeFraction,
+    // ← what the viewer expects as "how many sectors does the sweep have?"
+    sectorStrobing: totalSectors,
+    currentSector: sweepIdx,
+
+    // make mode & inputs visible to UI
+    currentMode: s.currentMode,
+    dutyCycle: s.dutyCycle,
+    sectorCount: totalSectors,
 
     strobeHz, sectorPeriod_ms,
 
