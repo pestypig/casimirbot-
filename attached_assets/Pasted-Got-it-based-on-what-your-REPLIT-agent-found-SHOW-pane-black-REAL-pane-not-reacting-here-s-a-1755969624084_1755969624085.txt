@@ -1,0 +1,60 @@
+Got it — based on what your REPLIT agent found (SHOW pane = black, REAL pane not reacting), here’s a minimal, surgical patch pack that fixes both problems and keeps everything live end-to-end.
+
+1) Make REAL vs SHOW actually diverge (FR-duty vs UI-duty + correct sector base)
+
+Problem: both panes end up using the same tiny FR duty and/or the wrong sector divisor (using concurrent sectors ≈ 1 instead of total sectors = 400), so you don’t see mode differences.
+
+Fix (in WarpBubbleCompare.tsx): let physicsPayload choose the duty source and always average over total sectors. Use that for REAL (FR) vs SHOW (UI).
+
+type DutySource = 'fr' | 'ui';
+
+function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
+  if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
+
+  const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
+  const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
+  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
+
+  // --- duty selection ---
+  let duty = Number(p?.dutyCycle ?? 0.14); // UI-visible duty (SHOW)
+  if (dutySource === 'fr') {
+    if (Number.isFinite(p?.dutyEffectiveFR)) duty = Number(p.dutyEffectiveFR);
+    else if (Number.isFinite(p?.dutyEffective_FR)) duty = Number(p.dutyEffective_FR);
+    else if (p?.lightCrossing && Number.isFinite(p.lightCrossing.burst_ms)
+            && Number.isFinite(p.lightCrossing.dwell_ms) && p.lightCrossing.dwell_ms > 0) {
+      const sectors = Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400));
+      duty = (p.lightCrossing.burst_ms / p.lightCrossing.dwell_ms) / sectors;
+    }
+  }
+
+  // --- averaging must use TOTAL sectors (≈400), not concurrent (≈1..2) ---
+  const totalSectors = Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400));
+  const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;
+  const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
+  const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / totalSectors)) : 1;
+
+  return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
+}
+
+function physicsPayload(p: any, dutySource: DutySource) {
+  return {
+    thetaScale:     resolveThetaScale(p, dutySource),
+    dutyCycle:      Number(p?.dutyCycle ?? 0.14),              // UI duty (for logs)
+    sectorCount:    Math.max(1, Number(p?.sectorCount ?? 400)),// TOTAL sectors (averaging)
+    sectors:        Math.max(1, Number(p?.sectors ?? p?.sectorStrobing ?? 1)), // concurrent (sweep)
+    viewAvg:        p?.viewAvg ?? true,
+    gammaGeo:       Number(p?.gammaGeo ?? p?.g_y ?? 26),
+    deltaAOverA:    Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
+    gammaVdB:       Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5),
+  };
+}
+
+
+Use it during bootstrap and live updates:
+
+// REAL uses FR duty; SHOW uses UI duty
+const parityPhys = physicsPayload(base, 'fr');
+const showPhys   = physicsPayload(base, 'ui');
+
+pushUniformsWhenReady(leftEngine.current,  parityPhys);
+pushUniformsWhenReady(rightEngine.current, showPhys);

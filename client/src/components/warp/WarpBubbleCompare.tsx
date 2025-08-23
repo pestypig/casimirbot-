@@ -363,8 +363,8 @@ export default function WarpBubbleCompare({
         } catch (error) {
           console.error('[WARP ENGINE] Creation failed:', {
             error: error,
-            message: error?.message,
-            stack: error?.stack,
+            message: (error as any)?.message,
+            stack: (error as any)?.stack,
             constructor: typeof WarpCtor,
             leftCanvas: !!leftRef.current,
             rightCanvas: !!rightRef.current
@@ -510,8 +510,8 @@ export default function WarpBubbleCompare({
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
     const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
 
-    const parityPhys = physicsPayload(parityParams);
-    const showPhys = physicsPayload(showParams);
+    const parityPhys = physicsPayload(parityParams, 'fr');
+    const showPhys = physicsPayload(showParams, 'ui');
     pushUniformsWhenReady(leftEngine.current,  parityPhys);
     pushUniformsWhenReady(rightEngine.current, showPhys);
     
@@ -595,7 +595,7 @@ export default function WarpBubbleCompare({
   // Debug probe to verify physics parameters are changing with mode switches
   useEffect(() => {
     if (!leftEngine.current) return;
-    const p = physicsPayload(parityParams);
+    const p = physicsPayload(parityParams, 'fr');
     console.log('[REAL] thetaScale=', p.thetaScale,
                 'γ_geo=', p.gammaGeo,
                 'qSpoil=', p.deltaAOverA,
