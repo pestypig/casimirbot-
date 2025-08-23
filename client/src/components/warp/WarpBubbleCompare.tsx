@@ -70,7 +70,13 @@ function resolveThetaScale(p: any) {
   const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
   const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
   const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
-  return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
+  const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
+  
+  // Debug: Track exact thetaScale calculation
+  console.log('[REAL] thetaScale=' + result.toExponential(2) + 
+    ` (γGeo=${gammaGeo}, qSpoil=${qSpoil}, γVdB=${gammaVdB.toExponential(2)}, duty=${duty}, sectors=${sectors})`);
+  
+  return result;
 }
 
 function physicsPayload(p: any) {
@@ -207,21 +213,28 @@ const applyReal = (
 
 const applyShow = (
   e: any,
-  shared: ReturnType<typeof frameFromHull>,
+  sharedIn: ReturnType<typeof frameFromHull>,
   canvas: HTMLCanvasElement,
   colorMode: 'theta'|'shear'|'solid',
   opts: { T?: number; boostMax?: number; decades?: number; vizGain?: number; exposure?: number; zeroStop?: number; }
 ) => {
   const { T=0.70, boostMax=40, decades=3, vizGain=1.25, exposure=7.5, zeroStop=1e-7 } = opts || {};
-  primeOnce(e, shared, colorMode);
-  const camZ = compactCameraZ(canvas, shared.axesScene);
-  
-  // Debug: Track applyShow parameters
-  console.log('[SHOW] camZ=', camZ, 'T/b/dec/viz/exposure/zeroStop', T, boostMax, decades, vizGain, exposure, zeroStop);
+  primeOnce(e, sharedIn, colorMode);
 
-  // shader-side exaggeration
+  let shared = sharedIn;
+  const axesOK = shared?.axesScene?.every?.((n:any)=>Number.isFinite(n)&&Math.abs(n)>0);
+  if (!axesOK) {
+    console.warn('[SHOW] invalid axesScene, fixing');
+    shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+  }
+
+  const camZraw = compactCameraZ(canvas, shared.axesScene);
+  const camZ = Number.isFinite(camZraw) ? camZraw : 2.0;
+
   const t = clamp01(T);
   const b = Math.max(1, boostMax);
+
+  console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'dec', decades, 'viz', vizGain, 'exp', exposure, 'zstop', zeroStop);
 
   pushUniformsWhenReady(e, {
     ...shared,
@@ -236,17 +249,17 @@ const applyShow = (
     exposure,
     zeroStop,
     cosmeticLevel: 10,
-  });
-  
-  // Debug: Check if uniforms were pushed successfully
-  console.log('[SHOW] uniforms pushed?', !!e?.uniforms, e?.uniforms?.cameraZ);
-  // Quick GL sanity check
-  console.log('[SHOW] ctx lost?', e?.gl?.isContextLost?.());
+  }, 60);
 
-  // geometry/display gain if available (matches SliceViewer feel)
-  const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b; // 1..b
-  e.setDisplayGain?.(displayBoost);
+  const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b;
+  e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
   e.requestRewarp?.();
+
+  // context check
+  if (e?.gl?.isContextLost?.()) {
+    console.warn('[SHOW] context lost – attempting restore');
+    e.gl.getExtension('WEBGL_lose_context')?.restoreContext?.();
+  }
 };
 
 /* ---------------- Component ---------------- */
@@ -346,6 +359,13 @@ export default function WarpBubbleCompare({
 
         const parityPhys = physicsPayload(parityParams);
         const showPhys = physicsPayload(showParams);
+        
+        // Debug: Track exact physics parameters being passed
+        console.log('[REAL] parityParams gammaGeo/g_y/sectors:', parityParams?.gammaGeo, parityParams?.g_y, parityParams?.sectors);
+        console.log('[REAL] parityPhys:', parityPhys);
+        console.log('[SHOW] showParams gammaGeo/g_y/sectors:', showParams?.gammaGeo, showParams?.g_y, showParams?.sectors);  
+        console.log('[SHOW] showPhys:', showPhys);
+        
         pushUniformsWhenReady(leftEngine.current,  parityPhys);
         pushUniformsWhenReady(rightEngine.current, showPhys);
 
