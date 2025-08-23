@@ -342,12 +342,18 @@ export default function HelixCore() {
     ? pipeline!.sectorStrobing! 
     : (modeCfg.sectorStrobing ?? 1);
   
-  const sectorsResolved = useMemo(() => {
-    const s = Number(systemMetrics?.totalSectors ?? systemMetrics?.sectorStrobing);
-    if (Number.isFinite(s) && s > 0) return Math.max(1, Math.floor(s));
-    const u = Number(sectorsUI);
-    return Math.max(1, Math.floor(Number.isFinite(u) ? u : 1));
-  }, [systemMetrics?.sectorStrobing, systemMetrics?.totalSectors, sectorsUI]);
+  // Split sector handling: total sectors (400) for averaging vs concurrent sectors (1-2) for strobing
+  const totalSectors = useMemo(() => {
+    return Number.isFinite(systemMetrics?.totalSectors)
+      ? Math.max(1, Math.floor(systemMetrics!.totalSectors!))
+      : 400;
+  }, [systemMetrics?.totalSectors]);
+
+  const concurrentSectors = useMemo(() => {
+    return Number.isFinite(systemMetrics?.sectorStrobing)
+      ? Math.max(1, Math.floor(systemMetrics!.sectorStrobing!))
+      : (pipeline?.sectorStrobing ?? 1);
+  }, [systemMetrics?.sectorStrobing, pipeline?.sectorStrobing]);
 
   // Calculate hull geometry before using it
   const hull = (hullMetrics && hullMetrics.hull) ? {
@@ -359,7 +365,7 @@ export default function HelixCore() {
 
   // Shared light-crossing loop for synchronized strobing across all visual components  
   const lc = useLightCrossingLoop({
-    sectorStrobing: systemMetrics?.totalSectors ?? sectorsResolved,
+    sectorStrobing: concurrentSectors,
     currentSector: systemMetrics?.currentSector ?? 0,
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,  // Restored authentic physics timing
     duty: dutyUI,
@@ -414,8 +420,8 @@ export default function HelixCore() {
     // but DO NOT pin physicsParityMode / cosmeticLevel / curvatureGain* here.
     const base: any = {
       currentMode: effectiveMode,
-      sectorStrobing: sectorsResolved,
-      sectors: sectorsResolved,                    // explicit sectors for proper scale divisor
+      sectorStrobing: concurrentSectors,
+      sectors: totalSectors,                       // total sectors (400) for physics averaging
 
       // live hull geometry
       hull,
@@ -446,7 +452,7 @@ export default function HelixCore() {
 
     return base;
   }, [
-    effectiveMode, sectorsResolved, hull, dutyEffectiveFR, lc,
+    effectiveMode, totalSectors, concurrentSectors, hull, dutyEffectiveFR, lc,
     epsilonTilt, systemMetrics?.shiftVector?.betaTiltVec,
     pipeline?.dutyCycle, pipeline?.gammaGeo, pipeline?.qCavity, pipeline?.sagDepth_nm,
     pipeline?.TS_ratio, pipeline?.P_avg, pipeline?.M_exotic,
@@ -782,7 +788,7 @@ export default function HelixCore() {
                       qSpoilingFactor={qSpoilUI}
                       gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 2.86e5}
                       dutyCycle={dutyUI}
-                      sectors={sectorsResolved}   // ⬅️ use resolved sectors
+                      sectors={totalSectors}      // ⬅️ use total sectors for averaging
                       viewAvg={true}
                       diffMode={false}
                       refParams={{
@@ -851,7 +857,7 @@ export default function HelixCore() {
                 // Mode coupling from live pipeline data
                 mode: effectiveMode,
                 dutyCycle: dutyUI,
-                sectors: sectorsResolved,
+                sectors: totalSectors,
                 gammaGeo: pipeline?.gammaGeo ?? 26,
                 qSpoil: qSpoilUI,
                 qCavity: pipeline?.qCavity ?? 1e9,
@@ -1137,7 +1143,7 @@ export default function HelixCore() {
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
                     <div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
-                    <div>Sectors: {fint(sectorsResolved, '0')}</div>
+                    <div>Sectors: {fint(totalSectors, '0')} ({fint(concurrentSectors, '0')} live)</div>
                     <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1391,7 +1397,7 @@ export default function HelixCore() {
             <ResonanceSchedulerTile
               mode={effectiveMode}
               duty={dutyUI}
-              sectors={sectorsResolved}
+              sectors={concurrentSectors}
               freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
               sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
               currentSector={systemMetrics?.currentSector}
