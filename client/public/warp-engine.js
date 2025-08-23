@@ -745,49 +745,48 @@ class WarpEngine {
         const N = (x, d=0) => (Number.isFinite(x) ? +x : d);
         const clamp01 = (x) => Math.max(0, Math.min(1, x));
 
+        // Store previous uniforms for comparison
+        const prev = { ...(this.uniforms || {}) };
+        this.currentParams = { ...this.currentParams, ...parameters };
+
         // --- Resolve hull + scene scaling ---
-        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? this.uniforms?.hullAxes?.[0], 503.5);
-        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? this.uniforms?.hullAxes?.[1], 132.0);
-        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? this.uniforms?.hullAxes?.[2], 86.5);
+        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? prev?.hullAxes?.[0], 503.5);
+        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? prev?.hullAxes?.[1], 132.0);
+        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? prev?.hullAxes?.[2], 86.5);
         const s = 1 / Math.max(a, b, c, 1e-9);
         const axesScene = [a*s, b*s, c*s];
         const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
         // --- Parity / visualization ---
         const parity = !!parameters?.physicsParityMode;
-        const ridgeMode = (parameters?.ridgeMode ?? this.uniforms?.ridgeMode ?? 0)|0;
+        const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2 };
-        let colorModeRaw = parameters?.colorMode ?? this.uniforms?.colorMode ?? 'theta';
+        let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
         const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
                                                               : (colorModeRaw|0);
-        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (this.uniforms?.exposure ?? 6.0));
-        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (this.uniforms?.zeroStop ?? 1e-7));
-        const vizGain   = parity ? 1 : N(parameters?.vizGain, this.uniforms?.vizGain ?? 1);
-        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, this.uniforms?.curvatureGainT ?? 0));
-        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, this.uniforms?.curvatureBoostMax ?? 40));
-        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, this.uniforms?.cosmeticLevel ?? 10);
+        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (prev?.exposure ?? 6.0));
+        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (prev?.zeroStop ?? 1e-7));
+        const vizGain   = parity ? 1 : N(parameters?.vizGain, prev?.vizGain ?? 1);
+        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, prev?.curvatureGainT ?? 0));
+        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, prev?.curvatureBoostMax ?? 40));
+        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, prev?.cosmeticLevel ?? 10);
 
         // camera framing lock
-        const lockFraming = parameters?.lockFraming ?? this.uniforms?.lockFraming ?? true;
+        const lockFraming = parameters?.lockFraming ?? prev?.lockFraming ?? true;
         const cameraZ = (parameters?.cameraZ != null)
           ? +parameters.cameraZ
-          : (lockFraming ? (this.uniforms?.cameraZ ?? null) : this.uniforms?.cameraZ ?? null);
+          : (lockFraming ? (prev?.cameraZ ?? null) : prev?.cameraZ ?? null);
 
-        // Update internal parameters
-        this.currentParams = { ...this.currentParams, ...parameters };
-
-        this.uniforms = {
-          ...this.uniforms,
-
+        // --- build next uniforms without mutating prev ---
+        const nextUniforms = {
+          ...prev,
           // geometry (authoritative)
           hullAxes: [a, b, c],
-          axesClip: axesScene,      // ← replaces the baked unit ring
+          axesClip: axesScene,
           gridSpan,
-
           // camera/framing
           lockFraming,
           cameraZ,
-
           // visualization / parity
           physicsParityMode: parity,
           ridgeMode,
@@ -796,36 +795,49 @@ class WarpEngine {
           curvatureGainT: curvT,
           curvatureBoostMax: curvMax,
           cosmeticLevel: cosmetic,
-
-          // existing fields (keep your defaults if caller didn't supply)
-          vShip: parameters.vShip || this.uniforms.vShip || 1,
-          wallWidth: parameters.wallWidth || this.uniforms.wallWidth || 0.06,
-          driveDir: parameters.driveDir || this.uniforms.driveDir || [1,0,0],
-
-          // tilt (zeroed in parity mode)
-          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || this.uniforms.epsilonTilt || 0),
-          betaTiltVec: Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length === 3
-            ? parameters.betaTiltVec
-            : (this.uniforms.betaTiltVec || [0,-1,0]),
-          tiltGain: this.uniforms.tiltGain ?? 0.55
+          // existing fields
+          vShip: parameters.vShip || prev.vShip || 1,
+          wallWidth: parameters.wallWidth || prev.wallWidth || 0.06,
+          driveDir: parameters.driveDir || prev.driveDir || [1,0,0],
+          // tilt
+          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || prev.epsilonTilt || 0),
+          betaTiltVec: (Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length===3)
+                       ? parameters.betaTiltVec
+                       : (prev.betaTiltVec || [0,-1,0]),
+          tiltGain: prev.tiltGain ?? 0.55,
+          // 🔗 physics chain fields used by CPU warp & shader
+          thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
+          dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
+          sectors: Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorCount, prev.sectors ?? 1))),
+          split: Math.max(0, Math.min((prev.sectors ?? 1)-1, N(parameters.split, prev.split ?? 0))),
+          viewAvg: parameters.viewAvg != null ? !!parameters.viewAvg : (prev.viewAvg ?? true),
+          gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
+          deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
+          gammaVdB: N(parameters.gammaVdB, prev.gammaVdB ?? 2.86e5),
+          currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
-        // Only rebuild mesh if geometry actually changed (not for mode switches)
-        const geoChanged = (
-            parameters.hullAxes && (
-                parameters.hullAxes[0] !== this.uniforms.hullAxes[0] ||
-                parameters.hullAxes[1] !== this.uniforms.hullAxes[1] ||
-                parameters.hullAxes[2] !== this.uniforms.hullAxes[2]
-            )
-        ) || (
-            parameters.gridSpan && parameters.gridSpan !== this.uniforms.gridSpan
-        );
-        
-        if (geoChanged) {
-            console.log('[WarpEngine] Geometry changed, rebuilding grid');
-            this._updateGrid();
+        // decide if the CPU warp needs recompute
+        const geoChanged =
+          (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
+          (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
+          (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
+          (prev.gridSpan !== nextUniforms.gridSpan);
+
+        const warpKeys = [
+          'thetaScale','userGain','curvatureGainT','curvatureBoostMax',
+          'exposure','zeroStop','physicsParityMode','ridgeMode',
+          'driveDir','wallWidth','epsilonTilt','betaTiltVec','tiltGain',
+          'dutyCycle','sectors','split','gammaGeo','deltaAOverA','gammaVdB',
+          'viewAvg','currentMode'
+        ];
+        const ampChanged = warpKeys.some(k => JSON.stringify(prev[k]) !== JSON.stringify(nextUniforms[k]));
+
+        this.uniforms = nextUniforms;
+        if (geoChanged || ampChanged) {
+          this._updateGrid();
         } else if (parameters.currentMode) {
-            console.log('[WarpEngine] Mode change without geometry change - skipping grid rebuild');
+          console.log('[WarpEngine] Mode change applied (no warp needed)');
         }
     }
     
