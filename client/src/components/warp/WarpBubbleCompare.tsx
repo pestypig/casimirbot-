@@ -36,7 +36,7 @@ function ensureStrobeMux() {
 function resolveThetaScale(p: any) {
   if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
 
-  const gammaGeo = Number(p?.gammaGeo ?? 26);
+  const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
   const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
   const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
   const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? p?.sectorStrobing ?? 1));
@@ -66,7 +66,7 @@ function physicsPayload(p: any) {
     dutyCycle: Number(p?.dutyCycle ?? 0.14),
     sectors: Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? 1)),
     viewAvg: p?.viewAvg ?? true,
-    gammaGeo: Number(p?.gammaGeo ?? 26),
+    gammaGeo: Number(p?.gammaGeo ?? p?.g_y ?? 26),
     deltaAOverA: Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
     gammaVdB: Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5),
   };
@@ -247,7 +247,7 @@ export default function WarpBubbleCompare({
   const physicsKey = JSON.stringify({
     duty: base.dutyEffectiveFR ?? base.dutyCycle,
     sectors: base.sectorStrobing ?? base.sectors ?? base.sectorCount,
-    gammaGeo: base.g_y ?? base.gammaGeo,
+    gammaGeo: base.gammaGeo ?? base.g_y,
     qSpoil: base.qSpoilingFactor ?? base.deltaAOverA,
     gammaVdB: base.gammaVanDenBroeck ?? base.gammaVdB,
     lc: base.lightCrossing ? {
