@@ -641,7 +641,43 @@ class WarpEngine {
         }
     }
 
+    // --- Atomic uniform batching to avoid mid-frame bad states ---
+    _pendingUpdate = null;
+    _flushId = 0;
+    
+    _enqueueUniforms(patch) {
+        // Merge patches until next frame, then apply once
+        this._pendingUpdate = Object.assign(this._pendingUpdate || {}, patch || {});
+        if (this._flushId) return;
+        this._flushId = requestAnimationFrame(() => {
+            const p = this._pendingUpdate || {};
+            this._pendingUpdate = null;
+            this._flushId = 0;
+            try { 
+                this._applyUniformsNow(p); 
+            } catch(e) { 
+                console.warn("uniform flush failed", e); 
+            }
+            // After big bursts (e.g., mode switch) ensure camera is sane
+            try { 
+                this._resizeCanvasToDisplaySize(); 
+                this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); 
+            } catch {}
+            // Draw immediately so we don't present a black frame
+            try { 
+                this._render(); 
+            } catch {}
+        });
+    }
+    
     updateUniforms(parameters) {
+        // Don't apply while program not ready
+        if (!this.isLoaded || !this.gridProgram) { return; }
+        this._enqueueUniforms(parameters);
+    }
+    
+    // Keep original update logic but move it into _applyUniformsNow
+    _applyUniformsNow(parameters) {
         if (!parameters) return;
         
         // Helper functions
@@ -1212,24 +1248,17 @@ class WarpEngine {
 
     _render() {
         const gl = this.gl;
+        // Add safety checks to prevent "stuck black" state
+        if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+            return;
+        }
+        // Check for lost context and try to restore
+        if (gl.isContextLost && gl.isContextLost()) {
+            try { gl.getExtension('WEBGL_lose_context')?.restoreContext?.(); } catch {}
+            return;
+        }
+        
         try {
-            // Skip drawing until shaders are linked and uniforms are bound
-            if (!this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-                // Debug: log once why we're not rendering
-                if (!this._notReadyLogged) {
-                    console.log('[WarpEngine] Not ready to render:', {
-                        isLoaded: this.isLoaded,
-                        hasProgram: !!this.gridProgram,
-                        hasUniforms: !!this.gridUniforms,
-                        hasAttribs: !!this.gridAttribs
-                    });
-                    this._notReadyLogged = true;
-                }
-                return;
-            }
-            // Clear flag once we start rendering
-            this._notReadyLogged = false;
-            
             // Clear the screen
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             // Render the spacetime grid

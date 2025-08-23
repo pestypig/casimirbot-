@@ -1,0 +1,93 @@
+nice—progress! the “goes black when switching operational mode and stays black” is almost always a bad-state race during the update burst (mode flip pushes several uniform sets in quick succession). two practical fixes:
+
+A) fix the color-mode index (one-off bug that can blank visuals)
+
+Your engine’s shader uses 0=solid, 1=theta, 2=shear. Some places mapped it as {theta:0,…}. That can put the shader into an unexpected branch mid-toggle.
+
+Patch in both WarpBubbleCompare.tsx and WarpVisualizer.tsx:
+
+- const map: any = { theta: 0, shear: 1, solid: 2 };
++ const map: any = { solid: 0, theta: 1, shear: 2 };
+
+
+…and wherever you compute colorModeIndex do:
+
+- const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
++ const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
+
+B) make the mode toggle atomic + re-fit camera after the burst
+
+When mode changes, multiple updateUniforms calls land in different frames; if the first one rebuilds the grid and a later one tweaks exposure/zeroStop/gains before MVP/camera is refit, you can get an empty frame that never recovers. We’ll (1) coalesce updates for a frame, and (2) refit the camera once at the end.
+
+Drop this into client/public/warp-engine.js (inside class):
+
++  // --- atomic uniform batching to avoid mid-frame bad states ---
++  _pendingUpdate = null;
++  _flushId = 0;
++  _enqueueUniforms(patch) {
++    // merge patches until next frame, then apply once
++    this._pendingUpdate = Object.assign(this._pendingUpdate || {}, patch || {});
++    if (this._flushId) return;
++    this._flushId = requestAnimationFrame(() => {
++      const p = this._pendingUpdate || {};
++      this._pendingUpdate = null;
++      this._flushId = 0;
++      try { this._applyUniformsNow(p); } catch(e){ console.warn("uniform flush failed", e); }
++      // after big bursts (e.g., mode switch) ensure camera is sane
++      try { this._resizeCanvasToDisplaySize(); this._applyOverheadCamera({ spanHint: this.uniforms?.gridSpan || 1 }); } catch {}
++      // draw immediately so we don't present a black frame
++      try { this._render(); } catch {}
++    });
++  }
++
++  // keep your original update logic but move it into _applyUniformsNow
++  _applyUniformsNow(parameters) {
++    // === ORIGINAL BODY OF updateUniformS GOES HERE (minus early returns) ===
++    // (everything you already do: sanitize, compute axesScene/gridSpan, set this.uniforms,
++    //  call this._updateGrid(), etc.)
++  }
++
++  updateUniforms(parameters) {
++    // don’t apply while program not ready
++    if (!this.isLoaded || !this.gridProgram) { return; }
++    this._enqueueUniforms(parameters);
++  }
+
+
+If you prefer a tiny change: keep your current updateUniforms body and at its very end just do:
+
+this._enqueueUniforms({}); // schedules a post-burst refit+render
+
+
+but the refactor above is cleaner.
+
+C) tiny safety in render (prevents “stuck black”)
+  _render() {
+-   const gl = this.gl;
+-   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+-   this._renderGridPoints();
++   const gl = this.gl;
++   if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms) return;
++   if (gl.isContextLost && gl.isContextLost()) {
++     try { gl.getExtension('WEBGL_lose_context')?.restoreContext?.(); } catch {}
++     return;
++   }
++   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
++   this._renderGridPoints();
+  }
+
+D) seed framing first on updates (Visualizer & Compare)
+
+Before pushing any mode-specific viz uniforms in your update effects, seed framing (axes/clip/gridSpan) once; then push the rest. You already do this in places—make sure it always happens at the top of the effect that runs on parameters.currentMode.
+
+Example (Visualizer live-update effect), at the start:
+
++ // 1) frame seed first – prevents transient nulls during mode flip
++ const ah = num(parameters.hull?.a, 503.5), bh = num(parameters.hull?.b, 132), ch = num(parameters.hull?.c, 86.5);
++ const sh = 1 / Math.max(ah, bh, ch, 1e-9);
++ const axesSceneNow = [ah*sh, bh*sh, ch*sh] as [number,number,number];
++ const spanNow = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneNow) * VIS_LOCAL.spanPaddingDesktop);
++ engineRef.current.updateUniforms({ axesScene: axesSceneNow, axesClip: axesSceneNow, hullAxes: [ah,bh,ch], gridSpan: parameters.gridSpan ?? spanNow });
+
+
+Then apply physics/viz uniforms; the batching in (B) will coalesce them into one safe commit and re-fit the camera once at the end.

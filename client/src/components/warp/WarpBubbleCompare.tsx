@@ -531,27 +531,21 @@ export default function WarpBubbleCompare({
           ensureCanvasSize(leftRef.current!);
           ensureCanvasSize(rightRef.current!);
           
-          console.log('[WARP ENGINE] Creating left engine...');
           leftEngine.current  = new WarpCtor(leftRef.current);
-          console.log('[WARP ENGINE] Left engine created:', !!leftEngine.current);
-          
-          console.log('[WARP ENGINE] Creating right engine...');
           rightEngine.current = new WarpCtor(rightRef.current);
-          console.log('[WARP ENGINE] Right engine created:', !!rightEngine.current);
           
-          // Runtime proof it's the right file
-          console.log('[WARP PROBE]', {
-            scriptTags: Array.from(document.scripts).filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
-            hasCtor: !!(window as any).WarpEngine,
-            build: (window as any).__WarpEngineBuild || (window as any).WarpEngine?.BUILD,
-            ctorName: ((window as any).WarpEngine?.name)
-          });
+          // Runtime proof it's the right file (commented out for production)
+          // console.log('[WARP PROBE]', {
+          //   scriptTags: Array.from(document.scripts).filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
+          //   hasCtor: !!(window as any).WarpEngine,
+          //   build: (window as any).__WarpEngineBuild || (window as any).WarpEngine?.BUILD,
+          //   ctorName: ((window as any).WarpEngine?.name)
+          // });
           
           // Add WebGL context guards for resilience
           attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._resize?.());
           attachGLContextGuards(rightRef.current!, () => rightEngine.current?._resize?.());
           
-          console.log('[WARP ENGINE] Engines created, triggering resize');
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
           
@@ -560,8 +554,6 @@ export default function WarpBubbleCompare({
           const initColor = 1; // theta (engine expects 0=solid,1=theta,2=shear)
           leftEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
           rightEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
-          
-          console.log('[WARP ENGINE] Initialization complete, both engines ready');
           
           // Verify uniforms actually exist (catch silent no-ops)
           dumpUniforms(leftEngine.current,  'REAL');
@@ -669,10 +661,10 @@ export default function WarpBubbleCompare({
 
         const L = leftRef.current!,  R = rightRef.current!;
         
-        // Debug: Shared parameters and canvas
-        console.log('[SHOW] shared', shared);
-        console.log('[SHOW] axesScene', shared.axesScene);
-        console.log('[SHOW] canvas size', R.clientWidth, R.clientHeight);
+        // Debug: Shared parameters and canvas (commented out for production)
+        // console.log('[SHOW] shared', shared);
+        // console.log('[SHOW] axesScene', shared.axesScene);
+        // console.log('[SHOW] canvas size', R.clientWidth, R.clientHeight);
 
         requestAnimationFrame(() => {
           applyReal(leftEngine.current, shared, L, (parityParams?.viz?.colorMode ?? colorMode) as any);
@@ -750,8 +742,26 @@ export default function WarpBubbleCompare({
   // live updates when parameters change (same framing both panes)
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
-    const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
-
+    
+    // Fix D: Seed framing first to prevent transient nulls during mode flip
+    const hull = parityParams?.hull || showParams?.hull;
+    const ah = num(hull?.a, 503.5), bh = num(hull?.b, 132), ch = num(hull?.c, 86.5);
+    const sh = 1 / Math.max(ah, bh, ch, 1e-9);
+    const axesSceneNow = [ah*sh, bh*sh, ch*sh] as [number,number,number];
+    const spanNow = parityParams?.gridSpan || showParams?.gridSpan || 2.6;
+    
+    // Push framing first - prevents transient nulls
+    const framingSeed = { 
+      axesScene: axesSceneNow, 
+      axesClip: axesSceneNow, 
+      hullAxes: [ah,bh,ch], 
+      gridSpan: spanNow 
+    };
+    pushUniformsWhenReady(leftEngine.current, framingSeed);
+    pushUniformsWhenReady(rightEngine.current, framingSeed);
+    
+    // Then apply mode-specific physics
+    const shared = frameFromHull(hull, spanNow);
     const parityPhys = physicsPayload(parityParams, 'fr');
     const showPhys = physicsPayload(showParams, 'ui');
     pushUniformsWhenReady(leftEngine.current,  parityPhys);
