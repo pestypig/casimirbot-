@@ -478,8 +478,37 @@ useEffect(() => {
         return;
       }
 
-      // Try fixed bundle, then fall back
-      const trySrcs = ['/warp-engine.js?v=canonical'];
+      // --- Robust asset base resolution (handles sub-path deploys, Next/Vite/CRA) ---
+      const resolveAssetBase = () => {
+        const w: any = window;
+        // explicit override wins
+        if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
+        // Vite
+        if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+        // Webpack public path
+        if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
+        // Next.js base path
+        if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
+        // <base href="..."> tag
+        const baseEl = document.querySelector('base[href]');
+        if (baseEl) return (baseEl as HTMLBaseElement).href;
+        return '/';
+      };
+
+      const assetBase = resolveAssetBase();
+      const stamp = (w => (w.__APP_WARP_BUILD || 'dev'))(window as any);
+      const mk = (p: string) => {
+        try { return new URL(p, assetBase).toString(); } catch { return p; }
+      };
+
+      // Try explicit override → base-aware → relative → root
+      const trySrcs = [
+        (window as any).__WARP_ENGINE_SRC__,
+        mk(`warp-engine.js?v=${encodeURIComponent(stamp)}`),
+        'warp-engine.js',
+        '/warp-engine.js?v=canonical'
+      ].filter(Boolean) as string[];
+
       for (const src of trySrcs) {
         await new Promise<void>((resolve, reject) => {
           const script = document.createElement('script');
@@ -512,7 +541,7 @@ useEffect(() => {
         }
       }
 
-      throw new Error("WarpEngine not found on window after script load");
+      throw new Error("WarpEngine not found on window after script load (check public path / base URL)");
     } catch (err: any) {
       console.error('WarpEngine init error:', err);
       setFailed(err?.message || "Engine initialization failed");
