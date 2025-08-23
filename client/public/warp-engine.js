@@ -6,7 +6,7 @@
 //  URGENT: DEBUG STAMPS ADDED FOR PIPELINE DIAGNOSTICS
 //====================================================================
 
-class WarpEngine {
+class WarpCage {
     constructor(canvas) {
         try {
             // 🔍 DEBUG CHECKPOINT 1: Version Stamp for Cache Debugging  
@@ -1025,22 +1025,22 @@ class WarpEngine {
 
 // Optional toggles in dev console for cage renderer
 window.__cage_on  = () => {
-    if (window.warpEngine) {
-        window.warpEngine.enabled = true;
+    if (window.warpCage) {
+        window.warpCage.enabled = true;
         console.log('🔓 CAGE ENABLED: Legacy volumetric cage renderer activated');
     }
 };
 window.__cage_off = () => {
-    if (window.warpEngine) {
-        window.warpEngine.enabled = false;
+    if (window.warpCage) {
+        window.warpCage.enabled = false;
         console.log('🔒 CAGE DISABLED: Legacy volumetric cage renderer deactivated');
     }
 };
 
 // Export for both ES modules and CommonJS
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WarpEngine;
+    module.exports = WarpCage;
 } else {
-    window.WarpEngine = WarpEngine;
-    console.log("WarpEngine class loaded and available on window - CACHE BUSTED VERSION", Date.now());
+    window.WarpCage = WarpCage;
+    console.log("WarpCage loaded (legacy visualizer) - gated by ?cage=1", Date.now());
 }
