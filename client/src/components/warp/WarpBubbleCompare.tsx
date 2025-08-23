@@ -116,21 +116,25 @@ function attachGLContextGuards(canvas: HTMLCanvasElement, recreate: () => void) 
   }, false);
 }
 
-let showSafeFallbackDone = false;
-
 function applyShowSafe(e:any, payload:any) {
-  pushUniformsWhenReady(e, payload);
-  requestAnimationFrame(() => {
+  if (!e) return;
+  let applied = false;
+  const recheck = () => {
     const anyVerts = (e?.gridVertices?.length || 0) + (e?.originalGridVertices?.length || 0);
-    const anyReady = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
-    if (!anyReady && !showSafeFallbackDone) {
-      showSafeFallbackDone = true;
+    const ready = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
+    if (!ready && !applied) {
+      applied = true;
       pushUniformsWhenReady(e, { cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
       e.setDisplayGain?.(1);
-      e.requestRewarp?.();
       console.warn('[SHOW] cosmetics disabled as safety fallback');
+    } else if (ready && applied) {
+      // re-apply SHOW once; use whatever you computed in applyShow
+      pushUniformsWhenReady(e, payload);
+      console.log('[SHOW] re-applied boosted settings after grid ready');
     }
-  });
+  };
+  requestAnimationFrame(recheck);
+  setTimeout(recheck, 120); // belt & suspenders
 }
 
 /* ---------------- Physics scalar helpers ---------------- */
