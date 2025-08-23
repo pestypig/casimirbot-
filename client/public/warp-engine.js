@@ -167,33 +167,7 @@ class WarpEngine {
         };
         window.__warp_setCosmetic = this.__warp_setCosmetic;
 
-        // Ridge mode toggles (optional quick access)
-        window.__warp_singleRidge = () => this.updateUniforms({ ridgeMode: 1 });
-        window.__warp_physicsRidge = () => this.updateUniforms({ ridgeMode: 0 });
 
-        // One-click presets
-        window.__warp_truePhysics = () => {
-          this.updateUniforms({
-            physicsParityMode: true,        // activates the clamp above
-            curvatureGainT: 0,
-            ridgeMode: 0,           // physics double-lobe when checking parity
-            // curvatureBoostMax preserved for headroom, exposure/zeroStop set in parity block
-          });
-          console.log("✅ True Physics: parity ON, no boosts/cosmetics");
-        };
-
-        window.__warp_showcase = () => {
-          this.updateUniforms({
-            physicsParityMode: false,
-            cosmeticLevel: 10,
-            curvatureBoostMax: 40,
-            curvatureGainT: 0.50,          // "demo" mid-boost; adjust to taste
-            exposure: 6.0,
-            zeroStop: 1e-7,
-            ridgeMode: 1,           // single crest for a clear, unambiguous ring
-          });
-          console.log("🎨 Showcase: parity OFF, cosmetics/boosts ON");
-        };
 
         // default to "current visuals" feel
         this.setCosmeticLevel(10);
@@ -217,6 +191,12 @@ class WarpEngine {
             zeroStop: 1e-7,
             wallWidth: 0.05,         // fatten the wall to catch more vertices
         });
+        
+        // Namespaced debug hooks for DevTools access
+        const id = canvas.id || `warp-${Math.random().toString(36).slice(2,8)}`;
+        this.__id = id;
+        window.__warp = window.__warp || {};
+        window.__warp[id] = this; // e.g. window.__warp['parity-canvas'].setPresetParity()
         
         // Start render loop
         this._renderLoop();
@@ -1554,6 +1534,32 @@ class WarpEngine {
         this.updateUniforms({ userGain: Math.max(1, +gain) });
     }
 
+    setPresetParity() {
+        this.updateUniforms({
+            physicsParityMode: true,
+            ridgeMode: 0,              // show true physics double-lobe
+            curvatureGainT: 0.0,
+            curvatureBoostMax: 1.0,
+            exposure: 3.5,
+            zeroStop: 1e-5,
+            vizGain: 1.0,
+            userGain: 1.0
+        });
+    }
+
+    setPresetShowcase() {
+        this.updateUniforms({
+            physicsParityMode: false,
+            ridgeMode: 1,              // clean single crest at ρ=1
+            curvatureGainT: 0.6,       // slider blend → boost
+            curvatureBoostMax: 40.0,
+            exposure: 6.0,
+            zeroStop: 1e-7,
+            vizGain: 1.0,
+            userGain: 4.0
+        });
+    }
+
     destroy() {
         // Clean up per-canvas guard
         if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
@@ -1575,8 +1581,6 @@ class WarpEngine {
         if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
             delete window.__warp_setCosmetic;
         }
-        delete window.__warp_singleRidge;
-        delete window.__warp_physicsRidge;
         delete window.setStrobingState;
         
         // Clean up WebGL resources
