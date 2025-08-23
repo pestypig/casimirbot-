@@ -244,20 +244,79 @@ function scrubOverlays(e: any) {
   e.updateUniforms(patch);
 }
 
-/* ---------------- Safe uniform push (fixes null.length) ---------------- */
-function pushUniformsWhenReady(e: any, payload: any, retries = 24) {
-  if (!e) return;
+/* ---------------- Safe uniform push with compatibility shim ---------------- */
+function compatifyUniforms(raw: any) {
+  const p = { ...(raw || {}) };
+
+  // Color mode: accept string or numeric; provide both keys
+  const colorMap: any = { theta: 0, shear: 1, solid: 2 };
+  if (typeof p.colorMode === 'string') {
+    p.colorModeIndex = colorMap[p.colorMode] ?? 0;
+  } else if (Number.isFinite(p.colorMode)) {
+    p.colorModeIndex = p.colorMode;
+  }
+
+  // Sector/strobe synonyms
+  if (Number.isFinite(p.sectors)) {
+    p.sectorCount = p.sectorCount ?? p.sectors;
+  }
+  if (Number.isFinite(p.sectorIdx)) {
+    p.currentSector = p.currentSector ?? p.sectorIdx;
+    p.sectorIndex   = p.sectorIndex   ?? p.sectorIdx;
+  }
+  if (Number.isFinite(p.split)) {
+    p.sectorSplit = p.sectorSplit ?? p.split;
+  }
+
+  // Gain/boost synonyms
+  if (p.curvatureGainT != null) {
+    p.gainT      = p.gainT      ?? p.curvatureGainT;
+    p.thetaGainT = p.thetaGainT ?? p.curvatureGainT;
+  }
+  if (p.curvatureBoostMax != null) {
+    p.boostMax = p.boostMax ?? p.curvatureBoostMax;
+  }
+  if (p.curvatureGainDec != null) {
+    p.gainDec   = p.gainDec   ?? p.curvatureGainDec;
+    p.gainDecs  = p.gainDecs  ?? p.curvatureGainDec;
+    p.gainDecades = p.gainDecades ?? p.curvatureGainDec;
+  }
+
+  // Exposure synonyms
+  if (p.exposure != null) {
+    p.exposureEV = p.exposureEV ?? p.exposure;
+  }
+
+  // Camera synonyms
+  if (p.cameraZ != null) {
+    p.camZ = p.camZ ?? p.cameraZ;
+  }
+
+  // Parity synonyms
+  if (p.physicsParityMode != null) {
+    p.parityMode = p.parityMode ?? p.physicsParityMode;
+    p.isParity   = p.isParity   ?? p.physicsParityMode;
+  }
+
+  return p;
+}
+
+function pushUniformsWhenReady(engine: any, payload: any, retries = 24) {
+  if (!engine) return;
+  const bundle = compatifyUniforms(payload);
 
   const tryPush = () => {
-    try { e.updateUniforms?.(payload); } catch {}
-    try { e.setParams?.(payload); }      catch {}
+    try { engine.updateUniforms?.(bundle); } catch {}
+    try { engine.setParams?.(bundle); }      catch {}
   };
 
-  // Push immediately (don't gate on internal fields)
+  // push immediately
   tryPush();
 
-  // And again for a few frames to catch late init / resize
-  if (retries > 0) requestAnimationFrame(() => pushUniformsWhenReady(e, payload, retries - 1));
+  // push again on a few frames (late init, async resize, etc.)
+  if (retries > 0) {
+    requestAnimationFrame(() => pushUniformsWhenReady(engine, payload, retries - 1));
+  }
 }
 
 /* ---------------- Pane configurators ---------------- */
