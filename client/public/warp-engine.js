@@ -1,12 +1,6 @@
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
-// Runtime guard to prevent double-renders
-if (window.__WARP_ENGINE_ACTIVE && !window.__WARP_ENGINE_ALLOW_MULTI) {
-  console.warn('Duplicate warp engine blocked. Active:', window.__WARP_ENGINE_ACTIVE);
-  throw new Error('Second WarpEngine prevented from starting');
-}
-window.__WARP_ENGINE_ACTIVE = 'warp-engine';
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 const GRID_DEFAULTS = {
@@ -21,6 +15,14 @@ const SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? s
 
 class WarpEngine {
     constructor(canvas) {
+        // Per-canvas guard: allow multiple engines across different canvases
+        if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
+        if (window.__WARP_ENGINES.has(canvas) && !window.__WARP_ENGINE_ALLOW_MULTI) {
+            console.warn('Duplicate WarpEngine on the same canvas blocked.');
+            throw new Error('WarpEngine already attached to this canvas');
+        }
+        window.__WARP_ENGINES.add(canvas);
+        
         this.canvas = canvas;
         this.gl = canvas.getContext('webgl2', {
             alpha: false,
@@ -1553,6 +1555,11 @@ class WarpEngine {
     }
 
     destroy() {
+        // Clean up per-canvas guard
+        if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
+            window.__WARP_ENGINES.delete(this.canvas);
+        }
+        
         // Cancel animation frame
         if (this._raf) {
             cancelAnimationFrame(this._raf);
