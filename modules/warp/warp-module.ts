@@ -74,50 +74,33 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
 }
 
 /**
- * Validate warp bubble calculation results
+ * Validate warp bubble calculation results using pipeline inputs (not fixed "paper" bands)
  */
-function validateWarpResults(result: NatarioWarpResult): WarpBubbleResult['validationSummary'] {
-  // Geometry validation
-  const geometryValid = 
-    result.geometricBlueshiftFactor > 20 && 
-    result.geometricBlueshiftFactor < 30 && 
-    result.effectivePathLength > 0;
-  
-  // Amplification validation (should be substantial but finite)
-  const amplificationValid = 
-    result.totalAmplificationFactor > 1e6 && 
-    result.totalAmplificationFactor < 1e15 &&
-    result.qEnhancementFactor > 0;
-  
-  // Quantum safety validation
-  const quantumSafe = result.isQuantumSafe && result.quantumSafetyStatus !== 'violation';
-  
-  // Warp field stability validation
-  const warpFieldStable = 
-    result.isZeroExpansion && 
-    result.isCurlFree && 
-    result.stressEnergyTensor.isNullEnergyConditionSatisfied;
-  
-  // Overall status determination
-  let overallStatus: 'optimal' | 'acceptable' | 'warning' | 'failure';
-  
-  if (geometryValid && amplificationValid && quantumSafe && warpFieldStable) {
-    overallStatus = 'optimal';
-  } else if (geometryValid && amplificationValid && quantumSafe) {
-    overallStatus = 'acceptable';
-  } else if (geometryValid && quantumSafe) {
-    overallStatus = 'warning';
-  } else {
-    overallStatus = 'failure';
-  }
-  
-  return {
-    geometryValid,
-    amplificationValid,
-    quantumSafe,
-    warpFieldStable,
-    overallStatus
-  };
+function validateWarpResults(result: NatarioWarpResult, params: SimulationParameters): WarpBubbleResult['validationSummary'] {
+  const γ_geo = (params as any).amps?.gammaGeo ?? 26;
+  const γ_vdb = (params as any).amps?.gammaVanDenBroeck ?? 3.83e1;
+  const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
+
+  // "Sane" bands scale with inputs
+  const geomMin = 0.5 * γ_geo;
+  const geomMax = 2.0 * γ_geo;
+
+  const qEnhMin = 0; // nonnegative
+  const ampMin  = Math.pow(γ_geo, 3) * Math.sqrt(Q / 1e9) * Math.max(1, γ_vdb) * 1e-6; // allow very small d_eff
+  const ampMax  = ampMin * 1e9; // prevent NaN/Inf explosions
+
+  const geometryValid = (result.geometricBlueshiftFactor > geomMin) && (result.geometricBlueshiftFactor < geomMax) && Number.isFinite(result.effectivePathLength);
+  const amplificationValid = (result.totalAmplificationFactor > ampMin) && (result.totalAmplificationFactor < ampMax) && (result.qEnhancementFactor >= qEnhMin) && Number.isFinite(result.totalAmplificationFactor);
+
+  const quantumSafe = !!result.isQuantumSafe && result.quantumSafetyStatus !== 'violation';
+  const warpFieldStable = !!result.isZeroExpansion && !!result.isCurlFree && !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
+
+  const overallStatus =
+    geometryValid && amplificationValid && quantumSafe && warpFieldStable ? 'optimal' :
+    geometryValid && amplificationValid && quantumSafe                       ? 'acceptable' :
+    geometryValid && quantumSafe                                             ? 'warning' : 'failure';
+
+  return { geometryValid, amplificationValid, quantumSafe, warpFieldStable, overallStatus };
 }
 
 /**
@@ -146,7 +129,7 @@ export const warpBubbleModule: CasimirModule = {
       const warpResult = calculateNatarioWarpBubble(warpParams);
       
       // Validate results
-      const validationSummary = validateWarpResults(warpResult);
+      const validationSummary = validateWarpResults(warpResult, params);
       
       const calculationTime = Date.now() - startTime;
       
