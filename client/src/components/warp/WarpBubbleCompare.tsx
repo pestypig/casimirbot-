@@ -345,13 +345,16 @@ const applyReal = (
   if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
+  const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
 
   pushUniformsWhenReady(e, {
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
     physicsParityMode: true,
-    colorMode,
+    colorMode: colorModeIndex,
+    colorModeIndex,
+    colorModeName: colorMode,
     vizGain: 1,
     displayGain: 1,
     exposure: 4.2,      // slightly up from 3.8 but not blinding
