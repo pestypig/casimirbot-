@@ -122,18 +122,25 @@ function calculateStressEnergyTensor(
   const totalTiles = Math.max(1, 1.96e9); // Default tile count
   const rho = casimirEnergy / totalTiles / tileVolume;
   
-  // Apply configurable amplification factors (pipeline-driven, not hard-coded)
-  const gammaGeo = 26; // Default geometric amplification
-  const gammaVdB = 3.83e1; // Corrected Van den Broeck default
-  const qFactor = params.dynamicConfig?.cavityQ ?? 1e9;
-  const qGain = Math.sqrt(qFactor / 1e9); // Use sqrt model as default
-  
-  // Enhanced energy density using pipeline amplification chain
-  const rhoAmp = rho * Math.pow(gammaGeo, 3) * gammaVdB * qGain * sectorDutyEff;
-  
+  const gammaGeo  = params.dynamicConfig?.gammaGeo  ?? (params as any).gammaGeo  ?? 26;
+  const gammaVdB  = params.dynamicConfig?.gammaVanDenBroeck ?? (params as any).gammaVanDenBroeck ?? 2.86e5;
+  const qFactor   = params.dynamicConfig?.cavityQ   ?? (params as any).cavityQ   ?? 1e9;
+  const qSpoil    = params.dynamicConfig?.qSpoilingFactor ?? (params as any).qSpoilingFactor ?? 1;
+
+  // Choose your Q model (sqrt by default)
+  const qGain = Math.sqrt(qFactor / 1e9);
+
+  // ---- Build *instantaneous* energy density (no duty averaging yet)
+  const rho_inst = rho * Math.pow(gammaGeo, 3) * gammaVdB * qGain * qSpoil;
+
+  // ---- Export both: instantaneous and time-averaged (FR)
+  const rho_avg  = rho_inst * sectorDutyEff;
+
   return {
-    stressEnergyT00: rhoAmp,     // Keep sign from pipeline
-    stressEnergyT11: -rhoAmp,    // EOS w = -1 for exotic matter
+    stressEnergyT00: rho_avg,
+    stressEnergyT11: -rho_avg,
+    // @ts-expect-error: add fields to result type or export separately
+    stressEnergyT00_inst: rho_inst
   };
 }
 
