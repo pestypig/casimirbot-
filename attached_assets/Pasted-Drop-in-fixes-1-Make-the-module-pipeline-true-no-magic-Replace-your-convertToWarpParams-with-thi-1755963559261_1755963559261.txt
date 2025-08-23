@@ -1,0 +1,51 @@
+Drop-in fixes
+1) Make the module pipeline-true (no magic)
+
+Replace your convertToWarpParams with this version. It derives everything from the pipeline snapshot inside SimulationParameters, resolves FR duty, and normalizes units. It assumes simulationParams.geometry.hull exists (add tiny guards if not).
+
+// modules/warp/warp-bubble.module.ts (replace convertToWarpParams)
+function resolveDutyEff(params: SimulationParameters): number {
+  const S = Math.max(1, Math.floor(params.dynamicConfig?.sectorCount ?? 1));
+  // Prefer FR duty if burst/dwell are provided
+  const burst = params.dynamicConfig?.burstLengthUs;
+  const dwell = params.dynamicConfig?.cycleLengthUs;
+  if (Number.isFinite(burst) && Number.isFinite(dwell) && (dwell as number) > 0) {
+    return Math.max(0, Math.min(1, (burst as number) / (dwell as number) / S));
+  }
+  const d = Math.max(0, Math.min(1, params.dynamicConfig?.sectorDuty ?? params.dynamicConfig?.dutyLocal ?? params.dynamicConfig?.dutyCycle ?? 0.14));
+  return Math.max(0, Math.min(1, d / S));
+}
+
+function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
+  const dyn = params.dynamicConfig ?? ({} as NonNullable<SimulationParameters["dynamicConfig"]>);
+  const hull = params.geometry?.hull ?? { a: 503.5, b: 132.0, c: 86.5 }; // meters
+  const R_geom_m = Math.cbrt(hull.a * hull.b * hull.c);                   // meters
+  const R_geom_um = R_geom_m * 1e6;                                       // Natário file expects µm
+
+  // Single source of truth
+  const sectorCount = Math.max(1, Math.floor(dyn.sectorCount ?? params.arrayConfig?.sectors ?? 1));
+  const d_eff = resolveDutyEff(params);
+
+  return {
+    // Geometry (Natário warp currently expects µm & nm)
+    bowlRadius: R_geom_um,                                // µm
+    sagDepth: params.sagDepth ?? 16,                      // nm
+    gap: params.gap ?? 1,                                 // nm
+
+    // Dynamics (from pipeline)
+    cavityQ: dyn.cavityQ ?? 1e9,
+    burstDuration: dyn.burstLengthUs ?? 10,               // µs
+    cycleDuration: dyn.cycleLengthUs ?? 1000,            // µs
+
+    // Strobing (pipeline values only)
+    sectorCount,
+    dutyFactor: (dyn.dutyLocal ?? dyn.dutyCycle ?? 0.14), // local burst duty (0..1), before sector division
+    effectiveDuty: d_eff,                                 // ship-wide FR duty (0..1)
+
+    // Warp-field microscopic stroke
+    shiftAmplitude: (dyn.strokeAmplitudePm ?? 50) * 1e-12, // pm → m
+
+    // Tight but configurable tolerance
+    expansionTolerance: params.tolerances?.zeroExpansionTol ?? 1e-12,
+  };
+}

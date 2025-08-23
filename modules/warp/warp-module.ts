@@ -21,35 +21,55 @@ export interface WarpBubbleResult extends NatarioWarpResult {
 }
 
 /**
- * Convert simulation parameters to Natário warp parameters
+ * Resolve effective duty from pipeline parameters
+ */
+function resolveDutyEff(params: SimulationParameters): number {
+  const S = Math.max(1, Math.floor(params.dynamicConfig?.sectorCount ?? 1));
+  // Prefer FR duty if burst/dwell are provided
+  const burst = params.dynamicConfig?.burstLengthUs;
+  const dwell = params.dynamicConfig?.cycleLengthUs;
+  if (Number.isFinite(burst) && Number.isFinite(dwell) && (dwell as number) > 0) {
+    return Math.max(0, Math.min(1, (burst as number) / (dwell as number) / S));
+  }
+  const d = Math.max(0, Math.min(1, params.dynamicConfig?.sectorDuty ?? 0.14));
+  return Math.max(0, Math.min(1, d / S));
+}
+
+/**
+ * Convert simulation parameters to Natário warp parameters (pipeline-true)
  */
 function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
-  const dynamicConfig = params.dynamicConfig;
-  
-  if (!dynamicConfig) {
-    throw new Error('Dynamic configuration required for warp bubble calculations');
-  }
-  
+  const dyn = params.dynamicConfig ?? ({} as NonNullable<SimulationParameters["dynamicConfig"]>);
+  // Use default hull dimensions for Needle Hull geometry
+  const hull = { a: 503.5, b: 132.0, c: 86.5 }; // meters
+  const R_geom_m = Math.cbrt(hull.a * hull.b * hull.c);                   // meters
+  const R_geom_um = R_geom_m * 1e6;                                       // Natário file expects µm
+
+  // Single source of truth
+  const sectorCount = Math.max(1, Math.floor(dyn.sectorCount ?? 1));
+  const d_eff = resolveDutyEff(params);
+
   return {
-    // Geometry parameters (use paper's needle hull specifications)
-    bowlRadius: params.radius || 20000,  // μm (40 μm diameter = 20 μm radius)
-    sagDepth: params.sagDepth || 16,     // nm (optimal from paper)
-    gap: params.gap || 1,                // nm
-    
-    // Dynamic Casimir parameters
-    cavityQ: dynamicConfig.cavityQ || 1e9,
-    burstDuration: dynamicConfig.burstLengthUs || 10,     // μs
-    cycleDuration: dynamicConfig.cycleLengthUs || 1000,   // μs
-    
-    // Sector strobing parameters (from papers)
-    sectorCount: dynamicConfig.sectorCount || 400,        // S = 400
-    dutyFactor: 0.01,                                     // d = 1%
-    effectiveDuty: dynamicConfig.sectorDuty || 2.5e-5,   // d_eff = 2.5×10^-5
-    
-    // Warp field parameters
-    shiftAmplitude: dynamicConfig.strokeAmplitudePm ? 
-      dynamicConfig.strokeAmplitudePm * 1e-12 : 1e-10,   // Convert pm to m
-    expansionTolerance: 1e-12,                            // Zero-expansion tolerance
+    // Geometry (Natário warp currently expects µm & nm)
+    bowlRadius: R_geom_um,                                // µm
+    sagDepth: params.sagDepth ?? 16,                      // nm
+    gap: params.gap ?? 1,                                 // nm
+
+    // Dynamics (from pipeline)
+    cavityQ: dyn.cavityQ ?? 1e9,
+    burstDuration: dyn.burstLengthUs ?? 10,               // µs
+    cycleDuration: dyn.cycleLengthUs ?? 1000,            // µs
+
+    // Strobing (pipeline values only)
+    sectorCount,
+    dutyFactor: dyn.sectorDuty ?? 0.14,                   // local burst duty (0..1), before sector division
+    effectiveDuty: d_eff,                                 // ship-wide FR duty (0..1)
+
+    // Warp-field microscopic stroke
+    shiftAmplitude: (dyn.strokeAmplitudePm ?? 50) * 1e-12, // pm → m
+
+    // Tight but configurable tolerance
+    expansionTolerance: dyn.expansionTolerance ?? 1e-12,
   };
 }
 

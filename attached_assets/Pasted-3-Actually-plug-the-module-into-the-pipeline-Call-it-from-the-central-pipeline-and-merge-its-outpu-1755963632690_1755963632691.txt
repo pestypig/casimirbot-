@@ -1,0 +1,45 @@
+3) Actually plug the module into the pipeline
+
+Call it from the central pipeline and merge its outputs into the shared snapshot your hooks/visualizers already consume.
+
+// server/energy-pipeline.ts
+import warpBubbleModule from '../modules/warp/warp-bubble.module.js';
+
+export async function computeEnergySnapshot(sim: SimulationParameters) {
+  // …your existing static/dynamic calls…
+
+  // Run Natário warp (now pipeline-true)
+  const warp = await warpBubbleModule.calculate(sim);
+
+  // Expose to clients (names match what your adapters expect)
+  return {
+    // existing fields…
+    gammaGeo: sim.amps?.gammaGeo ?? 26,
+    gammaVanDenBroeck: sim.amps?.gammaVanDenBroeck ?? 3.83e1,
+    qCavity: sim.dynamicConfig?.cavityQ ?? 1e9,
+    qSpoilingFactor: sim.amps?.qSpoilingFactor ?? 1,
+
+    // strobing
+    dutyCycle: sim.dynamicConfig?.dutyCycle ?? sim.dynamicConfig?.dutyLocal ?? 0.14,
+    sectorStrobing: sim.dynamicConfig?.sectorCount ?? 1,
+    dutyEffectiveFR: ((): number => {
+      const d_eff = (sim.dynamicConfig?.burstLengthUs && sim.dynamicConfig?.cycleLengthUs)
+        ? (sim.dynamicConfig.burstLengthUs / sim.dynamicConfig.cycleLengthUs) / Math.max(1, sim.dynamicConfig.sectorCount ?? 1)
+        : (sim.dynamicConfig?.sectorDuty ?? 0.14 / Math.max(1, sim.dynamicConfig?.sectorCount ?? 1));
+      return Math.max(0, Math.min(1, d_eff));
+    })(),
+
+    // Natário / stress-energy surface (time-averaged)
+    T00_avg: warp.stressEnergyTensor?.T00,
+    T11_avg: warp.stressEnergyTensor?.T11,
+    beta_avg: warp.betaAvg ?? warp.natarioShiftAmplitude, // whichever name your natário-warp uses
+    gr_ok: warp.validationSummary.warpFieldStable,
+    natarioConstraint: warp.isZeroExpansion ?? true,
+
+    // diagnostics
+    warpModule: { timeMs: warp.calculationTime, status: warp.validationSummary.overallStatus }
+  };
+}
+
+
+Once this lands, your use-energy-pipeline hook, driveWarpFromPipeline, WarpVisualizer, and WarpBubbleCompare all see the same γ/Q/duty numbers and the SHOW pane stops black-screening from mismatched magnitudes.
