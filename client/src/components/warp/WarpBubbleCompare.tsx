@@ -175,8 +175,8 @@ const applyReal = (
     colorMode,
     vizGain: 1,
     displayGain: 1,
-    exposure: 3.8,
-    zeroStop: 1e-6,
+    exposure: 5.0,         // was 3.8 - temporary debug visibility boost
+    zeroStop: 1e-7,        // was 1e-6 - capture smaller values
     cosmeticLevel: 0,
     curvatureGainDec: 0,
     curvatureGainT: 0,

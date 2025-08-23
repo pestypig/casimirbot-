@@ -1,0 +1,63 @@
+F) Props mismatch: gammaGeo never reaches the engine
+
+Your SHOW path uses the same resolveThetaScale as REAL. If you only pass g_y but not gammaGeo, the scale may default to 26. Make the SHOW helper accept both (you already have this in some places; ensure it’s in the exact file you’re running):
+
+const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
+const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? p?.sectorStrobing ?? 1));
+let duty = Number(p?.dutyCycle ?? 0.14);
+if (Number.isFinite(p?.dutyEffectiveFR)) duty = Number(p.dutyEffectiveFR);
+
+
+And ensure you pass sectors explicitly in compareParams.
+
+Minimal defensive patch to applyShow (safe + verbose)
+const applyShow = (
+  e: any,
+  sharedIn: ReturnType<typeof frameFromHull>,
+  canvas: HTMLCanvasElement,
+  colorMode: 'theta'|'shear'|'solid',
+  opts: { T?: number; boostMax?: number; decades?: number; vizGain?: number; exposure?: number; zeroStop?: number; }
+) => {
+  const { T=0.70, boostMax=40, decades=3, vizGain=1.25, exposure=7.5, zeroStop=1e-7 } = opts || {};
+  primeOnce(e, sharedIn, colorMode);
+
+  let shared = sharedIn;
+  const axesOK = shared?.axesScene?.every?.((n:any)=>Number.isFinite(n)&&Math.abs(n)>0);
+  if (!axesOK) {
+    console.warn('[SHOW] invalid axesScene, fixing');
+    shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+  }
+
+  const camZraw = compactCameraZ(canvas, shared.axesScene);
+  const camZ = Number.isFinite(camZraw) ? camZraw : 2.0;
+
+  const t = clamp01(T);
+  const b = Math.max(1, boostMax);
+
+  console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'dec', decades, 'viz', vizGain, 'exp', exposure, 'zstop', zeroStop);
+
+  pushUniformsWhenReady(e, {
+    ...shared,
+    cameraZ: camZ,
+    lockFraming: true,
+    physicsParityMode: false,
+    colorMode,
+    curvatureGainT: t,
+    curvatureBoostMax: b,
+    curvatureGainDec: Math.max(0, Math.min(8, decades)),
+    vizGain,
+    exposure,
+    zeroStop,
+    cosmeticLevel: 10,
+  }, 60);
+
+  const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b;
+  e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
+  e.requestRewarp?.();
+
+  // context check
+  if (e?.gl?.isContextLost?.()) {
+    console.warn('[SHOW] context lost – attempting restore');
+    e.gl.getExtension('WEBGL_lose_context')?.restoreContext?.();
+  }
+};
