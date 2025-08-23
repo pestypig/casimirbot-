@@ -40,7 +40,7 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
   }
 
   // Nuke caching that can pin the old engine
-  if (forceReload || (Ctor && currentBuild !== requiredBuild)) {
+  if (forceReload) {
     console.log('[WARP LOADER] Nuking Service Worker cache');
     try {
       // Service Worker / PWA: unregister & prepare for hard-reload
@@ -74,7 +74,7 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
   if (Ctor) {
     // Stamp a build token so we can verify later even if the engine lacks BUILD
     w.__WarpEngineBuild = w.WarpEngine?.BUILD || requiredBuild;
-    console.log('[WARP LOADER] Loaded WarpEngine', { src: url, build: w.__WarpEngineBuild });
+    console.log('[WARP LOADER] Loaded WarpEngine', { build: w.__WarpEngineBuild });
     return Ctor;
   }
   throw new Error('WarpEngine constructor not found after reload');
@@ -404,7 +404,7 @@ const applyShow = (
   const t = clamp01(T);
   const b = Math.max(1, boostMax);
 
-  // Use numeric color mode for engine compatibility
+  // Use numeric color mode for engine compatibility (engine: 0=solid,1=theta,2=shear)
   const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
 
   console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
@@ -552,7 +552,7 @@ export default function WarpBubbleCompare({
           
           // Force immediate initialization with bulletproof cameraZ
           const initCamZ = safeCamZ(2.0);  // fallback to safe default
-          const initColor = 0; // theta
+          const initColor = 1; // theta (engine expects 0=solid,1=theta,2=shear)
           leftEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
           rightEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
           
