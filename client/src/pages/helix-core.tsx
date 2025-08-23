@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpBubbleCompare = lazy(() =>
@@ -196,6 +196,8 @@ export default function HelixCore() {
     () => Array.from({ length: 400 }, (_, i) => ({ id: `S${i + 1}` })), []
   );
 
+  const queryClient = useQueryClient();
+
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [mainframeLog, setMainframeLog] = useState<string[]>([
     "[HELIX-CORE] System initialized",
@@ -341,11 +343,11 @@ export default function HelixCore() {
     : (modeCfg.sectorStrobing ?? 1);
   
   const sectorsResolved = useMemo(() => {
-    const s = Number(systemMetrics?.sectorStrobing);
+    const s = Number(systemMetrics?.totalSectors ?? systemMetrics?.sectorStrobing);
     if (Number.isFinite(s) && s > 0) return Math.max(1, Math.floor(s));
     const u = Number(sectorsUI);
     return Math.max(1, Math.floor(Number.isFinite(u) ? u : 1));
-  }, [systemMetrics?.sectorStrobing, sectorsUI]);
+  }, [systemMetrics?.sectorStrobing, systemMetrics?.totalSectors, sectorsUI]);
 
   // Calculate hull geometry before using it
   const hull = (hullMetrics && hullMetrics.hull) ? {
@@ -357,7 +359,7 @@ export default function HelixCore() {
 
   // Shared light-crossing loop for synchronized strobing across all visual components  
   const lc = useLightCrossingLoop({
-    sectorStrobing: systemMetrics?.sectorStrobing ?? sectorsResolved,
+    sectorStrobing: systemMetrics?.totalSectors ?? sectorsResolved,
     currentSector: systemMetrics?.currentSector ?? 0,
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,  // Restored authentic physics timing
     duty: dutyUI,
@@ -700,10 +702,16 @@ export default function HelixCore() {
                   className={`font-mono ${isActive ? 'bg-cyan-600 text-white' : 'bg-slate-900'}`}
                   onClick={() => {
                     if (!isActive) {
-                      switchMode.mutate(m.key as any);
-                      setModeVersion(v => v + 1); // force visualizer remount for instant change
+                      switchMode.mutate(m.key as any, {
+                        onSuccess: () => {
+                          // make both sides refresh
+                          queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+                          queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                        }
+                      });
+                      setModeVersion(v => v + 1);
+                      refetchMetrics();
                       setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
-                      refetchMetrics(); // ⬅️ add
                     }
                   }}
                 >
@@ -975,7 +983,13 @@ export default function HelixCore() {
                 <Select 
                   value={pipeline?.currentMode || 'hover'}
                   onValueChange={(mode) => {
-                    switchMode.mutate(mode as any);
+                    switchMode.mutate(mode as any, {
+                      onSuccess: () => {
+                        // make both sides refresh
+                        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+                        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                      }
+                    });
                     setMainframeLog(prev => [
                       ...prev,
                       `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].dutyCycle*100).toFixed(1)}%, sectors=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorStrobing})...`
@@ -1658,7 +1672,13 @@ export default function HelixCore() {
               })}
               setMode={(mode) => {
                 if (switchMode) {
-                  switchMode.mutate(mode as any);
+                  switchMode.mutate(mode as any, {
+                    onSuccess: () => {
+                      // make both sides refresh
+                      queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                    }
+                  });
                   // Bump mode version to force WarpVisualizer remount
                   setModeVersion(v => v + 1);
                   // Luma whisper on mode change
