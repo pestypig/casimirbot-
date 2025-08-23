@@ -48,6 +48,34 @@ function ensureStrobeMux() {
   w.__addStrobingListener = (fn: Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
 }
 
+/* ---------------- Canvas & Safety helpers ---------------- */
+function ensureCanvasSize(canvas: HTMLCanvasElement) {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const cw = (canvas.clientWidth  || 800) * dpr;
+  const ch = (canvas.clientHeight || 320) * dpr;
+  if (canvas.width !== cw)  canvas.width  = cw;
+  if (canvas.height !== ch) canvas.height = ch;
+}
+
+const safeCamZ = (cv: number) => (Number.isFinite(cv) && Math.abs(cv) > 1e-9) ? cv : 2.0;
+
+let showSafeFallbackDone = false;
+
+function applyShowSafe(e:any, payload:any) {
+  pushUniformsWhenReady(e, payload);
+  requestAnimationFrame(() => {
+    const anyVerts = (e?.gridVertices?.length || 0) + (e?.originalGridVertices?.length || 0);
+    const anyReady = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
+    if (!anyReady && !showSafeFallbackDone) {
+      showSafeFallbackDone = true;
+      pushUniformsWhenReady(e, { cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
+      e.setDisplayGain?.(1);
+      e.requestRewarp?.();
+      console.warn('[SHOW] cosmetics disabled as safety fallback');
+    }
+  });
+}
+
 /* ---------------- Physics scalar helpers ---------------- */
 type DutySource = 'fr' | 'ui';
 
@@ -339,6 +367,11 @@ export default function WarpBubbleCompare({
         const WarpCtor = await ensureWarpEngineCtor();
         if (cancelled) return;
 
+        // StrictMode re-mount guard (prevents double constructor crashes in dev)
+        const busy = (window as any).__warpCompareBusy ?? false;
+        if (busy) return;
+        (window as any).__warpCompareBusy = true;
+
         try {
           console.log('[WARP ENGINE] Attempting to create engines with:', {
             constructor: typeof WarpCtor,
@@ -348,11 +381,16 @@ export default function WarpBubbleCompare({
             rightCanvasSize: rightRef.current ? `${rightRef.current.width}x${rightRef.current.height}` : 'N/A'
           });
           
-          leftEngine.current  = new WarpCtor(leftRef.current);
-          console.log('[WARP ENGINE] Left engine created:', !!leftEngine.current);
+          // Ensure canvas has pixels before engine creation
+          ensureCanvasSize(leftRef.current!);
+          ensureCanvasSize(rightRef.current!);
           
+          leftEngine.current  = new WarpCtor(leftRef.current);
           rightEngine.current = new WarpCtor(rightRef.current);
-          console.log('[WARP ENGINE] Right engine created:', !!rightEngine.current);
+          
+          console.log('[WARP ENGINE] Engines created, triggering resize');
+          leftEngine.current?._resize?.();
+          rightEngine.current?._resize?.();
           
           // Force immediate initialization
           leftEngine.current?.setParams?.({thetaScale: 1.0, sectors: 400, cameraZ: 2.0});
@@ -370,6 +408,8 @@ export default function WarpBubbleCompare({
             rightCanvas: !!rightRef.current
           });
           return;
+        } finally {
+          (window as any).__warpCompareBusy = false;
         }
         
         ensureStrobeMux();
@@ -427,7 +467,7 @@ export default function WarpBubbleCompare({
         rightEngine.current?.setSceneScale?.((window as any).sceneScale);
 
         // ensure only the calibrated hull model draws
-        const killMixing = {
+        const killMixingReal = {
           modelMode: 'calibrated',   // engine will prefer calibrated chain
           // defensively zero any demo weights if the engine exposes them:
           unitBubbleWeight: 0,
@@ -435,8 +475,15 @@ export default function WarpBubbleCompare({
           refHullAlpha: 0,
           onWindow: false,           // no instantaneous overlay
         };
-        pushUniformsWhenReady(leftEngine.current,  killMixing);
-        pushUniformsWhenReady(rightEngine.current, killMixing);
+        const killMixingShow = {
+          modelMode: 'calibrated',   // engine will prefer calibrated chain
+          unitBubbleWeight: 0,
+          demoBubbleWeight: 0,
+          refHullAlpha: 0,
+          // no onWindow here - keep it enabled for SHOW
+        };
+        pushUniformsWhenReady(leftEngine.current,  killMixingReal);
+        pushUniformsWhenReady(rightEngine.current, killMixingShow);
 
         // neutralize stray demo globals
         (window as any).__warp_setGainDec = () => {};
@@ -454,20 +501,21 @@ export default function WarpBubbleCompare({
           leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
           scrubOverlays(leftEngine.current);
 
-          applyShow(
-            rightEngine.current,
-            shared,
-            R,
-            (showParams?.viz?.colorMode ?? colorMode) as any,
-            {
-              T: showParams?.viz?.curvatureGainT ?? 0.70,
-              boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
-              decades: showParams?.curvatureGainDec ?? 3,
-              vizGain: 1.25,
-              exposure: showParams?.viz?.exposure ?? 7.5,
-              zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
-            }
-          );
+          // Use safety wrapper for SHOW pane to handle black screen issues
+          const showPayload = {
+            ...shared,
+            colorMode: (showParams?.viz?.colorMode ?? colorMode) as any,
+            T: showParams?.viz?.curvatureGainT ?? 0.70,
+            boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
+            decades: showParams?.curvatureGainDec ?? 3,
+            vizGain: 1.25,
+            exposure: showParams?.viz?.exposure ?? 7.5,
+            zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
+          };
+          
+          // Apply show with cosmetic safety fallback
+          applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
+          applyShowSafe(rightEngine.current, showPayload);
           scrubOverlays(rightEngine.current);
         });
 
@@ -538,7 +586,7 @@ export default function WarpBubbleCompare({
     rightEngine.current?.setSceneScale?.((window as any).sceneScale);
 
     // ensure only the calibrated hull model draws
-    const killMixing = {
+    const killMixingReal = {
       modelMode: 'calibrated',   // engine will prefer calibrated chain
       // defensively zero any demo weights if the engine exposes them:
       unitBubbleWeight: 0,
@@ -546,26 +594,34 @@ export default function WarpBubbleCompare({
       refHullAlpha: 0,
       onWindow: false,           // no instantaneous overlay
     };
-    pushUniformsWhenReady(leftEngine.current,  killMixing);
-    pushUniformsWhenReady(rightEngine.current, killMixing);
+    const killMixingShow = {
+      modelMode: 'calibrated',   // engine will prefer calibrated chain
+      unitBubbleWeight: 0,
+      demoBubbleWeight: 0,
+      refHullAlpha: 0,
+      // no onWindow here - keep it enabled for SHOW
+    };
+    pushUniformsWhenReady(leftEngine.current,  killMixingReal);
+    pushUniformsWhenReady(rightEngine.current, killMixingShow);
 
     applyReal(leftEngine.current,  shared, leftRef.current,  (parityParams?.viz?.colorMode ?? colorMode) as any);
     leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
 
-    applyShow(
-      rightEngine.current,
-      shared,
-      rightRef.current,
-      (showParams?.viz?.colorMode ?? colorMode) as any,
-      {
-        T: showParams?.viz?.curvatureGainT ?? 0.70,
-        boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
-        decades: showParams?.curvatureGainDec ?? 3,
-        vizGain: 1.25,
-        exposure: showParams?.viz?.exposure ?? 7.5,
-        zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
-      }
-    );
+    // Use safety wrapper for SHOW pane to handle black screen issues
+    const showPayload = {
+      ...shared,
+      colorMode: (showParams?.viz?.colorMode ?? colorMode) as any,
+      T: showParams?.viz?.curvatureGainT ?? 0.70,
+      boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
+      decades: showParams?.curvatureGainDec ?? 3,
+      vizGain: 1.25,
+      exposure: showParams?.viz?.exposure ?? 7.5,
+      zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
+    };
+    
+    // Apply show with cosmetic safety fallback
+    applyShow(rightEngine.current, shared, rightRef.current!, showPayload.colorMode, showPayload);
+    applyShowSafe(rightEngine.current, showPayload);
 
     scrubOverlays(leftEngine.current);
     scrubOverlays(rightEngine.current);
