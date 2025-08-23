@@ -426,7 +426,7 @@ class WarpEngine {
                 for (let x = 0; x < divisions; ++x) {
                     const x0 = (-half + x * step) * norm;
                     const x1 = (-half + (x + 1) * step) * norm;
-                    const yBase = -0.15 + 0.05 * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                    const yBase = 0.0 + 0.05 * Math.sin(x0 * 2) * Math.cos(zPos * 3);
                     verts.push(x0, yBase, zPos, x1, yBase, zPos);  // X-lines
                 }
             }
@@ -435,14 +435,14 @@ class WarpEngine {
                 for (let z = 0; z < divisions; ++z) {
                     const z0 = (-half + z * step) * norm;
                     const z1 = (-half + (z + 1) * step) * norm;
-                    const yBase = -0.15 + 0.05 * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                    const yBase = 0.0 + 0.05 * Math.sin(xPos * 2) * Math.cos(z0 * 3);
                     verts.push(xPos, yBase, z0, xPos, yBase, z1);  // Z-lines
                 }
             }
         }
         else if (plane === 'XZ') {
             // Side wall grid - vertical sheet, offset from camera axis for visibility
-            const ySheet = 0.25;  // Move away from camera axis (25% of clip cube)
+            const ySheet = 0.0;
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let x = 0; x < divisions; ++x) {
@@ -462,7 +462,7 @@ class WarpEngine {
         }
         else if (plane === 'YZ') {
             // End wall grid - vertical sheet, offset from camera axis for visibility
-            const xSheet = 0.25;  // Move away from camera axis (25% of clip cube)
+            const xSheet = 0.0;
             for (let z = 0; z <= divisions; ++z) {
                 const zPos = (-half + z * step) * norm;
                 for (let y = 0; y < divisions; ++y) {
