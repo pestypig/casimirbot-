@@ -124,7 +124,7 @@ function scrubOverlays(e: any) {
     if (/(^|_)unit(|_)?(bubble|ring|blend|weight)?/i.test(k)) patch[k] = 0;
     if (/demo(|Mix|Blend|Weight|Ring|Layer)/i.test(k))        patch[k] = 0;
     if (/(ref|reference).*(hull|ring|layer|alpha)/i.test(k))  patch[k] = 0;
-    if (/onWindow|showInst|instant/i.test(k))                  patch[k] = 0;
+    // Keep average view on, but don't kill FR window gating.
     if (/avg|showAvg|viewAvg/i.test(k))                        patch[k] = 1;
   }
 
@@ -345,6 +345,7 @@ export default function WarpBubbleCompare({
 
         requestAnimationFrame(() => {
           applyReal(leftEngine.current, shared, L, (parityParams?.viz?.colorMode ?? colorMode) as any);
+          leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
           scrubOverlays(leftEngine.current);
 
           applyShow(
@@ -443,6 +444,7 @@ export default function WarpBubbleCompare({
     pushUniformsWhenReady(rightEngine.current, killMixing);
 
     applyReal(leftEngine.current,  shared, leftRef.current,  (parityParams?.viz?.colorMode ?? colorMode) as any);
+    leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
 
     applyShow(
       rightEngine.current,
