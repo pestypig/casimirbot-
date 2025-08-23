@@ -536,8 +536,10 @@ export function getTileStatus(req: Request, res: Response) {
 }
 
 // Initialize the global pipeline state
-const pipelineState = calculateEnergyPipeline(initializePipelineState());
-setGlobalPipelineState(pipelineState);
+(async () => {
+  const pipelineState = await calculateEnergyPipeline(initializePipelineState());
+  setGlobalPipelineState(pipelineState);
+})();
 
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
@@ -683,9 +685,9 @@ export async function updatePipelineParams(req: Request, res: Response) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid parameters", issues: parsed.error.issues });
     }
-    const newState = await pipeMutex.lock(() => {
+    const newState = await pipeMutex.lock(async () => {
       const curr = getGlobalPipelineState();
-      const next = updateParameters(curr, parsed.data);
+      const next = await updateParameters(curr, parsed.data);
       setGlobalPipelineState(next);
       return next;
     });
@@ -702,9 +704,9 @@ export async function switchOperationalMode(req: Request, res: Response) {
     if (!['hover','cruise','emergency','standby'].includes(mode)) {
       return res.status(400).json({ error: "Invalid mode" });
     }
-    const newState = await pipeMutex.lock(() => {
+    const newState = await pipeMutex.lock(async () => {
       const curr = getGlobalPipelineState();
-      const next = switchMode(curr, mode as EnergyPipelineState['currentMode']);
+      const next = await switchMode(curr, mode as EnergyPipelineState['currentMode']);
       setGlobalPipelineState(next);
       return next;
     });

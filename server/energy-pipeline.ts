@@ -12,6 +12,7 @@ import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
 import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
 import { toPipelineStressEnergy } from '../modules/dynamic/stress-energy-equations.js';
+import warpBubbleModule from '../modules/warp/warp-module.js';
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
 export type HullAxes = { a: number; b: number; c: number };
@@ -292,7 +293,7 @@ function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
 }
 
 // Main pipeline calculation
-export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipelineState {
+export async function calculateEnergyPipeline(state: EnergyPipelineState): Promise<EnergyPipelineState> {
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
 
@@ -652,19 +653,65 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
     console.warn('Stress-energy calculation failed:', e);
   }
   
+  // Calculate Natário warp bubble results (now pipeline-true)
+  try {
+    const hullGeomWarp = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
+    const a_warp = hullGeomWarp.Lx_m / 2;
+    const b_warp = hullGeomWarp.Ly_m / 2;
+    const c_warp = hullGeomWarp.Lz_m / 2;
+    const geomR_warp = Math.cbrt(a_warp * b_warp * c_warp); // meters
+    
+    const warpParams = {
+      geometry: 'bowl' as const,
+      gap: state.gap_nm ?? 1,
+      radius: geomR_warp * 1e6, // Convert meters to micrometers for compatibility
+      sagDepth: state.sag_nm ?? 16,
+      material: 'PEC' as const,
+      temperature: state.temperature_K ?? 20,
+      moduleType: 'warp' as const,
+      dynamicConfig: {
+        modulationFreqGHz: state.modulationFreq_GHz ?? 15,
+        strokeAmplitudePm: 50,
+        burstLengthUs: 10,
+        cycleLengthUs: 1000,
+        cavityQ: state.qCavity ?? 1e9,
+        sectorCount: state.sectorCount ?? 400,
+        sectorDuty: (state as any).dutyEffectiveFR ?? 2.5e-5,
+        pulseFrequencyGHz: state.modulationFreq_GHz ?? 15,
+        lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6,
+        shiftAmplitude: 50e-12,
+        expansionTolerance: 1e-12,
+        warpFieldType: 'natario' as const
+      },
+      // Add amps field for validation bounds
+      amps: {
+        gammaGeo: state.gammaGeo ?? 26,
+        gammaVanDenBroeck: state.gammaVanDenBroeck ?? 3.83e1,
+        qSpoilingFactor: state.qSpoilingFactor ?? 1
+      }
+    };
+    
+    const warp = await warpBubbleModule.calculate(warpParams);
+    
+    // Store warp results in state for API access
+    (state as any).warp = warp;
+  } catch (e) {
+    console.warn('Warp bubble calculation failed:', e);
+  }
+  
   return state;
 }
 
 // Mode switching function
-export function switchMode(state: EnergyPipelineState, newMode: EnergyPipelineState['currentMode']): EnergyPipelineState {
+export async function switchMode(state: EnergyPipelineState, newMode: EnergyPipelineState['currentMode']): Promise<EnergyPipelineState> {
   state.currentMode = newMode;
-  return calculateEnergyPipeline(state);
+  return await calculateEnergyPipeline(state);
 }
 
 // Parameter update function
-export function updateParameters(state: EnergyPipelineState, params: Partial<EnergyPipelineState>): EnergyPipelineState {
+export async function updateParameters(state: EnergyPipelineState, params: Partial<EnergyPipelineState>): Promise<EnergyPipelineState> {
   Object.assign(state, params);
-  return calculateEnergyPipeline(state);
+  return await calculateEnergyPipeline(state);
 }
 
 // Export current pipeline state for external access
@@ -676,6 +723,76 @@ export function getGlobalPipelineState(): EnergyPipelineState {
 
 export function setGlobalPipelineState(state: EnergyPipelineState): void {
   globalPipelineState = state;
+}
+
+/**
+ * Compute energy snapshot for unified client consumption
+ * Calls the central pipeline and merges outputs into shared snapshot
+ */
+export async function computeEnergySnapshot(sim: any) {
+  // Convert sim to pipeline state format
+  const state = {
+    ...initializePipelineState(),
+    gap_nm: sim.gap ?? 1,
+    sag_nm: sim.sagDepth ?? 16,
+    temperature_K: sim.temperature ?? 20,
+    modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? 15,
+    currentMode: sim.mode ?? 'hover',
+    gammaGeo: sim.amps?.gammaGeo ?? 26,
+    qMechanical: sim.amps?.qMechanical ?? 1,
+    qCavity: sim.dynamicConfig?.cavityQ ?? 1e9,
+    gammaVanDenBroeck: sim.amps?.gammaVanDenBroeck ?? 3.83e1,
+    qSpoilingFactor: sim.amps?.qSpoilingFactor ?? 1,
+    dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
+    sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
+    exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405
+  };
+
+  // Run the unified pipeline calculation
+  const result = await calculateEnergyPipeline(state);
+
+  // Calculate Ford-Roman duty with proper fallback chain  
+  const dutyEffectiveFR = (() => {
+    const burst = sim.dynamicConfig?.burstLengthUs;
+    const dwell = sim.dynamicConfig?.cycleLengthUs;
+    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+      return Math.max(0, Math.min(1, burst / dwell / Math.max(1, sim.dynamicConfig?.sectorCount ?? 1)));
+    }
+    const d = Math.max(0, Math.min(1, sim.dynamicConfig?.sectorDuty ?? sim.dynamicConfig?.dutyLocal ?? sim.dynamicConfig?.dutyCycle ?? 0.14));
+    return Math.max(0, Math.min(1, d / Math.max(1, sim.dynamicConfig?.sectorCount ?? 1)));
+  })();
+
+  // Expose to clients (names match what adapters expect)
+  return {
+    // Core pipeline state
+    ...result,
+    
+    // Amplification parameters 
+    gammaGeo: result.gammaGeo,
+    gammaVanDenBroeck: result.gammaVanDenBroeck,
+    qCavity: result.qCavity,
+    qSpoilingFactor: result.qSpoilingFactor,
+
+    // Strobing parameters
+    dutyCycle: result.dutyCycle,
+    sectorStrobing: result.sectorStrobing,
+    dutyEffectiveFR,
+
+    // Natário / stress-energy surface (time-averaged)
+    T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,
+    T11_avg: (result as any).warp?.stressEnergyTensor?.T11 ?? (result as any).stressEnergy?.T11,
+    T22_avg: (result as any).warp?.stressEnergyTensor?.T22 ?? (result as any).stressEnergy?.T22,
+    T33_avg: (result as any).warp?.stressEnergyTensor?.T33 ?? (result as any).stressEnergy?.T33,
+    beta_avg: (result as any).warp?.betaAvg ?? (result as any).warp?.natarioShiftAmplitude ?? (result as any).stressEnergy?.beta_avg,
+    gr_ok: (result as any).warp?.validationSummary?.warpFieldStable ?? true,
+    natarioConstraint: (result as any).warp?.isZeroExpansion ?? result.natarioConstraint,
+
+    // Diagnostics
+    warpModule: (result as any).warp ? {
+      timeMs: (result as any).warp.calculationTime ?? 0,
+      status: (result as any).warp.validationSummary?.overallStatus ?? 'optimal'
+    } : { timeMs: 0, status: 'optimal' }
+  };
 }
 
 /**
