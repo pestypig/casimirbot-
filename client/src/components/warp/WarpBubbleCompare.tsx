@@ -60,6 +60,21 @@ function ensureStrobeMux() {
   w.__addStrobingListener = (fn: Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
 }
 
+/* ---------------- Uniform verification & physics validation ---------------- */
+function dumpUniforms(e:any, tag:string) {
+  const u = (e && e.uniforms) ? Object.keys(e.uniforms).sort() : [];
+  console.log(`[${tag}] engine uniforms:`, u);
+}
+
+const check = (label:string, o:any) => {
+  if (!Number.isFinite(o?.thetaScale) || o.thetaScale <= 0) {
+    console.warn(`[${label}] BAD thetaScale`, o);
+  }
+  if (!Number.isFinite(o?.cameraZ) || Math.abs(o.cameraZ) < 1e-9) {
+    console.warn(`[${label}] BAD cameraZ`, o);
+  }
+};
+
 /* ---------------- Canvas & Safety helpers ---------------- */
 function ensureCanvasSize(canvas: HTMLCanvasElement) {
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -432,6 +447,10 @@ export default function WarpBubbleCompare({
           
           console.log('[WARP ENGINE] Initialization complete, both engines ready');
           
+          // Verify uniforms actually exist (catch silent no-ops)
+          dumpUniforms(leftEngine.current,  'REAL');
+          dumpUniforms(rightEngine.current, 'SHOW');
+          
         } catch (error) {
           console.error('[WARP ENGINE] Creation failed:', {
             error: error,
@@ -560,6 +579,10 @@ export default function WarpBubbleCompare({
           applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
           applyShowSafe(rightEngine.current, showPayload);
           scrubOverlays(rightEngine.current);
+          
+          // Verify final physics scalars (catch NaNs that yield black)
+          check('REAL',  { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(L, shared.axesScene)) });
+          check('SHOW',  { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(R, shared.axesScene)) });
         });
 
         // lock framing across resizes (prevents "camera pulled back")
@@ -668,6 +691,10 @@ export default function WarpBubbleCompare({
 
     scrubOverlays(leftEngine.current);
     scrubOverlays(rightEngine.current);
+    
+    // Verify physics scalars on updates
+    check('REAL-UPDATE', { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene)) });
+    check('SHOW-UPDATE', { thetaScale: shared?.thetaScale || 1.0, cameraZ: safeCamZ(compactCameraZ(rightRef.current!, shared.axesScene)) });
   }, [
     parityParams?.hull?.a, parityParams?.hull?.b, parityParams?.hull?.c,
     showParams?.hull?.a, showParams?.hull?.b, showParams?.hull?.c,
