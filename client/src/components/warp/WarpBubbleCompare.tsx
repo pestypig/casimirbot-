@@ -1,7 +1,10 @@
 import React, { useEffect, useRef } from "react";
 
 // at top-level, set a build token (replace with your commit/ts)
-const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || "dev-" + Date.now();
+const APP_WARP_BUILD =
+  (window as any).__APP_WARP_BUILD ||
+  (window as any).__WarpEngineBuild || // reuse engine's stamped build if present
+  "dev";
 
 /* ---------------- Script loader & strobe mux ---------------- */
 function loadScript(src: string) {
@@ -27,7 +30,9 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
   let Ctor = w.WarpEngine?.default || w.WarpEngine;
   const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
   if (Ctor && !forceReload) {
-    if (!requiredBuild || currentBuild === requiredBuild) {
+    // In dev, accept any build; in prod, match the token
+    const dev = requiredBuild === 'dev';
+    if (dev || !requiredBuild || currentBuild === requiredBuild) {
       console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
       return Ctor;
     }
@@ -49,10 +54,20 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
     }
   }
 
-  // Remove any old <script> tags and load a fresh one with cache-bust
-  removeOldWarpScripts();
-  const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
-  await loadScript(url);
+  // Only inject if no script tag exists (avoid double execution)
+  const existing = Array.from(document.scripts).find(s => /\/warp-engine\.js(\?|$)/.test(s.src));
+  if (!existing) {
+    // Fresh load with cache-bust
+    const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
+    await loadScript(url);
+  } else {
+    // Wait for the existing tag to finish (or the global to appear)
+    await new Promise<void>((resolve, reject) => {
+      const ok = () => (w.WarpEngine ? resolve() : setTimeout(ok, 30));
+      existing.addEventListener('error', () => reject(new Error('warp-engine.js failed to load')));
+      ok();
+    });
+  }
 
   // Re-check
   Ctor = w.WarpEngine?.default || w.WarpEngine;
@@ -249,7 +264,7 @@ function compatifyUniforms(raw: any) {
   const p = { ...(raw || {}) };
 
   // Enhanced color mode compatibility - normalize to numeric
-  const map: any = { theta: 0, shear: 1, solid: 2 };
+  const map: any = { solid: 0, theta: 1, shear: 2 };
   if (typeof p.colorMode === 'string') p.colorMode = map[p.colorMode] ?? 0;
   if (!Number.isFinite(p.colorMode) && Number.isFinite(p.colorModeIndex)) p.colorMode = p.colorModeIndex;
   if (p.colorModeName == null && typeof raw?.colorMode === 'string') p.colorModeName = raw.colorMode;
@@ -344,7 +359,7 @@ const applyReal = (
   if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
-  const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
+  const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
 
   pushUniformsWhenReady(e, {
     ...shared,
@@ -390,7 +405,7 @@ const applyShow = (
   const b = Math.max(1, boostMax);
 
   // Use numeric color mode for engine compatibility
-  const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[colorMode] ?? 0;
+  const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
 
   console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
 
@@ -673,7 +688,7 @@ export default function WarpBubbleCompare({
           
           // Apply show with cosmetic safety fallback
           applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
-          const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[showPayload.colorMode] ?? 0;
+          const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode] ?? 1;
           applyShowSafe(rightEngine.current, {
             ...showPayload,
             colorMode: colorModeIndex,
@@ -795,7 +810,7 @@ export default function WarpBubbleCompare({
     
     // Apply show with cosmetic safety fallback
     applyShow(rightEngine.current, shared, rightRef.current!, showPayload.colorMode, showPayload);
-    const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[showPayload.colorMode] ?? 0;
+    const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode] ?? 1;
     applyShowSafe(rightEngine.current, {
       ...showPayload,
       colorMode: colorModeIndex,
