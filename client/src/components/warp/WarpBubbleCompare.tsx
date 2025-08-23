@@ -527,11 +527,23 @@ export default function WarpBubbleCompare({
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
           
-          // Force immediate initialization with bulletproof cameraZ
+          // Force immediate initialization with bulletproof defaults (prevents first-frame NaNs)
           const initCamZ = safeCamZ(2.0);  // fallback to safe default
           const initColor = 1; // theta (engine expects 0=solid,1=theta,2=shear)
-          leftEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
-          rightEngine.current?.setParams?.({ thetaScale: 1.0, sectors: 400, cameraZ: initCamZ, colorMode: initColor, colorModeIndex: initColor, colorModeName: 'theta' });
+          const safeDefaults = { 
+            thetaScale: 1.0,          // safe physics scale
+            sectors: 400,             // reasonable sector count  
+            cameraZ: initCamZ,        // bulletproof camera position
+            colorMode: initColor, 
+            colorModeIndex: initColor, 
+            colorModeName: 'theta',
+            exposure: 6.0,            // safe exposure level
+            zeroStop: 1e-7,           // safe zero-stop threshold
+            vizGain: 1.0,             // safe visualization gain
+            cosmeticLevel: 1.0        // minimal but non-zero cosmetic level
+          };
+          leftEngine.current?.setParams?.(safeDefaults);
+          rightEngine.current?.setParams?.(safeDefaults);
           
           // Verify uniforms actually exist (catch silent no-ops)
           dumpUniforms(leftEngine.current,  'REAL');
