@@ -624,7 +624,9 @@ class WarpEngine {
         gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg || 1405);
         
         // CRITICAL FIX: Upload directly injected β₀ from amplifier chain
-        const currentBeta0 = this.uniforms.beta0 || (this.uniforms.dutyCycle * this.uniforms.g_y);
+        const currentBeta0 = (this.uniforms.beta0 != null)
+          ? +this.uniforms.beta0
+          : (this.uniforms.dutyCycle * this.uniforms.g_y);
         gl.uniform1f(this.uLoc.beta0, currentBeta0);
         
         // 🔍 DEBUG CHECKPOINT 2B: GPU uniform verification + Beta0 shader check
