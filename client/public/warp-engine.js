@@ -1,3 +1,11 @@
+;(() => {
+  // Prevent duplicate loads (HMR, script re-inject, etc.)
+  if (globalThis.__WARP_ENGINE_LOADED__) {
+    console.warn('[warp-engine] duplicate load detected — skipping body');
+    return;
+  }
+  globalThis.__WARP_ENGINE_LOADED__ = true;
+
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
@@ -1616,6 +1624,11 @@ class WarpEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
-    window.WarpEngine = WarpEngine;
+    globalThis.WarpEngine = WarpEngine;
     console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
 }
+
+// Stamp a build token so the loader can compare
+globalThis.WarpEngine.BUILD = globalThis.__APP_WARP_BUILD || 'dev';
+globalThis.__WarpEngineBuild = globalThis.WarpEngine.BUILD;
+})();

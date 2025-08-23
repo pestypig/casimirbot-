@@ -560,13 +560,8 @@ export default function WarpBubbleCompare({
         } finally {
           busyRef.current = false;
         }
-      } catch (e: any) {
-        console.error('[WARP ENGINE] Creation failed:', { error: e, message: e?.message, stack: e?.stack, constructor: typeof (window as any).WarpEngine, leftCanvas: !!leftRef.current, rightCanvas: !!rightRef.current });
-      } finally {
-        (window as any).__warpCompareBusy = false;
-      }
         
-      ensureStrobeMux();
+        ensureStrobeMux();
 
         // Keep both panes in lockstep with Helix strobing
         const off = (window as any).__addStrobingListener?.(
