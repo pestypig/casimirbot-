@@ -34,6 +34,21 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
     console.warn('[WARP LOADER] Build mismatch; reloading engine', { currentBuild, requiredBuild });
   }
 
+  // Nuke caching that can pin the old engine
+  if (forceReload || (Ctor && currentBuild !== requiredBuild)) {
+    console.log('[WARP LOADER] Nuking Service Worker cache');
+    try {
+      // Service Worker / PWA: unregister & prepare for hard-reload
+      const registrations = await navigator.serviceWorker?.getRegistrations?.();
+      if (registrations?.length) {
+        await Promise.all(registrations.map(r => r.unregister()));
+        console.log('[WARP LOADER] Unregistered', registrations.length, 'service workers');
+      }
+    } catch (e) {
+      console.warn('[WARP LOADER] Service worker cleanup failed (normal if none active):', e);
+    }
+  }
+
   // Remove any old <script> tags and load a fresh one with cache-bust
   removeOldWarpScripts();
   const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
