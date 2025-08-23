@@ -588,6 +588,7 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   try {
     const staticResult = calculateCasimirEnergy({
       gap: state.gap_nm,
+      geometry: 'parallel_plates',
       arrayConfig: { size: Math.sqrt(state.N_tiles) }
     } as any);
     

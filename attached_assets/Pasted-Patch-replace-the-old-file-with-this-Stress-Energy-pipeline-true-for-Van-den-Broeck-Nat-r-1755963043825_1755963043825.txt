@@ -1,3 +1,4 @@
+Patch (replace the old file with this)
 /**
  * Stress–Energy (pipeline-true) for Van den Broeck–Natário flow
  * No magic constants; reads γ_geo, Q, q_spoil, γ_VdB, duty from pipeline.
