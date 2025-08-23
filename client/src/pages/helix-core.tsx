@@ -416,47 +416,49 @@ export default function HelixCore() {
   const compareParams = useMemo(() => {
     const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 
-    // Use the same authoritative numbers you were pushing into WarpVisualizer,
-    // but DO NOT pin physicsParityMode / cosmeticLevel / curvatureGain* here.
-    const base: any = {
-      currentMode: effectiveMode,
-      sectorStrobing: concurrentSectors,
-      sectors: totalSectors,                       // total sectors (400) for physics averaging
+    // Light-crossing from pipeline (wall scale) + macro timing
+    const fHz = num(pipeline?.modulationFreq_GHz) ? (pipeline!.modulationFreq_GHz! * 1e9) : 15e9;
+    const Tm_ms = 1000 / fHz;                         // mechanical period (ms)
+    const burst_ms = 0.01 * Tm_ms;                    // 1% local ON-window (paper)
+    const dwell_ms = Tm_ms;                           // "cycle" here = modulation period
+    const tauLC_ms = ((pipeline?.hull?.wallThickness_m ?? 1.0) / 299792458) * 1000;
 
-      // live hull geometry
+    return {
+      currentMode: effectiveMode,
+
+      // geometry
       hull,
 
-      // timing + FR window (authoritative)
-      dutyEffectiveFR,
-      lightCrossing: lc,
+      // timing
+      lightCrossing: {
+        phase: 0, sectorIdx: systemMetrics?.currentSector ?? 0,
+        sectorCount: pipeline?.sectorCount ?? 400,       // total sectors
+        burst_ms, dwell_ms, tauLC_ms
+      },
 
-      // interior tilt (small, visual-only; wrapper will treat appropriately)
-      epsilonTilt,
-      betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+      // --- BOTH duties so Real/Show can choose ---
+      dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,        // UI duty (visible)
+      dutyEffectiveFR:  num((pipeline as any)?.dutyEffective_FR) ?? num(pipeline?.dutyShip),
 
-      wallWidth_m: 6.0,
-      gridScale: 1.6,
+      // --- BOTH sector numbers ---
+      sectorCount:      num(pipeline?.sectorCount)      ?? 400,         // total (averaging)
+      sectorStrobing:   num(pipeline?.sectorStrobing)   ?? 1,           // concurrent (sweep)
 
-      // pipeline physics scalars (only when present)
-      dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,
-      gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,      // ← add this for shader thetaScale
-      g_y:              num(pipeline?.gammaGeo)         ?? 26,      // (keep for backward compat)
-      cavityQ:          num(pipeline?.qCavity)          ?? 1e9,
-      sagDepth_nm:      num(pipeline?.sagDepth_nm)      ?? 16,
-      tsRatio:          num(pipeline?.TS_ratio)         ?? 5.03e4,
-      powerAvg_MW:      num(pipeline?.P_avg)            ?? 83.3,
-      exoticMass_kg:    num(pipeline?.M_exotic)         ?? 1405,
+      // physics amps
+      gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck: num(pipeline?.gammaVanDenBroeck) ?? 2.86e5,
-    };
+      gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 2.86e5,
 
-    return base;
+      // viewer niceties
+      viewAvg: true,
+      colorMode: "theta" as const,
+      lockFraming: true,
+    };
   }, [
-    effectiveMode, totalSectors, concurrentSectors, hull, dutyEffectiveFR, lc,
-    epsilonTilt, systemMetrics?.shiftVector?.betaTiltVec,
-    pipeline?.dutyCycle, pipeline?.gammaGeo, pipeline?.qCavity, pipeline?.sagDepth_nm,
-    pipeline?.TS_ratio, pipeline?.P_avg, pipeline?.M_exotic,
-    pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
+    effectiveMode, hull, systemMetrics?.currentSector,
+    pipeline?.modulationFreq_GHz, pipeline?.hull?.wallThickness_m,
+    pipeline?.dutyCycle, pipeline?.dutyShip, pipeline?.sectorCount, pipeline?.sectorStrobing,
+    pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck
   ]);
 
   // Create truly separate payloads (no shared nested refs)
