@@ -295,6 +295,24 @@ export default function WarpBubbleCompare({
         rightEngine.current = new WarpCtor(rightRef.current);
         ensureStrobeMux();
 
+        // Keep both panes in lockstep with Helix strobing
+        const off = (window as any).__addStrobingListener?.(
+          ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
+            const s = Math.max(1, Math.floor(sectorCount||1));
+            const payload = {
+              sectors: s,
+              split: Math.max(0, Math.min(s-1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
+              sectorIdx: Math.max(0, currentSector % s)
+            };
+            pushUniformsWhenReady(leftEngine.current,  payload);
+            pushUniformsWhenReady(rightEngine.current, payload);
+            leftEngine.current?.requestRewarp?.();
+            rightEngine.current?.requestRewarp?.();
+          }
+        );
+        (leftEngine.current  as any).__strobeOff = off;
+        (rightEngine.current as any).__strobeOff = off;
+
         const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
 
         const parityPhys = physicsPayload(parityParams);
@@ -370,6 +388,8 @@ export default function WarpBubbleCompare({
     return () => {
       cancelled = true;
       try { roRef.current?.disconnect(); } catch {}
+      try { (leftEngine.current  as any)?.__strobeOff?.(); } catch {}
+      try { (rightEngine.current as any)?.__strobeOff?.(); } catch {}
       try { leftEngine.current?.destroy?.(); } catch {}
       try { rightEngine.current?.destroy?.(); } catch {}
       leftEngine.current = null;
