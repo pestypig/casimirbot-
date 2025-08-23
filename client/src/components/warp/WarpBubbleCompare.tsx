@@ -531,8 +531,13 @@ export default function WarpBubbleCompare({
           ensureCanvasSize(leftRef.current!);
           ensureCanvasSize(rightRef.current!);
           
+          console.log('[WARP ENGINE] Creating left engine...');
           leftEngine.current  = new WarpCtor(leftRef.current);
+          console.log('[WARP ENGINE] Left engine created:', !!leftEngine.current);
+          
+          console.log('[WARP ENGINE] Creating right engine...');
           rightEngine.current = new WarpCtor(rightRef.current);
+          console.log('[WARP ENGINE] Right engine created:', !!rightEngine.current);
           
           // Runtime proof it's the right file
           console.log('[WARP PROBE]', {
@@ -863,11 +868,11 @@ export default function WarpBubbleCompare({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40">
         <div className="px-2 py-1 text-xs font-mono text-slate-300">REAL (parity)</div>
-        <canvas ref={leftRef} className="w-full h-[320px]" />
+        <canvas ref={leftRef} className="w-full h-[320px]" style={{ background: '#111' }} />
       </div>
       <div className="rounded-md overflow-hidden bg-black/40">
         <div className="px-2 py-1 text-xs font-mono text-slate-300">SHOW (boosted)</div>
-        <canvas ref={rightRef} className="w-full h-[320px]" />
+        <canvas ref={rightRef} className="w-full h-[320px]" style={{ background: '#111' }} />
       </div>
     </div>
   );

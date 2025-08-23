@@ -73,7 +73,7 @@ class WarpEngine {
         };
         
         // Initialize WebGL state
-        this.gl.clearColor(0.0, 0.0, 0.3, 1.0); // Dark blue background
+        this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // Black background for visibility
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.depthFunc(this.gl.LEQUAL);
         
@@ -213,6 +213,7 @@ class WarpEngine {
         window.__warp[id] = this; // e.g. window.__warp['parity-canvas'].setPresetParity()
         
         // Start render loop
+        console.log('[WarpEngine] Starting render loop...');
         this._renderLoop();
     }
 
@@ -1214,8 +1215,21 @@ class WarpEngine {
         try {
             // Skip drawing until shaders are linked and uniforms are bound
             if (!this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+                // Debug: log once why we're not rendering
+                if (!this._notReadyLogged) {
+                    console.log('[WarpEngine] Not ready to render:', {
+                        isLoaded: this.isLoaded,
+                        hasProgram: !!this.gridProgram,
+                        hasUniforms: !!this.gridUniforms,
+                        hasAttribs: !!this.gridAttribs
+                    });
+                    this._notReadyLogged = true;
+                }
                 return;
             }
+            // Clear flag once we start rendering
+            this._notReadyLogged = false;
+            
             // Clear the screen
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             // Render the spacetime grid
