@@ -486,6 +486,18 @@ export default function WarpBubbleCompare({
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Debug probe to verify physics parameters are changing with mode switches
+  useEffect(() => {
+    if (!leftEngine.current) return;
+    const p = physicsPayload(parityParams);
+    console.log('[REAL] thetaScale=', p.thetaScale,
+                'γ_geo=', p.gammaGeo,
+                'qSpoil=', p.deltaAOverA,
+                'γ_VdB=', p.gammaVdB,
+                'dutyFR=', parityParams?.dutyEffectiveFR,
+                'sectors=', p.sectors);
+  }, [physicsKey]);
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40">
