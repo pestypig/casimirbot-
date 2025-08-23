@@ -22,10 +22,21 @@ function removeOldWarpScripts() {
     .forEach(n => n.parentNode?.removeChild(n));
 }
 
-// Asset path resolution for subpaths
+// --- Robust asset base resolution (handles sub-path deploys, Next/Vite/CRA) ---
 function resolveAssetBase() {
-  const base = import.meta.env.BASE_URL || '/';
-  return base.endsWith('/') ? base.slice(0, -1) : base;
+  const w: any = window;
+  // explicit override wins
+  if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
+  // Vite
+  if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+  // Webpack public path
+  if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
+  // Next.js base path
+  if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
+  // <base href="..."> tag
+  const baseEl = document.querySelector('base[href]');
+  if (baseEl) return (baseEl as HTMLBaseElement).href;
+  return '/';
 }
 
 async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
@@ -56,7 +67,10 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
 
   // Load script with proper asset path resolution
   const assetBase = resolveAssetBase();
-  const url = `${assetBase}/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
+  const mk = (p: string) => {
+    try { return new URL(p, assetBase).toString(); } catch { return p; }
+  };
+  const url = mk(`warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`);
   await loadScript(url);
 
   const Ctor = w.WarpEngine?.default || w.WarpEngine;
