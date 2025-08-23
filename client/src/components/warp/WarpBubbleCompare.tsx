@@ -32,6 +32,36 @@ function ensureStrobeMux() {
   w.__addStrobingListener = (fn: Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
 }
 
+/* ---------------- Physics scalar helpers ---------------- */
+function resolveThetaScale(p: any) {
+  if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
+
+  const gammaGeo = Number(p?.gammaGeo ?? 26);
+  const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
+  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5);
+  const duty     = Number(p?.dutyCycle ?? 0.14);
+  const sectors  = Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? 1));
+  const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
+  const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
+  const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
+  return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
+}
+
+function physicsPayload(p: any) {
+  return {
+    // the scalar the engine/shader both expect
+    thetaScale: resolveThetaScale(p),
+
+    // pieces (the CPU path in WarpEngine logs/uses these for diagnostics)
+    dutyCycle: Number(p?.dutyCycle ?? 0.14),
+    sectors: Math.max(1, Number(p?.sectors ?? p?.sectorCount ?? 1)),
+    viewAvg: p?.viewAvg ?? true,
+    gammaGeo: Number(p?.gammaGeo ?? 26),
+    deltaAOverA: Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
+    gammaVdB: Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5),
+  };
+}
+
 /* ---------------- Framing helpers ---------------- */
 type Hull = { a:number; b:number; c:number };
 
@@ -221,6 +251,10 @@ export default function WarpBubbleCompare({
 
         const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
 
+        const phys = physicsPayload(parameters);
+        pushUniformsWhenReady(leftEngine.current,  phys);
+        pushUniformsWhenReady(rightEngine.current, phys);
+
         // normalize any global fallback the engine might use
         (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
         leftEngine.current?.setSceneScale?.((window as any).sceneScale);
@@ -301,6 +335,10 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
     const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+
+    const phys = physicsPayload(parameters);
+    pushUniformsWhenReady(leftEngine.current,  phys);
+    pushUniformsWhenReady(rightEngine.current, phys);
 
     // normalize any global fallback the engine might use
     (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
