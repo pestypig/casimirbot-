@@ -248,13 +248,12 @@ function scrubOverlays(e: any) {
 function compatifyUniforms(raw: any) {
   const p = { ...(raw || {}) };
 
-  // Color mode: accept string or numeric; provide both keys
-  const colorMap: any = { theta: 0, shear: 1, solid: 2 };
-  if (typeof p.colorMode === 'string') {
-    p.colorModeIndex = colorMap[p.colorMode] ?? 0;
-  } else if (Number.isFinite(p.colorMode)) {
-    p.colorModeIndex = p.colorMode;
-  }
+  // Enhanced color mode compatibility - normalize to numeric
+  const map: any = { theta: 0, shear: 1, solid: 2 };
+  if (typeof p.colorMode === 'string') p.colorMode = map[p.colorMode] ?? 0;
+  if (!Number.isFinite(p.colorMode) && Number.isFinite(p.colorModeIndex)) p.colorMode = p.colorModeIndex;
+  if (p.colorModeName == null && typeof raw?.colorMode === 'string') p.colorModeName = raw.colorMode;
+  if (p.colorModeIndex == null && Number.isFinite(p.colorMode)) p.colorModeIndex = p.colorMode;
 
   // Sector/strobe synonyms
   if (Number.isFinite(p.sectors)) {
@@ -670,7 +669,13 @@ export default function WarpBubbleCompare({
           
           // Apply show with cosmetic safety fallback
           applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
-          applyShowSafe(rightEngine.current, showPayload);
+          const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[showPayload.colorMode] ?? 0;
+          applyShowSafe(rightEngine.current, {
+            ...showPayload,
+            colorMode: colorModeIndex,
+            colorModeIndex,
+            colorModeName: showPayload.colorMode,
+          });
           scrubOverlays(rightEngine.current);
           
           // Verify final physics scalars (catch NaNs that yield black)
@@ -786,7 +791,13 @@ export default function WarpBubbleCompare({
     
     // Apply show with cosmetic safety fallback
     applyShow(rightEngine.current, shared, rightRef.current!, showPayload.colorMode, showPayload);
-    applyShowSafe(rightEngine.current, showPayload);
+    const colorModeIndex = ({ theta:0, shear:1, solid:2 } as const)[showPayload.colorMode] ?? 0;
+    applyShowSafe(rightEngine.current, {
+      ...showPayload,
+      colorMode: colorModeIndex,
+      colorModeIndex,
+      colorModeName: showPayload.colorMode,
+    });
 
     scrubOverlays(leftEngine.current);
     scrubOverlays(rightEngine.current);
