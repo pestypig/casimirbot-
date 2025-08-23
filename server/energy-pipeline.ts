@@ -9,6 +9,8 @@ const MODEL_MODE: 'calibrated' | 'raw' =
 // ── Physics Constants (centralized) ──────────────────────────────────────────
 import { HBAR, C, PI } from "./physics-const.js";
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
+import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
+import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
 export type HullAxes = { a: number; b: number; c: number };
@@ -581,6 +583,45 @@ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipel
   
   // Store Natário metrics in state for API access
   (state as any).natario = natario;
+  
+  // Calculate dynamic Casimir with pipeline integration
+  try {
+    const staticResult = calculateCasimirEnergy({
+      gap: state.gap_nm,
+      arrayConfig: { size: Math.sqrt(state.N_tiles) }
+    } as any);
+    
+    const dyn = calculateDynamicCasimirWithNatario(
+      {
+        staticEnergy: staticResult.totalEnergy,
+        modulationFreqGHz: state.modulationFreq_GHz,
+        strokeAmplitudePm: (state as any).strokeAmplitude_pm ?? 50,
+        burstLengthUs: (state as any).burst_us ?? 10,
+        cycleLengthUs: (state as any).cycle_us ?? 1000,
+        cavityQ: state.qCavity,
+        tileCount: state.N_tiles
+      },
+      // pass the full snapshot so resolveFromPipeline can read it:
+      {
+        ...state,
+        dynamicConfig: {
+          modulationFreqGHz: state.modulationFreq_GHz,
+          cavityQ: state.qCavity,
+          qSpoilingFactor: state.qSpoilingFactor,
+          sectorCount: state.sectorStrobing,
+          sectorDuty: state.dutyCycle,
+          lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6,
+          gammaGeo: state.gammaGeo,
+          gammaVanDenBroeck: state.gammaVanDenBroeck
+        }
+      } as any
+    );
+    
+    // Store dynamic results in state
+    (state as any).dynamic = dyn;
+  } catch (e) {
+    console.warn('Dynamic Casimir calculation failed:', e);
+  }
   
   return state;
 }

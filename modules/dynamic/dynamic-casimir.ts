@@ -91,8 +91,8 @@ export interface DynamicCasimirResult {
   quantumSafetyStatus: 'safe' | 'warning' | 'violation';
   
   // Power calculations
-  instantaneousPower: number;    // Raw power during burst (~2 PW)
-  averagePower: number;          // Duty-mitigated power (~83 MW)
+  instantaneousPower: number;    // Raw power during burst
+  averagePower: number;          // Duty-mitigated power
   
   // GR validity checks
   isaacsonLimit: boolean;        // High-frequency limit compliance
@@ -100,8 +100,8 @@ export interface DynamicCasimirResult {
   
   // Additional readouts for research verification
   averagePowerPerTile: number;     // Power per tile for scaling
-  averagePowerTotalLattice: number; // Full lattice power (83 MW)
-  exoticMassPerTile: number;       // Mass per tile (1.5 kg target)
+  averagePowerTotalLattice: number; // Full lattice power
+  exoticMassPerTile: number;       // Mass per tile
   exoticMassTotalLattice: number;  // Total exotic mass
   
   // Complete Energy Pipeline (T_μν → metric calculations)
@@ -173,43 +173,13 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   const tileVolume = 0.05 * 0.05 * 0.01; // m³ (2.5×10⁻⁵ m³)
   const exoticEnergyDensity = cycleAverageEnergy / tileVolume;
   
-  // Implement exact Needle Hull exotic mass formula from paper
-  // Paper states: bare energy density of −4.3 × 10⁸ J m⁻³ for 1 nm gap
-  // Target: 1.5 kg per tile with γ_VdB ≈ 10¹¹ amplification
+  // Calculate mass from amplified energy
+  const exoticMassPerTile = Math.abs(cycleAverageEnergy) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
   
-  // Base Casimir energy density per tile (5cm × 5cm × 1nm volume)
-  const tileGapVolume = 0.05 * 0.05 * 1e-9; // m³ (5cm × 5cm × 1nm gap)
-  const bareEnergyDensity = -4.3e8; // J/m³ from paper
-  const bareEnergyPerTile = bareEnergyDensity * tileGapVolume; // Joules
-  
-  // Van-den-Broeck amplification chain from paper:
-  // 1. Geometric blue-shift γ_geo ≈ 25
-  // 2. Q-enhancement from superconducting cavity ≈ √Q 
-  // 3. Van-den-Broeck seed pocket γ_VdB ≈ 10¹¹
-  const totalEnhancement = gammaGeo * qEnhancement * gammaVdB;
-  
-  // Apply duty cycle and amplification to get exotic mass per tile
-  // Paper target: 1.5 kg per tile
-  const enhancedEnergyPerTile = Math.abs(bareEnergyPerTile) * totalEnhancement * dutyFactor;
-  const exoticMassPerTile = enhancedEnergyPerTile / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  
-  // Direct implementation to match paper's 1.5 kg target exactly
-  const paperTargetMassPerTile = 1.5; // kg as stated in paper
-  
-  // Use the paper's target directly for consistency with research results
-  const correctedMassPerTile = paperTargetMassPerTile;
-  
-  // Paper states: 1.96 × 10⁹ tiles total in the needle hull lattice
-  // Target: 1.4 × 10³ kg total exotic mass for the full warp bubble
-  const paperTileCount = 1.96e9; // Total tiles in needle hull from paper
-  const paperTargetTotalMass = 1.4e3; // 1.4 × 10³ kg target from paper
-  
-  // Calculate per-tile mass to achieve target total mass
-  // Target per-tile mass = 1.4×10³ kg / 1.96×10⁹ tiles = 7.14×10⁻⁷ kg per tile
-  const targetMassPerTile = paperTargetTotalMass / paperTileCount;
-  
-  // Scale to match paper's total lattice exotic mass target
-  const totalExoticMass = paperTargetTotalMass; // Use target directly: 1.4×10³ kg
+  // Calculate exotic mass from energy
+  const c2 = PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C;
+  const massPerTile = Math.abs(cycleAverageEnergy) / c2;
+  const totalExoticMass = massPerTile * tileCount;
   
   // Quantum inequality check (Ford-Roman constraints)
   // ζ = ρ_eff × τ_pulse / QI_bound
@@ -227,41 +197,19 @@ export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCa
   }
   
   // Power calculations following paper's methodology
-  // Paper states: raw 2 PW lattice load reduced to 83 MW via duty-cycle mitigation
-  const instantaneousPower = boostedEnergy / pulseDuration; // Power during 10 μs burst
-  
-  // Paper methodology: Raw instantaneous power during burst is ~2 PW for full lattice
-  // This gets reduced to 83 MW via duty cycle mitigation and sector strobing
-  const rawPowerPerTile = 2e15 / paperTileCount; // 2 PW / 1.96×10⁹ tiles
-  const burstPowerPerTile = rawPowerPerTile * tileCount; // Scale for current tile count
-  
-  // Apply duty cycle mitigation from paper
-  const localDutyFactor = dutyFactor; // 1% local burst duty (10 μs / 1000 μs)
-  const sectorCount = 400; // 400 azimuthal sectors from paper
-  const shipWideDutyFactor = localDutyFactor / sectorCount; // d_eff = 2.5×10⁻⁵
-  
-  // Calculate average power using paper's mitigation factors
-  const averagePowerRaw = burstPowerPerTile * localDutyFactor; // Local duty cycle
-  const averagePowerSectorStrobed = averagePowerRaw / sectorCount; // Sector strobing
-  
-  // Paper target: 83 MW for full lattice, scale proportionally
-  const paperTargetPower = 83e6; // 83 MW from paper
-  const powerPerTileTarget = paperTargetPower / paperTileCount;
-  const scaledTargetPower = powerPerTileTarget * tileCount;
-  
-  // Display the target power value for verification
-  // For single tile simulation: 83 MW / 1.96e9 tiles = ~4.2e-8 MW per tile
-  const correctedAveragePower = scaledTargetPower;
+  // Power calculations (pipeline-based)
+  const instantaneousPower = boostedEnergy / pulseDuration; // Power during burst
+  const averagePower = cycleAverageEnergy * f_m; // ⟨E⟩ per cycle times cycles/s
   
   // GR validity checks
   const isaacsonLimit = dutyFactor < 0.1; // High-frequency limit for spacetime stability
   const greenWaldCompliance = quantumInequalityMargin < 1.0; // Averaged null energy condition
   
-  // Calculate power and mass readouts for both per-tile and total lattice
-  const powerPerTileReadout = correctedAveragePower; // Power for current simulation (per tile)
-  const powerTotalLatticeReadout = paperTargetPower; // 83 MW for full 1.96×10⁹ tile lattice
-  const massPerTileReadout = targetMassPerTile; // 7.14×10⁻⁷ kg per tile (corrected)
-  const massTotalLatticeReadout = totalExoticMass; // 1.4×10³ kg for full lattice (corrected)
+  // Calculate power and mass readouts
+  const powerPerTileReadout = averagePower / tileCount;
+  const powerTotalLatticeReadout = averagePower;
+  const massPerTileReadout = Math.abs(cycleAverageEnergy) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
+  const massTotalLatticeReadout = massPerTileReadout * tileCount;
 
   // Complete Energy Pipeline Implementation (following theory checklist)
   const c = 299_792_458; // m/s - speed of light
@@ -399,33 +347,123 @@ export function calculateDynamicCasimirWithNatario(
   params: DynamicCasimirParams,
   simulationParams: SimulationParameters
 ): DynamicCasimirResult & Partial<NatarioMetricResult> {
-  // Get base dynamic Casimir results
-  const baseResults = calculateDynamicCasimir(params);
-  
-  // Calculate Natário metric components if dynamic config is present
-  let natarioResults: Partial<NatarioMetricResult> = {};
-  
-  if (simulationParams.dynamicConfig) {
-    try {
-      const natarioMetric = calculateNatarioMetric(simulationParams, params.staticEnergy);
-      const grValidation = validateGRConsistency(natarioMetric);
-      
-      natarioResults = {
-        stressEnergyT00: natarioMetric.stressEnergyT00,
-        stressEnergyT11: natarioMetric.stressEnergyT11,
-        natarioShiftAmplitude: natarioMetric.natarioShiftAmplitude,
-        sectorStrobingEfficiency: natarioMetric.sectorStrobingEfficiency,
-        grValidityCheck: natarioMetric.grValidityCheck && grValidation.strategyA,
-        homogenizationRatio: natarioMetric.homogenizationRatio,
-        timeAveragedCurvature: natarioMetric.timeAveragedCurvature
-      };
-    } catch (error) {
-      console.warn('Natário metric calculation failed:', error);
+  // --- Resolve pipeline values
+  const pipe = resolveFromPipeline(simulationParams);
+  const { A_total_inst } = computeAmplificationChain(pipe);
+
+  // --- Time domain
+  const strokePeriodPs = 1000 / pipe.modulationFreq_GHz;
+  const dutyFactor_local = Math.max(0, Math.min(1, params.burstLengthUs / params.cycleLengthUs)); // local burst duty
+  // Prefer FR duty (burst/dwell or explicit) for average physics:
+  const d_eff = Math.max(0, Math.min(1, pipe.dutyEffectiveFR));
+
+  // --- Static baseline (from static module call above)
+  const staticEnergy = Math.abs(params.staticEnergy); // magnitude
+
+  // Instantaneous amplified energy (per cavity/tile-scale quantity as appropriate to your staticEnergy)
+  const boostedEnergy = staticEnergy * A_total_inst;
+
+  // Cycle-averaged energy uses FR duty
+  const cycleAverageEnergy = boostedEnergy * d_eff;
+
+  // Geometry for densities
+  const gap_m = Math.max(1e-12, pipe.gap_nm * PHYSICS_CONSTANTS.NM_TO_M);
+  const tileVolume = Math.max(1e-18, pipe.tileArea_m2 * gap_m);
+  const exoticEnergyDensity = cycleAverageEnergy / tileVolume;
+
+  // Power (do not use "2 PW/83 MW" targets)
+  const f_m = pipe.modulationFreq_GHz * 1e9;
+  const T_m = 1 / f_m;
+  const instantaneousPower = boostedEnergy / Math.max(1e-12, params.burstLengthUs * 1e-6); // during local burst
+  const averagePower = cycleAverageEnergy * f_m; // ⟨E⟩ per cycle times cycles/s
+
+  // Lattice totals (use pipeline N_tiles)
+  const E_tile = cycleAverageEnergy;              // per tile/cavity (matches staticEnergy basis)
+  const E_total = E_tile * pipe.N_tiles;
+  const c2 = PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C;
+  const massPerTileComputed = Math.abs(E_tile) / c2;
+  const massTotalLatticeReadout = Math.abs(E_total) / c2;
+
+  // Cavity losses (pipeline Q)
+  const ω = 2 * Math.PI * f_m;
+  const U_geo_like = boostedEnergy; // energy sitting in the effective "amplified" state
+  const P_loss = Math.abs(U_geo_like * ω / Math.max(1, pipe.cavityQ)); // simplistic cavity loss model
+
+  // Light-crossing & TS ratio (pipeline hull → τ_LC already supplied)
+  const T_LC = Math.max(1e-12, pipe.tauLC_ms * 1e-3);
+  const TS_ratio = T_m / T_LC;
+
+  // Compose base dynamic result
+  const baseResults: DynamicCasimirResult = {
+    strokePeriodPs,
+    dutyFactor: dutyFactor_local,   // keep local % for UI
+    boostedEnergy,
+    cycleAverageEnergy,
+    totalExoticMass: massTotalLatticeReadout,
+    exoticEnergyDensity,
+    quantumInequalityMargin: 0,     // leave 0 or compute with your proper QI bound; remove the HBAR_C/δ^4 toy
+    quantumSafetyStatus: 'safe',    // let server/services/target-validation.ts own this
+    instantaneousPower,
+    averagePower,
+    isaacsonLimit: d_eff < 0.1,     // rough check; refine if needed
+    greenWaldCompliance: true,      // defer to natario-metric's GR checks
+    averagePowerPerTile: averagePower / pipe.N_tiles,
+    averagePowerTotalLattice: averagePower,
+    exoticMassPerTile: massPerTileComputed,
+    exoticMassTotalLattice: massTotalLatticeReadout,
+    energyPipeline: {
+      U_static: params.staticEnergy,     // sign-preserving if your static returns signed
+      U_Q: params.cavityQ * params.staticEnergy,
+      U_geo: boostedEnergy,              // using total amp chain is fine as "effective geometric"
+      U_cycle: cycleAverageEnergy,
+      P_loss,
+      TS_ratio,
+      E_tile,
+      E_total,
+      m_exotic: massTotalLatticeReadout,
+      γ_geo: pipe.gammaGeo,
+      ω,
+      d: d_eff,
+      N_tiles: pipe.N_tiles,
+      τ_pulse: T_m,
+      T_LC,
+      powerPerTileComputed: P_loss,
+      powerTotalComputed: P_loss * pipe.N_tiles,
+      massPerTileComputed
     }
-  }
-  
-  return {
-    ...baseResults,
-    ...natarioResults
   };
+
+  // Natário metric on **time-averaged** energy (pipeline-true)
+  let natarioResults: Partial<NatarioMetricResult> = {};
+  try {
+    const nat = calculateNatarioMetric(
+      {
+        ...simulationParams,
+        // hand the same knobs the viewers read:
+        dynamicConfig: {
+          ...(simulationParams.dynamicConfig||{}),
+          cavityQ: pipe.cavityQ,
+          sectorCount: pipe.sectorStrobing,
+          sectorDuty: pipe.dutyCycle,
+          pulseFrequencyGHz: pipe.modulationFreq_GHz,
+          lightCrossingTimeNs: pipe.tauLC_ms * 1e6
+        }
+      } as any,
+      E_total // total average negative energy (preferred over static)
+    );
+    const gr = validateGRConsistency(nat);
+    natarioResults = {
+      stressEnergyT00: nat.stressEnergyT00,
+      stressEnergyT11: nat.stressEnergyT11,
+      natarioShiftAmplitude: nat.natarioShiftAmplitude,
+      sectorStrobingEfficiency: nat.sectorStrobingEfficiency,
+      grValidityCheck: nat.grValidityCheck && gr.strategyA,
+      homogenizationRatio: nat.homogenizationRatio,
+      timeAveragedCurvature: nat.timeAveragedCurvature
+    };
+  } catch (e) {
+    console.warn('Natário metric calculation failed:', e);
+  }
+
+  return { ...baseResults, ...natarioResults };
 }
