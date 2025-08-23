@@ -410,6 +410,14 @@ export default function WarpBubbleCompare({
           leftEngine.current  = new WarpCtor(leftRef.current);
           rightEngine.current = new WarpCtor(rightRef.current);
           
+          // Runtime proof it's the right file
+          console.log('[WARP PROBE]', {
+            scriptTags: [...document.scripts].filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
+            hasCtor: !!(window as any).WarpEngine,
+            build: (window as any).__WarpEngineBuild || (window as any).WarpEngine?.BUILD,
+            ctorName: ((window as any).WarpEngine?.name)
+          });
+          
           // Add WebGL context guards for resilience
           attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._resize?.());
           attachGLContextGuards(rightRef.current!, () => rightEngine.current?._resize?.());
