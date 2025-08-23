@@ -52,6 +52,8 @@ class WarpEngine {
                 exoticMass_kg: 1405     // exotic mass (kg)
             };
 
+            this.showQuad = false; // default: no orange background field
+
             console.log("WarpEngine: Compiling shaders...");
             this._compileShaders();
             
@@ -636,7 +638,11 @@ class WarpEngine {
         }
         
         // Render main warp field visualization first
-        this._renderQuad();
+        if (this.showQuad && currentBeta0 !== 0) {
+            gl.depthMask(false);
+            this._renderQuad();
+            gl.depthMask(true);
+        }
         
         // Enable depth testing for 3D grid overlay
         gl.enable(gl.DEPTH_TEST);
