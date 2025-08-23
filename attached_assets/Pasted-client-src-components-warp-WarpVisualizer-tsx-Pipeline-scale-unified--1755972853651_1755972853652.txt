@@ -1,0 +1,160 @@
+client/src/components/warp/WarpVisualizer.tsx
+@@
+ // --- Pipeline θ-scale (unified) ----------------------------------------------
+ function resolveThetaScale(p: any) {
+   // Prefer direct scalar if upstream provided it
+   if (Number.isFinite(p?.thetaScale)) return Number(p.thetaScale);
+@@
+-  const sectors = Math.max(1, Number(p?.sectors ?? p?.sectorStrobing ?? p?.lightCrossing?.sectorCount ?? 1));
++  // IMPORTANT: use total sectorCount for averaging (strobing count is for viz only)
++  const sectors = Math.max(
++    1,
++    Number(
++      p?.sectorCount ??
++      p?.sectors ??                   // fallback
++      p?.sectorStrobing ??            // last resort (viz)
++      p?.lightCrossing?.sectorCount ??
++      1
++    )
++  );
+   const A_geo   = Math.pow(Math.max(1, gammaGeo), 3);
+   const dutyAvg = Math.sqrt(Math.max(1e-12, duty / sectors));
+   return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyAvg;
+ }
+@@
+   const makeEngine = (EngineCtor: any) => {
+@@
+-    const sectorsResolved = Math.max(
+-      1,
+-      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
+-    );
++    // Separate strobing vs averaging:
++    const sectorCountResolved = Math.max(
++      1,
++      Math.floor(
++        num(
++          // total sectors across the ring (pipeline-provided if available)
++          (parameters as any).sectorCount,
++          lc?.sectorCount ?? 1
++        )
++      )
++    );
++    const sectorsResolved = Math.max(
++      1,
++      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1)) // concurrent strobe for viz
++    );
+     const splitResolved = Math.max(0, Math.min(sectorsResolved - 1, Math.floor(sectorsResolved / 2)));
+@@
+-    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 2.86e5);
++    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 2.86e5);
+@@
+-    engine.bootstrap(uniforms);
++    engine.bootstrap(uniforms);
+ 
+     // Prime θ-scale for the first frame (single source of truth)
+-    engine.updateUniforms({ thetaScale: resolveThetaScale({
+-      dutyCycle: dutyResolved,
+-      sectors: sectorsResolved,
+-      gammaGeo,
+-      qSpoilingFactor: qSpoil,
+-      gammaVdB: gammaVdBDefault
+-    })});
++    engine.updateUniforms({
++      thetaScale: resolveThetaScale({
++        dutyCycle: dutyResolved,
++        sectorCount: sectorCountResolved,   // ← total for averaging
++        sectors: sectorsResolved,           // viz strobing (kept for compatibility)
++        gammaGeo,
++        qSpoilingFactor: qSpoil,
++        gammaVdB: gammaVdBDefault
++      }),
++      sectorCount: sectorCountResolved,     // make it explicit on the engine too
++      sectors: sectorsResolved,
++    });
+@@
+-    engine.updateUniforms({
+-      colorMode: parameters.viz?.colorMode ?? 'theta',
++    // Normalize colorMode to numeric (engine: 0=solid,1=theta,2=shear) and send synonyms
++    const cmRaw = parameters.viz?.colorMode ?? 'theta';
++    const cmMap: any = { solid:0, theta:1, shear:2 };
++    const cmIndex = typeof cmRaw === 'string' ? (cmMap[cmRaw] ?? 1) : Number(cmRaw);
++    engine.updateUniforms({
++      colorMode: cmIndex,
++      colorModeIndex: cmIndex,
++      colorModeName: typeof cmRaw === 'string' ? cmRaw : (['solid','theta','shear'][cmIndex] ?? 'theta'),
+       curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
+       curvatureBoostMax: parity ? 1 : (parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax),
+       exposure: parameters.viz?.exposure ?? undefined,
+       zeroStop: parameters.viz?.zeroStop ?? undefined,
+       cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
+     });
+@@
+-      const pipelineState = {
++      const pipelineState = {
+         currentMode: parameters.currentMode || 'hover',
+         dutyCycle: parameters.dutyCycle,
+         dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
+-        sectorCount: sectorsResolved,
++        sectorCount: sectorCountResolved,                 // ← total sectors for averaging
+         gammaGeo: gammaGeo,
+-        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 3.83e1),
++        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 2.86e5), // unify default
+         qCavity: qCavity,
+         qSpoilingFactor: qSpoil,
+         sag_nm: num(parameters.sagDepth_nm, 16),
+         hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+         shipRadius_m: parameters.hull?.c ?? 86.5,
+         modelMode: parity ? 'raw' as const : 'calibrated' as const,
+       };
+@@
+-        engineRef.current.updateUniforms?.({
++        engineRef.current.updateUniforms?.({
+           vizGain: 1,
+           curvatureGainDec: 0,
+           curvatureBoostMax: 1,
+           curvatureGainT: 0,
+           displayGain: 1,
+           thetaScale: resolveThetaScale({  // still computed, just no exaggeration
+             dutyCycle: dutyResolved,
+-            sectors: sectorsResolved,
++            sectorCount: sectorCountResolved,
++            sectors: sectorsResolved,
+             gammaGeo,
+             qSpoilingFactor: qSpoil,
+-            gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5)
++            gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5)
+           }),
+         });
+@@
+-      engineRef.current.updateUniforms({
++      engineRef.current.updateUniforms({
+         // Interior gravity visuals
+         epsilonTilt: Number(epsilonTiltResolved || 0),
+         betaTiltVec: betaTiltVec as [number, number, number],
+         tiltGain: tiltGainResolved,
+@@
+-        // Viz overrides
+-        colorMode: parameters.viz?.colorMode ?? 'theta',
++        // Viz overrides (keep normalized)
++        colorMode: cmIndex,
++        colorModeIndex: cmIndex,
++        colorModeName: typeof cmRaw === 'string' ? cmRaw : (['solid','theta','shear'][cmIndex] ?? 'theta'),
+         exposure: parameters.viz?.exposure ?? undefined,
+         zeroStop: parameters.viz?.zeroStop ?? undefined,
+         cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined,
+@@
+   const resetView = () => {
+     if (!engineRef.current) return;
+     // Reapply the exact uniforms we computed in the last update, not the bare props.
+     const u = engineRef.current.uniforms || {};
+     engineRef.current.updateUniforms({ ...u });
+     if (engineRef.current.requestRewarp) engineRef.current.requestRewarp();
+   };
++
++  // Safety: if shader ready callback was missed (older drivers), unhide after first RAF
++  useEffect(() => {
++    if (!isLoaded && engineRef.current) {
++      const id = requestAnimationFrame(() => setIsLoaded(true));
++      return () => cancelAnimationFrame(id);
++    }
++  }, [isLoaded]);

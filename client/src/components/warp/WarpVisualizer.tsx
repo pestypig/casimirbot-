@@ -86,7 +86,17 @@ function resolveThetaScale(p: any) {
     return Math.max(0, Math.min(1, Number(p?.dutyCycle ?? 0.14)));
   })();
 
-  const sectors = Math.max(1, Number(p?.sectors ?? p?.sectorStrobing ?? p?.lightCrossing?.sectorCount ?? 1));
+  // IMPORTANT: use total sectorCount for averaging (strobing count is for viz only)
+  const sectors = Math.max(
+    1,
+    Number(
+      p?.sectorCount ??
+      p?.sectors ??                   // fallback
+      p?.sectorStrobing ??            // last resort (viz)
+      p?.lightCrossing?.sectorCount ??
+      1
+    )
+  );
   const A_geo   = Math.pow(Math.max(1, gammaGeo), 3);
   const dutyAvg = Math.sqrt(Math.max(1e-12, duty / sectors));
   return A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyAvg;
@@ -273,9 +283,20 @@ useEffect(() => {
       (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
        clamp01(num(parameters.dutyCycle, 0.14)));
 
+    // Separate strobing vs averaging:
+    const sectorCountResolved = Math.max(
+      1,
+      Math.floor(
+        num(
+          // total sectors across the ring (pipeline-provided if available)
+          (parameters as any).sectorCount,
+          lc?.sectorCount ?? 1
+        )
+      )
+    );
     const sectorsResolved = Math.max(
       1,
-      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
+      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1)) // concurrent strobe for viz
     );
     const splitResolved = Math.max(0, Math.min(sectorsResolved - 1, Math.floor(sectorsResolved / 2)));
     
@@ -340,17 +361,28 @@ useEffect(() => {
     engine.bootstrap(uniforms);
     
     // Prime θ-scale for the first frame (single source of truth)
-    engine.updateUniforms({ thetaScale: resolveThetaScale({
-      dutyCycle: dutyResolved,
+    engine.updateUniforms({
+      thetaScale: resolveThetaScale({
+        dutyCycle: dutyResolved,
+        sectorCount: sectorCountResolved,   // ← total for averaging
+        sectors: sectorsResolved,           // viz strobing (kept for compatibility)
+        gammaGeo,
+        qSpoilingFactor: qSpoil,
+        gammaVdB: gammaVdBDefault
+      }),
+      sectorCount: sectorCountResolved,     // make it explicit on the engine too
       sectors: sectorsResolved,
-      gammaGeo,
-      qSpoilingFactor: qSpoil,
-      gammaVdB: gammaVdBDefault
-    })});
+    });
     
     // Apply viz overrides if provided
+    // Normalize colorMode to numeric (engine: 0=solid,1=theta,2=shear) and send synonyms
+    const cmRaw = parameters.viz?.colorMode ?? 'theta';
+    const cmMap: any = { solid:0, theta:1, shear:2 };
+    const cmIndex = typeof cmRaw === 'string' ? (cmMap[cmRaw] ?? 1) : Number(cmRaw);
     engine.updateUniforms({
-      colorMode: parameters.viz?.colorMode ?? 'theta',
+      colorMode: cmIndex,
+      colorModeIndex: cmIndex,
+      colorModeName: typeof cmRaw === 'string' ? cmRaw : (['solid','theta','shear'][cmIndex] ?? 'theta'),
       curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
       curvatureBoostMax: parity ? 1 : (parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax),
       exposure: parameters.viz?.exposure ?? undefined,
@@ -544,9 +576,20 @@ useEffect(() => {
         (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
          clamp01(num(parameters.dutyCycle, 0.14)));
 
+      // Separate strobing vs averaging:
+      const sectorCountResolved = Math.max(
+        1,
+        Math.floor(
+          num(
+            // total sectors across the ring (pipeline-provided if available)
+            (parameters as any).sectorCount,
+            lc?.sectorCount ?? 1
+          )
+        )
+      );
       const sectorsResolved = Math.max(
         1,
-        Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
+        Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1)) // concurrent strobe for viz
       );
 
       // Harden unit/finite guards for Q, γ, wall width (no hidden magic)
@@ -573,6 +616,7 @@ useEffect(() => {
       engineRef.current.updateUniforms({
         thetaScale: resolveThetaScale({
           dutyCycle: dutyResolved,
+          sectorCount: sectorCountResolved,
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
@@ -588,7 +632,7 @@ useEffect(() => {
         dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
         sectorCount: sectorsResolved,
         gammaGeo: gammaGeo,
-        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 3.83e1),
+        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 2.86e5), // unify default
         qCavity: qCavity,
         qSpoilingFactor: qSpoil,
         sag_nm: num(parameters.sagDepth_nm, 16),
@@ -660,8 +704,12 @@ useEffect(() => {
         curvatureBoostMax: parity ? 1 : Math.max(1, parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
         curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
         
-        // Viz overrides
-        colorMode: parameters.viz?.colorMode ?? 'theta',
+        // Viz overrides (normalize colorMode locally)
+        colorMode: (() => {
+          const cmRaw2 = parameters.viz?.colorMode ?? 'theta';
+          const cmMap2: any = { solid:0, theta:1, shear:2 };
+          return typeof cmRaw2 === 'string' ? (cmMap2[cmRaw2] ?? 1) : Number(cmRaw2);
+        })(),
         exposure: parameters.viz?.exposure ?? undefined,
         zeroStop: parameters.viz?.zeroStop ?? undefined,
         cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined,
@@ -792,6 +840,14 @@ useEffect(() => {
     engineRef.current.updateUniforms({ ...u });
     if (engineRef.current.requestRewarp) engineRef.current.requestRewarp();
   };
+
+  // Safety: if shader ready callback was missed (older drivers), unhide after first RAF
+  useEffect(() => {
+    if (!isLoaded && engineRef.current) {
+      const id = requestAnimationFrame(() => setIsLoaded(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isLoaded]);
 
   return (
     <Card className="h-full">
