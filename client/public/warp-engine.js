@@ -16,6 +16,12 @@ class WarpEngine {
             
             console.log("WarpEngine v2.0: Starting 3D volumetric cage initialization...");
             this.canvas = canvas;
+            
+            // Gate this legacy cage behind a URL flag
+            this.enabled = /\bcage=1\b/.test(location.search);
+            if (!this.enabled) {
+                console.warn('CAGE DISABLED (enable with ?cage=1). Skipping quad+grid render.');
+            }
             // Try WebGL2 first, then WebGL1, then experimental contexts
             this.gl = canvas.getContext("webgl2") || 
                      canvas.getContext("webgl") || 
@@ -595,6 +601,8 @@ class WarpEngine {
     }
 
     _draw(time) {
+        if (!this.enabled) return; // hard skip all drawing from this file
+        
         const gl = this.gl;
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         
@@ -1006,6 +1014,20 @@ class WarpEngine {
         }
     }
 }
+
+// Optional toggles in dev console for cage renderer
+window.__cage_on  = () => {
+    if (window.warpEngine) {
+        window.warpEngine.enabled = true;
+        console.log('🔓 CAGE ENABLED: Legacy volumetric cage renderer activated');
+    }
+};
+window.__cage_off = () => {
+    if (window.warpEngine) {
+        window.warpEngine.enabled = false;
+        console.log('🔒 CAGE DISABLED: Legacy volumetric cage renderer deactivated');
+    }
+};
 
 // Export for both ES modules and CommonJS
 if (typeof module !== 'undefined' && module.exports) {
