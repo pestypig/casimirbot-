@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Tooltip } from "@/components/ui/Tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 const fmtSci = (v: number) =>
