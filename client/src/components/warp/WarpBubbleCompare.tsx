@@ -14,12 +14,28 @@ async function ensureWarpEngineCtor(): Promise<any> {
   const w = window as any;
   let Ctor = w.WarpEngine?.default || w.WarpEngine;
   if (typeof Ctor === 'function') return Ctor;
-  for (const src of ['/warp-engine.js?v=canonical']) {
-    try { await loadScript(src); } catch {}
-    Ctor = w.WarpEngine?.default || w.WarpEngine;
-    if (typeof Ctor === 'function') return Ctor;
+
+  const candidates = [
+    '/warp-engine.js?v=canonical',
+    '/warp-engine.js',
+    '/WarpEngine.js',
+    '/Warp_engine.js',
+    '/warp_engine.js',
+    '/assets/warp-engine.js',
+    '/static/warp-engine.js'
+  ];
+
+  for (const src of candidates) {
+    try {
+      console.log('[WarpLoader] trying', src);
+      await loadScript(src);
+      Ctor = w.WarpEngine?.default || w.WarpEngine;
+      if (typeof Ctor === 'function') return Ctor;
+    } catch (e) {
+      console.warn('[WarpLoader] failed', src, e);
+    }
   }
-  throw new Error('WarpEngine constructor not found');
+  throw new Error('WarpEngine constructor not found (check filename/path/CSP/MIME type)');
 }
 function ensureStrobeMux() {
   const w = window as any;
@@ -136,13 +152,14 @@ function scrubOverlays(e: any) {
 }
 
 /* ---------------- Safe uniform push (fixes null.length) ---------------- */
-function pushUniformsWhenReady(e: any, payload: any, retries = 16) {
+function pushUniformsWhenReady(e: any, payload: any, retries = 60) {
   if (!e) return;
   const ready = !!(e.gridVertices && e.originalGridVertices);
   if (ready) {
-    try { e.updateUniforms?.(payload); return; } catch {}
+    try { e.updateUniforms?.(payload); return; } catch (err) { console.warn('[pushUniforms] update failed', err); }
   }
   if (retries > 0) requestAnimationFrame(() => pushUniformsWhenReady(e, payload, retries - 1));
+  else console.warn('[pushUniforms] gave up pushing uniforms');
 }
 
 /* ---------------- Pane configurators ---------------- */
@@ -152,7 +169,7 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
   if (!e._bootstrapped) {
     e.bootstrap?.(payload);
     e._bootstrapped = true;
-    requestAnimationFrame(() => pushUniformsWhenReady(e, payload));
+    setTimeout(() => pushUniformsWhenReady(e, payload), 0); // microtick delay
     return;
   }
   pushUniformsWhenReady(e, payload);
@@ -198,6 +215,9 @@ const applyShow = (
   const { T=0.70, boostMax=40, decades=3, vizGain=1.25, exposure=7.5, zeroStop=1e-7 } = opts || {};
   primeOnce(e, shared, colorMode);
   const camZ = compactCameraZ(canvas, shared.axesScene);
+  
+  // Debug: Track applyShow parameters
+  console.log('[SHOW] camZ=', camZ, 'T/b/dec/viz/exposure/zeroStop', T, boostMax, decades, vizGain, exposure, zeroStop);
 
   // shader-side exaggeration
   const t = clamp01(T);
@@ -217,6 +237,11 @@ const applyShow = (
     zeroStop,
     cosmeticLevel: 10,
   });
+  
+  // Debug: Check if uniforms were pushed successfully
+  console.log('[SHOW] uniforms pushed?', !!e?.uniforms, e?.uniforms?.cameraZ);
+  // Quick GL sanity check
+  console.log('[SHOW] ctx lost?', e?.gl?.isContextLost?.());
 
   // geometry/display gain if available (matches SliceViewer feel)
   const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b; // 1..b
@@ -293,6 +318,10 @@ export default function WarpBubbleCompare({
 
         leftEngine.current  = new WarpCtor(leftRef.current);
         rightEngine.current = new WarpCtor(rightRef.current);
+        
+        // Debug: Constructor and engine creation
+        console.log('[SHOW] Ctor?', typeof WarpCtor, 'engine?', !!rightEngine.current);
+        console.log('[SHOW] script present?', !!(window as any).WarpEngine);
         ensureStrobeMux();
 
         // Keep both panes in lockstep with Helix strobing
@@ -342,6 +371,11 @@ export default function WarpBubbleCompare({
         (window as any).__warp_setCosmetic = () => {};
 
         const L = leftRef.current!,  R = rightRef.current!;
+        
+        // Debug: Shared parameters and canvas
+        console.log('[SHOW] shared', shared);
+        console.log('[SHOW] axesScene', shared.axesScene);
+        console.log('[SHOW] canvas size', R.clientWidth, R.clientHeight);
 
         requestAnimationFrame(() => {
           applyReal(leftEngine.current, shared, L, (parityParams?.viz?.colorMode ?? colorMode) as any);
