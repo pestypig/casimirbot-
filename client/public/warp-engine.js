@@ -1129,8 +1129,8 @@ class WarpEngine {
     _renderGridPoints() {
         const gl = this.gl;
         
-        // Use the properly compiled grid program
-        if (!this.gridProgram) {
+        // Guard: program and locations must be ready (async compile path)
+        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
             if (!this._warnNoProgramOnce) {
                 console.warn("Grid program not ready yet; waiting for shader link…");
                 this._warnNoProgramOnce = true;
@@ -1211,12 +1211,18 @@ class WarpEngine {
 
     _render() {
         const gl = this.gl;
-        
-        // Clear the screen
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        
-        // Render the spacetime grid
-        this._renderGridPoints();
+        try {
+            // Skip drawing until shaders are linked and uniforms are bound
+            if (!this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+                return;
+            }
+            // Clear the screen
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            // Render the spacetime grid
+            this._renderGridPoints();
+        } catch (err) {
+            console.error('[WarpEngine] render error:', err);
+        }
         
         // Emit diagnostics for proof panel
         if (this.onDiagnostics) {
