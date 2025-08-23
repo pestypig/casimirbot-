@@ -391,8 +391,7 @@ export default function HelixCore() {
     return clamp01(ui);
   }, [lc?.burst_ms, lc?.dwell_ms, pipeline?.dutyCycle, modeCfg.dutyCycle]);
 
-  // 🔑 Mode version tracking - force WarpVisualizer remount on mode changes  
-  const [modeVersion, setModeVersion] = useState(0);
+  // Removed mode version tracking to prevent forced remounts that cause black screens
   
   // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
@@ -761,7 +760,6 @@ export default function HelixCore() {
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}>
                         <WarpBubbleCompare
-                          key={`compare-${effectiveMode}-v${modeVersion}`}
                           parameters={{
                             ...compareParams,
                             sectorCount: totalSectors,          // TOTAL (averaging)
@@ -1694,8 +1692,7 @@ export default function HelixCore() {
                       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
                     }
                   });
-                  // Bump mode version to force WarpVisualizer remount
-                  setModeVersion(v => v + 1);
+                  // Removed forced remount that causes black screens
                   // Luma whisper on mode change
                   const whispers = {
                     'Hover': "Form first. Speed follows.",

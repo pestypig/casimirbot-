@@ -1,0 +1,100 @@
+1) Forced remounts (key props / conditional trees) → destroy() → no program
+
+From your logs:
+
+WarpEngine resources cleaned up (that’s destroy()),
+
+immediately followed by Render blocked - ... gridProgram: false.
+
+That happens when a parent re-renders the viewer with a different key (often tied to currentMode or physicsParityMode) or conditionally unmounts the canvas subtree. React unmount → your effect cleanup calls engine.destroy() → render loop is gone → new instance hasn’t finished compiling shaders yet → black.
+
+What to search for
+
+key={ anywhere near your viewer(s):
+
+rg -n "key=.*(mode|currentMode|parity|physicsParityMode)" client/src
+
+explicit engine teardown:
+
+rg -n "engineRef\.current\.destroy|\bdestroy\(" client/src
+
+the compare wrapper that still pushes uniforms while the program is gone:
+
+rg -n "pushUniformsWhenReady|tryPush" client/src
+
+What to patch (in the compare wrapper)
+
+Make sure each side is stable across mode changes:
+
+- <WarpVisualizer key={params.currentMode} parameters={params} />
++ <WarpVisualizer parameters={params} />
+
+
+If you were keying the container that holds each <canvas>, remove that key too.
+
+2) REAL/SHOW aren’t truly independent → both sides flip together
+
+In your WarpVisualizer you merge/update uniforms in-place. If the parent passes the same object reference to both panes and mutates it, both engines will get the same physicsParityMode/currentMode at some point.
+
+What to search for
+
+where both viewers are created:
+
+rg -n "WarpVisualizer" client/src
+
+shared prop object reused:
+
+look for const params = ...; <WarpVisualizer ... params /> twice
+
+What to do (in the parent/compare component)
+
+Create two immutable parameter objects per render and set parity on each:
+
+const base = /* compute pipeline state */;
+
+const realParams = {
+  ...base,
+  physicsParityMode: true,
+  viz: { ...(base.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1 },
+};
+
+const showParams = {
+  ...base,
+  physicsParityMode: false,
+  viz: { ...(base.viz ?? {}), curvatureGainT: base.viz?.curvatureGainT ?? 0.6, curvatureBoostMax: base.viz?.curvatureBoostMax ?? 40 },
+};
+
+// Important: do NOT reuse `base` after these spreads; don’t mutate later.
+return (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <WarpVisualizer parameters={realParams} />
+    <WarpVisualizer parameters={showParams} />
+  </div>
+);
+
+
+Also ensure you’re not passing sectorCount / sectors or thetaScale by reference from a shared mutable store to both panes.
+
+3) One small engine-side safety net (prevents “dropped uniforms” during relink)
+
+Right now, if gridProgram is momentarily null (after teardown/relink), updateUniforms returns early and your TSX keeps sending patches into the void until compilation finishes. Queue them instead so they apply the moment shaders are ready.
+
+File: client/public/warp-engine.js
+
+updateUniforms(parameters) {
+  if (this._destroyed) return;
+- // Don't apply while program not ready
+- if (!this.isLoaded || !this.gridProgram) { return; }
+- this._enqueueUniforms(parameters);
++ // If program isn't ready yet, queue and let _render() relink shaders
++ if (!this.gridProgram || !this.isLoaded) {
++   this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
++   // Kick the linker if needed; _render() will also call this.
++   if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
++   return;
++ }
++ this._enqueueUniforms(parameters);
+}
+
+
+This way a temporary relink doesn’t produce a long “black” window.

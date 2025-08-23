@@ -727,8 +727,13 @@ class WarpEngine {
     
     updateUniforms(parameters) {
         if (this._destroyed) return;
-        // Don't apply while program not ready
-        if (!this.isLoaded || !this.gridProgram) { return; }
+        // If program isn't ready yet, queue and let _render() relink shaders
+        if (!this.gridProgram || !this.isLoaded) {
+            this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
+            // Kick the linker if needed; _render() will also call this.
+            if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
+            return;
+        }
         this._enqueueUniforms(parameters);
     }
     
@@ -1319,6 +1324,11 @@ class WarpEngine {
         if (!this.gridProgram && gl) {
             try { this._compileGridShaders(); } catch (e) { console.warn('Autorelink failed:', e); }
             return; // wait for shaders to (a)synchronously link
+        }
+        // Apply any pending updates now that shaders are ready
+        if (this._pendingUpdate && this.isLoaded && this.gridProgram) {
+            this._enqueueUniforms(this._pendingUpdate);
+            this._pendingUpdate = null;
         }
         // Add safety checks to prevent "stuck black" state
         if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
