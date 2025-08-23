@@ -22,57 +22,45 @@ function removeOldWarpScripts() {
     .forEach(n => n.parentNode?.removeChild(n));
 }
 
+// Asset path resolution for subpaths
+function resolveAssetBase() {
+  const base = import.meta.env.BASE_URL || '/';
+  return base.endsWith('/') ? base.slice(0, -1) : base;
+}
+
 async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
   const { requiredBuild = APP_WARP_BUILD, forceReload = false } = opts;
   const w = window as any;
-
-  // If an engine is already present, verify its build token
-  let Ctor = w.WarpEngine?.default || w.WarpEngine;
   const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
-  if (Ctor && !forceReload) {
-    // In dev, accept any build; in prod, match the token
-    const dev = requiredBuild === 'dev';
-    if (dev || !requiredBuild || currentBuild === requiredBuild) {
-      console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
-      return Ctor;
-    }
-    console.warn('[WARP LOADER] Build mismatch; reloading engine', { currentBuild, requiredBuild });
+  const mismatch = currentBuild && requiredBuild && currentBuild !== requiredBuild;
+
+  if (w.WarpEngine && !forceReload && !mismatch && requiredBuild !== 'dev') {
+    console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
+    return w.WarpEngine.default || w.WarpEngine;
   }
 
-  // Nuke caching that can pin the old engine
-  if (forceReload) {
-    console.log('[WARP LOADER] Nuking Service Worker cache');
+  console.log('[WARP LOADER] Loading WarpEngine', { currentBuild, requiredBuild, mismatch, forceReload });
+
+  // 👉 blow away old script + SW caches when needed
+  if (mismatch || forceReload) {
     try {
-      // Service Worker / PWA: unregister & prepare for hard-reload
-      const registrations = await navigator.serviceWorker?.getRegistrations?.();
-      if (registrations?.length) {
-        await Promise.all(registrations.map(r => r.unregister()));
-        console.log('[WARP LOADER] Unregistered', registrations.length, 'service workers');
-      }
+      const regs = await navigator.serviceWorker?.getRegistrations?.();
+      await Promise.all((regs || []).map(r => r.unregister()));
+      console.log('[WARP LOADER] Unregistered service workers:', (regs || []).length);
     } catch (e) {
-      console.warn('[WARP LOADER] Service worker cleanup failed (normal if none active):', e);
+      console.warn('[WARP LOADER] Service worker cleanup failed:', e);
     }
+    // remove existing script tags so the new one executes
+    Array.from(document.querySelectorAll('script[src*="warp-engine.js"]')).forEach(n => n.remove());
   }
 
-  // Only inject if no script tag exists (avoid double execution)
-  const existing = Array.from(document.scripts).find(s => /\/warp-engine\.js(\?|$)/.test(s.src));
-  if (!existing) {
-    // Fresh load with cache-bust
-    const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
-    await loadScript(url);
-  } else {
-    // Wait for the existing tag to finish (or the global to appear)
-    await new Promise<void>((resolve, reject) => {
-      const ok = () => (w.WarpEngine ? resolve() : setTimeout(ok, 30));
-      existing.addEventListener('error', () => reject(new Error('warp-engine.js failed to load')));
-      ok();
-    });
-  }
+  // Load script with proper asset path resolution
+  const assetBase = resolveAssetBase();
+  const url = `${assetBase}/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
+  await loadScript(url);
 
-  // Re-check
-  Ctor = w.WarpEngine?.default || w.WarpEngine;
+  const Ctor = w.WarpEngine?.default || w.WarpEngine;
   if (Ctor) {
-    // Stamp a build token so we can verify later even if the engine lacks BUILD
     w.__WarpEngineBuild = w.WarpEngine?.BUILD || requiredBuild;
     console.log('[WARP LOADER] Loaded WarpEngine', { build: w.__WarpEngineBuild });
     return Ctor;
