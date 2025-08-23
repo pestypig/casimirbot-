@@ -572,10 +572,9 @@ export default function WarpBubbleCompare({
           ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
             const s = Math.max(1, Math.floor(sectorCount||1));   // concurrent sectors in the sweep loop
             const payload = {
-              // these are for the animation/sweep, not for averaging
-              sectors: s,
-              split: Math.max(0, Math.min(s-1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
-              sectorIdx: Math.max(0, currentSector % s)
+              // ❌ sectors: s,  // Let physicsPayload own sectors for averaging
+              sectorIdx: Math.max(0, currentSector % s),
+              sectorSplit: Math.max(0, Math.min(s - 1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
             };
             pushUniformsWhenReady(leftEngine.current,  payload);
             pushUniformsWhenReady(rightEngine.current, payload);
