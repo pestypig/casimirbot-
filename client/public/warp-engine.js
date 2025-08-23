@@ -132,7 +132,7 @@ class WarpEngine {
             cameraZ: null,
             
             // ridge visualization mode
-            ridgeMode: 0  // 0 = physics df (double-lobe), 1 = single crest at ρ=1
+            ridgeMode: 1  // default to single crest at ρ=1 (clean outline)
         };
         
         // Initialize rendering pipeline
@@ -174,6 +174,7 @@ class WarpEngine {
           this.updateUniforms({
             physicsParityMode: true,        // activates the clamp above
             curvatureGainT: 0,
+            ridgeMode: 0,           // physics double-lobe when checking parity
             // curvatureBoostMax preserved for headroom, exposure/zeroStop set in parity block
           });
           console.log("✅ True Physics: parity ON, no boosts/cosmetics");
@@ -187,6 +188,7 @@ class WarpEngine {
             curvatureGainT: 0.50,          // "demo" mid-boost; adjust to taste
             exposure: 6.0,
             zeroStop: 1e-7,
+            ridgeMode: 1,           // single crest for a clear, unambiguous ring
           });
           console.log("🎨 Showcase: parity OFF, cosmetics/boosts ON");
         };
