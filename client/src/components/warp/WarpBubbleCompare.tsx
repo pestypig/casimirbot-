@@ -193,7 +193,12 @@ const applyReal = (
   colorMode: 'theta'|'shear'|'solid'
 ) => {
   primeOnce(e, shared, colorMode);
-  const camZ = compactCameraZ(canvas, shared.axesScene);
+
+  const axesOK = shared?.axesScene?.every?.(n => Number.isFinite(n) && Math.abs(n) > 0);
+  if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+
+  const camZraw = compactCameraZ(canvas, shared.axesScene);
+  const camZ = Number.isFinite(camZraw) ? camZraw : 2.0;
   // parity: absolutely neutral
   pushUniformsWhenReady(e, {
     ...shared,
