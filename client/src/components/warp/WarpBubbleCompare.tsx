@@ -217,13 +217,11 @@ function scrubOverlays(e: any) {
   // Prefer calibrated geometry only
   if ('modelMode' in u) patch.modelMode = 'calibrated';
 
-  // Kill common demo/unit/ref/instant paths (defensive — only if present)
   for (const k of Object.keys(u)) {
-    if (/(^|_)unit(|_)?(bubble|ring|blend|weight)?/i.test(k)) patch[k] = 0;
-    if (/demo(|Mix|Blend|Weight|Ring|Layer)/i.test(k))        patch[k] = 0;
-    if (/(ref|reference).*(hull|ring|layer|alpha)/i.test(k))  patch[k] = 0;
-    // Keep average view on, but don't kill FR window gating.
-    if (/avg|showAvg|viewAvg/i.test(k))                        patch[k] = 1;
+    // Only nuke obvious "reference overlays"
+    if (/(ref|reference).*(hull|ring|layer|alpha)/i.test(k)) patch[k] = 0;
+    // Keep average view on, but don't touch displacement gates
+    if (/avg|showAvg|viewAvg/i.test(k)) patch[k] = 1;
   }
 
   // Make sure we don't accidentally switch cameras by reusing hull
