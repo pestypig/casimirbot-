@@ -230,6 +230,26 @@ export default function WarpBubbleCompare({
   colorMode = "theta",
   lockFraming = true, // reserved; we always lock from inside
 }: Props) {
+  // Explicitly construct separate payloads for airtight mode control
+  const base = parameters ? JSON.parse(JSON.stringify(parameters)) : {};
+  
+  const parityParams = {
+    ...base,
+    physicsParityMode: true,
+    viz: { ...(base.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1 },
+    curvatureGainDec: 0,
+    curvatureBoostMax: 1,
+  };
+
+  const showParams = {
+    ...base,
+    physicsParityMode: false, // allow exaggeration & cosmetic boosts
+  };
+
+  // Optional: set per-pane display gain
+  const parityX = parityExaggeration ?? 1;
+  const heroX = heroExaggeration ?? 82;
+
   const leftRef = useRef<HTMLCanvasElement>(null);
   const rightRef = useRef<HTMLCanvasElement>(null);
   const leftEngine = useRef<any>(null);
@@ -249,11 +269,12 @@ export default function WarpBubbleCompare({
         rightEngine.current = new WarpCtor(rightRef.current);
         ensureStrobeMux();
 
-        const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+        const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
 
-        const phys = physicsPayload(parameters);
-        pushUniformsWhenReady(leftEngine.current,  phys);
-        pushUniformsWhenReady(rightEngine.current, phys);
+        const parityPhys = physicsPayload(parityParams);
+        const showPhys = physicsPayload(showParams);
+        pushUniformsWhenReady(leftEngine.current,  parityPhys);
+        pushUniformsWhenReady(rightEngine.current, showPhys);
 
         // normalize any global fallback the engine might use
         (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
@@ -279,21 +300,21 @@ export default function WarpBubbleCompare({
         const L = leftRef.current!,  R = rightRef.current!;
 
         requestAnimationFrame(() => {
-          applyReal(leftEngine.current, shared, L, (parameters?.viz?.colorMode ?? colorMode) as any);
+          applyReal(leftEngine.current, shared, L, (parityParams?.viz?.colorMode ?? colorMode) as any);
           scrubOverlays(leftEngine.current);
 
           applyShow(
             rightEngine.current,
             shared,
             R,
-            (parameters?.viz?.colorMode ?? colorMode) as any,
+            (showParams?.viz?.colorMode ?? colorMode) as any,
             {
-              T: parameters?.viz?.curvatureGainT ?? 0.70,
-              boostMax: parameters?.viz?.curvatureBoostMax ?? heroExaggeration,
-              decades: parameters?.curvatureGainDec ?? 3,
+              T: showParams?.viz?.curvatureGainT ?? 0.70,
+              boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
+              decades: showParams?.curvatureGainDec ?? 3,
               vizGain: 1.25,
-              exposure: parameters?.viz?.exposure ?? 7.5,
-              zeroStop: parameters?.viz?.zeroStop ?? 1e-7,
+              exposure: showParams?.viz?.exposure ?? 7.5,
+              zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
             }
           );
           scrubOverlays(rightEngine.current);
@@ -334,11 +355,12 @@ export default function WarpBubbleCompare({
   // live updates when parameters change (same framing both panes)
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
-    const shared = frameFromHull(parameters?.hull, parameters?.gridSpan);
+    const shared = frameFromHull(parityParams?.hull || showParams?.hull, parityParams?.gridSpan || showParams?.gridSpan);
 
-    const phys = physicsPayload(parameters);
-    pushUniformsWhenReady(leftEngine.current,  phys);
-    pushUniformsWhenReady(rightEngine.current, phys);
+    const parityPhys = physicsPayload(parityParams);
+    const showPhys = physicsPayload(showParams);
+    pushUniformsWhenReady(leftEngine.current,  parityPhys);
+    pushUniformsWhenReady(rightEngine.current, showPhys);
 
     // normalize any global fallback the engine might use
     (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
@@ -357,34 +379,35 @@ export default function WarpBubbleCompare({
     pushUniformsWhenReady(leftEngine.current,  killMixing);
     pushUniformsWhenReady(rightEngine.current, killMixing);
 
-    applyReal(leftEngine.current,  shared, leftRef.current,  (parameters?.viz?.colorMode ?? colorMode) as any);
+    applyReal(leftEngine.current,  shared, leftRef.current,  (parityParams?.viz?.colorMode ?? colorMode) as any);
 
     applyShow(
       rightEngine.current,
       shared,
       rightRef.current,
-      (parameters?.viz?.colorMode ?? colorMode) as any,
+      (showParams?.viz?.colorMode ?? colorMode) as any,
       {
-        T: parameters?.viz?.curvatureGainT ?? 0.70,
-        boostMax: parameters?.viz?.curvatureBoostMax ?? heroExaggeration,
-        decades: parameters?.curvatureGainDec ?? 3,
+        T: showParams?.viz?.curvatureGainT ?? 0.70,
+        boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
+        decades: showParams?.curvatureGainDec ?? 3,
         vizGain: 1.25,
-        exposure: parameters?.viz?.exposure ?? 7.5,
-        zeroStop: parameters?.viz?.zeroStop ?? 1e-7,
+        exposure: showParams?.viz?.exposure ?? 7.5,
+        zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
       }
     );
 
     scrubOverlays(leftEngine.current);
     scrubOverlays(rightEngine.current);
   }, [
-    parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c,
-    parameters?.gridSpan,
-    parameters?.viz?.curvatureGainT,
-    parameters?.viz?.curvatureBoostMax,
-    parameters?.viz?.exposure,
-    parameters?.viz?.zeroStop,
-    parameters?.curvatureGainDec,
-    colorMode
+    parityParams?.hull?.a, parityParams?.hull?.b, parityParams?.hull?.c,
+    showParams?.hull?.a, showParams?.hull?.b, showParams?.hull?.c,
+    parityParams?.gridSpan, showParams?.gridSpan,
+    parityParams?.viz?.curvatureGainT, showParams?.viz?.curvatureGainT,
+    parityParams?.viz?.curvatureBoostMax, showParams?.viz?.curvatureBoostMax,
+    parityParams?.viz?.exposure, showParams?.viz?.exposure,
+    parityParams?.viz?.zeroStop, showParams?.viz?.zeroStop,
+    parityParams?.curvatureGainDec, showParams?.curvatureGainDec,
+    colorMode, heroX, parityX
   ]);
 
   // Fix black bands/duplicated rows after layout changes
