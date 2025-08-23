@@ -237,8 +237,7 @@ const applyReal = (
   const axesOK = shared?.axesScene?.every?.(n => Number.isFinite(n) && Math.abs(n) > 0);
   if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
 
-  const camZraw = compactCameraZ(canvas, shared.axesScene);
-  const camZ = Number.isFinite(camZraw) ? camZraw : 2.0;
+  const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
   // parity: absolutely neutral
   pushUniformsWhenReady(e, {
     ...shared,
@@ -278,8 +277,7 @@ const applyShow = (
     shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
   }
 
-  const camZraw = compactCameraZ(canvas, shared.axesScene);
-  const camZ = Number.isFinite(camZraw) ? camZraw : 2.0;
+  const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
 
   const t = clamp01(T);
   const b = Math.max(1, boostMax);
@@ -369,6 +367,7 @@ export default function WarpBubbleCompare({
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const roRef = useRef<ResizeObserver | null>(null);
+  const busyRef = useRef<boolean>(false);
 
   // bootstrap both engines once
   useEffect(() => {
@@ -380,9 +379,8 @@ export default function WarpBubbleCompare({
         if (cancelled) return;
 
         // StrictMode re-mount guard (prevents double constructor crashes in dev)
-        const busy = (window as any).__warpCompareBusy ?? false;
-        if (busy) return;
-        (window as any).__warpCompareBusy = true;
+        if (busyRef.current) return;
+        busyRef.current = true;
 
         try {
           console.log('[WARP ENGINE] Attempting to create engines with:', {
@@ -425,7 +423,7 @@ export default function WarpBubbleCompare({
           });
           return;
         } finally {
-          (window as any).__warpCompareBusy = false;
+          busyRef.current = false;
         }
         
         ensureStrobeMux();
@@ -473,6 +471,15 @@ export default function WarpBubbleCompare({
           sectors: showPhys?.sectors
         });
         console.log('[WARP DEBUG] Engines ready?', !!leftEngine.current, !!rightEngine.current);
+        
+        // Log bad physics early to catch silent NaNs
+        const warnIfBad = (tag:string, phys:any) => {
+          if (!Number.isFinite(phys?.thetaScale) || phys.thetaScale <= 0) {
+            console.warn(`[WARP DEBUG] ${tag} bad thetaScale:`, phys?.thetaScale, phys);
+          }
+        };
+        warnIfBad('REAL', parityPhys);
+        warnIfBad('SHOW', showPhys);
         
         pushUniformsWhenReady(leftEngine.current,  parityPhys);
         pushUniformsWhenReady(rightEngine.current, showPhys);
@@ -539,8 +546,8 @@ export default function WarpBubbleCompare({
         roRef.current = new ResizeObserver(() => {
           const fresh = frameFromHull(parameters?.hull, parameters?.gridSpan);
           const L = leftRef.current!, R = rightRef.current!;
-          const camL = compactCameraZ(L, fresh.axesScene);
-          const camR = compactCameraZ(R, fresh.axesScene);
+          const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
+          const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
 
           // make the GL viewport match CSS before re-locking framing
           leftEngine.current?._resize?.();

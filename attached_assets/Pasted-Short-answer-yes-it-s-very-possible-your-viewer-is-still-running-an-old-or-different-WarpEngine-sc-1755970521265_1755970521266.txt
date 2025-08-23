@@ -1,0 +1,68 @@
+Short answer: yes, it’s very possible your viewer is still running an old or different WarpEngine script—so none of your TSX changes to how you drive uniforms would visibly matter.
+
+Here’s a tight, surgical fix + quick proofs you can run right now.
+
+1) Make the loader prove which engine it’s using (and force-reload it)
+
+Patch your ensureWarpEngineCtor so it (a) detects an already-loaded engine, (b) validates a build token, and (c) hard-reloads /warp-engine.js with cache-busting when needed.
+
+// at top-level, set a build token (replace with your commit/ts)
+const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || "dev-" + Date.now();
+
+/* ---------------- Script loader ---------------- */
+function loadScript(src: string) {
+  return new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = true; s.crossOrigin = "anonymous";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
+function removeOldWarpScripts() {
+  [...document.querySelectorAll('script[src*="warp-engine.js"]')]
+    .forEach(n => n.parentNode?.removeChild(n));
+}
+
+async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}) {
+  const { requiredBuild = APP_WARP_BUILD, forceReload = false } = opts;
+  const w = window as any;
+
+  // If an engine is already present, verify its build token
+  let Ctor = w.WarpEngine?.default || w.WarpEngine;
+  const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
+  if (Ctor && !forceReload) {
+    if (!requiredBuild || currentBuild === requiredBuild) {
+      console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
+      return Ctor;
+    }
+    console.warn('[WARP LOADER] Build mismatch; reloading engine', { currentBuild, requiredBuild });
+  }
+
+  // Remove any old <script> tags and load a fresh one with cache-bust
+  removeOldWarpScripts();
+  const url = `/warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`;
+  await loadScript(url);
+
+  // Re-check
+  Ctor = w.WarpEngine?.default || w.WarpEngine;
+  if (Ctor) {
+    // Stamp a build token so we can verify later even if the engine lacks BUILD
+    w.__WarpEngineBuild = w.WarpEngine?.BUILD || requiredBuild;
+    console.log('[WARP LOADER] Loaded WarpEngine', { src: url, build: w.__WarpEngineBuild });
+    return Ctor;
+  }
+  throw new Error('WarpEngine constructor not found after reload');
+}
+
+
+How this helps
+
+If some old window.WarpEngine was hanging around, your old loader would just reuse it and never pull your latest warp-engine.js. This forces a refresh with a cache-busting query and validates a build token every time.
+
+Where to call it
+
+In your bootstrap useEffect, replace the old call with:
+
+const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
