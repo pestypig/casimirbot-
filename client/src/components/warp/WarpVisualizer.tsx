@@ -575,6 +575,33 @@ useEffect(() => {
       const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
       const parity = !!parameters.physicsParityMode;
 
+      // ----- Seed framing every update (keeps axesClip non-null, matches engine) -----
+      const ah = num(parameters.hull?.a, 503.5), bh = num(parameters.hull?.b, 132), ch = num(parameters.hull?.c, 86.5);
+      const sh = 1 / Math.max(ah, bh, ch, 1e-9);
+      const axesSceneNow: [number,number,number] = [ah*sh, bh*sh, ch*sh];
+      const spanNow = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneNow) * VIS_LOCAL.spanPaddingDesktop);
+
+      // Push framing
+      engineRef.current.updateUniforms({
+        axesScene: axesSceneNow,
+        axesClip:  axesSceneNow,
+        hullAxes:  [ah,bh,ch] as [number,number,number],
+        gridSpan:  parameters.gridSpan ?? spanNow,
+      });
+
+      // ----- Single-source θ-scale (shader + CPU agree) -----
+      engineRef.current.updateUniforms({
+        thetaScale: resolveThetaScale({
+          dutyCycle: dutyResolved,
+          sectors: sectorsResolved,
+          gammaGeo,
+          qSpoilingFactor: qSpoil,
+          gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
+          lightCrossing: lc,
+          dutyEffectiveFR: parameters.dutyEffectiveFR
+        }),
+      });
+
       const pipelineState = {
         currentMode: parameters.currentMode || 'hover',
         dutyCycle: parameters.dutyCycle,
