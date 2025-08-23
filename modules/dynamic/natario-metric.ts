@@ -175,14 +175,11 @@ function calculateNatarioShift(
     ? geomFactorFromEllipsoid(hullDimensions.a, hullDimensions.b, hullDimensions.c)
     : 1.0; // Fallback to spherical
   
-  // Base shift amplitude from stress-energy tensor
+  // Base shift amplitude from *averaged* T00
   const baseShift = Math.sqrt((eightPiG * energyDensityMagnitude) / cSquared) * hullRadiusM;
   
-  // Time-averaged shift with geometric correction
-  // β_avg = β_base × √(d_eff) × f(geometry)
-  const timeAveragedShift = baseShift * Math.sqrt(sectorDutyEff) * geometricFactor;
-  
-  return timeAveragedShift;
+  // Time-averaged shift with geometric correction only (no extra √duty here)
+  return baseShift * geometricFactor;
 }
 
 /**
