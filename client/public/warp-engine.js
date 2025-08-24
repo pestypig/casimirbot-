@@ -672,18 +672,14 @@ class WarpEngine {
         // cache locations & mark ready
         this._cacheGridLocations(program);
         this._warnNoProgramOnce = false;
-        this._setLoaded(true);
         return true;
     }
 
     _cacheGridLocations(program) {
         const gl = this.gl;
         this.gridProgram = program;
-        this.gridAttribs = {
-            position: gl.getAttribLocation(program, 'a_position'),
-        };
         this.gridUniforms = {
-            mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
+            mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
             sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
             thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
             ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
@@ -691,6 +687,10 @@ class WarpEngine {
             sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
             split:      gl.getUniformLocation(program, 'u_Split'),
         };
+        this.gridAttribs = {
+            position: gl.getAttribLocation(program, 'a_position'),
+        };
+        this._setLoaded(true);
     }
     
     _setupUniformLocations() {
@@ -913,22 +913,22 @@ class WarpEngine {
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
-        // --- Compute θ-scale from pipeline if caller didn't pass one ---
-        const sectorsEff = Math.max(1, nextUniforms.sectors ?? 1);
-        
-        // --- FR duty selection (prefer explicit FR) ---
-        const dutyEffFR = (frFromParams != null)
-          ? Math.max(0, +frFromParams)
-          : (nextUniforms.viewAvg ? Math.max(1e-12, (nextUniforms.dutyCycle ?? 0) / nextUniforms.sectors) : 1.0);
-
-        const thetaScaleFromChain =
-          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+        // --- Bullet-proof θ-scale (prevents "θ-scale — invalid" row) ---
+        const sectorsEff = Math.max(1, nextUniforms.sectors|0 || 1);
+        const frFromParams = parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
+        const dutyEffFR = Math.max(1e-12,
+          frFromParams != null ? +frFromParams
+                               : (nextUniforms.viewAvg ? (Math.max(1e-12, nextUniforms.dutyCycle||0) / sectorsEff) : 1)
+        );
+        const betaInst =
+          Math.pow(Math.max(1, nextUniforms.gammaGeo||1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB ?? 1) *
-          (nextUniforms.viewAvg ? Math.sqrt(dutyEffFR) : 1);
+          Math.max(1, nextUniforms.gammaVdB||1);
 
-        nextUniforms.thetaScale =
-          Number.isFinite(parameters?.thetaScale) ? +parameters.thetaScale : thetaScaleFromChain;
+        const thetaScaleFromChain = nextUniforms.viewAvg ? betaInst * Math.sqrt(dutyEffFR) : betaInst;
+        nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
+          ? +parameters.thetaScale
+          : thetaScaleFromChain;
 
         // decide if the CPU warp needs recompute
         const geoChanged =
@@ -1476,6 +1476,16 @@ class WarpEngine {
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
+        
+        // Shader link logging (helps if you ever see "Shaders linked — no program" again)
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+          const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
+          const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
+          const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
+          console.error('[WarpEngine] Link error:', { vsLog, fsLog, pgLog });
+          gl.deleteProgram(program);
+          return null;
+        }
         
         // async path (KHR_parallel_shader_compile)
         if (this.parallelShaderExt && onReady) {
