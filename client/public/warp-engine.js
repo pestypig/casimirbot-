@@ -77,6 +77,7 @@ class WarpEngine {
         // Loading state management
         this.isLoaded = false;
         this.onLoadingStateChange = null; // callback for loading progress
+        this._readyQueue = [];            // callbacks to run once shaders are linked
         
         // Strobing state for sector sync
         this.strobingState = {
@@ -670,6 +671,26 @@ class WarpEngine {
                 message: loaded ? 'Warp engine ready' : 'Initializing...'
             });
         }
+        // Flush once-ready callbacks on first successful link
+        if (loaded && this._readyQueue && this._readyQueue.length) {
+            const q = this._readyQueue.splice(0);
+            for (const fn of q) { try { fn(this); } catch(e){ console.warn(e); } }
+            try { this._render(); } catch {}
+        }
+    }
+
+    // Run a callback when the engine is fully ready (shaders linked)
+    onceReady(fn) {
+        if (this.isLoaded && this.gridProgram) {
+            try { fn(this); } catch(e){ console.warn(e); }
+        } else {
+            this._readyQueue.push(fn);
+        }
+    }
+
+    // Public: force a geometry rebuild + immediate draw
+    forceRedraw() {
+        try { this._updateGrid(); this._render(); } catch(e){ console.warn('forceRedraw:', e); }
     }
 
     // --- Atomic uniform batching to avoid mid-frame bad states ---
@@ -1823,7 +1844,13 @@ globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
     e.__id = id;
     (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
     e.bootstrap(opts.paramsTruth || {});
-    e.setPresetParity();      // <- TRUTH MODE
+    e.onceReady(() => {
+      e.setPresetParity();                                  // TRUTH MODE
+      // Make the difference obvious at a glance (optional, can remove):
+      e.updateUniforms({ colorMode: 2, ridgeMode: 0 });     // shear palette + physics double-lobe
+      e.forceRedraw();
+      console.log('[warp] truth ready');
+    });
     engines.truth = e;
   }
 
@@ -1834,7 +1861,12 @@ globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
     e.__id = id;
     (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
     e.bootstrap(opts.paramsCosmetic || {});
-    e.setPresetShowcase();    // <- COSMETIC MODE
+    e.onceReady(() => {
+      e.setPresetShowcase();                               // COSMETIC MODE
+      e.updateUniforms({ colorMode: 1, ridgeMode: 1 });    // theta diverging + single crest
+      e.forceRedraw();
+      console.log('[warp] cosmetic ready');
+    });
     engines.cosmetic = e;
   }
 
