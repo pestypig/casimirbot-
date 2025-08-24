@@ -3,6 +3,98 @@ import React, { useEffect, useRef } from "react";
 // Use the build token stamped at app boot
 const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
 
+/* ---------------- Client-side physics calc identical to EnergyPipeline ---------------- */
+type BaseInputs = {
+  hull: { a: number; b: number; c: number };
+  wallWidth_m?: number;
+  driveDir?: [number, number, number];
+  vShip?: number;
+
+  // duties
+  dutyCycle: number;          // UI duty (0..1)
+  dutyEffectiveFR: number;    // ship-wide FR duty (0..1)
+
+  // sectors
+  sectorCount: number;        // total sectors (averaging)
+  sectors: number;            // concurrent (strobing)
+
+  // physics chain
+  gammaGeo: number;           // γ_geo
+  qSpoilingFactor: number;    // ΔA/A
+  gammaVanDenBroeck: number;  // γ_VdB
+
+  colorMode?: 'theta'|'shear'|'solid';
+  lockFraming?: boolean;
+};
+
+const clampValue = (x: number) => Math.max(0, Math.min(1, x));
+
+function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
+  // canonical: θ-scale = γ^3 · (ΔA/A) · γ_VdB · √(duty / sectors_avg)
+  const g3   = Math.pow(Math.max(1, base.gammaGeo), 3);
+  const dAA  = Math.max(1e-12, base.qSpoilingFactor);
+  const gVdB = Math.max(1, base.gammaVanDenBroeck);
+
+  const duty = (flavor === 'fr') 
+    ? clampValue(base.dutyEffectiveFR)                     // ship-averaged FR duty
+    : clampValue(base.dutyCycle / Math.max(1, base.sectorCount)); // UI duty averaged over all sectors
+
+  const sectorsAvg = Math.max(1, base.sectorCount);
+  const dutySqrt = Math.sqrt(Math.max(1e-12, duty));    // √(duty) ; sectors already averaged in "duty" above
+
+  return g3 * dAA * gVdB * dutySqrt;
+}
+
+function buildCommonUniforms(base: BaseInputs) {
+  return {
+    // geometry
+    hullAxes: [base.hull.a, base.hull.b, base.hull.c] as [number,number,number],
+    wallWidth_m: base.wallWidth_m ?? 6.0,
+    driveDir: base.driveDir ?? [1,0,0],
+    vShip: base.vShip ?? 1.0,
+
+    // timing / averaging
+    dutyCycle: base.dutyCycle,          // UI duty (for diagnostics)
+    sectors: Math.max(1, base.sectors), // concurrent
+    sectorCount: Math.max(1, base.sectorCount), // total
+    viewAvg: true,
+
+    // visual defaults
+    colorMode: base.colorMode ?? 'theta',
+    lockFraming: base.lockFraming ?? true,
+  };
+}
+
+export function buildEngineUniforms(base: BaseInputs) {
+  const common = buildCommonUniforms(base);
+  const real = {
+    ...common,
+    thetaScale: buildThetaScale(base, 'fr'),
+    physicsParityMode: true,
+    ridgeMode: 0,          // ⚠ physics double-lobe (real)
+    exposure: 4.2,
+    zeroStop: 1e-6,
+    cosmeticLevel: 1,
+    curvatureGainT: 0,
+    curvatureBoostMax: 1,
+    userGain: 1,
+  };
+  const show = {
+    ...common,
+    thetaScale: buildThetaScale(base, 'ui'),
+    physicsParityMode: false,
+    ridgeMode: 1,          // single crest at ρ=1 (show)
+    exposure: 7.5,
+    zeroStop: 1e-7,
+    cosmeticLevel: 10,
+    // these two can be driven by your "heroExaggeration"/slider
+    curvatureGainT: 0.70,
+    curvatureBoostMax: 40,
+    userGain: 4.0,
+  };
+  return { real, show };
+}
+
 /* ---------------- Script loader & strobe mux ---------------- */
 function loadScript(src: string) {
   return new Promise<void>((resolve, reject) => {
@@ -587,9 +679,29 @@ export default function WarpBubbleCompare({
         const shared = frameFromHull(base?.hull, base?.gridSpan);
 
         // REAL (parity): FR duty (conservative) - use base parameters with FR source
-        const parityPhys = physicsPayload(base, 'fr');
         // SHOW (boosted): UI duty (visibly mode-dependent) - use base parameters with UI source
-        const showPhys = physicsPayload(base, 'ui');
+        // Use new coherent physics calculator
+        const baseInputs: BaseInputs = {
+          hull: { 
+            a: base?.hull?.a ?? 503.5, 
+            b: base?.hull?.b ?? 132, 
+            c: base?.hull?.c ?? 86.5 
+          },
+          wallWidth_m: base?.hull?.wallThickness_m ?? 6.0,
+          driveDir: [1, 0, 0],
+          vShip: 1.0,
+          dutyCycle: base?.dutyCycle ?? 0.14,
+          dutyEffectiveFR: base?.dutyEffectiveFR ?? 0.000025,
+          sectorCount: base?.sectorCount ?? 400,
+          sectors: Math.max(1, base?.sectors ?? base?.concurrentSectors ?? 1),
+          gammaGeo: base?.gammaGeo ?? 26,
+          qSpoilingFactor: base?.qSpoilingFactor ?? base?.deltaAOverA ?? 1,
+          gammaVanDenBroeck: base?.gammaVanDenBroeck ?? 135203.8,
+          colorMode: 'theta',
+          lockFraming: true
+        };
+        
+        const { real: parityPhys, show: showPhys } = buildEngineUniforms(baseInputs);
         
         // Debug: Track exact physics parameters being passed
         console.log('[WARP DEBUG] Base params:', {
@@ -762,10 +874,31 @@ export default function WarpBubbleCompare({
     pushUniformsWhenReady(leftEngine.current, framingSeed);
     pushUniformsWhenReady(rightEngine.current, framingSeed);
     
-    // Then apply mode-specific physics
+    // Then apply mode-specific physics using coherent calculator
     const shared = frameFromHull(hull, spanNow);
-    const parityPhys = physicsPayload(parityParams, 'fr');
-    const showPhys = physicsPayload(showParams, 'ui');
+    
+    // Build physics inputs for coherent calculation
+    const updateInputs: BaseInputs = {
+      hull: { 
+        a: hull?.a ?? 503.5, 
+        b: hull?.b ?? 132, 
+        c: hull?.c ?? 86.5 
+      },
+      wallWidth_m: hull?.wallThickness_m ?? 6.0,
+      driveDir: [1, 0, 0],
+      vShip: 1.0,
+      dutyCycle: parityParams?.dutyCycle ?? showParams?.dutyCycle ?? 0.14,
+      dutyEffectiveFR: parityParams?.dutyEffectiveFR ?? showParams?.dutyEffectiveFR ?? 0.000025,
+      sectorCount: parityParams?.sectorCount ?? showParams?.sectorCount ?? 400,
+      sectors: Math.max(1, parityParams?.sectors ?? showParams?.sectors ?? parityParams?.concurrentSectors ?? showParams?.concurrentSectors ?? 1),
+      gammaGeo: parityParams?.gammaGeo ?? showParams?.gammaGeo ?? 26,
+      qSpoilingFactor: parityParams?.qSpoilingFactor ?? showParams?.qSpoilingFactor ?? parityParams?.deltaAOverA ?? showParams?.deltaAOverA ?? 1,
+      gammaVanDenBroeck: parityParams?.gammaVanDenBroeck ?? showParams?.gammaVanDenBroeck ?? 135203.8,
+      colorMode: 'theta',
+      lockFraming: true
+    };
+    
+    const { real: parityPhys, show: showPhys } = buildEngineUniforms(updateInputs);
     pushUniformsWhenReady(leftEngine.current,  {
       ...parityPhys,
       physicsParityMode: true,
@@ -949,11 +1082,32 @@ export default function WarpBubbleCompare({
       }, 100);
     };
     
-    const p = physicsPayload(parityParams, 'fr');
+    // Use coherent physics calculator for debugging output
+    const debugInputs: BaseInputs = {
+      hull: { 
+        a: parityParams?.hull?.a ?? 503.5, 
+        b: parityParams?.hull?.b ?? 132, 
+        c: parityParams?.hull?.c ?? 86.5 
+      },
+      wallWidth_m: parityParams?.hull?.wallThickness_m ?? 6.0,
+      driveDir: [1, 0, 0],
+      vShip: 1.0,
+      dutyCycle: parityParams?.dutyCycle ?? 0.14,
+      dutyEffectiveFR: parityParams?.dutyEffectiveFR ?? 0.000025,
+      sectorCount: parityParams?.sectorCount ?? 400,
+      sectors: Math.max(1, parityParams?.sectors ?? parityParams?.concurrentSectors ?? 1),
+      gammaGeo: parityParams?.gammaGeo ?? 26,
+      qSpoilingFactor: parityParams?.qSpoilingFactor ?? parityParams?.deltaAOverA ?? 1,
+      gammaVanDenBroeck: parityParams?.gammaVanDenBroeck ?? 135203.8,
+      colorMode: 'theta',
+      lockFraming: true
+    };
+    
+    const { real: p } = buildEngineUniforms(debugInputs);
     console.log('[REAL] thetaScale=', p.thetaScale,
                 'γ_geo=', p.gammaGeo,
-                'qSpoil=', p.deltaAOverA,
-                'γ_VdB=', p.gammaVdB,
+                'qSpoil=', debugInputs.qSpoilingFactor,
+                'γ_VdB=', debugInputs.gammaVanDenBroeck,
                 'dutyFR=', parityParams?.dutyEffectiveFR,
                 'sectors=', p.sectors);
   }, [physicsKey]);

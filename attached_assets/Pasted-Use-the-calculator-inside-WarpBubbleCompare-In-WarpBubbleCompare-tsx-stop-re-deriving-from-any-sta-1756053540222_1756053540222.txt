@@ -1,0 +1,70 @@
+Use the calculator inside WarpBubbleCompare
+
+In WarpBubbleCompare.tsx, stop re-deriving from any stale internal snapshot. Instead, use the values you already pass from helix-core.tsx (parameters prop carries dutyCycle, dutyEffectiveFR, sectorCount, sectors, gammaGeo, qSpoilingFactor, gammaVanDenBroeck, hull, etc.).
+
+Add this update effect (replace your current “physicsPayload(base, 'fr'/'ui')” block):
+
+// assume props.parameters matches BaseInputs shape (same fields as helix-core passes)
+useEffect(() => {
+  if (!leftEngine.current || !rightEngine.current || !props.parameters) return;
+
+  // build both payloads from the SAME source of truth
+  const { real, show } = buildEngineUniforms({
+    hull: props.parameters.hull,
+    wallWidth_m: props.parameters.wallWidth_m ?? 6.0,
+    driveDir: props.parameters.driveDir ?? [1,0,0],
+    vShip: props.parameters.vShip ?? 1.0,
+
+    dutyCycle: props.parameters.dutyCycle,
+    dutyEffectiveFR: props.parameters.dutyEffectiveFR, // ship-wide FR duty from parent (lc loop)
+
+    sectorCount: Math.max(1, props.parameters.sectorCount),
+    sectors: Math.max(1, props.parameters.sectors),
+
+    gammaGeo: props.parameters.gammaGeo,
+    qSpoilingFactor: props.parameters.qSpoilingFactor ?? 1,
+    gammaVanDenBroeck: props.parameters.gammaVanDenBroeck ?? 2.86e5,
+
+    colorMode: props.colorMode ?? 'theta',
+    lockFraming: props.lockFraming ?? true,
+  });
+
+  // IMPORTANT: remove/avoid preset calls after this point; they overwrite
+  pushUniformsWhenReady(leftEngine.current,  real);
+  pushUniformsWhenReady(rightEngine.current, show);
+
+  // keep both canvases in lock-step strobe
+  // (your existing __addStrobingListener block is fine)
+
+  // Force a draw so the user sees the change immediately
+  leftEngine.current.forceRedraw?.();
+  rightEngine.current.forceRedraw?.();
+
+  // optional: quick console check
+  console.log('[WBC] uniforms applied', {
+    real_thetaScale: real.thetaScale,
+    show_thetaScale: show.thetaScale,
+    sectors: real.sectors, sectorCount: real.sectorCount,
+    dutyFR: props.parameters.dutyEffectiveFR,
+    dutyUI: props.parameters.dutyCycle
+  });
+}, [
+  // deps that actually matter to physics
+  props.parameters?.hull?.a, props.parameters?.hull?.b, props.parameters?.hull?.c,
+  props.parameters?.wallWidth_m,
+  props.parameters?.dutyCycle,
+  props.parameters?.dutyEffectiveFR,
+  props.parameters?.sectorCount,
+  props.parameters?.sectors,
+  props.parameters?.gammaGeo,
+  props.parameters?.qSpoilingFactor,
+  props.parameters?.gammaVanDenBroeck,
+  props.colorMode, props.lockFraming
+]);
+
+
+Also do this:
+
+If you still have calls like engine.setPresetParity() / setPresetShowcase() in onceReady(), move them before the effect above, or remove them. They overwrite your uniforms.
+
+Keep your strobe listener as-is; it’s good. Just make sure its payload uses the same sectorCount both engines were created with.
