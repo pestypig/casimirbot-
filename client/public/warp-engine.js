@@ -544,6 +544,10 @@ class WarpEngine {
             "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
+            "uniform int   u_RidgeMode;\n" +    // physics uniforms
+            "uniform int   u_PhysicsParityMode;\n" +
+            "uniform int   u_SectorCount;\n" +
+            "uniform int   u_Split;\n" +
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -710,6 +714,27 @@ class WarpEngine {
     // Public: force a geometry rebuild + immediate draw
     forceRedraw() {
         try { this._updateGrid(); this._render(); } catch(e){ console.warn('forceRedraw:', e); }
+    }
+
+    // Simple parameter API (so the React side can push values)
+    setParameters(next) { this.params = Object.assign(this.params || {}, next); }
+    resize(w, h) { this.gl.viewport(0, 0, w, h); }
+    start() { 
+        if (this._raf) return; 
+        const loop = () => { 
+            this._raf = requestAnimationFrame(loop); 
+            this._render(); 
+        }; 
+        loop(); 
+    }
+    stop() { 
+        if (this._raf) cancelAnimationFrame(this._raf); 
+        this._raf = null; 
+    }
+    dispose() { 
+        const gl = this.gl; 
+        if (this.gridVbo) gl.deleteBuffer(this.gridVbo); 
+        if (this.gridProgram) gl.deleteProgram(this.gridProgram); 
     }
 
     // --- Atomic uniform batching to avoid mid-frame bad states ---
