@@ -1,10 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
-// at top-level, set a build token (replace with your commit/ts)
-const APP_WARP_BUILD =
-  (window as any).__APP_WARP_BUILD ||
-  (window as any).__WarpEngineBuild || // reuse engine's stamped build if present
-  "dev";
+// Use the build token stamped at app boot
+const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
 
 /* ---------------- Script loader & strobe mux ---------------- */
 function loadScript(src: string) {
@@ -50,7 +47,7 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
     return w.WarpEngine.default || w.WarpEngine;
   }
 
-  console.log('[WARP LOADER] Loading WarpEngine', { currentBuild, requiredBuild, mismatch, forceReload });
+  console.log('[WARP LOADER] Loading WarpEngine', { requiredBuild, forceReload });
 
   // 👉 blow away old script + SW caches when needed
   if (mismatch || forceReload) {
