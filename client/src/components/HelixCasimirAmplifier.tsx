@@ -218,9 +218,22 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
 
   // Debounced fetch on param change & when visible
   useEffect(() => {
-    if (!visible) return;
     const controller = new AbortController();
-    const timer = setTimeout(async () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let started = false;
+
+    if (!visible) {
+      // Nothing to do when hidden; still return a safe cleanup.
+      return () => {
+        if (timer) clearTimeout(timer);
+        if (!controller.signal.aborted) {
+          controller.abort(new DOMException('hidden/cleanup', 'AbortError'));
+        }
+      };
+    }
+
+    timer = setTimeout(async () => {
+      started = true;
       try {
         const q = new URLSearchParams({
           nTheta: String(params.nTheta),
@@ -233,11 +246,21 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
         const json = await res.json();
         setData(json);
         setErr(null);
-      } catch (e: any) {
-        if (e.name !== "AbortError") setErr(e?.message ?? "fetch failed");
+      } catch (err: any) {
+        // Swallow effect teardown aborts
+        if (err?.name === 'AbortError' || controller.signal.aborted) return;
+        // surface real errors
+        setErr(err?.message ?? "fetch failed");
       }
-    }, 300); // debounce user changes
-    return () => { controller.abort(); clearTimeout(timer); };
+    }, 300);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      // Only abort if we actually kicked off the request
+      if (started && !controller.signal.aborted) {
+        controller.abort(new DOMException('effect cleanup', 'AbortError'));
+      }
+    };
   }, [endpoint, params, visible]);
 
   // Optional: light keep-alive every ~45s while visible
