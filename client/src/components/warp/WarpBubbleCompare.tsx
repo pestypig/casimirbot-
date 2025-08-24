@@ -992,18 +992,15 @@ export default function WarpBubbleCompare({
     // pushSafe(leftEngine,  { cameraZ: z });
     // pushSafe(rightEngine, { cameraZ: z });
   }, [
-    leftEngine.current, rightEngine.current,
-    // physics chain
+    // remove the .current refs; keep your live/pipeline deps
     snapForMode?.gammaGeo, snapForMode?.gammaVdB, (snapForMode as any)?.g_y,
     snapForMode?.deltaAOverA, (snapForMode as any)?.qSpoilingFactor,
     snapForMode?.dutyCycle, snapForMode?.sectorCount, snapForMode?.sectorStrobing,
     snapForMode?.sectors, snapForMode?.sectorSplit, snapForMode?.split, snapForMode?.currentSector,
     snapForMode?.viewAvg,
-    // geometry
     snapForMode?.hullAxes?.[0], snapForMode?.hullAxes?.[1], snapForMode?.hullAxes?.[2],
     snapForMode?.hull?.a, snapForMode?.hull?.b, snapForMode?.hull?.c,
     snapForMode?.wallWidth_m, snapForMode?.wallWidth_rho,
-    // viz
     snapForMode?.curvatureGainT, snapForMode?.curvatureBoostMax,
     snapForMode?.exposure, snapForMode?.zeroStop, snapForMode?.userGain,
     snapForMode?.displayGain,
