@@ -880,7 +880,7 @@ class WarpEngine {
         const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
         // --- Parity / visualization ---
-        const parity = !!parameters?.physicsParityMode;
+        const parity = !!parameters?.physicsParityMode || !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
         const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2 };
