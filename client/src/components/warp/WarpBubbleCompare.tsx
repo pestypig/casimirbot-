@@ -765,6 +765,8 @@ export default function WarpBubbleCompare({
         (window as any).__warpCompareBusy = true;
         
         const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
+        // make the strobe mux before engines so they subscribe cleanly
+        ensureStrobeMux();
         if (cancelled) return;
 
         // StrictMode re-mount guard (prevents double constructor crashes in dev)
@@ -802,23 +804,18 @@ export default function WarpBubbleCompare({
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
           
-          // Force immediate initialization with bulletproof defaults (prevents first-frame NaNs)
-          const initCamZ = safeCamZ(2.0);  // fallback to safe default
-          const initColor = 1; // theta (engine expects 0=solid,1=theta,2=shear)
-          const safeDefaults = { 
-            thetaScale: 1.0,          // safe physics scale
-            sectors: 400,             // reasonable sector count  
-            cameraZ: initCamZ,        // bulletproof camera position
-            colorMode: initColor, 
-            colorModeIndex: initColor, 
-            colorModeName: 'theta',
-            exposure: 6.0,            // safe exposure level
-            zeroStop: 1e-7,           // safe zero-stop threshold
-            vizGain: 1.0,             // safe visualization gain
-            cosmeticLevel: 1.0        // minimal but non-zero cosmetic level
-          };
-          leftEngine.current?.setParams?.(safeDefaults);
-          rightEngine.current?.setParams?.(safeDefaults);
+          // Initialize once shaders are linked to avoid pre-link uniform pushes
+          const defaultFrame = frameFromHull({ a:503.5, b:132, c:86.5 }, 2.6);
+          const zL = safeCamZ(compactCameraZ(leftRef.current!,  defaultFrame.axesScene));
+          const zR = safeCamZ(compactCameraZ(rightRef.current!, defaultFrame.axesScene));
+          leftEngine.current?.onceReady?.(() => {
+            pushSafe(leftEngine,  { ...defaultFrame, cameraZ: zL });
+            leftEngine.current?.setPresetParity?.();     // truth pane defaults
+          });
+          rightEngine.current?.onceReady?.(() => {
+            pushSafe(rightEngine, { ...defaultFrame, cameraZ: zR });
+            rightEngine.current?.setPresetShowcase?.();  // boosted pane defaults
+          });
           
           // Verify uniforms actually exist (catch silent no-ops)
           dumpUniforms(leftEngine.current,  'REAL');
@@ -838,7 +835,7 @@ export default function WarpBubbleCompare({
           busyRef.current = false;
         }
         
-        ensureStrobeMux();
+        // (mux already ensured above)
 
         // Keep both panes in lockstep with Helix strobing
         const off = (window as any).__addStrobingListener?.(
@@ -855,11 +852,7 @@ export default function WarpBubbleCompare({
         (leftEngine.current  as any).__strobeOff = off;
         (rightEngine.current as any).__strobeOff = off;
 
-        // Create engines with basic defaults - physics will be applied via useEffect
-        const defaultHull = { a: 503.5, b: 132, c: 86.5 };
-        const defaultFrame = frameFromHull(defaultHull, 2.6);
-        leftEngine.current = new WarpCtor(leftRef.current, defaultFrame, {});
-        rightEngine.current = new WarpCtor(rightRef.current, defaultFrame, {});
+        // ❌ Do not re-create engines on the same canvases (causes black screens)
 
         // Wire diagnostics so you can compare against the calculator
         const syncBadge = (side: 'REAL'|'SHOW', u: any) => {
