@@ -1297,6 +1297,7 @@ class WarpEngine {
         if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
             console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
             this.currentGridSpan = targetSpan;
+            this._gridSpan = targetSpan; // keep camera resize hint fresh
             const newGridData = this._createGrid(targetSpan, gridDivisions);
             
             // Update both current and original vertices
