@@ -1001,7 +1001,8 @@ class WarpEngine {
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
         // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
         const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
-        const mode = (bubbleParams.currentMode || 'hover').toLowerCase();
+        // prefer explicit payload, fall back to current uniforms
+        const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
         const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
         // Small per-mode seasoning only, so we don't hide the physics
@@ -1177,7 +1178,6 @@ class WarpEngine {
             const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
             const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
             const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
-            const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
 
             // Geometry amplitude should be monotonic with the slider and not instantly saturate.
             // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
@@ -1357,30 +1357,30 @@ class WarpEngine {
         gl.uniform3f(this.gridUniforms.axes, axes[0], axes[1], axes[2]);       // Same value!
         
         gl.uniform3f(this.gridUniforms.driveDir,
-            this.uniforms?.driveDir[0] || 1.0,
-            this.uniforms?.driveDir[1] || 0.0,
-            this.uniforms?.driveDir[2] || 0.0);
+            (this.uniforms?.driveDir?.[0] ?? 1.0),
+            (this.uniforms?.driveDir?.[1] ?? 0.0),
+            (this.uniforms?.driveDir?.[2] ?? 0.0));
         gl.uniform1f(this.gridUniforms.wallWidth, Math.max(1e-4, this.uniforms?.wallWidth ?? 0.016));
-        gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
+        gl.uniform1f(this.gridUniforms.vShip,            (this.uniforms?.vShip            ?? 1.0));
         
         // Violet interior tilt tint (visual-only)
-        const epsTilt = (this.uniforms?.epsilonTilt || 0) * (this.uniforms?.tiltGain || 0);
-        const wInt = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // same window as geometry
+        const epsTilt = (this.uniforms?.epsilonTilt ?? 0) * (this.uniforms?.tiltGain ?? 0);
+        const wInt = Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.016), 0.02); // same window as geometry
         const tintViz = 8.0;  // purely visual: raise/lower if you want the violet to pop more/less
         gl.uniform1f(this.gridUniforms.epsTilt, epsTilt);
         gl.uniform1f(this.gridUniforms.intWidth, wInt);
         gl.uniform1f(this.gridUniforms.tiltViz, tintViz);
         
         // Exposure controls for enhanced mode contrast
-        gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
-        gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
-        gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
-        gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
+        gl.uniform1f(this.gridUniforms.exposure,         (this.uniforms?.exposure         ?? 6.0));
+        gl.uniform1f(this.gridUniforms.zeroStop,         (this.uniforms?.zeroStop         ?? 1e-7));
+        gl.uniform1f(this.gridUniforms.thetaScale,       (this.uniforms?.thetaScale       ?? 1.0));
+        gl.uniform1f(this.gridUniforms.userGain,         (this.uniforms?.userGain         ?? 1.0));
         gl.uniform1i(this.gridUniforms.physicsParityMode, this.uniforms?.physicsParityMode ? 1 : 0);
-        gl.uniform1f(this.gridUniforms.displayGain, this.uniforms?.displayGain || 1.0);
-        gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
-        gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
-        gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
+        gl.uniform1f(this.gridUniforms.displayGain,      (this.uniforms?.displayGain      ?? 1.0));
+        gl.uniform1f(this.gridUniforms.vizGain,          (this.uniforms?.vizGain          ?? 1.0));
+        gl.uniform1f(this.gridUniforms.curvatureGainT,   (this.uniforms?.curvatureGainT   ?? 0.0));
+        gl.uniform1f(this.gridUniforms.curvatureBoostMax,(this.uniforms?.curvatureBoostMax?? 1.0));
         gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
         gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
         

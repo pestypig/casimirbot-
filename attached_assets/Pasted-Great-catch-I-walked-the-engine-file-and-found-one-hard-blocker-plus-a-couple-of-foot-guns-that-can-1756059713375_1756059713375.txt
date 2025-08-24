@@ -1,0 +1,57 @@
+Great catch. I walked the engine file and found one hard blocker plus a couple of foot-guns that can easily produce “black screen” symptoms.
+
+🔧 Critical bug (parse-time)
+
+You’re declaring const mode twice inside _warpGridVertices. That’s a syntax error, so the whole script fails to evaluate and both canvases stay black.
+
+Fix (minimal diff): keep a single source of truth for mode.
+
+@@ _warpGridVertices(vtx, bubbleParams) {
+-  const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
+-  const mode = (bubbleParams.currentMode || 'hover').toLowerCase();
++  const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
++  // prefer explicit payload, fall back to current uniforms
++  const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
+@@
+-  const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+-  const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+-  const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+-  const mode       = (this.uniforms?.currentMode || 'hover').toLowerCase();
++  const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
++  const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
++  const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+
+🧯 Two runtime fixes (avoid “black”/wrong framing)
+1) Preserve legitimate zeros when sending uniforms
+
+Using || turns valid 0 values into fallbacks. That can silently rotate driveDir or change gains.
+
+Fix: use ?? for uniforms where 0 is meaningful.
+
+@@ _renderGridPoints() {
+- gl.uniform3f(this.gridUniforms.driveDir,
+-     this.uniforms?.driveDir[0] || 1.0,
+-     this.uniforms?.driveDir[1] || 0.0,
+-     this.uniforms?.driveDir[2] || 0.0);
+- gl.uniform1f(this.gridUniforms.vShip, this.uniforms?.vShip || 1.0);
+- gl.uniform1f(this.gridUniforms.exposure, this.uniforms?.exposure || 6.0);
+- gl.uniform1f(this.gridUniforms.zeroStop, this.uniforms?.zeroStop || 1e-7);
+- gl.uniform1f(this.gridUniforms.thetaScale, this.uniforms?.thetaScale || 1.0);
+- gl.uniform1f(this.gridUniforms.userGain, this.uniforms?.userGain || 1.0);
+- gl.uniform1f(this.gridUniforms.displayGain, this.uniforms?.displayGain || 1.0);
+- gl.uniform1f(this.gridUniforms.vizGain, this.uniforms?.vizGain || 1.0);
+- gl.uniform1f(this.gridUniforms.curvatureGainT, this.uniforms?.curvatureGainT || 0.0);
+- gl.uniform1f(this.gridUniforms.curvatureBoostMax, this.uniforms?.curvatureBoostMax || 1.0);
++ gl.uniform3f(this.gridUniforms.driveDir,
++     (this.uniforms?.driveDir?.[0] ?? 1.0),
++     (this.uniforms?.driveDir?.[1] ?? 0.0),
++     (this.uniforms?.driveDir?.[2] ?? 0.0));
++ gl.uniform1f(this.gridUniforms.vShip,            (this.uniforms?.vShip            ?? 1.0));
++ gl.uniform1f(this.gridUniforms.exposure,         (this.uniforms?.exposure         ?? 6.0));
++ gl.uniform1f(this.gridUniforms.zeroStop,         (this.uniforms?.zeroStop         ?? 1e-7));
++ gl.uniform1f(this.gridUniforms.thetaScale,       (this.uniforms?.thetaScale       ?? 1.0));
++ gl.uniform1f(this.gridUniforms.userGain,         (this.uniforms?.userGain         ?? 1.0));
++ gl.uniform1f(this.gridUniforms.displayGain,      (this.uniforms?.displayGain      ?? 1.0));
++ gl.uniform1f(this.gridUniforms.vizGain,          (this.uniforms?.vizGain          ?? 1.0));
++ gl.uniform1f(this.gridUniforms.curvatureGainT,   (this.uniforms?.curvatureGainT   ?? 0.0));
++ gl.uniform1f(this.gridUniforms.curvatureBoostMax,(this.uniforms?.curvatureBoostMax?? 1.0));
