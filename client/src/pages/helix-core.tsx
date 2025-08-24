@@ -349,6 +349,11 @@ export default function HelixCore() {
       : 400;
   }, [systemMetrics?.totalSectors]);
 
+  // Keep the trail array sized to totalSectors
+  useEffect(() => {
+    setTrail(prev => (prev.length === totalSectors ? prev : Array(totalSectors).fill(0)));
+  }, [totalSectors]);
+
   const concurrentSectors = useMemo(() => {
     return Number.isFinite(systemMetrics?.sectorStrobing)
       ? Math.max(1, Math.floor(systemMetrics!.sectorStrobing!))
