@@ -903,6 +903,7 @@ export default function WarpBubbleCompare({
     pushSafe(leftEngine, {
       ...shared,
       ...real,
+      currentMode: parameters.currentMode,       // ← add this
       physicsParityMode: true,
       vShip: 0, // explicit
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
@@ -916,6 +917,7 @@ export default function WarpBubbleCompare({
     pushSafe(rightEngine, {
       ...shared,
       ...show,
+      currentMode: parameters.currentMode,       // ← add this
       physicsParityMode: false,
       vShip: parameters.currentMode === 'standby' ? 0 : 1, // explicit
       thetaScale: parameters.currentMode === 'standby' ? 0 : (show.thetaScale || 1e-6), // explicit protection
