@@ -752,75 +752,10 @@ export default function WarpBubbleCompare({
       pushUniformsWhenReady(rightEngine.current, lcPayload);
     }
 
-    // normalize any global fallback the engine might use
-    (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
-    leftEngine.current?.setSceneScale?.((window as any).sceneScale);
-    rightEngine.current?.setSceneScale?.((window as any).sceneScale);
-
-    // ensure only the calibrated hull model draws
-    const killMixingReal = {
-      modelMode: 'calibrated',   // engine will prefer calibrated chain
-      // defensively zero any demo weights if the engine exposes them:
-      unitBubbleWeight: 0,
-      demoBubbleWeight: 0,
-      refHullAlpha: 0,
-      onWindow: false,           // no instantaneous overlay
-    };
-    const killMixingShow = {
-      modelMode: 'calibrated',   // engine will prefer calibrated chain
-      unitBubbleWeight: 0,
-      demoBubbleWeight: 0,
-      refHullAlpha: 0,
-      // no onWindow here - keep it enabled for SHOW
-    };
-    pushUniformsWhenReady(leftEngine.current,  killMixingReal);
-    pushUniformsWhenReady(rightEngine.current, killMixingShow);
-
-    applyReal(leftEngine.current,  shared, leftRef.current,  (parityParams?.viz?.colorMode ?? colorMode) as any);
-    leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
-
-    // Use safety wrapper for SHOW pane to handle black screen issues
-    const showPayload = {
-      ...shared,
-      colorMode: (showParams?.viz?.colorMode ?? colorMode) as any,
-      T: showParams?.viz?.curvatureGainT ?? 0.70,
-      boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
-      decades: showParams?.curvatureGainDec ?? 3,
-      vizGain: 1.25,
-      exposure: showParams?.viz?.exposure ?? 7.5,
-      zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
-    };
-    
-    // Apply show with cosmetic safety fallback
-    applyShow(rightEngine.current, shared, rightRef.current!, showPayload.colorMode, showPayload);
-    const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode as keyof { solid:0, theta:1, shear:2 }] ?? 1;
-    applyShowSafe(rightEngine.current, {
-      ...showPayload,
-      colorMode: colorModeIndex,
-      colorModeIndex,
-      colorModeName: showPayload.colorMode,
-      physicsParityMode: false,
-      ridgeMode: 1,
-    });
-
-    scrubOverlays(leftEngine.current);
-    scrubOverlays(rightEngine.current);
-    
-    // Verify physics scalars on updates
-    check('REAL-UPDATE', { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene)) });
-    check('SHOW-UPDATE', { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(rightRef.current!, shared.axesScene)) });
-  }, [
-    parityParams?.hull?.a, parityParams?.hull?.b, parityParams?.hull?.c,
-    showParams?.hull?.a, showParams?.hull?.b, showParams?.hull?.c,
-    parityParams?.gridSpan, showParams?.gridSpan,
-    parityParams?.viz?.curvatureGainT, showParams?.viz?.curvatureGainT,
-    parityParams?.viz?.curvatureBoostMax, showParams?.viz?.curvatureBoostMax,
-    parityParams?.viz?.exposure, showParams?.viz?.exposure,
-    parityParams?.viz?.zeroStop, showParams?.viz?.zeroStop,
-    parityParams?.curvatureGainDec, showParams?.curvatureGainDec,
-    colorMode, heroX, parityX,
-    physicsKey                       // new: react to mode/duty/sectors/LC
-  ]);
+    // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
+    const displayGain = Math.max(1, (1) * (heroX ? 1 + 0.5*Math.log10(Math.max(1, heroX)) : 1));
+    rightEngine.current.setDisplayGain?.(displayGain);
+  }, [parameters, colorMode, lockFraming, heroX]);
 
   // Fix black bands/duplicated rows after layout changes
   useEffect(() => {
@@ -886,34 +821,17 @@ export default function WarpBubbleCompare({
       }, 100);
     };
     
-    // Use coherent physics calculator for debugging output
-    const debugInputs: BaseInputs = {
-      hull: { 
-        a: parityParams?.hull?.a ?? 503.5, 
-        b: parityParams?.hull?.b ?? 132, 
-        c: parityParams?.hull?.c ?? 86.5 
-      },
-      wallWidth_m: parityParams?.hull?.wallThickness_m ?? 6.0,
-      driveDir: [1, 0, 0],
-      vShip: 1.0,
-      dutyCycle: parityParams?.dutyCycle ?? 0.14,
-      dutyEffectiveFR: parityParams?.dutyEffectiveFR ?? 0.000025,
-      sectorCount: parityParams?.sectorCount ?? 400,
-      sectors: Math.max(1, parityParams?.sectors ?? parityParams?.concurrentSectors ?? 1),
-      gammaGeo: parityParams?.gammaGeo ?? 26,
-      qSpoilingFactor: parityParams?.qSpoilingFactor ?? parityParams?.deltaAOverA ?? 1,
-      gammaVanDenBroeck: parityParams?.gammaVanDenBroeck ?? 135203.8,
-      colorMode: 'theta',
-      lockFraming: true
-    };
-    
-    const { real: p } = buildEngineUniforms(debugInputs);
-    console.log('[REAL] thetaScale=', p.thetaScale,
-                'γ_geo=', p.gammaGeo,
-                'qSpoil=', debugInputs.qSpoilingFactor,
-                'γ_VdB=', debugInputs.gammaVanDenBroeck,
-                'dutyFR=', parityParams?.dutyEffectiveFR,
-                'sectors=', p.sectors);
+    // Simple debug output using parameters directly
+    if (parameters) {
+      console.log('[REAL] Physics from parameters:', {
+        dutyFR: parameters.dutyEffectiveFR,
+        dutyUI: parameters.dutyCycle,
+        sectors: parameters.sectors,
+        sectorCount: parameters.sectorCount,
+        gammaGeo: parameters.gammaGeo,
+        qSpoil: parameters.qSpoilingFactor
+      });
+    }
   }, [
     // deps that actually matter to physics
     parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c,
