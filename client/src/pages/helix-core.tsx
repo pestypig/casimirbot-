@@ -453,7 +453,7 @@ export default function HelixCore() {
   const gTargets: Record<string, number> = {
     hover: 0.10*G, cruise: 0.05*G, emergency: 0.30*G, standby: 0
   };
-  const currentMode = (pipeline?.currentMode ?? 'hover').toLowerCase();
+  const currentMode = effectiveMode.toLowerCase();
   const gTarget = gTargets[currentMode] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c*c)));
