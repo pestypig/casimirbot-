@@ -934,10 +934,6 @@ export default function WarpBubbleCompare({
     const realU = toRealUniforms(snapForMode);
     const showU = toShowUniforms(snapForMode);
 
-    // prevent any accidental θ overwrite by live ticks
-    delete (realU as any).thetaScale;
-    delete (showU as any).thetaScale;
-
     const realFinal = { ...realU, currentMode: snapForMode.currentMode };
     const showFinal = { ...showU, currentMode: snapForMode.currentMode };
 
@@ -953,6 +949,10 @@ export default function WarpBubbleCompare({
       show_sectorCount: showFinal.sectorCount,
       currentMode: snapForMode.currentMode
     });
+
+    // Guard: live tick must not overwrite θ coming from props.parameters
+    delete (realFinal as any).thetaScale;
+    delete (showFinal as any).thetaScale;
 
     // REAL (parity)
     pushSafe(leftEngine, realFinal);
