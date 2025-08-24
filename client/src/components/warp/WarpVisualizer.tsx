@@ -319,6 +319,7 @@ useEffect(() => {
 
       wallWidth: wallNorm,
       physicsParityMode: !!parameters.physicsParityMode,
+      ridgeMode: !!parameters.physicsParityMode ? 0 : 1,
 
       epsilonTilt: epsilonTiltResolved,
       betaTiltVec: betaTiltResolved,
@@ -647,6 +648,10 @@ useEffect(() => {
         
         // Critical: preserve currentMode from pipeline
         currentMode: parameters.currentMode || 'hover',
+        
+        // Critical: update visual mode flags for live mode switching
+        physicsParityMode: !!parameters.physicsParityMode,
+        ridgeMode: !!parameters.physicsParityMode ? 0 : 1,
         
         // Theta scale
         thetaScale: resolveThetaScale({
