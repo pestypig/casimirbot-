@@ -1133,7 +1133,8 @@ export default function HelixCore() {
                 <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div>Duty: {fmt(dutyUI * 100, 1, '0')}%</div>
+                    <div>Duty (UI): {fmt(dutyUI * 100, 1, '0')}%</div>
+                    <div>Duty (FR): {fmt(dutyEffectiveFR * 100, 3, '0.0025')}%</div>
                     <div>Sectors: {fint(totalSectors, '0')} ({fint(concurrentSectors, '0')} live)</div>
                     <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
                     <Tooltip>
