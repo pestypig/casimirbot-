@@ -1768,7 +1768,13 @@ class WarpEngine {
     }
 
     setDisplayGain(gain) {
+        // strictly the shader's u_displayGain (used only when parity=false)
         this.updateUniforms({ displayGain: Math.max(1, +gain) });
+    }
+
+    setUserGain(gain) {
+        // strictly the shader's u_userGain (multiplies both modes)
+        this.updateUniforms({ userGain: Math.max(1, +gain) });
     }
 
     setPresetParity() {
