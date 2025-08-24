@@ -1,0 +1,93 @@
+Here’s a minimal, drop-in patch that makes one viewer “truth only” and the other “cosmetic/showcase.”
+It adds a tiny initializer you can call from your page (or let it auto-target #viewer-truth / #viewer-cosmetic).
+
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@ -2120,10 +2120,60 @@
+ if (typeof module !== 'undefined' && module.exports) {
+     module.exports = WarpEngine;
+ } else {
+     globalThis.WarpEngine = WarpEngine;
+     console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
+ }
+ 
+ // Stamp a build token so the loader can compare
+ globalThis.WarpEngine.BUILD = globalThis.__APP_WARP_BUILD || 'dev';
+ globalThis.__WarpEngineBuild = globalThis.WarpEngine.BUILD;
++
++// ---------------------------------------------------------------------------
++// Helper init: one viewer in TRUTH mode, one in COSMETIC mode
++// Usage (page-side):
++//   __warpInitTruthCosmetic({
++//     truth:    '#viewer-truth',     // CSS selector or canvas element (optional; defaults provided)
++//     cosmetic: '#viewer-cosmetic',  // CSS selector or canvas element
++//     paramsTruth:    { /* optional bootstrap uniforms for truth */ },
++//     paramsCosmetic: { /* optional bootstrap uniforms for cosmetic */ }
++//   });
++//
++// If you don’t pass selectors, it will look for #viewer-truth and #viewer-cosmetic.
++// Can be called after DOMContentLoaded.
++// ---------------------------------------------------------------------------
++globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
++  const q = (x) => (typeof x === 'string' ? document.querySelector(x) : x);
++  const truthEl    = q(opts.truth)    || document.getElementById('viewer-truth');
++  const cosmeticEl = q(opts.cosmetic) || document.getElementById('viewer-cosmetic');
++  if (!truthEl && !cosmeticEl) {
++    console.warn('[warp-engine] no truth/cosmetic canvases found');
++    return {};
++  }
++
++  const engines = {};
++  // Truth-only viewer (physics-faithful)
++  if (truthEl) {
++    const e = new WarpEngine(truthEl);
++    const id = truthEl.id || 'viewer-truth';
++    e.__id = id;
++    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
++    e.bootstrap(opts.paramsTruth || {});
++    e.setPresetParity();      // <- TRUTH MODE
++    engines.truth = e;
++  }
++
++  // Cosmetic/showcase viewer (visually exaggerated)
++  if (cosmeticEl) {
++    const e = new WarpEngine(cosmeticEl);
++    const id = cosmeticEl.id || 'viewer-cosmetic';
++    e.__id = id;
++    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
++    e.bootstrap(opts.paramsCosmetic || {});
++    e.setPresetShowcase();    // <- COSMETIC MODE
++    engines.cosmetic = e;
++  }
++
++  // Keep both canvases sized if their containers change
++  const ro = new ResizeObserver(() => {
++    engines.truth?._resizeCanvasToDisplaySize?.();
++    engines.cosmetic?._resizeCanvasToDisplaySize?.();
++  });
++  truthEl    && ro.observe(truthEl.parentElement || truthEl);
++  cosmeticEl && ro.observe(cosmeticEl.parentElement || cosmeticEl);
++  return engines;
++};
+ })();
+
+Example page usage
+<div class="warp-wrap"><canvas id="viewer-truth"></canvas></div>
+<div class="warp-wrap"><canvas id="viewer-cosmetic"></canvas></div>
+
+<script>
+  // After the engine script is loaded:
+  __warpInitTruthCosmetic({
+    paramsTruth: {
+      ridgeMode: 0,            // (optional; Parity preset already enforces physics double-lobe)
+      exposure: 3.5, zeroStop: 1e-5
+    },
+    paramsCosmetic: {
+      ridgeMode: 1,            // clean single crest outline
+      userGain: 4.0, curvatureGainT: 0.6, curvatureBoostMax: 40
+    }
+  });
+</script>
+
+
+That’s it—viewer-truth runs physics-faithful parity mode, and viewer-cosmetic runs the exaggerated showcase mode. Both still listen to your global strobing bus (window.setStrobingState) so they stay synchronized over duty cycles/sectors.

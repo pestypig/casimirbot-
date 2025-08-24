@@ -1792,4 +1792,59 @@ if (typeof module !== 'undefined' && module.exports) {
 // Stamp a build token so the loader can compare
 globalThis.WarpEngine.BUILD = globalThis.__APP_WARP_BUILD || 'dev';
 globalThis.__WarpEngineBuild = globalThis.WarpEngine.BUILD;
+
+// ---------------------------------------------------------------------------
+// Helper init: one viewer in TRUTH mode, one in COSMETIC mode
+// Usage (page-side):
+//   __warpInitTruthCosmetic({
+//     truth:    '#viewer-truth',     // CSS selector or canvas element (optional; defaults provided)
+//     cosmetic: '#viewer-cosmetic',  // CSS selector or canvas element
+//     paramsTruth:    { /* optional bootstrap uniforms for truth */ },
+//     paramsCosmetic: { /* optional bootstrap uniforms for cosmetic */ }
+//   });
+//
+// If you don't pass selectors, it will look for #viewer-truth and #viewer-cosmetic.
+// Can be called after DOMContentLoaded.
+// ---------------------------------------------------------------------------
+globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
+  const q = (x) => (typeof x === 'string' ? document.querySelector(x) : x);
+  const truthEl    = q(opts.truth)    || document.getElementById('viewer-truth');
+  const cosmeticEl = q(opts.cosmetic) || document.getElementById('viewer-cosmetic');
+  if (!truthEl && !cosmeticEl) {
+    console.warn('[warp-engine] no truth/cosmetic canvases found');
+    return {};
+  }
+
+  const engines = {};
+  // Truth-only viewer (physics-faithful)
+  if (truthEl) {
+    const e = new WarpEngine(truthEl);
+    const id = truthEl.id || 'viewer-truth';
+    e.__id = id;
+    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+    e.bootstrap(opts.paramsTruth || {});
+    e.setPresetParity();      // <- TRUTH MODE
+    engines.truth = e;
+  }
+
+  // Cosmetic/showcase viewer (visually exaggerated)
+  if (cosmeticEl) {
+    const e = new WarpEngine(cosmeticEl);
+    const id = cosmeticEl.id || 'viewer-cosmetic';
+    e.__id = id;
+    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+    e.bootstrap(opts.paramsCosmetic || {});
+    e.setPresetShowcase();    // <- COSMETIC MODE
+    engines.cosmetic = e;
+  }
+
+  // Keep both canvases sized if their containers change
+  const ro = new ResizeObserver(() => {
+    engines.truth?._resizeCanvasToDisplaySize?.();
+    engines.cosmetic?._resizeCanvasToDisplaySize?.();
+  });
+  truthEl    && ro.observe(truthEl.parentElement || truthEl);
+  cosmeticEl && ro.observe(cosmeticEl.parentElement || cosmeticEl);
+  return engines;
+};
 })();
