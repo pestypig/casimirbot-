@@ -60,7 +60,7 @@ export default function WarpRenderInspector(props: {
   const rightEngine = useRef<any>(null);
 
   // Live energy pipeline data for diagnostics
-  const live = useEnergyPipeline();
+  const { data: live } = useEnergyPipeline();
   const switchMode = useSwitchMode();
   const queryClient = useQueryClient();
 
