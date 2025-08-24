@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
-import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
+import { useQueryClient } from "@tanstack/react-query";
 
 /**
  * WarpRenderInspector
@@ -60,8 +61,17 @@ export default function WarpRenderInspector(props: {
 
   // Live energy pipeline data for diagnostics
   const live = useEnergyPipeline();
+  const switchMode = useSwitchMode();
+  const queryClient = useQueryClient();
 
-  const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>('hover');
+  // Get current mode from global energy pipeline instead of local state
+  const currentMode = ((live?.data as any)?.currentMode as 'hover'|'cruise'|'emergency'|'standby') || 'hover';
+  const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>(currentMode);
+
+  // Sync local mode with global mode
+  useEffect(() => {
+    setMode(currentMode);
+  }, [currentMode]);
   const [ridgeMode, setRidgeMode] = useState<0|1>(1); // 0=physics df, 1=single crest
   const [colorMode, setColorMode] = useState<'theta'|'shear'|'solid'>('theta');
   const [userGain, setUserGain] = useState(1);
@@ -251,8 +261,16 @@ export default function WarpRenderInspector(props: {
     return () => { try { off?.(); } catch {} };
   }, []);
 
-  // UI events
-  const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => setMode(m);
+  // UI events - use global mode switching instead of local state
+  const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
+    switchMode.mutate(m as any, {
+      onSuccess: () => {
+        // Refresh both pipeline and metrics to keep everything in sync
+        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+      }
+    });
+  };
 
   return (
     <div className="w-full grid gap-4 p-4">
