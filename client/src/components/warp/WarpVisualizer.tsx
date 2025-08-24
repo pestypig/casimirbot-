@@ -675,21 +675,33 @@ useEffect(() => {
           burst_ms: lc.burst_ms,
         }),
 
-        // Parity overrides (if needed)
-        ...(parity && {
+        // Parity-specific visual settings to make the difference unmistakable
+        ...(parity ? {
+          // Truth mode: subdued, physics-accurate
+          exposure: 3.5,
+          zeroStop: 1e-5,
           vizGain: 1,
           curvatureGainDec: 0,
           curvatureBoostMax: 1,
           curvatureGainT: 0,
           displayGain: 1,
+        } : {
+          // Cosmetic mode: enhanced, visually dramatic
+          exposure: 6,
+          zeroStop: 1e-7,
+          curvatureGainT: 0.6,
+          curvatureBoostMax: 40,
         }),
       };
 
       // Single atomic update to prevent mode conflicts
       engineRef.current.updateUniforms(consolidatedUniforms);
       
+      // Apply display gain based on mode
       if (parity) {
-        engineRef.current.setDisplayGain?.(1);
+        engineRef.current.setDisplayGain?.(1);      // Truth: natural gain
+      } else {
+        engineRef.current.setDisplayGain?.(2.5);    // Cosmetic: enhanced gain
       }
 
       // Add visual enhancements that aren't physics-driven
