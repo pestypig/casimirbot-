@@ -918,6 +918,7 @@ export default function WarpBubbleCompare({
       ...show,
       physicsParityMode: false,
       vShip: parameters.currentMode === 'standby' ? 0 : 1, // explicit
+      thetaScale: parameters.currentMode === 'standby' ? 0 : (show.thetaScale || 1e-6), // explicit protection
       gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
       deltaAOverA: show.qSpoilingFactor,
       sectors: Math.max(1, parameters.sectors),
