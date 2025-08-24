@@ -812,6 +812,19 @@ class WarpEngine {
           ? +parameters.cameraZ
           : (lockFraming ? (prev?.cameraZ ?? null) : prev?.cameraZ ?? null);
 
+        // --- inbound name normalization ---
+        const sectorsIn =
+          N(parameters?.sectors ?? parameters?.sectorCount ?? parameters?.sectorStrobing, prev?.sectors ?? 1);
+
+        const splitIn =
+          N(parameters?.split ?? parameters?.sectorSplit ?? parameters?.sectorIdx ?? this.strobingState?.currentSector, prev?.split ?? 0);
+
+        const gammaVdBIn =
+          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
+
+        const frFromParams =
+          parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
+
         // --- build next uniforms without mutating prev ---
         const nextUniforms = {
           ...prev,
@@ -845,21 +858,22 @@ class WarpEngine {
           // 🔗 physics chain fields used by CPU warp & shader
           thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
           dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
-          sectors: Math.max(1, Math.floor(N(parameters.sectors ?? parameters.sectorCount, prev.sectors ?? 1))),
-          split: Math.max(0, Math.min((prev.sectors ?? 1)-1, N(parameters.split, prev.split ?? 0))),
+          sectors: Math.max(1, Math.floor(sectorsIn)),
+          split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsIn)) - 1, splitIn|0)),
           viewAvg: parameters.viewAvg != null ? !!parameters.viewAvg : (prev.viewAvg ?? true),
           gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
           deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
-          gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck, prev.gammaVdB ?? 2.86e5),
+          gammaVdB: gammaVdBIn,
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
         // --- Compute θ-scale from pipeline if caller didn't pass one ---
         const sectorsEff = Math.max(1, nextUniforms.sectors ?? 1);
-        const dutyEffFR  =
-          (parameters?.dutyEffectiveFR != null || parameters?.dutyEffFR != null || parameters?.dutyFR != null)
-            ? Math.max(0, +(parameters.dutyEffectiveFR ?? parameters.dutyEffFR ?? parameters.dutyFR))
-            : (nextUniforms.viewAvg ? Math.max(1e-12, (nextUniforms.dutyCycle ?? 0) / sectorsEff) : 1.0);
+        
+        // --- FR duty selection (prefer explicit FR) ---
+        const dutyEffFR = (frFromParams != null)
+          ? Math.max(0, +frFromParams)
+          : (nextUniforms.viewAvg ? Math.max(1e-12, (nextUniforms.dutyCycle ?? 0) / nextUniforms.sectors) : 1.0);
 
         const thetaScaleFromChain =
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
