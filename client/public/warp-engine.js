@@ -174,7 +174,10 @@ class WarpEngine {
             this.strobingState.currentSector = Math.max(0, currentSector|0) % this.strobingState.sectorCount;
             this.updateUniforms({
               sectors: this.strobingState.sectorCount,
-              split: Number.isFinite(split) ? Math.max(0, Math.min(this.strobingState.sectorCount-1, split|0)) : this.uniforms?.split
+              // prefer explicit split if provided; otherwise use currentSector
+              split: Number.isFinite(split)
+                ? Math.max(0, Math.min(this.strobingState.sectorCount - 1, split|0))
+                : this.strobingState.currentSector
             });
           } catch(e){ console.warn("WarpEngine strobe error:", e); }
         };
@@ -831,6 +834,8 @@ class WarpEngine {
           vShip: parameters.vShip || prev.vShip || 1,
           wallWidth: parameters.wallWidth || prev.wallWidth || 0.06,
           driveDir: parameters.driveDir || prev.driveDir || [1,0,0],
+          displayGain: N(parameters.displayGain, prev.displayGain ?? 1.0),
+          userGain: N(parameters.userGain, prev.userGain ?? 1.0),
           // tilt
           epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || prev.epsilonTilt || 0),
           betaTiltVec: (Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length===3)
@@ -845,15 +850,15 @@ class WarpEngine {
           viewAvg: parameters.viewAvg != null ? !!parameters.viewAvg : (prev.viewAvg ?? true),
           gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
           deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
-          gammaVdB: N(parameters.gammaVdB, prev.gammaVdB ?? 2.86e5),
+          gammaVdB: N(parameters.gammaVdB ?? parameters.gammaVanDenBroeck, prev.gammaVdB ?? 2.86e5),
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
         // --- Compute θ-scale from pipeline if caller didn't pass one ---
         const sectorsEff = Math.max(1, nextUniforms.sectors ?? 1);
         const dutyEffFR  =
-          (parameters?.dutyEffectiveFR != null)
-            ? Math.max(0, +parameters.dutyEffectiveFR)
+          (parameters?.dutyEffectiveFR != null || parameters?.dutyEffFR != null || parameters?.dutyFR != null)
+            ? Math.max(0, +(parameters.dutyEffectiveFR ?? parameters.dutyEffFR ?? parameters.dutyFR))
             : (nextUniforms.viewAvg ? Math.max(1e-12, (nextUniforms.dutyCycle ?? 0) / sectorsEff) : 1.0);
 
         const thetaScaleFromChain =
@@ -873,7 +878,7 @@ class WarpEngine {
           (prev.gridSpan !== nextUniforms.gridSpan);
 
         const warpKeys = [
-          'thetaScale','userGain','curvatureGainT','curvatureBoostMax',
+          'thetaScale','userGain','displayGain','curvatureGainT','curvatureBoostMax',
           'exposure','zeroStop','physicsParityMode','ridgeMode',
           'driveDir','wallWidth','epsilonTilt','betaTiltVec','tiltGain',
           'dutyCycle','sectors','split','gammaGeo','deltaAOverA','gammaVdB',
@@ -1749,7 +1754,7 @@ class WarpEngine {
     }
 
     setDisplayGain(gain) {
-        this.updateUniforms({ userGain: Math.max(1, +gain) });
+        this.updateUniforms({ displayGain: Math.max(1, +gain) });
     }
 
     setPresetParity() {
