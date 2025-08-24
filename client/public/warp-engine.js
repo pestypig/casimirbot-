@@ -654,21 +654,35 @@ class WarpEngine {
         }
     }
     
+    _onProgramLinked(program) {
+        const gl = this.gl;
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Shader program link error:', gl.getProgramInfoLog(program));
+            gl.deleteProgram(program);
+            return false;
+        }
+        // cache locations & mark ready
+        this._cacheGridLocations(program);
+        this._warnNoProgramOnce = false;
+        this._setLoaded(true);
+        return true;
+    }
+
     _cacheGridLocations(program) {
         const gl = this.gl;
         this.gridProgram = program;
-        this.gridAttribs  = { position: gl.getAttribLocation(program, 'a_position') };
+        this.gridAttribs = {
+            position: gl.getAttribLocation(program, 'a_position'),
+        };
         this.gridUniforms = {
             mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
             sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
-            // physics uniforms expected by _renderGridPoints():
-            thetaScale:  gl.getUniformLocation(program, 'u_thetaScale'),
-            ridgeMode:   gl.getUniformLocation(program, 'u_RidgeMode'),
-            parity:      gl.getUniformLocation(program, 'u_PhysicsParityMode'),
-            sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
-            split:       gl.getUniformLocation(program, 'u_Split'),
+            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+            ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
+            parity:     gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+            sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
+            split:      gl.getUniformLocation(program, 'u_Split'),
         };
-        this.isLoaded = true; // ✔ satisfies checkpoint "Engine ready"
     }
     
     _setupUniformLocations() {
@@ -1450,27 +1464,17 @@ class WarpEngine {
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
         
-        // async path
+        // async path (KHR_parallel_shader_compile)
         if (this.parallelShaderExt && onReady) {
             this._pollShaderCompletion(program, () => {
-                if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                    console.error('Shader program link error:', gl.getProgramInfoLog(program));
-                    gl.deleteProgram(program);
-                    return;
-                }
-                this._cacheGridLocations(program);   // <-- cache here
-                onReady(program);
+                if (this._onProgramLinked(program)) onReady(program);
             });
             return program;
         }
 
         // sync path
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('Shader program link error:', gl.getProgramInfoLog(program));
-            gl.deleteProgram(program);
-            return null;
-        }
-        this._cacheGridLocations(program);       // <-- and here
+        this._onProgramLinked(program);
+        if (onReady) try { onReady(program); } catch {}
         return program;
     }
     
