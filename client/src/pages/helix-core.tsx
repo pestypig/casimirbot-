@@ -48,6 +48,7 @@ import { HelpCircle } from "lucide-react";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
+import { useActiveTiles } from "@/hooks/use-active-tiles";
 
 declare global {
   interface Window {
@@ -213,9 +214,6 @@ export default function HelixCore() {
     return stored === "galactic" ? "galactic" : "solar";
   });
   const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
-  
-  // Smooth animation for instantaneous tile count
-  const [instantTilesSmooth, setInstantTilesSmooth] = useState(0);
   
   // Live solar positions for route planning (updates every 5 seconds)
   const [solarTick, setSolarTick] = useState(0);
@@ -398,35 +396,16 @@ export default function HelixCore() {
     concurrentSectors, totalSectors
   ]);
 
-  // Compute instantaneous tiles for smooth animation
-  const instantTiles = useMemo(() => {
-    const totalTilesLive =
-      isFiniteNumber(systemMetrics?.totalTiles) ? systemMetrics!.totalTiles! :
-      (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
-
-    if (!isFiniteNumber(totalTilesLive)) return undefined;
-
-    // Instantaneous gate from light-crossing loop
-    const inBurstNow = !!lc && Number.isFinite(lc.phase) && Number.isFinite(lc.burst_ms)
-      ? (lc.phase % lc.dwell_ms) < lc.burst_ms
-      : false;
-
-    // Tiles per sector
-    const tilesPerSector =
-      isFiniteNumber(systemMetrics?.tilesPerSector)
-        ? systemMetrics!.tilesPerSector!
-        : (isFiniteNumber(totalTilesLive) && totalSectors > 0 ? Math.floor(totalTilesLive! / totalSectors) : 0);
-
-    // Instantaneous energized tiles: only the concurrently "live" sectors, only during the burst
-    const S_live = Math.max(1, Math.floor(concurrentSectors ?? 1));
-    return (tilesPerSector > 0) ? (inBurstNow ? (S_live * tilesPerSector) : 0) : undefined;
-  }, [systemMetrics?.totalTiles, systemMetrics?.tilesPerSector, pipeline?.N_tiles, lc?.phase, lc?.burst_ms, lc?.dwell_ms, totalSectors, concurrentSectors]);
-
-  // Smooth animation for instantaneous tile count
-  useEffect(() => {
-    const target = isFiniteNumber(instantTiles) ? instantTiles : 0;
-    setInstantTilesSmooth(prev => prev + 0.35 * (target - prev));
-  }, [instantTiles]);
+  // Use the compact hook for active tiles computation
+  const activeTiles = useActiveTiles({
+    totalTiles: systemMetrics?.totalTiles ?? pipeline?.N_tiles,
+    totalSectors,
+    concurrentSectors,
+    dutyEffectiveFR,
+    tilesPerSector: systemMetrics?.tilesPerSector,
+    lc,
+    serverActiveTiles: systemMetrics?.activeTiles,
+  });
 
   // Removed mode version tracking to prevent forced remounts that cause black screens
   
@@ -1061,38 +1040,8 @@ export default function HelixCore() {
                 )}
               </div>
 
-              {/* Mode-aware Active Tiles computation */}
-              {(() => {
-                // Pull inputs
-                const totalTilesLive =
-                  isFiniteNumber(systemMetrics?.totalTiles) ? systemMetrics!.totalTiles! :
-                  (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
-
-                const S_total = totalSectors;                                    // e.g., 400
-                const S_live  = Math.max(1, Math.floor(concurrentSectors ?? 1)); // 1 or 2
-                // Use the real FR duty you already computed (adapts if scheduler changes the burst window)
-                const derivedActiveTiles = isFiniteNumber(totalTilesLive)
-                  ? Math.round(totalTilesLive * dutyEffectiveFR)
-                  : undefined;
-
-                // Instantaneous gate from light-crossing loop (1 during the local burst window, else 0)
-                const burstLocal =
-                  Number.isFinite(lc?.burst_ms) && Number.isFinite(lc?.dwell_ms) && lc!.dwell_ms! > 0
-                    ? lc!.burst_ms! / lc!.dwell_ms!
-                    : 0.01; // fallback
-
-                const activeTilesDisplay = (() => {
-                  const serverVal = systemMetrics?.activeTiles;
-                  if (isFiniteNumber(serverVal) && isFiniteNumber(derivedActiveTiles)) {
-                    const rel = Math.abs(serverVal - derivedActiveTiles) / Math.max(1, derivedActiveTiles);
-                    return rel < 0.05 ? serverVal : derivedActiveTiles; // if drift >5%, use derived
-                  }
-                  return isFiniteNumber(serverVal) ? serverVal :
-                         isFiniteNumber(derivedActiveTiles) ? derivedActiveTiles : 2_800_000;
-                })();
-
-                return (
-                  <div className="grid grid-cols-2 gap-4">
+              {/* Active Tiles Panel */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
@@ -1109,15 +1058,15 @@ export default function HelixCore() {
                     </Tooltip>
                   </div>
                   <p className="text-lg font-mono text-cyan-400">
-                    {(isFiniteNumber(activeTilesDisplay) ? activeTilesDisplay : 2_800_000).toLocaleString()}
+                    {(activeTiles.avgTiles ?? 2_800_000).toLocaleString()}
                     <span className="ml-2 text-xs text-slate-400">avg</span>
                   </p>
                   <p className="text-sm font-mono text-emerald-400 mt-1">
-                    {isFiniteNumber(instantTiles) ? instantTiles.toLocaleString() : '—'}
+                    {Number.isFinite(activeTiles.instantTilesSmooth) ? activeTiles.instantTilesSmooth.toLocaleString() : '—'}
                     <span className="ml-2 text-xs text-slate-400">now</span>
                   </p>
                   <p className="text-xs text-slate-500">
-                    {`${S_live} live • ${S_total} total • ${(burstLocal*100).toFixed(2)}% local ON`}
+                    {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${(activeTiles.burstLocal*100).toFixed(2)}% local ON`}
                   </p>
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
@@ -1139,9 +1088,7 @@ export default function HelixCore() {
                     {fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
                   </p>
                 </div>
-                  </div>
-                );
-              })()}
+              </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
