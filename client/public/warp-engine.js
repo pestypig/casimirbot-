@@ -843,6 +843,22 @@ class WarpEngine {
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
+        // --- Compute θ-scale from pipeline if caller didn't pass one ---
+        const sectorsEff = Math.max(1, nextUniforms.sectors ?? 1);
+        const dutyEffFR  =
+          (parameters?.dutyEffectiveFR != null)
+            ? Math.max(0, +parameters.dutyEffectiveFR)
+            : (nextUniforms.viewAvg ? Math.max(1e-12, (nextUniforms.dutyCycle ?? 0) / sectorsEff) : 1.0);
+
+        const thetaScaleFromChain =
+          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+          (nextUniforms.viewAvg ? Math.sqrt(dutyEffFR) : 1);
+
+        nextUniforms.thetaScale =
+          Number.isFinite(parameters?.thetaScale) ? +parameters.thetaScale : thetaScaleFromChain;
+
         // decide if the CPU warp needs recompute
         const geoChanged =
           (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
@@ -1037,6 +1053,10 @@ class WarpEngine {
         const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+
+        if (!Number.isFinite(this.uniforms.thetaScale) || this.uniforms.thetaScale <= 0) {
+          this.uniforms.thetaScale = betaUsedUniform; // last-resort sync
+        }
 
         // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
         const betaVisUniform = betaUsedUniform;
