@@ -19,6 +19,7 @@ import { useMetrics } from "@/hooks/use-metrics";
 const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
 );
+const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -921,6 +922,53 @@ export default function HelixCore() {
                 </div>
               );
             })()}
+          </CardContent>
+        </Card>
+
+        {/* ====== WARP RENDER INSPECTOR (Debugging) ====== */}
+        <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-orange-400" />
+              Warp Render Inspector • Physics Debug
+            </CardTitle>
+            <CardDescription>
+              REAL vs SHOW engine comparison — verify operational-mode and calculator payloads reach WarpEngine
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading inspector…</div>}>
+              <WarpRenderInspector
+                parityPhys={{
+                  hull: { a: 503.5, b: 132, c: 86.5 },
+                  gammaGeo: pipeline?.gammaGeo ?? 26,
+                  qSpoilingFactor: qSpoilUI,
+                  gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
+                  dutyCycle: dutyUI,
+                  dutyEffectiveFR,
+                  sectors: totalSectors,
+                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  sectorCount: totalSectors,
+                }}
+                showPhys={{
+                  hull: { a: 503.5, b: 132, c: 86.5 },
+                  gammaGeo: pipeline?.gammaGeo ?? 26,
+                  qSpoilingFactor: qSpoilUI,
+                  gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
+                  dutyCycle: dutyUI,
+                  sectors: totalSectors,
+                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  sectorCount: totalSectors,
+                }}
+                baseShared={{
+                  hull: { a: 503.5, b: 132, c: 86.5 },
+                  sectors: totalSectors,
+                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  colorMode: 'theta',
+                  ridgeMode: 1,
+                }}
+              />
+            </Suspense>
           </CardContent>
         </Card>
 
