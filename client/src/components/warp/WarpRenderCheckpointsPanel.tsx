@@ -31,15 +31,19 @@ const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 function computeThetaScaleFromSnap(v: any) {
-  const gammaGeo = N(v?.gammaGeo ?? v?.g_y, 26);
-  const dAa = Math.max(1e-12, N(v?.deltaAOverA ?? v?.qSpoilingFactor, 1));
-  const gammaVdB = Math.max(1, N(v?.gammaVdB ?? v?.gammaVanDenBroeck, 2.86e5));
-  const sectorsTotal = Math.max(1, Math.floor(N(v?.sectorCount ?? v?.sectors ?? 1, 1)));
-  const duty = Math.max(0, N(v?.dutyCycle, 0));
-  const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * dAa * gammaVdB;
-  const effDuty = Math.max(1e-12, duty / sectorsTotal);
-  const viewAvg = (v?.viewAvg ?? true) ? 1 : 0;
-  return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+  const N = (x:any,d=0)=>Number.isFinite(x)?+x:d;
+  const isStandby = String(v?.currentMode||'').toLowerCase()==='standby';
+  const gammaGeo  = N(v?.gammaGeo ?? v?.g_y, 26);
+  const dAa       = Math.max(1e-12, N(v?.deltaAOverA ?? v?.qSpoilingFactor, 1));
+  const gammaVdB  = Math.max(1, N(v?.gammaVanDenBroeck ?? v?.gammaVdB, 2.86e5));
+  const sectors   = Math.max(1, Math.floor(N(v?.sectorCount ?? v?.sectors ?? 1, 1)));
+  const dFRraw    = v?.dutyEffectiveFR ?? v?.dutyShip ?? v?.dutyEff;
+  const dutyFR    = isStandby ? 0 : (Number.isFinite(dFRraw) ? Math.max(0, +dFRraw) : NaN);
+  const dutyUI    = Math.max(0, N(v?.dutyCycle, 0)) / sectors;
+  const dutyEff   = Number.isFinite(dutyFR) ? dutyFR : dutyUI;
+  const betaInst  = Math.pow(Math.max(1, gammaGeo), 3) * dAa * (isStandby ? 1 : gammaVdB);
+  const viewAvg   = (v?.viewAvg ?? true) ? 1 : 0;
+  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, dutyEff)) : betaInst;
 }
 
 // Same θ computation as WarpBubbleCompare.tsx for perfect consistency
