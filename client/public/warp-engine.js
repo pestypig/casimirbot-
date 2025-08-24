@@ -411,7 +411,11 @@ class WarpEngine {
     }
 
     _compileGridShaders() {
-        const isWebGL2 = this.gl.getParameter(this.gl.VERSION).includes("WebGL 2.0");
+        const gl = this.gl;
+        if (!gl) return;
+        this._setLoaded(false);              // ← important: we're not ready *yet*
+        
+        const isWebGL2 = gl.getParameter(gl.VERSION).includes("WebGL 2.0");
         
         const gridVs = isWebGL2 ?
             "#version 300 es\n" +
