@@ -1341,7 +1341,10 @@ class WarpEngine {
 
     _renderGridPoints() {
         const gl = this.gl;
-        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) return;
+        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+            if (!this._warnNoProgramOnce) { console.warn('Grid program not ready yet; waiting for shader link…'); this._warnNoProgramOnce = true; }
+            return;
+        }
 
         gl.useProgram(this.gridProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
@@ -1349,21 +1352,19 @@ class WarpEngine {
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
 
-        // MVP & color
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
 
-        // PHYSICS (safe defaults)
         const u = this.uniforms || {};
         const sectors = Math.max(1, (u.sectors|0) || 1);
-        gl.uniform1f(this.gridUniforms.thetaScale, Number.isFinite(u.thetaScale) && u.thetaScale > 0 ? u.thetaScale : 5.03e3);
-        gl.uniform1i(this.gridUniforms.ridgeMode,  Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
-        gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
-        gl.uniform1i(this.gridUniforms.sectorCount,sectors);
-        gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sectors-1, (u.split|0) || 0)));
+        gl.uniform1f(this.gridUniforms.thetaScale,  (Number.isFinite(u.thetaScale) && u.thetaScale>0) ? u.thetaScale : 5.03e3);
+        gl.uniform1i(this.gridUniforms.ridgeMode,   Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
+        gl.uniform1i(this.gridUniforms.parity,      u.physicsParityMode ? 1 : 0);
+        gl.uniform1i(this.gridUniforms.sectorCount, sectors);
+        gl.uniform1i(this.gridUniforms.split,       Math.max(0, Math.min(sectors-1, (u.split|0) || 0)));
 
-        const vertexCount = this.gridVertices.length / 3;
-        gl.drawArrays(gl.LINES, 0, vertexCount);
+        const vertexCount = (this.gridVertices?.length || 0) / 3;
+        if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
 
         gl.disableVertexAttribArray(loc);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
