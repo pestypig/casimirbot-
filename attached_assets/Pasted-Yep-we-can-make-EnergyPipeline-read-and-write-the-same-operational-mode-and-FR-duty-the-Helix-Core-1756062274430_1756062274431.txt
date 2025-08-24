@@ -1,3 +1,14 @@
+Yep—we can make EnergyPipeline read and write the same operational mode (and FR duty) the Helix-Core page uses. Below is a tight, drop-in update that:
+
+Subscribes to /api/helix/pipeline via your existing useEnergyPipeline() hook (shared source of truth).
+
+(Optionally) switches mode with useSwitchMode() (same mutate + react-query invalidation).
+
+Pulls /api/helix/metrics to reconstruct dutyEffectiveFR if the pipeline hasn’t precomputed it.
+
+Fixes a couple semantics mismatches (TS label, Q usage in the “P_loss” row, γ³ display).
+
+1) Updated EnergyPipeline.tsx (paste over your component)
 /**
  * Energy Pipeline Display Component (aligned with Helix-Core)
  * Shares pipeline mode + FR duty with the rest of the app
@@ -98,7 +109,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const StatusBadge = ({ ok }: { ok: boolean }) =>
     ok ? <Badge className="bg-green-100 text-green-800">PASS</Badge> : <Badge className="bg-red-100 text-red-800">FAIL</Badge>;
 
-  // Validation targets (show "as-computed" rather than arbitrary specs)
+  // Validation targets (show “as-computed” rather than arbitrary specs)
   const targets = {
     U_cycle: Math.abs(U_cycle),
     m_exotic,
@@ -295,3 +306,34 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     </div>
   );
 }
+
+2) How to drop it into the Helix-Core page
+
+Anywhere in your right/left column stack (e.g., under “Metric Compliance HUD”), just render it. You don’t need to pass a results prop unless you want to preview a one-off sim; the component already subscribes to the same pipeline as Helix-Core.
+
+{/* Energy Pipeline (shares mode & FR duty with the page) */}
+<EnergyPipeline allowModeSwitch={false} />
+
+
+If you do want a tiny inline mode switcher inside this card too, flip the flag:
+
+<EnergyPipeline allowModeSwitch />
+
+
+That switcher uses the same useSwitchMode() mutate + react-query invalidation you already use, so both the page and this panel stay in lockstep.
+
+What changed vs your original component (quick diff notes)
+
+Mode sharing: reads currentMode from useEnergyPipeline(); optional local switcher calls useSwitchMode() and invalidates ['/api/helix/pipeline'] and ['/api/helix/metrics'] (exactly like the page).
+
+FR duty alignment: prefers pipeline.dutyEffectiveFR; if missing, reconstructs from metrics.sectorStrobing/totalSectors with 1% local ON default (same fallback you used in Helix-Core).
+
+Labels/physics touch-ups:
+
+P_tile_on = U_geo_raw · ω (since (U_Q * ω / Q) = U_geo_raw * ω).
+
+TS copy now matches the HUD: SAFE when » 1.
+
+γ_geo³ renders from the live number (no hardcoded 15,625).
+
+That’s it—after this, the Energy Pipeline panel and the Helix-Core page are literally reading and writing the same mode and duty, so no more drift.
