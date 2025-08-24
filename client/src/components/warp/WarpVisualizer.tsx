@@ -618,16 +618,37 @@ useEffect(() => {
       const axesSceneNow: [number,number,number] = [ah*sh, bh*sh, ch*sh];
       const spanNow = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneNow) * VIS_LOCAL.spanPaddingDesktop);
 
-      // Push framing
-      engineRef.current.updateUniforms({
+      // ===== CONSOLIDATED UNIFORM UPDATE (prevents mode override conflicts) =====
+      const pipelineState = {
+        currentMode: parameters.currentMode || 'hover',
+        dutyCycle: parameters.dutyCycle,
+        dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
+        sectorCount: sectorCountResolved,
+        gammaGeo: gammaGeo,
+        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 2.86e5), // unify default
+        qCavity: qCavity,
+        qSpoilingFactor: qSpoil,
+        sag_nm: num(parameters.sagDepth_nm, 16),
+        hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
+        shipRadius_m: parameters.hull?.c ?? 86.5,
+        modelMode: parity ? 'raw' as const : 'calibrated' as const,
+      };
+      
+      // First set core physics via pipeline adapter
+      driveWarpFromPipeline(engineRef.current, pipelineState);
+
+      // Now build the consolidated uniform update that preserves currentMode
+      const consolidatedUniforms = {
+        // Framing (preserve these)
         axesScene: axesSceneNow,
         axesClip:  axesSceneNow,
         hullAxes:  [ah,bh,ch] as [number,number,number],
         gridSpan:  parameters.gridSpan ?? spanNow,
-      });
-
-      // ----- Single-source θ-scale (shader + CPU agree) -----
-      engineRef.current.updateUniforms({
+        
+        // Critical: preserve currentMode from pipeline
+        currentMode: parameters.currentMode || 'hover',
+        
+        // Theta scale
         thetaScale: resolveThetaScale({
           dutyCycle: dutyResolved,
           sectorCount: sectorCountResolved,
@@ -638,53 +659,32 @@ useEffect(() => {
           lightCrossing: lc,
           dutyEffectiveFR: parameters.dutyEffectiveFR
         }),
-      });
 
-      const pipelineState = {
-        currentMode: parameters.currentMode || 'hover',
-        dutyCycle: parameters.dutyCycle,
-        dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
-        sectorCount: sectorsResolved,
-        gammaGeo: gammaGeo,
-        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 2.86e5), // unify default
-        qCavity: qCavity,
-        qSpoilingFactor: qSpoil,
-        sag_nm: num(parameters.sagDepth_nm, 16),
-        hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
-        shipRadius_m: parameters.hull?.c ?? 86.5,
-        modelMode: parity ? 'raw' as const : 'calibrated' as const,
-      };
-      driveWarpFromPipeline(engineRef.current, pipelineState);
-
-      // Immediately enforce REAL state if parity
-      if (parity) {
-        engineRef.current.updateUniforms?.({
-          vizGain: 1,
-          curvatureGainDec: 0,
-          curvatureBoostMax: 1,
-          curvatureGainT: 0,
-          displayGain: 1,
-          thetaScale: resolveThetaScale({  // still computed, just no exaggeration
-            dutyCycle: dutyResolved,
-            sectors: sectorsResolved,
-            gammaGeo,
-            qSpoilingFactor: qSpoil,
-            gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5)
-          }),
-        });
-        engineRef.current.setDisplayGain?.(1);
-      }
-
-      // Pipeline-timed gating (live sync)
-      if (lc) {
-        engineRef.current.updateUniforms({
+        // Pipeline-timed gating (if available)
+        ...(lc && {
           phase: lc.phase,
           onWindow: !!lc.onWindowDisplay,
           sectorIdx: Math.max(0, lc.sectorIdx % (parameters.sectorStrobing || lc.sectorCount || 1)),
           tauLC_ms: lc.tauLC_ms,
           dwell_ms: lc.dwell_ms,
           burst_ms: lc.burst_ms,
-        });
+        }),
+
+        // Parity overrides (if needed)
+        ...(parity && {
+          vizGain: 1,
+          curvatureGainDec: 0,
+          curvatureBoostMax: 1,
+          curvatureGainT: 0,
+          displayGain: 1,
+        }),
+      };
+
+      // Single atomic update to prevent mode conflicts
+      engineRef.current.updateUniforms(consolidatedUniforms);
+      
+      if (parity) {
+        engineRef.current.setDisplayGain?.(1);
       }
 
       // Add visual enhancements that aren't physics-driven
