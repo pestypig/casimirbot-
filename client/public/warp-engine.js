@@ -28,6 +28,12 @@ if (typeof window.SCENE_SCALE === 'undefined') {
 const SCENE_SCALE = window.SCENE_SCALE;
 
 class WarpEngine {
+    static getOrCreate(canvas) {
+        const existing = canvas.__warpEngine;
+        if (existing && !existing._destroyed) return existing;
+        return new this(canvas);
+    }
+
     constructor(canvas) {
         // Per-canvas guard: allow multiple engines across different canvases
         if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
@@ -39,6 +45,7 @@ class WarpEngine {
         
         this._destroyed = false;
         this.canvas = canvas;
+        canvas.__warpEngine = this;
         this.gl = canvas.getContext('webgl2', {
             alpha: false,
             antialias: false,
