@@ -126,7 +126,8 @@ export function useSwitchMode() {
         await apiRequest('POST', '/api/helix/pipeline/update', {
           dutyCycle: cfg.dutyCycle,
           sectorStrobing: cfg.sectorStrobing,
-          qSpoilingFactor: cfg.qSpoilingFactor
+          qSpoilingFactor: cfg.qSpoilingFactor,
+          gammaVanDenBroeck: cfg.gammaVanDenBroeck,  // ← include this
         });
       }
       return data;
