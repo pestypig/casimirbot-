@@ -1415,7 +1415,11 @@ class WarpEngine {
 
         const u = this.uniforms || {};
         const sectors = Math.max(1, (u.sectors|0) || 1);
-        const theta = (Number.isFinite(u.thetaScale) && u.thetaScale > 0) ? u.thetaScale : 5.03e3;
+        const mode = String(u.currentMode || '').toLowerCase();
+        const theta =
+          mode === 'standby'
+            ? 0
+            : (Number.isFinite(u.thetaScale) ? Math.max(0, u.thetaScale) : 0);
 
         gl.uniform1f(this.gridUniforms.thetaScale,  theta);
         gl.uniform1i(this.gridUniforms.ridgeMode,   Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
@@ -1472,6 +1476,10 @@ class WarpEngine {
             gl.depthMask(true);
             gl.colorMask(true, true, true, true);
             gl.clearColor(0, 0, 0, 1);
+            
+            // Clear the screen & enforce a single opaque pass
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             
             // Render the spacetime grid
