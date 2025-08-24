@@ -1040,57 +1040,82 @@ export default function HelixCore() {
                 )}
               </div>
 
-              {/* Active Tiles Panel */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-slate-950 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-sm">
-                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                        <p className="mb-2">Only a tiny fraction of tiles energize at any instant. Time-slicing (sectors, duty) ensures the light-crossing time τ_LC exceeds any local "on" window, preserving GR causality while the time-averaged stress matches the Natário profile.</p>
-                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                        <p className="text-xs italic">Not all lamps must glow at once. A lighthouse turns to reach every ship.</p>
-                      </TooltipContent>
-                    </Tooltip>
+              {/* Active Tiles Panel with helper strings */}
+              {(() => {
+                const frPctLabel = Number.isFinite(dutyEffectiveFR) ? ` (${(dutyEffectiveFR * 100).toExponential(2)}%)` : '';
+                const localOnLabel = Number.isFinite(activeTiles?.burstLocal) ? `${(activeTiles.burstLocal * 100).toFixed(2)}%` : '—';
+                
+                return (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-950 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        {/* Title now reflects pipeline semantics */}
+                        <p className="text-xs text-slate-400">Active Tiles (Energized)</p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-sm">
+                            <div className="font-medium text-yellow-300 mb-1">🧠 Basis</div>
+                            <p className="mb-2">
+                              <strong>FR-avg</strong> uses ship-wide Ford–Roman duty across {totalSectors} sectors;
+                              <strong> Instant</strong> shows tiles energized in the current live sector window
+                              ({Math.max(1, Math.floor(concurrentSectors))}/{totalSectors}, local ON {localOnLabel}).
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+
+                      {/* FR-averaged count (matches pipeline's FR duty) */}
+                      <p className="text-lg font-mono text-cyan-400">
+                        {(activeTiles.avgTiles ?? 2_800_000).toLocaleString()}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="ml-2 text-xs text-slate-400 underline decoration-dotted cursor-help">
+                              FR-avg{frPctLabel}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-sm">
+                            Ship-averaged (Ford–Roman) duty used by the energy pipeline.
+                          </TooltipContent>
+                        </Tooltip>
+                      </p>
+
+                      {/* Instantaneous energized tiles */}
+                      <p className="text-sm font-mono text-emerald-400 mt-1">
+                        {Number.isFinite(activeTiles.instantTilesSmooth)
+                          ? activeTiles.instantTilesSmooth.toLocaleString()
+                          : '—'}
+                        <span className="ml-2 text-xs text-slate-400">instant</span>
+                      </p>
+
+                      {/* Basis line unchanged except for using the same terms */}
+                      <p className="text-xs text-slate-500">
+                        {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${localOnLabel} local ON`}
+                      </p>
+                    </div>
+
+                    {/* Energy Output panel unchanged */}
+                    <div className="p-3 bg-slate-950 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-slate-400">Energy Output</p>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                            <p className="mb-2">Average electrical power (ship-wide) from pipeline FR duty.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <p className="text-lg font-mono text-yellow-400">
+                        {fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-lg font-mono text-cyan-400">
-                    {(activeTiles.avgTiles ?? 2_800_000).toLocaleString()}
-                    <span className="ml-2 text-xs text-slate-400">avg</span>
-                  </p>
-                  <p className="text-sm font-mono text-emerald-400 mt-1">
-                    {Number.isFinite(activeTiles.instantTilesSmooth) ? activeTiles.instantTilesSmooth.toLocaleString() : '—'}
-                    <span className="ml-2 text-xs text-slate-400">now</span>
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${(activeTiles.burstLocal*100).toFixed(2)}% local ON`}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-950 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-400">Energy Output</p>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs">
-                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                        <p className="mb-2">Average power output from all active Casimir tile sectors. Scales with operational mode and duty cycle.</p>
-                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                        <p className="text-xs italic">Energy flows where intention directs it.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <p className="text-lg font-mono text-yellow-400">
-                    {Number.isFinite(pipeline?.P_avg)
-                      ? fmtPowerUnit(pipeline!.P_avg)            // P_avg is MW
-                      : fmtPowerUnitFromW(systemMetrics?.energyOutput)} {/* energyOutput is W */}
-                  </p>
-                </div>
-              </div>
+                );
+              })()}
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-950 rounded-lg">
