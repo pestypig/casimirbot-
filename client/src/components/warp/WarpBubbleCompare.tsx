@@ -686,6 +686,8 @@ export default function WarpBubbleCompare({
             colorMode: colorModeIndex,
             colorModeIndex,
             colorModeName: showPayload.colorMode,
+            physicsParityMode: false,
+            ridgeMode: 1,
           });
           scrubOverlays(rightEngine.current);
           
@@ -856,6 +858,8 @@ export default function WarpBubbleCompare({
       colorMode: colorModeIndex,
       colorModeIndex,
       colorModeName: showPayload.colorMode,
+      physicsParityMode: false,
+      ridgeMode: 1,
     });
 
     scrubOverlays(leftEngine.current);
