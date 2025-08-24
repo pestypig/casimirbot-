@@ -1455,18 +1455,58 @@ class WarpEngine {
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
 
         const u = this.uniforms || {};
-        const sectors = Math.max(1, (u.sectors|0) || 1);
         const mode = String(u.currentMode || '').toLowerCase();
-        const theta =
-          mode === 'standby'
-            ? 0
-            : (Number.isFinite(u.thetaScale) ? Math.max(0, u.thetaScale) : 0);
+        const isStandby = mode === 'standby';
+        const parity = !!u.physicsParityMode;
 
-        gl.uniform1f(this.gridUniforms.thetaScale,  theta);
-        gl.uniform1i(this.gridUniforms.ridgeMode,   Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
-        gl.uniform1i(this.gridUniforms.parity,      u.physicsParityMode ? 1 : 0);
+        // sectors / split
+        const sectors = Math.max(1, (u.sectors|0) || (u.sectorCount|0) || 1);
+        const split   = Math.max(0, Math.min(sectors - 1, (u.split|0) || 0));
         gl.uniform1i(this.gridUniforms.sectorCount, sectors);
-        gl.uniform1i(this.gridUniforms.split,       Math.max(0, Math.min(sectors-1, (u.split|0) || 0)));
+        gl.uniform1i(this.gridUniforms.split,       split);
+
+        // θ-scale: zero in standby, else as provided (no magic fallback)
+        const theta = isStandby ? 0.0 : (Number.isFinite(u.thetaScale) ? Math.max(0, u.thetaScale) : 0.0);
+        gl.uniform1f(this.gridUniforms.thetaScale, theta);
+
+        // parity & viz knobs (REAL parity forces neutral)
+        gl.uniform1i(this.gridUniforms.parity,    parity ? 1 : 0);
+        gl.uniform1i(this.gridUniforms.ridgeMode, Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : (parity ? 0 : 1));
+        gl.uniform1i(this.gridUniforms.colorMode, Number.isFinite(u.colorMode) ? (u.colorMode|0) : (parity ? 2 : 1));
+
+        const exposure  = Number.isFinite(u.exposure)  ? u.exposure  : (parity ? 3.5 : 6.0);
+        const zeroStop  = Number.isFinite(u.zeroStop)  ? u.zeroStop  : (parity ? 1e-5 : 1e-7);
+        gl.uniform1f(this.gridUniforms.exposure, exposure);
+        gl.uniform1f(this.gridUniforms.zeroStop, zeroStop);
+
+        // drive & shell
+        const d = Array.isArray(u.driveDir) && u.driveDir.length === 3 ? u.driveDir : [1,0,0];
+        gl.uniform3f(this.gridUniforms.driveDir, d[0], d[1], d[2]);
+        const wallWidth = Number.isFinite(u.wallWidth) ? Math.max(1e-6, u.wallWidth) :
+                          Number.isFinite(u.wallWidth_rho) ? Math.max(1e-6, u.wallWidth_rho) : 1e-3;
+        gl.uniform1f(this.gridUniforms.wallWidth, wallWidth);
+
+        // velocity — CRITICAL: 0 in standby (and typically 0 in REAL)
+        const vShip = isStandby ? 0.0 : (Number.isFinite(u.vShip) ? u.vShip : (parity ? 0.0 : 1.0));
+        gl.uniform1f(this.gridUniforms.vShip, vShip);
+
+        // gains — neutralize in parity & standby
+        const userGain  = (parity || isStandby) ? 1.0 : (Number.isFinite(u.userGain) ? Math.max(1, u.userGain) : 4.0);
+        const dispGain  = (parity || isStandby) ? 1.0 : (Number.isFinite(u.displayGain) ? Math.max(1, u.displayGain) : 1.0);
+        const vizGain   = (parity || isStandby) ? 1.0 : (Number.isFinite(u.vizGain) ? Math.max(1, u.vizGain) : 1.0);
+        const tBlend    = (parity || isStandby) ? 0.0 : (Number.isFinite(u.curvatureGainT) ? Math.max(0, Math.min(1, u.curvatureGainT)) : 0.6);
+        const tBoost    = (parity || isStandby) ? 1.0 : (Number.isFinite(u.curvatureBoostMax) ? Math.max(1, u.curvatureBoostMax) : 40.0);
+        gl.uniform1f(this.gridUniforms.userGain,        userGain);
+        gl.uniform1f(this.gridUniforms.displayGain,     dispGain);
+        gl.uniform1f(this.gridUniforms.vizGain,         vizGain);
+        gl.uniform1f(this.gridUniforms.curvatureGainT,  tBlend);
+        gl.uniform1f(this.gridUniforms.curvatureBoostMax, tBoost);
+
+        // axes
+        const ax = Array.isArray(u.axesClip) && u.axesClip.length === 3 ? u.axesClip : [1,1,1];
+        const ah = Array.isArray(u.hullAxes) && u.hullAxes.length === 3 ? u.hullAxes : [503.5,132.0,86.5];
+        gl.uniform3f(this.gridUniforms.axesScene, ax[0], ax[1], ax[2]);
+        gl.uniform3f(this.gridUniforms.axes,      ah[0], ah[1], ah[2]);
 
         const vertexCount = (this.gridVertices?.length || 0) / 3;
         if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
