@@ -1456,62 +1456,57 @@ class WarpEngine {
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
 
+        const u = this.uniforms || {};
+
+        // --- names / helpers
+        const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
+        const F = (x, d)=> Number.isFinite(x) ? +x : d;
+        const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
+
+        // --- colors / matrices you already set:
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
 
-        const u = this.uniforms || {};
-        const mode = String(u.currentMode || '').toLowerCase();
-        const isStandby = mode === 'standby';
-        const parity = !!u.physicsParityMode;
+        // --- modes / sectoring (use lowercase names in the shader)
+        if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(u.colorMode, 1));
+        if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(u.ridgeMode, 1));
+        if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
+        if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount,I(u.sectors, 1));
+        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      I(Math.max(0, Math.min(I(u.sectors,1)-1, I(u.split,0))), 0));
 
-        // sectors / split
-        const sectors = Math.max(1, (u.sectors|0) || (u.sectorCount|0) || 1);
-        const split   = Math.max(0, Math.min(sectors - 1, (u.split|0) || 0));
-        gl.uniform1i(this.gridUniforms.sectorCount, sectors);
-        gl.uniform1i(this.gridUniforms.split,       split);
+        // --- axes (scene-normalized and legacy hull)
+        const axesScene = u.axesClip || u.axesScene || [1,1,1];
+        const hullAxes  = u.hullAxes || [503.5, 132.0, 86.5];
+        if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
+        if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
 
-        // θ-scale: zero in standby, else as provided (no magic fallback)
-        const theta = isStandby ? 0.0 : (Number.isFinite(u.thetaScale) ? Math.max(0, u.thetaScale) : 0.0);
-        gl.uniform1f(this.gridUniforms.thetaScale, theta);
+        // --- drive + wall
+        const drive = V3(u.driveDir, [1,0,0]);
+        const wRho  = Number.isFinite(u.wallWidth_rho) ? u.wallWidth_rho : (Number.isFinite(u.wallWidth) ? u.wallWidth : 0.02);
+        if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
+        if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, F(wRho, 0.02));
 
-        // parity & viz knobs (REAL parity forces neutral)
-        gl.uniform1i(this.gridUniforms.parity,    parity ? 1 : 0);
-        gl.uniform1i(this.gridUniforms.ridgeMode, Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : (parity ? 0 : 1));
-        gl.uniform1i(this.gridUniforms.colorMode, Number.isFinite(u.colorMode) ? (u.colorMode|0) : (parity ? 2 : 1));
+        // --- critical amplitude carrier INSIDE theta field:
+        const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
+        if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
 
-        const exposure  = Number.isFinite(u.exposure)  ? u.exposure  : (parity ? 3.5 : 6.0);
-        const zeroStop  = Number.isFinite(u.zeroStop)  ? u.zeroStop  : (parity ? 1e-5 : 1e-7);
-        gl.uniform1f(this.gridUniforms.exposure, exposure);
-        gl.uniform1f(this.gridUniforms.zeroStop, zeroStop);
+        // --- θ-scale (you already set a fallback in JS if missing)
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, F(u.thetaScale, 5.03e3));
 
-        // drive & shell
-        const d = Array.isArray(u.driveDir) && u.driveDir.length === 3 ? u.driveDir : [1,0,0];
-        gl.uniform3f(this.gridUniforms.driveDir, d[0], d[1], d[2]);
-        const wallWidth = Number.isFinite(u.wallWidth) ? Math.max(1e-6, u.wallWidth) :
-                          Number.isFinite(u.wallWidth_rho) ? Math.max(1e-6, u.wallWidth_rho) : 1e-3;
-        gl.uniform1f(this.gridUniforms.wallWidth, wallWidth);
+        // --- exposure / viz chain
+        if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
+        if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(u.zeroStop, u.physicsParityMode ? 1e-5 : 1e-7));
+        if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(u.userGain, 1.0));
+        if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(u.displayGain, 1.0));
+        if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(u.vizGain, 1.0));
+        if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(u.curvatureGainT, 0.0));
+        if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(u.curvatureBoostMax, 1.0));
 
-        // velocity — CRITICAL: 0 in standby (and typically 0 in REAL)
-        const vShip = isStandby ? 0.0 : (Number.isFinite(u.vShip) ? u.vShip : (parity ? 0.0 : 1.0));
-        gl.uniform1f(this.gridUniforms.vShip, vShip);
+        // --- interior tilt (benign defaults)
+        if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
+        if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
+        if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
 
-        // gains — neutralize in parity & standby
-        const userGain  = (parity || isStandby) ? 1.0 : (Number.isFinite(u.userGain) ? Math.max(1, u.userGain) : 4.0);
-        const dispGain  = (parity || isStandby) ? 1.0 : (Number.isFinite(u.displayGain) ? Math.max(1, u.displayGain) : 1.0);
-        const vizGain   = (parity || isStandby) ? 1.0 : (Number.isFinite(u.vizGain) ? Math.max(1, u.vizGain) : 1.0);
-        const tBlend    = (parity || isStandby) ? 0.0 : (Number.isFinite(u.curvatureGainT) ? Math.max(0, Math.min(1, u.curvatureGainT)) : 0.6);
-        const tBoost    = (parity || isStandby) ? 1.0 : (Number.isFinite(u.curvatureBoostMax) ? Math.max(1, u.curvatureBoostMax) : 40.0);
-        gl.uniform1f(this.gridUniforms.userGain,        userGain);
-        gl.uniform1f(this.gridUniforms.displayGain,     dispGain);
-        gl.uniform1f(this.gridUniforms.vizGain,         vizGain);
-        gl.uniform1f(this.gridUniforms.curvatureGainT,  tBlend);
-        gl.uniform1f(this.gridUniforms.curvatureBoostMax, tBoost);
-
-        // axes
-        const ax = Array.isArray(u.axesClip) && u.axesClip.length === 3 ? u.axesClip : [1,1,1];
-        const ah = Array.isArray(u.hullAxes) && u.hullAxes.length === 3 ? u.hullAxes : [503.5,132.0,86.5];
-        gl.uniform3f(this.gridUniforms.axesScene, ax[0], ax[1], ax[2]);
-        gl.uniform3f(this.gridUniforms.axes,      ah[0], ah[1], ah[2]);
 
         const vertexCount = (this.gridVertices?.length || 0) / 3;
         if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
