@@ -904,6 +904,7 @@ export default function WarpBubbleCompare({
       ...shared,
       ...real,
       physicsParityMode: true,
+      vShip: 0, // explicit
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
       deltaAOverA: real.qSpoilingFactor,
       dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
@@ -916,6 +917,7 @@ export default function WarpBubbleCompare({
       ...shared,
       ...show,
       physicsParityMode: false,
+      vShip: parameters.currentMode === 'standby' ? 0 : 1, // explicit
       gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
       deltaAOverA: show.qSpoilingFactor,
       sectors: Math.max(1, parameters.sectors),
