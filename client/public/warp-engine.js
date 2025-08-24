@@ -1153,7 +1153,11 @@ class WarpEngine {
                 // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
                 // Let exaggeration raise the ceiling too, but gently (log so it doesn't jump)
                 const exgLog  = Math.log10(Math.max(1, userGain));
-                const maxPush = 0.12 + 0.10 * (boostNow / Math.max(1, boostMax)) + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
+                // use the actual max from uniforms (fall back to REF_BOOSTMAX)
+                const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
+                const maxPush = 0.12
+                  + 0.10 * (boostNow / Math.max(1, boostMax))
+                  + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
                 const softClamp = (x, m) => m * Math.tanh(x / m);
                 disp = softClamp(disp, maxPush);
                 
