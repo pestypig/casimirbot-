@@ -758,16 +758,8 @@ export async function computeEnergySnapshot(sim: any) {
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
 
-  // Calculate Ford-Roman duty with proper fallback chain  
-  const dutyEffectiveFR = (() => {
-    const burst = sim.dynamicConfig?.burstLengthUs;
-    const dwell = sim.dynamicConfig?.cycleLengthUs;
-    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
-      return Math.max(0, Math.min(1, burst / dwell / Math.max(1, sim.dynamicConfig?.sectorCount ?? 1)));
-    }
-    const d = Math.max(0, Math.min(1, sim.dynamicConfig?.sectorDuty ?? sim.dynamicConfig?.dutyLocal ?? sim.dynamicConfig?.dutyCycle ?? 0.14));
-    return Math.max(0, Math.min(1, d / Math.max(1, sim.dynamicConfig?.sectorCount ?? 1)));
-  })();
+  // Trust the pipeline's FR duty (ship-wide, sector-averaged)
+  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? result.dutyEff ?? 2.5e-5;
 
   // Expose to clients (names match what adapters expect)
   return {
@@ -783,7 +775,7 @@ export async function computeEnergySnapshot(sim: any) {
     // Strobing parameters
     dutyCycle: result.dutyCycle,
     sectorStrobing: result.sectorStrobing,
-    dutyEffectiveFR,
+    dutyEffectiveFR,  // authoritative
 
     // Natário / stress-energy surface (time-averaged)
     T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,
