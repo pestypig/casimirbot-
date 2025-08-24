@@ -681,9 +681,6 @@ export default function WarpBubbleCompare({
       deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
       gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
 
-      // θ-scale (keep your existing computation)
-      thetaScale: computeThetaScale(snap),
-
       // Forward currentMode to engine for GPU-side mode decisions
       currentMode: snap.currentMode,
 
