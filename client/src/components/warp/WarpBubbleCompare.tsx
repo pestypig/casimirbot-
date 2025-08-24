@@ -20,14 +20,14 @@ const ensureScript = () =>
     document.head.appendChild(s);
   });
 
-const sizeCanvas = (cv: HTMLCanvasElement) => {
-  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  const r = cv.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(r.width * dpr));
-  const h = Math.max(1, Math.floor(r.height * dpr));
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+function sizeCanvas(cv: HTMLCanvasElement) {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width  * dpr));
+  const h = Math.max(1, Math.floor(rect.height * dpr));
+  cv.width = w; cv.height = h;
   return { w, h };
-};
+}
 
 function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
@@ -966,14 +966,23 @@ export default function WarpBubbleCompare({
     (window as any).setStrobingState?.({ sectorCount: sTotal, currentSector: cur, split });
   }, [snapForMode?.sectorCount, snapForMode?.sectorStrobing, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
 
-  // Fix black bands/duplicated rows after layout changes
+  // DPR-aware sizing + resize observer (keeps "WebGL context — alive / Render loop — active")
   useEffect(() => {
-    const onResize = () => {
-      leftEngine.current?._resize?.();
-      rightEngine.current?._resize?.();
+    const onDpr = () => {
+      if (!leftRef.current || !rightRef.current) return;
+      const L = leftEngine.current, R = rightEngine.current;
+      const { w: wL, h: hL } = sizeCanvas(leftRef.current);
+      L?.gl?.viewport(0, 0, wL, hL); L?.forceRedraw?.();
+      const { w: wR, h: hR } = sizeCanvas(rightRef.current);
+      R?.gl?.viewport(0, 0, wR, hR); R?.forceRedraw?.();
     };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    const mql = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
+    mql.addEventListener?.('change', onDpr);
+    window.addEventListener('resize', onDpr);
+    return () => {
+      mql.removeEventListener?.('change', onDpr);
+      window.removeEventListener('resize', onDpr);
+    };
   }, []);
 
   // Debug probe to verify physics parameters are changing with mode switches
