@@ -721,6 +721,7 @@ export default function WarpBubbleCompare({
       colorMode: 1,       // theta diverging palette
       exposure: N(snap.exposure, 6.0),
       zeroStop: N(snap.zeroStop, 1e-7),
+      thetaScale: isStandby ? 0 : computeThetaScale(snap),
       curvatureGainT: isStandby ? 0 : T,
       curvatureBoostMax: isStandby ? 1 : B,
       userGain: isStandby ? 1 : N(snap.userGain, 4.0),
