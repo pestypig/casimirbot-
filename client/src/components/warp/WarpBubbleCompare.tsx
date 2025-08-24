@@ -438,8 +438,10 @@ export default function WarpBubbleCompare({
 
   // Fingerprint of physics inputs that should re-push uniforms
   const physicsKey = JSON.stringify({
-    duty: base.dutyEffectiveFR ?? base.dutyCycle,
-    sectors: base.sectorStrobing ?? base.sectors ?? base.sectorCount,
+    dutyFR: base.dutyEffectiveFR,                 // REAL trigger
+    dutyUI: base.dutyCycle,                       // SHOW trigger ✅
+    sectorsTotal: base.sectorCount,
+    sectorsLive: base.sectorStrobing ?? base.concurrentSectors,
     gammaGeo: base.gammaGeo ?? base.g_y,
     qSpoil: base.qSpoilingFactor ?? base.deltaAOverA,
     gammaVdB: base.gammaVanDenBroeck ?? base.gammaVdB,
@@ -449,7 +451,8 @@ export default function WarpBubbleCompare({
       dwell_ms: base.lightCrossing.dwell_ms,
       burst_ms: base.lightCrossing.burst_ms,
       tauLC_ms: base.lightCrossing.tauLC_ms
-    } : null
+    } : null,
+    mode: base.currentMode                        // optional, helpful for tracing
   });
   
   const parityParams = {
