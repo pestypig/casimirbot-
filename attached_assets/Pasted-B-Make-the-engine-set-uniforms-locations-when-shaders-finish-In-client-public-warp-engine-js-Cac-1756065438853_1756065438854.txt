@@ -1,0 +1,83 @@
+B) Make the engine set uniforms/locations when shaders finish
+
+In client/public/warp-engine.js:
+
+Cache attribs/uniforms after link completes (both sync and async path):
+
+// add this helper somewhere in the class
+_cacheGridLocations(program) {
+  const gl = this.gl;
+  this.gridProgram = program;
+  this.gridAttribs = {
+    position: gl.getAttribLocation(program, 'a_position'),
+  };
+  this.gridUniforms = {
+    mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+    sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+    // physics (must exist in your fragment shader)
+    thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+    ridgeMode: gl.getUniformLocation(program, 'u_RidgeMode'),
+    parity: gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+    sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
+    split: gl.getUniformLocation(program, 'u_Split'),
+  };
+}
+
+// inside _linkProgram(...):
+if (this.parallelShaderExt && onReady) {
+  this._pollShaderCompletion(program, (ok) => {
+    if (!ok) { onReady(false); return; }
+    this._cacheGridLocations(program);
+    onReady(true);
+  });
+  return program;
+}
+
+// synchronous fallback:
+if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+  console.error('Shader program link error:', gl.getProgramInfoLog(program));
+  gl.deleteProgram(program);
+  return null;
+}
+this._cacheGridLocations(program);
+return program;
+
+
+Ensure uniforms are actually sent each frame (your _renderGridPoints currently sets only mvpMatrix & sheetColor):
+
+_renderGridPoints() {
+  const gl = this.gl;
+  if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+    if (!this._warnNoProgramOnce) {
+      console.warn("Grid program not ready yet; waiting for shader link…");
+      this._warnNoProgramOnce = true;
+    }
+    return;
+  }
+
+  gl.useProgram(this.gridProgram);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+  const loc = this.gridAttribs.position;
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+
+  // MVP & color
+  gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+  gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+  // physics uniforms (with safe defaults)
+  const p = this.params || {};
+  const theta = +p.thetaScale > 0 ? +p.thetaScale : 5.03e3;
+  gl.uniform1f(this.gridUniforms.thetaScale, theta);
+  gl.uniform1i(this.gridUniforms.ridgeMode, Number.isFinite(+p.ridgeMode) ? +p.ridgeMode : 1);
+  gl.uniform1i(this.gridUniforms.parity, p.physicsParityMode ? 1 : 0);
+  gl.uniform1i(this.gridUniforms.sectorCount, Math.max(1, +p.sectorCount || 1));
+  gl.uniform1i(this.gridUniforms.split, Math.max(0, +p.split || 0));
+
+  const vertexCount = this.gridVertices.length / 3;
+  gl.drawArrays(gl.LINES, 0, vertexCount);
+
+  gl.disableVertexAttribArray(loc);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+}
