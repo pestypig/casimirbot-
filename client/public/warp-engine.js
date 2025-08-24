@@ -881,6 +881,7 @@ class WarpEngine {
 
         // --- Parity / visualization ---
         const parity = !!parameters?.physicsParityMode;
+        const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
         const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2 };
         let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
@@ -958,7 +959,7 @@ class WarpEngine {
         const sectorsEff = Math.max(1, nextUniforms.sectors|0 || 1);
 
         let dutyEffFR;
-        if (isStandby) {
+        if (zeroStandby) {
           dutyEffFR = 0;                    // 🔒 TRUE ZERO in standby
         } else if (frFromParams != null) {
           dutyEffFR = Math.max(0, +frFromParams);
@@ -969,7 +970,7 @@ class WarpEngine {
         }
 
         // build theta scale
-        const thetaScaleFromChain = isStandby ? 0 :
+        const thetaScaleFromChain = zeroStandby ? 0 :
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
@@ -984,8 +985,8 @@ class WarpEngine {
         const nowActive = (nextUniforms.thetaScale ?? 0) > 1e-12;
         if (wasActive && !nowActive) this._restoreOriginalGrid?.();
 
-        // Neutralize visual boosts in standby
-        if (isStandby) {
+        // Neutralize visual boosts in standby (only for REAL parity)
+        if (zeroStandby) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
           nextUniforms.curvatureBoostMax = 1;
@@ -1324,10 +1325,10 @@ class WarpEngine {
             // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
             const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
 
-            // Special case: make standby perfectly flat if desired
+            // Special case: make REAL standby perfectly flat if desired
             let disp;
-            if (mode === 'standby') {
-                disp = 0; // perfectly flat grid for standby mode
+            if (mode === 'standby' && parity) {
+                disp = 0; // perfectly flat grid for REAL standby mode
             } else {
                 // geometry should follow A_geom (independent of exposure tone-mapping)
                 disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
