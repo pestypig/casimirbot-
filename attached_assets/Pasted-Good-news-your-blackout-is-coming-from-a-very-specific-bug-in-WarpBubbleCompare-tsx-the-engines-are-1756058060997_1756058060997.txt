@@ -1,0 +1,66 @@
+Good news—your blackout is coming from a very specific bug in WarpBubbleCompare.tsx: the engines are being constructed twice on the same canvas. The second new WarpCtor(...) hits the WarpEngine’s per-canvas guard (Duplicate WarpEngine on the same canvas blocked) and throws, which interrupts init and leaves the panes black. There are also a couple of minor init timing issues.
+
+Here’s a minimal, safe patch:
+
+What to change
+
+Create each engine only once (delete the second new WarpCtor(...) block).
+
+Initialize uniforms after link via onceReady instead of calling a non-existent setParams.
+
+Ensure the strobe mux exists before creating engines so they subscribe cleanly.
+
+Drop-in diff (copy/paste)
+
+Find the “bootstrap both engines once” effect and apply the edits below:
+
+@@
+-        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
++        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
++        // make the strobe mux before engines so they subscribe cleanly
++        ensureStrobeMux();
+@@
+-          leftEngine.current  = new WarpCtor(leftRef.current);
+-          rightEngine.current = new WarpCtor(rightRef.current);
++          leftEngine.current  = new WarpCtor(leftRef.current);
++          rightEngine.current = new WarpCtor(rightRef.current);
+@@
+-          // Force immediate initialization with bulletproof defaults (prevents first-frame NaNs)
+-          const initCamZ = safeCamZ(2.0);  // fallback to safe default
+-          const initColor = 1; // theta (engine expects 0=solid,1=theta,2=shear)
+-          const safeDefaults = { 
+-            thetaScale: 1.0,
+-            sectors: 400,
+-            cameraZ: initCamZ,
+-            colorMode: initColor,
+-            colorModeIndex: initColor,
+-            colorModeName: 'theta',
+-            exposure: 6.0,
+-            zeroStop: 1e-7,
+-            vizGain: 1.0,
+-            cosmeticLevel: 1.0
+-          };
+-          leftEngine.current?.setParams?.(safeDefaults);
+-          rightEngine.current?.setParams?.(safeDefaults);
++          // Initialize once shaders are linked to avoid pre-link uniform pushes
++          const defaultFrame = frameFromHull({ a:503.5, b:132, c:86.5 }, 2.6);
++          const zL = safeCamZ(compactCameraZ(leftRef.current!,  defaultFrame.axesScene));
++          const zR = safeCamZ(compactCameraZ(rightRef.current!, defaultFrame.axesScene));
++          leftEngine.current?.onceReady?.(() => {
++            pushSafe(leftEngine,  { ...defaultFrame, cameraZ: zL });
++            leftEngine.current?.setPresetParity?.();     // truth pane defaults
++          });
++          rightEngine.current?.onceReady?.(() => {
++            pushSafe(rightEngine, { ...defaultFrame, cameraZ: zR });
++            rightEngine.current?.setPresetShowcase?.();  // boosted pane defaults
++          });
+@@
+-        ensureStrobeMux();
++        // (mux already ensured above)
+@@
+-        // Create engines with basic defaults - physics will be applied via useEffect
+-        const defaultHull = { a: 503.5, b: 132, c: 86.5 };
+-        const defaultFrame = frameFromHull(defaultHull, 2.6);
+-        leftEngine.current = new WarpCtor(leftRef.current, defaultFrame, {});
+-        rightEngine.current = new WarpCtor(rightRef.current, defaultFrame, {});
++        // ❌ Do not re-create engines on the same canvases (causes black screens)
