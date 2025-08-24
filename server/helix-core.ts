@@ -612,13 +612,13 @@ export function getSystemMetrics(req: Request, res: Response) {
     activeSectors: concurrent,
     activeFraction,
     // ← what the viewer expects as "how many sectors does the sweep have?"
-    sectorStrobing: totalSectors,
+    sectorStrobing: concurrent,   // concurrent (live) sectors
     currentSector: sweepIdx,
 
     // make mode & inputs visible to UI
     currentMode: s.currentMode,
     dutyCycle: s.dutyCycle,
-    sectorCount: totalSectors,
+    sectorCount: totalSectors,    // total sectors for averaging
 
     strobeHz, sectorPeriod_ms,
 
@@ -626,7 +626,9 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     shiftVector: { epsilonTilt, betaTiltVec, gTarget, R_geom, gEff_check: epsilonTilt * (C*C) / R_geom },
 
-    energyOutput_MW: s.P_avg,
+    energyOutput_MW: s.P_avg,          // MW (canonical)
+    energyOutput_W:  s.P_avg * 1e6,    // W  (for fmtPowerUnitFromW callers)
+    energyOutput:    s.P_avg,          // MW (legacy alias used by UI)
     exoticMass_kg: Math.round(s.M_exotic),
     exoticMassRaw_kg: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
@@ -683,8 +685,12 @@ export function getPipelineState(req: Request, res: Response) {
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
-  const state = getGlobalPipelineState();
-  res.json(state);
+  const s = getGlobalPipelineState();
+  res.json({
+    ...s,
+    // add a stable camel alias so all clients pick it up
+    dutyEffectiveFR: s.dutyEffectiveFR ?? s.dutyEffective_FR
+  });
 }
 
 // Update pipeline parameters

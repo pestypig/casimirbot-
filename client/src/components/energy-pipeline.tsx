@@ -47,8 +47,8 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     if (isFiniteNum(fromPipe)) return clamp01(fromPipe);
 
     const burstLocal = 0.01; // 1% default (same assumption used in Helix-Core when missing)
-    const liveSectors = Math.max(1, Math.floor(systemMetrics?.sectorStrobing ?? (live?.sectorStrobing ?? 1)));
-    const totalSectors = Math.max(1, Math.floor(systemMetrics?.totalSectors ?? 400));
+    const liveSectors = Math.max(1, Math.floor((systemMetrics as any)?.sectorStrobing ?? (live?.sectorStrobing ?? 1)));
+    const totalSectors = Math.max(1, Math.floor((systemMetrics as any)?.totalSectors ?? 400));
     return clamp01(burstLocal * (liveSectors / totalSectors));
   }, [live, systemMetrics]);
 
