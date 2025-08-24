@@ -29,34 +29,32 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
   
   if (results.energyPipeline) {
     pipeline = results.energyPipeline;
-  } else if (results.stressEnergyTensor || results.powerDraw || true) {
+  } else {
     // Build a pipeline-shaped view from the unified snapshot (computeEnergySnapshot)
-    const fGHz = Number(results.modulationFreq_GHz ?? results.modulationFreq_GHz ?? 15);
+    const fGHz = Number(results.modulationFreq_GHz ?? 15);
     const f_m = fGHz * 1e9;                 // Hz
     const ω = 2 * Math.PI * f_m;            // rad/s
 
     // First-class pipeline fields (authoritative)
-    const dutyFR = Number(
-      results.dutyEffectiveFR ?? results.dutyShip ?? results.dutyEff ?? 2.5e-5
-    );                                       // Ford–Roman ship-wide duty
-    const dutyUI = Number(results.dutyCycle ?? 0.14);   // UI duty (for display only)
+    const dutyFR = Number(results.dutyEffectiveFR ?? 2.5e-5);  // Ford–Roman ship-wide duty
+    const dutyUI = Number(results.dutyCycle ?? 0.14);          // UI duty (for display only)
     const γ_geo  = Number(results.gammaGeo ?? 26);
     const Q      = Number(results.qCavity ?? 1e9);
-    const N      = Math.max(1, Number(results.N_tiles ?? results.N_tilesTotal ?? 1));
+    const N      = Math.max(1, Number(results.N_tiles ?? 1));
 
     // Per-tile static energy comes directly from the pipeline
-    const U_static = Number(results.U_static ?? 0);      // J per tile
+    const U_static = Number(results.U_static ?? 0);            // J per tile
 
     // Follow the same order as the pipeline: geometry → Q → duty(FR)
     const γ3        = Math.pow(γ_geo, 3);
-    const U_geo_raw = U_static * γ3;                     // J per tile (on-window stored)
-    const U_Q       = U_geo_raw * Q;                     // J per tile (on-window)
-    const U_cycle   = U_Q * dutyFR;                      // J per tile, ship-averaged (FR)
+    const U_geo_raw = U_static * γ3;                           // J per tile (on-window stored)
+    const U_Q       = U_geo_raw * Q;                           // J per tile (on-window)
+    const U_cycle   = U_Q * dutyFR;                            // J per tile, ship-averaged (FR)
 
     // Per-tile dissipation during ON-window (pipeline's P_tile_on)
-    const P_tile_on = Math.abs(U_Q) * ω / Math.max(1, Q); // W per tile (ON)
+    const P_tile_on = Math.abs(U_Q) * ω / Math.max(1, Q);     // W per tile (ON)
     // Average total electrical power (matches pipeline's P_avg when inputs match)
-    const P_total   = P_tile_on * N * dutyFR;             // W ship-averaged
+    const P_total   = P_tile_on * N * dutyFR;                 // W ship-averaged
 
     // Prefer pipeline's own calibrated totals if present (authoritative)
     const P_avg_W   = Number.isFinite(results.P_avg) ? Number(results.P_avg) * 1e6 : P_total;
@@ -84,15 +82,6 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
       TS_geom,
       m_exotic,
     };
-  } else {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <Calculator className="h-12 w-12 mx-auto mb-4 opacity-50" />
-        <p>Energy pipeline data not available</p>
-        <p className="text-sm">This simulation doesn't include compatible energy calculations</p>
-        <p className="text-xs mt-2">Switch to Dynamic module for full energy pipeline analysis</p>
-      </div>
-    );
   }
 
   const formatScientific = (value: number) => {
