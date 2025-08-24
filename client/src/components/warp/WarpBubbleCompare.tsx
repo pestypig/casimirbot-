@@ -526,40 +526,7 @@ export default function WarpBubbleCompare({
   colorMode = "theta",
   lockFraming = true, // reserved; we always lock from inside
 }: Props) {
-  // Explicitly construct separate payloads for airtight mode control
-  const base = parameters ? JSON.parse(JSON.stringify(parameters)) : {};
-
-  // Fingerprint of physics inputs that should re-push uniforms
-  const physicsKey = JSON.stringify({
-    dutyFR: base.dutyEffectiveFR,                 // REAL trigger
-    dutyUI: base.dutyCycle,                       // SHOW trigger ✅
-    sectorsTotal: base.sectorCount,
-    sectorsLive: base.sectorStrobing ?? base.concurrentSectors,
-    gammaGeo: base.gammaGeo ?? base.g_y,
-    qSpoil: base.qSpoilingFactor ?? base.deltaAOverA,
-    gammaVdB: base.gammaVanDenBroeck ?? base.gammaVdB,
-    lc: base.lightCrossing ? {
-      phase: base.lightCrossing.phase,
-      sectorIdx: base.lightCrossing.sectorIdx,
-      dwell_ms: base.lightCrossing.dwell_ms,
-      burst_ms: base.lightCrossing.burst_ms,
-      tauLC_ms: base.lightCrossing.tauLC_ms
-    } : null,
-    mode: base.currentMode                        // optional, helpful for tracing
-  });
-  
-  const parityParams = {
-    ...base,
-    physicsParityMode: true,
-    viz: { ...(base.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1 },
-    curvatureGainDec: 0,
-    curvatureBoostMax: 1,
-  };
-
-  const showParams = {
-    ...base,
-    physicsParityMode: false, // allow exaggeration & cosmetic boosts
-  };
+  // Physics parameters are now handled directly from props.parameters in useEffect
 
   // Optional: set per-pane display gain
   const parityX = parityExaggeration ?? 1;
@@ -663,7 +630,6 @@ export default function WarpBubbleCompare({
           ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
             const s = Math.max(1, Math.floor(sectorCount||1));   // concurrent sectors in the sweep loop
             const payload = {
-              // ❌ sectors: s,  // Let physicsPayload own sectors for averaging
               sectorIdx: Math.max(0, currentSector % s),
               sectorSplit: Math.max(0, Math.min(s - 1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
             };
@@ -676,152 +642,27 @@ export default function WarpBubbleCompare({
         (leftEngine.current  as any).__strobeOff = off;
         (rightEngine.current as any).__strobeOff = off;
 
-        const shared = frameFromHull(base?.hull, base?.gridSpan);
+        // Create engines with basic defaults - physics will be applied via useEffect
+        const defaultHull = { a: 503.5, b: 132, c: 86.5 };
+        const defaultFrame = frameFromHull(defaultHull, 2.6);
+        leftEngine.current = new WarpCtor(leftRef.current, defaultFrame, {});
+        rightEngine.current = new WarpCtor(rightRef.current, defaultFrame, {});
 
-        // REAL (parity): FR duty (conservative) - use base parameters with FR source
-        // SHOW (boosted): UI duty (visibly mode-dependent) - use base parameters with UI source
-        // Use new coherent physics calculator
-        const baseInputs: BaseInputs = {
-          hull: { 
-            a: base?.hull?.a ?? 503.5, 
-            b: base?.hull?.b ?? 132, 
-            c: base?.hull?.c ?? 86.5 
-          },
-          wallWidth_m: base?.hull?.wallThickness_m ?? 6.0,
-          driveDir: [1, 0, 0],
-          vShip: 1.0,
-          dutyCycle: base?.dutyCycle ?? 0.14,
-          dutyEffectiveFR: base?.dutyEffectiveFR ?? 0.000025,
-          sectorCount: base?.sectorCount ?? 400,
-          sectors: Math.max(1, base?.sectors ?? base?.concurrentSectors ?? 1),
-          gammaGeo: base?.gammaGeo ?? 26,
-          qSpoilingFactor: base?.qSpoilingFactor ?? base?.deltaAOverA ?? 1,
-          gammaVanDenBroeck: base?.gammaVanDenBroeck ?? 135203.8,
-          colorMode: 'theta',
-          lockFraming: true
-        };
-        
-        const { real: parityPhys, show: showPhys } = buildEngineUniforms(baseInputs);
-        
-        // Debug: Track exact physics parameters being passed
-        console.log('[WARP DEBUG] Base params:', {
-          mode: base?.currentMode,
-          dutyCycle: base?.dutyCycle, 
-          dutyFR: base?.dutyEffectiveFR,
-          sectors: base?.sectorCount,
-          gammaGeo: base?.gammaGeo
-        });
-        console.log('[WARP DEBUG] REAL physics (FR):', {
-          thetaScale: parityPhys?.thetaScale,
-          sectors: parityPhys?.sectors
-        });
-        console.log('[WARP DEBUG] SHOW physics (UI):', {
-          thetaScale: showPhys?.thetaScale,
-          sectors: showPhys?.sectors
-        });
-        console.log('[WARP DEBUG] Engines ready?', !!leftEngine.current, !!rightEngine.current);
-        
-        // Log bad physics early to catch silent NaNs
-        const warnIfBad = (tag:string, phys:any) => {
-          if (!Number.isFinite(phys?.thetaScale) || phys.thetaScale <= 0) {
-            console.warn(`[WARP DEBUG] ${tag} bad thetaScale:`, phys?.thetaScale, phys);
-          }
-        };
-        warnIfBad('REAL', parityPhys);
-        warnIfBad('SHOW', showPhys);
-        
-        pushUniformsWhenReady(leftEngine.current,  {
-          ...parityPhys,
-          physicsParityMode: true,
-          ridgeMode: 0,          // ← physics double-lobe
-        });
+        console.log('[WARP ENGINE] Basic engines created, waiting for useEffect physics');
 
-        pushUniformsWhenReady(rightEngine.current, {
-          ...showPhys,
-          physicsParityMode: false,
-          ridgeMode: 1,          // ← single crest cosmetic
-        });
+        // Basic initialization complete
+        leftEngine.current?.start?.();
+        rightEngine.current?.start?.();
 
-        // normalize any global fallback the engine might use
-        (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
-        leftEngine.current?.setSceneScale?.((window as any).sceneScale);
-        rightEngine.current?.setSceneScale?.((window as any).sceneScale);
-
-        // ensure only the calibrated hull model draws
-        const killMixingReal = {
-          modelMode: 'calibrated',   // engine will prefer calibrated chain
-          // defensively zero any demo weights if the engine exposes them:
-          unitBubbleWeight: 0,
-          demoBubbleWeight: 0,
-          refHullAlpha: 0,
-          onWindow: false,           // no instantaneous overlay
-        };
-        const killMixingShow = {
-          modelMode: 'calibrated',   // engine will prefer calibrated chain
-          unitBubbleWeight: 0,
-          demoBubbleWeight: 0,
-          refHullAlpha: 0,
-          // no onWindow here - keep it enabled for SHOW
-        };
-        pushUniformsWhenReady(leftEngine.current,  killMixingReal);
-        pushUniformsWhenReady(rightEngine.current, killMixingShow);
-
-        // neutralize stray demo globals
-        (window as any).__warp_setGainDec = () => {};
-        (window as any).__warp_setCosmetic = () => {};
-
-        const L = leftRef.current!,  R = rightRef.current!;
-        
-        // Debug: Shared parameters and canvas (commented out for production)
-        // console.log('[SHOW] shared', shared);
-        // console.log('[SHOW] axesScene', shared.axesScene);
-        // console.log('[SHOW] canvas size', R.clientWidth, R.clientHeight);
-
-        requestAnimationFrame(() => {
-          applyReal(leftEngine.current, shared, L, (parityParams?.viz?.colorMode ?? colorMode) as any);
-          leftEngine.current?.setDisplayGain?.(parityX ?? 1); // stays 1 by default
-          scrubOverlays(leftEngine.current);
-
-          // Use safety wrapper for SHOW pane to handle black screen issues
-          const showPayload = {
-            ...shared,
-            colorMode: (showParams?.viz?.colorMode ?? colorMode) as any,
-            T: showParams?.viz?.curvatureGainT ?? 0.70,
-            boostMax: showParams?.viz?.curvatureBoostMax ?? heroX,
-            decades: showParams?.curvatureGainDec ?? 3,
-            vizGain: 1.25,
-            exposure: showParams?.viz?.exposure ?? 7.5,
-            zeroStop: showParams?.viz?.zeroStop ?? 1e-7,
-          };
-          
-          // Apply show with cosmetic safety fallback
-          applyShow(rightEngine.current, shared, R, showPayload.colorMode, showPayload);
-          const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[showPayload.colorMode as keyof { solid:0, theta:1, shear:2 }] ?? 1;
-          applyShowSafe(rightEngine.current, {
-            ...showPayload,
-            colorMode: colorModeIndex,
-            colorModeIndex,
-            colorModeName: showPayload.colorMode,
-            physicsParityMode: false,
-            ridgeMode: 1,
-          });
-          scrubOverlays(rightEngine.current);
-          
-          // Verify final physics scalars (catch NaNs that yield black)
-          check('REAL',  { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(L, shared.axesScene)) });
-          check('SHOW',  { thetaScale: 1.0, cameraZ: safeCamZ(compactCameraZ(R, shared.axesScene)) });
-        });
-
-        // lock framing across resizes (prevents "camera pulled back")
+        // Set up resize observer for responsive framing
         roRef.current = new ResizeObserver(() => {
-          const fresh = frameFromHull(parameters?.hull, parameters?.gridSpan);
+          if (!parameters?.hull) return;
+          const fresh = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
           const L = leftRef.current!, R = rightRef.current!;
 
-          // 🔧 make sure canvases have pixels that match CSS box
           ensureCanvasSize(L);
           ensureCanvasSize(R);
 
-          // rebind GL viewport to new pixel size before camera update
           leftEngine.current?._resize?.();
           rightEngine.current?._resize?.();
 
@@ -852,89 +693,52 @@ export default function WarpBubbleCompare({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // live updates when parameters change (same framing both panes)
+  // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current || !leftRef.current || !rightRef.current) return;
-    
-    // Fix D: Seed framing first to prevent transient nulls during mode flip
-    const hull = parityParams?.hull || showParams?.hull;
-    const num = (x: any, d: number) => (Number.isFinite(x) ? +x : d);
-    const ah = num(hull?.a, 503.5), bh = num(hull?.b, 132), ch = num(hull?.c, 86.5);
-    const sh = 1 / Math.max(ah, bh, ch, 1e-9);
-    const axesSceneNow = [ah*sh, bh*sh, ch*sh] as [number,number,number];
-    const spanNow = parityParams?.gridSpan || showParams?.gridSpan || 2.6;
-    
-    // Push framing first - prevents transient nulls
-    const framingSeed = { 
-      axesScene: axesSceneNow, 
-      axesClip: axesSceneNow, 
-      hullAxes: [ah,bh,ch], 
-      gridSpan: spanNow 
-    };
-    pushUniformsWhenReady(leftEngine.current, framingSeed);
-    pushUniformsWhenReady(rightEngine.current, framingSeed);
-    
-    // Then apply mode-specific physics using coherent calculator
-    const shared = frameFromHull(hull, spanNow);
-    
-    // Build physics inputs for coherent calculation
-    const updateInputs: BaseInputs = {
-      hull: { 
-        a: hull?.a ?? 503.5, 
-        b: hull?.b ?? 132, 
-        c: hull?.c ?? 86.5 
-      },
-      wallWidth_m: hull?.wallThickness_m ?? 6.0,
-      driveDir: [1, 0, 0],
-      vShip: 1.0,
-      dutyCycle: parityParams?.dutyCycle ?? showParams?.dutyCycle ?? 0.14,
-      dutyEffectiveFR: parityParams?.dutyEffectiveFR ?? showParams?.dutyEffectiveFR ?? 0.000025,
-      sectorCount: parityParams?.sectorCount ?? showParams?.sectorCount ?? 400,
-      sectors: Math.max(1, parityParams?.sectors ?? showParams?.sectors ?? parityParams?.concurrentSectors ?? showParams?.concurrentSectors ?? 1),
-      gammaGeo: parityParams?.gammaGeo ?? showParams?.gammaGeo ?? 26,
-      qSpoilingFactor: parityParams?.qSpoilingFactor ?? showParams?.qSpoilingFactor ?? parityParams?.deltaAOverA ?? showParams?.deltaAOverA ?? 1,
-      gammaVanDenBroeck: parityParams?.gammaVanDenBroeck ?? showParams?.gammaVanDenBroeck ?? 135203.8,
-      colorMode: 'theta',
-      lockFraming: true
-    };
-    
-    const { real: parityPhys, show: showPhys } = buildEngineUniforms(updateInputs);
-    pushUniformsWhenReady(leftEngine.current,  {
-      ...parityPhys,
-      physicsParityMode: true,
-      ridgeMode: 0,
+    if (!leftEngine.current || !rightEngine.current || !parameters) return;
+
+    // build both payloads from the SAME source of truth
+    const { real, show } = buildEngineUniforms({
+      hull: parameters.hull,
+      wallWidth_m: parameters.wallWidth_m ?? 6.0,
+      driveDir: parameters.driveDir ?? [1,0,0],
+      vShip: parameters.vShip ?? 1.0,
+
+      dutyCycle: parameters.dutyCycle,
+      dutyEffectiveFR: parameters.dutyEffectiveFR, // ship-wide FR duty from parent (lc loop)
+
+      sectorCount: Math.max(1, parameters.sectorCount),
+      sectors: Math.max(1, parameters.sectors),
+
+      gammaGeo: parameters.gammaGeo,
+      qSpoilingFactor: parameters.qSpoilingFactor ?? 1,
+      gammaVanDenBroeck: parameters.gammaVanDenBroeck ?? 2.86e5,
+
+      colorMode: colorMode ?? 'theta',
+      lockFraming: lockFraming ?? true,
     });
-    pushUniformsWhenReady(rightEngine.current, {
-      ...showPhys,
-      physicsParityMode: false,
-      ridgeMode: 1,
+
+    // IMPORTANT: remove/avoid preset calls after this point; they overwrite
+    pushUniformsWhenReady(leftEngine.current,  real);
+    pushUniformsWhenReady(rightEngine.current, show);
+
+    // Force a draw so the user sees the change immediately
+    leftEngine.current.forceRedraw?.();
+    rightEngine.current.forceRedraw?.();
+
+    // optional: quick console check
+    console.log('[WBC] uniforms applied', {
+      real_thetaScale: real.thetaScale,
+      show_thetaScale: show.thetaScale,
+      sectors: real.sectors, sectorCount: real.sectorCount,
+      dutyFR: parameters.dutyEffectiveFR,
+      dutyUI: parameters.dutyCycle
     });
     
-    // Debug mode change
-    if (parityParams?.currentMode || showParams?.currentMode) {
-      const currentMode = parityParams?.currentMode || showParams?.currentMode;
-      console.log('[WarpBubbleCompare] Mode update:', {
-        mode: currentMode,
-        leftEngine: !!leftEngine.current,
-        rightEngine: !!rightEngine.current,
-        parityPhys: parityPhys,
-        showPhys: showPhys,
-        shared: shared,
-        leftCanvasVisible: leftRef.current?.style.display !== 'none',
-        rightCanvasVisible: rightRef.current?.style.display !== 'none'
-      });
-      
-      // Add currentMode to the physics payload for debugging
-      if (currentMode) {
-        (parityPhys as any).currentMode = currentMode;
-        (showPhys as any).currentMode = currentMode;
-      }
-    }
-    
-    // Also push FR-window/light-crossing controls if present
-    if (base.lightCrossing) {
-      const lc = base.lightCrossing;
-      const s = Math.max(1, Number(base.sectorStrobing ?? lc.sectorCount ?? showPhys.sectors ?? 1));
+    // Also push FR-window/light-crossing controls if present  
+    if (parameters.lightCrossing) {
+      const lc = parameters.lightCrossing;
+      const s = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
       const lcPayload = {
         phase: lc.phase,
         onWindow: !!lc.onWindowDisplay,
@@ -1110,7 +914,19 @@ export default function WarpBubbleCompare({
                 'γ_VdB=', debugInputs.gammaVanDenBroeck,
                 'dutyFR=', parityParams?.dutyEffectiveFR,
                 'sectors=', p.sectors);
-  }, [physicsKey]);
+  }, [
+    // deps that actually matter to physics
+    parameters?.hull?.a, parameters?.hull?.b, parameters?.hull?.c,
+    parameters?.wallWidth_m,
+    parameters?.dutyCycle,
+    parameters?.dutyEffectiveFR,
+    parameters?.sectorCount,
+    parameters?.sectors,
+    parameters?.gammaGeo,
+    parameters?.qSpoilingFactor,
+    parameters?.gammaVanDenBroeck,
+    colorMode, lockFraming
+  ]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
