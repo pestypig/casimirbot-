@@ -932,27 +932,27 @@ class WarpEngine {
         }
 
         // build theta scale
-        const betaInst =
+        const thetaScaleFromChain = isStandby ? 0 :
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB ?? 1);
-
-        const thetaScaleFromChain =
-          isStandby
-            ? 0
-            : (nextUniforms.viewAvg ? betaInst * Math.sqrt(Math.max(0, dutyEffFR)) : betaInst);
+          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+          (nextUniforms.viewAvg ? Math.sqrt(Math.max(0, dutyEffFR)) : 1);
 
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
           : thetaScaleFromChain;
 
-        // Also neutralize boosts in standby (esp. SHOW pane)
+        // If amplitude just went "off", restore the pristine grid
+        const wasActive = (prev.thetaScale ?? 0) > 1e-12;
+        const nowActive = (nextUniforms.thetaScale ?? 0) > 1e-12;
+        if (wasActive && !nowActive) this._restoreOriginalGrid?.();
+
+        // Neutralize visual boosts in standby
         if (isStandby) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
           nextUniforms.curvatureBoostMax = 1;
           nextUniforms.userGain = 1;
-          // if you expose ship velocity to the shader, zero it here too:
           nextUniforms.vShip = 0;
         }
 
@@ -1022,6 +1022,15 @@ class WarpEngine {
             // Buffer size unchanged, use cheaper subdata update
             gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
         }
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    _restoreOriginalGrid() {
+        if (!this.originalGridVertices || !this.gridVertices || !this.gl || !this.gridVbo) return;
+        this.gridVertices.set(this.originalGridVertices);
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
