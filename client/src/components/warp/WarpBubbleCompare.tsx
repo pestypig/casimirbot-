@@ -11,46 +11,22 @@ const getAppBuild = () =>
 const CM = { solid: 0, theta: 1, shear: 2 };
 const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
 
-// Bootstrap helper functions for robust WebGL initialization
-const getGL = (canvas: HTMLCanvasElement) => {
-  const opts: WebGLContextAttributes = {
-    alpha: false,
-    antialias: false,
-    depth: false,
-    stencil: false,
-    desynchronized: true,
-    powerPreference: "high-performance",
-    premultipliedAlpha: false,
-    preserveDrawingBuffer: false,
-    failIfMajorPerformanceCaveat: false,
-  };
-  return (
-    canvas.getContext("webgl2", opts) ||
-    canvas.getContext("webgl",  opts) ||
-    canvas.getContext("experimental-webgl", opts as any)
-  ) as (WebGL2RenderingContext | WebGLRenderingContext | null);
-};
+// Engine mounting helper functions
+const ensureScript = () =>
+  new Promise<void>((resolve, reject) => {
+    if ((window as any).WarpEngine) return resolve();
+    const s = document.createElement('script');
+    s.src = '/warp-engine.js'; s.defer = true; s.onload = () => resolve(); s.onerror = reject;
+    document.head.appendChild(s);
+  });
 
-const sizeCanvas = (canvas: HTMLCanvasElement) => {
+const sizeCanvas = (cv: HTMLCanvasElement) => {
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-  const rect = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(rect.width  * dpr));
-  const h = Math.max(1, Math.floor(rect.height * dpr));
-  if (canvas.width !== w || canvas.height !== h) {
-    canvas.width = w; canvas.height = h;
-  }
-  return { w, h, dpr };
-};
-
-const saneTheta = (p: any) => {
-  const γg  = +p.gammaGeo || 26;
-  const qAa = +p.qSpoilingFactor || 1;
-  const γv  = +p.gammaVanDenBroeck || 2.86e5;
-  const dutyFR = Number.isFinite(p.dutyEffectiveFR)
-    ? Math.max(1e-12, +p.dutyEffectiveFR)
-    : Math.max(1e-12, (+p.dutyCycle || 0.14) / Math.max(1, +p.sectors || 1));
-  const t = Math.pow(γg,3) * qAa * γv * Math.sqrt(dutyFR);
-  return Number.isFinite(t) && t > 0 ? t : 5.03e3; // UI's expected baseline
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(r.width * dpr));
+  const h = Math.max(1, Math.floor(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return { w, h };
 };
 
 function sanitizeUniforms(u: any = {}) {
@@ -784,82 +760,74 @@ export default function WarpBubbleCompare({
   const busyRef = useRef<boolean>(false);
 
   useEffect(() => {
-    const W = (window as any).WarpEngine;
-    if (!leftRef.current || !rightRef.current) return;
-    if (!W) { console.error("[Warp] window.WarpEngine not loaded"); return; }
-
-    // idempotent cleanup if StrictMode remounts
+    let cancelled = false;
     const kill = (ref: any) => {
-      const s = ref.current;
-      if (!s) return;
-      s.stop?.(); s.dispose?.();
+      const e = ref.current;
+      if (!e) return;
+      e.__ro?.disconnect?.();
+      e.stop?.();
+      e.dispose?.();
       ref.current = null;
-    };
-    kill(leftEngine); kill(rightEngine);
-
-    const initOne = async (cv: HTMLCanvasElement, parityPhys: boolean) => {
-      const eng = new W(cv);                // ctor creates gl & initial grid
-      const { w, h } = sizeCanvas(cv);
-      eng.gl.viewport(0, 0, w, h);
-      // wait until grid program + buffers exist (async path safe)
-      await new Promise<void>((resolve) => {
-        const tick = () => {
-          if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
-          requestAnimationFrame(tick);
-        };
-        tick();
-      });
-
-      // defensive, physics-safe defaults (prevents "θ-scale — invalid" & "ridge undefined")
-      const sectorsTotal = Math.max(1, +parameters?.sectorCount || +parameters?.sectors || 1);
-      const dutyFR = Number.isFinite(parameters?.dutyEffectiveFR)
-        ? Math.max(1e-12, +parameters.dutyEffectiveFR)
-        : Math.max(1e-12, (+parameters?.dutyCycle || 0.14) / sectorsTotal);
-      const thetaScale =
-        Math.pow(+parameters?.gammaGeo || 26, 3) *
-        (+parameters?.qSpoilingFactor || 1) *
-        (+parameters?.gammaVanDenBroeck || 2.86e5) *
-        Math.sqrt(dutyFR);
-
-      eng.setParameters?.({
-        thetaScale: Number.isFinite(thetaScale) && thetaScale > 0 ? thetaScale : 5.03e3,
-        physicsParityMode: !!parityPhys, // REAL=true, SHOW=false
-        ridgeMode: 1,
-        colorMode: "theta",
-        viewAvg: true,
-        sectorCount: sectorsTotal,
-        split: Math.max(0, (+parameters?.split | 0) % sectorsTotal),
-      });
-
-      // start loop & resize observer
-      eng.start?.();
-      const ro = new ResizeObserver(() => {
-        const { w, h } = sizeCanvas(cv);
-        eng.gl.viewport(0, 0, w, h);
-        eng.resize?.(w, h);
-      });
-      ro.observe(cv);
-      eng.__ro = ro;
-      eng.isLoaded = true;                  // satisfies "Engine ready — isLoaded=true"
-      return eng;
     };
 
     (async () => {
-      leftEngine.current  = await initOne(leftRef.current!,  /*REAL*/ true);
-      rightEngine.current = await initOne(rightRef.current!, /*SHOW*/ false);
+      if (!leftRef.current || !rightRef.current) return;
+      await ensureScript();
+      const W = (window as any).WarpEngine;
+      if (!W) { console.error('[Warp] engine script not available'); return; }
+
+      // idempotent (React StrictMode)
+      kill(leftEngine); kill(rightEngine);
+
+      const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+        const eng = new W(cv);                          // creates gl; may or may not init grid
+        const { w, h } = sizeCanvas(cv);
+        eng.gl.viewport(0, 0, w, h);
+
+        // Fallback init if constructor didn't prepare grid/shaders
+        try { eng._initializeGrid?.(); } catch {}
+        try { eng._compileGridShaders?.(); } catch {}
+
+        // Wait until program + VBO exist (handles async shader path)
+        await new Promise<void>((resolve) => {
+          const tick = () => {
+            if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
+            requestAnimationFrame(tick);
+          };
+          tick();
+        });
+
+        // Push initial uniforms (parity/cosmetics set in toReal/toShow)
+        eng.updateUniforms?.(uniforms);
+        eng.isLoaded = true;             // satisfies checkpoints' "Engine ready"
+
+        // Start render loop if engine doesn't auto-run
+        if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
+        eng.start?.(); // if you added start()
+
+        // Keep canvas sized
+        const ro = new ResizeObserver(() => {
+          const { w, h } = sizeCanvas(cv);
+          eng.gl.viewport(0, 0, w, h);
+          eng.resize?.(w, h);
+        });
+        ro.observe(cv);
+        eng.__ro = ro;
+        return eng;
+      };
+
+      if (cancelled) return;
+
+      // Build initial uniform packets for each side
+      const baseSnap = snapForMode ?? {};
+      const realU = toRealUniforms(baseSnap);
+      const showU = toShowUniforms(baseSnap);
+
+      leftEngine.current  = await initOne(leftRef.current!,  realU);
+      rightEngine.current = await initOne(rightRef.current!, showU);
     })();
 
-    return () => {
-      for (const ref of [leftEngine, rightEngine]) {
-        const s = ref.current;
-        if (!s) continue;
-        s.__ro?.disconnect?.();
-        s.stop?.();
-        s.dispose?.();
-        ref.current = null;
-      }
-    };
-    // re-init only when canvases or the engine script changes
+    return () => { cancelled = true; kill(leftEngine); kill(rightEngine); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leftRef.current, rightRef.current]);
 
