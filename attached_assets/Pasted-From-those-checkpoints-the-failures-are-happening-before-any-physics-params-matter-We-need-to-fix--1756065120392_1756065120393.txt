@@ -1,0 +1,201 @@
+From those checkpoints, the failures are happening before any physics params matter. We need to fix the WebGL bootstrap (context → program → buffers) and the uniform wiring defaults. Two things in parallel:
+
+1) Drop-in bootstrap for WarpBubbleCompare (gets you past “context missing / no program / 0 buffers”)
+
+Paste this inside WarpBubbleCompare.tsx (or adapt your existing init). It’s self-contained and defensive:
+
+// at top of file
+const getGL = (canvas: HTMLCanvasElement) => {
+  const opts: WebGLContextAttributes = {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    desynchronized: true,
+    powerPreference: "high-performance",
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false,
+    failIfMajorPerformanceCaveat: false,
+  };
+  return (
+    canvas.getContext("webgl2", opts) ||
+    canvas.getContext("webgl",  opts) ||
+    canvas.getContext("experimental-webgl", opts as any)
+  ) as (WebGL2RenderingContext | WebGLRenderingContext | null);
+};
+
+const sizeCanvas = (canvas: HTMLCanvasElement) => {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width  * dpr));
+  const h = Math.max(1, Math.floor(rect.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+  return { w, h, dpr };
+};
+
+const saneTheta = (p: any) => {
+  const γg  = +p.gammaGeo || 26;
+  const qAa = +p.qSpoilingFactor || 1;
+  const γv  = +p.gammaVanDenBroeck || 2.86e5;
+  const dutyFR = Number.isFinite(p.dutyEffectiveFR)
+    ? Math.max(1e-12, +p.dutyEffectiveFR)
+    : Math.max(1e-12, (+p.dutyCycle || 0.14) / Math.max(1, +p.sectors || 1));
+  const t = Math.pow(γg,3) * qAa * γv * Math.sqrt(dutyFR);
+  return Number.isFinite(t) && t > 0 ? t : 5.03e3; // UI’s expected baseline
+};
+
+// inside the component
+useEffect(() => {
+  const initOne = async (
+    canvas: HTMLCanvasElement | null,
+    setRef: React.MutableRefObject<any>,
+    parity: boolean
+  ) => {
+    if (!canvas) return;
+
+    // 1) Context
+    const gl = getGL(canvas);
+    if (!gl) {
+      console.warn("[Warp] WebGL context missing");
+      return;
+    }
+
+    // 2) Size + viewport
+    const { w, h } = sizeCanvas(canvas);
+    gl.viewport(0, 0, w, h);
+
+    // 3) Init engine (whichever factory you use)
+    // Prefer an explicit create/init instead of implicit side effects
+    const engine = (window as any).WarpEngine?.create
+      ? (window as any).WarpEngine.create(gl)
+      : new (window as any).WarpEngine(gl); // adapt to your API
+
+    // 4) Link program & buffers with hard defaults so guards don’t bail
+    const okProg = await engine.initProgram?.("gridProgram").catch(() => false);
+    if (okProg === false) {
+      console.warn("[Warp] gridProgram link failed");
+      return;
+    }
+    const okBufs = await engine.initGridBuffers?.().catch(() => false);
+    if (okBufs === false) {
+      console.warn("[Warp] grid buffers init failed");
+      return;
+    }
+
+    // 5) Apply viewer params with safe fallbacks
+    const θ = saneTheta(parameters || {});
+    engine.setParameters?.({
+      thetaScale: θ,                    // ← avoids “θ-scale — invalid”
+      physicsParityMode: !!parity,      // REAL=true, SHOW=false
+      ridgeMode: 1,                     // ← avoids “Ridge mode — undefined”
+      colorMode: "theta",
+      viewAvg: true,
+      sectorCount: Math.max(1, +parameters?.sectorCount || +parameters?.sectors || 1),
+      split: Math.max(0, (+parameters?.split|0) % Math.max(1, +parameters?.sectorCount || 1)),
+    });
+
+    // 6) Start loop
+    engine.start?.();
+
+    // 7) Resize handling + context loss
+    const ro = new ResizeObserver(() => {
+      const { w, h } = sizeCanvas(canvas);
+      gl.viewport(0, 0, w, h);
+      engine.resize?.(w, h);
+    });
+    ro.observe(canvas);
+
+    const onLost = (e: any) => { e.preventDefault(); engine.stop?.(); };
+    const onRestored = () => { /* re-run initProgram/initGridBuffers/setParameters/start */ };
+    canvas.addEventListener("webglcontextlost", onLost, false);
+    canvas.addEventListener("webglcontextrestored", onRestored, false);
+
+    setRef.current = { engine, gl, ro, onLost, onRestored, canvas };
+  };
+
+  initOne(leftRef.current,  leftEngine,  /*REAL*/ true);
+  initOne(rightRef.current, rightEngine, /*SHOW*/ false);
+
+  return () => {
+    for (const ref of [leftEngine, rightEngine]) {
+      const s = ref.current;
+      if (!s) continue;
+      s.canvas?.removeEventListener("webglcontextlost", s.onLost);
+      s.canvas?.removeEventListener("webglcontextrestored", s.onRestored);
+      s.ro?.disconnect();
+      s.engine?.stop?.();
+      s.engine?.dispose?.();
+      ref.current = null;
+    }
+  };
+}, [leftRef.current, rightRef.current, parameters]);
+
+
+That alone should flip the checkpoints to:
+
+WebGL context — alive
+
+Shaders linked — gridProgram ready
+
+Grid buffers — N/N floats
+
+Ridge mode — 1
+
+θ-scale — ~5.03e+3 (no longer “invalid”)
+
+If it still says “missing/no program,” the problem is in your engine module, not the canvas.
+
+2) I still need these exact code spots to verify the guards that abort init
+
+Please paste the function bodies (no need for whole files) for:
+
+Context creation & guards
+
+Whatever calls canvas.getContext(...)
+
+Any if (!gl) return ... pathways
+
+Program/shader link
+
+initProgram("gridProgram") (or equivalent)
+
+createShader/compileShader/getShaderInfoLog
+
+createProgram/attachShader/linkProgram/getProgramInfoLog
+
+Buffer allocation
+
+The call that builds “grid buffers” (where “0/0 floats” comes from)
+
+Any early-exit conditions (e.g., if (!thetaScale || !sectors) return)
+
+Uniform wiring
+
+Where thetaScale, physicsParityMode, and ridgeMode are getUniformLocation + uniform* set
+
+Any defaulting logic that could yield undefined → NaN
+
+Checkpoint logging
+
+The function that prints “REAL — Checkpoints …” so I can map each line to the code path/guard
+
+Likely culprits (mapped to your checkpoints)
+
+WebGL context — missing
+getContext('webgl2') returns null and there is no fallback to 'webgl'/'experimental-webgl', or you’re calling before the canvas has a non-zero size. The bootstrap above handles both.
+
+Shaders linked — no program
+A guard refuses to compile/link if thetaScale, sectorCount, or ridgeMode is falsy. We set hard defaults. I need to see the exact guard.
+
+Ridge mode — undefined
+Your engine probably expects params.ridgeMode (top-level), while you send viewer.ridgeMode or nothing. We set it explicitly to 1.
+
+θ-scale — invalid
+Division by zero (√(duty/sectors) with sectors=0) or NaN from missing props. The saneTheta helper clamps it.
+
+Grid buffers — 0/0 floats
+Buffer init tied to a valid program or a positive vertex count; often skipped after an earlier guard (θ or ridge). The bootstrap forces the order: program → buffers → uniforms.
+
+If you wire the snippet above and it still doesn’t light up, paste those 5 engine snippets and I’ll point to the exact guard/line that’s blocking init.
