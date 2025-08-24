@@ -1,4 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from "react";
+import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 /**
  * WarpRenderInspector
@@ -55,6 +57,9 @@ export default function WarpRenderInspector(props: {
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+
+  // Live energy pipeline data for diagnostics
+  const live = useEnergyPipeline();
 
   const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>('hover');
   const [ridgeMode, setRidgeMode] = useState<0|1>(1); // 0=physics df, 1=single crest
@@ -348,6 +353,17 @@ export default function WarpRenderInspector(props: {
           <p className="text-xs text-neutral-500 mt-2">Opens a concise table/diagnostics in DevTools.</p>
         </div>
       </section>
+
+      {/* Comprehensive WebGL diagnostics panel */}
+      <WarpRenderCheckpointsPanel
+        leftLabel="REAL"
+        rightLabel="SHOW"
+        leftEngineRef={leftEngine}
+        rightEngineRef={rightEngine}
+        leftCanvasRef={leftRef}
+        rightCanvasRef={rightRef}
+        live={live}
+      />
     </div>
   );
 }
