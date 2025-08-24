@@ -222,49 +222,6 @@ function resolveAssetBase() {
   return '/';
 }
 
-async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
-  const { requiredBuild = getAppBuild(), forceReload = false } = opts;
-  const w = window as any;
-  const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
-  const mismatch = currentBuild && requiredBuild && currentBuild !== requiredBuild;
-
-  if (w.WarpEngine && !forceReload && !mismatch && requiredBuild !== 'dev') {
-    console.log('[WARP LOADER] Reusing WarpEngine', { build: currentBuild });
-    return w.WarpEngine.default || w.WarpEngine;
-  }
-
-  console.log('[WARP LOADER] Loading WarpEngine', { requiredBuild, forceReload });
-
-  // 👉 blow away old script + SW caches when needed
-  if (mismatch || forceReload) {
-    try {
-      const regs = await navigator.serviceWorker?.getRegistrations?.();
-      await Promise.all((regs || []).map(r => r.unregister()));
-      console.log('[WARP LOADER] Unregistered service workers:', (regs || []).length);
-    } catch (e) {
-      console.warn('[WARP LOADER] Service worker cleanup failed:', e);
-    }
-    // remove existing script tags so the new one executes
-    Array.from(document.querySelectorAll('script[src*="warp-engine.js"]')).forEach(n => n.remove());
-  }
-
-  // Load script with proper asset path resolution
-  const assetBase = resolveAssetBase();
-  const mk = (p: string) => {
-    try { return new URL(p, assetBase).toString(); } catch { return p; }
-  };
-  const devBust = requiredBuild === 'dev' ? `&t=${Date.now()}` : '';
-  const url = mk(`warp-engine.js?v=${encodeURIComponent(requiredBuild)}${devBust}`);
-  await loadScript(url);
-
-  const Ctor = w.WarpEngine?.default || w.WarpEngine;
-  if (Ctor) {
-    w.__WarpEngineBuild = w.WarpEngine?.BUILD || requiredBuild;
-    console.log('[WARP LOADER] Loaded WarpEngine', { build: w.__WarpEngineBuild });
-    return Ctor;
-  }
-  throw new Error('WarpEngine constructor not found after reload');
-}
 function ensureStrobeMux() {
   const w = window as any;
   const prev = w.setStrobingState;
