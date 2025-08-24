@@ -1,0 +1,86 @@
+Short answer: your Active Tiles panel is basically wired right if you’re using the useActiveTiles hook exactly as shown (avg = 
+𝑁
+tiles
+⋅
+𝑑
+FR
+N
+tiles
+	​
+
+⋅d
+FR
+	​
+
+; now = 
+𝑆
+live
+⋅
+S
+live
+	​
+
+⋅ tiles/sector during the burst). There are a couple of gotchas to fix so the numbers truly reflect the pipeline:
+
+✅ What’s correct
+
+Averaged (“avg”) value
+avgTiles = totalTiles * dutyEffectiveFR — and your dutyEffectiveFR comes from the light-crossing loop (burst_ms/dwell_ms) times the concurrent/total sector fraction. That exactly matches the Ford–Roman ship-wide duty used by the EnergyPipeline math.
+
+Instant (“now”) value
+instantTiles = (inBurstNow ? S_live * tilesPerSector : 0) with a light EMA is the right instantaneous picture, provided lc.phase, burst_ms, and dwell_ms are all live.
+
+Tiles-per-sector
+Falling back to floor(totalTiles / totalSectors) when the server doesn’t give tilesPerSector is fine and consistent with the scheduler model.
+
+⚠️ Tighten these to ensure “true values”
+
+Use one authority for S_total and dutyEffectiveFR
+If totalSectors comes from /metrics (e.g., 384 or 512 in future configs) but dutyEffectiveFR was computed assuming 400, the avg will drift. Compute dutyEffectiveFR from the same S_total you pass to the hook (or pass the server-provided FR duty straight through).
+
+Make sure lc.phase is flowing
+If phase isn’t advancing (or burst_ms, dwell_ms are NaN), inBurstNow stays false and the “now” line looks stagnant. Quick guard:
+
+// when building lc:
+const lc = useLightCrossingLoop({ /* ... */ });
+// sanity ping somewhere:
+if (!Number.isFinite(lc?.phase) || !Number.isFinite(lc?.burst_ms) || !Number.isFinite(lc?.dwell_ms)) {
+  console.warn("[HELIX] LC loop missing timing — 'now' tiles will be flat");
+}
+
+
+Unit mismatch in the Energy Output panel (important)
+In the small panel you render:
+
+{fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
+
+
+Your fmtPowerUnit helper expects MW, but systemMetrics.energyOutput is typically W. So when pipeline?.P_avg is absent, you’ll format W as MW and wildly overstate the number.
+
+Fix:
+
+{Number.isFinite(pipeline?.P_avg)
+  ? fmtPowerUnit(pipeline!.P_avg)            // P_avg is MW
+  : fmtPowerUnitFromW(systemMetrics?.energyOutput)} // energyOutput is W
+
+
+Prefer server counts when available, fall back consistently
+Pass the hook both sources, but pick one as the primary so “avg” and “now” stay coherent:
+
+const totalTiles = isFinite(systemMetrics?.totalTiles)
+  ? systemMetrics!.totalTiles
+  : (isFinite(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
+
+const activeTiles = useActiveTiles({
+  totalTiles,
+  totalSectors,                // same S_total used to compute FR duty
+  concurrentSectors,
+  dutyEffectiveFR,             // same authority as above
+  tilesPerSector: systemMetrics?.tilesPerSector,
+  lc,
+  serverActiveTiles: systemMetrics?.activeTiles,
+});
+
+
+(Nice-to-have) drift telemetry
+Keep (or add) the 5% drift watchdog comparing serverActiveTiles vs derived average for a few samples; that’s the best way to catch scheduler desyncs early.
