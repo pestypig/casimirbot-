@@ -439,6 +439,11 @@ class WarpEngine {
             "#version 300 es\n" +
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
+            "uniform float u_thetaScale;\n" +
+            "uniform int   u_RidgeMode;\n" +
+            "uniform int   u_PhysicsParityMode;\n" +
+            "uniform int   u_SectorCount;\n" +
+            "uniform int   u_Split;\n" +
             "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
             "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
@@ -449,7 +454,6 @@ class WarpEngine {
             "uniform float u_tiltViz;\n" +      // visual gain for violet tint only
             "uniform float u_exposure;\n" +     // logarithmic exposure control (3.0 .. 12.0)
             "uniform float u_zeroStop;\n" +     // prevents log blowup (~1e-9 .. 1e-5)
-            "uniform float u_thetaScale;\n" +   // amplitude chain: γ³ · (ΔA/A) · γ_VdB · √(duty/sectors)
             "uniform float u_userGain;\n" +     // unified curvature gain from UI slider
             "uniform bool  u_physicsParityMode;\n" + // parity mode flag
             "uniform float u_displayGain;\n" +   // display gain multiplier
@@ -537,6 +541,11 @@ class WarpEngine {
             :
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
+            "uniform float u_thetaScale;\n" +
+            "uniform int   u_RidgeMode;\n" +
+            "uniform int   u_PhysicsParityMode;\n" +
+            "uniform int   u_SectorCount;\n" +
+            "uniform int   u_Split;\n" +
             "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
             "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
@@ -547,7 +556,6 @@ class WarpEngine {
             "uniform float u_tiltViz;\n" +
             "uniform float u_exposure;\n" +
             "uniform float u_zeroStop;\n" +
-            "uniform float u_thetaScale;\n" +
             "uniform float u_userGain;\n" +
             "uniform bool  u_physicsParityMode;\n" + // parity mode flag
             "uniform float u_displayGain;\n" +   // display gain multiplier
@@ -556,10 +564,6 @@ class WarpEngine {
             "uniform float u_curvatureBoostMax;\n" + // max boost multiplier
             "uniform int   u_colorMode;\n" +    // 0=solid, 1=theta (front/back), 2=shear |σ| proxy
             "uniform int   u_ridgeMode;\n" +    // 0=physics df, 1=single crest at ρ=1
-            "uniform int   u_RidgeMode;\n" +    // physics uniforms
-            "uniform int   u_PhysicsParityMode;\n" +
-            "uniform int   u_SectorCount;\n" +
-            "uniform int   u_Split;\n" +
             "varying vec3 v_pos;\n" +
             "vec3 diverge(float t) {\n" +
             "    float x = clamp((t+1.0)*0.5, 0.0, 1.0);\n" +
@@ -1367,7 +1371,10 @@ class WarpEngine {
     _renderGridPoints() {
         const gl = this.gl;
         if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-            if (!this._warnNoProgramOnce) { console.warn('Grid program not ready yet; waiting for shader link…'); this._warnNoProgramOnce = true; }
+            if (!this._warnNoProgramOnce) {
+                console.warn("Grid program not ready yet; waiting for shader link…");
+                this._warnNoProgramOnce = true;
+            }
             return;
         }
 
@@ -1382,7 +1389,9 @@ class WarpEngine {
 
         const u = this.uniforms || {};
         const sectors = Math.max(1, (u.sectors|0) || 1);
-        gl.uniform1f(this.gridUniforms.thetaScale,  (Number.isFinite(u.thetaScale) && u.thetaScale>0) ? u.thetaScale : 5.03e3);
+        const theta = (Number.isFinite(u.thetaScale) && u.thetaScale > 0) ? u.thetaScale : 5.03e3;
+
+        gl.uniform1f(this.gridUniforms.thetaScale,  theta);
         gl.uniform1i(this.gridUniforms.ridgeMode,   Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
         gl.uniform1i(this.gridUniforms.parity,      u.physicsParityMode ? 1 : 0);
         gl.uniform1i(this.gridUniforms.sectorCount, sectors);
