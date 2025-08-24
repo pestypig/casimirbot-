@@ -423,11 +423,7 @@ export default function HelixCore() {
 
   // after you compute effectiveMode and dutyEffectiveFR:
   const isStandby = String(effectiveMode).toLowerCase() === 'standby';
-
-  // force FR duty to true zero in standby (viewer amplitude chain)
   const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
-
-  // also ensure UI dutyCycle is zero in standby for SHOW pane
   const dutyUI_safe = isStandby ? 0 : dutyUI;
 
   // Use the compact hook for active tiles computation
@@ -481,7 +477,7 @@ export default function HelixCore() {
       // timing (removed ad-hoc lightCrossing - use live lc instead)
 
       // --- UI duty (FR duty computed separately and added at call-site) ---
-      dutyCycle:        num(pipeline?.dutyCycle)        ?? 0.14,        // UI duty (visible)
+      dutyCycle: dutyUI_safe,
 
       // --- BOTH sector numbers ---
       sectorCount: totalSectors,          // TOTAL (averaging)
@@ -491,7 +487,7 @@ export default function HelixCore() {
       // physics amps
       gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck:num(pipeline?.gammaVanDenBroeck)?? 2.86e5,
+      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 2.86e5),
 
       // viewer niceties
       viewAvg: true,
@@ -502,7 +498,8 @@ export default function HelixCore() {
     effectiveMode, hull, systemMetrics?.currentSector, totalSectors, concurrentSectors,
     pipeline?.modulationFreq_GHz, pipeline?.hull?.wallThickness_m,
     pipeline?.dutyCycle, pipeline?.sectorCount, pipeline?.sectorStrobing,
-    pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck, sectorsUI
+    pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck, sectorsUI,
+    isStandby, dutyEffectiveFR_safe, dutyUI_safe
   ]);
 
   // Create truly separate payloads (no shared nested refs)
@@ -843,7 +840,7 @@ export default function HelixCore() {
                       gammaGeo={pipeline?.gammaGeo ?? 26}
                       qSpoilingFactor={qSpoilUI}
                       gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 2.86e5}
-                      dutyCycle={dutyUI}
+                      dutyCycle={dutyUI_safe}
                       sectors={totalSectors}      // ⬅️ use total sectors for averaging
                       viewAvg={true}
                       diffMode={false}
@@ -912,7 +909,7 @@ export default function HelixCore() {
                 betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0,-1,0]) as [number,number,number],
                 // Mode coupling from live pipeline data
                 mode: effectiveMode,
-                dutyCycle: dutyUI,
+                dutyCycle: dutyUI_safe,
                 sectors: totalSectors,
                 gammaGeo: pipeline?.gammaGeo ?? 26,
                 qSpoil: qSpoilUI,
@@ -926,7 +923,7 @@ export default function HelixCore() {
                   mechCoupling: 0.65,           // tweak visual strength 0..1
                 },
                 // 🔽 Ford-Roman window + light-crossing data
-                dutyEffectiveFR,
+                dutyEffectiveFR: dutyEffectiveFR_safe,
                 lightCrossing: lc,
                 zeta: pipeline?.zeta,
               }}
@@ -982,8 +979,8 @@ export default function HelixCore() {
                   gammaGeo: pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
                   gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
-                  dutyCycle: dutyUI,
-                  dutyEffectiveFR,
+                  dutyCycle: dutyUI_safe,
+                  dutyEffectiveFR: dutyEffectiveFR_safe,
                   sectors: totalSectors,
                   split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
@@ -993,8 +990,8 @@ export default function HelixCore() {
                   gammaGeo: pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
                   gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
-                  dutyCycle: dutyUI,
-                  dutyEffectiveFR,
+                  dutyCycle: dutyUI_safe,
+                  dutyEffectiveFR: dutyEffectiveFR_safe,
                   sectors: totalSectors,
                   split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
