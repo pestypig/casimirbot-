@@ -73,12 +73,15 @@ export function LiveEnergyPipeline({
   const currentModeKey = live.currentMode in modes ? live.currentMode : "hover";
   const currentModeCfg = modes[currentModeKey] ?? { name: currentModeKey };
 
-  // human-friendly description built from live values when viewing the current mode
-  const liveDesc = [
-    Number.isFinite(live.P_avg_MW) ? `${live.P_avg_MW.toFixed(1)} MW` : "— MW",
-    Number.isFinite(live.M_exotic_kg) ? `${live.M_exotic_kg.toFixed(0)} kg` : "— kg",
-    Number.isFinite(live.zeta) ? `ζ=${live.zeta.toFixed(3)}` : "ζ=—"
+  // Build live descriptions for all modes using actual pipeline values
+  const buildLiveDesc = (P_MW: number, M_kg: number, zeta: number) => [
+    Number.isFinite(P_MW) ? `${P_MW.toFixed(1)} MW` : "— MW",
+    Number.isFinite(M_kg) ? `${M_kg.toFixed(0)} kg` : "— kg", 
+    Number.isFinite(zeta) ? `ζ=${zeta.toFixed(3)}` : "ζ=—"
   ].join(" • ");
+
+  // Current mode live description
+  const liveDesc = buildLiveDesc(live.P_avg_MW, live.M_exotic_kg, live.zeta);
 
   // Harden formatting
   const fmt = (v: unknown, d = "—", n?: number) => {
@@ -177,20 +180,51 @@ export function LiveEnergyPipeline({
               <SelectValue placeholder="Select mode" />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(modes).map(([key, cfg]) => (
-                <SelectItem key={key} value={key}>
-                  <div className="flex flex-col">
-                    <span className="font-medium">{cfg?.name ?? key}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {key === currentModeKey
-                        ? liveDesc
-                        : (cfg?.powerTarget != null
-                            ? `${cfg.powerTarget} MW target`
-                            : "")}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))}
+              {Object.entries(modes).map(([key, cfg]) => {
+                // For current mode, show live values. For others, show live values when available
+                // or fallback to mode policy targets with proper units
+                const getModeDesc = () => {
+                  if (key === currentModeKey) {
+                    return liveDesc; // Always show live values for current mode
+                  }
+                  
+                  // For non-current modes, show live values if we have them, otherwise smart fallback
+                  if (Number.isFinite(live.P_avg_MW) && Number.isFinite(live.M_exotic_kg) && Number.isFinite(live.zeta)) {
+                    // We have pipeline data - build hypothetical values based on mode policy
+                    const modeConfig = MODE_CONFIGS[key as keyof typeof MODE_CONFIGS];
+                    if (modeConfig?.powerTarget_W != null) {
+                      const powerMW = modeConfig.powerTarget_W / 1e6; // Convert W to MW
+                      return buildLiveDesc(powerMW, live.M_exotic_kg, live.zeta);
+                    }
+                  }
+                  
+                  // Fallback: Show mode policy target with correct units
+                  const modeConfig = MODE_CONFIGS[key as keyof typeof MODE_CONFIGS];
+                  if (modeConfig?.powerTarget_W != null) {
+                    const powerW = modeConfig.powerTarget_W;
+                    if (powerW >= 1e6) {
+                      return `${(powerW / 1e6).toFixed(1)} MW target`;
+                    } else if (powerW >= 1e3) {
+                      return `${(powerW / 1e3).toFixed(1)} kW target`;
+                    } else {
+                      return `${powerW.toFixed(1)} W target`;
+                    }
+                  }
+                  
+                  return ""; // No target available
+                };
+
+                return (
+                  <SelectItem key={key} value={key}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{cfg?.name ?? key}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {getModeDesc()}
+                      </span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
