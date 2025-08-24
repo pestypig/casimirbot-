@@ -742,11 +742,13 @@ export default function WarpBubbleCompare({
     curvatureBoostMax: 1.0,
     userGain: 1.0,
     vizGain: 1.0,
+    vShip: 0.0,                       // REAL: never "fly"
   });
 
   const toShowUniforms = (snap: LiveSnap) => {
     const T = clamp01(N(snap.curvatureGainT, 0.6));
     const B = Math.max(1, N(snap.curvatureBoostMax, 40));
+    const isStandby = String(snap.currentMode || '').toLowerCase() === 'standby';
     return {
       ...toSharedUniforms(snap),
       physicsParityMode: false,
@@ -754,12 +756,12 @@ export default function WarpBubbleCompare({
       colorMode: 1,       // theta diverging palette
       exposure: N(snap.exposure, 6.0),
       zeroStop: N(snap.zeroStop, 1e-7),
-      curvatureGainT: T,
-      curvatureBoostMax: B,
-      userGain: N(snap.userGain, 4.0),
-      vizGain: 1.0,
-      // display gain mirrors UI decades (optional—engine also respects userGain)
-      displayGain: 1 + T * (B - 1),
+      curvatureGainT: isStandby ? 0 : T,
+      curvatureBoostMax: isStandby ? 1 : B,
+      userGain: isStandby ? 1 : N(snap.userGain, 4.0),
+      vizGain: isStandby ? 1 : 1.0,
+      vShip: isStandby ? 0.0 : N((snap as any).vShip, 1.0),  // SHOW can "fly", but not in standby
+      displayGain: isStandby ? 1 : (1 + T * (B - 1)),
     };
   };
 
