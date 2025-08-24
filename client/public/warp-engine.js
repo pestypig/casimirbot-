@@ -343,19 +343,25 @@ class WarpEngine {
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
     _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
-        // Adaptive mesh density for thin walls (smoother displacement)
-        const baseDiv = Math.max(divisions, 160);
-        const targetVertsAcrossWall = 12;
-        const hullAxes = this.currentParams?.hullAxes || [503.5, 132, 86.5];
-        const wallWidth_m = this.currentParams?.wallWidth_m || 6.0;
-        
-        // ρ-span of ±3σ wall thickness
-        const span_rho = Math.max(1e-3, (3 * wallWidth_m) / Math.min(...hullAxes));
-        const scale = Math.max(1.0, targetVertsAcrossWall / (span_rho * baseDiv));
-        divisions = Math.min(320, Math.floor(baseDiv * scale)); // Higher cap for smoother walls
+        // ---- guards ----
+        const spanSafe = Number.isFinite(span) && span > 0 ? span : 1.6;
+        const divIn    = Number.isFinite(divisions) && divisions > 0 ? divisions : GRID_DEFAULTS.divisions || 160;
+
+        const baseDiv  = Math.max(divIn, 160);
+        const hullAxes = Array.isArray(this.currentParams?.hullAxes) ? this.currentParams.hullAxes : [503.5,132,86.5];
+        const wallWidth_m = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : 6.0;
+
+        const minAxis = Math.max(1e-6, Math.min(...hullAxes));
+        const span_rho = (3 * wallWidth_m) / minAxis;
+        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * baseDiv));
+
+        let div = Math.min(320, Math.floor(baseDiv * scale));
+        if (!Number.isFinite(div) || div < 1) div = baseDiv;   // final fallback
+
+        divisions = div;
         const verts = [];
-        const step = (span * 2) / divisions;  // Full span width divided by divisions
-        const half = span;  // Half-extent
+        const step = (spanSafe * 2) / divisions;  // Full span width divided by divisions
+        const half = spanSafe;  // Half-extent
         
         // Create a slight height variation across the grid for proper 3D visualization
         const yBase = -0.15;  // Base Y level
@@ -389,7 +395,7 @@ class WarpEngine {
         }
         
         console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
-        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${span*2})`);
+        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${spanSafe*2})`);
         return new Float32Array(verts);
     }
 
