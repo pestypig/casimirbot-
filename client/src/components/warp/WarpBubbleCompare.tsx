@@ -612,8 +612,17 @@ export default function WarpBubbleCompare({
         warnIfBad('REAL', parityPhys);
         warnIfBad('SHOW', showPhys);
         
-        pushUniformsWhenReady(leftEngine.current,  parityPhys);
-        pushUniformsWhenReady(rightEngine.current, showPhys);
+        pushUniformsWhenReady(leftEngine.current,  {
+          ...parityPhys,
+          physicsParityMode: true,
+          ridgeMode: 0,          // ← physics double-lobe
+        });
+
+        pushUniformsWhenReady(rightEngine.current, {
+          ...showPhys,
+          physicsParityMode: false,
+          ridgeMode: 1,          // ← single crest cosmetic
+        });
 
         // normalize any global fallback the engine might use
         (window as any).sceneScale = 1 / Math.max(shared.hullAxes[0], shared.hullAxes[1], shared.hullAxes[2]);
@@ -749,8 +758,16 @@ export default function WarpBubbleCompare({
     const shared = frameFromHull(hull, spanNow);
     const parityPhys = physicsPayload(parityParams, 'fr');
     const showPhys = physicsPayload(showParams, 'ui');
-    pushUniformsWhenReady(leftEngine.current,  parityPhys);
-    pushUniformsWhenReady(rightEngine.current, showPhys);
+    pushUniformsWhenReady(leftEngine.current,  {
+      ...parityPhys,
+      physicsParityMode: true,
+      ridgeMode: 0,
+    });
+    pushUniformsWhenReady(rightEngine.current, {
+      ...showPhys,
+      physicsParityMode: false,
+      ridgeMode: 1,
+    });
     
     // Debug mode change
     if (parityParams?.currentMode || showParams?.currentMode) {
