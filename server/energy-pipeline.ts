@@ -326,7 +326,12 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
   const S_total = state.sectorCount;
   const S_live = state.concurrentSectors;
-  const d_eff = BURST_DUTY_LOCAL * (S_live / S_total); // ship-wide duty
+
+  // if standby, FR duty must be exactly zero for viewers/clients
+  const isStandby = String(state.currentMode || '').toLowerCase() === 'standby';
+  const d_eff = isStandby
+    ? 0
+    : BURST_DUTY_LOCAL * (S_live / Math.max(1, S_total)); // existing calc
 
   state.activeSectors   = S_live;
   state.activeFraction  = S_live / S_total;

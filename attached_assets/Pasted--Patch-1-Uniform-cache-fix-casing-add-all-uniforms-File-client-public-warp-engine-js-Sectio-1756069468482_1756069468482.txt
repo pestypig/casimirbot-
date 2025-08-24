@@ -1,0 +1,55 @@
+✅ Patch 1 — Uniform cache (fix casing + add all uniforms)
+
+File: client/public/warp-engine.js
+Section: where you cache this.gridUniforms after linking
+
+- this.gridUniforms = {
+-   mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
+-   sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+-   thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+-   ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
+-   parity:     gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+-   sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
+-   split:      gl.getUniformLocation(program, 'u_Split'),
+- };
++ this.gridUniforms = {
++   // matrices & base
++   mvpMatrix:        gl.getUniformLocation(program, 'u_mvpMatrix'),
++   sheetColor:       gl.getUniformLocation(program, 'u_sheetColor'),
++
++   // physics chain / sectoring
++   thetaScale:       gl.getUniformLocation(program, 'u_thetaScale'),
++   sectorCount:      gl.getUniformLocation(program, 'u_SectorCount'),
++   split:            gl.getUniformLocation(program, 'u_Split'),
++
++   // mode & visualization
++   parity:           gl.getUniformLocation(program, 'u_physicsParityMode'),
++   colorMode:        gl.getUniformLocation(program, 'u_colorMode'),
++   ridgeMode:        gl.getUniformLocation(program, 'u_ridgeMode'),
++   exposure:         gl.getUniformLocation(program, 'u_exposure'),
++   zeroStop:         gl.getUniformLocation(program, 'u_zeroStop'),
++
++   // velocity / drive / shell
++   driveDir:         gl.getUniformLocation(program, 'u_driveDir'),
++   vShip:            gl.getUniformLocation(program, 'u_vShip'),
++   wallWidth:        gl.getUniformLocation(program, 'u_wallWidth'),
++
++   // gain chain
++   userGain:         gl.getUniformLocation(program, 'u_userGain'),
++   displayGain:      gl.getUniformLocation(program, 'u_displayGain'),
++   vizGain:          gl.getUniformLocation(program, 'u_vizGain'),
++   curvatureGainT:   gl.getUniformLocation(program, 'u_curvatureGainT'),
++   curvatureBoostMax:gl.getUniformLocation(program, 'u_curvatureBoostMax'),
++
++   // axes
++   axesScene:        gl.getUniformLocation(program, 'u_axesScene'),
++   axes:             gl.getUniformLocation(program, 'u_axes'),
++ };
++
++ // (Optional) quick sanity log once
++ if (!this._uniformAuditOnce) {
++   this._uniformAuditOnce = true;
++   for (const [k,v] of Object.entries(this.gridUniforms)) {
++     if (v == null) console.warn('[WarpEngine] Missing uniform location:', k);
++   }
++ }
