@@ -65,7 +65,7 @@ export default function WarpRenderInspector(props: {
   const queryClient = useQueryClient();
 
   // Get current mode from global energy pipeline instead of local state
-  const currentMode = ((live?.data as any)?.currentMode as 'hover'|'cruise'|'emergency'|'standby') || 'hover';
+  const currentMode = ((live as any)?.currentMode as 'hover'|'cruise'|'emergency'|'standby') || 'hover';
   const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>(currentMode);
 
   // Sync local mode with global mode
