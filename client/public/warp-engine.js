@@ -650,35 +650,18 @@ class WarpEngine {
     _cacheGridLocations(program) {
         const gl = this.gl;
         this.gridProgram = program;
-        this.gridAttribs = { position: gl.getAttribLocation(program, 'a_position') };
+        this.gridAttribs  = { position: gl.getAttribLocation(program, 'a_position') };
         this.gridUniforms = {
             mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
             sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
-            axesScene: gl.getUniformLocation(program, 'u_axesScene'),
-            axes: gl.getUniformLocation(program, 'u_axes'),
-            driveDir: gl.getUniformLocation(program, 'u_driveDir'),
-            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
-            vShip: gl.getUniformLocation(program, 'u_vShip'),
-            epsTilt: gl.getUniformLocation(program, 'u_epsTilt'),
-            intWidth: gl.getUniformLocation(program, 'u_intWidth'),
-            tiltViz: gl.getUniformLocation(program, 'u_tiltViz'),
-            exposure: gl.getUniformLocation(program, 'u_exposure'),
-            zeroStop: gl.getUniformLocation(program, 'u_zeroStop'),
-            userGain: gl.getUniformLocation(program, 'u_userGain'),
-            physicsParityMode: gl.getUniformLocation(program, 'u_physicsParityMode'),
-            displayGain: gl.getUniformLocation(program, 'u_displayGain'),
-            vizGain: gl.getUniformLocation(program, 'u_vizGain'),
-            curvatureGainT: gl.getUniformLocation(program, 'u_curvatureGainT'),
-            curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
-            colorMode: gl.getUniformLocation(program, 'u_colorMode'),
-            // physics
-            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
-            ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
-            parity:     gl.getUniformLocation(program, 'u_PhysicsParityMode'),
-            sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
-            split:      gl.getUniformLocation(program, 'u_Split'),
+            // physics uniforms expected by _renderGridPoints():
+            thetaScale:  gl.getUniformLocation(program, 'u_thetaScale'),
+            ridgeMode:   gl.getUniformLocation(program, 'u_RidgeMode'),
+            parity:      gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+            sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
+            split:       gl.getUniformLocation(program, 'u_Split'),
         };
-        this.isLoaded = true;
+        this.isLoaded = true; // ✔ satisfies checkpoint "Engine ready"
     }
     
     _setupUniformLocations() {
@@ -1459,24 +1442,27 @@ class WarpEngine {
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
         
-        // Non-blocking compilation if available
+        // async path
         if (this.parallelShaderExt && onReady) {
-            console.log("⚡ Starting non-blocking shader compilation...");
-            this._pollShaderCompletion(program, (ok) => {
-                if (!ok) { onReady(false); return; }
-                this._cacheGridLocations(program);
-                onReady(true);
+            this._pollShaderCompletion(program, () => {
+                if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+                    console.error('Shader program link error:', gl.getProgramInfoLog(program));
+                    gl.deleteProgram(program);
+                    return;
+                }
+                this._cacheGridLocations(program);   // <-- cache here
+                onReady(program);
             });
-            return program; // Return immediately, will be ready asynchronously
+            return program;
         }
-        
-        // Synchronous fallback
+
+        // sync path
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
             console.error('Shader program link error:', gl.getProgramInfoLog(program));
             gl.deleteProgram(program);
             return null;
         }
-        this._cacheGridLocations(program);
+        this._cacheGridLocations(program);       // <-- and here
         return program;
     }
     
