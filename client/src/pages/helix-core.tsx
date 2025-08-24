@@ -1037,10 +1037,9 @@ export default function HelixCore() {
 
                 const S_total = totalSectors;                                    // e.g., 400
                 const S_live  = Math.max(1, Math.floor(concurrentSectors ?? 1)); // 1 or 2
-                const BURST_LOCAL = 0.01;                                        // 10µs / 1ms
-
-                const derivedActiveTiles = (isFiniteNumber(totalTilesLive) && S_total > 0)
-                  ? Math.round(totalTilesLive * (S_live / S_total) * BURST_LOCAL)
+                // Use the real FR duty you already computed (adapts if scheduler changes the burst window)
+                const derivedActiveTiles = isFiniteNumber(totalTilesLive)
+                  ? Math.round(totalTilesLive * dutyEffectiveFR)
                   : undefined;
 
                 const activeTilesDisplay = (() => {
