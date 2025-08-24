@@ -148,6 +148,17 @@ export default function WarpRenderInspector(props: {
     };
   }, [props.showPhys, shared, userGain, decades, mode]);
 
+  // Reuse-or-create guard so we never attach twice to the same canvas
+  const ENGINE_KEY = '__warpEngine';
+
+  function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
+    const existing = (cv as any)[ENGINE_KEY];
+    if (existing && !existing._destroyed) return existing as WarpType;
+    const eng = new Ctor(cv);
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
+  }
+
   // Engine creation & lifecycle
   useEffect(() => {
     const W: any = (window as any).WarpEngine;
@@ -158,13 +169,13 @@ export default function WarpRenderInspector(props: {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
-      leftEngine.current  = new W(leftRef.current);
+      leftEngine.current  = getOrCreateEngine(W, leftRef.current);
     }
     if (rightRef.current && !rightEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
       rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-      rightEngine.current = new W(rightRef.current);
+      rightEngine.current = getOrCreateEngine(W, rightRef.current);
     }
 
     // Bootstrap; fit camera after link using derived axes
@@ -193,6 +204,25 @@ export default function WarpRenderInspector(props: {
       try { rightEngine.current?.destroy(); } catch {}
       leftEngine.current = null as any;
       rightEngine.current = null as any;
+
+      // Robust cleanup for HMR/StrictMode
+      if (leftRef.current) {
+        try {
+          if ((leftRef.current as any)[ENGINE_KEY] && !(leftRef.current as any)[ENGINE_KEY]._destroyed) {
+            (leftRef.current as any)[ENGINE_KEY].destroy?.();
+          }
+          delete (leftRef.current as any)[ENGINE_KEY];
+        } catch {}
+      }
+      
+      if (rightRef.current) {
+        try {
+          if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
+            (rightRef.current as any)[ENGINE_KEY].destroy?.();
+          }
+          delete (rightRef.current as any)[ENGINE_KEY];
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

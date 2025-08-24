@@ -675,6 +675,17 @@ export default function WarpBubbleCompare({
   const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
   const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+  // Reuse-or-create guard so we never attach twice to the same canvas
+  const ENGINE_KEY = '__warpEngine';
+
+  function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
+    const existing = (cv as any)[ENGINE_KEY];
+    if (existing && !existing._destroyed) return existing as WarpType;
+    const eng = new Ctor(cv);
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
+  }
+
   // Compute θ-scale (γ^3 · ΔA/A · γ_VdB · √(duty/sectors)) if not provided
   const computeThetaScale = (v: LiveSnap) => {
     const gammaGeo = N(v.gammaGeo ?? (v as any).g_y, 26);
@@ -760,6 +771,11 @@ export default function WarpBubbleCompare({
   const busyRef = useRef<boolean>(false);
 
   useEffect(() => {
+    const left = leftRef.current;
+    const right = rightRef.current;
+
+    if (!left || !right) return;
+
     let cancelled = false;
     const kill = (ref: any) => {
       const e = ref.current;
@@ -771,7 +787,6 @@ export default function WarpBubbleCompare({
     };
 
     (async () => {
-      if (!leftRef.current || !rightRef.current) return;
       await ensureScript();
       const W = (window as any).WarpEngine;
       if (!W) { console.error('[Warp] engine script not available'); return; }
@@ -780,7 +795,7 @@ export default function WarpBubbleCompare({
       kill(leftEngine); kill(rightEngine);
 
       const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-        const eng = new W(cv);                          // creates gl; may or may not init grid
+        const eng = getOrCreateEngine(W, cv);           // reuse existing or create new engine
         const { w, h } = sizeCanvas(cv);
         eng.gl.viewport(0, 0, w, h);
 
@@ -823,12 +838,31 @@ export default function WarpBubbleCompare({
       const realU = toRealUniforms(baseSnap);
       const showU = toShowUniforms(baseSnap);
 
-      leftEngine.current  = await initOne(leftRef.current!,  realU);
-      rightEngine.current = await initOne(rightRef.current!, showU);
+      leftEngine.current  = await initOne(left,  realU);
+      rightEngine.current = await initOne(right, showU);
     })();
 
-    return () => { cancelled = true; kill(leftEngine); kill(rightEngine); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+      kill(leftEngine);
+      kill(rightEngine);
+
+      // Robust cleanup for HMR/StrictMode
+      try {
+        if ((left as any)[ENGINE_KEY] && !(left as any)[ENGINE_KEY]._destroyed) {
+          (left as any)[ENGINE_KEY].destroy?.();
+        }
+        delete (left as any)[ENGINE_KEY];
+      } catch {}
+
+      try {
+        if ((right as any)[ENGINE_KEY] && !(right as any)[ENGINE_KEY]._destroyed) {
+          (right as any)[ENGINE_KEY].destroy?.();
+        }
+        delete (right as any)[ENGINE_KEY];
+      } catch {}
+    };
+    // IMPORTANT: keep deps minimal; do not include uniforms objects that change every tick
   }, [leftRef.current, rightRef.current]);
 
   // Use props.parameters directly instead of re-deriving from stale snapshots
