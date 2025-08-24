@@ -646,6 +646,10 @@ export default function WarpBubbleCompare({
         leftEngine.current = new WarpCtor(leftRef.current, defaultFrame, {});
         rightEngine.current = new WarpCtor(rightRef.current, defaultFrame, {});
 
+        // Wire diagnostics so you can compare against the calculator
+        leftEngine.current!.onDiagnostics  = (d) => (window as any).__diagREAL = d;
+        rightEngine.current!.onDiagnostics = (d) => (window as any).__diagSHOW = d;
+
         console.log('[WARP ENGINE] Basic engines created, waiting for useEffect physics');
 
         // Basic initialization complete
