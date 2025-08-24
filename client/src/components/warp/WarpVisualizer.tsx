@@ -649,9 +649,9 @@ useEffect(() => {
         // Critical: preserve currentMode from pipeline
         currentMode: parameters.currentMode || 'hover',
         
-        // Critical: update visual mode flags for live mode switching
-        physicsParityMode: !!parameters.physicsParityMode,
-        ridgeMode: !!parameters.physicsParityMode ? 0 : 1,
+        // 🔑 ensure truth/cosmetic actually toggles at runtime
+        physicsParityMode: parity,
+        ridgeMode: parity ? 0 : 1,
         
         // Theta scale
         thetaScale: resolveThetaScale({
