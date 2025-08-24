@@ -440,10 +440,10 @@ class WarpEngine {
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "uniform float u_thetaScale;\n" +
-            "uniform int   u_RidgeMode;\n" +
-            "uniform int   u_PhysicsParityMode;\n" +
-            "uniform int   u_SectorCount;\n" +
-            "uniform int   u_Split;\n" +
+            "uniform int   u_ridgeMode;\n" +
+            "uniform int   u_physicsParityMode;\n" +
+            "uniform int   u_sectorCount;\n" +
+            "uniform int   u_split;\n" +
             "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
             "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
@@ -542,10 +542,10 @@ class WarpEngine {
             "precision highp float;\n" +
             "uniform vec3 u_sheetColor;\n" +
             "uniform float u_thetaScale;\n" +
-            "uniform int   u_RidgeMode;\n" +
-            "uniform int   u_PhysicsParityMode;\n" +
-            "uniform int   u_SectorCount;\n" +
-            "uniform int   u_Split;\n" +
+            "uniform int   u_ridgeMode;\n" +
+            "uniform int   u_physicsParityMode;\n" +
+            "uniform int   u_sectorCount;\n" +
+            "uniform int   u_split;\n" +
             "uniform vec3 u_axesScene;\n" +   // Authoritative scene-normalized hull axes
             "uniform vec3 u_axes;\n" +        // Legacy fallback
             "uniform vec3 u_driveDir;\n" +
