@@ -68,7 +68,6 @@ export default function WarpRenderInspector(props: {
     ridgeMode,
     lockFraming: true,
     hull: { a: 503.5, b: 132, c: 86.5 }, // default hull
-    hullAxes: [1, 1, 1],
     gridSpan: 2.6,
     sectors: 400,
     split: 0,
@@ -82,7 +81,7 @@ export default function WarpRenderInspector(props: {
       ...shared,
       // geometry
       hull: p.hull || p.hullDims || shared.hull,
-      hullAxes: p.hullAxes || shared.hullAxes,
+      hullAxes: p.hullAxes || undefined, // let engine derive from hull if absent
       gridSpan: p.gridSpan ?? shared.gridSpan,
       // physics chain & overrides
       physicsParityMode: true,
@@ -101,7 +100,7 @@ export default function WarpRenderInspector(props: {
       curvatureBoostMax: 1,
       vizGain: 1,
       displayGain: 1,
-      userGain: Math.max(1, userGain),
+      userGain: 1, // keep REAL parity visually "true"
       currentMode: mode,
     };
   }, [props.parityPhys, shared, userGain, mode]);
@@ -114,7 +113,7 @@ export default function WarpRenderInspector(props: {
       ...shared,
       physicsParityMode: false,
       hull: p.hull || p.hullDims || shared.hull,
-      hullAxes: p.hullAxes || shared.hullAxes,
+      hullAxes: p.hullAxes || undefined, // let engine derive from hull if absent
       gridSpan: p.gridSpan ?? shared.gridSpan,
       gammaGeo: N(p.gammaGeo ?? p.g_y, 26),
       deltaAOverA: N(p.deltaAOverA ?? p.qSpoilingFactor, 1),
@@ -139,12 +138,36 @@ export default function WarpRenderInspector(props: {
     const W: any = (window as any).WarpEngine;
     if (!W) { console.error("WarpEngine not found on window. Load warp-engine.js first."); return; }
 
-    if (leftRef.current && !leftEngine.current)  leftEngine.current  = new W(leftRef.current);
-    if (rightRef.current && !rightEngine.current) rightEngine.current = new W(rightRef.current);
+    if (leftRef.current && !leftEngine.current)  {
+      // DPR-safe size before GL init
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
+      leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
+      leftEngine.current  = new W(leftRef.current);
+    }
+    if (rightRef.current && !rightEngine.current) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+      rightEngine.current = new W(rightRef.current);
+    }
 
-    // Bootstrap so the first frame fits correctly
+    // Bootstrap; fit camera after link using derived axes
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
+    leftEngine.current?.onceReady?.(() => {
+      const ax = leftEngine.current?.uniforms?.axesClip;
+      const cz = compactCameraZ(ax);
+      leftEngine.current.updateUniforms({ cameraZ: cz, lockFraming: true });
+    });
+    rightEngine.current?.onceReady?.(() => {
+      const ax = rightEngine.current?.uniforms?.axesClip;
+      const cz = compactCameraZ(ax);
+      rightEngine.current.updateUniforms({ cameraZ: cz, lockFraming: true });
+      // optional: mirror display gain through helper
+      const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
+      rightEngine.current.setDisplayGain?.(dg);
+    });
 
     // Diagnostics -> window for quick comparison
     leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
@@ -162,17 +185,24 @@ export default function WarpRenderInspector(props: {
   // Apply payloads any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
-
+    // sanitize a few hot-path values
+    const safe = (o:any)=>({
+      ...o,
+      sectors: Math.max(1, Math.floor(N(o.sectors, 1))),
+      split: Math.max(0, Math.floor(N(o.split, 0))),
+      exposure: Math.max(1, Math.min(12, N(o.exposure, 6))),
+      zeroStop: Math.max(1e-9, N(o.zeroStop, 1e-7)),
+    });
     // REAL
     pushUniformsWhenReady(leftEngine.current, {
-      ...realPayload,
+      ...safe(realPayload),
       ridgeMode: 0,
       physicsParityMode: true,
     });
 
     // SHOW
     pushUniformsWhenReady(rightEngine.current, {
-      ...showPayload,
+      ...safe(showPayload),
       ridgeMode: 1,
       physicsParityMode: false,
     });
@@ -183,6 +213,24 @@ export default function WarpRenderInspector(props: {
     pushUniformsWhenReady(leftEngine.current,  { cameraZ: cz });
     pushUniformsWhenReady(rightEngine.current, { cameraZ: cz });
   }, [realPayload, showPayload, shared]);
+
+  // Keep canvases crisp on container resize
+  useEffect(() => {
+    const ro = new ResizeObserver(() => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      for (const c of [leftRef.current, rightRef.current]) {
+        if (!c) continue;
+        const w = Math.max(1, Math.floor((c.clientWidth  || 1) * dpr));
+        const h = Math.max(1, Math.floor((c.clientHeight || 1) * dpr));
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+      }
+      leftEngine.current?._resize?.();
+      rightEngine.current?._resize?.();
+    });
+    leftRef.current && ro.observe(leftRef.current);
+    rightRef.current && ro.observe(rightRef.current);
+    return () => ro.disconnect();
+  }, []);
 
   // Wire strobing once; both engines receive the same stream
   useEffect(() => {
