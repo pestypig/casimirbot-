@@ -647,8 +647,11 @@ export default function WarpBubbleCompare({
         rightEngine.current = new WarpCtor(rightRef.current, defaultFrame, {});
 
         // Wire diagnostics so you can compare against the calculator
-        leftEngine.current!.onDiagnostics  = (d) => (window as any).__diagREAL = d;
-        rightEngine.current!.onDiagnostics = (d) => (window as any).__diagSHOW = d;
+        const syncBadge = (side: 'REAL'|'SHOW', u: any) => {
+          console.debug(`[${side}] θ-scale=${u.thetaScale?.toExponential?.(2)}  gVdB=${u.gammaVdB}  duty=${u.dutyCycle}  FR=${(u as any).dutyEffectiveFR}  sectors=${u.sectors}/${u.split}`);
+        };
+        leftEngine.current!.onDiagnostics  = (d) => { (window as any).__diagREAL = d;  syncBadge('REAL', leftEngine.current!.uniforms); };
+        rightEngine.current!.onDiagnostics = (d) => { (window as any).__diagSHOW = d; syncBadge('SHOW', rightEngine.current!.uniforms); };
 
         console.log('[WARP ENGINE] Basic engines created, waiting for useEffect physics');
 
