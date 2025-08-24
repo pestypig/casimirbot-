@@ -214,6 +214,9 @@ export default function HelixCore() {
   });
   const [solarBodies, setSolarBodies] = useState(() => solarToBodies(computeSolarXY()));
   
+  // Smooth animation for instantaneous tile count
+  const [instantTilesSmooth, setInstantTilesSmooth] = useState(0);
+  
   // Live solar positions for route planning (updates every 5 seconds)
   const [solarTick, setSolarTick] = useState(0);
   const solarBodiesForRoutes = useMemo(() => getSolarBodiesAsPc(), [solarTick]);
@@ -394,6 +397,36 @@ export default function HelixCore() {
     pipelineState, lc?.burst_ms, lc?.dwell_ms,
     concurrentSectors, totalSectors
   ]);
+
+  // Compute instantaneous tiles for smooth animation
+  const instantTiles = useMemo(() => {
+    const totalTilesLive =
+      isFiniteNumber(systemMetrics?.totalTiles) ? systemMetrics!.totalTiles! :
+      (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
+
+    if (!isFiniteNumber(totalTilesLive)) return undefined;
+
+    // Instantaneous gate from light-crossing loop
+    const inBurstNow = !!lc && Number.isFinite(lc.phase) && Number.isFinite(lc.burst_ms)
+      ? (lc.phase % lc.dwell_ms) < lc.burst_ms
+      : false;
+
+    // Tiles per sector
+    const tilesPerSector =
+      isFiniteNumber(systemMetrics?.tilesPerSector)
+        ? systemMetrics!.tilesPerSector!
+        : (isFiniteNumber(totalTilesLive) && totalSectors > 0 ? Math.floor(totalTilesLive! / totalSectors) : 0);
+
+    // Instantaneous energized tiles: only the concurrently "live" sectors, only during the burst
+    const S_live = Math.max(1, Math.floor(concurrentSectors ?? 1));
+    return (tilesPerSector > 0) ? (inBurstNow ? (S_live * tilesPerSector) : 0) : undefined;
+  }, [systemMetrics?.totalTiles, systemMetrics?.tilesPerSector, pipeline?.N_tiles, lc?.phase, lc?.burst_ms, lc?.dwell_ms, totalSectors, concurrentSectors]);
+
+  // Smooth animation for instantaneous tile count
+  useEffect(() => {
+    const target = isFiniteNumber(instantTiles) ? instantTiles : 0;
+    setInstantTilesSmooth(prev => prev + 0.35 * (target - prev));
+  }, [instantTiles]);
 
   // Removed mode version tracking to prevent forced remounts that cause black screens
   
@@ -1042,6 +1075,12 @@ export default function HelixCore() {
                   ? Math.round(totalTilesLive * dutyEffectiveFR)
                   : undefined;
 
+                // Instantaneous gate from light-crossing loop (1 during the local burst window, else 0)
+                const burstLocal =
+                  Number.isFinite(lc?.burst_ms) && Number.isFinite(lc?.dwell_ms) && lc!.dwell_ms! > 0
+                    ? lc!.burst_ms! / lc!.dwell_ms!
+                    : 0.01; // fallback
+
                 const activeTilesDisplay = (() => {
                   const serverVal = systemMetrics?.activeTiles;
                   if (isFiniteNumber(serverVal) && isFiniteNumber(derivedActiveTiles)) {
@@ -1070,12 +1109,15 @@ export default function HelixCore() {
                     </Tooltip>
                   </div>
                   <p className="text-lg font-mono text-cyan-400">
-                    {isFiniteNumber(activeTilesDisplay)
-                      ? activeTilesDisplay.toLocaleString()
-                      : '2,800,000'}
+                    {(isFiniteNumber(activeTilesDisplay) ? activeTilesDisplay : 2_800_000).toLocaleString()}
+                    <span className="ml-2 text-xs text-slate-400">avg</span>
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
-                    {`${S_live} live • ${S_total} total • 1% local ON`}
+                  <p className="text-sm font-mono text-emerald-400 mt-1">
+                    {isFiniteNumber(instantTiles) ? instantTiles.toLocaleString() : '—'}
+                    <span className="ml-2 text-xs text-slate-400">now</span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {`${S_live} live • ${S_total} total • ${(burstLocal*100).toFixed(2)}% local ON`}
                   </p>
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
