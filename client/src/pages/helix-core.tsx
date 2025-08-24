@@ -421,12 +421,21 @@ export default function HelixCore() {
     concurrentSectors, totalSectors
   ]);
 
+  // after you compute effectiveMode and dutyEffectiveFR:
+  const isStandby = String(effectiveMode).toLowerCase() === 'standby';
+
+  // force FR duty to true zero in standby (viewer amplitude chain)
+  const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
+
+  // also ensure UI dutyCycle is zero in standby for SHOW pane
+  const dutyUI_safe = isStandby ? 0 : dutyUI;
+
   // Use the compact hook for active tiles computation
   const activeTiles = useActiveTiles({
     totalTiles: systemMetrics?.totalTiles ?? pipeline?.N_tiles,
     totalSectors,
     concurrentSectors,
-    dutyEffectiveFR,
+    dutyEffectiveFR_safe,
     tilesPerSector: systemMetrics?.tilesPerSector,
     lc,
     serverActiveTiles: systemMetrics?.activeTiles,
@@ -802,11 +811,15 @@ export default function HelixCore() {
                             lightCrossing: lc,                  // ✅ use the live loop
                             sectorCount: totalSectors,          // TOTAL (averaging)
                             sectors: concurrentSectors,         // concurrent (sweep)
-                            dutyEffectiveFR,                    // already computed
-                            dutyCycle: dutyUI,                  // UI duty
+                            dutyEffectiveFR: dutyEffectiveFR_safe, // ⬅️ use the zeroed value
+                            dutyCycle: dutyUI_safe,             // UI duty (zeroed in standby)
                             viewAvg: true,              // keep FR-averaged amplitude in both panes
                             colorMode: "theta",         // consistent color
                             lockFraming: true,          // no auto zoom change with gain
+                            // conservative in standby
+                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                            powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
+                            exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
                           }}
                           parityExaggeration={1}
                           heroExaggeration={82}         // or wire to a slider/HUD
@@ -1140,7 +1153,7 @@ export default function HelixCore() {
 
               {/* Active Tiles Panel with helper strings */}
               {(() => {
-                const frPctLabel = Number.isFinite(dutyEffectiveFR) ? ` (${(dutyEffectiveFR * 100).toExponential(2)}%)` : '';
+                const frPctLabel = Number.isFinite(dutyEffectiveFR_safe) ? ` (${(dutyEffectiveFR_safe * 100).toExponential(2)}%)` : '';
                 const localOnLabel = Number.isFinite(activeTiles?.burstLocal) ? `${(activeTiles.burstLocal * 100).toFixed(2)}%` : '—';
                 
                 return (
@@ -1246,8 +1259,8 @@ export default function HelixCore() {
                 <div className="p-3 bg-slate-950 rounded-lg text-xs font-mono">
                   <p className="text-slate-400 mb-1">Pipeline Parameters:</p>
                   <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <div>Duty (UI): {fmt(dutyUI * 100, 1, '0')}%</div>
-                    <div>Duty (FR): {fmt(dutyEffectiveFR * 100, 3, '0.0025')}%</div>
+                    <div>Duty (UI): {fmt(dutyUI_safe * 100, 1, '0')}%</div>
+                    <div>Duty (FR): {fmt(dutyEffectiveFR_safe * 100, 3, '0.0025')}%</div>
                     <div>Sectors: {fint(totalSectors, '0')} ({fint(concurrentSectors, '0')} live)</div>
                     <div>Q-Spoil: {fmt(qSpoilUI, 3, '1.000')}</div>
                     <Tooltip>
@@ -1501,7 +1514,7 @@ export default function HelixCore() {
             {/* Resonance Scheduler (auto, mode-coupled) */}
             <ResonanceSchedulerTile
               mode={effectiveMode}
-              duty={dutyUI}
+              duty={dutyUI_safe}
               sectors={concurrentSectors}
               freqGHz={(pipeline?.modulationFreq_GHz ?? 15)}
               sectorPeriod_ms={systemMetrics?.sectorPeriod_ms}
