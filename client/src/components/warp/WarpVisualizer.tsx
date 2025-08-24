@@ -429,6 +429,18 @@ useEffect(() => {
         engineRef.current = makeEngine((window as any).WarpEngine);
         ensureStrobeMux(); // wrap the engine's handler into the mux
         
+        // Add ResizeObserver to react to container changes
+        const resizeObserver = new ResizeObserver(() => {
+          if (engineRef.current?._resizeCanvasToDisplaySize) {
+            engineRef.current._resizeCanvasToDisplaySize();
+          }
+        });
+        if (canvasRef.current?.parentElement) {
+          resizeObserver.observe(canvasRef.current.parentElement);
+        }
+        // Store cleanup function for later
+        (engineRef.current as any).__resizeObserver = resizeObserver;
+        
         // Register with strobing multiplexer
         const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
           if (!engineRef.current) return;
@@ -536,6 +548,11 @@ useEffect(() => {
   return () => {
     cancelled = true;
     if (watchdog) clearTimeout(watchdog);
+    
+    // cleanup resize observer
+    try {
+      (engineRef.current as any)?.__resizeObserver?.disconnect?.();
+    } catch {}
     
     // cleanup strobing listener
     try {
@@ -901,12 +918,21 @@ useEffect(() => {
       <CardContent>
         <div 
           className="relative w-full bg-slate-900 rounded-lg overflow-hidden border border-slate-700"
-          style={{ height: 'min(56vh, 520px)' }}
+          style={{ 
+            aspectRatio: '16 / 9',
+            width: 'min(100%, 900px)',
+            minHeight: '320px'
+          }}
         >
           <canvas
             ref={canvasRef}
             className="w-full h-full block transition-opacity duration-200"
-            style={{ opacity: isLoaded ? 1 : 0 }}   // no "jump" while fitting
+            style={{ 
+              opacity: isLoaded ? 1 : 0,
+              width: '100%',
+              height: '100%',
+              display: 'block'
+            }}
             width={VIS.canvasWidthDefault}
             height={VIS.canvasHeightDefault}
             data-testid="canvas-warp-bubble"

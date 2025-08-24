@@ -1,0 +1,60 @@
+2) Canvas has no real size on the page
+
+Your engine sizes the drawing buffer from canvas.clientWidth/Height. If CSS doesn’t give the canvas (or its parent) an explicit height, clientHeight becomes 0 → the internal buffer ends up 1px tall and everything looks “broken”.
+
+Make the canvas actually have a height (aspect-ratio is the easiest way):
+
+<div class="warp-wrap">
+  <canvas id="warp-canvas"></canvas>
+</div>
+
+<style>
+  .warp-wrap {
+    /* pick one of these patterns */
+    /* A) fixed aspect ratio */
+    aspect-ratio: 16 / 9;
+    width: min(100%, 900px);
+    /* B) or fixed height on small screens */
+    max-width: 100%;
+    min-height: 320px;
+  }
+  #warp-canvas {
+    width: 100%;
+    height: 100%;           /* now clientHeight > 0 */
+    display: block;         /* kill inline gap */
+  }
+</style>
+
+<script type="module">
+  // Ensure WarpEngine is loaded once (your guard already handles this)
+  const canvas = document.getElementById('warp-canvas');
+  const engine = new WarpEngine(canvas);
+
+  // Make size react to container changes (not just window resizes)
+  const ro = new ResizeObserver(() => engine._resizeCanvasToDisplaySize());
+  ro.observe(canvas.parentElement);
+
+  // Prime the scene with something visible
+  engine.bootstrap({
+    hullAxes: [503.5, 132.0, 86.5], // meters; used to normalize axes
+    wallWidth_m: 0.50,              // physical wall thickness (m) or use wallWidth_rho
+    currentMode: 'cruise',
+    dutyCycle: 0.01,                // 10 µs / 1 ms local duty
+    sectors: 400,                   // strobing partition
+    viewAvg: true,                  // average over duty/sectors for visuals
+    driveDir: [1,0,0],
+    ridgeMode: 1,                   // clean single crest
+    curvatureGainT: 0.6,
+    curvatureBoostMax: 40,
+    exposure: 6.0,
+    zeroStop: 1e-7,
+    vizGain: 1.0,
+    userGain: 4.0
+  });
+
+  // Optional: a pretty showcase preset
+  engine.setPresetShowcase();
+
+  // Example of feeding your sector strobing UI into the renderer
+  // window.setStrobingState({ sectorCount: 400, currentSector: 0, split: 200 });
+</script>
