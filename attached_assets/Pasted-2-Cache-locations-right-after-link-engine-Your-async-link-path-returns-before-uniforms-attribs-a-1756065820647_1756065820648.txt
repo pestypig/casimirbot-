@@ -1,0 +1,72 @@
+2) Cache locations right after link (engine)
+
+Your async link path returns before uniforms/attribs are cached, so the renderer thinks “no program.” Add a cache step that runs for both async and sync linking.
+
+// client/public/warp-engine.js (inside class)
+_cacheGridLocations(program) {
+  const gl = this.gl;
+  this.gridProgram = program;
+  this.gridAttribs = { position: gl.getAttribLocation(program, 'a_position') };
+  this.gridUniforms = {
+    mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
+    sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+    // physics
+    thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+    ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
+    parity:     gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+    sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
+    split:      gl.getUniformLocation(program, 'u_Split'),
+  };
+  this.isLoaded = true;
+}
+
+// after link succeeds (both paths) call:
+this._cacheGridLocations(program);
+
+
+And if you’re using the async KHR_parallel_shader_compile path, ensure the completion callback calls _cacheGridLocations(program) before it sets “ready.”
+
+3) Actually send physics uniforms each frame (engine)
+
+Your _renderGridPoints() currently sets only MVP & color. Set the physics uniforms (from your this.uniforms, which _applyUniformsNow updates):
+
+_renderGridPoints() {
+  const gl = this.gl;
+  if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) return;
+
+  gl.useProgram(this.gridProgram);
+  gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+  const loc = this.gridAttribs.position;
+  gl.enableVertexAttribArray(loc);
+  gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+
+  // MVP & color
+  gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+  gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+  // PHYSICS (safe defaults)
+  const u = this.uniforms || {};
+  const sectors = Math.max(1, (u.sectors|0) || 1);
+  gl.uniform1f(this.gridUniforms.thetaScale, Number.isFinite(u.thetaScale) && u.thetaScale > 0 ? u.thetaScale : 5.03e3);
+  gl.uniform1i(this.gridUniforms.ridgeMode,  Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
+  gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
+  gl.uniform1i(this.gridUniforms.sectorCount,sectors);
+  gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sectors-1, (u.split|0) || 0)));
+
+  const vertexCount = this.gridVertices.length / 3;
+  gl.drawArrays(gl.LINES, 0, vertexCount);
+
+  gl.disableVertexAttribArray(loc);
+  gl.bindBuffer(gl.ARRAY_BUFFER, null);
+}
+
+
+Make sure your fragment shader declares these uniforms:
+
+precision highp float;
+uniform float u_thetaScale;
+uniform int   u_RidgeMode;
+uniform int   u_PhysicsParityMode;
+uniform int   u_SectorCount;
+uniform int   u_Split;
+// ...

@@ -642,34 +642,44 @@ class WarpEngine {
         }
     }
     
-    _setupUniformLocations() {
+    // Cache attribs/uniforms after link completes (both sync and async path)
+    _cacheGridLocations(program) {
         const gl = this.gl;
-        this.gridUniforms = {
-            mvpMatrix: gl.getUniformLocation(this.gridProgram, 'u_mvpMatrix'),
-            sheetColor: gl.getUniformLocation(this.gridProgram, 'u_sheetColor'),
-            axesScene: gl.getUniformLocation(this.gridProgram, 'u_axesScene'),
-            axes: gl.getUniformLocation(this.gridProgram, 'u_axes'),
-            driveDir: gl.getUniformLocation(this.gridProgram, 'u_driveDir'),
-            wallWidth: gl.getUniformLocation(this.gridProgram, 'u_wallWidth'),
-            vShip: gl.getUniformLocation(this.gridProgram, 'u_vShip'),
-            epsTilt: gl.getUniformLocation(this.gridProgram, 'u_epsTilt'),
-            intWidth: gl.getUniformLocation(this.gridProgram, 'u_intWidth'),
-            tiltViz: gl.getUniformLocation(this.gridProgram, 'u_tiltViz'),
-            exposure: gl.getUniformLocation(this.gridProgram, 'u_exposure'),
-            zeroStop: gl.getUniformLocation(this.gridProgram, 'u_zeroStop'),
-            thetaScale: gl.getUniformLocation(this.gridProgram, 'u_thetaScale'),
-            userGain: gl.getUniformLocation(this.gridProgram, 'u_userGain'),
-            physicsParityMode: gl.getUniformLocation(this.gridProgram, 'u_physicsParityMode'),
-            displayGain: gl.getUniformLocation(this.gridProgram, 'u_displayGain'),
-            vizGain: gl.getUniformLocation(this.gridProgram, 'u_vizGain'),
-            curvatureGainT: gl.getUniformLocation(this.gridProgram, 'u_curvatureGainT'),
-            curvatureBoostMax: gl.getUniformLocation(this.gridProgram, 'u_curvatureBoostMax'),
-            colorMode: gl.getUniformLocation(this.gridProgram, 'u_colorMode'),
-            ridgeMode: gl.getUniformLocation(this.gridProgram, 'u_ridgeMode')
-        };
+        this.gridProgram = program;
         this.gridAttribs = {
-            position: gl.getAttribLocation(this.gridProgram, 'a_position'),
+            position: gl.getAttribLocation(program, 'a_position'),
         };
+        this.gridUniforms = {
+            mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+            sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+            axesScene: gl.getUniformLocation(program, 'u_axesScene'),
+            axes: gl.getUniformLocation(program, 'u_axes'),
+            driveDir: gl.getUniformLocation(program, 'u_driveDir'),
+            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
+            vShip: gl.getUniformLocation(program, 'u_vShip'),
+            epsTilt: gl.getUniformLocation(program, 'u_epsTilt'),
+            intWidth: gl.getUniformLocation(program, 'u_intWidth'),
+            tiltViz: gl.getUniformLocation(program, 'u_tiltViz'),
+            exposure: gl.getUniformLocation(program, 'u_exposure'),
+            zeroStop: gl.getUniformLocation(program, 'u_zeroStop'),
+            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+            userGain: gl.getUniformLocation(program, 'u_userGain'),
+            physicsParityMode: gl.getUniformLocation(program, 'u_physicsParityMode'),
+            displayGain: gl.getUniformLocation(program, 'u_displayGain'),
+            vizGain: gl.getUniformLocation(program, 'u_vizGain'),
+            curvatureGainT: gl.getUniformLocation(program, 'u_curvatureGainT'),
+            curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
+            colorMode: gl.getUniformLocation(program, 'u_colorMode'),
+            ridgeMode: gl.getUniformLocation(program, 'u_ridgeMode'),
+            // physics (must exist in your fragment shader)
+            parity: gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+            sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
+            split: gl.getUniformLocation(program, 'u_Split'),
+        };
+    }
+    
+    _setupUniformLocations() {
+        this._cacheGridLocations(this.gridProgram);
     }
     
     _setLoaded(loaded) {
@@ -1384,6 +1394,15 @@ class WarpEngine {
         gl.uniform1f(this.gridUniforms.curvatureBoostMax,(this.uniforms?.curvatureBoostMax?? 1.0));
         gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
         gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
+
+        // physics uniforms (with safe defaults) 
+        const p = this.params || {};
+        const theta = +p.thetaScale > 0 ? +p.thetaScale : 5.03e3;
+        gl.uniform1f(this.gridUniforms.thetaScale, theta);
+        gl.uniform1i(this.gridUniforms.ridgeMode, Number.isFinite(+p.ridgeMode) ? +p.ridgeMode : 1);
+        gl.uniform1i(this.gridUniforms.parity, p.physicsParityMode ? 1 : 0);
+        gl.uniform1i(this.gridUniforms.sectorCount, Math.max(1, +p.sectorCount || 1));
+        gl.uniform1i(this.gridUniforms.split, Math.max(0, +p.split || 0));
         
         // Render as lines for better visibility
         const vertexCount = this.gridVertices.length / 3;
@@ -1476,7 +1495,11 @@ class WarpEngine {
         // Non-blocking compilation if available
         if (this.parallelShaderExt && onReady) {
             console.log("⚡ Starting non-blocking shader compilation...");
-            this._pollShaderCompletion(program, onReady);
+            this._pollShaderCompletion(program, (ok) => {
+                if (!ok) { onReady(false); return; }
+                this._cacheGridLocations(program);
+                onReady(true);
+            });
             return program; // Return immediately, will be ready asynchronously
         }
         
@@ -1486,7 +1509,7 @@ class WarpEngine {
             gl.deleteProgram(program);
             return null;
         }
-        
+        this._cacheGridLocations(program);
         return program;
     }
     
