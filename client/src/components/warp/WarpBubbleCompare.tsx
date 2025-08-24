@@ -4,6 +4,51 @@ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 // Use the build token stamped at app boot
 const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
 
+// --- resilient uniform push helpers ---
+const CM = { solid: 0, theta: 1, shear: 2 };
+const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
+
+function sanitizeUniforms(u: any = {}) {
+  const s = { ...u };
+
+  // numeric coercions + clamps
+  s.thetaScale        = Math.max(1e-12,  finite(s.thetaScale,        1));
+  s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
+  s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
+  s.wallWidth         = Math.max(1e-4,    finite(s.wallWidth,  0.016));
+  s.curvatureBoostMax = Math.max(1,       finite(s.curvatureBoostMax, 40));
+  s.curvatureGainT    = Math.max(0, Math.min(1, finite(s.curvatureGainT, 0)));
+  s.userGain          = Math.max(1,       finite(s.userGain,  1));
+  s.displayGain       = Math.max(1,       finite(s.displayGain, 1));
+  s.sectors           = Math.max(1, Math.floor(finite(s.sectors, 1)));
+  s.split             = Math.max(0, Math.min(s.sectors - 1, Math.floor(finite(s.split, 0))));
+
+  // map strings → ints
+  if (typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode] ?? 1;
+  s.ridgeMode = Math.max(0, Math.min(1, Math.floor(finite(s.ridgeMode, 0))));
+
+  // hull normalization (drop invalid)
+  if (s.hull) {
+    const a = finite(s.hull.a, NaN), b = finite(s.hull.b, NaN), c = finite(s.hull.c, NaN);
+    if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) s.hull = { a, b, c };
+    else delete s.hull;
+  }
+
+  return s;
+}
+
+function pushSafe(engineRef: React.MutableRefObject<any>, patch: any) {
+  const e = engineRef?.current;
+  if (!e) return;
+  const clean = sanitizeUniforms(patch);
+  if (!e.isLoaded || !e.gridProgram) {
+    e.onceReady(() => { e.updateUniforms(clean); e.forceRedraw?.(); });
+  } else {
+    e.updateUniforms(clean);
+    e.forceRedraw?.();
+  }
+}
+
 // Modes we expose in UI
 type ModeKey = "hover" | "cruise" | "emergency" | "standby";
 
@@ -254,12 +299,22 @@ function applyShowSafe(e:any, payload:any) {
     const ready = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
     if (!ready && !applied) {
       applied = true;
-      pushUniformsWhenReady(e, { cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
+      const clean = sanitizeUniforms({ cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
       e.setDisplayGain?.(1);
       console.warn('[SHOW] cosmetics disabled as safety fallback');
     } else if (ready && applied) {
       // re-apply SHOW once; use whatever you computed in applyShow
-      pushUniformsWhenReady(e, payload);
+      const clean = sanitizeUniforms(payload);
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
       console.log('[SHOW] re-applied boosted settings after grid ready');
     }
   };
@@ -404,27 +459,6 @@ function compatifyUniforms(raw: any) {
   return p;
 }
 
-function pushUniformsWhenReady(engine: any, payload: any, retries = 24) {
-  if (!engine || (engine._destroyed === true)) return;
-  const bundle = compatifyUniforms(payload);
-
-  const tryPush = () => {
-    if (!engine || engine._destroyed) return;
-    try { engine.updateUniforms?.(bundle); } catch {}
-    try { engine.setParams?.(bundle); }      catch {}
-  };
-
-  // push immediately
-  tryPush();
-
-  // push again on a few frames (late init, async resize, etc.)
-  if (retries > 0) {
-    requestAnimationFrame(() => {
-      if (!engine || engine._destroyed) return;
-      pushUniformsWhenReady(engine, payload, retries - 1);
-    });
-  }
-}
 
 /* ---------------- Pane configurators ---------------- */
 const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
@@ -433,10 +467,22 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
   if (!e._bootstrapped) {
     e.bootstrap?.(payload);
     e._bootstrapped = true;
-    setTimeout(() => pushUniformsWhenReady(e, payload), 0); // microtick delay
+    setTimeout(() => {
+      const clean = sanitizeUniforms(payload);
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
+    }, 0); // microtick delay
     return;
   }
-  pushUniformsWhenReady(e, payload);
+  const clean = sanitizeUniforms(payload);
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
 };
 
 const applyReal = (
@@ -454,7 +500,7 @@ const applyReal = (
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
   const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
 
-  pushUniformsWhenReady(e, {
+  const clean = sanitizeUniforms({
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -473,6 +519,11 @@ const applyReal = (
     curvatureBoostMax: 1,
     // ⚠ don't override tilt here; let upstream params decide
   });
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
   e.setDisplayGain?.(1);
   e.requestRewarp?.();
 };
@@ -503,7 +554,7 @@ const applyShow = (
 
   console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
 
-  pushUniformsWhenReady(e, {
+  const clean = sanitizeUniforms({
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -520,7 +571,12 @@ const applyShow = (
     exposure: Math.max(0.1, exposure),
     zeroStop,
     cosmeticLevel: 10,
-  }, 60);
+  });
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
 
   const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b;
   e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
@@ -790,8 +846,8 @@ export default function WarpBubbleCompare({
             const s = Math.max(1, sectorCount|0);
             const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
             const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
-            pushUniformsWhenReady(leftEngine.current,  payload);
-            pushUniformsWhenReady(rightEngine.current, payload);
+            pushSafe(leftEngine,  payload);
+            pushSafe(rightEngine, payload);
             leftEngine.current?.requestRewarp?.();
             rightEngine.current?.requestRewarp?.();
           }
@@ -833,8 +889,8 @@ export default function WarpBubbleCompare({
           const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
           const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
 
-          pushUniformsWhenReady(leftEngine.current,  { ...fresh, cameraZ: camL, lockFraming: true });
-          pushUniformsWhenReady(rightEngine.current, { ...fresh, cameraZ: camR, lockFraming: true });
+          pushSafe(leftEngine,  { ...fresh, cameraZ: camL, lockFraming: true });
+          pushSafe(rightEngine, { ...fresh, cameraZ: camR, lockFraming: true });
         });
         roRef.current.observe(leftRef.current!);
         roRef.current.observe(rightRef.current!);
@@ -886,7 +942,7 @@ export default function WarpBubbleCompare({
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
 
     // REAL (parity / Ford–Roman)
-    pushUniformsWhenReady(leftEngine.current, {
+    pushSafe(leftEngine, {
       ...shared,
       ...real,
       physicsParityMode: true,
@@ -898,7 +954,7 @@ export default function WarpBubbleCompare({
     });
 
     // SHOW (UI)
-    pushUniformsWhenReady(rightEngine.current, {
+    pushSafe(rightEngine, {
       ...shared,
       ...show,
       physicsParityMode: false,
@@ -934,8 +990,8 @@ export default function WarpBubbleCompare({
         burst_ms: lc.burst_ms,
         sectors: s
       };
-      pushUniformsWhenReady(leftEngine.current,  lcPayload);
-      pushUniformsWhenReady(rightEngine.current, lcPayload);
+      pushSafe(leftEngine,  lcPayload);
+      pushSafe(rightEngine, lcPayload);
     }
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
@@ -951,10 +1007,10 @@ export default function WarpBubbleCompare({
     const showU = toShowUniforms(snapForMode);
 
     // REAL (parity)
-    pushUniformsWhenReady(leftEngine.current, realU);
+    pushSafe(leftEngine, realU);
 
     // SHOW (boosted)
-    pushUniformsWhenReady(rightEngine.current, showU);
+    pushSafe(rightEngine, showU);
     // Optional: also set display gain explicitly on the instance
     rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
 
@@ -962,8 +1018,8 @@ export default function WarpBubbleCompare({
     // (kept conservative by default; uncomment if you have helpers like compactCameraZ/safeCamZ)
     // const axesScene = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
     // const z = safeCamZ(compactCameraZ(leftRef.current!, axesScene));
-    // pushUniformsWhenReady(leftEngine.current,  { cameraZ: z });
-    // pushUniformsWhenReady(rightEngine.current, { cameraZ: z });
+    // pushSafe(leftEngine,  { cameraZ: z });
+    // pushSafe(rightEngine, { cameraZ: z });
   }, [
     leftEngine.current, rightEngine.current,
     // physics chain
