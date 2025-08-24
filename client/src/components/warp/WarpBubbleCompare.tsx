@@ -1,8 +1,11 @@
+'use client';
+
 import React, { useEffect, useRef } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
-// Use the build token stamped at app boot
-const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
+// Build token: read lazily so SSR never touches `window`
+const getAppBuild = () =>
+  (typeof window !== 'undefined' && (window as any).__APP_WARP_BUILD) || 'dev';
 
 // --- resilient uniform push helpers ---
 const CM = { solid: 0, theta: 1, shear: 2 };
@@ -201,7 +204,7 @@ function resolveAssetBase() {
 }
 
 async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
-  const { requiredBuild = APP_WARP_BUILD, forceReload = false } = opts;
+  const { requiredBuild = getAppBuild(), forceReload = false } = opts;
   const w = window as any;
   const currentBuild = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
   const mismatch = currentBuild && requiredBuild && currentBuild !== requiredBuild;
@@ -760,11 +763,12 @@ export default function WarpBubbleCompare({
     (async () => {
       if (!leftRef.current || !rightRef.current) return;
       try {
-        // StrictMode/HMR guard
-        if ((window as any).__warpCompareBusy) return;
-        (window as any).__warpCompareBusy = true;
+        // StrictMode/HMR guard with ref-count so we can release on unmount
+        const busyKey = '__warpCompareBusyCount';
+        (window as any)[busyKey] = ((window as any)[busyKey] || 0) + 1;
+        if ((window as any)[busyKey] > 1) return;
         
-        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: APP_WARP_BUILD });
+        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: getAppBuild() });
         // make the strobe mux before engines so they subscribe cleanly
         ensureStrobeMux();
         if (cancelled) return;
@@ -902,6 +906,10 @@ export default function WarpBubbleCompare({
       try { rightEngine.current?.destroy?.(); } catch {}
       leftEngine.current = null;
       rightEngine.current = null;
+      try {
+        const busyKey = '__warpCompareBusyCount';
+        (window as any)[busyKey] = Math.max(0, ((window as any)[busyKey] || 1) - 1);
+      } catch {}
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

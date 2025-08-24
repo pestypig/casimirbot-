@@ -1,0 +1,59 @@
+Here are the issues I’d fix, in order of how likely they are to bite you, plus tight diffs.
+
+High-impact bugs / foot-guns
+
+Server/SSR crash (uses window at module scope)
+You read window to set APP_WARP_BUILD before the component runs. In Next.js (or any SSR), that throws.
+
+Fix: mark the file client-only and lazily read the build token.
+
++ 'use client';
+
+-import React, { useEffect, useRef } from "react";
++import React, { useEffect, useRef } from "react";
+
+-// Use the build token stamped at app boot
+-const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
++// Build token: read lazily so SSR never touches `window`
++const getAppBuild = () =>
++  (typeof window !== 'undefined' && (window as any).__APP_WARP_BUILD) || 'dev';
+
+
+And in the loader:
+
+-async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
+-  const { requiredBuild = APP_WARP_BUILD, forceReload = false } = opts;
++async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?: boolean } = {}): Promise<any> {
++  const { requiredBuild = getAppBuild(), forceReload = false } = opts;
+
+
+Global init lock never released
+You set window.__warpCompareBusy = true and never clear it, so remounts (route changes/HMR) can permanently skip init.
+
+Fix: switch to a ref-count that you decrement on cleanup.
+
+-        // StrictMode/HMR guard
+-        if ((window as any).__warpCompareBusy) return;
+-        (window as any).__warpCompareBusy = true;
++        // StrictMode/HMR guard with ref-count so we can release on unmount
++        const busyKey = '__warpCompareBusyCount';
++        (window as any)[busyKey] = ((window as any)[busyKey] || 0) + 1;
++        if ((window as any)[busyKey] > 1) return;
+
+
+And in the cleanup of that effect:
+
+     return () => {
+       cancelled = true;
+       try { roRef.current?.disconnect(); } catch {}
+       try { (leftEngine.current  as any)?.__strobeOff?.(); } catch {}
+       try { (rightEngine.current as any)?.__strobeOff?.(); } catch {}
+       try { leftEngine.current?.destroy?.(); } catch {}
+       try { rightEngine.current?.destroy?.(); } catch {}
+       leftEngine.current = null;
+       rightEngine.current = null;
++      try {
++        const busyKey = '__warpCompareBusyCount';
++        (window as any)[busyKey] = Math.max(0, ((window as any)[busyKey] || 1) - 1);
++      } catch {}
+     };
