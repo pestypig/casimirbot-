@@ -1,0 +1,65 @@
+3) One-minute console harness (works in your page)
+
+Paste this in DevTools after the compare view has mounted:
+
+// Grab the two engines that WarpEngine exposes on load
+const W = window.__warp || {};
+const ids = Object.keys(W);
+const L = W[ids.find(k => /truth|real|parity|left/i.test(k))] || W[ids[0]];
+const R = W[ids.find(k => /show|cosmetic|right/i.test(k))] || W[ids[1]];
+
+console.table({
+  leftReady:  !!L?.isLoaded,  rightReady: !!R?.isLoaded,
+  leftParity:  L?.uniforms?.physicsParityMode, 
+  rightParity: R?.uniforms?.physicsParityMode,
+  leftRidge:   L?.uniforms?.ridgeMode,
+  rightRidge:  R?.uniforms?.ridgeMode,
+});
+
+// 3a) verify strobing names are honored
+L.updateUniforms({ sectors: 5, split: 2 });
+R.updateUniforms({ sectors: 5, split: 2 });
+requestAnimationFrame(() => console.log('strobing OK?', L.uniforms.sectors, L.uniforms.split));
+
+// 3b) verify FR override vs UI duty
+// REAL: force a tiny Ford–Roman duty; SHOW: use UI duty
+L.updateUniforms({ gammaGeo: 26, deltaAOverA: 1.0, gammaVdB: 2.86e5, dutyEffectiveFR: 1e-8, viewAvg: true });
+R.updateUniforms({ gammaGeo: 26, deltaAOverA: 1.0, gammaVdB: 2.86e5, dutyCycle: 0.2, sectors: 4, viewAvg: true });
+requestAnimationFrame(() => {
+  console.log('θ-scale REAL (FR override):', L.uniforms.thetaScale);
+  console.log('θ-scale SHOW (UI duty):   ', R.uniforms.thetaScale);
+});
+
+// 3c) verify calculator → engine field pass-through
+// pretend calculator changed gammaVanDenBroeck + hull
+R.updateUniforms({ gammaVanDenBroeck: 3.1e5, hull: {a: 520, b: 130, c: 85} });
+requestAnimationFrame(() => {
+  console.log('gammaVdB alias resolved:', R.uniforms.gammaVdB);
+  console.log('axesClip updated:', R.uniforms.axesClip);
+});
+
+// 3d) verify SHOW “display gain” path (visual only)
+const startGain = R.uniforms.displayGain;
+R.setDisplayGain((startGain||1) * 3);
+requestAnimationFrame(() => console.log('displayGain→', R.uniforms.displayGain));
+
+// 3e) read live diagnostics and compare to your calculator
+setTimeout(() => {
+  console.log('REAL diag:', window.__diagREAL);
+  console.log('SHOW diag:', window.__diagSHOW);
+}, 200);
+
+
+What you should see:
+
+leftParity === true, rightParity === false
+
+sectors/split reflect your last push on both sides
+
+thetaScale changes on REAL when you change dutyEffectiveFR, and on SHOW when you change dutyCycle/sectors
+
+gammaVanDenBroeck alias lands in uniforms.gammaVdB
+
+setDisplayGain moves uniforms.displayGain (visual amplification path)
+
+__diagREAL/__diagSHOW populated with beta_inst/beta_avg/beta_net, theta_front/rear, etc.
