@@ -554,34 +554,43 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     qSpoilingFactor: state.qSpoilingFactor
   });
   
+  // --- Construct light-crossing packet (filled correctly below) ---
+  const f_m = (state.modulationFreq_GHz ?? 15) * 1e9;     // Hz
+  const T_m_s = 1 / f_m;                                  // s
+  const tauLC_s = (state.hull?.wallThickness_m ?? 1.0) / C;
+  const lightCrossing = {
+    tauLC_ms: tauLC_s * 1e3,
+    burst_ms: BURST_DUTY_LOCAL * T_m_s * 1e3,
+    dwell_ms: T_m_s * 1e3,
+  };
+  (state as any).lightCrossing = lightCrossing;
+
   // Calculate Natário metrics using pipeline state
-  const natario = calculateNatarioMetric(
-    {
+  const natario = calculateNatarioMetric({
       gap: state.gap_nm,
       hull: state.hull ? { a: state.hull.Lx_m / 2, b: state.hull.Ly_m / 2, c: state.hull.Lz_m / 2 } : { a: 503.5, b: 132, c: 86.5 },
       N_tiles: state.N_tiles,
       tileArea_m2: state.tileArea_cm2 * CM2_TO_M2,
       dutyEffectiveFR: d_eff,
-      lightCrossing: { tauLC_ms: (state as any).TS_wall || 1.0, burst_ms: 0.01, dwell_ms: 0.99 },
+      lightCrossing,
       gammaGeo: state.gammaGeo,
       gammaVanDenBroeck: state.gammaVanDenBroeck,
       qSpoilingFactor: state.qSpoilingFactor,
       cavityQ: state.qCavity,
       modulationFreq_GHz: state.modulationFreq_GHz,
-      sectorStrobing: state.sectorStrobing,
+      sectorStrobing: state.concurrentSectors,   // concurrent live sectors
       dynamicConfig: {
-        sectorCount: state.sectorStrobing,
-        sectorDuty: state.dutyCycle,
+        sectorCount: state.sectorCount,          // TOTAL sectors (e.g. 400)
+        concurrentSectors: state.concurrentSectors,
+        sectorDuty: d_eff,                       // FR duty, not UI duty
         cavityQ: state.qCavity,
         qSpoilingFactor: state.qSpoilingFactor,
         gammaGeo: state.gammaGeo,
         gammaVanDenBroeck: state.gammaVanDenBroeck,
         pulseFrequencyGHz: state.modulationFreq_GHz,
-        lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6
+        lightCrossingTimeNs: tauLC_s * 1e9
       }
-    } as any,
-    state.U_static * state.N_tiles   // pipeline total Casimir energy this tick
-  );
+    } as any, state.U_static * state.N_tiles);
   
   // Store Natário metrics in state for API access
   (state as any).natario = natario;
@@ -594,8 +603,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       arrayConfig: { size: Math.sqrt(state.N_tiles) }
     } as any);
     
-    const dyn = calculateDynamicCasimirWithNatario(
-      {
+    const dyn = calculateDynamicCasimirWithNatario({
         staticEnergy: staticResult.totalEnergy,
         modulationFreqGHz: state.modulationFreq_GHz,
         strokeAmplitudePm: (state as any).strokeAmplitude_pm ?? 50,
@@ -603,17 +611,16 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
         cycleLengthUs: (state as any).cycle_us ?? 1000,
         cavityQ: state.qCavity,
         tileCount: state.N_tiles
-      },
-      // pass the full snapshot so resolveFromPipeline can read it:
-      {
+      }, {
         ...state,
         dynamicConfig: {
           modulationFreqGHz: state.modulationFreq_GHz,
           cavityQ: state.qCavity,
           qSpoilingFactor: state.qSpoilingFactor,
-          sectorCount: state.sectorStrobing,
-          sectorDuty: state.dutyCycle,
-          lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6,
+          sectorCount: state.sectorCount,
+          concurrentSectors: state.concurrentSectors,
+          sectorDuty: d_eff,                      // FR duty
+          lightCrossingTimeNs: tauLC_s * 1e9,
           gammaGeo: state.gammaGeo,
           gammaVanDenBroeck: state.gammaVanDenBroeck
         }
