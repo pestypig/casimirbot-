@@ -15,6 +15,27 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
+
+// Utils for live mode descriptions
+type ModeKey = "hover" | "cruise" | "emergency" | "standby";
+
+const formatPower = (P_MW?: number, P_W?: number) => {
+  if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
+  if (Number.isFinite(P_W as number)) {
+    const w = P_W as number;
+    if (w >= 1e6) return `${(w / 1e6).toFixed(1)} MW`;
+    if (w >= 1e3) return `${(w / 1e3).toFixed(1)} kW`;
+    return `${w.toFixed(1)} W`;
+  }
+  return "—";
+};
+
+const buildLiveDesc = (snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number }, cfg?: { powerTarget_W?: number }) => {
+  const P = formatPower(snap?.P_avg_MW, cfg?.powerTarget_W);
+  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
+  const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
+  return `${P} • ${M} • ${Z}`;
+};
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
@@ -288,6 +309,9 @@ export default function HelixCore() {
   
   // Type-safe access to pipeline state
   const pipeline = pipelineState as EnergyPipelineState;
+
+  // Optional: expose for quick console checks
+  useEffect(() => { (window as any).__energyLive = pipeline; }, [pipeline]);
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -1070,17 +1094,40 @@ export default function HelixCore() {
                   }}
                 >
                   <SelectTrigger className="bg-slate-950 border-slate-700">
-                    <SelectValue />
+                    <SelectValue placeholder="Select mode">
+                      {(() => {
+                        const currentModeKey: ModeKey = (pipeline?.currentMode as ModeKey) || "hover";
+                        const currentCfg = MODE_CONFIGS[currentModeKey];
+                        const currentSnap = { P_avg_MW: pipeline?.P_avg, M_exotic_kg: pipeline?.M_exotic, zeta: pipeline?.zeta };
+                        const currentTitle = buildLiveDesc(currentSnap, currentCfg);
+                        return (
+                          <div className="flex flex-col">
+                            <span className="font-medium">{currentCfg?.name ?? currentModeKey}</span>
+                            <span className="text-xs text-muted-foreground">{currentTitle}</span>
+                          </div>
+                        );
+                      })()} 
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(MODE_CONFIGS).map(([mode, config]) => (
-                      <SelectItem key={mode} value={mode}>
-                        <div className="flex items-center gap-2">
-                          <span className={config.color}>{config.name}</span>
-                          <span className="text-xs text-slate-500">({fmtPowerUnitFromW(config.powerTarget_W)})</span>
-                        </div>
-                      </SelectItem>
-                    ))}
+                    {Object.entries(MODE_CONFIGS).map(([key, cfg]) => {
+                      const k = key as ModeKey;
+                      // For current mode, use live values; for others, use config fallback
+                      const isCurrentMode = k === pipeline?.currentMode;
+                      const snap = isCurrentMode ? 
+                        { P_avg_MW: pipeline?.P_avg, M_exotic_kg: pipeline?.M_exotic, zeta: pipeline?.zeta } : 
+                        null;
+                      return (
+                        <SelectItem key={key} value={key}>
+                          <div className="flex flex-col">
+                            <span className={`font-medium ${cfg.color}`}>{cfg?.name ?? key}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {buildLiveDesc(snap, cfg)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 {pipeline && (
