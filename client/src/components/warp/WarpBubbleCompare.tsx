@@ -914,13 +914,17 @@ export default function WarpBubbleCompare({
     });
 
     // SHOW (UI)
+    const showTheta = parameters.currentMode === 'standby'
+      ? 0
+      : Math.max(1e-6, show.thetaScale || 0);
+
     pushSafe(rightEngine, {
       ...shared,
       ...show,
       currentMode: parameters.currentMode,       // ← add this
       physicsParityMode: false,
       vShip: parameters.currentMode === 'standby' ? 0 : 1, // explicit
-      thetaScale: parameters.currentMode === 'standby' ? 0 : (show.thetaScale || 1e-6), // explicit protection
+      thetaScale: showTheta,  // ← floored
       gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
       deltaAOverA: show.qSpoilingFactor,
       sectors: Math.max(1, parameters.sectors),
