@@ -936,11 +936,27 @@ export default function WarpBubbleCompare({
     delete (realU as any).thetaScale;
     delete (showU as any).thetaScale;
 
+    const realFinal = { ...realU, currentMode: snapForMode.currentMode };
+    const showFinal = { ...showU, currentMode: snapForMode.currentMode };
+
+    // Debug: log uniforms for inspection
+    console.log('🔍 UNIFORMS DEBUG:', {
+      real_thetaScale: realFinal.thetaScale,
+      show_thetaScale: showFinal.thetaScale,
+      real_gammaVdB: realFinal.gammaVdB,
+      show_gammaVdB: showFinal.gammaVdB,
+      real_viewAvg: realFinal.viewAvg,
+      show_viewAvg: showFinal.viewAvg,
+      real_sectorCount: realFinal.sectorCount,
+      show_sectorCount: showFinal.sectorCount,
+      currentMode: snapForMode.currentMode
+    });
+
     // REAL (parity)
-    pushSafe(leftEngine,  { ...realU, currentMode: snapForMode.currentMode });
+    pushSafe(leftEngine, realFinal);
 
     // SHOW (boosted)
-    pushSafe(rightEngine, { ...showU, currentMode: snapForMode.currentMode });
+    pushSafe(rightEngine, showFinal);
     // Optional: also set display gain explicitly on the instance
     rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
 
