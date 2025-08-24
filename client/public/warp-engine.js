@@ -919,9 +919,6 @@ class WarpEngine {
 
         // --- Bullet-proof θ-scale (prevents "θ-scale — invalid" row) ---
         const sectorsEff = Math.max(1, nextUniforms.sectors|0 || 1);
-        
-        // compute effective FR duty
-        const frFromParams = parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
 
         let dutyEffFR;
         if (isStandby) {
