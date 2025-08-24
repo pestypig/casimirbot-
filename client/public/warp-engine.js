@@ -679,37 +679,42 @@ class WarpEngine {
         const gl = this.gl;
         this.gridProgram = program;
         this.gridUniforms = {
-            // matrices & base
-            mvpMatrix:        gl.getUniformLocation(program, 'u_mvpMatrix'),
-            sheetColor:       gl.getUniformLocation(program, 'u_sheetColor'),
+            // matrices / basics
+            mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+            sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
 
-            // physics chain / sectoring
-            thetaScale:       gl.getUniformLocation(program, 'u_thetaScale'),
-            sectorCount:      gl.getUniformLocation(program, 'u_SectorCount'),
-            split:            gl.getUniformLocation(program, 'u_Split'),
+            // core physics chain
+            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+            colorMode:  gl.getUniformLocation(program, 'u_colorMode'),
+            ridgeMode:  gl.getUniformLocation(program, 'u_ridgeMode')  || gl.getUniformLocation(program, 'u_RidgeMode'),
+            parity:     gl.getUniformLocation(program, 'u_physicsParityMode') || gl.getUniformLocation(program, 'u_PhysicsParityMode'),
 
-            // mode & visualization
-            parity:           gl.getUniformLocation(program, 'u_physicsParityMode'),
-            colorMode:        gl.getUniformLocation(program, 'u_colorMode'),
-            ridgeMode:        gl.getUniformLocation(program, 'u_ridgeMode'),
-            exposure:         gl.getUniformLocation(program, 'u_exposure'),
-            zeroStop:         gl.getUniformLocation(program, 'u_zeroStop'),
+            // sectoring
+            sectorCount: gl.getUniformLocation(program, 'u_sectorCount') || gl.getUniformLocation(program, 'u_SectorCount'),
+            split:       gl.getUniformLocation(program, 'u_split') || gl.getUniformLocation(program, 'u_Split'),
 
-            // velocity / drive / shell
-            driveDir:         gl.getUniformLocation(program, 'u_driveDir'),
-            vShip:            gl.getUniformLocation(program, 'u_vShip'),
-            wallWidth:        gl.getUniformLocation(program, 'u_wallWidth'),
+            // scene & hull
+            axesScene: gl.getUniformLocation(program, 'u_axesScene'),
+            axes:      gl.getUniformLocation(program, 'u_axes'),
 
-            // gain chain
-            userGain:         gl.getUniformLocation(program, 'u_userGain'),
-            displayGain:      gl.getUniformLocation(program, 'u_displayGain'),
-            vizGain:          gl.getUniformLocation(program, 'u_vizGain'),
-            curvatureGainT:   gl.getUniformLocation(program, 'u_curvatureGainT'),
-            curvatureBoostMax:gl.getUniformLocation(program, 'u_curvatureBoostMax'),
+            // drive + wall
+            driveDir:  gl.getUniformLocation(program, 'u_driveDir'),
+            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
+            vShip:     gl.getUniformLocation(program, 'u_vShip'),
 
-            // axes
-            axesScene:        gl.getUniformLocation(program, 'u_axesScene'),
-            axes:             gl.getUniformLocation(program, 'u_axes'),
+            // viz / exposure chain
+            exposure:          gl.getUniformLocation(program, 'u_exposure'),
+            zeroStop:          gl.getUniformLocation(program, 'u_zeroStop'),
+            userGain:          gl.getUniformLocation(program, 'u_userGain'),
+            displayGain:       gl.getUniformLocation(program, 'u_displayGain'),
+            vizGain:           gl.getUniformLocation(program, 'u_vizGain'),
+            curvatureGainT:    gl.getUniformLocation(program, 'u_curvatureGainT'),
+            curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
+
+            // interior tilt (safe no-ops if unused)
+            intWidth: gl.getUniformLocation(program, 'u_intWidth'),
+            epsTilt:  gl.getUniformLocation(program, 'u_epsTilt'),
+            tiltViz:  gl.getUniformLocation(program, 'u_tiltViz'),
         };
 
         // (Optional) quick sanity log once

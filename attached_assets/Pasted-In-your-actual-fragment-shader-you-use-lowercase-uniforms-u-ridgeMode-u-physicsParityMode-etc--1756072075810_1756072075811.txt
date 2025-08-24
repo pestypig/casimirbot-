@@ -1,0 +1,55 @@
+In your actual fragment shader you use lowercase uniforms (u_ridgeMode, u_physicsParityMode, etc.), but the engine only caches/sets the UPPERCASE variants and doesn’t set the rest (like u_vShip, u_driveDir, u_axesScene, u_wallWidth, gains). Result:
+
+u_vShip defaults to 0.0 → θ and shear both go to zero → SHOW looks flat.
+
+Axes uniforms default to (0,0,0) → v_pos / axes → NaNs → nothing meaningful renders even if θ-scale is non-zero.
+
+Parity/ridge/sector uniforms you’re setting use the wrong names, so they don’t actually toggle the shader branches.
+
+Below is a minimal, surgical fix you can paste in that will bring SHOW back immediately and keep REAL = zero in standby.
+
+1) Fix uniform lookups after program link
+
+File: client/public/warp-engine.js
+Inside: your shader link success handler (where you currently set this.gridUniforms = { … })
+
+Replace the tiny cache with a full cache (use lowercase names first; fall back to uppercase to stay compatible with old builds):
+
+this.gridUniforms = {
+  // matrices / basics
+  mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+  sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+
+  // core physics chain
+  thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+  colorMode:  gl.getUniformLocation(program, 'u_colorMode'),
+  ridgeMode:  gl.getUniformLocation(program, 'u_ridgeMode')  || gl.getUniformLocation(program, 'u_RidgeMode'),
+  parity:     gl.getUniformLocation(program, 'u_physicsParityMode') || gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+
+  // sectoring
+  sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
+  split:       gl.getUniformLocation(program, 'u_Split'),
+
+  // scene & hull
+  axesScene: gl.getUniformLocation(program, 'u_axesScene'),
+  axes:      gl.getUniformLocation(program, 'u_axes'),
+
+  // drive + wall
+  driveDir:  gl.getUniformLocation(program, 'u_driveDir'),
+  wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
+  vShip:     gl.getUniformLocation(program, 'u_vShip'),
+
+  // viz / exposure chain
+  exposure:          gl.getUniformLocation(program, 'u_exposure'),
+  zeroStop:          gl.getUniformLocation(program, 'u_zeroStop'),
+  userGain:          gl.getUniformLocation(program, 'u_userGain'),
+  displayGain:       gl.getUniformLocation(program, 'u_displayGain'),
+  vizGain:           gl.getUniformLocation(program, 'u_vizGain'),
+  curvatureGainT:    gl.getUniformLocation(program, 'u_curvatureGainT'),
+  curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
+
+  // interior tilt (safe no-ops if unused)
+  intWidth: gl.getUniformLocation(program, 'u_intWidth'),
+  epsTilt:  gl.getUniformLocation(program, 'u_epsTilt'),
+  tiltViz:  gl.getUniformLocation(program, 'u_tiltViz'),
+};

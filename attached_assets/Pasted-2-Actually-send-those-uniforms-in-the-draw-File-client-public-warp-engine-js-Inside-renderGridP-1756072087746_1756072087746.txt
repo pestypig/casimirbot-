@@ -1,0 +1,60 @@
+2) Actually send those uniforms in the draw
+
+File: client/public/warp-engine.js
+Inside: _renderGridPoints() — right after gl.useProgram(this.gridProgram); and before drawArrays
+
+Add the missing uniform sets with robust defaults:
+
+const u = this.uniforms || {};
+
+// --- names / helpers
+const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
+const F = (x, d)=> Number.isFinite(x) ? +x : d;
+const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
+
+// --- colors / matrices you already set:
+gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+// --- modes / sectoring (use lowercase names in the shader)
+if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(u.colorMode, 1));
+if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(u.ridgeMode, 1));
+if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
+if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount,I(u.sectors, 1));
+if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      I(Math.max(0, Math.min(I(u.sectors,1)-1, I(u.split,0))), 0));
+
+// --- axes (scene-normalized and legacy hull)
+const axesScene = u.axesClip || u.axesScene || [1,1,1];
+const hullAxes  = u.hullAxes || [503.5, 132.0, 86.5];
+if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
+if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
+
+// --- drive + wall
+const drive = V3(u.driveDir, [1,0,0]);
+const wRho  = Number.isFinite(u.wallWidth_rho) ? u.wallWidth_rho : (Number.isFinite(u.wallWidth) ? u.wallWidth : 0.02);
+if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
+if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, F(wRho, 0.02));
+
+// --- critical amplitude carrier INSIDE theta field:
+const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
+if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
+
+// --- θ-scale (you already set a fallback in JS if missing)
+if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, F(u.thetaScale, 5.03e3));
+
+// --- exposure / viz chain
+if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
+if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(u.zeroStop, u.physicsParityMode ? 1e-5 : 1e-7));
+if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(u.userGain, 1.0));
+if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(u.displayGain, 1.0));
+if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(u.vizGain, 1.0));
+if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(u.curvatureGainT, 0.0));
+if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(u.curvatureBoostMax, 1.0));
+
+// --- interior tilt (benign defaults)
+if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
+if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
+if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
+
+
+This alone will make SHOW light up again (because u_vShip will be 1.0 unless parity/standby forces it to 0) and will prevent NaNs by providing valid axes and wall width.
