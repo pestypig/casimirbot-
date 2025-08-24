@@ -932,6 +932,10 @@ export default function WarpBubbleCompare({
     const realU = toRealUniforms(snapForMode);
     const showU = toShowUniforms(snapForMode);
 
+    // prevent any accidental θ overwrite by live ticks
+    delete (realU as any).thetaScale;
+    delete (showU as any).thetaScale;
+
     // REAL (parity)
     pushSafe(leftEngine,  { ...realU, currentMode: snapForMode.currentMode });
 
