@@ -681,6 +681,8 @@ export default function WarpBubbleCompare({
       deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
       gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
 
+      // Do NOT push thetaScale from live ticks; parameters effect is source of truth
+
       // Forward currentMode to engine for GPU-side mode decisions
       currentMode: snap.currentMode,
 
@@ -718,7 +720,7 @@ export default function WarpBubbleCompare({
       colorMode: 1,       // theta diverging palette
       exposure: N(snap.exposure, 6.0),
       zeroStop: N(snap.zeroStop, 1e-7),
-      thetaScale: isStandby ? 0 : computeThetaScale(snap),
+      // Do NOT push thetaScale from live ticks; parameters effect is source of truth
       curvatureGainT: isStandby ? 0 : T,
       curvatureBoostMax: isStandby ? 1 : B,
       userGain: isStandby ? 1 : N(snap.userGain, 4.0),
