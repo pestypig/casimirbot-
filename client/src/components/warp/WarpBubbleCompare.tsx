@@ -4,6 +4,51 @@ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 // Use the build token stamped at app boot
 const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
 
+// --- resilient uniform push helpers ---
+const CM = { solid: 0, theta: 1, shear: 2 };
+const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
+
+function sanitizeUniforms(u: any = {}) {
+  const s = { ...u };
+
+  // numeric coercions + clamps
+  s.thetaScale        = Math.max(1e-12,  finite(s.thetaScale,        1));
+  s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
+  s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
+  s.wallWidth         = Math.max(1e-4,    finite(s.wallWidth,  0.016));
+  s.curvatureBoostMax = Math.max(1,       finite(s.curvatureBoostMax, 40));
+  s.curvatureGainT    = Math.max(0, Math.min(1, finite(s.curvatureGainT, 0)));
+  s.userGain          = Math.max(1,       finite(s.userGain,  1));
+  s.displayGain       = Math.max(1,       finite(s.displayGain, 1));
+  s.sectors           = Math.max(1, Math.floor(finite(s.sectors, 1)));
+  s.split             = Math.max(0, Math.min(s.sectors - 1, Math.floor(finite(s.split, 0))));
+
+  // map strings → ints
+  if (typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode] ?? 1;
+  s.ridgeMode = Math.max(0, Math.min(1, Math.floor(finite(s.ridgeMode, 0))));
+
+  // hull normalization (drop invalid)
+  if (s.hull) {
+    const a = finite(s.hull.a, NaN), b = finite(s.hull.b, NaN), c = finite(s.hull.c, NaN);
+    if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) s.hull = { a, b, c };
+    else delete s.hull;
+  }
+
+  return s;
+}
+
+function pushSafe(engineRef: React.MutableRefObject<any>, patch: any) {
+  const e = engineRef?.current;
+  if (!e) return;
+  const clean = sanitizeUniforms(patch);
+  if (!e.isLoaded || !e.gridProgram) {
+    e.onceReady(() => { e.updateUniforms(clean); e.forceRedraw?.(); });
+  } else {
+    e.updateUniforms(clean);
+    e.forceRedraw?.();
+  }
+}
+
 // Modes we expose in UI
 type ModeKey = "hover" | "cruise" | "emergency" | "standby";
 
@@ -254,12 +299,22 @@ function applyShowSafe(e:any, payload:any) {
     const ready = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
     if (!ready && !applied) {
       applied = true;
-      pushUniformsWhenReady(e, { cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
+      const clean = sanitizeUniforms({ cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
       e.setDisplayGain?.(1);
       console.warn('[SHOW] cosmetics disabled as safety fallback');
     } else if (ready && applied) {
       // re-apply SHOW once; use whatever you computed in applyShow
-      pushUniformsWhenReady(e, payload);
+      const clean = sanitizeUniforms(payload);
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
       console.log('[SHOW] re-applied boosted settings after grid ready');
     }
   };
@@ -404,27 +459,6 @@ function compatifyUniforms(raw: any) {
   return p;
 }
 
-function pushUniformsWhenReady(engine: any, payload: any, retries = 24) {
-  if (!engine || (engine._destroyed === true)) return;
-  const bundle = compatifyUniforms(payload);
-
-  const tryPush = () => {
-    if (!engine || engine._destroyed) return;
-    try { engine.updateUniforms?.(bundle); } catch {}
-    try { engine.setParams?.(bundle); }      catch {}
-  };
-
-  // push immediately
-  tryPush();
-
-  // push again on a few frames (late init, async resize, etc.)
-  if (retries > 0) {
-    requestAnimationFrame(() => {
-      if (!engine || engine._destroyed) return;
-      pushUniformsWhenReady(engine, payload, retries - 1);
-    });
-  }
-}
 
 /* ---------------- Pane configurators ---------------- */
 const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 'theta'|'shear'|'solid') => {
@@ -433,10 +467,22 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
   if (!e._bootstrapped) {
     e.bootstrap?.(payload);
     e._bootstrapped = true;
-    setTimeout(() => pushUniformsWhenReady(e, payload), 0); // microtick delay
+    setTimeout(() => {
+      const clean = sanitizeUniforms(payload);
+      if (e.isLoaded && e.gridProgram) {
+        e.updateUniforms(clean);
+      } else {
+        e.onceReady?.(() => e.updateUniforms(clean));
+      }
+    }, 0); // microtick delay
     return;
   }
-  pushUniformsWhenReady(e, payload);
+  const clean = sanitizeUniforms(payload);
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
 };
 
 const applyReal = (
@@ -454,7 +500,7 @@ const applyReal = (
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
   const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
 
-  pushUniformsWhenReady(e, {
+  const clean = sanitizeUniforms({
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -473,6 +519,11 @@ const applyReal = (
     curvatureBoostMax: 1,
     // ⚠ don't override tilt here; let upstream params decide
   });
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
   e.setDisplayGain?.(1);
   e.requestRewarp?.();
 };
@@ -503,7 +554,7 @@ const applyShow = (
 
   console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
 
-  pushUniformsWhenReady(e, {
+  const clean = sanitizeUniforms({
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
@@ -520,7 +571,12 @@ const applyShow = (
     exposure: Math.max(0.1, exposure),
     zeroStop,
     cosmeticLevel: 10,
-  }, 60);
+  });
+  if (e.isLoaded && e.gridProgram) {
+    e.updateUniforms(clean);
+  } else {
+    e.onceReady?.(() => e.updateUniforms(clean));
+  }
 
   const displayBoost = (1 - clamp01(decades/8)) + clamp01(decades/8) * b;
   e.setDisplayGain?.(Number.isFinite(displayBoost) ? displayBoost : 1);
@@ -587,6 +643,114 @@ export default function WarpBubbleCompare({
   // Titles for the two panels
   const realPanelTitle = `REAL • ${currentSubtitle}`;   // parity/FR view
   const showPanelTitle = `SHOW • ${currentSubtitle}`;   // boosted/UI view
+
+  // 7.1 — Live → Uniforms mapping helpers
+  type LiveSnap = Partial<{
+    // physics / timing
+    dutyCycle: number;
+    sectorCount: number; sectorStrobing: number; sectors: number;
+    sectorSplit: number; split: number; currentSector: number;
+    gammaGeo: number; g_y: number;
+    deltaAOverA: number; qSpoilingFactor: number;
+    gammaVdB: number; gammaVanDenBroeck: number;
+    viewAvg: boolean;
+
+    // geometry
+    hullAxes: [number, number, number];
+    hull: { a: number; b: number; c: number };
+    wallWidth_m: number; wallWidth_rho: number;
+    driveDir: [number, number, number];
+
+    // viz
+    curvatureGainT: number; curvatureBoostMax: number;
+    exposure: number; zeroStop: number; cosmeticLevel: number;
+    ridgeMode: number; colorMode: number | "theta" | "shear" | "solid";
+    userGain: number; displayGain: number; lockFraming: boolean; cameraZ: number;
+  }>;
+
+  const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
+  const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+  // Compute θ-scale (γ^3 · ΔA/A · γ_VdB · √(duty/sectors)) if not provided
+  const computeThetaScale = (v: LiveSnap) => {
+    const gammaGeo = N(v.gammaGeo ?? (v as any).g_y, 26);
+    const dAa = N(v.deltaAOverA ?? (v as any).qSpoilingFactor, 1);
+    const gammaVdB = N(v.gammaVdB ?? (v as any).gammaVanDenBroeck, 2.86e5);
+    const sectors = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectorStrobing ?? v.sectors, 1)));
+    const duty = Math.max(0, N(v.dutyCycle, 0));
+    const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
+    const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+    const effDuty = Math.max(1e-12, duty / sectors);
+    return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+  };
+
+  const toSharedUniforms = (snap: LiveSnap) => {
+    // hull → axesClip is computed in engine, but we pass meters for authority
+    const a = N(snap.hull?.a ?? snap.hullAxes?.[0], 503.5);
+    const b = N(snap.hull?.b ?? snap.hullAxes?.[1], 132.0);
+    const c = N(snap.hull?.c ?? snap.hullAxes?.[2], 86.5);
+    return {
+      hullAxes: [a, b, c] as [number, number, number],
+      wallWidth_m: Number.isFinite(snap.wallWidth_m) ? snap.wallWidth_m : undefined,
+      wallWidth_rho: Number.isFinite(snap.wallWidth_rho) ? snap.wallWidth_rho : undefined,
+      driveDir: (Array.isArray(snap.driveDir) && snap.driveDir.length === 3) ? snap.driveDir : [1, 0, 0],
+
+      // strobing/sectoring values (also mirrored to the global strobe mux below)
+      dutyCycle: N(snap.dutyCycle, 0.14),
+      sectors: Math.max(1, Math.floor(N(snap.sectorCount ?? snap.sectorStrobing ?? snap.sectors, 1))),
+      split: Math.max(0, Math.floor(N(snap.sectorSplit ?? snap.split ?? snap.currentSector, 0))),
+      viewAvg: !!(snap.viewAvg ?? true),
+
+      // physics chain
+      gammaGeo: N(snap.gammaGeo ?? (snap as any).g_y, 26),
+      deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
+      gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
+
+      // θ-scale (engine will compute if omitted; we compute explicitly for parity)
+      thetaScale: computeThetaScale(snap),
+
+      // camera/framing passthroughs if present
+      lockFraming: snap.lockFraming ?? true,
+      cameraZ: Number.isFinite(snap.cameraZ) ? snap.cameraZ : undefined,
+    };
+  };
+
+  const toRealUniforms = (snap: LiveSnap) => ({
+    ...toSharedUniforms(snap),
+    physicsParityMode: true,
+    ridgeMode: 0,
+    colorMode: 2,          // shear is a nice truth default; change if you prefer
+    exposure: 3.5,
+    zeroStop: 1e-5,
+    curvatureGainT: 0.0,
+    curvatureBoostMax: 1.0,
+    userGain: 1.0,
+    vizGain: 1.0,
+  });
+
+  const toShowUniforms = (snap: LiveSnap) => {
+    const T = clamp01(N(snap.curvatureGainT, 0.6));
+    const B = Math.max(1, N(snap.curvatureBoostMax, 40));
+    return {
+      ...toSharedUniforms(snap),
+      physicsParityMode: false,
+      ridgeMode: 1,
+      colorMode: 1,       // theta diverging palette
+      exposure: N(snap.exposure, 6.0),
+      zeroStop: N(snap.zeroStop, 1e-7),
+      curvatureGainT: T,
+      curvatureBoostMax: B,
+      userGain: N(snap.userGain, 4.0),
+      vizGain: 1.0,
+      // display gain mirrors UI decades (optional—engine also respects userGain)
+      displayGain: 1 + T * (B - 1),
+    };
+  };
+
+  // 7.2 — Choose the live snapshot for the current mode (byMode or flat)
+  const snapAll = live?.byMode ?? live?.modes ?? null;
+  const snapForMode: LiveSnap = (snapAll && (snapAll as any)[currentModeKey]) || (live as any) || {};
+
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
 
@@ -682,8 +846,8 @@ export default function WarpBubbleCompare({
             const s = Math.max(1, sectorCount|0);
             const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
             const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
-            pushUniformsWhenReady(leftEngine.current,  payload);
-            pushUniformsWhenReady(rightEngine.current, payload);
+            pushSafe(leftEngine,  payload);
+            pushSafe(rightEngine, payload);
             leftEngine.current?.requestRewarp?.();
             rightEngine.current?.requestRewarp?.();
           }
@@ -725,8 +889,8 @@ export default function WarpBubbleCompare({
           const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
           const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
 
-          pushUniformsWhenReady(leftEngine.current,  { ...fresh, cameraZ: camL, lockFraming: true });
-          pushUniformsWhenReady(rightEngine.current, { ...fresh, cameraZ: camR, lockFraming: true });
+          pushSafe(leftEngine,  { ...fresh, cameraZ: camL, lockFraming: true });
+          pushSafe(rightEngine, { ...fresh, cameraZ: camR, lockFraming: true });
         });
         roRef.current.observe(leftRef.current!);
         roRef.current.observe(rightRef.current!);
@@ -778,7 +942,7 @@ export default function WarpBubbleCompare({
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
 
     // REAL (parity / Ford–Roman)
-    pushUniformsWhenReady(leftEngine.current, {
+    pushSafe(leftEngine, {
       ...shared,
       ...real,
       physicsParityMode: true,
@@ -790,7 +954,7 @@ export default function WarpBubbleCompare({
     });
 
     // SHOW (UI)
-    pushUniformsWhenReady(rightEngine.current, {
+    pushSafe(rightEngine, {
       ...shared,
       ...show,
       physicsParityMode: false,
@@ -826,14 +990,62 @@ export default function WarpBubbleCompare({
         burst_ms: lc.burst_ms,
         sectors: s
       };
-      pushUniformsWhenReady(leftEngine.current,  lcPayload);
-      pushUniformsWhenReady(rightEngine.current, lcPayload);
+      pushSafe(leftEngine,  lcPayload);
+      pushSafe(rightEngine, lcPayload);
     }
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
     const displayGain = Math.max(1, (1) * (heroX ? 1 + 0.5*Math.log10(Math.max(1, heroX)) : 1));
     rightEngine.current.setDisplayGain?.(displayGain);
   }, [parameters, colorMode, lockFraming, heroX]);
+
+  // 7.3 — Push uniforms into both engines whenever live values change
+  useEffect(() => {
+    if (!leftEngine.current || !rightEngine.current) return;
+
+    const realU = toRealUniforms(snapForMode);
+    const showU = toShowUniforms(snapForMode);
+
+    // REAL (parity)
+    pushSafe(leftEngine, realU);
+
+    // SHOW (boosted)
+    pushSafe(rightEngine, showU);
+    // Optional: also set display gain explicitly on the instance
+    rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
+
+    // Camera nudge: if you track a shared axesScene span, you can enforce a safe cameraZ
+    // (kept conservative by default; uncomment if you have helpers like compactCameraZ/safeCamZ)
+    // const axesScene = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
+    // const z = safeCamZ(compactCameraZ(leftRef.current!, axesScene));
+    // pushSafe(leftEngine,  { cameraZ: z });
+    // pushSafe(rightEngine, { cameraZ: z });
+  }, [
+    leftEngine.current, rightEngine.current,
+    // physics chain
+    snapForMode?.gammaGeo, snapForMode?.gammaVdB, (snapForMode as any)?.g_y,
+    snapForMode?.deltaAOverA, (snapForMode as any)?.qSpoilingFactor,
+    snapForMode?.dutyCycle, snapForMode?.sectorCount, snapForMode?.sectorStrobing,
+    snapForMode?.sectors, snapForMode?.sectorSplit, snapForMode?.split, snapForMode?.currentSector,
+    snapForMode?.viewAvg,
+    // geometry
+    snapForMode?.hullAxes?.[0], snapForMode?.hullAxes?.[1], snapForMode?.hullAxes?.[2],
+    snapForMode?.hull?.a, snapForMode?.hull?.b, snapForMode?.hull?.c,
+    snapForMode?.wallWidth_m, snapForMode?.wallWidth_rho,
+    // viz
+    snapForMode?.curvatureGainT, snapForMode?.curvatureBoostMax,
+    snapForMode?.exposure, snapForMode?.zeroStop, snapForMode?.userGain,
+    snapForMode?.displayGain,
+    live?.currentMode
+  ]);
+
+  // 7.4 — Mirror strobing (sectoring) to the global mux that WarpEngine listens to
+  useEffect(() => {
+    const s = Math.max(1, Math.floor(N(snapForMode?.sectorCount ?? snapForMode?.sectors ?? 1, 1)));
+    const cur = Math.max(0, Math.floor(N(snapForMode?.currentSector ?? 0, 0)) % s);
+    const split = Math.max(0, Math.min(s - 1, Math.floor(N(snapForMode?.sectorSplit ?? snapForMode?.split ?? cur, cur))));
+    (window as any).setStrobingState?.({ sectorCount: s, currentSector: cur, split });
+  }, [snapForMode?.sectorCount, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
 
   // Fix black bands/duplicated rows after layout changes
   useEffect(() => {
