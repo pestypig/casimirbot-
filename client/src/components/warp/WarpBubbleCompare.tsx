@@ -234,7 +234,8 @@ async function ensureWarpEngineCtor(opts: { requiredBuild?: string; forceReload?
   const mk = (p: string) => {
     try { return new URL(p, assetBase).toString(); } catch { return p; }
   };
-  const url = mk(`warp-engine.js?v=${encodeURIComponent(requiredBuild)}&t=${Date.now()}`);
+  const devBust = requiredBuild === 'dev' ? `&t=${Date.now()}` : '';
+  const url = mk(`warp-engine.js?v=${encodeURIComponent(requiredBuild)}${devBust}`);
   await loadScript(url);
 
   const Ctor = w.WarpEngine?.default || w.WarpEngine;
@@ -325,25 +326,7 @@ function applyShowSafe(e:any, payload:any) {
   setTimeout(recheck, 120); // belt & suspenders
 }
 
-/* ---------------- Physics scalar helpers ---------------- */
-import { resolveThetaScale, type DutySource } from '@/lib/warp-theta';
-
-function physicsPayload(p: any, dutySource: DutySource = 'fr') {
-  const sectorsLive  = Math.max(1, Number(p?.sectorStrobing ?? p?.concurrentSectors ?? p?.sectors ?? 1));
-  const sectorsTotal = Math.max(1, Number(p?.sectorCount ?? 400));
-  const shaped = { ...p, sectors: sectorsLive, sectorCount: sectorsTotal };
-
-  return {
-    thetaScale: resolveThetaScale(shaped, dutySource),
-    dutyCycle: Number(p?.dutyCycle ?? 0.14),
-    sectors: sectorsLive,                 // ← live strobing for averaging
-    sectorCount: sectorsTotal,            // ← total for book-keeping
-    viewAvg: p?.viewAvg ?? true,
-    gammaGeo: Number(p?.gammaGeo ?? p?.g_y ?? 26),
-    deltaAOverA: Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
-    gammaVdB: Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 2.86e5),
-  };
-}
+// (removed unused import + helper; this component computes θ-scale inline)
 
 /* ---------------- Framing helpers ---------------- */
 type Hull = { a:number; b:number; c:number };
@@ -700,7 +683,8 @@ export default function WarpBubbleCompare({
 
       // strobing/sectoring values (also mirrored to the global strobe mux below)
       dutyCycle: N(snap.dutyCycle, 0.14),
-      sectors: Math.max(1, Math.floor(N(snap.sectorCount ?? snap.sectorStrobing ?? snap.sectors, 1))),
+      sectors: Math.max(1, Math.floor(N(snap.sectorStrobing ?? snap.sectors, 1))),
+      sectorCount: Math.max(1, Math.floor(N(snap.sectorCount ?? 1, 1))),
       split: Math.max(0, Math.floor(N(snap.sectorSplit ?? snap.split ?? snap.currentSector, 0))),
       viewAvg: !!(snap.viewAvg ?? true),
 
@@ -1042,11 +1026,12 @@ export default function WarpBubbleCompare({
 
   // 7.4 — Mirror strobing (sectoring) to the global mux that WarpEngine listens to
   useEffect(() => {
-    const s = Math.max(1, Math.floor(N(snapForMode?.sectorCount ?? snapForMode?.sectors ?? 1, 1)));
-    const cur = Math.max(0, Math.floor(N(snapForMode?.currentSector ?? 0, 0)) % s);
-    const split = Math.max(0, Math.min(s - 1, Math.floor(N(snapForMode?.sectorSplit ?? snapForMode?.split ?? cur, cur))));
-    (window as any).setStrobingState?.({ sectorCount: s, currentSector: cur, split });
-  }, [snapForMode?.sectorCount, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
+    const sTotal = Math.max(1, Math.floor(N(snapForMode?.sectorCount ?? 1, 1)));
+    const sLive  = Math.max(1, Math.floor(N(snapForMode?.sectorStrobing ?? snapForMode?.sectors ?? sTotal, sTotal)));
+    const cur    = Math.max(0, Math.floor(N(snapForMode?.currentSector ?? 0, 0)) % sLive);
+    const split  = Math.max(0, Math.min(sLive - 1, Math.floor(N(snapForMode?.sectorSplit ?? snapForMode?.split ?? cur, cur))));
+    (window as any).setStrobingState?.({ sectorCount: sTotal, currentSector: cur, split });
+  }, [snapForMode?.sectorCount, snapForMode?.sectorStrobing, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
 
   // Fix black bands/duplicated rows after layout changes
   useEffect(() => {
