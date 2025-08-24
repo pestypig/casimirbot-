@@ -1,7 +1,34 @@
 import React, { useEffect, useRef } from "react";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 // Use the build token stamped at app boot
 const APP_WARP_BUILD = (window as any).__APP_WARP_BUILD || Date.now().toString();
+
+// Modes we expose in UI
+type ModeKey = "hover" | "cruise" | "emergency" | "standby";
+
+// Safe unit formatting for either live MW or config W
+const formatPower = (P_MW?: number, P_W?: number) => {
+  if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
+  if (Number.isFinite(P_W as number)) {
+    const w = P_W as number;
+    if (w >= 1e6) return `${(w / 1e6).toFixed(1)} MW`;
+    if (w >= 1e3) return `${(w / 1e3).toFixed(1)} kW`;
+    return `${w.toFixed(1)} W`;
+  }
+  return "—";
+};
+
+// Build a live subtitle for a mode (power • mass • zeta)
+const buildLiveDesc = (
+  snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number },
+  cfg?: { powerTarget_W?: number }
+) => {
+  const P = formatPower(snap?.P_avg_MW, cfg?.powerTarget_W);
+  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
+  const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
+  return `${P} • ${M} • ${Z}`;
+};
 
 /* ---------------- Client-side physics calc identical to EnergyPipeline ---------------- */
 type BaseInputs = {
@@ -536,6 +563,30 @@ export default function WarpBubbleCompare({
   const rightRef = useRef<HTMLCanvasElement>(null);
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+
+  // Live pipeline snapshot (same hook used by Energy Control panel)
+  const { data: live } = useEnergyPipeline();
+
+  // tolerant extraction – supports live.byMode, live.modes, or flat legacy shapes
+  const liveForMode = (key: ModeKey) =>
+    (live?.byMode && live.byMode[key]) ||
+    (live?.modes && live.modes[key]) ||
+    (live && (live as any)[key]) || null;
+
+  // current UI mode key (fallback to 'hover')
+  const currentModeKey = ((live?.currentMode as ModeKey) || "hover") as ModeKey;
+
+  // optional: read UI configs if present on window; safe fallback to empty
+  const modeCfgs: Record<string, { name?: string; powerTarget_W?: number }> =
+    (typeof window !== "undefined" && (window as any).MODE_CONFIGS) || {};
+
+  const currentSnap = liveForMode(currentModeKey);
+  const currentCfg = modeCfgs[currentModeKey];
+  const currentSubtitle = buildLiveDesc(currentSnap, currentCfg);
+
+  // Titles for the two panels
+  const realPanelTitle = `REAL • ${currentSubtitle}`;   // parity/FR view
+  const showPanelTitle = `SHOW • ${currentSubtitle}`;   // boosted/UI view
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
 
@@ -876,7 +927,7 @@ export default function WarpBubbleCompare({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
-        <div className="px-2 py-1 text-xs font-mono text-slate-300">REAL (parity)</div>
+        <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
         <canvas 
           ref={leftRef} 
           className="w-full h-[calc(100%-32px)] block" 
@@ -884,7 +935,7 @@ export default function WarpBubbleCompare({
         />
       </div>
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
-        <div className="px-2 py-1 text-xs font-mono text-slate-300">SHOW (boosted)</div>
+        <div className="px-2 py-1 text-xs font-mono text-slate-300">{showPanelTitle}</div>
         <canvas 
           ref={rightRef} 
           className="w-full h-[calc(100%-32px)] block" 
