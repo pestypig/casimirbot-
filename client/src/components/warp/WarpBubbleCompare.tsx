@@ -700,30 +700,34 @@ export default function WarpBubbleCompare({
   };
 
   const toSharedUniforms = (snap: LiveSnap) => {
-    // hull → axesClip is computed in engine, but we pass meters for authority
     const a = N(snap.hull?.a ?? snap.hullAxes?.[0], 503.5);
     const b = N(snap.hull?.b ?? snap.hullAxes?.[1], 132.0);
     const c = N(snap.hull?.c ?? snap.hullAxes?.[2], 86.5);
+    const aEff = Math.cbrt(a*b*c);
+    const wRho = Number.isFinite(snap.wallWidth_rho)
+      ? snap.wallWidth_rho
+      : (Number.isFinite(snap.wallWidth_m) ? Math.max(1e-6, snap.wallWidth_m / Math.max(1e-6, aEff)) : undefined);
+
     return {
       hullAxes: [a, b, c] as [number, number, number],
-      wallWidth_m: Number.isFinite(snap.wallWidth_m) ? snap.wallWidth_m : undefined,
-      wallWidth_rho: Number.isFinite(snap.wallWidth_rho) ? snap.wallWidth_rho : undefined,
-      driveDir: (Array.isArray(snap.driveDir) && snap.driveDir.length === 3) ? snap.driveDir : [1, 0, 0],
+      wallWidth_rho: wRho,
+      driveDir: (Array.isArray(snap.driveDir) && snap.driveDir.length===3) ? snap.driveDir : [1,0,0],
 
-      // strobing/sectoring values (also mirrored to the global strobe mux below)
       dutyCycle: N(snap.dutyCycle, 0.14),
       sectors: Math.max(1, Math.floor(N(snap.sectorStrobing ?? snap.sectors, 1))),
       sectorCount: Math.max(1, Math.floor(N(snap.sectorCount ?? 1, 1))),
       split: Math.max(0, Math.floor(N(snap.sectorSplit ?? snap.split ?? snap.currentSector, 0))),
       viewAvg: !!(snap.viewAvg ?? true),
 
-      // physics chain
       gammaGeo: N(snap.gammaGeo ?? (snap as any).g_y, 26),
       deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
       gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
 
-      // θ-scale (engine will compute if omitted; we compute explicitly for parity)
+      // θ-scale (keep your existing computation)
       thetaScale: computeThetaScale(snap),
+
+      // NEW: carrier for θ field in shader; 0 in standby, 1 otherwise
+      vShip: (snap.currentMode === 'standby') ? 0 : 1,
 
       // camera/framing passthroughs if present
       lockFraming: snap.lockFraming ?? true,
