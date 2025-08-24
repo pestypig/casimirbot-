@@ -11,6 +11,48 @@ const getAppBuild = () =>
 const CM = { solid: 0, theta: 1, shear: 2 };
 const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
 
+// Bootstrap helper functions for robust WebGL initialization
+const getGL = (canvas: HTMLCanvasElement) => {
+  const opts: WebGLContextAttributes = {
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    desynchronized: true,
+    powerPreference: "high-performance",
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false,
+    failIfMajorPerformanceCaveat: false,
+  };
+  return (
+    canvas.getContext("webgl2", opts) ||
+    canvas.getContext("webgl",  opts) ||
+    canvas.getContext("experimental-webgl", opts as any)
+  ) as (WebGL2RenderingContext | WebGLRenderingContext | null);
+};
+
+const sizeCanvas = (canvas: HTMLCanvasElement) => {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width  * dpr));
+  const h = Math.max(1, Math.floor(rect.height * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w; canvas.height = h;
+  }
+  return { w, h, dpr };
+};
+
+const saneTheta = (p: any) => {
+  const γg  = +p.gammaGeo || 26;
+  const qAa = +p.qSpoilingFactor || 1;
+  const γv  = +p.gammaVanDenBroeck || 2.86e5;
+  const dutyFR = Number.isFinite(p.dutyEffectiveFR)
+    ? Math.max(1e-12, +p.dutyEffectiveFR)
+    : Math.max(1e-12, (+p.dutyCycle || 0.14) / Math.max(1, +p.sectors || 1));
+  const t = Math.pow(γg,3) * qAa * γv * Math.sqrt(dutyFR);
+  return Number.isFinite(t) && t > 0 ? t : 5.03e3; // UI's expected baseline
+};
+
 function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
 
@@ -741,9 +783,73 @@ export default function WarpBubbleCompare({
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
 
-  // bootstrap both engines once
+  // bootstrap both engines once using robust initialization
   useEffect(() => {
     let cancelled = false;
+    
+    const initOne = async (
+      canvas: HTMLCanvasElement | null,
+      setRef: React.MutableRefObject<any>,
+      parity: boolean
+    ) => {
+      if (!canvas) return;
+
+      // 1) Context
+      const gl = getGL(canvas);
+      if (!gl) {
+        console.warn("[Warp] WebGL context missing");
+        return;
+      }
+
+      // 2) Size + viewport
+      const { w, h } = sizeCanvas(canvas);
+      gl.viewport(0, 0, w, h);
+
+      // 3) Init engine using the actual constructor pattern
+      const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: getAppBuild() });
+      const engine = new WarpCtor(canvas);
+
+      // 4) Wait for shaders to be ready and apply default parameters  
+      const θ = saneTheta(parameters || {});
+      const defaultParams = {
+        thetaScale: θ,                    // ← avoids "θ-scale — invalid"
+        physicsParityMode: !!parity,      // REAL=true, SHOW=false
+        ridgeMode: 1,                     // ← avoids "Ridge mode — undefined"
+        colorMode: "theta",
+        viewAvg: true,
+        sectorCount: Math.max(1, +parameters?.sectorCount || +parameters?.sectors || 1),
+        split: Math.max(0, (+parameters?.split|0) % Math.max(1, +parameters?.sectorCount || 1)),
+      };
+
+      // Apply parameters once ready to avoid pre-link uniform pushes
+      engine.onceReady?.(() => {
+        engine.updateUniforms?.(defaultParams);
+        if (parity) {
+          engine.setPresetParity?.();     // truth pane defaults
+        } else {
+          engine.setPresetShowcase?.();   // boosted pane defaults  
+        }
+      });
+
+      // 5) Start the engine
+      engine.start?.();
+
+      // 7) Resize handling + context loss
+      const ro = new ResizeObserver(() => {
+        const { w, h } = sizeCanvas(canvas);
+        gl.viewport(0, 0, w, h);
+        engine.resize?.(w, h);
+      });
+      ro.observe(canvas);
+
+      const onLost = (e: any) => { e.preventDefault(); engine.stop?.(); };
+      const onRestored = () => { /* re-run initProgram/initGridBuffers/setParameters/start */ };
+      canvas.addEventListener("webglcontextlost", onLost, false);
+      canvas.addEventListener("webglcontextrestored", onRestored, false);
+
+      setRef.current = { engine, gl, ro, onLost, onRestored, canvas };
+    };
+
     (async () => {
       if (!leftRef.current || !rightRef.current) return;
       try {
@@ -762,59 +868,16 @@ export default function WarpBubbleCompare({
         busyRef.current = true;
 
         try {
-          console.log('[WARP ENGINE] Attempting to create engines with:', {
-            constructor: typeof WarpCtor,
-            leftCanvas: !!leftRef.current,
-            rightCanvas: !!rightRef.current,
-            leftCanvasSize: leftRef.current ? `${leftRef.current.width}x${leftRef.current.height}` : 'N/A',
-            rightCanvasSize: rightRef.current ? `${rightRef.current.width}x${rightRef.current.height}` : 'N/A'
-          });
+          console.log('[WARP ENGINE] Attempting bootstrap initialization');
           
-          // Ensure canvas has pixels before engine creation
-          ensureCanvasSize(leftRef.current!);
-          ensureCanvasSize(rightRef.current!);
-          
-          leftEngine.current  = new WarpCtor(leftRef.current);
-          rightEngine.current = new WarpCtor(rightRef.current);
-          
-          // Runtime proof it's the right file (commented out for production)
-          // console.log('[WARP PROBE]', {
-          //   scriptTags: Array.from(document.scripts).filter(s => /warp-engine\.js/.test(s.src)).map(s => s.src),
-          //   hasCtor: !!(window as any).WarpEngine,
-          //   build: (window as any).__WarpEngineBuild || (window as any).WarpEngine?.BUILD,
-          //   ctorName: ((window as any).WarpEngine?.name)
-          // });
-          
-          // Add WebGL context guards for resilience
-          attachGLContextGuards(leftRef.current!,  () => leftEngine.current?._recreateGL?.());
-          attachGLContextGuards(rightRef.current!, () => rightEngine.current?._recreateGL?.());
-          
-          leftEngine.current?._resize?.();
-          rightEngine.current?._resize?.();
-          
-          // Initialize once shaders are linked to avoid pre-link uniform pushes
-          const defaultFrame = frameFromHull({ a:503.5, b:132, c:86.5 }, 2.6);
-          const zL = safeCamZ(compactCameraZ(leftRef.current!,  defaultFrame.axesScene));
-          const zR = safeCamZ(compactCameraZ(rightRef.current!, defaultFrame.axesScene));
-          leftEngine.current?.onceReady?.(() => {
-            pushSafe(leftEngine,  { ...defaultFrame, cameraZ: zL });
-            leftEngine.current?.setPresetParity?.();     // truth pane defaults
-          });
-          rightEngine.current?.onceReady?.(() => {
-            pushSafe(rightEngine, { ...defaultFrame, cameraZ: zR });
-            rightEngine.current?.setPresetShowcase?.();  // boosted pane defaults
-          });
-          
-          // Verify uniforms actually exist (catch silent no-ops)
-          dumpUniforms(leftEngine.current,  'REAL');
-          dumpUniforms(rightEngine.current, 'SHOW');
+          await initOne(leftRef.current,  leftEngine,  /*REAL*/ true);
+          await initOne(rightRef.current, rightEngine, /*SHOW*/ false);
           
         } catch (error) {
-          console.error('[WARP ENGINE] Creation failed:', {
+          console.error('[WARP ENGINE] Bootstrap failed:', {
             error: error,
             message: (error as any)?.message,
             stack: (error as any)?.stack,
-            constructor: typeof WarpCtor,
             leftCanvas: !!leftRef.current,
             rightCanvas: !!rightRef.current
           });
@@ -825,56 +888,35 @@ export default function WarpBubbleCompare({
         
         // (mux already ensured above)
 
-        // Keep both panes in lockstep with Helix strobing
-        const off = (window as any).__addStrobingListener?.(
-          ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
-            const s = Math.max(1, sectorCount|0);
-            const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
-            const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
-            pushSafe(leftEngine,  payload);
-            pushSafe(rightEngine, payload);
-            leftEngine.current?.requestRewarp?.();
-            rightEngine.current?.requestRewarp?.();
-          }
-        );
-        (leftEngine.current  as any).__strobeOff = off;
-        (rightEngine.current as any).__strobeOff = off;
+        // Wire up the initialized engines for strobing and diagnostics
+        const leftEng = leftEngine.current?.engine;
+        const rightEng = rightEngine.current?.engine;
+        
+        if (leftEng && rightEng) {
+          // Keep both panes in lockstep with Helix strobing
+          const off = (window as any).__addStrobingListener?.(
+            ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
+              const s = Math.max(1, sectorCount|0);
+              const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
+              const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
+              pushSafe(leftEngine,  payload);
+              pushSafe(rightEngine, payload);
+              leftEng?.requestRewarp?.();
+              rightEng?.requestRewarp?.();
+            }
+          );
+          (leftEng as any).__strobeOff = off;
+          (rightEng as any).__strobeOff = off;
 
-        // ❌ Do not re-create engines on the same canvases (causes black screens)
+          // Wire diagnostics so you can compare against the calculator
+          const syncBadge = (side: 'REAL'|'SHOW', u: any) => {
+            console.debug(`[${side}] θ-scale=${u.thetaScale?.toExponential?.(2)}  gVdB=${u.gammaVdB}  duty=${u.dutyCycle}  FR=${(u as any).dutyEffectiveFR}  sectors=${u.sectors}/${u.split}`);
+          };
+          leftEng.onDiagnostics  = (d) => { (window as any).__diagREAL = d;  syncBadge('REAL', leftEng.uniforms); };
+          rightEng.onDiagnostics = (d) => { (window as any).__diagSHOW = d; syncBadge('SHOW', rightEng.uniforms); };
 
-        // Wire diagnostics so you can compare against the calculator
-        const syncBadge = (side: 'REAL'|'SHOW', u: any) => {
-          console.debug(`[${side}] θ-scale=${u.thetaScale?.toExponential?.(2)}  gVdB=${u.gammaVdB}  duty=${u.dutyCycle}  FR=${(u as any).dutyEffectiveFR}  sectors=${u.sectors}/${u.split}`);
-        };
-        leftEngine.current!.onDiagnostics  = (d) => { (window as any).__diagREAL = d;  syncBadge('REAL', leftEngine.current!.uniforms); };
-        rightEngine.current!.onDiagnostics = (d) => { (window as any).__diagSHOW = d; syncBadge('SHOW', rightEngine.current!.uniforms); };
-
-        console.log('[WARP ENGINE] Basic engines created, waiting for useEffect physics');
-
-        // Basic initialization complete
-        leftEngine.current?.start?.();
-        rightEngine.current?.start?.();
-
-        // Set up resize observer for responsive framing
-        roRef.current = new ResizeObserver(() => {
-          if (!parameters?.hull) return;
-          const fresh = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
-          const L = leftRef.current!, R = rightRef.current!;
-
-          ensureCanvasSize(L);
-          ensureCanvasSize(R);
-
-          leftEngine.current?._resize?.();
-          rightEngine.current?._resize?.();
-
-          const camL = safeCamZ(compactCameraZ(L, fresh.axesScene));
-          const camR = safeCamZ(compactCameraZ(R, fresh.axesScene));
-
-          pushSafe(leftEngine,  { ...fresh, cameraZ: camL, lockFraming: true });
-          pushSafe(rightEngine, { ...fresh, cameraZ: camR, lockFraming: true });
-        });
-        roRef.current.observe(leftRef.current!);
-        roRef.current.observe(rightRef.current!);
+          console.log('[WARP ENGINE] Bootstrap initialization complete');
+        }
 
       } catch (e) {
         console.error('[WarpBubbleCompare] init failed:', e);
@@ -883,13 +925,21 @@ export default function WarpBubbleCompare({
 
     return () => {
       cancelled = true;
+      
+      // Clean up based on new structure from bootstrap
+      for (const ref of [leftEngine, rightEngine]) {
+        const s = ref.current;
+        if (!s) continue;
+        s.canvas?.removeEventListener("webglcontextlost", s.onLost);
+        s.canvas?.removeEventListener("webglcontextrestored", s.onRestored);
+        s.ro?.disconnect();
+        s.engine?.stop?.();
+        s.engine?.dispose?.();
+        try { (s.engine as any)?.__strobeOff?.(); } catch {}
+        ref.current = null;
+      }
+      
       try { roRef.current?.disconnect(); } catch {}
-      try { (leftEngine.current  as any)?.__strobeOff?.(); } catch {}
-      try { (rightEngine.current as any)?.__strobeOff?.(); } catch {}
-      try { leftEngine.current?.destroy?.(); } catch {}
-      try { rightEngine.current?.destroy?.(); } catch {}
-      leftEngine.current = null;
-      rightEngine.current = null;
       try {
         const busyKey = '__warpCompareBusyCount';
         (window as any)[busyKey] = Math.max(0, ((window as any)[busyKey] || 1) - 1);
