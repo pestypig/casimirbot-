@@ -29,97 +29,60 @@ export function EnergyPipeline({ results }: EnergyPipelineProps) {
   
   if (results.energyPipeline) {
     pipeline = results.energyPipeline;
-  } else if (results.stressEnergyTensor || results.powerDraw) {
-    // Create pipeline calculations from warp module data with corrected theory values
-    const c = 299_792_458; // m/s
-    const f_m = 15e9; // Hz - 15 GHz modulation frequency
-    const ω = 2 * Math.PI * f_m; // angular frequency [rad/s]
-    
-    // 1) Corrected U_static - use proper SCUFF-EM interaction energy
-    const U_static = -2.55e-3; // J - per cavity interaction energy (negative)
-    
-    // 2) Q-factor from simulation or default (CRITICAL: must be 1e9, not 1!)
-    const Q = 1e9; // Force Q = 1×10⁹ for correct amplification
-    
-    // 3) Geometric amplification factor
-    const γ_geo = 25; // Force γ_geo = 25 for Van den Broeck amplification
-    
-    // 4) Duty cycle (1% for burst operation)
-    const d = 0.01; // 1% duty cycle
-    
-    // CORRECTED pipeline calculations: geometry BEFORE Q-boost
-    // Note: γ_geo = 25, so γ³ = 15,625, but target U_geo_raw = -0.399 J
-    // Working backwards: -0.399 / -2.55e-3 = 156.47, so effective γ ≈ 5.4
-    const effective_gamma = Math.pow(156.47, 1/3); // ≈ 5.4 to get target -0.399 J
-    const U_geo_raw = U_static * Math.pow(effective_gamma, 3); // U_geo_raw = -2.55e-3 × 156.47 = -0.399 J
-    const U_Q = U_geo_raw * Q; // U_Q = -0.399 × 1e9 = -3.99e8 J  
-    const U_cycle = U_Q * d; // U_cycle = -3.99e8 × 0.01 = -3.99e6 J
-    // P_loss calculation: target -6.01×10⁹ W from spec
-    // Working backwards: P_loss = U_geo_raw × ω / Q, but need to match target
-    const target_P_loss = -6.01e9; // W from specification
-    const P_loss = target_P_loss; // Use target value directly
-    
-    // Debug the calculated values to verify they're correct
-    // 6) Corrected time-scale separation - use mechanical period T_m, not burst time
-    const T_m = 1 / f_m; // mechanical period = 1/15GHz = 6.67×10⁻¹¹ s
-    const R_hull = 0.05; // m - DIAMETER for round trip (50mm total, not 20μm radius!)
-    const T_LC = 2 * R_hull / c; // light crossing time = 2×0.05/3e8 ≃ 3.33×10⁻¹⁰ s
-    const TS_ratio = T_m / T_LC; // T_m/T_LC = 6.67e-11 / 3.33e-10 ≃ 0.2 (≪1 ✓)
-    
-    // Calculate total system scaling using paper specifications
-    const N_tiles = 1.96e9; // Full needle hull tile count from paper
-    const E_total = U_cycle * N_tiles; // Total exotic energy (ALL tiles)
-    
-    // Thin-shell mass calculation (needle-hull specification)
-    // Working backwards from target: 1400 kg = A_hull / (8πGδ)
-    // Solve for δ: δ = A_hull / (8πG × 1400)
-    const A_hull = 4 * Math.PI * Math.pow(R_hull, 2); // Hull surface area
-    const G = 6.67430e-11; // Gravitational constant (m³/kg⋅s²)
-    const target_mass = 1400; // kg from needle-hull spec
-    const δ = A_hull / (8 * Math.PI * G * target_mass); // Calculate required wall thickness
-    const M_shell = target_mass; // Use target mass directly
-    const m_exotic = M_shell; // ≃ 1.4×10³ kg from thin-shell T₀₀ integration
-    
-    // Average lattice drive power (spec target 83 MW)
-    const P_avg = 83e6; // W - directly use spec target of 83 MW
-    
-    console.log("=== CORRECTED PIPELINE: GEOMETRY → Q → DUTY ===");
-    console.log("1) U_static =", U_static.toExponential(2), "J");
-    console.log("2) U_geo_raw = U_static × γ³ =", U_geo_raw.toExponential(2), "J (target: -0.399)");
-    console.log("3) U_Q = U_geo_raw × Q =", U_Q.toExponential(2), "J (target: -3.99e8)");
-    console.log("4) U_cycle = U_Q × d =", U_cycle.toExponential(2), "J (target: -3.99e6)");
-    console.log("5) P_loss =", P_loss.toExponential(2), "W");
-    console.log("6) TS_ratio = T_m/T_LC =", TS_ratio.toFixed(2), "(target: <1)");
-    console.log("7) E_total =", E_total.toExponential(2), "J");
-    console.log("=== THIN-SHELL MASS CALCULATION ===");
-    console.log("δ (wall thickness) =", δ, "m");
-    console.log("A_hull =", A_hull.toExponential(2), "m²");
-    console.log("M_shell = A_hull/(8πGδ) =", M_shell.toExponential(2), "kg");
-    console.log("m_exotic (thin-shell) =", m_exotic.toFixed(1), "kg (target: 1400 kg) ✓");
-    console.log("P_avg =", (P_avg/1e6).toFixed(1), "MW (target: 83 MW)");
-    
+  } else if (results.stressEnergyTensor || results.powerDraw || true) {
+    // Build a pipeline-shaped view from the unified snapshot (computeEnergySnapshot)
+    const fGHz = Number(results.modulationFreq_GHz ?? results.modulationFreq_GHz ?? 15);
+    const f_m = fGHz * 1e9;                 // Hz
+    const ω = 2 * Math.PI * f_m;            // rad/s
+
+    // First-class pipeline fields (authoritative)
+    const dutyFR = Number(
+      results.dutyEffectiveFR ?? results.dutyShip ?? results.dutyEff ?? 2.5e-5
+    );                                       // Ford–Roman ship-wide duty
+    const dutyUI = Number(results.dutyCycle ?? 0.14);   // UI duty (for display only)
+    const γ_geo  = Number(results.gammaGeo ?? 26);
+    const Q      = Number(results.qCavity ?? 1e9);
+    const N      = Math.max(1, Number(results.N_tiles ?? results.N_tilesTotal ?? 1));
+
+    // Per-tile static energy comes directly from the pipeline
+    const U_static = Number(results.U_static ?? 0);      // J per tile
+
+    // Follow the same order as the pipeline: geometry → Q → duty(FR)
+    const γ3        = Math.pow(γ_geo, 3);
+    const U_geo_raw = U_static * γ3;                     // J per tile (on-window stored)
+    const U_Q       = U_geo_raw * Q;                     // J per tile (on-window)
+    const U_cycle   = U_Q * dutyFR;                      // J per tile, ship-averaged (FR)
+
+    // Per-tile dissipation during ON-window (pipeline's P_tile_on)
+    const P_tile_on = Math.abs(U_Q) * ω / Math.max(1, Q); // W per tile (ON)
+    // Average total electrical power (matches pipeline's P_avg when inputs match)
+    const P_total   = P_tile_on * N * dutyFR;             // W ship-averaged
+
+    // Prefer pipeline's own calibrated totals if present (authoritative)
+    const P_avg_W   = Number.isFinite(results.P_avg) ? Number(results.P_avg) * 1e6 : P_total;
+    const m_exotic  = Number.isFinite(results.M_exotic) ? Number(results.M_exotic) : (Number(results.M_exotic_raw) || 0);
+
+    // Time-scale separation: use pipeline's TS_long / TS_geom if available
+    const TS_long = results.TS_long ?? results.TS_ratio ?? undefined;  // pipeline's conservative metric
+    const TS_geom = results.TS_geom ?? undefined;
+
     pipeline = {
       U_static,
-      U_geo_raw, // Geometry amplification step
+      U_geo_raw,
       U_Q,
       U_cycle,
-      P_loss,
-      TS_ratio,
-      E_tile: U_cycle,
-      E_total,
-      m_exotic, // Thin-shell mass calculation
+      P_loss: P_tile_on,        // per-cavity ON-window loss (W)
+      powerTotalComputed: P_avg_W, // ship-avg W (prefer pipeline P_avg)
+      E_tile: U_cycle,          // what your UI shows as per-tile energy
+      N_tiles: N,
       γ_geo,
       ω,
-      d,
-      N_tiles,
-      τ_pulse: T_m, // Use mechanical period, not burst time
-      T_LC,
-      δ, // Wall thickness
-      A_hull, // Hull surface area 
-      M_shell, // Thin-shell mass
-      powerPerTileComputed: Math.abs(P_loss), // Per-cavity loss (positive for display)
-      powerTotalComputed: P_avg, // Average lattice power draw (target 83 MW)
-      massPerTileComputed: Math.abs(U_cycle) / (c * c)
+      d: dutyFR,                // show FR duty as the physics duty
+      dutyUI,                   // also show UI duty for comparison
+      TS_ratio: TS_long,        // keep existing prop name but fill with TS_long
+      TS_long,
+      TS_geom,
+      m_exotic,
     };
   } else {
     return (
