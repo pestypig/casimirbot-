@@ -166,7 +166,8 @@ class WarpEngine {
         
         // Initialize rendering pipeline
         this._setupCamera();
-        this._initializeGrid();
+        this._initializeGrid();              // creates VBO & vertices
+        this._compileGridShaders();          // compiles & links program (async-safe)
         
         const strobeHandler = ({ sectorCount, currentSector, split }) => {
           try {
