@@ -646,15 +646,12 @@ class WarpEngine {
         }
     }
     
-    // Cache attribs/uniforms after link completes (both sync and async path)
     _cacheGridLocations(program) {
         const gl = this.gl;
         this.gridProgram = program;
-        this.gridAttribs = {
-            position: gl.getAttribLocation(program, 'a_position'),
-        };
+        this.gridAttribs = { position: gl.getAttribLocation(program, 'a_position') };
         this.gridUniforms = {
-            mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+            mvpMatrix:  gl.getUniformLocation(program, 'u_mvpMatrix'),
             sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
             axesScene: gl.getUniformLocation(program, 'u_axesScene'),
             axes: gl.getUniformLocation(program, 'u_axes'),
@@ -666,7 +663,6 @@ class WarpEngine {
             tiltViz: gl.getUniformLocation(program, 'u_tiltViz'),
             exposure: gl.getUniformLocation(program, 'u_exposure'),
             zeroStop: gl.getUniformLocation(program, 'u_zeroStop'),
-            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
             userGain: gl.getUniformLocation(program, 'u_userGain'),
             physicsParityMode: gl.getUniformLocation(program, 'u_physicsParityMode'),
             displayGain: gl.getUniformLocation(program, 'u_displayGain'),
@@ -674,12 +670,14 @@ class WarpEngine {
             curvatureGainT: gl.getUniformLocation(program, 'u_curvatureGainT'),
             curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
             colorMode: gl.getUniformLocation(program, 'u_colorMode'),
-            ridgeMode: gl.getUniformLocation(program, 'u_ridgeMode'),
-            // physics (must exist in your fragment shader)
-            parity: gl.getUniformLocation(program, 'u_PhysicsParityMode'),
-            sectorCount: gl.getUniformLocation(program, 'u_SectorCount'),
-            split: gl.getUniformLocation(program, 'u_Split'),
+            // physics
+            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+            ridgeMode:  gl.getUniformLocation(program, 'u_RidgeMode'),
+            parity:     gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+            sectorCount:gl.getUniformLocation(program, 'u_SectorCount'),
+            split:      gl.getUniformLocation(program, 'u_Split'),
         };
+        this.isLoaded = true;
     }
     
     _setupUniformLocations() {
@@ -1359,87 +1357,30 @@ class WarpEngine {
 
     _renderGridPoints() {
         const gl = this.gl;
-        
-        // Guard: program and locations must be ready (async compile path)
-        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-            if (!this._warnNoProgramOnce) {
-                console.warn("Grid program not ready yet; waiting for shader link…");
-                this._warnNoProgramOnce = true;
-            }
-            return;
-        }
-        
-        // Throttled logging for performance
-        if (this._debugMode && Date.now() - (this._lastDebugTime || 0) > 1000) {
-            console.log("Using grid program for rendering...");
-            this._lastDebugTime = Date.now();
-        }
+        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) return;
+
         gl.useProgram(this.gridProgram);
-        
-        // Bind vertex data
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         const loc = this.gridAttribs.position;
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
-        
-        // Set all uniforms for York-time visualization
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
-        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0); // fallback red
-        
-        // Both uniforms get identical scene-normalized hull axes (eliminates dual ellipsoid)
-        const axes = this.uniforms?.axesClip ?? this._lastAxesScene ?? [1,1,1];
-        
-        gl.uniform3f(this.gridUniforms.axesScene, axes[0], axes[1], axes[2]);  // Authoritative
-        gl.uniform3f(this.gridUniforms.axes, axes[0], axes[1], axes[2]);       // Same value!
-        
-        gl.uniform3f(this.gridUniforms.driveDir,
-            (this.uniforms?.driveDir?.[0] ?? 1.0),
-            (this.uniforms?.driveDir?.[1] ?? 0.0),
-            (this.uniforms?.driveDir?.[2] ?? 0.0));
-        gl.uniform1f(this.gridUniforms.wallWidth, Math.max(1e-4, this.uniforms?.wallWidth ?? 0.016));
-        gl.uniform1f(this.gridUniforms.vShip,            (this.uniforms?.vShip            ?? 1.0));
-        
-        // Violet interior tilt tint (visual-only)
-        const epsTilt = (this.uniforms?.epsilonTilt ?? 0) * (this.uniforms?.tiltGain ?? 0);
-        const wInt = Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.016), 0.02); // same window as geometry
-        const tintViz = 8.0;  // purely visual: raise/lower if you want the violet to pop more/less
-        gl.uniform1f(this.gridUniforms.epsTilt, epsTilt);
-        gl.uniform1f(this.gridUniforms.intWidth, wInt);
-        gl.uniform1f(this.gridUniforms.tiltViz, tintViz);
-        
-        // Exposure controls for enhanced mode contrast
-        gl.uniform1f(this.gridUniforms.exposure,         (this.uniforms?.exposure         ?? 6.0));
-        gl.uniform1f(this.gridUniforms.zeroStop,         (this.uniforms?.zeroStop         ?? 1e-7));
-        gl.uniform1f(this.gridUniforms.thetaScale,       (this.uniforms?.thetaScale       ?? 1.0));
-        gl.uniform1f(this.gridUniforms.userGain,         (this.uniforms?.userGain         ?? 1.0));
-        gl.uniform1i(this.gridUniforms.physicsParityMode, this.uniforms?.physicsParityMode ? 1 : 0);
-        gl.uniform1f(this.gridUniforms.displayGain,      (this.uniforms?.displayGain      ?? 1.0));
-        gl.uniform1f(this.gridUniforms.vizGain,          (this.uniforms?.vizGain          ?? 1.0));
-        gl.uniform1f(this.gridUniforms.curvatureGainT,   (this.uniforms?.curvatureGainT   ?? 0.0));
-        gl.uniform1f(this.gridUniforms.curvatureBoostMax,(this.uniforms?.curvatureBoostMax?? 1.0));
-        gl.uniform1i(this.gridUniforms.colorMode, (this.uniforms?.colorMode ?? 1)|0);
-        gl.uniform1i(this.gridUniforms.ridgeMode, (this.uniforms?.ridgeMode|0));
 
-        // physics uniforms (with safe defaults) 
-        const p = this.params || {};
-        const theta = +p.thetaScale > 0 ? +p.thetaScale : 5.03e3;
-        gl.uniform1f(this.gridUniforms.thetaScale, theta);
-        gl.uniform1i(this.gridUniforms.ridgeMode, Number.isFinite(+p.ridgeMode) ? +p.ridgeMode : 1);
-        gl.uniform1i(this.gridUniforms.parity, p.physicsParityMode ? 1 : 0);
-        gl.uniform1i(this.gridUniforms.sectorCount, Math.max(1, +p.sectorCount || 1));
-        gl.uniform1i(this.gridUniforms.split, Math.max(0, +p.split || 0));
-        
-        // Render as lines for better visibility
+        // MVP & color
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+        // PHYSICS (safe defaults)
+        const u = this.uniforms || {};
+        const sectors = Math.max(1, (u.sectors|0) || 1);
+        gl.uniform1f(this.gridUniforms.thetaScale, Number.isFinite(u.thetaScale) && u.thetaScale > 0 ? u.thetaScale : 5.03e3);
+        gl.uniform1i(this.gridUniforms.ridgeMode,  Number.isFinite(u.ridgeMode) ? (u.ridgeMode|0) : 1);
+        gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
+        gl.uniform1i(this.gridUniforms.sectorCount,sectors);
+        gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sectors-1, (u.split|0) || 0)));
+
         const vertexCount = this.gridVertices.length / 3;
         gl.drawArrays(gl.LINES, 0, vertexCount);
-        
-        // Throttled render logging
-        if (this._debugMode && Date.now() - (this._lastRenderLog || 0) > 1000) {
-            console.log(`Rendered ${vertexCount} grid lines with 3D perspective - should now be visible!`);
-            this._lastRenderLog = Date.now();
-        }
-        
-        // Clean up
+
         gl.disableVertexAttribArray(loc);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
