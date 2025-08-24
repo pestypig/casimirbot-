@@ -726,6 +726,9 @@ export default function WarpBubbleCompare({
       // θ-scale (keep your existing computation)
       thetaScale: computeThetaScale(snap),
 
+      // Forward currentMode to engine for GPU-side mode decisions
+      currentMode: snap.currentMode,
+
       // NEW: carrier for θ field in shader; 0 in standby, 1 otherwise
       vShip: (snap.currentMode === 'standby') ? 0 : 1,
 
