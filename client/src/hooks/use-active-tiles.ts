@@ -21,7 +21,30 @@ export function useActiveTiles(opts: {
     ema = 0.35,
   } = opts;
 
+  // Sanity check for light-crossing loop parameters
+  useEffect(() => {
+    if (!Number.isFinite(lc?.phase) || !Number.isFinite(lc?.burst_ms) || !Number.isFinite(lc?.dwell_ms)) {
+      console.warn("[HELIX] LC loop missing timing — 'now' tiles will be flat", {
+        phase: lc?.phase,
+        burst_ms: lc?.burst_ms,
+        dwell_ms: lc?.dwell_ms
+      });
+    }
+  }, [lc?.phase, lc?.burst_ms, lc?.dwell_ms]);
+
+  // Use consistent authority for sector count (prefer passed totalSectors)
   const S_total = Math.max(1, Math.floor(totalSectors || 400));
+  
+  // Warn if dutyEffectiveFR was computed with different sector assumptions
+  useEffect(() => {
+    if (lc?.sectorCount && Math.abs(lc.sectorCount - S_total) > 0.1) {
+      console.warn("[HELIX] Sector count mismatch between dutyEffectiveFR calculation and hook:", {
+        hookSectors: S_total,
+        lcSectors: lc.sectorCount,
+        note: "This may cause drift in avgTiles calculation"
+      });
+    }
+  }, [S_total, lc?.sectorCount]);
   const S_live  = Math.max(1, Math.floor(concurrentSectors || 1));
 
   // average (FR) energized tiles across the whole ship

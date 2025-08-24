@@ -1085,7 +1085,9 @@ export default function HelixCore() {
                     </Tooltip>
                   </div>
                   <p className="text-lg font-mono text-yellow-400">
-                    {fmtPowerUnit(pipeline?.P_avg ?? systemMetrics?.energyOutput)}
+                    {Number.isFinite(pipeline?.P_avg)
+                      ? fmtPowerUnit(pipeline!.P_avg)            // P_avg is MW
+                      : fmtPowerUnitFromW(systemMetrics?.energyOutput)} {/* energyOutput is W */}
                   </p>
                 </div>
               </div>
