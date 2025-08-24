@@ -95,20 +95,6 @@ const fmtPowerUnit = (mw?: number) => {
   return `${(x * 1e6).toFixed(1)} W`;
 };
 
-// derive instantaneous active tiles from pipeline/system state (with 1% burst duty)
-const deriveActiveTiles = (
-  totalTiles?: number,
-  sectors?: number,
-  duty?: number,
-  mode?: 'standby'|'hover'|'cruise'|'emergency'
-) => {
-  if (!isFiniteNumber(totalTiles) || !isFiniteNumber(sectors) || sectors <= 0) return undefined;
-  if (mode === 'standby' || !isFiniteNumber(duty) || duty <= 0) return 0;
-
-  const BURST = 0.01; // local ON window
-  if (sectors > 1) return Math.round((totalTiles / sectors) * BURST);
-  return Math.round(totalTiles * duty * BURST);
-};
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -1046,35 +1032,25 @@ export default function HelixCore() {
               {(() => {
                 // Pull inputs
                 const totalTilesLive =
-                  (systemMetrics?.totalTiles && isFiniteNumber(systemMetrics.totalTiles))
-                    ? systemMetrics.totalTiles
-                    : (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
+                  isFiniteNumber(systemMetrics?.totalTiles) ? systemMetrics!.totalTiles! :
+                  (isFiniteNumber(pipeline?.N_tiles) ? pipeline!.N_tiles! : undefined);
 
-                const sectorsLive = isFiniteNumber(systemMetrics?.sectorStrobing)
-                  ? systemMetrics!.sectorStrobing!
-                  : (isFiniteNumber(pipeline?.sectorStrobing) ? pipeline!.sectorStrobing! : (MODE_CONFIGS[effectiveMode]?.sectorStrobing ?? 1));
+                const S_total = totalSectors;                                    // e.g., 400
+                const S_live  = Math.max(1, Math.floor(concurrentSectors ?? 1)); // 1 or 2
+                const BURST_LOCAL = 0.01;                                        // 10µs / 1ms
 
-                const dutyLive = isFiniteNumber(pipeline?.dutyCycle)
-                  ? pipeline!.dutyCycle!
-                  : (MODE_CONFIGS[effectiveMode]?.dutyCycle ?? 0);
+                const derivedActiveTiles = (isFiniteNumber(totalTilesLive) && S_total > 0)
+                  ? Math.round(totalTilesLive * (S_live / S_total) * BURST_LOCAL)
+                  : undefined;
 
-                // Derived count (mode-aware)
-                const derivedActiveTiles = deriveActiveTiles(totalTilesLive, sectorsLive, dutyEffectiveFR, effectiveMode);
-
-                // Prefer a sensible live server value, but override if it's missing or obviously stale
                 const activeTilesDisplay = (() => {
                   const serverVal = systemMetrics?.activeTiles;
-                  if (isFiniteNumber(serverVal)) {
-                    // If server value matches our derivation (or is close), trust server
-                    if (isFiniteNumber(derivedActiveTiles)) {
-                      const diff = Math.abs(serverVal - derivedActiveTiles);
-                      const rel = derivedActiveTiles === 0 ? diff : diff / derivedActiveTiles;
-                      return rel < 0.05 ? serverVal : derivedActiveTiles; // >5% drift → use derived
-                    }
-                    return serverVal;
+                  if (isFiniteNumber(serverVal) && isFiniteNumber(derivedActiveTiles)) {
+                    const rel = Math.abs(serverVal - derivedActiveTiles) / Math.max(1, derivedActiveTiles);
+                    return rel < 0.05 ? serverVal : derivedActiveTiles; // if drift >5%, use derived
                   }
-                  // No server value → use derived or a small fallback
-                  return isFiniteNumber(derivedActiveTiles) ? derivedActiveTiles : 2_800_000;
+                  return isFiniteNumber(serverVal) ? serverVal :
+                         isFiniteNumber(derivedActiveTiles) ? derivedActiveTiles : 2_800_000;
                 })();
 
                 return (
@@ -1099,13 +1075,9 @@ export default function HelixCore() {
                       ? activeTilesDisplay.toLocaleString()
                       : '2,800,000'}
                   </p>
-                  {isFiniteNumber(sectorsLive) && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      {sectorsLive > 1
-                        ? `${sectorsLive} sectors • ~${(dutyLive * 100).toFixed(2)}% of grid ON`
-                        : `${(dutyLive*100).toFixed(1)}% eligible • 1% local ON`}
-                    </p>
-                  )}
+                  <p className="text-xs text-slate-500 mt-1">
+                    {`${S_live} live • ${S_total} total • 1% local ON`}
+                  </p>
                 </div>
                 <div className="p-3 bg-slate-950 rounded-lg">
                   <div className="flex items-center gap-2">
