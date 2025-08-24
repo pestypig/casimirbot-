@@ -560,20 +560,24 @@ export default function HelixCore() {
   
   // Physics-timed sector sweep for UI animation
   useEffect(() => {
-    if (!systemMetrics) return;
+    if (!systemMetrics && !Number.isFinite(lc?.sectorIdx)) return;
 
-    const S = Math.max(1, systemMetrics.sectorStrobing || 1);
-    const idx = (systemMetrics.currentSector ?? 0) % S;
+    const total = totalSectors;                                 // e.g., 400
+    const live = Math.max(1, Math.floor(systemMetrics?.sectorStrobing ?? concurrentSectors ?? 1));
+    const baseIdxSrc = Number.isFinite(systemMetrics?.currentSector)
+      ? Number(systemMetrics!.currentSector)
+      : Number(lc?.sectorIdx ?? 0);                             // fallback to physics loop
+    const base = Math.max(0, Math.floor(baseIdxSrc)) % total;
 
-    // Decay all sectors
-    setTrail(prev => prev.map(v => Math.max(0, v * 0.90)));
-    // Energize current sector
     setTrail(prev => {
-      const copy = prev.slice();
-      copy[idx] = 1; // full bright
-      return copy;
+      // decay
+      const next = (prev.length === total ? prev : Array(total).fill(0))
+        .map(v => Math.max(0, v * 0.90));
+      // energize `live` consecutive sectors
+      for (let k = 0; k < live; k++) next[(base + k) % total] = 1;
+      return next;
     });
-  }, [systemMetrics?.currentSector, systemMetrics?.sectorStrobing]);
+  }, [totalSectors, concurrentSectors, systemMetrics?.currentSector, systemMetrics?.sectorStrobing, lc?.sectorIdx]);
 
   // Sync 3D engine with strobing state (defensive + sanitized)
   useEffect(() => {
