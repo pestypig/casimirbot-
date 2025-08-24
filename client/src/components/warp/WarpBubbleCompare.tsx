@@ -935,10 +935,10 @@ export default function WarpBubbleCompare({
     const showU = toShowUniforms(snapForMode);
 
     // REAL (parity)
-    pushSafe(leftEngine, realU);
+    pushSafe(leftEngine,  { ...realU, currentMode: snapForMode.currentMode });
 
     // SHOW (boosted)
-    pushSafe(rightEngine, showU);
+    pushSafe(rightEngine, { ...showU, currentMode: snapForMode.currentMode });
     // Optional: also set display gain explicitly on the instance
     rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
 
