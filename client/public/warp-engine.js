@@ -830,6 +830,10 @@ class WarpEngine {
         const prev = { ...(this.uniforms || {}) };
         this.currentParams = { ...this.currentParams, ...parameters };
 
+        // add mode detection after prev is defined
+        const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
+        const isStandby = modeStr === 'standby';
+
         // --- Resolve hull + scene scaling ---
         const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? prev?.hullAxes?.[0], 503.5);
         const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? prev?.hullAxes?.[1], 132.0);
@@ -915,20 +919,45 @@ class WarpEngine {
 
         // --- Bullet-proof θ-scale (prevents "θ-scale — invalid" row) ---
         const sectorsEff = Math.max(1, nextUniforms.sectors|0 || 1);
+        
+        // compute effective FR duty
         const frFromParams = parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
-        const dutyEffFR = Math.max(1e-12,
-          frFromParams != null ? +frFromParams
-                               : (nextUniforms.viewAvg ? (Math.max(1e-12, nextUniforms.dutyCycle||0) / sectorsEff) : 1)
-        );
-        const betaInst =
-          Math.pow(Math.max(1, nextUniforms.gammaGeo||1), 3) *
-          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB||1);
 
-        const thetaScaleFromChain = nextUniforms.viewAvg ? betaInst * Math.sqrt(dutyEffFR) : betaInst;
+        let dutyEffFR;
+        if (isStandby) {
+          dutyEffFR = 0;                    // 🔒 TRUE ZERO in standby
+        } else if (frFromParams != null) {
+          dutyEffFR = Math.max(0, +frFromParams);
+        } else {
+          // only clamp non-standby; and allow 0
+          const base = (nextUniforms.dutyCycle ?? 0) / Math.max(1, nextUniforms.sectors ?? 1);
+          dutyEffFR = Math.max(0, base);
+        }
+
+        // build theta scale
+        const betaInst =
+          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+          Math.max(1, nextUniforms.gammaVdB ?? 1);
+
+        const thetaScaleFromChain =
+          isStandby
+            ? 0
+            : (nextUniforms.viewAvg ? betaInst * Math.sqrt(Math.max(0, dutyEffFR)) : betaInst);
+
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
           : thetaScaleFromChain;
+
+        // Also neutralize boosts in standby (esp. SHOW pane)
+        if (isStandby) {
+          nextUniforms.vizGain = 1;
+          nextUniforms.curvatureGainT = 0;
+          nextUniforms.curvatureBoostMax = 1;
+          nextUniforms.userGain = 1;
+          // if you expose ship velocity to the shader, zero it here too:
+          nextUniforms.vShip = 0;
+        }
 
         // decide if the CPU warp needs recompute
         const geoChanged =
