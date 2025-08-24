@@ -611,14 +611,13 @@ export function getSystemMetrics(req: Request, res: Response) {
     totalSectors,
     activeSectors: concurrent,
     activeFraction,
-    // ← what the viewer expects as "how many sectors does the sweep have?"
     sectorStrobing: concurrent,   // concurrent (live) sectors
     currentSector: sweepIdx,
 
     // make mode & inputs visible to UI
     currentMode: s.currentMode,
     dutyCycle: s.dutyCycle,
-    sectorCount: totalSectors,    // total sectors for averaging
+    sectorCount: totalSectors,    // total for averaging
 
     strobeHz, sectorPeriod_ms,
 
@@ -626,9 +625,9 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     shiftVector: { epsilonTilt, betaTiltVec, gTarget, R_geom, gEff_check: epsilonTilt * (C*C) / R_geom },
 
-    energyOutput_MW: s.P_avg,          // MW (canonical)
-    energyOutput_W:  s.P_avg * 1e6,    // W  (for fmtPowerUnitFromW callers)
-    energyOutput:    s.P_avg,          // MW (legacy alias used by UI)
+    energyOutput_MW: s.P_avg,        // MW (canonical)
+    energyOutput_W:  s.P_avg * 1e6,  // W (for fmtPowerUnitFromW callers)
+    energyOutput:    s.P_avg,        // MW (legacy alias)
     exoticMass_kg: Math.round(s.M_exotic),
     exoticMassRaw_kg: Math.round(s.M_exotic_raw ?? s.M_exotic),
 
@@ -643,7 +642,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     },
 
     dutyGlobal_UI: s.dutyCycle,
-    dutyEffectiveFR: s.dutyEffective_FR,
+    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
 
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     gammaGeo: s.gammaGeo,
