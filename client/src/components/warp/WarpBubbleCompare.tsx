@@ -339,6 +339,7 @@ const applyReal = (
     cameraZ: camZ,
     lockFraming: true,
     physicsParityMode: true,
+    ridgeMode: 0,
     colorMode: colorModeIndex,
     colorModeIndex,
     colorModeName: colorMode,
@@ -387,6 +388,7 @@ const applyShow = (
     cameraZ: camZ,
     lockFraming: true,
     physicsParityMode: false,   // enable amplification
+    ridgeMode: 1,
     // Force numeric (engine canonical) + provide synonyms
     colorMode: colorModeIndex,
     colorModeIndex,
