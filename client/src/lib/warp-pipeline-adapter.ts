@@ -81,12 +81,13 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   const Qburst = s.qCavity ?? 1e9;
 
   // --- Mode & parity (MODEL_MODE=raw ⇒ parity visuals) ---
-  const physicsParityMode = (s.modelMode === 'raw');
 
   // Push everything into the renderer in one shot
   engine.updateUniforms({
     // Physics/ops
     currentMode: s.currentMode,
+    physicsParityMode: s.modelMode === 'raw',  // truth
+    ridgeMode:        s.modelMode === 'raw' ? 0 : 1,
     dutyCycle: d_ship,                // ship-wide effective duty
     sectors, split,
     gammaGeo, gammaVdB, Qburst,
@@ -98,8 +99,6 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
     wallWidth: w_rho,
     // Unified amplitude handed in numerically
     thetaScale,
-    // Parity / cosmetics
-    physicsParityMode,
     // Optional: keep your existing cosmetics; parity mode will disable them
     // cosmeticLevel: 10,
     // curvatureBoostMax: 40,
