@@ -152,14 +152,15 @@ function applyShowSafe(e:any, payload:any) {
 import { resolveThetaScale, type DutySource } from '@/lib/warp-theta';
 
 function physicsPayload(p: any, dutySource: DutySource = 'fr') {
-  return {
-    // the scalar the engine/shader both expect
-    thetaScale: resolveThetaScale(p, dutySource),
+  const sectorsLive  = Math.max(1, Number(p?.sectorStrobing ?? p?.concurrentSectors ?? p?.sectors ?? 1));
+  const sectorsTotal = Math.max(1, Number(p?.sectorCount ?? 400));
+  const shaped = { ...p, sectors: sectorsLive, sectorCount: sectorsTotal };
 
-    // pieces (the CPU path in WarpEngine logs/uses these for diagnostics)
+  return {
+    thetaScale: resolveThetaScale(shaped, dutySource),
     dutyCycle: Number(p?.dutyCycle ?? 0.14),
-    sectors: Math.max(1, Number(p?.sectorCount ?? p?.sectors ?? 400)), // total
-    sectorCount: Math.max(1, Number(p?.sectorCount ?? 400)),
+    sectors: sectorsLive,                 // ← live strobing for averaging
+    sectorCount: sectorsTotal,            // ← total for book-keeping
     viewAvg: p?.viewAvg ?? true,
     gammaGeo: Number(p?.gammaGeo ?? p?.g_y ?? 26),
     deltaAOverA: Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1),
