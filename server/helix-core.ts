@@ -549,7 +549,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const s = getGlobalPipelineState();
 
   const totalSectors = Math.max(1, s.sectorCount);
-  const concurrent = Math.max(0, s.concurrentSectors || 0);
+  const concurrent = Math.max(1, s.concurrentSectors || 1); // must be ≥1 to allocate buffers
   const activeFraction = concurrent / totalSectors;
 
   const strobeHz = Number(s.strobeHz ?? 1000);
@@ -581,7 +581,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const viz = (() => {
     const gammaGeo = s.gammaGeo ?? 26;
     const dAa      = s.qSpoilingFactor ?? 1;
-    const gammaVdB = s.gammaVanDenBroeck ?? 1;
+    const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5; // align with Energy Pipeline default
     const sectors  = Math.max(1, s.concurrentSectors || 1);
     const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
     const thetaScale_UI_like =
@@ -668,6 +668,10 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     viz,
     modelMode: "calibrated-single-pass",
+    // top-level viewer knobs (some clients read these here)
+    ridgeMode: 1,
+    physicsParityMode: false,
+    thetaScale: viz.thetaScale_FR_like,
     // 🔎 Viewer hints to prevent accidental multi-layer/df overlays
     viewer: {
       overlayMode: "single-pass",
