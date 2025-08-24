@@ -74,7 +74,7 @@ import { useActiveTiles } from "@/hooks/use-active-tiles";
 
 declare global {
   interface Window {
-    setStrobingState?: (args: { sectorCount: number; currentSector: number }) => void;
+    setStrobingState?: (args: { sectorCount: number; currentSector: number; split?: number }) => void;
   }
 }
 
@@ -627,7 +627,8 @@ export default function HelixCore() {
     if (typeof fn !== "function") return;
 
     try {
-      fn({ sectorCount: total, currentSector: Math.max(0, Math.floor(cs)) % total });
+      const cur = Math.max(0, Math.floor(cs)) % total;
+      fn({ sectorCount: total, currentSector: cur, split: cur });
     } catch (err) {
       console.warn("setStrobingState threw; skipped this tick:", err);
     }
@@ -971,7 +972,7 @@ export default function HelixCore() {
                   dutyCycle: dutyUI,
                   dutyEffectiveFR,
                   sectors: totalSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
                 }}
                 showPhys={{
@@ -980,14 +981,16 @@ export default function HelixCore() {
                   qSpoilingFactor: qSpoilUI,
                   gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
                   dutyCycle: dutyUI,
+                  dutyEffectiveFR,
                   sectors: totalSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
                 }}
                 baseShared={{
                   hull: { a: 503.5, b: 132, c: 86.5 },
                   sectors: totalSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, concurrentSectors - 1)),
+                  sectorCount: totalSectors,
+                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   colorMode: 'theta',
                   ridgeMode: 1,
                 }}
