@@ -688,8 +688,8 @@ export function getPipelineState(req: Request, res: Response) {
   const s = getGlobalPipelineState();
   res.json({
     ...s,
-    // add a stable camel alias so all clients pick it up
-    dutyEffectiveFR: s.dutyEffectiveFR ?? s.dutyEffective_FR
+    // stable camel alias for all clients
+    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR
   });
 }
 
