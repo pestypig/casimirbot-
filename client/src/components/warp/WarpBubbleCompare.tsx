@@ -628,11 +628,9 @@ export default function WarpBubbleCompare({
         // Keep both panes in lockstep with Helix strobing
         const off = (window as any).__addStrobingListener?.(
           ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
-            const s = Math.max(1, Math.floor(sectorCount||1));   // concurrent sectors in the sweep loop
-            const payload = {
-              sectorIdx: Math.max(0, currentSector % s),
-              sectorSplit: Math.max(0, Math.min(s - 1, Number.isFinite(split) ? (split as number|0) : Math.floor(s/2))),
-            };
+            const s = Math.max(1, sectorCount|0);
+            const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
+            const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
             pushUniformsWhenReady(leftEngine.current,  payload);
             pushUniformsWhenReady(rightEngine.current, payload);
             leftEngine.current?.requestRewarp?.();
@@ -718,9 +716,31 @@ export default function WarpBubbleCompare({
       lockFraming: lockFraming ?? true,
     });
 
-    // IMPORTANT: remove/avoid preset calls after this point; they overwrite
-    pushUniformsWhenReady(leftEngine.current,  real);
-    pushUniformsWhenReady(rightEngine.current, show);
+    // Build shared geometry data
+    const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+
+    // REAL (parity / Ford–Roman)
+    pushUniformsWhenReady(leftEngine.current, {
+      ...shared,
+      ...real,
+      physicsParityMode: true,
+      gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+      deltaAOverA: real.qSpoilingFactor,
+      dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
+      sectors: Math.max(1, parameters.sectors),
+      ridgeMode: 0,
+    });
+
+    // SHOW (UI)
+    pushUniformsWhenReady(rightEngine.current, {
+      ...shared,
+      ...show,
+      physicsParityMode: false,
+      gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+      deltaAOverA: show.qSpoilingFactor,
+      sectors: Math.max(1, parameters.sectors),
+      ridgeMode: 1,
+    });
 
     // Force a draw so the user sees the change immediately
     leftEngine.current.forceRedraw?.();
@@ -742,7 +762,7 @@ export default function WarpBubbleCompare({
       const lcPayload = {
         phase: lc.phase,
         onWindow: !!lc.onWindowDisplay,
-        sectorIdx: Math.max(0, lc.sectorIdx % s),
+        split: Math.max(0, (lc.sectorIdx ?? 0) % s),
         tauLC_ms: lc.tauLC_ms,
         dwell_ms: lc.dwell_ms,
         burst_ms: lc.burst_ms,
