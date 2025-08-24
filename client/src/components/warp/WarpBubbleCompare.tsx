@@ -783,170 +783,85 @@ export default function WarpBubbleCompare({
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
 
-  // bootstrap both engines once using robust initialization
   useEffect(() => {
-    let cancelled = false;
-    
-    const initOne = async (
-      canvas: HTMLCanvasElement | null,
-      setRef: React.MutableRefObject<any>,
-      parity: boolean
-    ) => {
-      if (!canvas) return;
+    const W = (window as any).WarpEngine;
+    if (!leftRef.current || !rightRef.current) return;
+    if (!W) { console.error("[Warp] window.WarpEngine not loaded"); return; }
 
-      // 1) Context
-      const gl = getGL(canvas);
-      if (!gl) {
-        console.warn("[Warp] WebGL context missing");
-        return;
-      }
+    // idempotent cleanup if StrictMode remounts
+    const kill = (ref: any) => {
+      const s = ref.current;
+      if (!s) return;
+      s.stop?.(); s.dispose?.();
+      ref.current = null;
+    };
+    kill(leftEngine); kill(rightEngine);
 
-      // 2) Size + viewport
-      const { w, h } = sizeCanvas(canvas);
-      gl.viewport(0, 0, w, h);
+    const initOne = async (cv: HTMLCanvasElement, parityPhys: boolean) => {
+      const eng = new W(cv);                // ctor creates gl & initial grid
+      const { w, h } = sizeCanvas(cv);
+      eng.gl.viewport(0, 0, w, h);
+      // wait until grid program + buffers exist (async path safe)
+      await new Promise<void>((resolve) => {
+        const tick = () => {
+          if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
 
-      // 3) Init engine using the actual constructor pattern
-      const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: getAppBuild() });
-      const engine = new WarpCtor(canvas);
+      // defensive, physics-safe defaults (prevents "θ-scale — invalid" & "ridge undefined")
+      const sectorsTotal = Math.max(1, +parameters?.sectorCount || +parameters?.sectors || 1);
+      const dutyFR = Number.isFinite(parameters?.dutyEffectiveFR)
+        ? Math.max(1e-12, +parameters.dutyEffectiveFR)
+        : Math.max(1e-12, (+parameters?.dutyCycle || 0.14) / sectorsTotal);
+      const thetaScale =
+        Math.pow(+parameters?.gammaGeo || 26, 3) *
+        (+parameters?.qSpoilingFactor || 1) *
+        (+parameters?.gammaVanDenBroeck || 2.86e5) *
+        Math.sqrt(dutyFR);
 
-      // 4) Wait for shaders to be ready and apply default parameters  
-      const θ = saneTheta(parameters || {});
-      const defaultParams = {
-        thetaScale: θ,                    // ← avoids "θ-scale — invalid"
-        physicsParityMode: !!parity,      // REAL=true, SHOW=false
-        ridgeMode: 1,                     // ← avoids "Ridge mode — undefined"
+      eng.setParameters?.({
+        thetaScale: Number.isFinite(thetaScale) && thetaScale > 0 ? thetaScale : 5.03e3,
+        physicsParityMode: !!parityPhys, // REAL=true, SHOW=false
+        ridgeMode: 1,
         colorMode: "theta",
         viewAvg: true,
-        sectorCount: Math.max(1, +parameters?.sectorCount || +parameters?.sectors || 1),
-        split: Math.max(0, (+parameters?.split|0) % Math.max(1, +parameters?.sectorCount || 1)),
-      };
-
-      // Apply parameters once ready to avoid pre-link uniform pushes
-      engine.onceReady?.(() => {
-        engine.updateUniforms?.(defaultParams);
-        if (parity) {
-          engine.setPresetParity?.();     // truth pane defaults
-        } else {
-          engine.setPresetShowcase?.();   // boosted pane defaults  
-        }
+        sectorCount: sectorsTotal,
+        split: Math.max(0, (+parameters?.split | 0) % sectorsTotal),
       });
 
-      // 5) Start the engine
-      engine.start?.();
-
-      // 7) Resize handling + context loss
+      // start loop & resize observer
+      eng.start?.();
       const ro = new ResizeObserver(() => {
-        const { w, h } = sizeCanvas(canvas);
-        gl.viewport(0, 0, w, h);
-        engine.resize?.(w, h);
+        const { w, h } = sizeCanvas(cv);
+        eng.gl.viewport(0, 0, w, h);
+        eng.resize?.(w, h);
       });
-      ro.observe(canvas);
-
-      const onLost = (e: any) => { e.preventDefault(); engine.stop?.(); };
-      const onRestored = () => { /* re-run initProgram/initGridBuffers/setParameters/start */ };
-      canvas.addEventListener("webglcontextlost", onLost, false);
-      canvas.addEventListener("webglcontextrestored", onRestored, false);
-
-      setRef.current = { engine, gl, ro, onLost, onRestored, canvas };
+      ro.observe(cv);
+      eng.__ro = ro;
+      eng.isLoaded = true;                  // satisfies "Engine ready — isLoaded=true"
+      return eng;
     };
 
     (async () => {
-      if (!leftRef.current || !rightRef.current) return;
-      try {
-        // StrictMode/HMR guard with ref-count so we can release on unmount
-        const busyKey = '__warpCompareBusyCount';
-        (window as any)[busyKey] = ((window as any)[busyKey] || 0) + 1;
-        if ((window as any)[busyKey] > 1) return;
-        
-        const WarpCtor = await ensureWarpEngineCtor({ requiredBuild: getAppBuild() });
-        // make the strobe mux before engines so they subscribe cleanly
-        ensureStrobeMux();
-        if (cancelled) return;
-
-        // StrictMode re-mount guard (prevents double constructor crashes in dev)
-        if (busyRef.current) return;
-        busyRef.current = true;
-
-        try {
-          console.log('[WARP ENGINE] Attempting bootstrap initialization');
-          
-          await initOne(leftRef.current,  leftEngine,  /*REAL*/ true);
-          await initOne(rightRef.current, rightEngine, /*SHOW*/ false);
-          
-        } catch (error) {
-          console.error('[WARP ENGINE] Bootstrap failed:', {
-            error: error,
-            message: (error as any)?.message,
-            stack: (error as any)?.stack,
-            leftCanvas: !!leftRef.current,
-            rightCanvas: !!rightRef.current
-          });
-          return;
-        } finally {
-          busyRef.current = false;
-        }
-        
-        // (mux already ensured above)
-
-        // Wire up the initialized engines for strobing and diagnostics
-        const leftEng = leftEngine.current?.engine;
-        const rightEng = rightEngine.current?.engine;
-        
-        if (leftEng && rightEng) {
-          // Keep both panes in lockstep with Helix strobing
-          const off = (window as any).__addStrobingListener?.(
-            ({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;}) => {
-              const s = Math.max(1, sectorCount|0);
-              const sp = Number.isFinite(split) ? split|0 : (currentSector|0);
-              const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
-              pushSafe(leftEngine,  payload);
-              pushSafe(rightEngine, payload);
-              leftEng?.requestRewarp?.();
-              rightEng?.requestRewarp?.();
-            }
-          );
-          (leftEng as any).__strobeOff = off;
-          (rightEng as any).__strobeOff = off;
-
-          // Wire diagnostics so you can compare against the calculator
-          const syncBadge = (side: 'REAL'|'SHOW', u: any) => {
-            console.debug(`[${side}] θ-scale=${u.thetaScale?.toExponential?.(2)}  gVdB=${u.gammaVdB}  duty=${u.dutyCycle}  FR=${(u as any).dutyEffectiveFR}  sectors=${u.sectors}/${u.split}`);
-          };
-          leftEng.onDiagnostics  = (d) => { (window as any).__diagREAL = d;  syncBadge('REAL', leftEng.uniforms); };
-          rightEng.onDiagnostics = (d) => { (window as any).__diagSHOW = d; syncBadge('SHOW', rightEng.uniforms); };
-
-          console.log('[WARP ENGINE] Bootstrap initialization complete');
-        }
-
-      } catch (e) {
-        console.error('[WarpBubbleCompare] init failed:', e);
-      }
+      leftEngine.current  = await initOne(leftRef.current!,  /*REAL*/ true);
+      rightEngine.current = await initOne(rightRef.current!, /*SHOW*/ false);
     })();
 
     return () => {
-      cancelled = true;
-      
-      // Clean up based on new structure from bootstrap
       for (const ref of [leftEngine, rightEngine]) {
         const s = ref.current;
         if (!s) continue;
-        s.canvas?.removeEventListener("webglcontextlost", s.onLost);
-        s.canvas?.removeEventListener("webglcontextrestored", s.onRestored);
-        s.ro?.disconnect();
-        s.engine?.stop?.();
-        s.engine?.dispose?.();
-        try { (s.engine as any)?.__strobeOff?.(); } catch {}
+        s.__ro?.disconnect?.();
+        s.stop?.();
+        s.dispose?.();
         ref.current = null;
       }
-      
-      try { roRef.current?.disconnect(); } catch {}
-      try {
-        const busyKey = '__warpCompareBusyCount';
-        (window as any)[busyKey] = Math.max(0, ((window as any)[busyKey] || 1) - 1);
-      } catch {}
     };
+    // re-init only when canvases or the engine script changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [leftRef.current, rightRef.current]);
 
   // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {

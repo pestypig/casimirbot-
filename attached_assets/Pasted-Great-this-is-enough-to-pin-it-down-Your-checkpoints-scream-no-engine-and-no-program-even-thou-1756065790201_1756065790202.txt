@@ -1,0 +1,118 @@
+Great—this is enough to pin it down. Your checkpoints scream “no engine” and “no program,” even though your uniform plumbing is solid. There are three concrete fixes to make the REAL/SHOW canvases actually come alive:
+
+1) Mount the engines from WarpBubbleCompare.tsx
+
+Right now the canvases exist but no engine is created for them. Add a mount effect that:
+
+Lazy-loads /warp-engine.js if needed
+
+Constructs one engine per canvas
+
+Waits for VBO + program to exist
+
+Pushes initial uniforms via updateUniforms
+
+Starts the render loop
+
+Cleans up on unmount and resizes on layout changes
+
+// WarpBubbleCompare.tsx (add near top)
+const ensureScript = () =>
+  new Promise<void>((resolve, reject) => {
+    if ((window as any).WarpEngine) return resolve();
+    const s = document.createElement('script');
+    s.src = '/warp-engine.js'; s.defer = true; s.onload = () => resolve(); s.onerror = reject;
+    document.head.appendChild(s);
+  });
+
+const sizeCanvas = (cv: HTMLCanvasElement) => {
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(r.width * dpr));
+  const h = Math.max(1, Math.floor(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return { w, h };
+};
+
+useEffect(() => {
+  let cancelled = false;
+  const kill = (ref: any) => {
+    const e = ref.current;
+    if (!e) return;
+    e.__ro?.disconnect?.();
+    e.stop?.();
+    e.dispose?.();
+    ref.current = null;
+  };
+
+  (async () => {
+    if (!leftRef.current || !rightRef.current) return;
+    await ensureScript();
+    const W = (window as any).WarpEngine;
+    if (!W) { console.error('[Warp] engine script not available'); return; }
+
+    // idempotent (React StrictMode)
+    kill(leftEngine); kill(rightEngine);
+
+    const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+      const eng = new W(cv);                          // creates gl; may or may not init grid
+      const { w, h } = sizeCanvas(cv);
+      eng.gl.viewport(0, 0, w, h);
+
+      // Fallback init if constructor didn't prepare grid/shaders
+      try { eng._initializeGrid?.(); } catch {}
+      try { eng._compileGridShaders?.(); } catch {}
+
+      // Wait until program + VBO exist (handles async shader path)
+      await new Promise<void>((resolve) => {
+        const tick = () => {
+          if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
+          requestAnimationFrame(tick);
+        };
+        tick();
+      });
+
+      // Push initial uniforms (parity/cosmetics set in toReal/toShow)
+      eng.updateUniforms?.(uniforms);
+      eng.isLoaded = true;             // satisfies checkpoints’ “Engine ready”
+
+      // Start render loop if engine doesn’t auto-run
+      if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
+      eng.start?.?.(); // if you added start()
+
+      // Keep canvas sized
+      const ro = new ResizeObserver(() => {
+        const { w, h } = sizeCanvas(cv);
+        eng.gl.viewport(0, 0, w, h);
+        eng.resize?.(w, h);
+      });
+      ro.observe(cv);
+      eng.__ro = ro;
+      return eng;
+    };
+
+    if (cancelled) return;
+
+    // Build initial uniform packets for each side
+    const baseSnap = snapForMode ?? {};
+    const realU = toRealUniforms(baseSnap);
+    const showU = toShowUniforms(baseSnap);
+
+    leftEngine.current  = await initOne(leftRef.current!,  realU);
+    rightEngine.current = await initOne(rightRef.current!, showU);
+  })();
+
+  return () => { cancelled = true; kill(leftEngine); kill(rightEngine); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [leftRef.current, rightRef.current]);
+
+
+This alone should flip:
+
+WebGL context → alive
+
+Shaders linked → gridProgram ready
+
+Engine ready → isLoaded=true
+
+Render loop → active
