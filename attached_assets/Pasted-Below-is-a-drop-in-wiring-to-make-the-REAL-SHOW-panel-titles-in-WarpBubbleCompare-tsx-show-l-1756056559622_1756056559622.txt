@@ -1,0 +1,315 @@
+Below is a **drop‑in wiring** to make the REAL/SHOW panel titles in `WarpBubbleCompare.tsx` show **live pipeline values** (power/mass/zeta) instead of any stale/hardcoded numbers. It’s defensive to different live shapes and falls back to config targets with correct units.
+
+---
+
+## 1) Imports (top of `WarpBubbleCompare.tsx`)
+
+```tsx
+// add
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+```
+
+---
+
+## 2) Helpers (place near other local helpers in the file)
+
+```tsx
+// Modes we expose in UI
+ type ModeKey = "hover" | "cruise" | "emergency" | "standby";
+
+// Safe unit formatting for either live MW or config W
+const formatPower = (P_MW?: number, P_W?: number) => {
+  if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
+  if (Number.isFinite(P_W as number)) {
+    const w = P_W as number;
+    if (w >= 1e6) return `${(w / 1e6).toFixed(1)} MW`;
+    if (w >= 1e3) return `${(w / 1e3).toFixed(1)} kW`;
+    return `${w.toFixed(1)} W`;
+  }
+  return "—";
+};
+
+// Build a live subtitle for a mode (power • mass • zeta)
+const buildLiveDesc = (
+  snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number },
+  cfg?: { powerTarget_W?: number }
+) => {
+  const P = formatPower(snap?.P_avg_MW, cfg?.powerTarget_W);
+  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
+  const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
+  return `${P} • ${M} • ${Z}`;
+};
+```
+
+---
+
+## 3) Inside the component body
+
+Add this **once** inside the `WarpBubbleCompare` component (with refs/engines), before your JSX `return`:
+
+```tsx
+  // Live pipeline snapshot (same hook used by Energy Control panel)
+  const live = useEnergyPipeline();
+
+  // tolerant extraction – supports live.byMode, live.modes, or flat legacy shapes
+  const liveForMode = (key: ModeKey) =>
+    (live?.byMode && live.byMode[key]) ||
+    (live?.modes && live.modes[key]) ||
+    (live && (live as any)[key]) || null;
+
+  // current UI mode key (fallback to 'hover')
+  const currentModeKey = ((live?.currentMode as ModeKey) || "hover") as ModeKey;
+
+  // optional: read UI configs if present on window; safe fallback to empty
+  const modeCfgs: Record<string, { name?: string; powerTarget_W?: number }> =
+    (typeof window !== "undefined" && (window as any).MODE_CONFIGS) || {};
+
+  const currentSnap = liveForMode(currentModeKey);
+  const currentCfg = modeCfgs[currentModeKey];
+  const currentSubtitle = buildLiveDesc(currentSnap, currentCfg);
+
+  // Titles for the two panels
+  const realPanelTitle = `REAL • ${currentSubtitle}`;   // parity/FR view
+  const showPanelTitle = `SHOW • ${currentSubtitle}`;   // boosted/UI view
+```
+
+> If your component already keeps an internal `mode` state separate from the pipeline, replace `currentModeKey` with that state as needed, but \*\*still pull values from \*\*\`\` so titles are truly live.
+
+---
+
+## 4) Use the titles in your JSX
+
+Wherever you render the side‑by‑side panels, replace the static titles (e.g., `"REAL"` / `"SHOW"`) with the computed strings:
+
+```tsx
+{/* BEFORE */}
+{/* <Panel title="REAL"> ... */}
+{/* <Panel title="SHOW"> ... */}
+
+{/* AFTER */}
+<Panel title={realPanelTitle}>
+  {/* REAL canvas & controls */}
+</Panel>
+<Panel title={showPanelTitle}>
+  {/* SHOW canvas & controls */}
+</Panel>
+```
+
+If you don’t have a `Panel` component and instead use a custom header, drop `currentSubtitle` right under your existing labels:
+
+```tsx
+<div className="flex items-center justify-between">
+  <h3 className="font-semibold">REAL</h3>
+  <span className="text-xs text-muted-foreground">{currentSubtitle}</span>
+</div>
+```
+
+---
+
+## 5) Optional: show **all modes** with their live values
+
+If you have a header bar or tab row and want each mode to show its own live number (not only the active one):
+
+```tsx
+const modeKeys: ModeKey[] = ["hover", "cruise", "emergency", "standby"];
+const modeBadges = modeKeys.map((k) => {
+  const snap = liveForMode(k);
+  const cfg = modeCfgs[k];
+  return (
+    <div key={k} className="px-2 py-1 rounded-full bg-muted text-xs">
+      <span className="font-medium capitalize">{k}</span>
+      <span className="opacity-70"> — {buildLiveDesc(snap, cfg)}</span>
+    </div>
+  );
+});
+```
+
+Then render `{modeBadges}` in your header area.
+
+---
+
+## 6) Notes & guarantees
+
+* **Live‑first:** Uses `P_avg_MW` etc. from the pipeline when available for *every* mode; falls back to config `powerTarget_W` with correct units (W/kW/MW) when live absent.
+* **No stale 7.4 W/MW confusion:** Unit formatting prevents mislabeling; Cruise will show `83.3 MW` live when your pipeline publishes it.
+* **No coupling to engines:** This only touches titles/labels. Your REAL/SHOW engines keep using their existing uniform updates.
+* **Defensive:** Won’t throw if the pipeline object shape changes slightly.
+
+That’s it—splice the snippets into `WarpBubbleCompare.tsx` and replace the two hardcoded titles with `realPanelTitle` / `showPanelTitle`. If you want me to target exact lines for your file, paste the header section of the component and I’ll return a pinpoint diff.
+
+---
+
+## 7) Backend → WarpEngine wiring (uniform bridge + strobing)
+
+This drop‑in patch **feeds live pipeline values into both REAL and SHOW engines** inside `WarpBubbleCompare.tsx`, mirroring the energy pipeline and the calculator outputs. It normalizes possible field names and updates uniforms + strobing in lockstep.
+
+> Place these near your engine setup (`leftEngine`/`rightEngine`) and **before** `return (...)` of the component.
+
+```tsx
+// 7.1 — Live → Uniforms mapping helpers
+
+type LiveSnap = Partial<{
+  // physics / timing
+  dutyCycle: number;
+  sectorCount: number; sectorStrobing: number; sectors: number;
+  sectorSplit: number; split: number; currentSector: number;
+  gammaGeo: number; g_y: number;
+  deltaAOverA: number; qSpoilingFactor: number;
+  gammaVdB: number; gammaVanDenBroeck: number;
+  viewAvg: boolean;
+
+  // geometry
+  hullAxes: [number, number, number];
+  hull: { a: number; b: number; c: number };
+  wallWidth_m: number; wallWidth_rho: number;
+  driveDir: [number, number, number];
+
+  // viz
+  curvatureGainT: number; curvatureBoostMax: number;
+  exposure: number; zeroStop: number; cosmeticLevel: number;
+  ridgeMode: number; colorMode: number | "theta" | "shear" | "solid";
+  userGain: number; displayGain: number; lockFraming: boolean; cameraZ: number;
+}>;
+
+const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// Compute θ-scale (γ^3 · ΔA/A · γ_VdB · √(duty/sectors)) if not provided
+const computeThetaScale = (v: LiveSnap) => {
+  const gammaGeo = N(v.gammaGeo ?? (v as any).g_y, 26);
+  const dAa = N(v.deltaAOverA ?? (v as any).qSpoilingFactor, 1);
+  const gammaVdB = N(v.gammaVdB ?? (v as any).gammaVanDenBroeck, 2.86e5);
+  const sectors = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectorStrobing ?? v.sectors, 1)));
+  const duty = Math.max(0, N(v.dutyCycle, 0));
+  const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
+  const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+  const effDuty = Math.max(1e-12, duty / sectors);
+  return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+};
+
+const toSharedUniforms = (snap: LiveSnap) => {
+  // hull → axesClip is computed in engine, but we pass meters for authority
+  const a = N(snap.hull?.a ?? snap.hullAxes?.[0], 503.5);
+  const b = N(snap.hull?.b ?? snap.hullAxes?.[1], 132.0);
+  const c = N(snap.hull?.c ?? snap.hullAxes?.[2], 86.5);
+  return {
+    hullAxes: [a, b, c] as [number, number, number],
+    wallWidth_m: Number.isFinite(snap.wallWidth_m) ? snap.wallWidth_m : undefined,
+    wallWidth_rho: Number.isFinite(snap.wallWidth_rho) ? snap.wallWidth_rho : undefined,
+    driveDir: (Array.isArray(snap.driveDir) && snap.driveDir.length === 3) ? snap.driveDir : [1, 0, 0],
+
+    // strobing/sectoring values (also mirrored to the global strobe mux below)
+    dutyCycle: N(snap.dutyCycle, 0.14),
+    sectors: Math.max(1, Math.floor(N(snap.sectorCount ?? snap.sectorStrobing ?? snap.sectors, 1))),
+    split: Math.max(0, Math.floor(N(snap.sectorSplit ?? snap.split ?? snap.currentSector, 0))),
+    viewAvg: !!(snap.viewAvg ?? true),
+
+    // physics chain
+    gammaGeo: N(snap.gammaGeo ?? (snap as any).g_y, 26),
+    deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
+    gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
+
+    // θ-scale (engine will compute if omitted; we compute explicitly for parity)
+    thetaScale: computeThetaScale(snap),
+
+    // camera/framing passthroughs if present
+    lockFraming: snap.lockFraming ?? true,
+    cameraZ: Number.isFinite(snap.cameraZ) ? snap.cameraZ : undefined,
+  };
+};
+
+const toRealUniforms = (snap: LiveSnap) => ({
+  ...toSharedUniforms(snap),
+  physicsParityMode: true,
+  ridgeMode: 0,
+  colorMode: 2,          // shear is a nice truth default; change if you prefer
+  exposure: 3.5,
+  zeroStop: 1e-5,
+  curvatureGainT: 0.0,
+  curvatureBoostMax: 1.0,
+  userGain: 1.0,
+  vizGain: 1.0,
+});
+
+const toShowUniforms = (snap: LiveSnap) => {
+  const T = clamp01(N(snap.curvatureGainT, 0.6));
+  const B = Math.max(1, N(snap.curvatureBoostMax, 40));
+  return {
+    ...toSharedUniforms(snap),
+    physicsParityMode: false,
+    ridgeMode: 1,
+    colorMode: 1,       // theta diverging palette
+    exposure: N(snap.exposure, 6.0),
+    zeroStop: N(snap.zeroStop, 1e-7),
+    curvatureGainT: T,
+    curvatureBoostMax: B,
+    userGain: N(snap.userGain, 4.0),
+    vizGain: 1.0,
+    // display gain mirrors UI decades (optional—engine also respects userGain)
+    displayGain: 1 + T * (B - 1),
+  };
+};
+
+// 7.2 — Choose the live snapshot for the current mode (byMode or flat)
+const currentModeKey = ((live?.currentMode as ModeKey) || "hover") as ModeKey;
+const snapAll = live?.byMode ?? live?.modes ?? null;
+const snapForMode: LiveSnap = (snapAll && (snapAll as any)[currentModeKey]) || (live as any) || {};
+
+// 7.3 — Push uniforms into both engines whenever live values change
+useEffect(() => {
+  if (!leftEngine.current || !rightEngine.current) return;
+
+  const realU = toRealUniforms(snapForMode);
+  const showU = toShowUniforms(snapForMode);
+
+  // REAL (parity)
+  pushUniformsWhenReady(leftEngine.current, realU);
+
+  // SHOW (boosted)
+  pushUniformsWhenReady(rightEngine.current, showU);
+  // Optional: also set display gain explicitly on the instance
+  rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
+
+  // Camera nudge: if you track a shared axesScene span, you can enforce a safe cameraZ
+  // (kept conservative by default; uncomment if you have helpers like compactCameraZ/safeCamZ)
+  // const axesScene = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
+  // const z = safeCamZ(compactCameraZ(leftRef.current!, axesScene));
+  // pushUniformsWhenReady(leftEngine.current,  { cameraZ: z });
+  // pushUniformsWhenReady(rightEngine.current, { cameraZ: z });
+}, [
+  leftEngine.current, rightEngine.current,
+  // physics chain
+  snapForMode?.gammaGeo, snapForMode?.gammaVdB, (snapForMode as any)?.g_y,
+  snapForMode?.deltaAOverA, (snapForMode as any)?.qSpoilingFactor,
+  snapForMode?.dutyCycle, snapForMode?.sectorCount, snapForMode?.sectorStrobing,
+  snapForMode?.sectors, snapForMode?.sectorSplit, snapForMode?.split, snapForMode?.currentSector,
+  snapForMode?.viewAvg,
+  // geometry
+  snapForMode?.hullAxes?.[0], snapForMode?.hullAxes?.[1], snapForMode?.hullAxes?.[2],
+  snapForMode?.hull?.a, snapForMode?.hull?.b, snapForMode?.hull?.c,
+  snapForMode?.wallWidth_m, snapForMode?.wallWidth_rho,
+  // viz
+  snapForMode?.curvatureGainT, snapForMode?.curvatureBoostMax,
+  snapForMode?.exposure, snapForMode?.zeroStop, snapForMode?.userGain,
+  snapForMode?.displayGain,
+  live?.currentMode
+]);
+
+// 7.4 — Mirror strobing (sectoring) to the global mux that WarpEngine listens to
+useEffect(() => {
+  const s = Math.max(1, Math.floor(N(snapForMode?.sectorCount ?? snapForMode?.sectors ?? 1, 1)));
+  const cur = Math.max(0, Math.floor(N(snapForMode?.currentSector ?? 0, 0)) % s);
+  const split = Math.max(0, Math.min(s - 1, Math.floor(N(snapForMode?.sectorSplit ?? snapForMode?.split ?? cur, cur))));
+  (window as any).setStrobingState?.({ sectorCount: s, currentSector: cur, split });
+}, [snapForMode?.sectorCount, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
+```
+
+### What this gives you
+
+* **Full backend feed** into both engines (duty/sectors/γ chain/ΔA/A/γ\_VdB/hull/wall/drive).
+* **Parity‑correct** REAL vs SHOW uniforms.
+* **Live strobing sync** via the same mux WarpEngine already consumes.
+* **Unit issues eliminated**: θ‑scale computed from live values when absent.
+* **No coupling to specific pipeline shapes**: tolerant field names + fallbacks.
+
+> If you already have `applyReal/applyShow`, you can keep them; just have them call `pushUniformsWhenReady(engine, toRealUniforms(snap))` or `toShowUniforms(snap)` instead of hardcoded values.
