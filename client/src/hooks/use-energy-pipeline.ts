@@ -185,7 +185,6 @@ export type ModeConfig = {
 
   // Legacy fields for backward compatibility
   qSpoilingFactor?: number;
-  gammaVanDenBroeck?: number;
 };
 
 // Mode configurations for UI display (synchronized with backend)
@@ -201,7 +200,6 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     powerTarget_W: 0,
     sectorStrobing: 1,
     qSpoilingFactor: 0.1,
-    gammaVanDenBroeck: 1,
   },
   hover: {
     name: "Hover",
@@ -214,7 +212,6 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     powerTarget_W: 83.3e6,       // match your display target
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 1e11,
   },
   cruise: {
     name: "Cruise",
@@ -227,7 +224,6 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     powerTarget_W: 40e6,
     sectorStrobing: 1,
     qSpoilingFactor: 0.625,
-    gammaVanDenBroeck: 1e11,
   },
   emergency: {
     name: "Emergency",
@@ -240,7 +236,6 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     powerTarget_W: 120e6,
     sectorStrobing: 8,
     qSpoilingFactor: 1,
-    gammaVanDenBroeck: 1e11,
   },
 };
 

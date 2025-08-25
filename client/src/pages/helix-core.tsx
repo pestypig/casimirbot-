@@ -391,6 +391,7 @@ export default function HelixCore() {
     window.addEventListener('helix:debug', onDebug as any);
     return () => window.removeEventListener('helix:debug', onDebug as any);
   }, []);
+
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -398,8 +399,15 @@ export default function HelixCore() {
     refetchInterval: 5000,
     staleTime: 4_500,
     refetchOnWindowFocus: false,
-    suspense: false,
   });
+
+  // Show theta audit in logs
+  useEffect(() => {
+    const a = (systemMetrics as any)?.thetaAudit;
+    if (!a) return;
+    const pct = a.expected ? ((a.used / a.expected) * 100).toFixed(1) : '—';
+    setMainframeLog(prev => [...prev, `[AUDIT] θ-scale expected=${a.expected.toExponential(2)} used=${a.used.toExponential(2)} (${pct}%)`].slice(-200));
+  }, [(systemMetrics as any)?.thetaAudit]);
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
   useResonatorAutoDuty({
@@ -646,7 +654,7 @@ export default function HelixCore() {
       // physics amps
       gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 1.4e5),
+      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 0),
 
       // viewer niceties
       viewAvg: true,
@@ -1003,7 +1011,7 @@ export default function HelixCore() {
                             colorMode: "theta",         // consistent color
                             lockFraming: true,          // no auto zoom change with gain
                             // conservative in standby
-                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
+                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
                             powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
                             exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
                           }}
@@ -1028,7 +1036,7 @@ export default function HelixCore() {
                       vShip={1.0}
                       gammaGeo={pipeline?.gammaGeo ?? 26}
                       qSpoilingFactor={qSpoilUI}
-                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 1.4e5}
+                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 0}
                       dutyCycle={dutyUI_safe}
                       dutyEffectiveFR={dutyEffectiveFR_safe}  // ⬅️ ensures same averaging as REAL
                       sectors={totalSectors}      // ⬅️ use total sectors for averaging
@@ -1037,7 +1045,7 @@ export default function HelixCore() {
                       refParams={{
                         gammaGeo: 26,
                         qSpoilingFactor: 1,
-                        gammaVdB: 1.4e5,
+                        gammaVdB: 0,
                         dutyCycle: 0.14,
                         sectors: 1,
                         viewAvg: true,
@@ -1165,7 +1173,7 @@ export default function HelixCore() {
                 parityPhys={{
                   gammaGeo:        pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
+                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
                   dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
                   dutyCycle:        dutyUI_safe,           // UI duty (for display)
               }}
@@ -1173,7 +1181,7 @@ export default function HelixCore() {
                 // same as above unless you want explicit "seasoning" in SHOW
                 gammaGeo:        pipeline?.gammaGeo ?? 26,
                 qSpoilingFactor: qSpoilUI,
-                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
+                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
                 dutyEffectiveFR:  dutyEffectiveFR_safe,
                 dutyCycle:        dutyUI_safe,
               }}

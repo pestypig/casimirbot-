@@ -17,7 +17,7 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
 
   const gammaGeo = Number(p?.gammaGeo ?? p?.g_y ?? 26);
   const qSpoil   = Number(p?.qSpoilingFactor ?? p?.deltaAOverA ?? 1);
-  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 1.4e5);
+  const gammaVdB = Number(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? 0);
 
   // Duty resolution based on source preference
   let duty = Number(p?.dutyCycle ?? 0.14);            // UI duty (visible) - fallback
