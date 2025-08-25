@@ -31,6 +31,10 @@ export type PipelineLike = {
   dutyCycle: number;             // UI duty (mode description)
   dutyBurst?: number;            // 0.01
   dutyEffective_FR?: number;     // ship-wide duty = 0.01 * activeSectors/400
+  // New MODE_CONFIGS fields
+  sectorsTotal?: number;         // total grid sectors (400)
+  sectorsConcurrent?: number;    // concurrent sectors from config
+  localBurstFrac?: number;       // per-sector ON window fraction
   // geometry/time
   hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number };
   strobeHz?: number;
@@ -88,9 +92,20 @@ export type HUDModel = {
 
 const SECTORS_TOTAL = 400;
 
+function clamp01(x: number): number {
+  return Math.max(0, Math.min(1, x));
+}
+
 export function toHUDModel(s: PipelineLike): HUDModel {
-  const dutyShip = s.dutyShip ?? s.dutyEffective_FR ?? (0.01 * (s.activeSectors / SECTORS_TOTAL));
-  const dutyBurst = s.dutyBurst ?? 0.01;
+  const sectorsConcurrent = s.sectorsConcurrent ?? s.activeSectors ?? 1;
+  const sectorsTotal = s.sectorsTotal ?? 400;
+  const localBurstFrac = s.localBurstFrac ?? 0.01;
+  
+  // If computing FR duty here, mirror the same formula:
+  const dutyFR = clamp01(localBurstFrac * (sectorsConcurrent / sectorsTotal));
+  
+  const dutyShip = s.dutyShip ?? s.dutyEffective_FR ?? dutyFR;
+  const dutyBurst = s.dutyBurst ?? localBurstFrac;
 
   // instantaneous ship power during ON window
   const powerOnW = (s.P_loss_raw || 0) * (s.N_tiles || 0);
@@ -115,8 +130,8 @@ export function toHUDModel(s: PipelineLike): HUDModel {
     powerOnW,
     dutyShip,
     dutyBurst,
-    sectorsConcurrent: s.concurrentSectors ?? s.activeSectors ?? 1,
-    sectorsTotal: SECTORS_TOTAL,
+    sectorsConcurrent,
+    sectorsTotal,
     tilesTotal: s.N_tiles ?? 0,
     tilesPerSector: s.tilesPerSector ?? Math.floor((s.N_tiles || 0) / SECTORS_TOTAL),
     zeta: s.zeta ?? 0,
