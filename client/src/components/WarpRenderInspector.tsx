@@ -81,6 +81,7 @@ export default function WarpRenderInspector(props: {
   parityPhys?: Record<string, any>;
   showPhys?: Record<string, any>;
   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
+  lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
 }){
   const leftRef = useRef<HTMLCanvasElement>(null);   // REAL
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
@@ -261,6 +262,21 @@ export default function WarpRenderInspector(props: {
   // Apply payloads any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
+
+    // --- Pane-specific Ford–Roman duty (from LC burst × conc/total)
+    const dutyLocal = (() => {
+      const b = Number(props.lightCrossing?.burst_ms);
+      const d = Number(props.lightCrossing?.dwell_ms);
+      return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
+    })();
+    const totalSectors = Math.max(1, Math.floor(
+      Number((props.baseShared as any)?.sectorCount ?? (props.baseShared as any)?.sectors ?? 400)
+    ));
+    const sLeft  = Math.max(1, Math.floor(Number((realPayload as any)?.sectors ?? 1)));
+    const sRight = Math.max(1, Math.floor(Number((showPayload as any)?.sectors ?? sLeft)));
+    const dutyFR_left  = dutyLocal * (sLeft  / totalSectors);
+    const dutyFR_right = dutyLocal * (sRight / totalSectors);
+
     // sanitize a few hot-path values
     const safe = (o:any)=> {
       const sectors = Math.max(1, Math.floor(N(o.sectors, 1)));
@@ -288,8 +304,9 @@ export default function WarpRenderInspector(props: {
     pushUniformsWhenReady(leftEngine.current, {
       ...safe(realPayload),
       ...physicalScale,
-      physicsParityMode: true,
       ridgeMode: 0,
+      physicsParityMode: true, parityMode: true,        // ⬅️ set both flags for old engines
+      dutyEffectiveFR: dutyFR_left,                     // ⬅️ authoritative FR duty
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       displayGain: 1,
@@ -301,7 +318,8 @@ export default function WarpRenderInspector(props: {
       ...safe(showPayload),
       ...physicalScale,
       ridgeMode: 1,
-      physicsParityMode: false,
+      physicsParityMode: false, parityMode: false,
+      dutyEffectiveFR: dutyFR_right,                    // ⬅️ averaged/FR as well
     });
 
     // Optional camera sweetener so both keep same framing
@@ -309,7 +327,7 @@ export default function WarpRenderInspector(props: {
     const cz = compactCameraZ(ax);
     pushUniformsWhenReady(leftEngine.current,  { cameraZ: cz });
     pushUniformsWhenReady(rightEngine.current, { cameraZ: cz });
-  }, [realPayload, showPayload, shared]);
+  }, [realPayload, showPayload, shared, props.lightCrossing]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
