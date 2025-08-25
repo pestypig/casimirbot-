@@ -194,13 +194,27 @@ function buildCommonUniforms(base: BaseInputs) {
     dutyCycle: base.dutyCycle,          // UI duty (for diagnostics)
     sectors: Math.max(1, base.sectors), // concurrent
     sectorCount: Math.max(1, base.sectorCount), // total
-    viewAvg: true,
+    viewAvg: TONEMAP_LOCK.viewAvg,      // Always true from first frame
 
-    // visual defaults
-    colorMode: base.colorMode ?? 'theta',
+    // physics parameters (these change by mode)
+    gammaGeo: base.gammaGeo,
+    qSpoilingFactor: base.qSpoilingFactor,
+    gammaVanDenBroeck: base.gammaVanDenBroeck,
+
+    // visual defaults (locked)
+    colorMode: TONEMAP_LOCK.colorMode,
     lockFraming: base.lockFraming ?? true,
   };
 }
+
+// Locked display settings - modes only change physics, not visuals
+const TONEMAP_LOCK = { 
+  exp: 5.0, 
+  zero: 1e-7, 
+  ridgeMode: 0, 
+  colorMode: 'theta' as const,
+  viewAvg: true 
+};
 
 export function buildEngineUniforms(base: BaseInputs) {
   const common = buildCommonUniforms(base);
@@ -208,9 +222,11 @@ export function buildEngineUniforms(base: BaseInputs) {
     ...common,
     thetaScale: buildThetaScale(base, 'fr'),
     physicsParityMode: true,
-    ridgeMode: 0,          // ⚠ physics double-lobe (real)
-    exposure: 4.2,
-    zeroStop: 1e-6,
+    ridgeMode: TONEMAP_LOCK.ridgeMode,
+    exposure: TONEMAP_LOCK.exp,
+    zeroStop: TONEMAP_LOCK.zero,
+    colorMode: TONEMAP_LOCK.colorMode,
+    viewAvg: TONEMAP_LOCK.viewAvg,
     cosmeticLevel: 1,
     curvatureGainT: 0,
     curvatureBoostMax: 1,
@@ -220,14 +236,15 @@ export function buildEngineUniforms(base: BaseInputs) {
     ...common,
     thetaScale: buildThetaScale(base, 'ui'),
     physicsParityMode: false,
-    ridgeMode: 1,          // single crest at ρ=1 (show)
-    exposure: 7.5,
-    zeroStop: 1e-7,
-    cosmeticLevel: 10,
-    // these two can be driven by your "heroExaggeration"/slider
-    curvatureGainT: 0.70,
-    curvatureBoostMax: 40,
-    userGain: 4.0,
+    ridgeMode: TONEMAP_LOCK.ridgeMode,
+    exposure: TONEMAP_LOCK.exp,
+    zeroStop: TONEMAP_LOCK.zero,
+    colorMode: TONEMAP_LOCK.colorMode,
+    viewAvg: TONEMAP_LOCK.viewAvg,
+    cosmeticLevel: 1, // Lock cosmetic level too
+    curvatureGainT: 0,
+    curvatureBoostMax: 1,
+    userGain: 1,
   };
   return { real, show };
 }

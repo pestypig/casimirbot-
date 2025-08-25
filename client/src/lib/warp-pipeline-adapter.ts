@@ -59,12 +59,13 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   const split   = Math.floor(sectors / 2); // canonical (+/–) split
 
   // --- Physics amplitude chain (renderer consumes this as u_thetaScale) ---
-  // NOTE: qSpoilingFactor is an *idle cryo* knob in HELIX; it should NOT scale
-  // on-window field amplitude. Keep it out of thetaScale.
+  // Include qSpoilingFactor in theta calculation for mode differences
   const gammaGeo = Math.max(1, s.gammaGeo ?? 26);
   const gammaVdB = Math.max(0, s.gammaVanDenBroeck ?? 0);
+  const qSpoil = Math.max(1e-12, s.qSpoilingFactor ?? 1);
   const thetaScale =
     Math.pow(gammaGeo, 3) *
+    qSpoil *
     gammaVdB *
     Math.max(1e-12, d_ship / sectors);
 
@@ -75,23 +76,24 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
 
   // Push everything into the renderer in one shot using gated uniforms
   gatedUpdateUniforms(engine, {
-    // Physics/ops
+    // Physics/ops - include qSpoilingFactor in physics chain
     currentMode: s.currentMode,
     // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
     dutyCycle: d_ship,                // ship-wide effective duty
-    sectors, split,
-    gammaGeo, gammaVdB, Qburst,
-    // keep idle spoil around for diagnostics only (not in thetaScale)
-    qSpoilingFactor: s.qSpoilingFactor,
-    deltaAOverA: 1.0,                 // do not amplitude-scale visuals with spoil
+    dutyEffectiveFR: d_ship,          // FR duty for calculations
+    sectorCount: sectors,
+    sectors: split,
+    gammaGeo, 
+    gammaVanDenBroeck: gammaVdB, 
+    qSpoilingFactor: qSpoil,          // Ensure this reaches the shader with correct value
+    qBurst: Qburst,
     // Geometry
     hullAxes: [a, b, c],
-    wallWidth: w_rho,
-    // Unified amplitude handed in numerically
+    wallWidth_rho: w_rho,
+    // Unified amplitude with qSpoiling included
     thetaScale,
-    // Optional: keep your existing cosmetics; parity mode will disable them
-    // cosmeticLevel: 10,
-    // curvatureBoostMax: 40,
-    // curvatureGainT: 0.0,
+    // Visual defaults locked by gating system
+    colorMode: 'theta',
+    viewAvg: true,
   }, 'pipeline-adapter');
 }

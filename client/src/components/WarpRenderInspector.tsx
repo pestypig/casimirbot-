@@ -78,6 +78,15 @@ const MODE_PRESET: Record<ModeKey, {curvT:number; boost:number; displayGain:numb
   standby:   { curvT: 0.00, boost:  1, displayGain: 1.0 },
 };
 
+// Locked display settings - modes only change physics, not visuals
+const TONEMAP_LOCK = { 
+  exp: 5.0, 
+  zero: 1e-7, 
+  ridgeMode: 0, 
+  colorMode: 'theta' as const,
+  viewAvg: true 
+};
+
 // ---- Component --------------------------------------------------------------
 export default function WarpRenderInspector(props: {
   // Optional: calculator outputs. Pass exactly what your calculator returns
@@ -255,10 +264,26 @@ export default function WarpRenderInspector(props: {
     // Keep engines muted until first canonical uniforms arrive
     if (!haveUniforms) {
       if (leftEngine.current) {
-        leftEngine.current.updateUniforms?.({ thetaScale: 0, physicsParityMode: true, ridgeMode: 1 });
+        leftEngine.current.updateUniforms?.({
+          thetaScale: 0, 
+          physicsParityMode: true, 
+          ridgeMode: TONEMAP_LOCK.ridgeMode,
+          exposure: TONEMAP_LOCK.exp,
+          zeroStop: TONEMAP_LOCK.zero,
+          colorMode: TONEMAP_LOCK.colorMode,
+          viewAvg: TONEMAP_LOCK.viewAvg
+        });
       }
       if (rightEngine.current) {
-        rightEngine.current.updateUniforms?.({ thetaScale: 0, physicsParityMode: false, ridgeMode: 1 });
+        rightEngine.current.updateUniforms?.({
+          thetaScale: 0, 
+          physicsParityMode: false, 
+          ridgeMode: TONEMAP_LOCK.ridgeMode,
+          exposure: TONEMAP_LOCK.exp,
+          zeroStop: TONEMAP_LOCK.zero,
+          colorMode: TONEMAP_LOCK.colorMode,
+          viewAvg: TONEMAP_LOCK.viewAvg
+        });
       }
     }
 

@@ -61,6 +61,17 @@ export function applyToEngine(
     uniforms.dutyEffectiveFR
   );
 
+  // Apply locked display settings - modes only change physics, not visuals
+  const lockedUniforms = {
+    ...uniforms,
+    thetaScale: θ,
+    ridgeMode: 0,
+    exposure: 5.0,
+    zeroStop: 1e-7,
+    colorMode: 'theta',
+    viewAvg: true
+  };
+
   // Debug echo (what we actually bind)
   (window as any).__warpEcho = {
     v, src: uniforms.__src, θ_used: θ,
@@ -73,7 +84,7 @@ export function applyToEngine(
     }
   };
 
-  engine.updateUniforms({ ...uniforms, thetaScale: θ });
+  engine.updateUniforms(lockedUniforms);
 }
 
 /**
