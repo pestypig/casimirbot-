@@ -218,7 +218,17 @@ export default function WarpRenderInspector(props: {
   function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
     const existing = (cv as any)[ENGINE_KEY];
     if (existing && !existing._destroyed) return existing as WarpType;
-    const eng = new Ctor(cv);
+    let eng: any;
+    try {
+      eng = new Ctor(cv);
+    } catch (err: any) {
+      const msg = String(err?.message || err).toLowerCase();
+      if (msg.includes('already attached')) {
+        // Another owner (e.g., Grid3DEngine) already attached; reuse theirs
+        return ((cv as any)[ENGINE_KEY] || (eng as any)) as WarpType;
+      }
+      throw err;
+    }
     (cv as any)[ENGINE_KEY] = eng;
     return eng;
   }
