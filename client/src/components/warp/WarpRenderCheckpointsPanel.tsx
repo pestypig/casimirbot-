@@ -129,7 +129,9 @@ function useCheckpointList(
   engineRef: React.MutableRefObject<any | null>,
   canvasRef: React.RefObject<HTMLCanvasElement>,
   liveSnap?: any,
-  expectations?: { parity?: boolean; ridge?: number }
+  expectations?: { parity?: boolean; ridge?: number },
+  dutyFR?: number,
+  thetaExpectedFn?: (u: any, dutyFR: number) => number
 ) {
   const hb = useEngineHeartbeat(engineRef);
 
@@ -171,8 +173,9 @@ function useCheckpointList(
     let tsState: "ok" | "warn" | "fail" = tsOk ? "ok" : "fail";
     let tsDetail = tsOk ? ts.toExponential(2) : "invalid";
 
-    if (liveSnap) {
-      const tsExp = expectedThetaForPane(liveSnap, e);
+    if (liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
+      // Use shader-matched theta calculation with Ford-Roman duty
+      const tsExp = thetaExpectedFn(u, dutyFR);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
       
       // Check for mode disagreement during transitions
@@ -185,8 +188,18 @@ function useCheckpointList(
           tsDetail += ` • (transition)`;
         } else {
           if (rel > 0.25) tsState = "warn"; // large disagreement
-          tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
+          const pct = (ts / tsExp - 1) * 100;
+          tsDetail += ` • exp ${tsExp.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
         }
+      }
+    } else if (liveSnap) {
+      // Fallback to old method
+      const tsExp = expectedThetaForPane(liveSnap, e);
+      const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
+      
+      if (tsOk && Number.isFinite(rel) && rel > 0.25) {
+        tsState = "warn";
+        tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
       }
     }
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
@@ -235,7 +248,7 @@ function useCheckpointList(
     rows.push({ label: "Render loop", detail: rafAlive ? "active" : "stopped", state: rafAlive ? "ok" : "warn" });
 
     return rows;
-  }, [engineRef.current, canvasRef.current, liveSnap, hb, label]);
+  }, [engineRef.current, canvasRef.current, liveSnap, hb, label, dutyFR, thetaExpectedFn]);
 }
 
 export default function WarpRenderCheckpointsPanel({
@@ -275,8 +288,17 @@ export default function WarpRenderCheckpointsPanel({
   const dutyLocalPct = `${(dutyLocal*100).toFixed(3)}%`;
   const dutyFRPct = `${(dutyFR*100).toFixed(4)}%`;
 
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 });
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 });
+  // Theta expected function using same chain as shader  
+  function thetaExpected(u: any, dutyFR: number) {
+    const gammaGeo = Number(u.gammaGeo ?? 26);
+    const deltaAA  = Number(u.deltaAOverA ?? 0.625);
+    const gammaVdB = Number(u.gammaVdB ?? 1.35e5);
+    const geomExp  = 3; // cubic - matches shader
+    return Math.pow(gammaGeo, geomExp) * deltaAA * gammaVdB * dutyFR;
+  }
+
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR, thetaExpected);
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR, thetaExpected);
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
