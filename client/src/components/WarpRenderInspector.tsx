@@ -409,11 +409,31 @@ export default function WarpRenderInspector(props: {
     return { expected, used, delta };
   }
 
-  // Transform uniforms with viewMassFraction support - always available and defaulted
-  const toUniforms = (src: any) => ({
-    ...src,
-    viewMassFraction: Number.isFinite(src?.viewMassFraction) ? src.viewMassFraction : 1.0,
-  });
+  // Transform uniforms with viewMassFraction support and name normalization
+  const toUniforms = (src: any) => {
+    const u = { ...(src || {}) };
+
+    // Ensure both spellings exist for gamma VdB
+    if (typeof u.gammaVanDenBroeck === 'number' && typeof u.gammaVdB !== 'number') {
+      u.gammaVdB = u.gammaVanDenBroeck;
+    }
+    if (typeof u.gammaVdB === 'number' && typeof u.gammaVanDenBroeck !== 'number') {
+      u.gammaVanDenBroeck = u.gammaVdB;
+    }
+
+    // Ensure both spellings exist for q spoiling
+    if (typeof u.qSpoilingFactor === 'number' && typeof u.qSpoil !== 'number') {
+      u.qSpoil = u.qSpoilingFactor;
+    }
+    if (typeof u.qSpoil === 'number' && typeof u.qSpoilingFactor !== 'number') {
+      u.qSpoilingFactor = u.qSpoil;
+    }
+
+    // View fraction default
+    if (typeof u.viewMassFraction !== 'number') u.viewMassFraction = 1.0;
+
+    return u;
+  };
 
   // Bound parameters for theta consistency check
   const bound = {

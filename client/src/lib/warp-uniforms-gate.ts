@@ -29,8 +29,27 @@ export function applyToEngine(
   engine: { updateUniforms: (u: any) => void },
   uniforms: WarpUniforms
 ) {
-  const v = uniforms.__version ?? Date.now();
-  const src = uniforms.__src || 'legacy';
+  // Normalize uniform names to ensure both spellings exist
+  const normalizedUniforms = { ...uniforms };
+  
+  // Ensure both spellings exist for gamma VdB
+  if (typeof normalizedUniforms.gammaVanDenBroeck === 'number' && typeof normalizedUniforms.gammaVdB !== 'number') {
+    normalizedUniforms.gammaVdB = normalizedUniforms.gammaVanDenBroeck;
+  }
+  if (typeof normalizedUniforms.gammaVdB === 'number' && typeof normalizedUniforms.gammaVanDenBroeck !== 'number') {
+    normalizedUniforms.gammaVanDenBroeck = normalizedUniforms.gammaVdB;
+  }
+
+  // Ensure both spellings exist for q spoiling
+  if (typeof normalizedUniforms.qSpoilingFactor === 'number' && typeof normalizedUniforms.qSpoil !== 'number') {
+    normalizedUniforms.qSpoil = normalizedUniforms.qSpoilingFactor;
+  }
+  if (typeof normalizedUniforms.qSpoil === 'number' && typeof normalizedUniforms.qSpoilingFactor !== 'number') {
+    normalizedUniforms.qSpoilingFactor = normalizedUniforms.qSpoil;
+  }
+  
+  const v = normalizedUniforms.__version ?? Date.now();
+  const src = normalizedUniforms.__src || 'legacy';
   
   // Server canonical source always wins if it has newer or equal version
   if (src === 'server') {
@@ -58,17 +77,17 @@ export function applyToEngine(
 
   // Canonical θ if server didn't precompute
   // Use visual-only γ_VdB to keep mass calibration away from theta calculations
-  const gammaVdB_vis = uniforms.gammaVanDenBroeck_vis ?? uniforms.gammaVanDenBroeck;
-  const θ = uniforms.thetaScale ?? (
-    Math.pow(uniforms.gammaGeo, 3) *
-    uniforms.qSpoilingFactor *
+  const gammaVdB_vis = normalizedUniforms.gammaVanDenBroeck_vis ?? normalizedUniforms.gammaVanDenBroeck;
+  const θ = normalizedUniforms.thetaScale ?? (
+    Math.pow(normalizedUniforms.gammaGeo, 3) *
+    normalizedUniforms.qSpoilingFactor *
     gammaVdB_vis *
-    uniforms.dutyEffectiveFR
+    normalizedUniforms.dutyEffectiveFR
   );
 
   // Apply locked display settings - modes only change physics, not visuals
   const lockedUniforms = {
-    ...uniforms,
+    ...normalizedUniforms,
     thetaScale: θ,
     ridgeMode: 0,
     exposure: 5.0,
@@ -76,19 +95,19 @@ export function applyToEngine(
     colorMode: 'theta',
     viewAvg: true,
     // Always ensure viewMassFraction is available and defaulted
-    viewMassFraction: Number.isFinite(uniforms?.viewMassFraction) ? uniforms.viewMassFraction : 1.0,
+    viewMassFraction: Number.isFinite(normalizedUniforms?.viewMassFraction) ? normalizedUniforms.viewMassFraction : 1.0,
   };
 
   // Debug echo (what we actually bind)
   (window as any).__warpEcho = {
-    v, src: uniforms.__src, θ_used: θ,
+    v, src: normalizedUniforms.__src, θ_used: θ,
     terms: {
-      γ_geo: uniforms.gammaGeo,
-      q: uniforms.qSpoilingFactor,
+      γ_geo: normalizedUniforms.gammaGeo,
+      q: normalizedUniforms.qSpoilingFactor,
       γ_VdB: gammaVdB_vis,  // use visual version for debug display
-      γ_VdB_mass: uniforms.gammaVanDenBroeck_mass, // also show mass version  
-      d_FR: uniforms.dutyEffectiveFR,
-      sectors: { total: uniforms.sectorCount, live: uniforms.sectors }
+      γ_VdB_mass: normalizedUniforms.gammaVanDenBroeck_mass, // also show mass version  
+      d_FR: normalizedUniforms.dutyEffectiveFR,
+      sectors: { total: normalizedUniforms.sectorCount, live: normalizedUniforms.sectors }
     }
   };
 
