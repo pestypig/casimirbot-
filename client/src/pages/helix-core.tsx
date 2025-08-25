@@ -229,8 +229,17 @@ interface ChatMessage {
 export default function HelixCore() {
   // Preload lazy bundles to avoid suspending during user input
   useEffect(() => {
-    import("@/components/warp/WarpBubbleCompare");
-    import("@/components/WarpRenderInspector");
+    const preload = () => {
+      import("@/components/warp/WarpBubbleCompare");
+      import("@/components/WarpRenderInspector");
+    };
+    const id = ('requestIdleCallback' in window)
+      ? (window as any).requestIdleCallback(preload)
+      : setTimeout(preload, 50);
+    return () => {
+      if ('cancelIdleCallback' in window) (window as any).cancelIdleCallback?.(id);
+      else clearTimeout(id);
+    };
   }, []);
 
   // Generate logical sector list (no physics here)
