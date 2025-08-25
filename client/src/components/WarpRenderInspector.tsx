@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState, startTransition} from "react";
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
@@ -293,14 +293,16 @@ export default function WarpRenderInspector(props: {
 
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
-    switchMode.mutate(m as any, {
-      onSuccess: () => {
-        // Refresh both pipeline and metrics to keep everything in sync
-        queryClient.invalidateQueries({ predicate: q =>
-          Array.isArray(q.queryKey) &&
-          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
-        });
-      }
+    startTransition(() => {
+      switchMode.mutate(m as any, {
+        onSuccess: () => {
+          // Refresh both pipeline and metrics to keep everything in sync
+          queryClient.invalidateQueries({ predicate: q =>
+            Array.isArray(q.queryKey) &&
+            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+          });
+        }
+      });
     });
   };
 

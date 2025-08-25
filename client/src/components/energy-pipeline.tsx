@@ -3,7 +3,7 @@
  * Shares pipeline mode + FR duty with the rest of the app
  */
 
-import { useMemo } from "react";
+import { useMemo, startTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp } from "lucide-react";
@@ -138,14 +138,16 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                     }`}
                     onClick={()=>{
                       if (m===mode) return;
-                      switchMode.mutate(m, {
-                        onSuccess: () => {
-                          // keep page + this component in sync
-                          queryClient.invalidateQueries({ predicate: q =>
-                            Array.isArray(q.queryKey) &&
-                            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
-                          });
-                        }
+                      startTransition(() => {
+                        switchMode.mutate(m, {
+                          onSuccess: () => {
+                            // keep page + this component in sync
+                            queryClient.invalidateQueries({ predicate: q =>
+                              Array.isArray(q.queryKey) &&
+                              (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                            });
+                          }
+                        });
                       });
                     }}
                   >

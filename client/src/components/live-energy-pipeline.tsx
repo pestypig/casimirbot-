@@ -1,3 +1,4 @@
+import { startTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -154,7 +155,9 @@ export function LiveEnergyPipeline({
           <Select
             value={currentModeKey}
             onValueChange={(value) => {
-              switchMode.mutate(value as any); // authoritative mode change
+              startTransition(() => {
+                switchMode.mutate(value as any); // authoritative mode change
+              });
               onModeChange?.(value);
               // Defensive access in the toast
               zenLongToast("mode:switch", {

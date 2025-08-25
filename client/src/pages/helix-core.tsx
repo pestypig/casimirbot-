@@ -55,13 +55,6 @@ const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
 );
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
-
-// Preload lazy bundles to avoid suspending during user input
-useEffect(() => {
-  import("@/components/warp/WarpBubbleCompare");
-  import("@/components/WarpRenderInspector");
-}, []);
-
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -833,15 +826,15 @@ export default function HelixCore() {
                       startTransition(() => {
                         setOptimisticMode(m.key as ModeKey);
                         setModeNonce(n => n + 1);
-                      });
-                      switchMode.mutate(m.key as any, {
-                        onSuccess: () => {
-                          // make both sides refresh
-                          queryClient.invalidateQueries({ predicate: q =>
-                            Array.isArray(q.queryKey) &&
-                            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
-                          });
-                        }
+                        switchMode.mutate(m.key as any, {
+                          onSuccess: () => {
+                            // make both sides refresh
+                            queryClient.invalidateQueries({ predicate: q =>
+                              Array.isArray(q.queryKey) &&
+                              (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                            });
+                          }
+                        });
                       });
                       refetchMetrics();
                       setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
@@ -1181,15 +1174,15 @@ export default function HelixCore() {
                     startTransition(() => {
                       setOptimisticMode(mode as ModeKey);
                       setModeNonce(n => n + 1);
-                    });
-                    switchMode.mutate(mode as any, {
-                      onSuccess: () => {
-                        // make both sides refresh
-                        queryClient.invalidateQueries({ predicate: q =>
-                          Array.isArray(q.queryKey) &&
-                          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
-                        });
-                      }
+                      switchMode.mutate(mode as any, {
+                        onSuccess: () => {
+                          // make both sides refresh
+                          queryClient.invalidateQueries({ predicate: q =>
+                            Array.isArray(q.queryKey) &&
+                            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                          });
+                        }
+                      });
                     });
                     setMainframeLog(prev => [
                       ...prev,
@@ -1897,16 +1890,18 @@ export default function HelixCore() {
               })}
               setMode={(mode) => {
                 if (switchMode) {
-                  setOptimisticMode(mode as ModeKey);
-                  setModeNonce(n => n + 1);
-                  switchMode.mutate(mode as any, {
-                    onSuccess: () => {
-                      // make both sides refresh
-                      queryClient.invalidateQueries({ predicate: q =>
-                        Array.isArray(q.queryKey) &&
-                        (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
-                      });
-                    }
+                  startTransition(() => {
+                    setOptimisticMode(mode as ModeKey);
+                    setModeNonce(n => n + 1);
+                    switchMode.mutate(mode as any, {
+                      onSuccess: () => {
+                        // make both sides refresh
+                        queryClient.invalidateQueries({ predicate: q =>
+                          Array.isArray(q.queryKey) &&
+                          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                        });
+                      }
+                    });
                   });
                   // Removed forced remount that causes black screens
                   // Luma whisper on mode change
