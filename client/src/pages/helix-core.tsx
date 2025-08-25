@@ -805,9 +805,11 @@ export default function HelixCore() {
           </div>
         </div>
 
-        {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
-        <Card className="bg-slate-900/50 border-slate-800 mb-4">
-          <CardHeader>
+        {false && (
+          <>
+          {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
+          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+            <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Atom className="w-5 h-5 text-cyan-400" />
               {MAINFRAME_ZONES.WARP_VISUALIZER}
@@ -897,8 +899,10 @@ export default function HelixCore() {
                 </div>
               );
             })()}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          </>
+        )}
 
         {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -992,55 +996,46 @@ export default function HelixCore() {
           </CardContent>
         </Card>
 
-        {/* ====== WARP RENDER INSPECTOR (Debugging) ====== */}
+        {/* ====== Warp Render Inspector • Physics Debug ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-orange-400" />
-              Warp Render Inspector • Physics Debug
-            </CardTitle>
-            <CardDescription>
-              REAL vs SHOW engine comparison — verify operational-mode and calculator payloads reach WarpEngine
-            </CardDescription>
+            <CardTitle>Warp Render Inspector • Physics Debug</CardTitle>
+            <CardDescription>Single source of truth for REAL vs SHOW with live pipeline</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading inspector…</div>}>
-              <WarpRenderInspector
-                key={`inspector-${renderNonce}`}
-                modeKey={effectiveMode}
-                reloadToken={modeNonce}
-                parityPhys={{
-                  hull: { a: 503.5, b: 132, c: 86.5 },
-                  gammaGeo: pipeline?.gammaGeo ?? 26,
-                  qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
-                  dutyCycle: dutyUI_safe,
-                  dutyEffectiveFR: dutyEffectiveFR_safe,
-                  sectors: concurrentSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
-                  sectorCount: totalSectors,
-                }}
-                showPhys={{
-                  hull: { a: 503.5, b: 132, c: 86.5 },
-                  gammaGeo: pipeline?.gammaGeo ?? 26,
-                  qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
-                  dutyCycle: dutyUI_safe,
-                  dutyEffectiveFR: dutyEffectiveFR_safe,
-                  sectors: concurrentSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
-                  sectorCount: totalSectors,
-                }}
-                baseShared={{
-                  hull: { a: 503.5, b: 132, c: 86.5 },
-                  sectors: concurrentSectors,
-                  sectorCount: totalSectors,
-                  split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
-                  colorMode: 'theta',
-                  ridgeMode: 1,
-                }}
-              />
-            </Suspense>
+          <CardContent className="pt-0">
+            <WarpRenderInspector
+              parityPhys={{
+                gammaGeo:        pipeline?.gammaGeo ?? 26,
+                qSpoilingFactor: qSpoilUI,
+                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
+                dutyCycle:        dutyUI_safe,           // UI duty (for display)
+              }}
+              showPhys={{
+                // same as above unless you want explicit "seasoning" in SHOW
+                gammaGeo:        pipeline?.gammaGeo ?? 26,
+                qSpoilingFactor: qSpoilUI,
+                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                dutyEffectiveFR:  dutyEffectiveFR_safe,
+                dutyCycle:        dutyUI_safe,
+              }}
+              baseShared={{
+                hull: {
+                  a: Number(hull.a) || 503.5,
+                  b: Number(hull.b) || 132.0,
+                  c: Number(hull.c) || 86.5,
+                },
+                wallWidth_m: 6.0,
+                driveDir: [1,0,0],
+                vShip: 1.0,
+                sectorCount: totalSectors,     // TOTAL (averaging)
+                sectors:      concurrentSectors, // live sweep
+                colorMode: 'theta',
+                lockFraming: true,
+                currentMode: effectiveMode,
+                lightCrossing: lc,
+              }}
+            />
           </CardContent>
         </Card>
 
