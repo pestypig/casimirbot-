@@ -121,16 +121,6 @@ const formatPower = (P_MW?: number, P_W?: number) => {
   return "—";
 };
 
-// Build a live subtitle for a mode (power • mass • zeta)
-const buildLiveDesc = (
-  snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number },
-  cfg?: { powerTarget_W?: number }
-) => {
-  const P = formatPower(snap?.P_avg_MW, cfg?.powerTarget_W);
-  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
-  const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
-  return `${P} • ${M} • ${Z}`;
-};
 
 /* ---------------- Client-side physics calc identical to EnergyPipeline ---------------- */
 type BaseInputs = {
@@ -624,39 +614,19 @@ export default function WarpBubbleCompare({
   const modeCfgs: Record<string, { name?: string; powerTarget_W?: number }> =
     (typeof window !== "undefined" && (window as any).MODE_CONFIGS) || {};
 
-  const currentCfg = modeCfgs[currentModeKey];
-  const currentSubtitle = "Parameter-driven";
+  // Parameter-based subtitle formatter
+  const subtitleFromParams = (p: any) => {
+    const P = Number.isFinite(p?.powerAvg_MW) ? `${p.powerAvg_MW.toFixed(1)} MW` : '—';
+    const M = Number.isFinite(p?.exoticMass_kg) ? `${Math.round(p.exoticMass_kg)} kg` : '— kg';
+    const Z = Number.isFinite(p?.zeta) ? `ζ=${p.zeta.toFixed(3)}` : 'ζ=—';
+    return `${P} • ${M} • ${Z}`;
+  };
 
   // Titles for the two panels
-  const realPanelTitle = `REAL • ${currentSubtitle}`;   // parity/FR view
-  const showPanelTitle = `SHOW • ${currentSubtitle}`;   // boosted/UI view
-
-  // 7.1 — Live → Uniforms mapping helpers
-  type LiveSnap = Partial<{
-    // physics / timing
-    dutyCycle: number;
-    sectorCount: number; sectorStrobing: number; sectors: number;
-    sectorSplit: number; split: number; currentSector: number;
-    gammaGeo: number; g_y: number;
-    deltaAOverA: number; qSpoilingFactor: number;
-    gammaVdB: number; gammaVanDenBroeck: number;
-    viewAvg: boolean;
-
-    // geometry
-    hullAxes: [number, number, number];
-    hull: { a: number; b: number; c: number };
-    wallWidth_m: number; wallWidth_rho: number;
-    driveDir: [number, number, number];
-
-    // viz
-    curvatureGainT: number; curvatureBoostMax: number;
-    exposure: number; zeroStop: number; cosmeticLevel: number;
-    ridgeMode: number; colorMode: number | "theta" | "shear" | "solid";
-    userGain: number; displayGain: number; lockFraming: boolean; cameraZ: number;
-  }>;
+  const realPanelTitle = `REAL • ${subtitleFromParams(parameters)}`;
+  const showPanelTitle = `SHOW • ${subtitleFromParams(parameters)}`;
 
   const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
-  const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
@@ -669,80 +639,7 @@ export default function WarpBubbleCompare({
     return eng;
   }
 
-  // Parity-aware expected theta calculation that uses engine's γ_VdB 
-  const expectedThetaForPane = (live: any, engine: any) => {
-    const parity = !!engine?.uniforms?.physicsParityMode; // REAL=true, SHOW=false
-    const mode = String(live?.currentMode||'').toLowerCase();
-    if (mode === 'standby') return 0;
 
-    const gammaGeo = Math.max(1, N(live?.gammaGeo ?? live?.g_y, 26));
-    const dAa      = Math.max(1e-12, N(live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
-
-    // Pull γ_VdB from the engine uniforms if present (authoritative for that pane)
-    const gVdB = Math.max(
-      1,
-      N(
-        engine?.uniforms?.gammaVdB ??
-        engine?.uniforms?.gammaVanDenBroeck ??
-        live?.gammaVanDenBroeck ?? live?.gammaVdB,
-        2.86e5
-      )
-    );
-
-    // Duty per pane
-    let duty: number;
-    if (parity) {
-      // REAL: ship-wide Ford–Roman duty
-      const dFR = live?.dutyEffectiveFR ?? live?.dutyShip ?? live?.dutyEff;
-      duty = Number.isFinite(+dFR) ? Math.max(0, +dFR) : 0;
-    } else {
-      // SHOW: UI duty averaged over total sectors
-      const S = Math.max(1, Math.floor(N(live?.sectorCount ?? live?.sectors ?? 1, 1)));
-      duty = Math.max(0, N(live?.dutyCycle, 0)) / S;
-    }
-
-    const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
-    const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
-    return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, duty)) : betaInst;
-  };
-
-  const toSharedUniforms = (snap: LiveSnap) => {
-    const a = N(snap.hull?.a ?? snap.hullAxes?.[0], 503.5);
-    const b = N(snap.hull?.b ?? snap.hullAxes?.[1], 132.0);
-    const c = N(snap.hull?.c ?? snap.hullAxes?.[2], 86.5);
-    const aEff = Math.cbrt(a*b*c);
-    const wRho = Number.isFinite(snap.wallWidth_rho)
-      ? snap.wallWidth_rho
-      : (Number.isFinite(snap.wallWidth_m) ? Math.max(1e-6, snap.wallWidth_m / Math.max(1e-6, aEff)) : undefined);
-
-    return {
-      hullAxes: [a, b, c] as [number, number, number],
-      wallWidth_rho: wRho,
-      driveDir: (Array.isArray(snap.driveDir) && snap.driveDir.length===3) ? snap.driveDir : [1,0,0],
-
-      dutyCycle: N(snap.dutyCycle, 0.14),
-      sectors: Math.max(1, Math.floor(N(snap.sectorStrobing ?? snap.sectors, 1))),
-      sectorCount: Math.max(1, Math.floor(N(snap.sectorCount ?? 1, 1))),
-      split: Math.max(0, Math.floor(N(snap.sectorSplit ?? snap.split ?? snap.currentSector, 0))),
-      viewAvg: !!(snap.viewAvg ?? true),
-
-      gammaGeo: N(snap.gammaGeo ?? (snap as any).g_y, 26),
-      deltaAOverA: N(snap.deltaAOverA ?? (snap as any).qSpoilingFactor, 1),
-      gammaVdB: N(snap.gammaVdB ?? (snap as any).gammaVanDenBroeck, 2.86e5),
-
-      // Do NOT push thetaScale from live ticks; parameters effect is source of truth
-
-      // Forward currentMode to engine for GPU-side mode decisions
-      currentMode: snap.currentMode,
-
-      // NEW: carrier for θ field in shader; 0 in standby, 1 otherwise
-      vShip: (snap.currentMode === 'standby') ? 0 : 1,
-
-      // camera/framing passthroughs if present
-      lockFraming: snap.lockFraming ?? true,
-      cameraZ: Number.isFinite(snap.cameraZ) ? snap.cameraZ : undefined,
-    };
-  };
 
   // Removed toRealUniforms and toShowUniforms - using buildEngineUniforms from parameters only
 
@@ -949,7 +846,23 @@ export default function WarpBubbleCompare({
     rightEngine.current.setDisplayGain?.(displayGain);
   }, [parameters, colorMode, lockFraming, heroX]);
 
-  // No more live-driven uniform pushes or strobing - parameters effect handles everything
+  // 7.4 — Mirror strobing state from parameters.lightCrossing
+  useEffect(() => {
+    const lc = parameters?.lightCrossing;
+    const total = Math.max(1, Math.floor(Number(parameters?.sectorCount) || 1));
+    const live  = Math.max(1, Math.floor(Number(parameters?.sectors) || total));
+    const cur   = Number.isFinite(lc?.sectorIdx) ? Math.max(0, Math.floor(lc.sectorIdx) % live) : 0;
+
+    (window as any).setStrobingState?.({
+      sectorCount: total,     // TOTAL only
+      currentSector: cur,     // live pointer
+      split: cur              // keep split aligned with current sector
+    });
+  }, [
+    parameters?.sectorCount,
+    parameters?.sectors,
+    parameters?.lightCrossing?.sectorIdx
+  ]);
 
   // DPR-aware sizing + resize observer (keeps "WebGL context — alive / Render loop — active")
   useEffect(() => {
