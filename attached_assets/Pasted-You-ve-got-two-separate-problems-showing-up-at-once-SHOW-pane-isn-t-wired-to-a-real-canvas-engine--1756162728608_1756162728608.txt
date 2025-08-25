@@ -1,0 +1,97 @@
+You’ve got two separate problems showing up at once:
+
+SHOW pane isn’t wired to a real canvas/engine (so the checkpoints see 0×0, “WebGL context — missing”).
+
+Uniform name mismatches + late writers are making the θ math look bonkers (γ_VdB=0, q=?) even when the pipeline has sane values.
+
+Here’s how to fix both—small, surgical patches.
+
+A) Make SHOW (grid3d) a first-class engine (so checkpoints see it)
+
+Right now SHOW uses <Grid3DEngine …/> (which owns its own canvas), but your checkpoints still read rightCanvasRef/rightEngineRef—which never get set in that branch. Two ways to solve:
+
+Option A1 (recommended): expose canvas/engine via forwardRef
+
+Patch Grid3DEngine to expose its internals:
+
+// Grid3DEngine.tsx
+import React, { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
+
+export type Grid3DHandle = {
+  getCanvas: () => HTMLCanvasElement | null;
+  getEngine: () => any | null;
+  updateUniforms: (u: any) => void;
+  onceReady: (cb: () => void) => void;
+  setDisplayGain: (g: number) => void;
+  destroy: () => void;
+  _resize: () => void;
+  setVisible?: (on: boolean) => void;
+};
+
+const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: string; style?: React.CSSProperties }>(
+  ({ uniforms, className, style }, ref) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const engineRef = useRef<any>(null);
+
+    useEffect(() => {
+      const W: any = (window as any).WarpEngine3D ?? (window as any).WarpEngine; // fallback
+      const c = canvasRef.current!;
+      engineRef.current = new W(c);
+      engineRef.current.bootstrap?.(uniforms);
+      return () => engineRef.current?.destroy?.();
+    }, []);
+
+    useEffect(() => {
+      engineRef.current?.updateUniforms?.(uniforms);
+    }, [uniforms]);
+
+    useImperativeHandle(ref, () => ({
+      getCanvas: () => canvasRef.current,
+      getEngine: () => engineRef.current,
+      updateUniforms: (u) => engineRef.current?.updateUniforms?.(u),
+      onceReady: (cb) => engineRef.current?.onceReady?.(cb),
+      setDisplayGain: (g) => engineRef.current?.setDisplayGain?.(g),
+      destroy: () => engineRef.current?.destroy?.(),
+      _resize: () => engineRef.current?._resize?.(),
+      setVisible: (on) => engineRef.current?.setVisible?.(on),
+    }));
+
+    return <canvas ref={canvasRef} className={className} style={style} />;
+  }
+);
+
+export default Grid3DEngine;
+
+
+Then in your Inspector:
+
+// inside WarpRenderInspector
+const grid3dRef = useRef<Grid3DHandle>(null);
+
+// in the SHOW article:
+{showRendererType === 'grid3d' ? (
+  <Grid3DEngine
+    ref={grid3dRef}
+    uniforms={showUniforms}
+    className="w-full h-full block"
+    style={{ background: 'black' }}
+  />
+) : (
+  <canvas ref={rightRef} className="w-full h-full block" />
+)}
+
+
+…and immediately after mount, bridge the inspector’s rightEngine/rightRef to what the 3D component exposes so your checkpoints see the real thing:
+
+useEffect(() => {
+  if (showRendererType !== 'grid3d') return;
+  const eng = grid3dRef.current?.getEngine();
+  const cvs = grid3dRef.current?.getCanvas();
+  if (eng && cvs) {
+    rightEngine.current = eng;
+    (rightRef as any).current = cvs;
+  }
+}, [showRendererType]);
+
+
+Result: SHOW’s canvas is non-zero, WebGL context exists, and WarpRenderCheckpointsPanel can pull diagnostics from the same engine the grid is rendering with.

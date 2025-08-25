@@ -3,7 +3,7 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
-import Grid3DEngine from "@/components/engines/Grid3DEngine";
+import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
 import { SliceViewer } from "@/components/SliceViewer";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
@@ -103,6 +103,7 @@ export default function WarpRenderInspector(props: {
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+  const grid3dRef = useRef<Grid3DHandle>(null);
   
   // Renderer type configuration
   const realRendererType = props.realRenderer || 'slice2d';
@@ -423,9 +424,20 @@ export default function WarpRenderInspector(props: {
   };
   const { expected, used, delta } = reportThetaConsistency(bound, toUniforms(props.showPhys || {}), showRendererType === 'grid3d');
 
+  // Bridge Grid3D engine to checkpoints panel
+  useEffect(() => {
+    if (showRendererType !== 'grid3d') return;
+    const eng = grid3dRef.current?.getEngine();
+    const cvs = grid3dRef.current?.getCanvas();
+    if (eng && cvs) {
+      rightEngine.current = eng;
+      (rightRef as any).current = cvs;
+    }
+  }, [showRendererType]);
+
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
+    if (!leftEngine.current || (!rightEngine.current && showRendererType !== 'grid3d')) return;
 
     // Gate first paint until canonical uniforms arrive (prevents averaging race)
     const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
@@ -449,17 +461,12 @@ export default function WarpRenderInspector(props: {
       qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
       // Use debug-controlled γ_VdB to prove physics separation
       gammaVanDenBroeck: gammaVdBBound,
-      // Lock seasoning to prevent first-frame breathing
-      viewAvg: true,
-      ridgeMode: 0,
-      exposure: 5.0,
-      zeroStop: 1e-7,
       dutyEffectiveFR,            // 0.01 × (1/400) here  
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
       sectors: sConcurrent,                    // 1
-      viewAvg: viewAvgUsed,       // Use debug toggle
       // Apply debug toggles to display controls
+      viewAvg: viewAvgUsed,       // Use debug toggle
       ridgeMode: ridgeModeUsed,
       exposure: tonemapExp,
       zeroStop: zeroStop,
@@ -644,6 +651,7 @@ export default function WarpRenderInspector(props: {
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             {showRendererType === 'grid3d' ? (
               <Grid3DEngine 
+                ref={grid3dRef}
                 uniforms={showUniforms} 
                 className="w-full h-full block" 
                 style={{background: 'black'}} 

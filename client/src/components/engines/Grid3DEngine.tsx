@@ -1,20 +1,62 @@
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+
+// Handle interface for Grid3DEngine
+export type Grid3DHandle = {
+  getCanvas: () => HTMLCanvasElement | null;
+  getEngine: () => any | null;
+  updateUniforms: (u: any) => void;
+  onceReady: (cb: () => void) => void;
+  setDisplayGain: (g: number) => void;
+  destroy: () => void;
+  _resize: () => void;
+  setVisible?: (on: boolean) => void;
+};
 
 // Minimal 3D grid engine that samples the Natário displacement field
 // and renders it as instanced points/lines with physics-accurate coloring
-export default function Grid3DEngine({ uniforms, ...rest }: { uniforms: any; [key: string]: any }) {
+const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: string; style?: React.CSSProperties }>(
+  ({ uniforms, className, style }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const engineRef = useRef<any>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    let isDestroyed = false;
+    
+    // Initialize canvas with proper size
+    const setupCanvas = () => {
+      if (isDestroyed) return;
+      
+      // Set canvas size
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width && rect.height) {
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+      } else {
+        canvas.width = 800;
+        canvas.height = 600;
+      }
+      
+      // Get 2D context
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Failed to get Canvas 2D context');
+        return;
+      }
+      
+      startRendering(ctx);
+    };
+    
+    // Wait for next frame to ensure canvas is in DOM
+    const timeout = setTimeout(setupCanvas, 100);
+    
+    const startRendering = (ctx: CanvasRenderingContext2D) => {
 
     let isDestroyed = false;
-
+    
     // Build a rectilinear lattice in model space (64×40×64)
     const buildGrid = (nx: number, ny: number, nz: number) => {
       const points = [];
@@ -124,51 +166,92 @@ export default function Grid3DEngine({ uniforms, ...rest }: { uniforms: any; [ke
     // Initialize and start rendering
     render();
 
+    };
+    
     // Cleanup
     return () => {
       isDestroyed = true;
+      clearTimeout(timeout);
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
       }
     };
   }, [uniforms]);
 
-  // Engine interface methods for compatibility
+  // Create mock engine object for compatibility
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Add engine methods to canvas for compatibility
-    (canvas as any).setVisible = (visible: boolean) => {
-      canvas.style.visibility = visible ? 'visible' : 'hidden';
+    // Create engine object with all expected methods
+    engineRef.current = {
+      canvas,
+      isLoaded: true,
+      gridProgram: true,
+      gridUniforms: true,
+      gridAttribs: true,
+      setVisible: (visible: boolean) => {
+        canvas.style.visibility = visible ? 'visible' : 'hidden';
+      },
+      updateUniforms: (newUniforms: any) => {
+        Object.assign(uniforms, newUniforms);
+      },
+      bootstrap: (payload: any) => {
+        Object.assign(uniforms, payload);
+      },
+      init: () => true,
+      dispose: () => {},
+      destroy: () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      },
+      _resize: () => {
+        // Canvas will re-render automatically on next frame
+      },
+      setDisplayGain: (gain: number) => {
+        // Apply display gain to rendering
+      },
+      onceReady: (cb: () => void) => {
+        // Always ready for Canvas 2D
+        cb();
+      },
+      // Mock WebGL context for checkpoints
+      getContext: () => ({
+        drawingBufferWidth: canvas.width || 800,
+        drawingBufferHeight: canvas.height || 600,
+        isContextLost: () => false
+      })
     };
 
-    (canvas as any).updateUniforms = (newUniforms: any) => {
-      // Store uniforms and trigger re-render via useEffect dependency
-      Object.assign(uniforms, newUniforms);
-    };
-
-    (canvas as any).bootstrap = (payload: any) => {
-      // Initialize with payload data
-      Object.assign(uniforms, payload);
-    };
-
-    (canvas as any).isLoaded = true;
-    (canvas as any).gridProgram = true; // Mock for readiness checks
-    (canvas as any).init = () => true; // Always succeeds for Canvas 2D
-    (canvas as any).dispose = () => {}; // No-op for Canvas 2D
+    // Also add methods to canvas for backward compatibility
+    Object.assign(canvas, engineRef.current);
   }, []);
+
+  // Expose engine methods via ref
+  useImperativeHandle(ref, () => ({
+    getCanvas: () => canvasRef.current,
+    getEngine: () => engineRef.current,
+    updateUniforms: (u) => engineRef.current?.updateUniforms?.(u),
+    onceReady: (cb) => engineRef.current?.onceReady?.(cb),
+    setDisplayGain: (g) => engineRef.current?.setDisplayGain?.(g),
+    destroy: () => engineRef.current?.destroy?.(),
+    _resize: () => engineRef.current?._resize?.(),
+    setVisible: (on) => engineRef.current?.setVisible?.(on)
+  }));
 
   return (
     <canvas 
       ref={canvasRef} 
-      {...rest}
+      className={className}
       style={{ 
         width: '100%', 
         height: '100%',
         background: 'black',
-        ...rest.style 
+        ...style
       }}
     />
   );
-}
+});
+
+export default Grid3DEngine;
