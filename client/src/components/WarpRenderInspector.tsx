@@ -119,6 +119,26 @@ export default function WarpRenderInspector(props: {
     T: (decades/8), boost: 40, userGain
   }), [wu, decades, userGain]);
 
+  function emitDebug(level: 'info'|'warn'|'error', tag: string, msg: string, data?: any) {
+    // ship to console
+    const line = `[${tag}] ${msg}`;
+    (console as any)[level]?.(line, data ?? '');
+    // ship to UI
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('helix:debug', {
+        detail: { level, tag, msg, data, ts: Date.now() }
+      }));
+    }
+  }
+
+  function findCaller(): string | undefined {
+    try {
+      const s = (new Error()).stack?.split('\n') ?? [];
+      // skip 0:Error, 1:emit site, 2:updateUniforms wrapper, 3:caller
+      return s[3]?.trim();
+    } catch { return undefined; }
+  }
+
   // Hard-lock parity and block direct thetaScale writes at the engine edge
   function hardLockUniforms(engine: any, {
     forceParity,
@@ -130,13 +150,25 @@ export default function WarpRenderInspector(props: {
     engine.updateUniforms = (patch: any) => {
       const safe = { ...(patch || {}) };
 
-      // 🔒 never allow external parity toggles
-      if ('physicsParityMode' in safe) delete (safe as any).physicsParityMode;
-      if ('parityMode'        in safe) delete (safe as any).parityMode;
+      // parity writes are forbidden
+      if ('physicsParityMode' in safe) {
+        emitDebug('warn', tag, 'blocked physicsParityMode override', {
+          value: (safe as any).physicsParityMode, from: findCaller()
+        });
+        delete (safe as any).physicsParityMode;
+      }
+      if ('parityMode' in safe) {
+        emitDebug('warn', tag, 'blocked parityMode override', {
+          value: (safe as any).parityMode, from: findCaller()
+        });
+        delete (safe as any).parityMode;
+      }
 
-      // 🔒 block direct thetaScale injections (we compute it from FR duty)
+      // thetaScale writes are forbidden (computed from FR duty internally)
       if (!allowThetaScaleDirect && 'thetaScale' in safe) {
-        console.warn(`[LOCK] ${tag}: blocked thetaScale override`, safe.thetaScale);
+        emitDebug('warn', tag, 'blocked thetaScale override', {
+          value: (safe as any).thetaScale, from: findCaller()
+        });
         delete (safe as any).thetaScale;
       }
 

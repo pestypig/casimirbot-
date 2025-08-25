@@ -1,0 +1,74 @@
+et’s surface those “[LOCK] … blocked thetaScale/parity …” lines right into your Log + Document Terminal.
+
+below are tiny, self-contained patches:
+
+1) emit a UI debug event from the engine lock
+
+in WarpRenderInspector (where you added hardLockUniforms), extend it like this:
+
+function emitDebug(level: 'info'|'warn'|'error', tag: string, msg: string, data?: any) {
+  // ship to console
+  const line = `[${tag}] ${msg}`;
+  (console as any)[level]?.(line, data ?? '');
+  // ship to UI
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('helix:debug', {
+      detail: { level, tag, msg, data, ts: Date.now() }
+    }));
+  }
+}
+
+function findCaller(): string | undefined {
+  try {
+    const s = (new Error()).stack?.split('\n') ?? [];
+    // skip 0:Error, 1:emit site, 2:updateUniforms wrapper, 3:caller
+    return s[3]?.trim();
+  } catch { return undefined; }
+}
+
+function hardLockUniforms(engine: any, {
+  forceParity,
+  allowThetaScaleDirect = false,
+  tag = 'ENGINE'
+}: { forceParity: boolean; allowThetaScaleDirect?: boolean; tag?: string }) {
+  if (!engine || engine.__locked) return;
+  const orig = engine.updateUniforms?.bind(engine);
+  engine.updateUniforms = (patch: any) => {
+    const safe = { ...(patch || {}) };
+
+    // parity writes are forbidden
+    if ('physicsParityMode' in safe) {
+      emitDebug('warn', tag, 'blocked physicsParityMode override', {
+        value: (safe as any).physicsParityMode, from: findCaller()
+      });
+      delete (safe as any).physicsParityMode;
+    }
+    if ('parityMode' in safe) {
+      emitDebug('warn', tag, 'blocked parityMode override', {
+        value: (safe as any).parityMode, from: findCaller()
+      });
+      delete (safe as any).parityMode;
+    }
+
+    // thetaScale writes are forbidden (computed from FR duty internally)
+    if (!allowThetaScaleDirect && 'thetaScale' in safe) {
+      emitDebug('warn', tag, 'blocked thetaScale override', {
+        value: (safe as any).thetaScale, from: findCaller()
+      });
+      delete (safe as any).thetaScale;
+    }
+
+    // force correct parity every call
+    (safe as any).physicsParityMode = forceParity;
+    (safe as any).parityMode        = forceParity;
+
+    return orig?.(safe);
+  };
+  engine.__locked = true;
+}
+
+
+(unchanged)
+
+if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
+if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
