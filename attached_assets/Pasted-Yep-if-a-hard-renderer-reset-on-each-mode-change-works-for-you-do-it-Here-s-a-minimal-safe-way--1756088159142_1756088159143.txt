@@ -1,0 +1,150 @@
+Yep—if a hard “renderer reset” on each mode change works for you, do it. Here’s a minimal, safe way to tear down and fully re-init both engines whenever parameters.currentMode changes, without touching the rest of your logic.
+
+1) Add a reusable kill + init helper inside WarpBubbleCompare
+
+Drop these just above your effects:
+
+// Kill and detach an engine instance on a canvas
+function killEngine(ref: React.MutableRefObject<any>, cv?: HTMLCanvasElement | null) {
+  const e = ref.current;
+  try { e?.__ro?.disconnect?.(); } catch {}
+  try { e?.stop?.(); } catch {}
+  try { e?.dispose?.(); } catch {}
+  ref.current = null;
+  // also clear the per-canvas instance cache
+  if (cv) (cv as any).__warpEngine = undefined;
+}
+
+// Build REAL/SHOW packets from parameters (your existing code)
+function buildPacketsFromParams(p: any) {
+  const { real, show } = buildEngineUniforms({
+    hull: p.hull,
+    wallWidth_m: p.wallWidth_m ?? 6.0,
+    driveDir: p.driveDir ?? [1,0,0],
+    vShip: p.vShip ?? 1.0,
+    dutyCycle: p.dutyCycle,
+    dutyEffectiveFR: p.dutyEffectiveFR,
+    sectorCount: Math.max(1, p.sectorCount),
+    sectors: Math.max(1, p.sectors),
+    gammaGeo: p.gammaGeo,
+    qSpoilingFactor: p.qSpoilingFactor ?? 1,
+    gammaVanDenBroeck: p.gammaVanDenBroeck ?? 2.86e5,
+    colorMode: 'theta',
+    lockFraming: true,
+  });
+  return { real, show };
+}
+
+// Full re-init using current parameters + camera + strobing
+async function reinitEnginesFromParams() {
+  await ensureScript();
+  const W = (window as any).WarpEngine;
+  if (!W || !leftRef.current || !rightRef.current || !parameters) return;
+
+  // 1) Cleanly kill any existing engines
+  killEngine(leftEngine, leftRef.current);
+  killEngine(rightEngine, rightRef.current);
+
+  // 2) Make fresh instances
+  const getOrCreateEngine = (cv: HTMLCanvasElement) => {
+    const existing = (cv as any).__warpEngine;
+    if (existing && !existing._destroyed) return existing;
+    const eng = new W(cv);
+    (cv as any).__warpEngine = eng;
+    return eng;
+  };
+
+  const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+    const eng = getOrCreateEngine(cv);
+    const { w, h } = sizeCanvas(cv);
+    eng.gl.viewport(0, 0, w, h);
+    try { eng._initializeGrid?.(); } catch {}
+    try { eng._compileGridShaders?.(); } catch {}
+    await new Promise<void>(res => {
+      const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
+      tick();
+    });
+    eng.updateUniforms?.(uniforms);
+    eng.isLoaded = true;
+    if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
+    eng.start?.();
+
+    // keep sized
+    const ro = new ResizeObserver(() => {
+      const { w: w2, h: h2 } = sizeCanvas(cv);
+      eng.gl.viewport(0, 0, w2, h2);
+      eng.resize?.(w2, h2);
+    });
+    ro.observe(cv);
+    eng.__ro = ro;
+    return eng;
+  };
+
+  // 3) Build uniforms from parameters (single source of truth)
+  const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+  const { real, show } = buildPacketsFromParams(parameters);
+
+  // REAL packet
+  const realPacket = {
+    ...shared,
+    ...real,
+    currentMode: parameters.currentMode,
+    physicsParityMode: true,
+    vShip: 0,
+    gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+    deltaAOverA: real.qSpoilingFactor,
+    dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
+    sectors: Math.max(1, parameters.sectors),
+    ridgeMode: 0,
+  };
+
+  // SHOW packet
+  const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
+  const showPacket = {
+    ...shared,
+    ...show,
+    currentMode: parameters.currentMode,
+    physicsParityMode: false,
+    vShip: parameters.currentMode === 'standby' ? 0 : 1,
+    thetaScale: showTheta,
+    gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+    deltaAOverA: show.qSpoilingFactor,
+    sectors: Math.max(1, parameters.sectors),
+    ridgeMode: 1,
+  };
+
+  // 4) Init both engines with fresh packets
+  leftEngine.current  = await initOne(leftRef.current,  realPacket);
+  rightEngine.current = await initOne(rightRef.current, showPacket);
+
+  // 5) Deterministic camera for both panes
+  const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
+  pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true });
+  pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true });
+
+  // 6) Re-broadcast strobing from the LC loop carried in parameters
+  const lc = parameters.lightCrossing;
+  if (lc) {
+    const total = Math.max(1, Number(parameters.sectorCount) || 1);
+    const live  = Math.max(1, Number(parameters.sectors) || total);
+    const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
+    (window as any).setStrobingState?.({ sectorCount: total, currentSector: cur, split: cur });
+  }
+
+  leftEngine.current?.forceRedraw?.();
+  rightEngine.current?.forceRedraw?.();
+}
+
+2) Call the re-init on mode changes
+
+Add this effect near your other effects:
+
+const lastModeRef = useRef<string | null>(null);
+
+useEffect(() => {
+  const mode = String(parameters?.currentMode || '');
+  if (!mode) return;
+  if (lastModeRef.current === mode) return; // no-op if same
+  lastModeRef.current = mode;
+  reinitEnginesFromParams();
+}, [parameters?.currentMode]);
