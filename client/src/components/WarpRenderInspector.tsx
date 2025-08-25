@@ -91,6 +91,7 @@ export default function WarpRenderInspector(props: {
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+  const [haveUniforms, setHaveUniforms] = useState(false);
 
   // Live energy pipeline data for diagnostics
   const { data: live } = useEnergyPipeline({
@@ -242,6 +243,7 @@ export default function WarpRenderInspector(props: {
 
     // Subscribe to canonical server uniforms
     const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+      setHaveUniforms(true); // Mark that we've received first uniforms
       if (leftEngine.current) {
         applyToEngine(leftEngine.current, u);          // REAL
       }
@@ -250,9 +252,20 @@ export default function WarpRenderInspector(props: {
       }
     });
 
+    // Keep engines muted until first canonical uniforms arrive
+    if (!haveUniforms) {
+      if (leftEngine.current) {
+        leftEngine.current.updateUniforms?.({ thetaScale: 0, physicsParityMode: true, ridgeMode: 1 });
+      }
+      if (rightEngine.current) {
+        rightEngine.current.updateUniforms?.({ thetaScale: 0, physicsParityMode: false, ridgeMode: 1 });
+      }
+    }
+
     return () => {
       // Unsubscribe from canonical uniforms
       unsubscribe(unsubscribeHandler);
+      setHaveUniforms(false); // Reset on cleanup
       
       try { leftEngine.current?.destroy(); } catch {}
       try { rightEngine.current?.destroy(); } catch {}
