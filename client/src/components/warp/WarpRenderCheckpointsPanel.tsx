@@ -289,16 +289,21 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct = `${(dutyFR*100).toFixed(4)}%`;
 
   // Theta expected function using same chain as shader  
-  function thetaExpected(u: any, dutyFR: number) {
-    const gammaGeo = Number(u.gammaGeo ?? 26);
-    const deltaAA  = Number(u.deltaAOverA ?? 0.625);
-    const gammaVdB = Number(u.gammaVdB ?? 1.35e5);
-    const geomExp  = 3; // cubic - matches shader
-    return Math.pow(gammaGeo, geomExp) * deltaAA * gammaVdB * dutyFR;
+  function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
+    const gammaGeo = N(u.gammaGeo, 26);
+    const deltaAA  = N(u.deltaAOverA, 0.625);
+    const gammaVdB = N(u.gammaVdB, 1.35e5);
+    const geomExp  = 3; // cubic
+    const betaInst = Math.pow(Math.max(1, gammaGeo), geomExp)
+                   * Math.max(1e-12, deltaAA)
+                   * Math.max(1, gammaVdB);
+    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+    const d = Math.max(1e-12, dutyFR);
+    return averaged ? betaInst * Math.sqrt(d) : betaInst;
   }
 
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR, thetaExpected);
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR, thetaExpected);
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR, (u) => thetaExpected(u, dutyFR, snap));
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR, (u) => thetaExpected(u, dutyFR, snap));
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
