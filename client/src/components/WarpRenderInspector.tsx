@@ -238,82 +238,57 @@ export default function WarpRenderInspector(props: {
     const d = Number(props.lightCrossing?.dwell_ms);
     return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
   })();
-  const sTotal    = Math.max(1, +(live?.sectorCount ?? 400));
-  const sConcREAL = Math.max(1, +((realPayload as any).sectors ?? wu.sectors ?? 1));
-  const sConcSHOW = Math.max(1, +((showPayload as any).sectors ?? wu.sectors ?? 1));
+  const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
+  const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
+  
+  // FR duty for both engines - let them derive thetaScale internally
+  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
 
-  const dutyFR_REAL = dutyLocal * (sConcREAL / sTotal);
-  const dutyUI_SHOW = dutyLocal * (1 / sTotal); // SHOW averages across all sectors
-
-  // Apply payloads any time calculator/shared/controls change
+  // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
 
-    // sanitize a few hot-path values
-    const safe = (o:any)=> {
-      const sectors = Math.max(1, Math.floor(N(o.sectors, 1)));
-      const rawSplit = Math.floor(N(o.split, 0));
-      const split = Math.max(0, Math.min(sectors - 1, rawSplit));
-      return {
-        ...o,
-        sectors,
-        split,
-        exposure: Math.max(1, Math.min(12, N(o.exposure, 6))),
-        zeroStop: Math.max(1e-9, N(o.zeroStop, 1e-7)),
-      };
+    // Shared physics parameters for both engines
+    const shared = {
+      gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
+      qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
+      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck, 2.86e5),
+      dutyEffectiveFR,            // 0.01 × (1/400) here  
+      dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
+      sectorCount: sTotal,                    // 400
+      sectors: sConcurrent,                    // 1
+      viewAvg: true,
+      // ✅ give the sweep window so duty_local can be computed
+      lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
+      // Physical scaling
+      hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
+      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+      driveDir: props.baseShared?.driveDir ?? [1,0,0],
+      vShip: props.baseShared?.vShip ?? 0,
+      colorMode: props.baseShared?.colorMode ?? 'theta',
+      lockFraming: true,
+      currentMode: props.baseShared?.currentMode ?? 'hover',
+      // ❌ do NOT include thetaScale anywhere
     };
-    
-    // Unified physical scale across panels
-    const hull = live?.hull ?? { a:503.5, b:132, c:86.5 };
-    const wallWidth_m = 6.0;
-    const gridSpan = 2.6;
-    const Rgeom = Math.cbrt(hull.a * hull.b * hull.c);
-    const deltaRho = wallWidth_m / Rgeom;
-    
-    const physicalScale = { hull, gridSpan, wallWidth_m, deltaRho };
-    
-    // REAL
-    pushUniformsWhenReady(leftEngine.current, {
-      ...safe(realPayload),
-      ...physicalScale,
-      ridgeMode: 0,
-      physicsParityMode: true,
-      parityMode: true,                 // back-compat alias
-      sectorCount: sTotal,
-      dutyEffectiveFR: dutyFR_REAL,     // 🔑 authoritative duty for θ
-      curvatureGainT: 0,
-      curvatureBoostMax: 1,
-      displayGain: 1,
-      userGain: 1,
-      lockFraming: true,
-      cameraZ: compactCameraZ(leftEngine.current?.uniforms?.axesClip || [1,0.26,0.17]),
-    });
 
-    // SHOW
-    pushUniformsWhenReady(rightEngine.current, {
-      ...safe(showPayload),
-      ...physicalScale,
-      ridgeMode: 1,
-      physicsParityMode: false,
-      parityMode: false,
-      sectorCount: sTotal,
-      dutyEffectiveFR: dutyUI_SHOW,     // (optional) unify θ path
-      lockFraming: true,
-      cameraZ: compactCameraZ(rightEngine.current?.uniforms?.axesClip || [1,0.26,0.17]),
-    });
+    // REAL engine - physics truth
+    leftEngine.current.updateUniforms({ ...shared, physicsParityMode: true });
+    
+    // SHOW engine - enhanced visuals  
+    rightEngine.current.updateUniforms({ ...shared, physicsParityMode: false });
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    pushUniformsWhenReady(leftEngine.current,  { cameraZ: cz });
-    pushUniformsWhenReady(rightEngine.current, { cameraZ: cz });
+    leftEngine.current.updateUniforms({ cameraZ: cz });
+    rightEngine.current.updateUniforms({ cameraZ: cz });
     
     // Sanity check parity modes
     setTimeout(() => {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
     }, 100);
-  }, [realPayload, showPayload, wu, props.lightCrossing]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
