@@ -373,6 +373,24 @@ export default function HelixCore() {
 
   // Optional: expose for quick console checks
   useEffect(() => { (window as any).__energyLive = pipeline; }, [pipeline]);
+
+  // Listen for debug events from hardLockUniforms and push into debug panel
+  useEffect(() => {
+    function onDebug(ev: Event) {
+      const e = ev as CustomEvent<{
+        level: 'info'|'warn'|'error';
+        tag: string; msg: string; data?: any; ts: number;
+      }>;
+      const d = e.detail || { level: 'info', tag: 'DEBUG', msg: 'unknown', ts: Date.now() };
+      const from = d.data?.from ? ` ← ${String(d.data.from).replace(/^at\s+/, '')}` : '';
+      const val  = d.data?.value !== undefined ? ` value=${JSON.stringify(d.data.value)}` : '';
+      const line = `[LOCK] ${d.tag}: ${d.msg}${val}${from}`;
+      // keep last 200 lines
+      setMainframeLog(prev => [...prev, line].slice(-200));
+    }
+    window.addEventListener('helix:debug', onDebug as any);
+    return () => window.removeEventListener('helix:debug', onDebug as any);
+  }, []);
   
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
@@ -1788,6 +1806,8 @@ export default function HelixCore() {
                             log.includes('[RESULT]') ? 'text-purple-400' :
                             log.includes('[TILE]') ? 'text-cyan-400' :
                             log.includes('[DATA]') ? 'text-blue-400' :
+                            log.includes('[LOCK]') ? 'text-rose-400' :
+                            log.includes('[ENGINE]') ? 'text-amber-400' :
                             'text-green-400'
                           }>
                             {log}
