@@ -617,7 +617,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     const staticResult = calculateCasimirEnergy({
       gap: state.gap_nm,
       geometry: 'parallel_plates',
-      arrayConfig: { size: Math.sqrt(state.N_tiles) }
+      arrayConfig: { size: Math.max(1, Math.floor(Math.sqrt(state.N_tiles))) }
     } as any);
     
     const dyn = calculateDynamicCasimirWithNatario({
