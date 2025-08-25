@@ -450,13 +450,24 @@ export default function WarpRenderInspector(props: {
       // ❌ do NOT include thetaScale anywhere
     };
 
+    // Gate engine updates until all required physics parameters are present
+    const realUniforms = { ...shared, physicsParityMode: true };
+    const ready = Number.isFinite(realUniforms.dutyEffectiveFR)
+                && Number.isFinite(realUniforms.gammaGeo)
+                && Number.isFinite(realUniforms.gammaVanDenBroeck);
+
+    if (!ready) {
+      // Skip draw + log this frame until all physics params are available
+      return;
+    }
+
     // REAL engine - physics truth
-    gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
+    gatedUpdateUniforms(leftEngine.current, realUniforms, 'inspector-real');
     
     // Handle different renderers for SHOW pane
     if (showMode === 'grid-3d') {
       // 3D grid mode - will be handled by conditional rendering
-      gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
+      // No need to update right engine for 3D mode
     } else {
       // SHOW engine - enhanced visuals with mode-specific overrides
       const showUniforms = {
