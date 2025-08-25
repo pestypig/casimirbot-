@@ -210,6 +210,29 @@ function useCheckpointList(
         tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
       }
     }
+    
+    // Bonus: inferred θ-duty hint (super helpful for debugging)
+    const gammaGeo = N(u?.gammaGeo, 26);
+    const deltaAA  = Math.max(1e-12, N(u?.deltaAOverA ?? u?.qSpoilingFactor, 1));
+    const gammaVdB = Math.max(1, N(u?.gammaVdB ?? u?.gammaVanDenBroeck, 2.86e5));
+    const betaInst = Math.pow(gammaGeo, 3) * deltaAA * gammaVdB;
+    const averaged = (u?.viewAvg ?? true);
+    let inferredDutyPct: string | null = null;
+    if (tsOk && betaInst > 0) {
+      const df = ts / betaInst;
+      const d  = averaged ? df*df : 1;
+      inferredDutyPct = `${(d*100).toFixed(3)}%`;
+    }
+    
+    // Add inferred duty to detail if available
+    if (inferredDutyPct && tsOk && liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
+      const tsExp = thetaExpectedFn(u, dutyFR);
+      const rel = Math.abs(ts - tsExp) / Math.max(1e-12, tsExp);
+      if (Number.isFinite(rel) && !String(tsDetail).includes('(transition)')) {
+        tsDetail += ` • used≈${inferredDutyPct}`;
+      }
+    }
+    
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
 
     // Parity & ridge expectations
