@@ -643,6 +643,31 @@ export function getSystemMetrics(req: Request, res: Response) {
   const C2 = 9e16;
   const massPerTile_kg = Math.abs(s.U_cycle) / C2;
 
+  // Canonical warpUniforms packet for consistent engine data
+  const canonicalWarpUniforms = {
+    // authoritative amps & duty for engines
+    gammaGeo: s.gammaGeo,
+    qSpoilingFactor: s.qSpoilingFactor,
+    gammaVanDenBroeck: s.gammaVanDenBroeck,
+    dutyEffectiveFR: dutyFR,
+    sectorCount: totalSectors,
+    sectors: concurrent,
+    colorMode: "theta" as const,
+    physicsParityMode: false,   // REAL should flip to true at callsite
+    ridgeMode: 1,
+    // expected θ from pipeline (linear duty)
+    thetaScale: theta_FR,
+  };
+
+  // lightweight server-side audit (optional but handy)
+  const thetaExpected = canonicalWarpUniforms.thetaScale;
+  const thetaUsedByServer = thetaExpected; // server isn't forcing; used for compare in clients
+  const thetaAudit = {
+    expected: thetaExpected,
+    used: thetaUsedByServer,
+    ratio: thetaExpected > 0 ? (thetaUsedByServer / thetaExpected) : 1
+  };
+
   res.json({
     totalTiles: Math.floor(s.N_tiles),
     activeTiles, tilesPerSector,
@@ -706,7 +731,8 @@ export function getSystemMetrics(req: Request, res: Response) {
     aEff_harm_m: aEff_harm,
 
     // ✅ canonical packet the renderer consumes
-    warpUniforms,
+    warpUniforms: canonicalWarpUniforms,
+    thetaAudit,
 
     // ✅ hint-only values (never applied as uniforms)
     viewerHints: {
