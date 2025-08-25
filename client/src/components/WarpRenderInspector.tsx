@@ -119,6 +119,20 @@ export default function WarpRenderInspector(props: {
     T: (decades/8), boost: 40, userGain
   }), [wu, decades, userGain]);
 
+  // Belt-and-suspenders: lock parity flags at the engine edge
+  function hardLockParity(e:any, force:boolean) {
+    if (!e || e.__parityLocked) return;
+    const orig = e.updateUniforms?.bind(e);
+    e.updateUniforms = (patch:any) => {
+      if (!patch) patch = {};
+      // refuse any external parity toggles
+      delete patch.physicsParityMode;
+      delete patch.parityMode;
+      return orig?.({ ...patch, physicsParityMode: force, parityMode: force });
+    };
+    e.__parityLocked = true;
+  }
+
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
 
@@ -148,6 +162,10 @@ export default function WarpRenderInspector(props: {
       rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
       rightEngine.current = getOrCreateEngine(W, rightRef.current);
     }
+
+    // Lock parity flags to prevent late writers from flipping REAL back to SHOW
+    leftEngine.current  && hardLockParity(leftEngine.current,  true);  // REAL
+    rightEngine.current && hardLockParity(rightEngine.current, false); // SHOW
 
     // Bootstrap; fit camera after link using derived axes
     leftEngine.current?.bootstrap({ ...realPayload });
