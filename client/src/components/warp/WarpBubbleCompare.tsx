@@ -960,6 +960,13 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
 
+    // assuming parameters.currentMode is the UI/page truth:
+    if ((snapForMode as any)?.currentMode && parameters?.currentMode &&
+        String((snapForMode as any).currentMode) !== String(parameters.currentMode)) {
+      // the live tick still reflects the previous mode; ignore this tick
+      return;
+    }
+
     const realU = toRealUniforms(snapForMode);
     const showU = toShowUniforms(snapForMode);
 
