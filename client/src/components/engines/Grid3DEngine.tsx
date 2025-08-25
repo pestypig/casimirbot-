@@ -33,7 +33,7 @@ export default function Grid3DEngine({ uniforms, ...rest }: { uniforms: any; [ke
 
     // Sample displacement field using Natário bell math
     const sampleDisplacementField = (x: number, y: number, z: number, uniforms: any) => {
-      const { hullAxes = [1, 0.26, 0.17], wallWidth = 0.06, gammaVdB = 1e11, gammaGeo = 26, qSpoilingFactor = 1, dutyEffectiveFR = 0.000025 } = uniforms;
+      const { hullAxes = [1, 0.26, 0.17], wallWidth = 0.06, gammaVdB = 1e11, gammaGeo = 26, qSpoilingFactor = 1, dutyEffectiveFR = 0.000025, viewMassFraction = 1.0 } = uniforms;
       
       // Ellipsoidal radius calculation
       const rho = Math.sqrt(
@@ -47,8 +47,9 @@ export default function Grid3DEngine({ uniforms, ...rest }: { uniforms: any; [ke
       const bell = Math.exp(-Math.pow((rho - 1) / sigma, 2));
       
       // Theta calculation with physics chain
-      const thetaScale = Math.pow(gammaGeo, 3) * qSpoilingFactor * gammaVdB * dutyEffectiveFR;
-      const theta = bell * thetaScale;
+      const thetaScaleCanonical = Math.pow(gammaGeo, 3) * qSpoilingFactor * gammaVdB * dutyEffectiveFR;
+      const thetaScaleUsed = thetaScaleCanonical * viewMassFraction; // Apply view mass fraction
+      const theta = bell * thetaScaleUsed;
       
       // Sign based on compression/expansion regions
       const sign = rho < 1 ? -1 : 1;

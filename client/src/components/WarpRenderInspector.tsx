@@ -375,6 +375,12 @@ export default function WarpRenderInspector(props: {
     return { expected, used, delta };
   }
 
+  // Transform uniforms with viewMassFraction support
+  const toUniforms = (u: any) => ({
+    ...u,
+    viewMassFraction: Number.isFinite(u.viewMassFraction) ? u.viewMassFraction : 1.0,
+  });
+
   // Bound parameters for theta consistency check
   const bound = {
     gammaGeo: N(live?.gammaGeo, 26),
@@ -437,11 +443,21 @@ export default function WarpRenderInspector(props: {
       // ❌ do NOT include thetaScale anywhere
     };
 
-    // REAL engine - physics truth
-    gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
+    // REAL engine - physics truth with per-width view fraction
+    const realUniforms = toUniforms({
+      ...shared, 
+      physicsParityMode: true,
+      viewMassFraction: N(props.parityPhys?.viewMassFraction, 1.0)
+    });
+    gatedUpdateUniforms(leftEngine.current, realUniforms, 'inspector-real');
     
-    // SHOW engine - enhanced visuals  
-    gatedUpdateUniforms(rightEngine.current, { ...shared, physicsParityMode: false }, 'inspector-show');
+    // SHOW engine - enhanced visuals with full bubble
+    const showUniforms = toUniforms({
+      ...shared, 
+      physicsParityMode: false,
+      viewMassFraction: N(props.showPhys?.viewMassFraction, 1.0)
+    });
+    gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
@@ -457,6 +473,33 @@ export default function WarpRenderInspector(props: {
       reportThetaConsistency(bound);
     }, 100);
   }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
+
+  // Dummy uniforms for render (updated via useEffect)
+  const realUniforms = useMemo(() => toUniforms({
+    gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
+    qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
+    gammaVanDenBroeck: gammaVdBBound,
+    dutyEffectiveFR,
+    viewMassFraction: N(props.parityPhys?.viewMassFraction, 1.0),
+    hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
+    wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+    exposure: 5.0,
+    zeroStop: 1e-7,
+    physicsParityMode: true
+  }), [props.parityPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared]);
+  
+  const showUniforms = useMemo(() => toUniforms({
+    gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
+    qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
+    gammaVanDenBroeck: gammaVdBBound,
+    dutyEffectiveFR,
+    viewMassFraction: N(props.showPhys?.viewMassFraction, 1.0),
+    hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
+    wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+    exposure: 6.0,
+    zeroStop: 1e-7,
+    physicsParityMode: false
+  }), [props.showPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
@@ -551,7 +594,7 @@ export default function WarpRenderInspector(props: {
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             {realRendererType === 'grid3d' ? (
               <Grid3DEngine 
-                uniforms={shared} 
+                uniforms={realUniforms} 
                 className="w-full h-full block" 
                 style={{background: 'black'}} 
               />
@@ -568,7 +611,7 @@ export default function WarpRenderInspector(props: {
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             {showRendererType === 'grid3d' ? (
               <Grid3DEngine 
-                uniforms={{...shared, exposure: tonemapExp, zeroStop, ridgeMode: ridgeModeUsed, viewAvg: viewAvgUsed}} 
+                uniforms={showUniforms} 
                 className="w-full h-full block" 
                 style={{background: 'black'}} 
               />
@@ -647,6 +690,8 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
+            <div>view mass fraction (REAL): {(N(props.parityPhys?.viewMassFraction, 1.0) * 100).toFixed(3)}%</div>
+            <div>view mass fraction (SHOW): {(N(props.showPhys?.viewMassFraction, 1.0) * 100).toFixed(3)}%</div>
           </div>
           <button
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"

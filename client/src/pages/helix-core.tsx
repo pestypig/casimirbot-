@@ -570,6 +570,9 @@ export default function HelixCore() {
     if (Number.isFinite(tps) && tps > 0) return Math.floor(tps);
     return Math.max(1, Math.floor(totalTilesSafe / totalSectorsSafe));
   })();
+  
+  // Calculate view mass fraction for REAL renderer (one sector's worth vs full hull)
+  const viewMassFracReal = tilesPerSectorSafe / totalTilesSafe; // ≈ 1/400 for single sector
 
   const burstLocal = (() => {
     const b = Number(lc?.burst_ms), d = Number(lc?.dwell_ms);
@@ -1187,6 +1190,7 @@ export default function HelixCore() {
                   gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
                   dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
                   dutyCycle:        dutyUI_safe,           // UI duty (for display)
+                  viewMassFraction: viewMassFracReal,      // ← per-width view
               }}
               showPhys={{
                 // same as above unless you want explicit "seasoning" in SHOW
@@ -1195,6 +1199,7 @@ export default function HelixCore() {
                 gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
                 dutyEffectiveFR:  dutyEffectiveFR_safe,
                 dutyCycle:        dutyUI_safe,
+                viewMassFraction: 1.0,                   // ← full bubble
               }}
               baseShared={{
                 hull: {
