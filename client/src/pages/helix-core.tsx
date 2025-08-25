@@ -1113,6 +1113,9 @@ export default function HelixCore() {
           </CardContent>
         </Card>
 
+        {/* ====== REAL Equatorial Slice (to-scale) ====== */}
+        <CurvatureSlicePanel />
+
         {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
         <Card className="bg-slate-900/50 border-slate-800 mb-4">
           <CardHeader>
@@ -1588,8 +1591,6 @@ export default function HelixCore() {
               wallWidth_m={6.0}
             />
 
-            {/* Equatorial Curvature Slice - REAL physics from pipeline */}
-            <CurvatureSlicePanel />
           </div>
 
           {/* Right Column - Terminal & Inspector */}
