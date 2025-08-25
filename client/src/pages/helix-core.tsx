@@ -1143,7 +1143,7 @@ export default function HelixCore() {
           <CardContent className="pt-0">
             <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
               <WarpRenderInspector
-                key={`inspector-${modeNonce}`}
+                key={`inspector-${modeNonce}-${totalSectors}-${concurrentSectors}`}
                 parityPhys={{
                   gammaGeo:        pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
