@@ -548,7 +548,8 @@ export default function WarpRenderInspector(props: {
     const cvs = grid3dRef.current?.getCanvas();
     if (eng && cvs) {
       rightEngine.current = eng;
-      (rightRef as any).current = cvs;
+      (rightRef as any).current = cvs;   // so checkpoints can read size/diag
+      rightOwnedRef.current = false;     // foreign engine — do not destroy
       // Mute Grid3D engine until canonical uniforms arrive
       gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
       eng.setVisible?.(false);
