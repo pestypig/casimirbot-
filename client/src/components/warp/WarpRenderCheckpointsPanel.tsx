@@ -211,17 +211,23 @@ function useCheckpointList(
       }
     }
     
-    // Bonus: inferred θ-duty hint (super helpful for debugging)
-    const gammaGeo = N(u?.gammaGeo, 26);
-    const deltaAA  = Math.max(1e-12, N(u?.deltaAOverA ?? u?.qSpoilingFactor, 1));
-    const gammaVdB = Math.max(1, N(u?.gammaVdB ?? u?.gammaVanDenBroeck, 2.86e5));
-    const betaInst = Math.pow(gammaGeo, 3) * deltaAA * gammaVdB;
-    const averaged = (u?.viewAvg ?? true);
+    // Bonus: inferred θ-duty hint (prefer dutyUsed if available)
     let inferredDutyPct: string | null = null;
-    if (tsOk && betaInst > 0) {
-      const df = ts / betaInst;
-      const d  = averaged ? df*df : 1;
-      inferredDutyPct = `${(d*100).toFixed(3)}%`;
+    if (typeof u?.dutyUsed === 'number') {
+      // Use actual duty the engine computed
+      inferredDutyPct = `${(u.dutyUsed*100).toFixed(3)}%`;
+    } else if (tsOk) {
+      // Fall back to inferring from physics chain
+      const gammaGeo = N(u?.gammaGeo, 26);
+      const deltaAA  = Math.max(1e-12, N(u?.deltaAOverA ?? u?.qSpoilingFactor, 1));
+      const gammaVdB = Math.max(1, N(u?.gammaVdB ?? u?.gammaVanDenBroeck, 2.86e5));
+      const betaInst = Math.pow(gammaGeo, 3) * deltaAA * gammaVdB;
+      const averaged = (u?.viewAvg ?? true);
+      if (betaInst > 0) {
+        const df = ts / betaInst;
+        const d  = averaged ? df*df : 1;
+        inferredDutyPct = `${(d*100).toFixed(3)}%`;
+      }
     }
     
     // Add inferred duty to detail if available

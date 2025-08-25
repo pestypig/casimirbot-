@@ -996,6 +996,7 @@ class WarpEngine {
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
           : thetaScaleFromChain;
+        nextUniforms.dutyUsed   = dutyEffFR;   // 🔍 for checkpoints UI
 
         // If amplitude just went "off", restore the pristine grid
         const wasActive = (prev.thetaScale ?? 0) > 1e-12;
