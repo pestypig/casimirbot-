@@ -3,6 +3,7 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import CurvaturePhysicsPanel from "@/components/CurvaturePhysicsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
+import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 
 /**
  * WarpRenderInspector
@@ -109,76 +110,14 @@ export default function WarpRenderInspector(props: {
   const [userGain, setUserGain] = useState(1);
   const [decades, setDecades] = useState(0.6 * 8); // UI slider 0..8 → 0..1
 
-  // Pulled from calculator (if present). Keeps names WarpEngine expects.
-  const shared = useMemo(() => ({
-    colorMode,
-    ridgeMode,
-    lockFraming: true,
-    hull: { a: 503.5, b: 132, c: 86.5 }, // default hull
-    gridSpan: 2.6,
-    sectors: 400,
-    split: 0,
-    ...props.baseShared,
-  }), [props.baseShared, colorMode, ridgeMode]);
+  const wu = useMemo(() => normalizeWU(
+    (live as any)?.warpUniforms || (props as any)?.warpUniforms
+  ), [live, props]);
 
-  // Build REAL and SHOW payloads using canonical keys and aliases.
-  const realPayload = useMemo(() => {
-    const p = props.parityPhys || {};
-    return {
-      ...shared,
-      // geometry
-      hull: p.hull || p.hullDims || shared.hull,
-      hullAxes: p.hullAxes || undefined, // let engine derive from hull if absent
-      gridSpan: p.gridSpan ?? shared.gridSpan,
-      // physics chain & overrides
-      physicsParityMode: true,
-      gammaGeo: N(p.gammaGeo ?? p.g_y, 26),
-      deltaAOverA: N(p.deltaAOverA ?? p.qSpoilingFactor, 1),
-      gammaVdB: N(p.gammaVdB ?? p.gammaVanDenBroeck, 2.86e5),
-      dutyCycle: N(p.dutyCycle, 0.14),
-      // FR duty override → use it if calculator provides one
-      dutyEffectiveFR: N(p.dutyEffectiveFR ?? p.dutyEff ?? p.dutyFR, undefined),
-      sectors: Math.max(1, Math.floor(N(p.sectors ?? p.sectorCount, shared.sectors ?? 1))),
-      split: Math.max(0, Math.floor(N(p.split ?? p.sectorSplit ?? shared.split, 0))),
-      // conservative visuals
-      exposure: 3.5,
-      zeroStop: 1e-5,
-      curvatureGainT: 0.0,
-      curvatureBoostMax: 1,
-      vizGain: 1,
-      displayGain: 1,
-      userGain: 1, // keep REAL parity visually "true"
-      currentMode: mode,
-    };
-  }, [props.parityPhys, shared, userGain, mode]);
-
-  const showPayload = useMemo(() => {
-    const p = props.showPhys || {};
-    const T = clamp01(decades / 8);
-    const mp = MODE_PRESET[mode] || MODE_PRESET.hover;
-    return {
-      ...shared,
-      physicsParityMode: false,
-      hull: p.hull || p.hullDims || shared.hull,
-      hullAxes: p.hullAxes || undefined, // let engine derive from hull if absent
-      gridSpan: p.gridSpan ?? shared.gridSpan,
-      gammaGeo: N(p.gammaGeo ?? p.g_y, 26),
-      deltaAOverA: N(p.deltaAOverA ?? p.qSpoilingFactor, 1),
-      gammaVdB: N(p.gammaVdB ?? p.gammaVanDenBroeck, 2.86e5),
-      dutyCycle: N(p.dutyCycle, 0.14),
-      sectors: Math.max(1, Math.floor(N(p.sectors ?? p.sectorCount, shared.sectors ?? 1))),
-      split: Math.max(0, Math.floor(N(p.split ?? p.sectorSplit ?? shared.split, 0))),
-      // boosted visuals (operational-mode seasoning baked in so you can SEE it)
-      curvatureGainT: Math.max(mp.curvT, T),
-      curvatureBoostMax: Math.max(mp.boost, 20),
-      zeroStop: 1e-7,
-      exposure: 6.0,
-      vizGain: 1.0,
-      displayGain: Math.max(1, mp.displayGain),
-      userGain: Math.max(1, userGain),
-      currentMode: mode,
-    };
-  }, [props.showPhys, shared, userGain, decades, mode]);
+  const realPayload = useMemo(() => buildREAL(wu), [wu]);
+  const showPayload = useMemo(() => buildSHOW(wu, {
+    T: (decades/8), boost: 40, userGain
+  }), [wu, decades, userGain]);
 
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
@@ -266,8 +205,8 @@ export default function WarpRenderInspector(props: {
     return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
   })();
   const sTotal    = Math.max(1, +(live?.sectorCount ?? 400));
-  const sConcREAL = Math.max(1, +((realPayload as any).sectors ?? (shared as any).sectors ?? 1));
-  const sConcSHOW = Math.max(1, +((showPayload as any).sectors ?? (shared as any).sectors ?? 1));
+  const sConcREAL = Math.max(1, +((realPayload as any).sectors ?? wu.sectors ?? 1));
+  const sConcSHOW = Math.max(1, +((showPayload as any).sectors ?? wu.sectors ?? 1));
 
   const dutyFR_REAL = dutyLocal * (sConcREAL / sTotal);
   const dutyUI_SHOW = dutyLocal * (1 / sTotal); // SHOW averages across all sectors
@@ -330,7 +269,7 @@ export default function WarpRenderInspector(props: {
     });
 
     // Optional camera sweetener so both keep same framing
-    const ax = (shared as any).axesScene || leftEngine.current?.uniforms?.axesClip;
+    const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
     pushUniformsWhenReady(leftEngine.current,  { cameraZ: cz });
     pushUniformsWhenReady(rightEngine.current, { cameraZ: cz });
@@ -340,7 +279,7 @@ export default function WarpRenderInspector(props: {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
     }, 100);
-  }, [realPayload, showPayload, shared, props.lightCrossing]);
+  }, [realPayload, showPayload, wu, props.lightCrossing]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {

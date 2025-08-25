@@ -27,15 +27,13 @@ export function normalizeWU(raw:any): WarpUniforms {
   };
   return {
     ...raw,
-    gammaVdB: raw.gammaVdB ?? raw.gammaVanDenBroeck,
-    deltaAOverA: raw.deltaAOverA ?? raw.qSpoilingFactor,
+    gammaVdB: N(raw.gammaVdB ?? raw.gammaVanDenBroeck, 2.86e5),
+    deltaAOverA: Math.max(1e-12, N(raw.deltaAOverA ?? raw.qSpoilingFactor, 1)),
     sectorCount: Math.max(1, N(raw.sectorCount, 400)),
     sectors: Math.max(1, N(raw.sectors, 1)),
     dutyCycle: Math.max(1e-12, N(raw.dutyCycle, 0.01)),
     dutyEffectiveFR: Math.max(1e-12, N(raw.dutyEffectiveFR, 0.01/Math.max(1,N(raw.sectorCount,400)))),
     gammaGeo: N(raw.gammaGeo, 26),
-    gammaVdB: N(raw.gammaVdB ?? raw.gammaVanDenBroeck, 2.86e5),
-    deltaAOverA: Math.max(1e-12, N(raw.deltaAOverA ?? raw.qSpoilingFactor, 1)),
   };
 }
 
