@@ -599,12 +599,15 @@ export function getSystemMetrics(req: Request, res: Response) {
                                      (s as any).dutyEffective_FR ??
                                      (dutyLocal * (concurrent / totalSectors)));
 
-  const gammaGeo = s.gammaGeo ?? 26;
-  const dAA      = s.qSpoilingFactor ?? 1;
-  const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5;
-
-  const theta_UI = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyUI / concurrent);
-  const theta_FR = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyFR);
+  const γg   = s.gammaGeo ?? 26;
+  const qsp  = s.qSpoilingFactor ?? 1;
+  const γvdb = s.gammaVanDenBroeck ?? 0;             // ← use calibrated value from pipeline
+  const γ3 = Math.pow(γg, 3);
+  
+  // ✅ physics-true, FR-averaged — NO sqrt
+  const theta_FR = γ3 * qsp * γvdb * dutyFR;
+  // keep a UI-only label if you want, but don't use it in engines
+  const theta_UI = γ3 * qsp * γvdb * dutyUI;
 
   // Canonical, engine-facing bundle
   const warpUniforms = {
@@ -621,9 +624,9 @@ export function getSystemMetrics(req: Request, res: Response) {
     dutyEffectiveFR: dutyFR,      // REAL θ uses this
 
     // physics chain
-    gammaGeo,
-    gammaVdB,                     // ✅ canonical short key
-    deltaAOverA: dAA,             // ✅ canonical for qSpoilingFactor
+    gammaGeo: γg,
+    gammaVdB: γvdb,               // ✅ canonical short key
+    deltaAOverA: qsp,             // ✅ canonical for qSpoilingFactor
     currentMode: s.currentMode ?? 'hover'
   };
   const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;

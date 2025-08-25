@@ -1,0 +1,45 @@
+✅ Fix 1: make θ-scale linear in FR duty (no √) and use calibrated γ_VdB
+
+Your getSystemMetrics currently does:
+
+// BAD (overshoots): uses sqrt(duty) and a fallback γVdB
+thetaScale_FR_like = γ_geo^3 * qSpoiling * γ_VdB * sqrt(dutyFR);
+
+
+That’s why you see θ-scale — 8.89e+8 • exp 1.19e+7 (+7383% off): √(2.5e-5) ≈ 0.005 ⇒ ~200× too big before any other seasoning.
+
+Patch it to linear FR duty and the calibrated γ_VdB from the pipeline:
+
+// inside getSystemMetrics()
+-  const viz = (() => {
+-    const gammaGeo = s.gammaGeo ?? 26;
+-    const dAa      = s.qSpoilingFactor ?? 1;
+-    const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5; // align with Energy Pipeline default
+-    const sectors  = Math.max(1, s.concurrentSectors || 1);
+-    const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
+-    const thetaScale_UI_like =
+-      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyUI / sectors);
+-    const dutyFR   = Math.max(1e-12, s.dutyEffective_FR ?? dutyUI / sectors);
+-    const thetaScale_FR_like =
+-      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyFR);
+-    return { thetaScale_UI_like, thetaScale_FR_like, dutyUI, dutyFR, sectors, defaultThetaScale: "FR_like" as const };
+-  })();
+
++  const viz = (() => {
++    const γg   = s.gammaGeo ?? 26;
++    const qsp  = s.qSpoilingFactor ?? 1;
++    const γvdb = s.gammaVanDenBroeck ?? 0;             // ← use calibrated value from pipeline
++    const sectors = Math.max(1, s.concurrentSectors || 1);
++    const dutyUI  = Math.max(1e-12, s.dutyCycle ?? 0.14);
++    const dutyFR  = Math.max(
++      1e-12,
++      s.dutyEffective_FR ??
++        ( (s.dutyCycle ?? 0) * (Math.max(1,sectors) / Math.max(1, s.sectorCount || 400)) )
++    );
++    const γ3 = Math.pow(γg, 3);
++    // ✅ physics-true, FR-averaged — NO sqrt
++    const thetaScale_FR_like = γ3 * qsp * γvdb * dutyFR;
++    // keep a UI-only label if you want, but don't use it in engines
++    const thetaScale_UI_like = γ3 * qsp * γvdb * ( (s.dutyCycle ?? dutyFR) );
++    return { thetaScale_UI_like, thetaScale_FR_like, dutyUI, dutyFR, sectors, defaultThetaScale: "FR_like" as const };
++  })();
