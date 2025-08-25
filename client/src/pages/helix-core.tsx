@@ -422,16 +422,26 @@ export default function HelixCore() {
     ? pipeline!.dutyCycle!
     : (modeCfg.dutyCycle ?? 0.14);
 
-  // ⬇️ put this near dutyEffectiveFR (or right after sectorsUI)
-  const sectorsUI = isFiniteNumber(pipeline?.sectorStrobing) 
-    ? pipeline!.sectorStrobing! 
-    : (modeCfg.sectorStrobing ?? 1);
-  
   // Split sector handling: total sectors (400) for averaging vs concurrent sectors (1-2) for strobing
+
   const totalSectors = useMemo(() => {
-    const s = npos(systemMetrics?.totalSectors, 400);
-    return Math.max(1, Math.floor(s));
-  }, [systemMetrics?.totalSectors]);
+    const fromMetrics = Number(systemMetrics?.totalSectors);
+    if (Number.isFinite(fromMetrics) && fromMetrics! > 0) return Math.floor(fromMetrics!);
+    const fromPipeline = Number((pipeline as any)?.sectorsTotal);
+    if (Number.isFinite(fromPipeline) && fromPipeline! > 0) return Math.floor(fromPipeline!);
+    return modeCfg.sectorsTotal; // ← new
+  }, [systemMetrics?.totalSectors, (pipeline as any)?.sectorsTotal, modeCfg.sectorsTotal]);
+
+  const concurrentSectors = useMemo(() => {
+    const fromMetrics = Number(systemMetrics?.sectorStrobing);
+    if (Number.isFinite(fromMetrics) && fromMetrics! > 0) return Math.floor(fromMetrics!);
+    const fromPipeline = Number((pipeline as any)?.sectorsConcurrent ?? pipeline?.sectorStrobing);
+    if (Number.isFinite(fromPipeline) && fromPipeline! > 0) return Math.floor(fromPipeline!);
+    return modeCfg.sectorsConcurrent; // ← new
+  }, [systemMetrics?.sectorStrobing, (pipeline as any)?.sectorsConcurrent, pipeline?.sectorStrobing, modeCfg.sectorsConcurrent]);
+
+  // keep for legacy display text if needed  
+  const sectorsUI = concurrentSectors;
 
   // NOTE: totalTilesSafe and tilesPerSectorSafe are defined later in the robust calculation
 
@@ -439,12 +449,6 @@ export default function HelixCore() {
   useEffect(() => {
     setTrail(prev => (prev.length === totalSectors ? prev : Array(totalSectors).fill(0)));
   }, [totalSectors]);
-
-  const concurrentSectors = useMemo(() => {
-    return Number.isFinite(systemMetrics?.sectorStrobing)
-      ? Math.max(1, Math.floor(systemMetrics!.sectorStrobing!))
-      : (pipeline?.sectorStrobing ?? 1);
-  }, [systemMetrics?.sectorStrobing, pipeline?.sectorStrobing]);
 
   // Calculate hull geometry before using it
   const hull = (hullMetrics && hullMetrics.hull) ? {
