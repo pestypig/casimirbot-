@@ -330,6 +330,12 @@ export default function WarpRenderInspector(props: {
     const cz = compactCameraZ(ax);
     pushUniformsWhenReady(leftEngine.current,  { cameraZ: cz });
     pushUniformsWhenReady(rightEngine.current, { cameraZ: cz });
+    
+    // Sanity check parity modes
+    setTimeout(() => {
+      console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
+      console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
+    }, 100);
   }, [realPayload, showPayload, shared, props.lightCrossing]);
 
   // Keep canvases crisp on container resize
