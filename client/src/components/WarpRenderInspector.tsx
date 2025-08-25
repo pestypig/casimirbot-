@@ -375,10 +375,10 @@ export default function WarpRenderInspector(props: {
     return { expected, used, delta };
   }
 
-  // Transform uniforms with viewMassFraction support
-  const toUniforms = (u: any) => ({
-    ...u,
-    viewMassFraction: Number.isFinite(u.viewMassFraction) ? u.viewMassFraction : 1.0,
+  // Transform uniforms with viewMassFraction support - always available and defaulted
+  const toUniforms = (src: any) => ({
+    ...src,
+    viewMassFraction: Number.isFinite(src?.viewMassFraction) ? src.viewMassFraction : 1.0,
   });
 
   // Bound parameters for theta consistency check

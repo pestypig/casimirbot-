@@ -74,7 +74,9 @@ export function applyToEngine(
     exposure: 5.0,
     zeroStop: 1e-7,
     colorMode: 'theta',
-    viewAvg: true
+    viewAvg: true,
+    // Always ensure viewMassFraction is available and defaulted
+    viewMassFraction: Number.isFinite(uniforms?.viewMassFraction) ? uniforms.viewMassFraction : 1.0,
   };
 
   // Debug echo (what we actually bind)
