@@ -1,0 +1,73 @@
+3) Remove the “suspended while responding to synchronous input” warning
+
+Two tiny, safe adjustments:
+
+(a) Warm up the lazy bundles once on mount
+
+This prevents a user click (mode change) from coinciding with a lazy import:
+
+ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
++import { startTransition } from "react";
+
+ // lazy:
+ const WarpBubbleCompare = lazy(() =>
+   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
+ );
+ const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
+
++// Preload lazy bundles to avoid suspending during user input
++useEffect(() => {
++  import("@/components/warp/WarpBubbleCompare");
++  import("@/components/WarpRenderInspector");
++}, []);
+
+(b) Wrap mode-switch state updates in startTransition
+
+This makes React treat the heavy update as non-urgent, silencing the warning and keeping input responsive:
+
+// Quick Operational Mode Switch buttons
+onClick={() => {
+-  if (!isActive) {
+-    setOptimisticMode(m.key as ModeKey);
+-    setModeNonce(n => n + 1);
+-    switchMode.mutate(m.key as any, {
+-      onSuccess: () => {
+-        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
+-        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+-      }
+-    });
+-    refetchMetrics();
+-    setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
+-  }
++  if (!isActive) {
++    startTransition(() => {
++      setOptimisticMode(m.key as ModeKey);
++      setModeNonce(n => n + 1);
++    });
++    switchMode.mutate(m.key as any, {
++      onSuccess: () => {
++        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
++        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
++      }
++    });
++    refetchMetrics();
++    setMainframeLog(prev => [...prev, `[MODE] Quick switch → ${m.key}`]);
++  }
+}}
+
+
+Do the same wrap inside the <Select onValueChange> handler:
+
+onValueChange={(mode) => {
+-  setOptimisticMode(mode as ModeKey);
+-  setModeNonce(n => n + 1);
++  startTransition(() => {
++    setOptimisticMode(mode as ModeKey);
++    setModeNonce(n => n + 1);
++  });
+  switchMode.mutate(mode as any, { ... });
+  ...
+}}
+
+
+These two changes stop the synchronous-input suspend warning without changing your behavior.

@@ -80,6 +80,7 @@ import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
+import CurvatureSlicePanel from "@/components/CurvatureSlicePanel";
 import { HelpCircle } from "lucide-react";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
@@ -1586,6 +1587,9 @@ export default function HelixCore() {
               hull={hull}
               wallWidth_m={6.0}
             />
+
+            {/* Equatorial Curvature Slice - REAL physics from pipeline */}
+            <CurvatureSlicePanel />
           </div>
 
           {/* Right Column - Terminal & Inspector */}
