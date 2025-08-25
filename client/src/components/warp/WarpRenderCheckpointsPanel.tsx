@@ -280,9 +280,11 @@ export default function WarpRenderCheckpointsPanel({
     ? (lightCrossing.burst_ms / lightCrossing.dwell_ms)    // ~0.01
     : 0.01;                                                 // fallback
 
-  const sConcurrent = leftEngineRef.current?.uniforms?.sectors ?? 1;
-  const sTotal = snap?.sectorCount ?? 400;
-  const dutyFR = dutyLocal * (sConcurrent / sTotal);
+  const sTotal       = snap?.sectorCount ?? 400;
+  const sConcLeft    = leftEngineRef.current?.uniforms?.sectors  ?? 1;
+  const sConcRight   = rightEngineRef.current?.uniforms?.sectors ?? sConcLeft;
+  const dutyFR_left  = dutyLocal * (sConcLeft  / sTotal);
+  const dutyFR_right = dutyLocal * (sConcRight / sTotal);
 
   // Pretty strings
   const dutyLocalPct = `${(dutyLocal*100).toFixed(3)}%`;
@@ -302,8 +304,8 @@ export default function WarpRenderCheckpointsPanel({
     return averaged ? betaInst * Math.sqrt(d) : betaInst;
   }
 
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR, (u) => thetaExpected(u, dutyFR, snap));
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR, (u) => thetaExpected(u, dutyFR, snap));
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>thetaExpected(u, dutyFR_right, snap));
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
@@ -366,7 +368,7 @@ export default function WarpRenderCheckpointsPanel({
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">Sectors conc/total:</span>
-          <span className="font-mono">{sConcurrent}/{sTotal}</span>
+          <span className="font-mono">{sConcLeft}/{sTotal} (REAL) • {sConcRight}/{sTotal} (SHOW)</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">View averaging:</span>
