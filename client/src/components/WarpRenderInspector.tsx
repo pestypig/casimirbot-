@@ -312,6 +312,8 @@ export default function WarpRenderInspector(props: {
       curvatureBoostMax: 1,
       displayGain: 1,
       userGain: 1,
+      lockFraming: true,
+      cameraZ: compactCameraZ(leftEngine.current?.uniforms?.axesClip || [1,0.26,0.17]),
     });
 
     // SHOW
@@ -323,6 +325,8 @@ export default function WarpRenderInspector(props: {
       parityMode: false,
       sectorCount: sTotal,
       dutyEffectiveFR: dutyUI_SHOW,     // (optional) unify θ path
+      lockFraming: true,
+      cameraZ: compactCameraZ(rightEngine.current?.uniforms?.axesClip || [1,0.26,0.17]),
     });
 
     // Optional camera sweetener so both keep same framing
