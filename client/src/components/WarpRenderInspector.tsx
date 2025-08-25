@@ -379,6 +379,10 @@ export default function WarpRenderInspector(props: {
   const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
   const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
   
+  // Visual-only mass fraction scaling
+  const total = Math.max(1, Number(live?.sectorCount) || 400);
+  const viewFracREAL = 1 / total;
+  
   // FR duty for both engines - let them derive thetaScale internally
   const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
 
@@ -466,8 +470,8 @@ export default function WarpRenderInspector(props: {
     gammaVdB: gammaVdBBound,
     dutyEffectiveFR: dutyEffectiveFR
   };
-  // Extract only viewMassFraction from showPhys (no display gains)
-  const showViewMassFraction = N(props.showPhys?.viewMassFraction, 1.0);
+  // Extract view fractions for consistency check (SHOW renderer)
+  const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
 
   // Bridge Grid3D engine to checkpoints panel
@@ -547,7 +551,7 @@ export default function WarpRenderInspector(props: {
     const realUniforms = toUniforms({
       ...shared, 
       physicsParityMode: true,
-      viewMassFraction: N(props.parityPhys?.viewMassFraction, 1.0)
+      viewMassFraction: viewFracREAL
     });
     gatedUpdateUniforms(leftEngine.current, normalizeKeys(realUniforms), 'inspector-real');
     
@@ -555,7 +559,7 @@ export default function WarpRenderInspector(props: {
     const showUniforms = toUniforms({
       ...shared, 
       physicsParityMode: false,
-      viewMassFraction: N(props.showPhys?.viewMassFraction, 1.0)
+      viewMassFraction: 1.0
     });
     gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
 
@@ -580,20 +584,20 @@ export default function WarpRenderInspector(props: {
     qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
     gammaVanDenBroeck: gammaVdBBound,
     dutyEffectiveFR,
-    viewMassFraction: N(props.parityPhys?.viewMassFraction, 1.0),
+    viewMassFraction: viewFracREAL,
     hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
     wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
     exposure: 5.0,
     zeroStop: 1e-7,
     physicsParityMode: true
-  }), [props.parityPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared]);
+  }), [props.parityPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared, viewFracREAL]);
   
   const showUniforms = useMemo(() => toUniforms({
     gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
     qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
     gammaVanDenBroeck: gammaVdBBound,
     dutyEffectiveFR,
-    viewMassFraction: N(props.showPhys?.viewMassFraction, 1.0),
+    viewMassFraction: 1.0,
     hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
     wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
     exposure: 6.0,
@@ -756,8 +760,8 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
-            <div>view mass fraction (REAL): {(N(props.parityPhys?.viewMassFraction, 1.0) * 100).toFixed(3)}%</div>
-            <div>view mass fraction (SHOW): {(N(props.showPhys?.viewMassFraction, 1.0) * 100).toFixed(3)}%</div>
+            <div>view mass fraction (REAL): {(viewFracREAL * 100).toFixed(3)}% (1/{total})</div>
+            <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
