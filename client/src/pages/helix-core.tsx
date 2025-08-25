@@ -474,6 +474,17 @@ export default function HelixCore() {
     localBurstFrac: LOCAL_BURST_BY_MODE[effectiveMode as keyof typeof LOCAL_BURST_BY_MODE] ?? 0.01, // mode-aware burst duty
   });
 
+  // Quick validation snippet - log mode-aware calculations
+  console.table({
+    mode: effectiveMode,
+    totalSectors,
+    concurrentSectors,
+    dwell_ms: lc.dwell_ms,
+    burst_ms: lc.burst_ms,
+    localBurstFrac: LOCAL_BURST_BY_MODE[effectiveMode as keyof typeof LOCAL_BURST_BY_MODE],
+    dutyFR: dutyEffectiveFR_safe,
+  });
+
   const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)
     ? pipeline!.qSpoilingFactor!
     : (modeCfg.qSpoilingFactor ?? 1);
