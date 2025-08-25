@@ -644,17 +644,41 @@ export default function WarpBubbleCompare({
     return eng;
   }
 
-  // Compute θ-scale (γ^3 · ΔA/A · γ_VdB · √(duty/sectors)) if not provided
-  const computeThetaScale = (v: LiveSnap) => {
-    const gammaGeo = N(v.gammaGeo ?? (v as any).g_y, 26);
-    const dAa = N(v.deltaAOverA ?? (v as any).qSpoilingFactor, 1);
-    const gammaVdB = N(v.gammaVdB ?? (v as any).gammaVanDenBroeck, 2.86e5);
-    const sectors = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectorStrobing ?? v.sectors, 1)));
-    const duty = Math.max(0, N(v.dutyCycle, 0));
-    const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
-    const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
-    const effDuty = Math.max(1e-12, duty / sectors);
-    return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+  // Parity-aware expected theta calculation that uses engine's γ_VdB 
+  const expectedThetaForPane = (live: any, engine: any) => {
+    const parity = !!engine?.uniforms?.physicsParityMode; // REAL=true, SHOW=false
+    const mode = String(live?.currentMode||'').toLowerCase();
+    if (mode === 'standby') return 0;
+
+    const gammaGeo = Math.max(1, N(live?.gammaGeo ?? live?.g_y, 26));
+    const dAa      = Math.max(1e-12, N(live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
+
+    // Pull γ_VdB from the engine uniforms if present (authoritative for that pane)
+    const gVdB = Math.max(
+      1,
+      N(
+        engine?.uniforms?.gammaVdB ??
+        engine?.uniforms?.gammaVanDenBroeck ??
+        live?.gammaVanDenBroeck ?? live?.gammaVdB,
+        2.86e5
+      )
+    );
+
+    // Duty per pane
+    let duty: number;
+    if (parity) {
+      // REAL: ship-wide Ford–Roman duty
+      const dFR = live?.dutyEffectiveFR ?? live?.dutyShip ?? live?.dutyEff;
+      duty = Number.isFinite(+dFR) ? Math.max(0, +dFR) : 0;
+    } else {
+      // SHOW: UI duty averaged over total sectors
+      const S = Math.max(1, Math.floor(N(live?.sectorCount ?? live?.sectors ?? 1, 1)));
+      duty = Math.max(0, N(live?.dutyCycle, 0)) / S;
+    }
+
+    const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
+    const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
+    return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, duty)) : betaInst;
   };
 
   const toSharedUniforms = (snap: LiveSnap) => {
