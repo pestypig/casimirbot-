@@ -104,6 +104,8 @@ export default function WarpRenderInspector(props: {
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const grid3dRef = useRef<Grid3DHandle>(null);
+  const leftOwnedRef = useRef(false);
+  const rightOwnedRef = useRef(false);
   
   // Renderer type configuration
   const realRendererType = props.realRenderer || 'slice2d';
@@ -270,22 +272,26 @@ export default function WarpRenderInspector(props: {
       leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
       leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
+      leftOwnedRef.current = true;
       // Mute engine until canonical uniforms arrive (prevents first-frame spike)
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       leftEngine.current?.setVisible?.(false);
       // Hard-lock REAL pane against parity flips and thetaScale writers
       lockPane(leftEngine.current, 'REAL');
     }
-    if (rightRef.current && !rightEngine.current) {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-      rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
-      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
-      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
-      rightEngine.current?.setVisible?.(false);
-      // Hard-lock SHOW pane against parity flips and thetaScale writers
-      lockPane(rightEngine.current, 'SHOW');
+    if (showRendererType !== 'grid3d') {
+      if (rightRef.current && !rightEngine.current) {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+        rightEngine.current = createEngineWithFallback('slice2d', rightRef.current);
+        rightOwnedRef.current = true; // we own this engine
+        // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+        gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
+        rightEngine.current?.setVisible?.(false);
+        // Hard-lock SHOW pane against parity flips and thetaScale writers
+        lockPane(rightEngine.current, 'SHOW');
+      }
     }
 
     // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
