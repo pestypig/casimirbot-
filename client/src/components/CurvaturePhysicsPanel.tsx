@@ -111,7 +111,7 @@ export default function CurvaturePhysicsPanel({
 
   // Physics factors
   const gGeo = isNum(gammaGeo) ? gammaGeo! : (pipeline as any)?.gammaGeo ?? 26;
-  const gVdB = isNum(gammaVdB) ? gammaVdB! : (pipeline as any)?.gammaVanDenBroeck ?? 2.86e5;
+  const gVdB = isNum(gammaVdB) ? gammaVdB! : (pipeline as any)?.gammaVanDenBroeck ?? 1.4e5;
   const dAoA = isNum(qSpoilingFactor) ? qSpoilingFactor! : (pipeline as any)?.qSpoilingFactor ?? 1.0;
 
   // Amplitude proxy for the REAL pane (unitless scale factor)

@@ -252,7 +252,7 @@ export default function WarpRenderInspector(props: {
     const shared = {
       gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
       qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck, 2.86e5),
+      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck, 1.4e5),
       dutyEffectiveFR,            // 0.01 × (1/400) here  
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400

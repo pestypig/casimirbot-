@@ -64,7 +64,7 @@ export default function AmplificationPanel() {
   const gammaVdB =
     (data as any).gammaVdB ??
     (data as any).gammaVanDenBroeck ??
-    2.86e5;
+    1.4e5;
 
   const duty =
     (data as any).dutyCycle ??

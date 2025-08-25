@@ -23,11 +23,11 @@ const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
 export function normalizeWU(raw:any): WarpUniforms {
   if (!raw) return {
     sectorCount: 400, sectors: 1, dutyCycle: 0.01, dutyEffectiveFR: 0.01/400,
-    gammaGeo: 26, gammaVdB: 2.86e5, deltaAOverA: 1
+    gammaGeo: 26, gammaVdB: 1.4e5, deltaAOverA: 1
   };
   return {
     ...raw,
-    gammaVdB: N(raw.gammaVdB ?? raw.gammaVanDenBroeck, 2.86e5),
+    gammaVdB: N(raw.gammaVdB ?? raw.gammaVanDenBroeck, 1.4e5),
     deltaAOverA: Math.max(1e-12, N(raw.deltaAOverA ?? raw.qSpoilingFactor, 1)),
     sectorCount: Math.max(1, N(raw.sectorCount, 400)),
     sectors: Math.max(1, N(raw.sectors, 1)),

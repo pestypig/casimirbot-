@@ -19,7 +19,7 @@ interface InteractiveHeatMapProps {
   onModeChange?: (mode: string) => void;
 }
 
-const DEFAULT_GAMMA_VDB = 2.86e5;
+const DEFAULT_GAMMA_VDB = 1.4e5;
 
 const pick = <T,>(v: T | undefined, d: T) => (typeof v === "number" ? (isFinite(v as any) ? v! : d) : (v ?? d));
 

@@ -46,7 +46,7 @@ function expectedThetaForPane(live: any, engine: any) {
       engine?.uniforms?.gammaVdB ??
       engine?.uniforms?.gammaVanDenBroeck ??
       live?.gammaVanDenBroeck ?? live?.gammaVdB,
-      2.86e5
+      1.4e5
     )
   );
 
@@ -71,7 +71,7 @@ function expectedThetaForPane(live: any, engine: any) {
 function computeThetaScaleFromParams(v: any) {
   const gammaGeo = N(v.gammaGeo, 26);
   const dAa = N(v.qSpoilingFactor, 1);
-  const gammaVdB = N(v.gammaVanDenBroeck, 2.86e5);
+  const gammaVdB = N(v.gammaVanDenBroeck, 1.4e5);
   const sectors = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectors, 1)));
   const duty = Math.max(0, N(v.dutyCycle, 0));
   const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
@@ -220,7 +220,7 @@ function useCheckpointList(
       // Fall back to inferring from physics chain
       const gammaGeo = N(u?.gammaGeo, 26);
       const deltaAA  = Math.max(1e-12, N(u?.deltaAOverA ?? u?.qSpoilingFactor, 1));
-      const gammaVdB = Math.max(1, N(u?.gammaVdB ?? u?.gammaVanDenBroeck, 2.86e5));
+      const gammaVdB = Math.max(1, N(u?.gammaVdB ?? u?.gammaVanDenBroeck, 1.4e5));
       const betaInst = Math.pow(gammaGeo, 3) * deltaAA * gammaVdB;
       const averaged = (u?.viewAvg ?? true);
       if (betaInst > 0) {
@@ -398,8 +398,8 @@ export default function WarpRenderCheckpointsPanel({
           <span className="text-white/70">γ_geo × q × γ_VdB:</span>
           <span className="font-mono">{
             parameters
-              ? `${N(parameters.gammaGeo, 26)}³ × ${N(parameters.qSpoilingFactor, 1).toFixed(2)} × ${N(parameters.gammaVanDenBroeck, 2.86e5).toExponential(1)}`
-              : `${N(snap?.gammaGeo ?? snap?.g_y, 26)}³ × ${N(snap?.deltaAOverA ?? snap?.qSpoilingFactor, 1).toFixed(2)} × ${N(snap?.gammaVdB ?? snap?.gammaVanDenBroeck, 2.86e5).toExponential(1)}`
+              ? `${N(parameters.gammaGeo, 26)}³ × ${N(parameters.qSpoilingFactor, 1).toFixed(2)} × ${N(parameters.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
+              : `${N(snap?.gammaGeo ?? snap?.g_y, 26)}³ × ${N(snap?.deltaAOverA ?? snap?.qSpoilingFactor, 1).toFixed(2)} × ${N(snap?.gammaVdB ?? snap?.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
           }</span>
         </div>
         <div className="flex justify-between">

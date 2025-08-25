@@ -295,7 +295,7 @@ useEffect(() => {
     const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
 
     // Harden gammaVdB default (match AmplificationPanel & pipeline)
-    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 2.86e5);
+    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 1.4e5);
 
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
@@ -309,7 +309,7 @@ useEffect(() => {
       gammaGeo,
       Qburst: qCavity,
       deltaAOverA: qSpoil,
-      gammaVdB: gammaVdBDefault,           // << was 3.83e1; now 2.86e5 default
+      gammaVdB: gammaVdBDefault,           // << was 3.83e1; now 1.4e5 default
 
       // Seed framing so engine has non-null axes in first frame
       axesScene: axesSceneSeed,
@@ -626,7 +626,7 @@ useEffect(() => {
         dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
         sectorCount: sectorCountResolved,
         gammaGeo: gammaGeo,
-        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 2.86e5), // unify default
+        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 1.4e5), // unify default
         qCavity: qCavity,
         qSpoilingFactor: qSpoil,
         sag_nm: num(parameters.sagDepth_nm, 16),
@@ -660,7 +660,7 @@ useEffect(() => {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5),
+          gammaVdB: num(parameters.gammaVanDenBroeck, 1.4e5),
           lightCrossing: lc,
           dutyEffectiveFR: parameters.dutyEffectiveFR
         }),

@@ -628,7 +628,7 @@ export default function HelixCore() {
       // physics amps
       gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 2.86e5),
+      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 1.4e5),
 
       // viewer niceties
       viewAvg: true,
@@ -985,7 +985,7 @@ export default function HelixCore() {
                             colorMode: "theta",         // consistent color
                             lockFraming: true,          // no auto zoom change with gain
                             // conservative in standby
-                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
                             powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
                             exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
                           }}
@@ -1010,7 +1010,7 @@ export default function HelixCore() {
                       vShip={1.0}
                       gammaGeo={pipeline?.gammaGeo ?? 26}
                       qSpoilingFactor={qSpoilUI}
-                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 2.86e5}
+                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 1.4e5}
                       dutyCycle={dutyUI_safe}
                       dutyEffectiveFR={dutyEffectiveFR_safe}  // ⬅️ ensures same averaging as REAL
                       sectors={totalSectors}      // ⬅️ use total sectors for averaging
@@ -1019,7 +1019,7 @@ export default function HelixCore() {
                       refParams={{
                         gammaGeo: 26,
                         qSpoilingFactor: 1,
-                        gammaVdB: 2.86e5,
+                        gammaVdB: 1.4e5,
                         dutyCycle: 0.14,
                         sectors: 1,
                         viewAvg: true,
@@ -1147,7 +1147,7 @@ export default function HelixCore() {
                 parityPhys={{
                   gammaGeo:        pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
                   dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
                   dutyCycle:        dutyUI_safe,           // UI duty (for display)
               }}
@@ -1155,7 +1155,7 @@ export default function HelixCore() {
                 // same as above unless you want explicit "seasoning" in SHOW
                 gammaGeo:        pipeline?.gammaGeo ?? 26,
                 qSpoilingFactor: qSpoilUI,
-                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 1.4e5),
                 dutyEffectiveFR:  dutyEffectiveFR_safe,
                 dutyCycle:        dutyUI_safe,
               }}

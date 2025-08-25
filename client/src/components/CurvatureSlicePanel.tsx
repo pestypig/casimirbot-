@@ -73,7 +73,7 @@ export default function CurvatureSlicePanel() {
   // Physics chain from pipeline (keep unity-safe minimums)
   const gammaGeo = Number.isFinite(live?.gammaGeo) ? Number(live!.gammaGeo) : 26;
   const qSpoil   = Number.isFinite(live?.qSpoilingFactor) ? Number(live!.qSpoilingFactor) : 1;
-  const gammaVdB = Math.max(1, Number.isFinite(live?.gammaVanDenBroeck) ? Number(live!.gammaVanDenBroeck) : 2.86e5);
+  const gammaVdB = Math.max(1, Number.isFinite(live?.gammaVanDenBroeck) ? Number(live!.gammaVanDenBroeck) : 1.4e5);
   const dutyUI   = Number.isFinite(live?.dutyCycle) ? Number(live!.dutyCycle) : 0.14;
 
   return (

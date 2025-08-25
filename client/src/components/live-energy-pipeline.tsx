@@ -61,7 +61,7 @@ export function LiveEnergyPipeline({
     qSpoilingFactor: Number.isFinite(P.qSpoilingFactor) ? P.qSpoilingFactor! : 1,
     qCavity:      Number.isFinite(P.qCavity) ? P.qCavity! : (qFactor ?? 1e9),
     gammaGeo:     Number.isFinite(P.gammaGeo) ? P.gammaGeo! : (gammaGeo ?? 26),
-    gammaVanDenBroeck: Number.isFinite(P.gammaVanDenBroeck) ? P.gammaVanDenBroeck! : 2.86e5,
+    gammaVanDenBroeck: Number.isFinite(P.gammaVanDenBroeck) ? P.gammaVanDenBroeck! : 1.4e5,
     modulationFreq_GHz: Number.isFinite(P.modulationFreq_GHz) ? P.modulationFreq_GHz! : 15,
     P_avg_MW:     Number.isFinite(P.P_avg) ? P.P_avg! : NaN,
     M_exotic_kg:  Number.isFinite(P.M_exotic) ? P.M_exotic! : NaN,
