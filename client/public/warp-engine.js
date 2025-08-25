@@ -690,8 +690,8 @@ class WarpEngine {
             parity:     gl.getUniformLocation(program, 'u_physicsParityMode') || gl.getUniformLocation(program, 'u_PhysicsParityMode'),
 
             // sectoring
-            sectorCount: gl.getUniformLocation(program, 'u_sectorCount') || gl.getUniformLocation(program, 'u_SectorCount'),
-            split:       gl.getUniformLocation(program, 'u_split') || gl.getUniformLocation(program, 'u_Split'),
+            sectorCount: gl.getUniformLocation(program, 'u_sectorCount'),
+            split:       gl.getUniformLocation(program, 'u_split'),
 
             // scene & hull
             axesScene: gl.getUniformLocation(program, 'u_axesScene'),

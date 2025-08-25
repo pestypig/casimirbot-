@@ -33,7 +33,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(x)?+x:d;
   const parity = !!engine?.uniforms?.physicsParityMode; // REAL=true, SHOW=false
-  const mode = String(engine?.uniforms?.currentMode ?? live?.currentMode || '').toLowerCase();
+  const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
   if (mode === 'standby') return 0;
 
   const gammaGeo = Math.max(1, N(live?.gammaGeo ?? live?.g_y, 26));
