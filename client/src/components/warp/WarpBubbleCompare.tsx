@@ -606,6 +606,7 @@ export default function WarpBubbleCompare({
   const rightRef = useRef<HTMLCanvasElement>(null);
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+  const reinitInFlight = useRef<Promise<void> | null>(null);
 
   // current UI mode key from parameters only
   const currentModeKey = ((parameters?.currentMode as ModeKey) ?? "hover") as ModeKey;
@@ -807,7 +808,13 @@ export default function WarpBubbleCompare({
     if (!mode) return;
     if (lastModeRef.current === mode) return; // no-op if same
     lastModeRef.current = mode;
-    reinitEnginesFromParams();
+
+    if (!reinitInFlight.current) {
+      reinitInFlight.current = (async () => {
+        try { await reinitEnginesFromParams(); }
+        finally { reinitInFlight.current = null; }
+      })();
+    }
   }, [parameters?.currentMode]);
 
 
