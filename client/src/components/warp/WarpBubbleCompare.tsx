@@ -934,31 +934,15 @@ export default function WarpBubbleCompare({
     const realU = toRealUniforms(snapForMode);
     const showU = toShowUniforms(snapForMode);
 
-    const realFinal = { ...realU, currentMode: snapForMode.currentMode };
-    const showFinal = { ...showU, currentMode: snapForMode.currentMode };
-
-    // Debug: log uniforms for inspection
-    console.log('🔍 UNIFORMS DEBUG:', {
-      real_thetaScale: realFinal.thetaScale,
-      show_thetaScale: showFinal.thetaScale,
-      real_gammaVdB: realFinal.gammaVdB,
-      show_gammaVdB: showFinal.gammaVdB,
-      real_viewAvg: realFinal.viewAvg,
-      show_viewAvg: showFinal.viewAvg,
-      real_sectorCount: realFinal.sectorCount,
-      show_sectorCount: showFinal.sectorCount,
-      currentMode: snapForMode.currentMode
-    });
-
-    // Guard: live tick must not overwrite θ coming from props.parameters
-    delete (realFinal as any).thetaScale;
-    delete (showFinal as any).thetaScale;
+    // Belt & suspenders: strip θ right before pushing live uniforms
+    delete (realU as any).thetaScale;
+    delete (showU as any).thetaScale;
 
     // REAL (parity)
-    pushSafe(leftEngine, realFinal);
+    pushSafe(leftEngine, realU);
 
     // SHOW (boosted)
-    pushSafe(rightEngine, showFinal);
+    pushSafe(rightEngine, showU);
     // Optional: also set display gain explicitly on the instance
     rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
 
