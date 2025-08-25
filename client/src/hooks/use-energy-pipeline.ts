@@ -85,12 +85,18 @@ export const fmtPowerUnitFromW = (watts?: number) => {
 };
 
 // Hook to get current pipeline state
-export function useEnergyPipeline() {
+export function useEnergyPipeline(options?: {
+  staleTime?: number;
+  refetchOnWindowFocus?: boolean;
+  refetchInterval?: number;
+}) {
   return useQuery({
     queryKey: ['/api/helix/pipeline'],
     queryFn: async () =>
       (await apiRequest('GET', '/api/helix/pipeline')).json(),
-    refetchInterval: 1000, // Refresh every second
+    refetchInterval: options?.refetchInterval ?? 1000, // Refresh every second
+    staleTime: options?.staleTime,
+    refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
 }
 

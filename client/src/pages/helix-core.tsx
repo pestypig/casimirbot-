@@ -316,7 +316,10 @@ export default function HelixCore() {
   }, []);
   
   // Use centralized energy pipeline
-  const { data: pipelineState } = useEnergyPipeline();
+  const { data: pipelineState } = useEnergyPipeline({
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
   const switchMode = useSwitchMode();
   
   // Type-safe access to pipeline state
@@ -329,7 +332,9 @@ export default function HelixCore() {
   // Fetch system metrics
   const { data: systemMetrics, refetch: refetchMetrics } = useQuery<SystemMetrics>({
     queryKey: ['/api/helix/metrics'],
-    refetchInterval: 5000 // Update every 5 seconds
+    refetchInterval: 5000,
+    staleTime: 4_500,
+    refetchOnWindowFocus: false,
   });
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
