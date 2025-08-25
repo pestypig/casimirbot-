@@ -818,8 +818,8 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const c = hullGeom.Lz_m / 2;  // Semi-axis Z (height/2)
   const axes: HullAxes = { a, b, c };
 
-  const nTheta = req.nTheta ?? 64;
-  const nPhi   = req.nPhi ?? 32;
+  const nTheta = Math.max(1, req.nTheta ?? 64);
+  const nPhi   = Math.max(2, req.nPhi ?? 32); // need ≥2 to avoid (nPhi-1)=0
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
   const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
