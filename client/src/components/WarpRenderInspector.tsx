@@ -559,6 +559,20 @@ export default function WarpRenderInspector(props: {
     }
   }, [showRendererType]);
 
+  // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
+  useEffect(() => {
+    if (showRendererType !== 'grid3d') return;
+    const cv = grid3dRef.current?.getCanvas?.();
+    if (!cv) return;
+    const ro = new ResizeObserver(() => {
+      if (cv.width > 0 && cv.height > 0) {
+        rightEngine.current?.forceRedraw?.();
+      }
+    });
+    ro.observe(cv);
+    return () => ro.disconnect();
+  }, [showRendererType]);
+
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || (!rightEngine.current && showRendererType !== 'grid3d')) return;
