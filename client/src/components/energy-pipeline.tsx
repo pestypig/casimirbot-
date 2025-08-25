@@ -133,8 +133,10 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                       switchMode.mutate(m, {
                         onSuccess: () => {
                           // keep page + this component in sync
-                          queryClient.invalidateQueries({ queryKey: ["/api/helix/pipeline"] });
-                          queryClient.invalidateQueries({ queryKey: ["/api/helix/metrics"] });
+                          queryClient.invalidateQueries({ predicate: q =>
+                            Array.isArray(q.queryKey) &&
+                            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                          });
                         }
                       });
                     }}

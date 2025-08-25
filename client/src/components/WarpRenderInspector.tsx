@@ -296,8 +296,10 @@ export default function WarpRenderInspector(props: {
     switchMode.mutate(m as any, {
       onSuccess: () => {
         // Refresh both pipeline and metrics to keep everything in sync
-        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+        queryClient.invalidateQueries({ predicate: q =>
+          Array.isArray(q.queryKey) &&
+          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+        });
       }
     });
   };

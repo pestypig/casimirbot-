@@ -811,8 +811,10 @@ export default function HelixCore() {
                       switchMode.mutate(m.key as any, {
                         onSuccess: () => {
                           // make both sides refresh
-                          queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-                          queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                          queryClient.invalidateQueries({ predicate: q =>
+                            Array.isArray(q.queryKey) &&
+                            (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                          });
                         }
                       });
                       refetchMetrics();
@@ -1152,8 +1154,10 @@ export default function HelixCore() {
                     switchMode.mutate(mode as any, {
                       onSuccess: () => {
                         // make both sides refresh
-                        queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-                        queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                        queryClient.invalidateQueries({ predicate: q =>
+                          Array.isArray(q.queryKey) &&
+                          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                        });
                       }
                     });
                     setMainframeLog(prev => [
@@ -1848,8 +1852,10 @@ export default function HelixCore() {
                   switchMode.mutate(mode as any, {
                     onSuccess: () => {
                       // make both sides refresh
-                      queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-                      queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+                      queryClient.invalidateQueries({ predicate: q =>
+                        Array.isArray(q.queryKey) &&
+                        (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+                      });
                     }
                   });
                   // Removed forced remount that causes black screens

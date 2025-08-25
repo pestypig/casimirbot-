@@ -108,8 +108,10 @@ export function useUpdatePipeline() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+      queryClient.invalidateQueries({ predicate: q =>
+        Array.isArray(q.queryKey) &&
+        (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+      });
     }
   });
 }
@@ -135,8 +137,10 @@ export function useSwitchMode() {
       return data;
     },
     onSuccess: (data, mode) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
+      queryClient.invalidateQueries({ predicate: q =>
+        Array.isArray(q.queryKey) &&
+        (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+      });
       
       // Let visualizers/inspectors hard-refresh
       publish("helix:pipeline:updated", { mode });
