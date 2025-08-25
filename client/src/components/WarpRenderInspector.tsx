@@ -129,6 +129,10 @@ export default function WarpRenderInspector(props: {
   const [forceAvg, setForceAvg] = useState(true);
   const [useMassGamma, setUseMassGamma] = useState(false);
 
+  // SHOW mode options
+  type ShowMode = 'ship-fr' | 'sector-fr' | 'sector-instant' | 'grid-3d';
+  const [showMode, setShowMode] = useState<ShowMode>('ship-fr');
+
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
   ), [live, props]);
@@ -377,6 +381,26 @@ export default function WarpRenderInspector(props: {
   };
   const { expected, used, delta } = reportThetaConsistency(bound);
 
+  // SHOW mode-specific parameters
+  const dutyEffectiveFR_safe = dutyEffectiveFR || 2.5e-5;
+  const effectiveMode = currentMode || 'hover';
+  const MODE_CONFIGS = {
+    hover: { localBurstFrac: 0.01 },
+    cruise: { localBurstFrac: 0.01 },
+    emergency: { localBurstFrac: 0.01 },
+    standby: { localBurstFrac: 0 }
+  };
+  
+  const showDuty = (showMode === 'sector-instant')
+    ? Math.max(dutyEffectiveFR_safe, MODE_CONFIGS[effectiveMode]?.localBurstFrac || 0.01)
+    : dutyEffectiveFR_safe;
+
+  const showSectors = (showMode.startsWith('sector-')) ? 1 : sConcurrent;
+
+  const showStencil = (showMode.startsWith('sector-'))
+    ? { maskCenter: (props.lightCrossing?.sectorIdx ?? 0), maskWidth: 1 }
+    : undefined;
+
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
@@ -433,8 +457,17 @@ export default function WarpRenderInspector(props: {
     // REAL engine - physics truth
     gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
     
-    // SHOW engine - enhanced visuals  
-    gatedUpdateUniforms(rightEngine.current, { ...shared, physicsParityMode: false }, 'inspector-show');
+    // SHOW engine - enhanced visuals with mode-specific overrides
+    const showUniforms = {
+      ...shared,
+      physicsParityMode: false,
+      // Apply SHOW mode overrides
+      dutyEffectiveFR: showDuty,
+      sectors: showSectors,
+      viewAvg: showMode !== 'sector-instant', // instant = no FR averaging
+      ...(showStencil && { sectorMask: showStencil })
+    };
+    gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
@@ -449,7 +482,7 @@ export default function WarpRenderInspector(props: {
       // Report theta consistency after engine updates
       reportThetaConsistency(bound);
     }, 100);
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms, showMode, showDuty, showSectors, showStencil]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
@@ -608,6 +641,15 @@ export default function WarpRenderInspector(props: {
               use calibrated γ_VdB (for test)
             </label>
           </fieldset>
+          <fieldset className="text-xs mt-2 pt-2 border-t border-blue-300">
+            <label className="text-blue-400 mb-2 block">SHOW Mode:</label>
+            <select value={showMode} onChange={e=>setShowMode(e.target.value as ShowMode)} className="border rounded px-2 py-1 text-xs bg-slate-800 text-blue-300">
+              <option value="ship-fr">Ship FR (default)</option>
+              <option value="sector-fr">Single Sector FR</option>
+              <option value="sector-instant">Single Sector Instant</option>
+              <option value="grid-3d">Grid 3D</option>
+            </select>
+          </fieldset>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -624,6 +666,7 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
+            <div className="text-blue-400">SHOW mode: {showMode} | duty: {(showDuty * 100).toExponential(2)}% | sectors: {showSectors}</div>
           </div>
           <button
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
