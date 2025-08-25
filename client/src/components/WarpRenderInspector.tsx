@@ -127,6 +127,7 @@ export default function WarpRenderInspector(props: {
   const [lockTone, setLockTone] = useState(true);
   const [lockRidge, setLockRidge] = useState(true);
   const [forceAvg, setForceAvg] = useState(true);
+  const [useMassGamma, setUseMassGamma] = useState(false);
 
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
@@ -336,6 +337,11 @@ export default function WarpRenderInspector(props: {
   // FR duty for both engines - let them derive thetaScale internally
   const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
 
+  // Debug toggle: choose between mass-calibrated vs visual-only γ_VdB (outside useEffect for display access)
+  const gammaVdB_vis = N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11);
+  const gammaVdB_mass = N(live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck, 1e11);
+  const gammaVdBBound = useMassGamma ? gammaVdB_mass : gammaVdB_vis;
+
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
@@ -355,8 +361,8 @@ export default function WarpRenderInspector(props: {
     const shared = {
       gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
       qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-      // Use visual-only γ_VdB to keep mass calibration away from renderer
-      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 0),
+      // Use debug-controlled γ_VdB to prove physics separation
+      gammaVanDenBroeck: gammaVdBBound,
       dutyEffectiveFR,            // 0.01 × (1/400) here  
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
@@ -396,7 +402,7 @@ export default function WarpRenderInspector(props: {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
     }, 100);
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
@@ -549,6 +555,12 @@ export default function WarpRenderInspector(props: {
               Force FR-avg
             </label>
           </fieldset>
+          <fieldset className="text-xs mt-2 pt-2 border-t border-red-300">
+            <label className="flex items-center gap-2 text-red-400">
+              <input type="checkbox" checked={useMassGamma} onChange={e=>setUseMassGamma(e.target.checked)} />
+              use calibrated γ_VdB (for test)
+            </label>
+          </fieldset>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -559,6 +571,13 @@ export default function WarpRenderInspector(props: {
 
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Live Engine Snapshot</h4>
+          {/* θ-scale verification display */}
+          <div className="text-xs text-neutral-600 mb-3 space-y-1">
+            <div>θ-scale expected: {((live as any)?.thetaScaleExpected ?? 0).toExponential(2)}</div>
+            <div>γ_geo³ × q × γ_VdB(vis): {(Math.pow(N(live?.gammaGeo, 26), 3) * N(live?.qSpoilingFactor, 1) * (N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11))).toExponential(2)}</div>
+            <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
+            <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
+          </div>
           <button
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
             onClick={() => {
