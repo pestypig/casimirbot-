@@ -1,10 +1,16 @@
 ;(() => {
   // Prevent duplicate loads (HMR, script re-inject, etc.)
-  if (globalThis.__WARP_ENGINE_LOADED__) {
-    console.warn('[warp-engine] duplicate load detected — skipping body');
+  const BUILD = globalThis.__APP_WARP_BUILD || 'dev';
+  // Only skip if we've *already* executed this exact build.
+  if (globalThis.__WARP_ENGINE_LOADED__ === BUILD) {
+    console.warn('[warp-engine] duplicate load detected — same build; skipping body');
     return;
   }
-  globalThis.__WARP_ENGINE_LOADED__ = true;
+  // Mark which build is loaded
+  globalThis.__WARP_ENGINE_LOADED__ = BUILD;
+  globalThis.WarpEngine = globalThis.WarpEngine || {};
+  globalThis.WarpEngine.BUILD = BUILD;
+  globalThis.__WarpEngineBuild = BUILD;
 
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
@@ -1989,13 +1995,12 @@ class WarpEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
+    globalThis.WarpEngine = globalThis.WarpEngine || {};
     globalThis.WarpEngine = WarpEngine;
     console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
 }
 
-// Stamp a build token so the loader can compare
-globalThis.WarpEngine.BUILD = globalThis.__APP_WARP_BUILD || 'dev';
-globalThis.__WarpEngineBuild = globalThis.WarpEngine.BUILD;
+// Build token already stamped in guard section above
 
 // ---------------------------------------------------------------------------
 // Helper init: one viewer in TRUTH mode, one in COSMETIC mode
