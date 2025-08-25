@@ -398,8 +398,10 @@ export default function WarpRenderInspector(props: {
         rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
       }
       
-      try { leftEngine.current?.destroy(); } catch {}
-      try { rightEngine.current?.destroy(); } catch {}
+      try { if (leftOwnedRef.current)  leftEngine.current?.destroy(); } catch {}
+      try { if (rightOwnedRef.current) rightEngine.current?.destroy(); } catch {}
+      leftOwnedRef.current = false;
+      rightOwnedRef.current = false;
       leftEngine.current = null as any;
       rightEngine.current = null as any;
 
@@ -413,7 +415,7 @@ export default function WarpRenderInspector(props: {
         } catch {}
       }
       
-      if (rightRef.current) {
+      if (rightRef.current && rightOwnedRef.current) {
         try {
           if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
             (rightRef.current as any)[ENGINE_KEY].destroy?.();
