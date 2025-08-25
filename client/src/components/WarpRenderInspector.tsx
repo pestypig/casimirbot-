@@ -363,9 +363,27 @@ export default function WarpRenderInspector(props: {
     const off = add(({ sectorCount, currentSector, split }: any) => {
       const s = Math.max(1, sectorCount|0);
       const sp = Number.isFinite(split) ? (split|0) : (currentSector|0);
-      const payload = { sectors: s, split: Math.max(0, Math.min(s - 1, sp)) };
-      pushUniformsWhenReady(leftEngine.current,  payload);
-      pushUniformsWhenReady(rightEngine.current, payload);
+
+      // Only broadcast TOTAL & split. Leave "sectors" (concurrent) alone.
+      const payload = { sectorCount: s, split: Math.max(0, sp) };
+
+      // Recompute FR using *current* concurrent sectors of each pane
+      const sConcL = Math.max(1, leftEngine.current?.uniforms?.sectors ?? 1);
+      const sConcR = Math.max(1, rightEngine.current?.uniforms?.sectors ?? 1);
+      const dutyLocal = 0.01; // or from lightCrossing
+      const dutyFR_REAL = dutyLocal * (sConcL / s);
+      const dutyUI_SHOW = dutyLocal * (1 / s);
+
+      pushUniformsWhenReady(leftEngine.current,  {
+        ...payload,
+        physicsParityMode: true,
+        dutyEffectiveFR: dutyFR_REAL,
+      });
+      pushUniformsWhenReady(rightEngine.current, {
+        ...payload,
+        physicsParityMode: false,
+        dutyEffectiveFR: dutyUI_SHOW,
+      });
     });
     return () => { try { off?.(); } catch {} };
   }, []);
