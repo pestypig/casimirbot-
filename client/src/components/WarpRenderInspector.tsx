@@ -257,6 +257,7 @@ export default function WarpRenderInspector(props: {
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
       leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
       // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+      gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       leftEngine.current?.setVisible?.(false);
     }
     if (rightRef.current && !rightEngine.current) {
@@ -265,6 +266,7 @@ export default function WarpRenderInspector(props: {
       rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
       rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
       // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       rightEngine.current?.setVisible?.(false);
     }
 
@@ -483,6 +485,7 @@ export default function WarpRenderInspector(props: {
       rightEngine.current = eng;
       (rightRef as any).current = cvs;
       // Mute Grid3D engine until canonical uniforms arrive
+      gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
       eng.setVisible?.(false);
       
       // Block stray thetaScale writes for Grid3D engine
@@ -562,6 +565,10 @@ export default function WarpRenderInspector(props: {
       viewMassFraction: 1.0
     });
     gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
+    
+    // Unmute engines after first normalized payloads are pushed
+    leftEngine.current?.setVisible?.(true);
+    rightEngine.current?.setVisible?.(true);
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
