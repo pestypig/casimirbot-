@@ -135,6 +135,16 @@ const fmtPowerUnit = (mw?: number) => {
   return `${(x * 1e6).toFixed(1)} W`;
 };
 
+// add with your other small utils
+const npos = (x: unknown, d = 0) => {
+  const v = Number(x);
+  return Number.isFinite(v) && v > 0 ? v : d;
+};
+const nnonneg = (x: unknown, d = 0) => {
+  const v = Number(x);
+  return Number.isFinite(v) && v >= 0 ? v : d;
+};
+
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -409,10 +419,24 @@ export default function HelixCore() {
   
   // Split sector handling: total sectors (400) for averaging vs concurrent sectors (1-2) for strobing
   const totalSectors = useMemo(() => {
-    return Number.isFinite(systemMetrics?.totalSectors)
-      ? Math.max(1, Math.floor(systemMetrics!.totalSectors!))
-      : 400;
+    const s = npos(systemMetrics?.totalSectors, 400);
+    return Math.max(1, Math.floor(s));
   }, [systemMetrics?.totalSectors]);
+
+  // Total tiles (prefer metrics, then pipeline, then a sane fallback)
+  const totalTilesSafe = useMemo(() => {
+    const a = npos(systemMetrics?.totalTiles, 0);
+    const b = npos(pipeline?.N_tiles, 0);
+    // use the first positive source, else fall back to your UI default
+    return a || b || 2_800_000;
+  }, [systemMetrics?.totalTiles, pipeline?.N_tiles]);
+
+  // Tiles per sector (prefer metrics; else derive from totalTiles/totalSectors)
+  const tilesPerSectorSafe = useMemo(() => {
+    const fromMetrics = npos(systemMetrics?.tilesPerSector, 0);
+    if (fromMetrics) return Math.floor(fromMetrics);
+    return Math.max(1, Math.floor(totalTilesSafe / Math.max(1, totalSectors)));
+  }, [systemMetrics?.tilesPerSector, totalTilesSafe, totalSectors]);
 
   // Keep the trail array sized to totalSectors
   useEffect(() => {
@@ -476,13 +500,13 @@ export default function HelixCore() {
 
   // Use the compact hook for active tiles computation
   const activeTiles = useActiveTiles({
-    totalTiles: systemMetrics?.totalTiles ?? pipeline?.N_tiles,
+    totalTiles: totalTilesSafe,
     totalSectors,
     concurrentSectors,
-    dutyEffectiveFR_safe,
-    tilesPerSector: systemMetrics?.tilesPerSector,
+    dutyEffectiveFR_safe: nnonneg(dutyEffectiveFR_safe, 0),
+    tilesPerSector: tilesPerSectorSafe,
     lc,
-    serverActiveTiles: systemMetrics?.activeTiles,
+    serverActiveTiles: nnonneg(systemMetrics?.activeTiles, NaN),
   });
 
   // Removed mode version tracking to prevent forced remounts that cause black screens
