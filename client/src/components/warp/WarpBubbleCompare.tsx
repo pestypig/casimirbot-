@@ -1103,18 +1103,20 @@ export default function WarpBubbleCompare({
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
-        <canvas 
-          ref={leftRef} 
-          className="w-full h-[calc(100%-32px)] block" 
-          style={{ background: '#111', display: 'block' }} 
+        <canvas
+          key={`left-${parameters?.currentMode || 'unk'}`}
+          ref={leftRef}
+          className="w-full h-[calc(100%-32px)] block"
+          style={{ background: '#111', display: 'block' }}
         />
       </div>
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{showPanelTitle}</div>
-        <canvas 
-          ref={rightRef} 
-          className="w-full h-[calc(100%-32px)] block" 
-          style={{ background: '#111', display: 'block' }} 
+        <canvas
+          key={`right-${parameters?.currentMode || 'unk'}`}
+          ref={rightRef}
+          className="w-full h-[calc(100%-32px)] block"
+          style={{ background: '#111', display: 'block' }}
         />
       </div>
     </div>
