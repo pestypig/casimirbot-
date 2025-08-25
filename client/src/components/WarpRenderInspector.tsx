@@ -256,12 +256,18 @@ export default function WarpRenderInspector(props: {
       leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
       leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
+      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+      leftEngine.current?.setVisible?.(false);
+      gatedUpdateUniforms(leftEngine.current, { thetaScale: 0 }, 'init-mute');
     }
     if (rightRef.current && !rightEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
       rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
       rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
+      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+      rightEngine.current?.setVisible?.(false);
+      gatedUpdateUniforms(rightEngine.current, { thetaScale: 0 }, 'init-mute');
     }
 
     // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
@@ -298,10 +304,20 @@ export default function WarpRenderInspector(props: {
       if (rightEngine.current) {
         applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
       }
+      
+      // Unmute engines when canonical uniforms arrive
+      leftEngine.current?.setVisible?.(true);
+      rightEngine.current?.setVisible?.(true);
+      // Also unmute Grid3D engine if active
+      if (showRendererType === 'grid3d') {
+        grid3dRef.current?.getEngine()?.setVisible?.(true);
+      }
     });
 
     // Keep engines muted until first canonical uniforms arrive
     if (!haveUniforms) {
+      leftEngine.current?.setVisible?.(false);
+      rightEngine.current?.setVisible?.(false);
       if (leftEngine.current) {
         leftEngine.current.updateUniforms?.({
           thetaScale: 0, 
@@ -452,6 +468,9 @@ export default function WarpRenderInspector(props: {
     if (eng && cvs) {
       rightEngine.current = eng;
       (rightRef as any).current = cvs;
+      // Mute Grid3D engine until canonical uniforms arrive
+      eng.setVisible?.(false);
+      gatedUpdateUniforms(eng, { thetaScale: 0 }, 'grid3d-init-mute');
     }
   }, [showRendererType]);
 
