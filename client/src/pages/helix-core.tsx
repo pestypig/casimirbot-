@@ -1214,6 +1214,8 @@ export default function HelixCore() {
               }}
               // ✅ give the inspector the actual window so it can compute duty_local
               lightCrossing={{ burst_ms: lc.burst_ms, dwell_ms: lc.dwell_ms }}
+              realRenderer="slice2d"
+              showRenderer="grid3d"
             />
             </Suspense>
           </CardContent>

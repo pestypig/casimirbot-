@@ -4,6 +4,7 @@ import CurvaturePhysicsPanel from "@/components/CurvaturePhysicsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import Grid3DEngine from "@/components/engines/Grid3DEngine";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
@@ -95,11 +96,17 @@ export default function WarpRenderInspector(props: {
   showPhys?: Record<string, any>;
   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
+  realRenderer?: 'slice2d' | 'grid3d'; // REAL engine type (default: slice2d)
+  showRenderer?: 'slice2d' | 'grid3d'; // SHOW engine type (default: grid3d)
 }){
   const leftRef = useRef<HTMLCanvasElement>(null);   // REAL
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+  
+  // Renderer type configuration
+  const realRendererType = props.realRenderer || 'slice2d';
+  const showRendererType = props.showRenderer || 'grid3d';
   const [haveUniforms, setHaveUniforms] = useState(false);
 
   // Live energy pipeline data for diagnostics
@@ -538,20 +545,36 @@ export default function WarpRenderInspector(props: {
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman)</h3>
+            <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) ({realRendererType})</h3>
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={leftRef} className="w-full h-full block"/>
+            {realRendererType === 'grid3d' ? (
+              <Grid3DEngine 
+                uniforms={shared} 
+                className="w-full h-full block" 
+                style={{background: 'black'}} 
+              />
+            ) : (
+              <canvas ref={leftRef} className="w-full h-full block"/>
+            )}
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">SHOW — Boosted (UI)</h3>
+            <h3 className="text-sm font-semibold">SHOW — Boosted (UI) ({showRendererType})</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={rightRef} className="w-full h-full block"/>
+            {showRendererType === 'grid3d' ? (
+              <Grid3DEngine 
+                uniforms={{...shared, exposure: tonemapExp, zeroStop, ridgeMode: ridgeModeUsed, viewAvg: viewAvgUsed}} 
+                className="w-full h-full block" 
+                style={{background: 'black'}} 
+              />
+            ) : (
+              <canvas ref={rightRef} className="w-full h-full block"/>
+            )}
           </div>
         </article>
       </section>
