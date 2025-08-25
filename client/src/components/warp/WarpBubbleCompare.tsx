@@ -785,7 +785,8 @@ export default function WarpBubbleCompare({
     pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true });
     pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true });
 
-    // 6) Re-broadcast strobing from the LC loop carried in parameters
+    // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
+    ensureStrobeMux();
     const lc = parameters.lightCrossing;
     if (lc) {
       const total = Math.max(1, Number(parameters.sectorCount) || 1);
