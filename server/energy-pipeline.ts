@@ -486,6 +486,24 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   // Mass calibration readout
   state.massCalibration = state.gammaVanDenBroeck / GAMMA_VDB;
   
+  // Split γ_VdB into visual vs mass knobs to keep calibrator away from renderer
+  (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // ← calibrated value used to hit M_target
+  (state as any).gammaVanDenBroeck_vis  = GAMMA_VDB;                 // ← fixed "physics/visual" seed for renderer
+  
+  // Make visual factor mode-invariant (except standby)
+  if (state.currentMode !== 'standby') {
+    (state as any).gammaVanDenBroeck_vis = GAMMA_VDB; // constant across modes
+  } else {
+    (state as any).gammaVanDenBroeck_vis = 1; // keep standby dark
+  }
+  
+  // Precomputed physics-only θ gain for client verification
+  (state as any).thetaScaleExpected = 
+    Math.pow(state.gammaGeo, 3) *
+    (state.qSpoilingFactor ?? 1) *
+    ((state as any).gammaVanDenBroeck_vis ?? GAMMA_VDB) *
+    (state.dutyEffective_FR ?? d_eff);
+  
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
   
@@ -837,6 +855,9 @@ export async function computeEnergySnapshot(sim: any) {
     // Amplification parameters 
     gammaGeo: result.gammaGeo,
     gammaVanDenBroeck: result.gammaVanDenBroeck,
+    gammaVanDenBroeck_vis: (result as any).gammaVanDenBroeck_vis,
+    gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
+    thetaScaleExpected: (result as any).thetaScaleExpected,
     qCavity: result.qCavity,
     qSpoilingFactor: result.qSpoilingFactor,
 

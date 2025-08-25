@@ -6,11 +6,14 @@
 export type WarpUniforms = {
   gammaGeo: number;
   qSpoilingFactor: number;
-  gammaVanDenBroeck: number;
+  gammaVanDenBroeck: number;    // visual-only version for rendering
+  gammaVanDenBroeck_vis?: number;  // explicit visual version
+  gammaVanDenBroeck_mass?: number; // mass-calibrated version
   dutyEffectiveFR: number;
   sectorCount: number;
   sectors: number;
   thetaScale?: number;         // optional precomputed (server)
+  thetaScaleExpected?: number; // server verification value
   colorMode?: 'theta'|'rho';
   physicsParityMode?: boolean;
   ridgeMode?: number;
@@ -54,10 +57,12 @@ export function applyToEngine(
   }
 
   // Canonical θ if server didn't precompute
+  // Use visual-only γ_VdB to keep mass calibration away from theta calculations
+  const gammaVdB_vis = uniforms.gammaVanDenBroeck_vis ?? uniforms.gammaVanDenBroeck;
   const θ = uniforms.thetaScale ?? (
     Math.pow(uniforms.gammaGeo, 3) *
     uniforms.qSpoilingFactor *
-    uniforms.gammaVanDenBroeck *
+    gammaVdB_vis *
     uniforms.dutyEffectiveFR
   );
 
@@ -78,7 +83,8 @@ export function applyToEngine(
     terms: {
       γ_geo: uniforms.gammaGeo,
       q: uniforms.qSpoilingFactor,
-      γ_VdB: uniforms.gammaVanDenBroeck,
+      γ_VdB: gammaVdB_vis,  // use visual version for debug display
+      γ_VdB_mass: uniforms.gammaVanDenBroeck_mass, // also show mass version  
       d_FR: uniforms.dutyEffectiveFR,
       sectors: { total: uniforms.sectorCount, live: uniforms.sectors }
     }

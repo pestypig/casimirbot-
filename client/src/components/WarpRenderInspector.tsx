@@ -344,7 +344,7 @@ export default function WarpRenderInspector(props: {
     const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
     const autoZero = N(props.parityPhys?.zeroStop ?? live?.zeroStop, 1e-7);
     const autoRidge = N(props.parityPhys?.ridgeMode ?? ridgeMode, 0);
-    const autoAvg = N(props.parityPhys?.viewAvg ?? true, true);
+    const autoAvg = props.parityPhys?.viewAvg ?? true;
 
     const tonemapExp = lockTone ? 5.0 : autoExp;
     const zeroStop = lockTone ? 1e-7 : autoZero;
@@ -355,7 +355,8 @@ export default function WarpRenderInspector(props: {
     const shared = {
       gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
       qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck, 0),
+      // Use visual-only γ_VdB to keep mass calibration away from renderer
+      gammaVanDenBroeck: N(props.parityPhys?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 0),
       dutyEffectiveFR,            // 0.01 × (1/400) here  
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400

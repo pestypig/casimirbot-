@@ -22,7 +22,9 @@ export interface EnergyPipelineState {
   dutyShip: number;
   sectorCount: number;
   gammaGeo: number;
-  gammaVanDenBroeck: number;
+  gammaVanDenBroeck: number;  // mass-calibrated version
+  gammaVanDenBroeck_vis?: number;  // visual-only version (physics seed)
+  gammaVanDenBroeck_mass?: number; // mass calibration version
   qCavity: number;
   qSpoilingFactor: number;
   currentMode: string;
@@ -30,6 +32,7 @@ export interface EnergyPipelineState {
   
   // Optional for fallbacks
   dutyEffective_FR?: number;
+  thetaScaleExpected?: number;  // precomputed server value for verification
 }
 
 /**
@@ -59,9 +62,10 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   const split   = Math.floor(sectors / 2); // canonical (+/–) split
 
   // --- Physics amplitude chain (renderer consumes this as u_thetaScale) ---
-  // Include qSpoilingFactor in theta calculation for mode differences
+  // Include qSpoilingFactor in theta calculation for mode differences  
+  // Use visual-only γ_VdB to keep mass calibration away from renderer
   const gammaGeo = Math.max(1, s.gammaGeo ?? 26);
-  const gammaVdB = Math.max(0, s.gammaVanDenBroeck ?? 0);
+  const gammaVdB = Math.max(0, s.gammaVanDenBroeck_vis ?? s.gammaVanDenBroeck ?? 0);
   const qSpoil = Math.max(1e-12, s.qSpoilingFactor ?? 1);
   const thetaScale =
     Math.pow(gammaGeo, 3) *
