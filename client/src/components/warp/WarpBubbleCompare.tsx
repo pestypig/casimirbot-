@@ -12,11 +12,30 @@ const CM = { solid: 0, theta: 1, shear: 2 };
 const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
 
 // Engine mounting helper functions
+const getBuild = () =>
+  (typeof window !== 'undefined' && (window as any).__APP_WARP_BUILD) || 'dev';
+
 const ensureScript = () =>
-  new Promise<void>((resolve, reject) => {
-    if ((window as any).WarpEngine) return resolve();
+  new Promise<void>(async (resolve, reject) => {
+    const w: any = window;
+    const required = getBuild();
+    const current  = w.WarpEngine?.BUILD || w.__WarpEngineBuild;
+    const mismatch = !!(current && required && current !== required);
+
+    if (w.WarpEngine && !mismatch) return resolve();
+
+    // Clean old script tags if we're upgrading
+    Array.from(document.querySelectorAll('script[src*="warp-engine.js"]'))
+      .forEach(n => n.parentNode?.removeChild(n));
+
+    // Also clear "loaded" marker so the new file runs
+    w.__WARP_ENGINE_LOADED__ = undefined;
+
+    const src = `/warp-engine.js?v=${encodeURIComponent(required)}`;
     const s = document.createElement('script');
-    s.src = '/warp-engine.js'; s.defer = true; s.onload = () => resolve(); s.onerror = reject;
+    s.src = src; s.defer = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
     document.head.appendChild(s);
   });
 
