@@ -1,6 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState, startTransition} from "react";
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
-import CurvaturePhysicsPanel from "@/components/CurvaturePhysicsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
@@ -126,10 +125,11 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     setMode(currentMode);
   }, [currentMode]);
-  const [ridgeMode, setRidgeMode] = useState<0|1>(1); // 0=physics df, 1=single crest
-  const [colorMode, setColorMode] = useState<'theta'|'shear'|'solid'>('theta');
-  const [userGain, setUserGain] = useState(1);
-  const [decades, setDecades] = useState(0.6 * 8); // UI slider 0..8 → 0..1
+  // Defaults for visual controls (no UI needed)
+  const ridgeMode = 1; // single crest
+  const colorMode = 'theta'; // diverging colors
+  const userGain = 1;
+  const decades = 0.6 * 8;
 
   // Debug toggles (React state)
   const [lockTone, setLockTone] = useState(true);
@@ -655,39 +655,10 @@ export default function WarpRenderInspector(props: {
         </article>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">Visual Controls</h4>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm">Color</label>
-            <select value={colorMode} onChange={e=>setColorMode(e.target.value as any)} className="border rounded px-2 py-1 text-sm">
-              <option value="theta">theta (diverging)</option>
-              <option value="shear">shear (teal→lime)</option>
-              <option value="solid">solid</option>
-            </select>
-          </div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm">Ridge</label>
-            <select value={ridgeMode} onChange={e=>setRidgeMode(Number(e.target.value) as 0|1)} className="border rounded px-2 py-1 text-sm">
-              <option value={0}>0 — physics df (double-lobe)</option>
-              <option value={1}>1 — single crest at ρ=1</option>
-            </select>
-          </div>
-          <div className="mb-2">
-            <label className="text-sm">Decades blend (T) — SHOW</label>
-            <input type="range" min={0} max={8} step={0.01} value={decades}
-              onChange={e=>setDecades(Number(e.target.value))} className="w-full"/>
-            <div className="text-xs text-neutral-500">T={(decades/8).toFixed(2)} • boost≤40</div>
-          </div>
-          <div className="mb-2">
-            <label className="text-sm">User Gain (SHOW)</label>
-            <input type="range" min={1} max={64} step={0.1} value={userGain}
-              onChange={e=>setUserGain(Number(e.target.value))} className="w-full"/>
-            <div className="text-xs text-neutral-500">{userGain.toFixed(2)}×</div>
-          </div>
-
-          {/* Debug toggles */}
-          <fieldset className="flex gap-3 text-xs mt-3 pt-3 border-t">
+          <h4 className="font-medium mb-3">Debug Toggles</h4>
+          <fieldset className="flex gap-3 text-xs">
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={lockTone} onChange={e=>setLockTone(e.target.checked)} />
               Lock tonemap
@@ -707,12 +678,6 @@ export default function WarpRenderInspector(props: {
               use calibrated γ_VdB (for test)
             </label>
           </fieldset>
-        </div>
-
-        <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">Strobing</h4>
-          <div className="text-sm text-neutral-600 mb-2">Use your existing strobing emitter; this panel listens and forwards to both engines.</div>
-          <div className="text-xs text-neutral-500">Tip: in DevTools → `window.setStrobingState({'{'}sectorCount:6,currentSector:2{'}'});`</div>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -761,20 +726,7 @@ export default function WarpRenderInspector(props: {
         }}
       />
 
-      {/* Physics equation panel showing REAL-pane calculation chain */}
-      <CurvaturePhysicsPanel
-        lightCrossing={{
-          burst_ms: (live as any)?.burst_ms,
-          dwell_ms: (live as any)?.dwell_ms,
-        }}
-        totalSectors={sTotal}
-        leftEngineRef={leftEngine}
-        gammaGeo={(live as any)?.gammaGeo}
-        gammaVdB={(live as any)?.gammaVanDenBroeck}
-        qSpoilingFactor={(live as any)?.qSpoilingFactor}
-        dutyEffectiveFR={(live as any)?.dutyFR}
-        className="mt-4"
-      />
+      {/* Visual controls removed - using hardcoded defaults */}
     </div>
   );
 }
