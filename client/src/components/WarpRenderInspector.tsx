@@ -342,6 +342,41 @@ export default function WarpRenderInspector(props: {
   const gammaVdB_mass = N(live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck, 1e11);
   const gammaVdBBound = useMassGamma ? gammaVdB_mass : gammaVdB_vis;
 
+  // Theta consistency helper functions
+  function thetaGainExpected({
+    gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR
+  }: {gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number}) {
+    return Math.pow(Number(gammaGeo)||0, 3)
+         * (Number(qSpoilingFactor)||1)
+         * (Number(gammaVdB)||1)
+         * (Number(dutyEffectiveFR)||0);
+  }
+
+  function pctDelta(a:number, b:number){
+    if (!isFinite(a) || !isFinite(b) || b === 0) return NaN;
+    return (a/b - 1) * 100;
+  }
+
+  function reportThetaConsistency(bound:{
+    gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number;
+  }) {
+    const expected = thetaGainExpected(bound);
+    const used = thetaGainExpected(bound);
+    const delta = pctDelta(used, expected);
+    const msg = `θ-scale — used=${used.toExponential(3)} • expected=${expected.toExponential(3)} • Δ=${isFinite(delta)?delta.toFixed(1):'—'}%`;
+    console.log(`[HELIX][θ] ${msg}`);
+    return { expected, used, delta };
+  }
+
+  // Bound parameters for theta consistency check
+  const bound = {
+    gammaGeo: N(live?.gammaGeo, 26),
+    qSpoilingFactor: N(live?.qSpoilingFactor, 1),
+    gammaVdB: gammaVdBBound,
+    dutyEffectiveFR: dutyEffectiveFR
+  };
+  const { expected, used, delta } = reportThetaConsistency(bound);
+
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
@@ -411,6 +446,8 @@ export default function WarpRenderInspector(props: {
     setTimeout(() => {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
+      // Report theta consistency after engine updates
+      reportThetaConsistency(bound);
     }, 100);
   }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
@@ -584,7 +621,7 @@ export default function WarpRenderInspector(props: {
           {/* θ-scale verification display */}
           <div className="text-xs text-neutral-600 mb-3 space-y-1">
             <div>θ-scale expected: {((live as any)?.thetaScaleExpected ?? 0).toExponential(2)}</div>
-            <div>γ_geo³ × q × γ_VdB(vis): {(Math.pow(N(live?.gammaGeo, 26), 3) * N(live?.qSpoilingFactor, 1) * (N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11))).toExponential(2)}</div>
+            <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
           </div>
