@@ -24,10 +24,14 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 // Push only after shaders are ready
 function pushUniformsWhenReady(engine: any, patch: Record<string, any>) {
   if (!engine) return;
+  const push = () => engine.updateUniforms?.(patch);
   if (engine.isLoaded && engine.gridProgram) {
-    engine.updateUniforms(patch);
+    push();
+  } else if (typeof engine.onceReady === "function") {
+    engine.onceReady(push);
   } else {
-    engine.onceReady(() => engine.updateUniforms(patch));
+    // Fallback for engines that load synchronously or lack onceReady
+    queueMicrotask(() => { if (!engine._destroyed) push(); });
   }
 }
 
