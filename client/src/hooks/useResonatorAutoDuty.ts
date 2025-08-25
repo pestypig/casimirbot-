@@ -34,6 +34,7 @@ export function useResonatorAutoDuty({
 
         onLog?.(`[SCHED] ${cmd} (mode=${mode}, duty=${(duty*100).toFixed(2)}%, S=${sectors}, f=${freqGHz.toFixed(3)} GHz)`);
 
+        // AbortController not available in this context, but signal could be passed if needed
         const res = await apiRequest('POST', '/api/helix/command', {
           messages: [{ role: 'user', content: cmd }]
         });

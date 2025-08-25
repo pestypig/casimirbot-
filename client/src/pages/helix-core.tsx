@@ -30,8 +30,9 @@ const formatPower = (P_MW?: number, P_W?: number) => {
   return "—";
 };
 
-const buildLiveDesc = (snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number }, cfg?: { powerTarget_W?: number }) => {
-  const P = formatPower(snap?.P_avg_MW, cfg?.powerTarget_W);
+const buildLiveDesc = (snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number }, cfg?: { powerTarget_W?: number }, pipelineTargetW?: number) => {
+  const targetW = pipelineTargetW ?? cfg?.powerTarget_W;
+  const P = formatPower(snap?.P_avg_MW, targetW);
   const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
   const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
   return `${P} • ${M} • ${Z}`;
@@ -237,6 +238,7 @@ export default function HelixCore() {
     }
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const commandAbortRef = useRef<AbortController | null>(null);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const [visualizersInitialized, setVisualizersInitialized] = useState(false);
@@ -578,6 +580,12 @@ export default function HelixCore() {
   const sendCommand = React.useCallback(async () => {
     if (!commandInput.trim() || isProcessing) return;
     
+    // Abort any previous command
+    if (commandAbortRef.current) {
+      commandAbortRef.current.abort();
+    }
+    commandAbortRef.current = new AbortController();
+    
     const userMessage: ChatMessage = {
       role: 'user',
       content: commandInput,
@@ -598,7 +606,7 @@ export default function HelixCore() {
           content: commandInput,
           timestamp: new Date()
         }])
-      });
+      }, commandAbortRef.current.signal);
       
       const responseData = await response.json();
       
@@ -717,9 +725,15 @@ export default function HelixCore() {
         };
         setChatMessages(prev => [...prev, userMessage]);
         
+        // Abort any previous command
+        if (commandAbortRef.current) {
+          commandAbortRef.current.abort();
+        }
+        commandAbortRef.current = new AbortController();
+        
         const response = await apiRequest('POST', '/api/helix/command', {
           messages: chatMessages.concat({ role: 'user', content: command })
-        });
+        }, commandAbortRef.current.signal);
         
         const responseData = await response.json();
         const assistantMessage: ChatMessage = {
@@ -1167,7 +1181,7 @@ export default function HelixCore() {
                         const currentModeKey: ModeKey = (pipeline?.currentMode as ModeKey) || "hover";
                         const currentCfg = MODE_CONFIGS[currentModeKey];
                         const currentSnap = { P_avg_MW: pipeline?.P_avg, M_exotic_kg: pipeline?.M_exotic, zeta: pipeline?.zeta };
-                        const currentTitle = buildLiveDesc(currentSnap, currentCfg);
+                        const currentTitle = buildLiveDesc(currentSnap, currentCfg, pipeline?.P_target_W);
                         return (
                           <div className="flex flex-col">
                             <span className="font-medium">{currentCfg?.name ?? currentModeKey}</span>
@@ -1183,7 +1197,7 @@ export default function HelixCore() {
                         <div className="flex flex-col">
                           <span className={`font-medium ${cfg.color}`}>{cfg?.name ?? key}</span>
                           <span className="text-xs text-muted-foreground">
-                            {buildLiveDesc(snap, cfg)}
+                            {buildLiveDesc(snap, cfg, pipeline?.P_target_W)}
                           </span>
                         </div>
                       </SelectItem>
@@ -1197,7 +1211,7 @@ export default function HelixCore() {
 
               {/* Active Tiles Panel with helper strings */}
               {(() => {
-                const frPctLabel = Number.isFinite(dutyEffectiveFR_safe) ? ` (${(dutyEffectiveFR_safe * 100).toExponential(2)}%)` : '';
+                const frPctLabel = Number.isFinite(dutyEffectiveFR_safe) ? ` (${(dutyEffectiveFR_safe * 100).toFixed(3)}%)` : '';
                 const localOnLabel = Number.isFinite(activeTiles?.burstLocal) ? `${(activeTiles.burstLocal * 100).toFixed(2)}%` : '—';
                 
                 return (
@@ -1376,9 +1390,15 @@ export default function HelixCore() {
                     };
                     setChatMessages(prev => [...prev, userMessage]);
                     
+                    // Abort any previous command
+                    if (commandAbortRef.current) {
+                      commandAbortRef.current.abort();
+                    }
+                    commandAbortRef.current = new AbortController();
+                    
                     const response = await apiRequest('POST', '/api/helix/command', {
                       messages: chatMessages.concat({ role: 'user', content: command })
-                    });
+                    }, commandAbortRef.current.signal);
                     
                     const responseData = await response.json();
                     const assistantMessage: ChatMessage = {
@@ -1692,9 +1712,15 @@ export default function HelixCore() {
                         };
                         setChatMessages(prev => [...prev, userMessage]);
 
+                        // Abort any previous command
+                        if (commandAbortRef.current) {
+                          commandAbortRef.current.abort();
+                        }
+                        commandAbortRef.current = new AbortController();
+                        
                         const response = await apiRequest('POST', '/api/helix/command', {
                           messages: chatMessages.concat({ role: 'user', content: command })
-                        });
+                        }, commandAbortRef.current.signal);
                         const responseData = await response.json();
 
                         const assistantMessage: ChatMessage = {
@@ -1748,9 +1774,15 @@ export default function HelixCore() {
                         };
                         setChatMessages(prev => [...prev, userMessage]);
 
+                        // Abort any previous command
+                        if (commandAbortRef.current) {
+                          commandAbortRef.current.abort();
+                        }
+                        commandAbortRef.current = new AbortController();
+                        
                         const response = await apiRequest('POST', '/api/helix/command', {
                           messages: chatMessages.concat({ role: 'user', content: command })
-                        });
+                        }, commandAbortRef.current.signal);
                         const responseData = await response.json();
 
                         const assistantMessage: ChatMessage = {
