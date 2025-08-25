@@ -24,6 +24,12 @@ class Mutex {
 }
 const pipeMutex = new Mutex();
 
+// Simple server-side event publisher (placeholder for future WebSocket integration)
+function publish(event: string, payload: any) {
+  // TODO: Integrate with WebSocket broadcaster when available
+  console.log(`[SERVER-EVENT] ${event}:`, payload);
+}
+
 // Schema for pipeline parameter updates
 const UpdateSchema = z.object({
   tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
@@ -709,6 +715,9 @@ export async function updatePipelineParams(req: Request, res: Response) {
       setGlobalPipelineState(next);
       return next;
     });
+    
+    publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(parsed.data), ts: Date.now() });
+    
     res.json(newState);
   } catch (error) {
     res.status(400).json({ error: "Failed to update parameters", details: error instanceof Error ? error.message : "Unknown error" });
@@ -728,6 +737,9 @@ export async function switchOperationalMode(req: Request, res: Response) {
       setGlobalPipelineState(next);
       return next;
     });
+    
+    publish("warp:reload", { reason: "mode-change", mode, ts: Date.now() });
+    
     res.json({ success: true, mode, state: newState, config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS] });
   } catch (error) {
     res.status(400).json({ error: "Failed to switch mode", details: error instanceof Error ? error.message : "Unknown error" });
