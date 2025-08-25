@@ -181,13 +181,13 @@ class WarpEngine {
             this.strobingState.sectorCount   = Math.max(1, sectorCount|0);
             this.strobingState.currentSector = Math.max(0, currentSector|0) % this.strobingState.sectorCount;
             this.updateUniforms({
-              sectors: this.strobingState.sectorCount,
-              // prefer explicit split if provided; otherwise use currentSector
+              sectorCount: this.strobingState.sectorCount, // TOTAL only
               split: Number.isFinite(split)
                 ? Math.max(0, Math.min(this.strobingState.sectorCount - 1, split|0))
                 : this.strobingState.currentSector
+              // ❌ no `sectors` here — leave that to the LC loop (S_live)
             });
-          } catch(e){ console.warn("WarpEngine strobe error:", e); }
+          } catch (e) { console.warn("WarpEngine strobe error:", e); }
         };
         if (typeof window.__addStrobingListener === 'function') {
           this._offStrobe = window.__addStrobingListener(strobeHandler);
