@@ -584,8 +584,9 @@ export function getSystemMetrics(req: Request, res: Response) {
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
 
   // --- Duty & θ chain (canonical) ---
-  const totalSectors = Math.max(1, s.sectorCount);
-  const concurrent   = Math.max(1, s.concurrentSectors || 1);
+  // Reuse existing variables to avoid redeclaration
+  // const totalSectors = Math.max(1, s.sectorCount);
+  // const concurrent   = Math.max(1, s.concurrentSectors || 1);
   const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
     ? Math.max(1e-12, (s as any).localBurstFrac as number)
     : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
@@ -737,17 +738,15 @@ export function getPipelineState(req: Request, res: Response) {
   
   res.json({
     ...s,
-    // stable camel alias for all clients
     dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
-    // Mode-aware physics fields from MODE_CONFIGS
-    sectorsTotal: modeConfig?.sectorsTotal ?? 400,
-    sectorsConcurrent: modeConfig?.sectorsConcurrent ?? 1,
-    localBurstFrac: modeConfig?.localBurstFrac ?? 0.01,
-    // Export both long & short physics keys for compatibility
+    // canonical viewer fields
+    sectorCount: s.sectorCount,                 // total
+    sectors: s.concurrentSectors ?? 1,          // concurrent
+    hull: { a: (s.hull?.Lx_m || 1007)/2, b: (s.hull?.Ly_m || 264)/2, c: (s.hull?.Lz_m || 173)/2 }, // ✅
     gammaVdB: s.gammaVanDenBroeck,
-    gammaVanDenBroeck: s.gammaVanDenBroeck,
-    qSpoilingFactor: s.qSpoilingFactor,
-    deltaAOverA: s.qSpoilingFactor
+    deltaAOverA: s.qSpoilingFactor,
+    // helpful defaults
+    localBurstFrac: (s as any).localBurstFrac ?? 0.01
   });
 }
 
