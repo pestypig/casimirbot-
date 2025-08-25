@@ -87,6 +87,14 @@ import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
 
+// Mode-specific RF burst fractions for proper curvature variation
+const LOCAL_BURST_BY_MODE = {
+  hover: 0.01,      // 1% burst duty
+  cruise: 0.005,    // 0.5% burst duty for efficiency
+  emergency: 0.02,  // 2% burst duty for maximum power
+  standby: 0.0,     // No burst in standby
+} as const;
+
 const DEV = process.env.NODE_ENV !== "production";
 
 declare global {
@@ -455,13 +463,15 @@ export default function HelixCore() {
 
   // Shared light-crossing loop for synchronized strobing across all visual components  
   const lc = useLightCrossingLoop({
-    sectorStrobing: concurrentSectors,
+    // sectorStrobing is TOTAL sector count expected by the hook
+    sectorStrobing: totalSectors,
     currentSector: systemMetrics?.currentSector ?? 0,
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,  // Restored authentic physics timing
     duty: dutyUI,
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
     hull: { a: hull.a, b: hull.b, c: hull.c },   // use live hull geometry
     wallWidth_m: 6.0,
+    localBurstFrac: LOCAL_BURST_BY_MODE[effectiveMode as keyof typeof LOCAL_BURST_BY_MODE] ?? 0.01, // mode-aware burst duty
   });
 
   const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)

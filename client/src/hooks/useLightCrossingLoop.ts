@@ -9,6 +9,7 @@ type Args = {
   freqGHz?: number;             // tile modulation frequency
   hull?: HullLike;              // ellipsoid axes (meters)
   wallWidth_m?: number;         // physical wall thickness
+  localBurstFrac?: number;      // local RF burst fraction (mode-specific)
 };
 
 export function useLightCrossingLoop({
@@ -19,6 +20,7 @@ export function useLightCrossingLoop({
   freqGHz = 15,
   hull,
   wallWidth_m = 1.0,  // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
+  localBurstFrac = 0.01,  // default 1% burst duty
 }: Args) {
   // --- Light-crossing estimate (choose the *shortest relevant* length scale)
   // Using the wall thickness gives a strict local bound; feel free to swap
@@ -27,8 +29,7 @@ export function useLightCrossingLoop({
   const L_m = Math.max(1e-6, wallWidth_m); // clamp
   const tauLC_ms = (L_m / c) * 1e3;        // ms
 
-  // --- 1% local ON window inside each sector's dwell (authentic physics)
-  const localBurstFrac = 0.01;
+  // --- Mode-aware local ON window inside each sector's dwell (authentic physics)
   const dwell_ms = Math.max(0.01, sectorPeriod_ms);
   const burst_ms = Math.max(tauLC_ms, dwell_ms * localBurstFrac); // enforce τLC bound
 
