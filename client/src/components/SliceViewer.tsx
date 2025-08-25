@@ -64,6 +64,7 @@ export interface SliceViewerProps {
   // Curvature gain controls (matches WarpVisualizer)
   curvatureGain?: number; // 0-8 slider range for blend control
   curvatureBoostMax?: number; // maximum boost multiplier (default 40)
+  viewMassFraction?: number; // view mass fraction for per-width scaling
 }
 
 function harmonicMean(a: number, b: number, c: number) {
@@ -133,6 +134,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   showContours = true,
   curvatureGain = 6.0,
   curvatureBoostMax = 40,
+  viewMassFraction = 1.0,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -153,28 +155,27 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   const dN = useMemo(() => normalize(divVec(driveDir, safeAxes)), [driveDir, safeAxes]);
 
   const amp = useMemo(() => {
-    // geometry
-    const A_geo = Math.pow(gammaGeo, 3);
-
-    // averaging: viewerAvg uses duty/sectors; REAL uses dutyEffectiveFR
+    // Canonical theta scale calculation (physics chain)
     const avg = viewAvg
       ? (Number.isFinite(dutyEffectiveFR)
           ? Math.max(1e-12, dutyEffectiveFR as number)
           : Math.max(1e-12, dutyCycle) / Math.max(1, sectors))
       : 1.0;
+    
+    const thetaScaleCanonical = Math.pow(gammaGeo, 3) * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
+    
+    // Apply view mass fraction after canonical chain
+    const thetaScaleUsed = thetaScaleCanonical * viewMassFraction;
 
-    // parity mode kills boosts (unity), otherwise respect viewer gain
+    // Visual boost (parity mode kills boosts, otherwise respect viewer gain)
     const curvatureGainT = Math.max(0, Math.min(1, curvatureGain / 8));
     const boost = physicsParityMode ? 1 : (1 - curvatureGainT) + curvatureGainT * curvatureBoostMax;
 
-    // keep gammaVdB ≥ 1 for stability; qSpoiling ≥ tiny
-    const A_base = A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
-
-    return A_base * boost;
+    return thetaScaleUsed * boost;
   }, [
     gammaGeo, qSpoilingFactor, gammaVdB,
     viewAvg, dutyEffectiveFR, dutyCycle, sectors,
-    physicsParityMode, curvatureGain, curvatureBoostMax
+    physicsParityMode, curvatureGain, curvatureBoostMax, viewMassFraction
   ]);
 
   const ampRef = useMemo(() => {
