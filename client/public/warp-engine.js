@@ -682,8 +682,8 @@ class WarpEngine {
             // core physics chain
             thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
             colorMode:  gl.getUniformLocation(program, 'u_colorMode'),
-            ridgeMode:  gl.getUniformLocation(program, 'u_ridgeMode')  || gl.getUniformLocation(program, 'u_RidgeMode'),
-            parity:     gl.getUniformLocation(program, 'u_physicsParityMode') || gl.getUniformLocation(program, 'u_PhysicsParityMode'),
+            ridgeMode:  gl.getUniformLocation(program, 'u_ridgeMode'),
+            parity:     gl.getUniformLocation(program, 'u_physicsParityMode'),
 
             // sectoring
             sectorCount: gl.getUniformLocation(program, 'u_sectorCount'),
