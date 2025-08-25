@@ -674,7 +674,21 @@ export default function WarpBubbleCompare({
     return (cv as any)[ENGINE_PROMISE];
   }
 
-
+  async function waitForCanvases(
+    leftRef: React.RefObject<HTMLCanvasElement>,
+    rightRef: React.RefObject<HTMLCanvasElement>,
+    timeoutMs = 800
+  ) {
+    const t0 = performance.now();
+    return new Promise<void>((resolve, reject) => {
+      const tick = () => {
+        if (leftRef.current && rightRef.current) return resolve();
+        if (performance.now() - t0 > timeoutMs) return reject(new Error('canvas mount timeout'));
+        requestAnimationFrame(tick);
+      };
+      tick();
+    });
+  }
 
   // Kill and detach an engine instance on a canvas
   function killEngine(ref: React.MutableRefObject<any>, cv?: HTMLCanvasElement | null) {
@@ -711,7 +725,9 @@ export default function WarpBubbleCompare({
   async function reinitEnginesFromParams() {
     await ensureScript();
     const W = (window as any).WarpEngine;
-    if (!W || !leftRef.current || !rightRef.current || !parameters) return;
+    if (!W || !parameters) return;
+    try { await waitForCanvases(leftRef, rightRef); } catch {}
+    if (!leftRef.current || !rightRef.current) return;
 
     // 1) Cleanly kill any existing engines
     killEngine(leftEngine, leftRef.current);
@@ -818,6 +834,16 @@ export default function WarpBubbleCompare({
     }
   }, [parameters?.currentMode]);
 
+  // Mount-only effect: guarantee initial attach
+  useEffect(() => {
+    if (leftEngine.current || rightEngine.current) return;
+    if (!parameters?.currentMode) return; // need at least the mode
+    if (!reinitInFlight.current) {
+      reinitInFlight.current = (async () => {
+        try { await reinitEnginesFromParams(); } finally { reinitInFlight.current = null; }
+      })();
+    }
+  }, []); // mount only
 
   // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {
@@ -1075,7 +1101,6 @@ export default function WarpBubbleCompare({
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
         <canvas
-          key={`left-${parameters?.currentMode || 'unk'}`}
           ref={leftRef}
           className="w-full h-[calc(100%-32px)] block"
           style={{ background: '#111', display: 'block' }}
@@ -1084,7 +1109,6 @@ export default function WarpBubbleCompare({
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{showPanelTitle}</div>
         <canvas
-          key={`right-${parameters?.currentMode || 'unk'}`}
           ref={rightRef}
           className="w-full h-[calc(100%-32px)] block"
           style={{ background: '#111', display: 'block' }}
