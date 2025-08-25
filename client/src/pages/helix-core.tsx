@@ -1000,7 +1000,7 @@ export default function HelixCore() {
                   gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
                   dutyCycle: dutyUI_safe,
                   dutyEffectiveFR: dutyEffectiveFR_safe,
-                  sectors: totalSectors,
+                  sectors: concurrentSectors,
                   split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
                 }}
@@ -1011,13 +1011,13 @@ export default function HelixCore() {
                   gammaVanDenBroeck: pipeline?.gammaVanDenBroeck ?? 2.86e5,
                   dutyCycle: dutyUI_safe,
                   dutyEffectiveFR: dutyEffectiveFR_safe,
-                  sectors: totalSectors,
+                  sectors: concurrentSectors,
                   split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   sectorCount: totalSectors,
                 }}
                 baseShared={{
                   hull: { a: 503.5, b: 132, c: 86.5 },
-                  sectors: totalSectors,
+                  sectors: concurrentSectors,
                   sectorCount: totalSectors,
                   split: Math.max(0, Math.min(totalSectors - 1, (systemMetrics?.currentSector ?? lc.sectorIdx ?? 0) % totalSectors)),
                   colorMode: 'theta',
