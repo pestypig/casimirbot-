@@ -7,7 +7,7 @@ const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
 // ── Physics Constants (centralized) ──────────────────────────────────────────
-import { HBAR, C, PI } from "./physics-const.js";
+import { HBAR, C } from "./physics-const.js";
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
 import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
@@ -142,7 +142,6 @@ export interface EnergyPipelineState {
 // Physical constants
 const HBAR_C = HBAR * C;             // ℏc ≈ 3.16152677e-26 [J·m] for Casimir calculations
 const NM_TO_M = 1e-9;
-const MM_TO_M = 1e-3;
 const CM2_TO_M2 = 1e-4;
 
 // ── Paper-backed constants (consolidated physics)
@@ -288,7 +287,7 @@ export function initializePipelineState(): EnergyPipelineState {
 // Calculate static Casimir energy using corrected physics
 function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
   const gap_m   = gap_nm * NM_TO_M;
-  const E_overA = -(PI * PI * HBAR_C) / (720 * Math.pow(gap_m, 3)); // J/m^2
+  const E_overA = -(Math.PI * Math.PI * HBAR_C) / (720 * Math.pow(gap_m, 3)); // J/m^2
   return E_overA * area_m2; // J
 }
 
@@ -379,7 +378,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
   // 6) Power — raw first, then power-only calibration via qMechanical
-  const omega = 2 * PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+  const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? 15) * 1e9;
   const Q = state.qCavity ?? Q_BURST;
   const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
