@@ -72,13 +72,7 @@ export interface HelixMetrics {
 export const PIPE_CONST = {
   TOTAL_SECTORS: 400,
   BURST_DUTY_LOCAL: 0.01,  // 1% local burst window
-  Q_BURST: 1e9,
-  MODE_TARGETS: {
-    hover:    { P_W: 83.3e6, M_kg: 1000 },
-    cruise:   { P_W: 7.437e3, M_kg: 1000 },  // 7.437 kW
-    emergency:{ P_W: 297.5e6, M_kg: 1000 },
-    standby:  { P_W: 0, M_kg: 0 }
-  }
+  Q_BURST: 1e9
 };
 
 // Shared smart formatter (W→kW→MW) for UI labels
@@ -94,6 +88,8 @@ export const fmtPowerUnitFromW = (watts?: number) => {
 export function useEnergyPipeline() {
   return useQuery({
     queryKey: ['/api/helix/pipeline'],
+    queryFn: async () =>
+      (await apiRequest('GET', '/api/helix/pipeline')).json(),
     refetchInterval: 1000, // Refresh every second
   });
 }
@@ -159,12 +155,11 @@ export const MODE_CONFIGS = {
   cruise: {
     name: "Cruise Mode",
     dutyCycle: 0.005,
-    sectorStrobing: 400,
-    qSpoilingFactor: 0.001,   // matches pipeline/old values
+    sectorStrobing: 1,
+    qSpoilingFactor: 0.625,
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Low-power cruise mode for sustained travel",
-    // Correct target = **7.437 W** (NOT kW/MW)
-    powerTarget_W: 7.437,
+    powerTarget_W: 83.3e6,
     color: "text-green-400"
   },
   emergency: {
