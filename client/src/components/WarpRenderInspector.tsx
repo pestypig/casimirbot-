@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState, startTransition} from "react";
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
+import CurvaturePhysicsPanel from "@/components/CurvaturePhysicsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -462,6 +463,21 @@ export default function WarpRenderInspector(props: {
         leftCanvasRef={leftRef}
         rightCanvasRef={rightRef}
         live={live}
+      />
+
+      {/* Physics equation panel showing REAL-pane calculation chain */}
+      <CurvaturePhysicsPanel
+        lightCrossing={{
+          burst_ms: (live as any)?.burst_ms,
+          dwell_ms: (live as any)?.dwell_ms,
+        }}
+        totalSectors={(live as any)?.sectorsTotal ?? 400}
+        concurrentSectors={(live as any)?.sectorsConcurrent ?? 1}
+        gammaGeo={(live as any)?.gammaGeo}
+        gammaVdB={(live as any)?.gammaVanDenBroeck}
+        qSpoilingFactor={(live as any)?.qSpoilingFactor}
+        dutyEffectiveFR={(live as any)?.dutyFR}
+        className="mt-4"
       />
     </div>
   );
