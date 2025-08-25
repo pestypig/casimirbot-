@@ -34,6 +34,15 @@ export interface SliceViewerProps {
   sectors?: number; // ≥1
   viewAvg?: boolean; // true→√(duty/sectors), false→instant
 
+  // Engine sync
+  dutyEffectiveFR?: number; // ship-wide FR duty (0..1)
+  physicsParityMode?: boolean; // true => no boost, unity viz chain
+  
+  // Live strobing (REAL instant view)
+  instantStrobe?: boolean; // false => avg; true => show sector polarity
+  split?: number; // current (+/−) split boundary from engine
+  strobeWidth?: number; // softness for tanh boundary (default 0.75)
+
   // Diff vs reference (viewer-only)
   diffMode?: boolean;
   refParams?: Partial<Pick<
@@ -111,7 +120,12 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   dutyCycle = 0.14,
   sectors = 1,
   viewAvg = true,
-  diffMode = true,
+  dutyEffectiveFR,
+  physicsParityMode = false,
+  instantStrobe = false,
+  split = 0,
+  strobeWidth = 0.75,
+  diffMode = false,
   refParams,
   sigmaRange = 6,
   exposure = 6,
@@ -140,8 +154,16 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
   const amp = useMemo(() => {
     const A_geo = Math.pow(gammaGeo, 3);
-    const avg = viewAvg ? Math.sqrt(Math.max(1e-12, dutyCycle) / Math.max(1, sectors)) : 1.0;
+    
+    // Use FR-averaged duty if provided, otherwise fall back to UI duty
+    const effectiveDuty = dutyEffectiveFR ?? dutyCycle;
+    const avg = viewAvg ? Math.sqrt(Math.max(1e-12, effectiveDuty) / Math.max(1, sectors)) : 1.0;
     const A_base = A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
+    
+    // Physics parity mode: disable all visual boosts (unity viz chain)
+    if (physicsParityMode) {
+      return A_base; // Raw physics, no visual amplification
+    }
     
     // Apply curvature gain blend: A_vis = A_base * boost * modeScale
     // curvatureGain: 0-8 → curvatureGainT: 0-1
@@ -150,7 +172,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     const modeScale = 1.0; // SliceViewer uses consistent scaling
     
     return A_base * boost * modeScale;
-  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, curvatureGain, curvatureBoostMax]);
+  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, dutyEffectiveFR, physicsParityMode, curvatureGain, curvatureBoostMax]);
 
   const ampRef = useMemo(() => {
     if (!diffMode) return 0;
@@ -163,7 +185,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     const avg = (refParams?.viewAvg ?? viewAvg)
       ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
     return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
-  }, [diffMode, refParams, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
+  }, [diffMode, refParams, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, dutyEffectiveFR]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -211,6 +233,14 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
         // York-time proxy (matches your shader form)
         let theta = vShip * xs_over_rs * dfdr; // 1/ρ cancels because pHat has |p|=1
+
+        // Live strobing: sector polarity (matches engine samplers/inspector)
+        if (instantStrobe && sectors > 1) {
+          // Soft sign based on current split boundary
+          const sectorIndex = Math.floor(i * sectors / nX); // map pixel to sector
+          const sectorSign = Math.tanh((sectorIndex - split) / Math.max(1e-6, strobeWidth));
+          theta *= sectorSign; // apply live sector polarity
+        }
 
         // Apply amplitude chain (viewer-only)
         let value = theta * amp;
@@ -293,14 +323,21 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     zeroStop,
     diffMode,
     showContours,
+    instantStrobe,
+    split,
+    strobeWidth,
   ]);
 
   return (
     <div className={clsx("rounded-xl border border-cyan-500/30 bg-slate-900/70 p-3", className)}>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs font-mono text-cyan-300">Equatorial Curvature Slice (ρ-space)</div>
+        <div className="text-xs font-mono text-cyan-300">
+          Equatorial Curvature Slice (ρ-space)
+          {physicsParityMode && <span className="ml-1 text-green-400">[REAL]</span>}
+          {instantStrobe && <span className="ml-1 text-orange-400">[LIVE]</span>}
+        </div>
         <div className="text-[10px] font-mono text-slate-400">
-          γ³×(ΔA/A)×γ_VdB×{viewAvg ? "√(duty/sectors)" : "instant"}
+          γ³×(ΔA/A)×γ_VdB×{viewAvg ? (dutyEffectiveFR !== undefined ? "√(FR-duty/sectors)" : "√(duty/sectors)") : "instant"}
         </div>
       </div>
       <canvas ref={canvasRef} className="w-full h-auto block rounded-lg overflow-hidden" />
