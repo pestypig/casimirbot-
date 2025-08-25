@@ -559,7 +559,7 @@ export default function HelixCore() {
   }, [chatMessages]);
   
   // Send command to HELIX-CORE
-  const sendCommand = async () => {
+  const sendCommand = React.useCallback(async () => {
     if (!commandInput.trim() || isProcessing) return;
     
     const userMessage: ChatMessage = {
@@ -625,7 +625,8 @@ export default function HelixCore() {
     } finally {
       setIsProcessing(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commandInput, isProcessing, chatMessages, refetchMetrics]);
   
   // Physics-timed sector sweep for UI animation
   useEffect(() => {
@@ -668,7 +669,7 @@ export default function HelixCore() {
   }, [totalSectors, systemMetrics?.currentSector, lc?.sectorIdx]);
 
   // Color mapper (blue→active; red if ζ breach)
-  const sectorColor = (i: number) => {
+  const sectorColor = React.useCallback((i: number) => {
     const ζ = systemMetrics?.fordRoman?.value ?? 0.0;
     const limitBreach = ζ >= 1.0;
     const v = trail[i] ?? 0;
@@ -676,10 +677,10 @@ export default function HelixCore() {
       return `rgba(239, 68, 68, ${0.2 + 0.8*v})`; // red
     }
     return `rgba(34, 197, 94, ${0.2 + 0.8*v})`; // green
-  };
+  }, [systemMetrics?.fordRoman?.value, trail]);
 
   // Handle tile click
-  const handleTileClick = async (sectorId: string) => {
+  const handleTileClick = React.useCallback(async (sectorId: string) => {
     setSelectedSector(sectorId);
     const sectorIndex = parseInt(sectorId.replace('S', '')) - 1;
     
@@ -733,7 +734,8 @@ export default function HelixCore() {
         setIsProcessing(false);
       }
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, chatMessages, refetchMetrics, trail]);
 
   return (
     <TooltipProvider>
