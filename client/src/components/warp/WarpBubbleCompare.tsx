@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef } from "react";
+import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 
 // Build token: read lazily so SSR never touches `window`
 const getAppBuild = () =>
@@ -703,21 +704,9 @@ export default function WarpBubbleCompare({
 
   // Build REAL/SHOW packets from parameters (your existing code)
   function buildPacketsFromParams(p: any) {
-    const { real, show } = buildEngineUniforms({
-      hull: p.hull,
-      wallWidth_m: p.wallWidth_m ?? 6.0,
-      driveDir: p.driveDir ?? [1,0,0],
-      vShip: p.vShip ?? 1.0,
-      dutyCycle: p.dutyCycle,
-      dutyEffectiveFR: p.dutyEffectiveFR,
-      sectorCount: Math.max(1, p.sectorCount),
-      sectors: Math.max(1, p.sectors),
-      gammaGeo: p.gammaGeo,
-      qSpoilingFactor: p.qSpoilingFactor ?? 1,
-      gammaVanDenBroeck: p.gammaVanDenBroeck ?? 2.86e5,
-      colorMode: 'theta',
-      lockFraming: true,
-    });
+    const wu = normalizeWU(p?.warpUniforms || (p as any));
+    const real = buildREAL(wu);
+    const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
     return { real, show };
   }
 
@@ -853,25 +842,9 @@ export default function WarpBubbleCompare({
     if (!leftEngine.current || !rightEngine.current || !parameters) return;
 
     // build both payloads from the SAME source of truth
-    const { real, show } = buildEngineUniforms({
-      hull: parameters.hull,
-      wallWidth_m: parameters.wallWidth_m ?? 6.0,
-      driveDir: parameters.driveDir ?? [1,0,0],
-      vShip: parameters.vShip ?? 1.0,
-
-      dutyCycle: parameters.dutyCycle,
-      dutyEffectiveFR: parameters.dutyEffectiveFR, // ship-wide FR duty from parent (lc loop)
-
-      sectorCount: Math.max(1, parameters.sectorCount),
-      sectors: Math.max(1, parameters.sectors),
-
-      gammaGeo: parameters.gammaGeo,
-      qSpoilingFactor: parameters.qSpoilingFactor ?? 1,
-      gammaVanDenBroeck: parameters.gammaVanDenBroeck ?? 2.86e5,
-
-      colorMode: colorMode ?? 'theta',
-      lockFraming: lockFraming ?? true,
-    });
+    const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
+    const real = buildREAL(wu);
+    const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
 
     // Build shared geometry data
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
