@@ -235,13 +235,18 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
     // sanitize a few hot-path values
-    const safe = (o:any)=>({
-      ...o,
-      sectors: Math.max(1, Math.floor(N(o.sectors, 1))),
-      split: Math.max(0, Math.floor(N(o.split, 0))),
-      exposure: Math.max(1, Math.min(12, N(o.exposure, 6))),
-      zeroStop: Math.max(1e-9, N(o.zeroStop, 1e-7)),
-    });
+    const safe = (o:any)=> {
+      const sectors = Math.max(1, Math.floor(N(o.sectors, 1)));
+      const rawSplit = Math.floor(N(o.split, 0));
+      const split = Math.max(0, Math.min(sectors - 1, rawSplit));
+      return {
+        ...o,
+        sectors,
+        split,
+        exposure: Math.max(1, Math.min(12, N(o.exposure, 6))),
+        zeroStop: Math.max(1e-9, N(o.zeroStop, 1e-7)),
+      };
+    };
     // REAL
     pushUniformsWhenReady(leftEngine.current, {
       ...safe(realPayload),
