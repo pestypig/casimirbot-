@@ -39,6 +39,21 @@ const ensureScript = () =>
     document.head.appendChild(s);
   });
 
+// Dev utility: manual hard reload escape hatch
+(window as any).__forceReloadWarpEngine = () => {
+  const w: any = window;
+  Array.from(document.querySelectorAll('script[src*="warp-engine.js"]'))
+    .forEach(n => n.parentNode?.removeChild(n));
+  w.__WARP_ENGINE_LOADED__ = undefined;
+  w.WarpEngine = undefined;
+  const stamp = (w.__APP_WARP_BUILD || 'dev');
+  const s = document.createElement('script');
+  s.src = `/warp-engine.js?v=${encodeURIComponent(stamp)}`;
+  s.defer = true;
+  s.onload = () => console.log('[force] WarpEngine reloaded');
+  document.head.appendChild(s);
+};
+
 function sizeCanvas(cv: HTMLCanvasElement) {
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const rect = cv.getBoundingClientRect();
