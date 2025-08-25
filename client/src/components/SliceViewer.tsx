@@ -179,16 +179,24 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
   const ampRef = useMemo(() => {
     if (!diffMode) return 0;
-    // Default to CURRENT props so Δ=0 when no explicit reference is provided.
     const g = refParams?.gammaGeo ?? gammaGeo;
     const q = refParams?.qSpoilingFactor ?? qSpoilingFactor;
     const v = refParams?.gammaVdB ?? gammaVdB;
-    const d = refParams?.dutyCycle ?? dutyCycle;
-    const s = refParams?.sectors ?? sectors;
-    const avg = (refParams?.viewAvg ?? viewAvg)
-      ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
-    return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
-  }, [diffMode, refParams, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, dutyEffectiveFR]);
+
+    // Reference averaging mirrors primary averaging rule:
+    const avgRef = (refParams?.viewAvg ?? viewAvg)
+      ? (Number.isFinite(dutyEffectiveFR)
+          ? Math.sqrt(Math.max(1e-12, dutyEffectiveFR as number))
+          : Math.sqrt(Math.max(1e-12, (refParams?.dutyCycle ?? dutyCycle)) /
+                      Math.max(1, (refParams?.sectors ?? sectors))))
+      : 1.0;
+
+    return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avgRef;
+  }, [
+    diffMode, refParams,
+    gammaGeo, qSpoilingFactor, gammaVdB,
+    dutyCycle, sectors, viewAvg, dutyEffectiveFR
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
