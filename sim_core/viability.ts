@@ -181,7 +181,7 @@ export function viability(
   // 9) Time-scale separation (matches Live Energy Pipeline)
   const f_m = 15e9; // Hz (mechanical frequency)
   const T_m = 1 / f_m; // s (mechanical period)
-  const L_LC = R_ship_m; // Light-crossing distance
+  const L_LC = 6.0; // Wall thickness (matches loop & HUD)
   const tau_LC = L_LC / c; // Light-crossing time
   const TS_ratio = tau_LC / T_m; // Should be ≫ 1
 
