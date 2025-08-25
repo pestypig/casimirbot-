@@ -33,7 +33,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(x)?+x:d;
   const parity = !!engine?.uniforms?.physicsParityMode; // REAL=true, SHOW=false
-  const mode = String(live?.currentMode||'').toLowerCase();
+  const mode = String(engine?.uniforms?.currentMode ?? live?.currentMode || '').toLowerCase();
   if (mode === 'standby') return 0;
 
   const gammaGeo = Math.max(1, N(live?.gammaGeo ?? live?.g_y, 26));
@@ -174,9 +174,19 @@ function useCheckpointList(
     if (liveSnap) {
       const tsExp = expectedThetaForPane(liveSnap, e);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
+      
+      // Check for mode disagreement during transitions
+      const engineMode = String(e?.uniforms?.currentMode || '').toLowerCase();
+      const liveMode = String(liveSnap?.currentMode || '').toLowerCase();
+      const inTransition = engineMode && liveMode && engineMode !== liveMode;
+      
       if (tsOk && Number.isFinite(rel)) {
-        if (rel > 0.25) tsState = "warn"; // large disagreement
-        tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
+        if (inTransition) {
+          tsDetail += ` • (transition)`;
+        } else {
+          if (rel > 0.25) tsState = "warn"; // large disagreement
+          tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
+        }
       }
     }
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
