@@ -398,7 +398,9 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   
   // Post-calibration clamping check for qMechanical
   const qMech_before = state.qMechanical;
-  state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical));
+  if (!isStandby) {
+    state.qMechanical = Math.max(1e-6, Math.min(1e6, state.qMechanical));
+  }
   (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
