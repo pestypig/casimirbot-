@@ -476,6 +476,18 @@ export default function WarpRenderInspector(props: {
       // Mute Grid3D engine until canonical uniforms arrive
       eng.setVisible?.(false);
       gatedUpdateUniforms(eng, { thetaScale: 0 }, 'grid3d-init-mute');
+      
+      // Block stray thetaScale writes for Grid3D engine
+      if (rightEngine.current && !rightEngine.current.__locked) {
+        const orig = rightEngine.current.updateUniforms?.bind(rightEngine.current);
+        rightEngine.current.updateUniforms = (patch: any) => {
+          const safe = { ...(patch || {}) };
+          if ('thetaScale' in safe) delete (safe as any).thetaScale; // physics derives it
+          (safe as any).physicsParityMode = false;
+          return gatedUpdateUniforms({ updateUniforms: orig }, safe, 'show-locked');
+        };
+        rightEngine.current.__locked = true;
+      }
     }
   }, [showRendererType]);
 
