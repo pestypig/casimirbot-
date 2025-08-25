@@ -205,7 +205,7 @@ export default function WarpRenderInspector(props: {
       (safe as any).parityMode        = forceParity;
 
       // Use gated uniforms instead of direct call
-      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${tag.toLowerCase()}-locked`);
+      return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }
@@ -278,12 +278,12 @@ export default function WarpRenderInspector(props: {
     leftEngine.current?.onceReady?.(() => {
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
+      gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-left-init');
     });
     rightEngine.current?.onceReady?.(() => {
       const ax = rightEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(rightEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-right-init');
+      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
       // optional: mirror display gain through helper
       const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
       rightEngine.current.setDisplayGain?.(dg);
@@ -402,6 +402,15 @@ export default function WarpRenderInspector(props: {
     return (a/b - 1) * 100;
   }
 
+  function normalizeKeys(u: any) {
+    const x = { ...(u || {}) };
+    if (typeof x.gammaVanDenBroeck === 'number' && typeof x.gammaVdB !== 'number') x.gammaVdB = x.gammaVanDenBroeck;
+    if (typeof x.gammaVdB === 'number' && typeof x.gammaVanDenBroeck !== 'number') x.gammaVanDenBroeck = x.gammaVdB;
+    if (typeof x.qSpoilingFactor === 'number' && typeof x.qSpoil !== 'number') x.qSpoil = x.qSpoilingFactor;
+    if (typeof x.qSpoil === 'number' && typeof x.qSpoilingFactor !== 'number') x.qSpoilingFactor = x.qSpoil;
+    return x;
+  }
+
   function reportThetaConsistency(bound:{
     gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number;
   }, viewMassFraction: number = 1.0, isShow: boolean = false) {
@@ -479,7 +488,7 @@ export default function WarpRenderInspector(props: {
           const safe = { ...(patch || {}) };
           if ('thetaScale' in safe) delete (safe as any).thetaScale; // physics derives it
           (safe as any).physicsParityMode = false;
-          return gatedUpdateUniforms({ updateUniforms: orig }, safe, 'show-locked');
+          return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), 'show-locked');
         };
         rightEngine.current.__locked = true;
       }
@@ -540,7 +549,7 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: true,
       viewMassFraction: N(props.parityPhys?.viewMassFraction, 1.0)
     });
-    gatedUpdateUniforms(leftEngine.current, realUniforms, 'inspector-real');
+    gatedUpdateUniforms(leftEngine.current, normalizeKeys(realUniforms), 'inspector-real');
     
     // SHOW engine - enhanced visuals with full bubble
     const showUniforms = toUniforms({
@@ -548,13 +557,13 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: false,
       viewMassFraction: N(props.showPhys?.viewMassFraction, 1.0)
     });
-    gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    gatedUpdateUniforms(leftEngine.current, { cameraZ: cz }, 'inspector-camera');
-    gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'inspector-camera');
+    gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
     
     // Sanity check parity modes
     setTimeout(() => {
