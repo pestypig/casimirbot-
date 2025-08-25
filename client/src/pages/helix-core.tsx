@@ -1072,13 +1072,14 @@ export default function HelixCore() {
             <CardDescription>Single source of truth for REAL vs SHOW with live pipeline</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
-            <WarpRenderInspector
-              parityPhys={{
-                gammaGeo:        pipeline?.gammaGeo ?? 26,
-                qSpoilingFactor: qSpoilUI,
-                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
-                dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
-                dutyCycle:        dutyUI_safe,           // UI duty (for display)
+            <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
+              <WarpRenderInspector
+                parityPhys={{
+                  gammaGeo:        pipeline?.gammaGeo ?? 26,
+                  qSpoilingFactor: qSpoilUI,
+                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 2.86e5),
+                  dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
+                  dutyCycle:        dutyUI_safe,           // UI duty (for display)
               }}
               showPhys={{
                 // same as above unless you want explicit "seasoning" in SHOW
@@ -1105,6 +1106,7 @@ export default function HelixCore() {
                 lightCrossing: lc,
               }}
             />
+            </Suspense>
           </CardContent>
         </Card>
 
