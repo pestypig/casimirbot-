@@ -27,12 +27,31 @@ export function applyToEngine(
   uniforms: WarpUniforms
 ) {
   const v = uniforms.__version ?? Date.now();
-  if (v < lastVersion) {
-    console.warn('[warp:gating] drop older uniforms from', uniforms.__src, 'v=', v, 'last=', lastVersion);
+  const src = uniforms.__src || 'legacy';
+  
+  // Server canonical source always wins if it has newer or equal version
+  if (src === 'server') {
+    if (v >= lastVersion) {
+      lastVersion = v;
+      lastSrc = src;
+    } else {
+      console.warn('[warp:gating] drop older server uniforms v=', v, 'last=', lastVersion);
+      return;
+    }
+  }
+  // Legacy sources blocked if server has written
+  else if (lastSrc === 'server' && src === 'legacy') {
+    console.warn('[warp:gating] blocked legacy uniforms (server canonical active)');
     return;
   }
-  lastVersion = v;
-  lastSrc = uniforms.__src;
+  // Standard version check for non-server sources
+  else if (v < lastVersion) {
+    console.warn('[warp:gating] drop older uniforms from', src, 'v=', v, 'last=', lastVersion);
+    return;
+  } else {
+    lastVersion = v;
+    lastSrc = src;
+  }
 
   // Canonical θ if server didn't precompute
   const θ = uniforms.thetaScale ?? (

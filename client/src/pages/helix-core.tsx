@@ -409,6 +409,14 @@ export default function HelixCore() {
     setMainframeLog(prev => [...prev, `[AUDIT] θ-scale expected=${a.expected.toExponential(2)} used=${a.used.toExponential(2)} (${pct}%)`].slice(-200));
   }, [(systemMetrics as any)?.thetaAudit]);
 
+  // Publish canonical uniforms from server metrics
+  useEffect(() => {
+    const wu = (systemMetrics as any)?.warpUniforms;
+    if (!wu) return;
+    const version = Number((systemMetrics as any)?.seq ?? Date.now());
+    publish('warp:uniforms', { ...wu, __src: 'server', __version: version });
+  }, [systemMetrics]);
+
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
   useResonatorAutoDuty({
     mode: (pipeline?.currentMode ?? 'hover') as 'standby'|'hover'|'cruise'|'emergency',

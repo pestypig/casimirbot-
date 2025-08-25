@@ -5,6 +5,8 @@ import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { subscribe, unsubscribe } from "@/lib/luma-bus";
+import { applyToEngine } from "@/lib/warp-uniforms-gate";
 
 /**
  * WarpRenderInspector
@@ -238,7 +240,20 @@ export default function WarpRenderInspector(props: {
     leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
     rightEngine.current && (rightEngine.current.onDiagnostics = (d: any) => ((window as any).__diagSHOW = d));
 
+    // Subscribe to canonical server uniforms
+    const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+      if (leftEngine.current) {
+        applyToEngine(leftEngine.current, u);          // REAL
+      }
+      if (rightEngine.current) {
+        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
+      }
+    });
+
     return () => {
+      // Unsubscribe from canonical uniforms
+      unsubscribe(unsubscribeHandler);
+      
       try { leftEngine.current?.destroy(); } catch {}
       try { rightEngine.current?.destroy(); } catch {}
       leftEngine.current = null as any;
