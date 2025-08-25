@@ -123,6 +123,11 @@ export default function WarpRenderInspector(props: {
   const [userGain, setUserGain] = useState(1);
   const [decades, setDecades] = useState(0.6 * 8); // UI slider 0..8 → 0..1
 
+  // Debug toggles (React state)
+  const [lockTone, setLockTone] = useState(true);
+  const [lockRidge, setLockRidge] = useState(true);
+  const [forceAvg, setForceAvg] = useState(true);
+
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
   ), [live, props]);
@@ -335,6 +340,17 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
 
+    // Debug toggle calculations
+    const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
+    const autoZero = N(props.parityPhys?.zeroStop ?? live?.zeroStop, 1e-7);
+    const autoRidge = N(props.parityPhys?.ridgeMode ?? ridgeMode, 0);
+    const autoAvg = N(props.parityPhys?.viewAvg ?? true, true);
+
+    const tonemapExp = lockTone ? 5.0 : autoExp;
+    const zeroStop = lockTone ? 1e-7 : autoZero;
+    const ridgeModeUsed = lockRidge ? 0 : autoRidge;
+    const viewAvgUsed = forceAvg ? true : autoAvg;
+
     // Shared physics parameters for both engines
     const shared = {
       gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
@@ -344,7 +360,11 @@ export default function WarpRenderInspector(props: {
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
       sectors: sConcurrent,                    // 1
-      viewAvg: true,
+      viewAvg: viewAvgUsed,       // Use debug toggle
+      // Apply debug toggles to display controls
+      ridgeMode: ridgeModeUsed,
+      exposure: tonemapExp,
+      zeroStop: zeroStop,
       // ✅ give the sweep window so duty_local can be computed
       lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
       // Physical scaling
@@ -512,6 +532,22 @@ export default function WarpRenderInspector(props: {
               onChange={e=>setUserGain(Number(e.target.value))} className="w-full"/>
             <div className="text-xs text-neutral-500">{userGain.toFixed(2)}×</div>
           </div>
+
+          {/* Debug toggles */}
+          <fieldset className="flex gap-3 text-xs mt-3 pt-3 border-t">
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={lockTone} onChange={e=>setLockTone(e.target.checked)} />
+              Lock tonemap
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={lockRidge} onChange={e=>setLockRidge(e.target.checked)} />
+              Lock ridge
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={forceAvg} onChange={e=>setForceAvg(e.target.checked)} />
+              Force FR-avg
+            </label>
+          </fieldset>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
