@@ -180,7 +180,7 @@ export const MODE_CONFIGS = {
   standby: {
     name: "Standby Mode",
     dutyCycle: 0.001,
-    sectorStrobing: 1,
+    sectorStrobing: 0,
     qSpoilingFactor: 0.1,
     gammaVanDenBroeck: 1,
     description: "Minimal power standby mode",
