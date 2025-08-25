@@ -1167,14 +1167,16 @@ export default function HelixCore() {
                 },
                 wallWidth_m: 6.0,
                 driveDir: [1,0,0],
-                vShip: 1.0,
-                sectorCount: totalSectors,     // TOTAL (averaging)
-                sectors:      concurrentSectors, // live sweep
+                vShip: 0,                         // keep REAL honest; SHOW adds motion
+                sectorCount: totalSectors,        // TOTAL for averaging (e.g., 400)
+                sectors: concurrentSectors,       // LIVE (should now be 1)
                 colorMode: 'theta',
                 lockFraming: true,
                 currentMode: effectiveMode,
-                lightCrossing: lc,
+                // ❌ remove: lightCrossing here does nothing
               }}
+              // ✅ give the inspector the actual window so it can compute duty_local
+              lightCrossing={{ burst_ms: lc.burst_ms, dwell_ms: lc.dwell_ms }}
             />
             </Suspense>
           </CardContent>
