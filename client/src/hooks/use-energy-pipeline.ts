@@ -131,6 +131,9 @@ export function useSwitchMode() {
       queryClient.invalidateQueries({ queryKey: ['/api/helix/pipeline'] });
       queryClient.invalidateQueries({ queryKey: ['/api/helix/metrics'] });
       
+      // Let visualizers/inspectors hard-refresh
+      publish("helix:pipeline:updated", { mode });
+      
       // Trigger Luma whisper for mode changes
       const wisdom = getModeWisdom(mode);
       publish("luma:whisper", { text: wisdom });
