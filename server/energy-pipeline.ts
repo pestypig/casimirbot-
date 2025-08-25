@@ -8,6 +8,10 @@ const MODEL_MODE: 'calibrated' | 'raw' =
 
 // ── Physics Constants (centralized) ──────────────────────────────────────────
 import { HBAR, C } from "./physics-const.js";
+
+// Performance guardrails for billion-tile calculations
+const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
+const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish helpers (use aggregate)
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
 import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
@@ -611,40 +615,56 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   // Store Natário metrics in state for API access
   (state as any).natario = natario;
   
-  // Calculate dynamic Casimir with pipeline integration
+  // Calculate dynamic Casimir with pipeline integration + performance guardrails
+  
+  // Cap dynamic grid size + short-circuit heavy branches
+  const tileEdge = Math.max(1, Math.floor(Math.sqrt(state.N_tiles)));
+  const dynEdge  = Math.min(TILE_EDGE_MAX, tileEdge);         // bounded for safety
+  const dynTileCount = dynEdge * dynEdge;
+  
+  // Expose a note for UIs/debug
+  (state as any).tileGrid = { edge: tileEdge, dynEdge, N_tiles: state.N_tiles, dynTileCount };
+  
+  // --- Dynamic helpers: feed safe sizes or short-circuit ---
+  const shouldSkipDynamic = state.N_tiles > DYN_TILECOUNT_HARD_SKIP;
+  
   try {
     const staticResult = calculateCasimirEnergy({
       gap: state.gap_nm,
       geometry: 'parallel_plates',
-      arrayConfig: { size: Math.max(1, Math.floor(Math.sqrt(state.N_tiles))) }
+      // bounded edge to keep any internal allocations sane
+      arrayConfig: { size: dynEdge }
     } as any);
     
-    const dyn = calculateDynamicCasimirWithNatario({
-        staticEnergy: staticResult.totalEnergy,
-        modulationFreqGHz: state.modulationFreq_GHz,
-        strokeAmplitudePm: (state as any).strokeAmplitude_pm ?? 50,
-        burstLengthUs: (state as any).burst_us ?? 10,
-        cycleLengthUs: (state as any).cycle_us ?? 1000,
-        cavityQ: state.qCavity,
-        tileCount: state.N_tiles
-      }, {
-        ...state,
-        dynamicConfig: {
+    if (!shouldSkipDynamic) {
+      const dyn = calculateDynamicCasimirWithNatario({
+          staticEnergy: staticResult.totalEnergy,
           modulationFreqGHz: state.modulationFreq_GHz,
+          strokeAmplitudePm: (state as any).strokeAmplitude_pm ?? 50,
+          burstLengthUs: (state as any).burst_us ?? 10,
+          cycleLengthUs: (state as any).cycle_us ?? 1000,
           cavityQ: state.qCavity,
-          qSpoilingFactor: state.qSpoilingFactor,
-          sectorCount: state.sectorCount,
-          concurrentSectors: state.concurrentSectors,
-          sectorDuty: d_eff,                      // FR duty
-          lightCrossingTimeNs: tauLC_s * 1e9,
-          gammaGeo: state.gammaGeo,
-          gammaVanDenBroeck: state.gammaVanDenBroeck
-        }
-      } as any
-    );
-    
-    // Store dynamic results in state
-    (state as any).dynamic = dyn;
+          // IMPORTANT: pass *aggregate* count, not an array-sized count
+          tileCount: state.N_tiles
+        }, {
+          ...state,
+          dynamicConfig: {
+            modulationFreqGHz: state.modulationFreq_GHz,
+            cavityQ: state.qCavity,
+            qSpoilingFactor: state.qSpoilingFactor,
+            sectorCount: state.sectorCount,
+            concurrentSectors: state.concurrentSectors,
+            sectorDuty: d_eff,  // FR duty
+            lightCrossingTimeNs: tauLC_s * 1e9,
+            gammaGeo: state.gammaGeo,
+            gammaVanDenBroeck: state.gammaVanDenBroeck
+          }
+        } as any
+      );
+      (state as any).dynamic = dyn;
+    } else {
+      (state as any).dynamic = { note: 'skipped (tilecount hard cap)', totalEnergy: staticResult.totalEnergy };
+    }
   } catch (e) {
     console.warn('Dynamic Casimir calculation failed:', e);
   }

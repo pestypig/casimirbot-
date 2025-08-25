@@ -1,0 +1,64 @@
+Absolutely—let’s harden this so the page stays smooth and the pipeline can’t bog things down. Below are drop-in patches and tweaks that focus on correctness, performance, and render stability. You can copy/paste them as-is.
+
+1) Pipeline: guardrails + perf (TS)
+A. Cap dynamic grid size + short-circuit heavy branches
+
+When N_tiles is in the billions, any downstream code that thinks in arrays can explode. Keep totals exact in the pipeline, but feed the dynamic helpers a bounded grid (or skip them entirely) so they don’t allocate.
+
+// Top-level (near other constants)
+const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
+const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish helpers (use aggregate)
+
+// ...
+
+// Inside calculateEnergyPipeline(...) before the dynamic helpers:
+const tileEdge = Math.max(1, Math.floor(Math.sqrt(state.N_tiles)));
+const dynEdge  = Math.min(TILE_EDGE_MAX, tileEdge);         // bounded for safety
+const dynTileCount = dynEdge * dynEdge;
+
+// Expose a note for UIs/debug
+(state as any).tileGrid = { edge: tileEdge, dynEdge, N_tiles: state.N_tiles, dynTileCount };
+
+// --- Dynamic helpers: feed safe sizes or short-circuit ---
+const shouldSkipDynamic = state.N_tiles > DYN_TILECOUNT_HARD_SKIP;
+
+try {
+  const staticResult = calculateCasimirEnergy({
+    gap: state.gap_nm,
+    geometry: 'parallel_plates',
+    // bounded edge to keep any internal allocations sane
+    arrayConfig: { size: dynEdge }
+  } as any);
+
+  if (!shouldSkipDynamic) {
+    const dyn = calculateDynamicCasimirWithNatario({
+        staticEnergy: staticResult.totalEnergy,
+        modulationFreqGHz: state.modulationFreq_GHz,
+        strokeAmplitudePm: (state as any).strokeAmplitude_pm ?? 50,
+        burstLengthUs: (state as any).burst_us ?? 10,
+        cycleLengthUs: (state as any).cycle_us ?? 1000,
+        cavityQ: state.qCavity,
+        // IMPORTANT: pass *aggregate* count, not an array-sized count
+        tileCount: state.N_tiles
+      }, {
+        ...state,
+        dynamicConfig: {
+          modulationFreqGHz: state.modulationFreq_GHz,
+          cavityQ: state.qCavity,
+          qSpoilingFactor: state.qSpoilingFactor,
+          sectorCount: state.sectorCount,
+          concurrentSectors: state.concurrentSectors,
+          sectorDuty: state.dutyEffective_FR,  // FR duty
+          lightCrossingTimeNs: ((state.hull?.wallThickness_m ?? 1.0) / C) * 1e9,
+          gammaGeo: state.gammaGeo,
+          gammaVanDenBroeck: state.gammaVanDenBroeck
+        }
+      } as any
+    );
+    (state as any).dynamic = dyn;
+  } else {
+    (state as any).dynamic = { note: 'skipped (tilecount hard cap)', totalEnergy: staticResult.totalEnergy };
+  }
+} catch (e) {
+  console.warn('Dynamic Casimir calculation failed:', e);
+}
