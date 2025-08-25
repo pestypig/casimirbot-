@@ -5,6 +5,7 @@ import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import WarpGrid3D from "@/components/warp/WarpGrid3D";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 
@@ -398,7 +399,7 @@ export default function WarpRenderInspector(props: {
   const showSectors = (showMode.startsWith('sector-')) ? 1 : sConcurrent;
 
   const showStencil = (showMode.startsWith('sector-'))
-    ? { maskCenter: (props.lightCrossing?.sectorIdx ?? 0), maskWidth: 1 }
+    ? { maskCenter: ((props.lightCrossing as any)?.currentSector ?? 0), maskWidth: 1 }
     : undefined;
 
   // Apply shared physics inputs any time calculator/shared/controls change
@@ -436,11 +437,6 @@ export default function WarpRenderInspector(props: {
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
       sectors: sConcurrent,                    // 1
-      viewAvg: viewAvgUsed,       // Use debug toggle
-      // Apply debug toggles to display controls
-      ridgeMode: ridgeModeUsed,
-      exposure: tonemapExp,
-      zeroStop: zeroStop,
       // ✅ give the sweep window so duty_local can be computed
       lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
       // Physical scaling
@@ -457,17 +453,23 @@ export default function WarpRenderInspector(props: {
     // REAL engine - physics truth
     gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
     
-    // SHOW engine - enhanced visuals with mode-specific overrides
-    const showUniforms = {
-      ...shared,
-      physicsParityMode: false,
-      // Apply SHOW mode overrides
-      dutyEffectiveFR: showDuty,
-      sectors: showSectors,
-      viewAvg: showMode !== 'sector-instant', // instant = no FR averaging
-      ...(showStencil && { sectorMask: showStencil })
-    };
-    gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
+    // Handle different renderers for SHOW pane
+    if (showMode === 'grid-3d') {
+      // 3D grid mode - will be handled by conditional rendering
+      gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
+    } else {
+      // SHOW engine - enhanced visuals with mode-specific overrides
+      const showUniforms = {
+        ...shared,
+        physicsParityMode: false,
+        // Apply SHOW mode overrides
+        dutyEffectiveFR: showDuty,
+        sectors: showSectors,
+        viewAvg: showMode !== 'sector-instant', // instant = no FR averaging
+        ...(showStencil && { sectorMask: showStencil })
+      };
+      gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
+    }
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
@@ -580,11 +582,27 @@ export default function WarpRenderInspector(props: {
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">SHOW — Boosted (UI)</h3>
+            <h3 className="text-sm font-semibold">SHOW — {showMode}</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={rightRef} className="w-full h-full block"/>
+            {showMode === 'grid-3d' ? (
+              <WarpGrid3D
+                hull={shared.hull || { a: 503.5, b: 132, c: 86.5 }}
+                wallWidth_m={shared.wallWidth_m || 6.0}
+                sectorCount={shared.sectorCount || 400}
+                sectors={showSectors}
+                dutyEffectiveFR={showDuty}
+                lightCrossing={props.lightCrossing}
+                gammaGeo={shared.gammaGeo || 26}
+                gammaVdB={gammaVdBBound}
+                qSpoilingFactor={shared.qSpoilingFactor || 1}
+                width={400}
+                height={300}
+              />
+            ) : (
+              <canvas ref={rightRef} className="w-full h-full block"/>
+            )}
           </div>
         </article>
       </section>
