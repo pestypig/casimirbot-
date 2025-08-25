@@ -607,6 +607,11 @@ export default function WarpRenderInspector(props: {
       // ❌ do NOT include thetaScale anywhere
     };
 
+    // Just before first uniforms push - seed FR to avoid transition spike
+    const seedFR = 0.01 * (1 / Math.max(1, sTotal)); // 1% × 1/400
+    gatedUpdateUniforms(leftEngine.current,  { dutyEffectiveFR: seedFR }, 'seed-fr');
+    gatedUpdateUniforms(rightEngine.current, { dutyEffectiveFR: seedFR }, 'seed-fr');
+    
     // REAL engine - physics truth with per-width view fraction
     const realUniforms = toUniforms({
       ...shared, 
