@@ -42,7 +42,7 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       
       // Get 2D context
       const ctx = canvas.getContext('2d');
-      if (!ctx) {
+      if (!ctx || typeof (ctx as any).clearRect !== 'function') {
         console.error('Failed to get Canvas 2D context');
         return;
       }
@@ -225,7 +225,7 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
         cb();
       },
       // Mock WebGL context for checkpoints
-      getContext: () => ({
+      getGLCompat: () => ({
         drawingBufferWidth: canvas.width || 800,
         drawingBufferHeight: canvas.height || 600,
         isContextLost: () => false
@@ -233,7 +233,9 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     };
 
     // Also add methods to canvas for backward compatibility
-    Object.assign(canvas, engineRef.current);
+    const compat = { ...engineRef.current } as any;
+    delete compat.getGLCompat;            // do not shadow native 2D API
+    Object.assign(canvas, compat);
   }, []);
 
   // Expose engine methods via ref
