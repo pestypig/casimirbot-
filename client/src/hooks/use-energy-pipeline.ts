@@ -125,6 +125,7 @@ export function useSwitchMode() {
           qSpoilingFactor: cfg.qSpoilingFactor,
         });
       }
+      publish("warp:reload", { reason: "mode-switch-local", mode, ts: Date.now() });
       return data;
     },
     onSuccess: (data, mode) => {
@@ -157,11 +158,11 @@ export const MODE_CONFIGS = {
   cruise: {
     name: "Cruise Mode",
     dutyCycle: 0.005,
-    sectorStrobing: 1,
-    qSpoilingFactor: 0.625,
+    sectorStrobing: 1,       // concurrent sectors
+    qSpoilingFactor: 0.625,  // matches server defaults
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Low-power cruise mode for sustained travel",
-    powerTarget_W: 83.3e6,
+    powerTarget_W: 7.437,    // keep in W as per policy
     color: "text-green-400"
   },
   emergency: {

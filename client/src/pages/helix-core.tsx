@@ -322,10 +322,6 @@ export default function HelixCore() {
   // Type-safe access to pipeline state
   const pipeline = pipelineState as EnergyPipelineState;
 
-  // Also rebind when core FR/sector knobs actually change (local safety net)
-  useEffect(() => {
-    setRenderNonce(n => n + 1);
-  }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
   // Optional: expose for quick console checks
   useEffect(() => { (window as any).__energyLive = pipeline; }, [pipeline]);
@@ -527,6 +523,11 @@ export default function HelixCore() {
     pipeline?.gammaGeo, pipeline?.qSpoilingFactor, pipeline?.gammaVanDenBroeck, sectorsUI,
     isStandby, dutyEffectiveFR_safe, dutyUI_safe
   ]);
+
+  // Also rebind when core FR/sector knobs actually change (local safety net)
+  useEffect(() => {
+    setRenderNonce(n => n + 1);
+  }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
   // Create truly separate payloads (no shared nested refs)
   const heroParams = useMemo(() => {
