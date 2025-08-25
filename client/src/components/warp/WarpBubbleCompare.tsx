@@ -995,13 +995,18 @@ export default function WarpBubbleCompare({
       pushSafe(rightEngine, lcPayload);
     }
 
-    // Set deterministic camera for both engines to avoid auto-fit order dependencies
+    // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
+    pushSafe(leftEngine, {
+      exposure: real.exposure,
+      zeroStop: real.zeroStop,
+      colorMode: 2,             // pin shear proxy permanently for REAL
+      ridgeMode: 0              // pin double-lobe physics mode
+    });
+
+    // SHOW: can have live camera and display adjustments
     if (leftRef.current && rightRef.current) {
-      const shared = { hull: { a: real.hullAxes[0], b: real.hullAxes[1], c: real.hullAxes[2] } };
-      // Use a fixed camera Z for consistent framing
-      const camZ = 1.8; // Fixed deterministic camera position
-      pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true });
-      pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true });
+      const fixedCamZ = 1.8; // Fixed camera for SHOW only
+      pushSafe(rightEngine, { cameraZ: fixedCamZ, lockFraming: true });
     }
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
