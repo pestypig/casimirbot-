@@ -82,7 +82,7 @@ function InteractiveHeatMap({
       qCavity: 1.6e6,      // 1.6×10⁶ (Lower for stability)
       mechQ: 5e4,          // 5.0×10⁴ (Fixed)
       dutyCycle: 0.005,    // 0.5% duty (Ford-Roman compliant)
-      sectorStrobing: 400, // 400-sector strobing (1/S = 1/400)
+      sectorStrobing: 1, // 1-sector strobing (proper sweep mode)
       qSpoilingFactor: 0.001, // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
       gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
       description: "7.4 MW • 1,405 kg • ζ=0.89"

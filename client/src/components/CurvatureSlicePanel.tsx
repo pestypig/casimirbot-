@@ -35,15 +35,17 @@ export default function CurvatureSlicePanel() {
 
   // Concurrent/total sectors (for FR fallback). Total = paper 400.
   const totalSectors = 400;
-  const concurrent = Math.max(
-    1,
-    Math.floor(
-      // prefer pipeline's concurrent sectors if present, else sectorStrobing, else 1
-      (live as any)?.concurrentSectors ??
-      (live as any)?.sectorStrobing ??
-      1
-    )
-  );
+  const concurrentSectors = useMemo(() => {
+    // Prefer explicit "how many are ON right now?"
+    const liveFromMetrics  = Number.isFinite((live as any)?.activeSectors) ? Number((live as any)?.activeSectors) : undefined;
+    const liveFromPipeline = Number.isFinite((live as any)?.sectorsConcurrent) ? Number((live as any)?.sectorsConcurrent) : undefined;
+
+    const S_total = Math.max(1, Number(totalSectors) || 400);
+    // Our strobe energizes exactly ONE sector at a time
+    const S_live = Math.max(1, Math.min(S_total, liveFromMetrics ?? liveFromPipeline ?? 1));
+    return S_live; // ← will be 1 in Hover/Cruise; clamp prevents 400/400
+  }, [(live as any)?.activeSectors, (live as any)?.sectorsConcurrent, totalSectors]);
+  const concurrent = concurrentSectors;
 
   // REAL ship-wide FR duty (server > computed fallback)
   const mode = String((live as any)?.currentMode || "hover").toLowerCase();

@@ -758,7 +758,7 @@ export default function HelixCore() {
     if (!systemMetrics && !Number.isFinite(lc?.sectorIdx)) return;
 
     const total = totalSectors;                                 // e.g., 400
-    const live = Math.max(1, Math.floor(systemMetrics?.sectorStrobing ?? concurrentSectors ?? 1));
+    const live = Math.max(1, Math.min(total, Math.floor(concurrentSectors ?? 1))); // Safe clamp: never exceed 1 for sweep
     const baseIdxSrc = Number.isFinite(systemMetrics?.currentSector)
       ? Number(systemMetrics!.currentSector)
       : Number(lc?.sectorIdx ?? 0);                             // fallback to physics loop
