@@ -408,18 +408,21 @@ export default function WarpRenderInspector(props: {
 
   function reportThetaConsistency(bound:{
     gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number;
-  }, u: any = {}, isShow: boolean = false) {
-    const canonical = thetaGainExpected(bound);
-    const expected = canonical; // Keep expected honest (canonical)
-    const used = canonical * (u.viewMassFraction ?? 1.0); // Apply view fraction to used
+  }, viewMassFraction: number = 1.0, isShow: boolean = false) {
+    // Expected: Pure pipeline physics (γ_geo³ × q × γ_VdB × d_FR)
+    const expected = thetaGainExpected(bound);
+    
+    // Used: Same physics chain × viewMassFraction only (no display gains)
+    const used = expected * viewMassFraction;
+    
     const delta = pctDelta(used, expected);
     const range = Math.max(expected, used) || 1;
     
     const fmt = (v: number) => v.toExponential(2);
     const fmtPct = (v: number) => (v * 100).toFixed(1) + '%';
     
-    console.log(`[HELIX][θ] θ-scale — ${fmt(canonical)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
-    console.log(`[HELIX][θ] view fraction: ${fmtPct(u.viewMassFraction ?? 1.0)}`);
+    console.log(`[HELIX][θ] θ-scale — ${fmt(expected)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
+    console.log(`[HELIX][θ] view fraction: ${fmtPct(viewMassFraction)}`);
     console.log(`[HELIX][θ] renderer: ${isShow ? 'grid3d' : 'slice2d'}`);
     
     return { expected, used, delta };
@@ -458,7 +461,9 @@ export default function WarpRenderInspector(props: {
     gammaVdB: gammaVdBBound,
     dutyEffectiveFR: dutyEffectiveFR
   };
-  const { expected, used, delta } = reportThetaConsistency(bound, toUniforms(props.showPhys || {}), showRendererType === 'grid3d');
+  // Extract only viewMassFraction from showPhys (no display gains)
+  const showViewMassFraction = N(props.showPhys?.viewMassFraction, 1.0);
+  const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
 
   // Bridge Grid3D engine to checkpoints panel
   useEffect(() => {
@@ -548,8 +553,8 @@ export default function WarpRenderInspector(props: {
     setTimeout(() => {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
-      // Report theta consistency after engine updates
-      reportThetaConsistency(bound);
+      // Report theta consistency after engine updates (use SHOW view fraction for consistency)
+      reportThetaConsistency(bound, showViewMassFraction);
     }, 100);
   }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
