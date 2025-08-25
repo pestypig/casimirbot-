@@ -170,7 +170,7 @@ export const MODE_CONFIGS = {
   emergency: {
     name: "Emergency Mode",
     dutyCycle: 0.50,
-    sectorStrobing: 1,
+    sectorStrobing: 2,
     qSpoilingFactor: 1,
     gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
     description: "Maximum power emergency mode",

@@ -341,6 +341,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
+  (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   // (dutyCycle already set from MODE_CONFIGS above)
 
   // ✅ First-class fields for UI display
@@ -654,7 +655,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       qSpoilingFactor: state.qSpoilingFactor ?? 1,
       dutyCycle: state.dutyCycle,
       sectorStrobing: state.sectorStrobing,
-      dutyEffectiveFR: (state as any).dutyEffectiveFR,
+      dutyEffectiveFR: state.dutyEffective_FR,     // stress-energy payload
       lightCrossing: (state as any).lightCrossing,
       R_geom_m: geomR
     });
@@ -688,9 +689,9 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
         cycleLengthUs: 1000,
         cavityQ: state.qCavity ?? 1e9,
         sectorCount: state.sectorCount ?? 400,
-        sectorDuty: (state as any).dutyEffectiveFR ?? 2.5e-5,
+        sectorDuty: state.dutyEffective_FR ?? 2.5e-5, // warp module payload
         pulseFrequencyGHz: state.modulationFreq_GHz ?? 15,
-        lightCrossingTimeNs: ((state as any).TS_wall || 1.0) * 1e6,
+        lightCrossingTimeNs: tauLC_s * 1e9,
         shiftAmplitude: 50e-12,
         expansionTolerance: 1e-12,
         warpFieldType: 'natario' as const
@@ -764,7 +765,7 @@ export async function computeEnergySnapshot(sim: any) {
   const result = await calculateEnergyPipeline(state);
 
   // Trust the pipeline's FR duty (ship-wide, sector-averaged)
-  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? result.dutyEff ?? 2.5e-5;
+  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
 
   // Expose to clients (names match what adapters expect)
   return {
@@ -814,7 +815,7 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const nTheta = req.nTheta ?? 64;
   const nPhi   = req.nPhi ?? 32;
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
-  const split   = Math.floor(sectors / 2); // always use proper split for wedge boundaries
+  const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
   // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
   // Use harmonic-mean effective radius to match viewer/renderer ρ-units.
