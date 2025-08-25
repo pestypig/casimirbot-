@@ -132,7 +132,11 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     return 0.016;
   }, [hullAxes, wallWidth_m, wallWidth_rho]);
 
-  const dN = useMemo(() => normalize(divVec(driveDir, hullAxes as Vec3)), [driveDir, hullAxes]);
+  const safeAxes = useMemo(
+    () => [Math.max(1e-9, hullAxes[0]), Math.max(1e-9, hullAxes[1]), Math.max(1e-9, hullAxes[2])] as Vec3,
+    [hullAxes]
+  );
+  const dN = useMemo(() => normalize(divVec(driveDir, safeAxes)), [driveDir, safeAxes]);
 
   const amp = useMemo(() => {
     const A_geo = Math.pow(gammaGeo, 3);
@@ -150,18 +154,21 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
   const ampRef = useMemo(() => {
     if (!diffMode) return 0;
+    // Default to CURRENT props so Δ=0 when no explicit reference is provided.
     const g = refParams?.gammaGeo ?? gammaGeo;
-    const q = refParams?.qSpoilingFactor ?? 1;
-    const v = refParams?.gammaVdB ?? 3.83e1;
-    const d = refParams?.dutyCycle ?? 0.14;
-    const s = refParams?.sectors ?? 1;
-    const avg = (refParams?.viewAvg ?? true) ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
+    const q = refParams?.qSpoilingFactor ?? qSpoilingFactor;
+    const v = refParams?.gammaVdB ?? gammaVdB;
+    const d = refParams?.dutyCycle ?? dutyCycle;
+    const s = refParams?.sectors ?? sectors;
+    const avg = (refParams?.viewAvg ?? viewAvg)
+      ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
     return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
-  }, [diffMode, refParams, gammaGeo]);
+  }, [diffMode, refParams, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    if (width <= 0 || height <= 0) return;
 
     // Handle high-DPR displays for crisp result
     const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -193,14 +200,14 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       const xs_over_rs = dot(pHat, dN); // equals cos(angle between p and drive)
 
       for (let i = 0; i < nX; i++) {
-        // xσ ∈ [-sigmaRange, +sigmaRange]
-        const xσ = -sigmaRange + (2 * sigmaRange * i) / (nX - 1);
-        const ρ = 1 + xσ * wRho; // absolute ρ
+        // xSigma ∈ [-sigmaRange, +sigmaRange]
+        const xSigma = -sigmaRange + (2 * sigmaRange * i) / Math.max(1, (nX - 1));
+        const rho = 1 + xSigma * wRho; // absolute ρ
 
         // Canonical Gaussian shell and its derivative
         const w = Math.max(1e-6, wRho);
-        const f = Math.exp(-((ρ - 1) * (ρ - 1)) / (w * w));
-        const dfdr = (-2 * (ρ - 1) / (w * w)) * f; // d/dρ
+        const f = Math.exp(-((rho - 1) * (rho - 1)) / (w * w));
+        const dfdr = (-2 * (rho - 1) / (w * w)) * f; // d/dρ
 
         // York-time proxy (matches your shader form)
         let theta = vShip * xs_over_rs * dfdr; // 1/ρ cancels because pHat has |p|=1

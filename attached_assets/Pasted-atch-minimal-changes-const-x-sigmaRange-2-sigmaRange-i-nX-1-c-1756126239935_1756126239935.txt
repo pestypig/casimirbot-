@@ -1,0 +1,57 @@
+atch (minimal changes)
+-        const xσ = -sigmaRange + (2 * sigmaRange * i) / (nX - 1);
+-        const ρ = 1 + xσ * wRho; // absolute ρ
++        const xSigma = -sigmaRange + (2 * sigmaRange * i) / Math.max(1, (nX - 1));
++        const rho = 1 + xSigma * wRho; // absolute ρ
+
+-        const w = Math.max(1e-6, wRho);
+-        const f = Math.exp(-((ρ - 1) * (ρ - 1)) / (w * w));
+-        const dfdr = (-2 * (ρ - 1) / (w * w)) * f; // d/dρ
++        const w = Math.max(1e-6, wRho);
++        const f = Math.exp(-((rho - 1) * (rho - 1)) / (w * w));
++        const dfdr = (-2 * (rho - 1) / (w * w)) * f; // d/dρ
+
+-  const dN = useMemo(() => normalize(divVec(driveDir, hullAxes as Vec3)), [driveDir, hullAxes]);
++  const safeAxes = useMemo(
++    () => [Math.max(1e-9, hullAxes[0]), Math.max(1e-9, hullAxes[1]), Math.max(1e-9, hullAxes[2])] as Vec3,
++    [hullAxes]
++  );
++  const dN = useMemo(() => normalize(divVec(driveDir, safeAxes)), [driveDir, safeAxes]);
+
+-  const ampRef = useMemo(() => {
+-    if (!diffMode) return 0;
+-    const g = refParams?.gammaGeo ?? gammaGeo;
+-    const q = refParams?.qSpoilingFactor ?? 1;
+-    const v = refParams?.gammaVdB ?? 3.83e1;
+-    const d = refParams?.dutyCycle ?? 0.14;
+-    const s = refParams?.sectors ?? 1;
+-    const avg = (refParams?.viewAvg ?? true) ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
+-    return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
+-  }, [diffMode, refParams, gammaGeo]);
++  const ampRef = useMemo(() => {
++    if (!diffMode) return 0;
++    // Default to CURRENT props so Δ=0 when no explicit reference is provided.
++    const g = refParams?.gammaGeo ?? gammaGeo;
++    const q = refParams?.qSpoilingFactor ?? qSpoilingFactor;
++    const v = refParams?.gammaVdB ?? gammaVdB;
++    const d = refParams?.dutyCycle ?? dutyCycle;
++    const s = refParams?.sectors ?? sectors;
++    const avg = (refParams?.viewAvg ?? viewAvg)
++      ? Math.sqrt(Math.max(1e-12, d) / Math.max(1, s)) : 1.0;
++    return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avg;
++  }, [diffMode, refParams, gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
++   if (width <= 0 || height <= 0) return;
+
+
+(Optional) if you want zero ASCII purism without retyping the math everywhere, just alias once:
+
+// after computing:
+const xSigma = ...; const rho = ...;
+// keep comments with ρ/σ for readability
+
+
+That’s it—after these tweaks you’ll have deterministic Δθ behaviour, safer math, and fewer surprise rerenders.
