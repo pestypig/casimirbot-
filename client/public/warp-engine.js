@@ -1468,8 +1468,10 @@ class WarpEngine {
         if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(u.colorMode, 1));
         if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(u.ridgeMode, 1));
         if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
-        if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount,I(u.sectors, 1));
-        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      I(Math.max(0, Math.min(I(u.sectors,1)-1, I(u.split,0))), 0));
+        const sLive  = Math.max(1, (u.sectors|0)      || 1);
+        const sTotal = Math.max(1, (u.sectorCount|0)  || sLive);
+        if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
+        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(u.split,0))));
 
         // --- axes (scene-normalized and legacy hull)
         const axesScene = u.axesClip || u.axesScene || [1,1,1];
