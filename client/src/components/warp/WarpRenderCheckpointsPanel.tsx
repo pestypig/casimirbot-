@@ -178,6 +178,14 @@ function useCheckpointList(
       const tsExp = thetaExpectedFn(u, dutyFR);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
       
+      // Smart θ mismatch detection
+      const parity = !!(u.physicsParityMode ?? u.parityMode);
+      const boostLeak = parity && N(u.curvatureBoostMax, 1) > 1;
+      if (boostLeak) {
+        tsDetail += ' • (check: REAL boost should be 1)';
+        tsState = 'warn';
+      }
+      
       // Check for mode disagreement during transitions
       const engineMode = String(e?.uniforms?.currentMode || '').toLowerCase();
       const liveMode = String(liveSnap?.currentMode || '').toLowerCase();
