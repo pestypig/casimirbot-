@@ -367,6 +367,7 @@ export default function HelixCore() {
     refetchInterval: 5000,
     staleTime: 4_500,
     refetchOnWindowFocus: false,
+    suspense: false,
   });
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes

@@ -53,6 +53,7 @@ export default function Simulation() {
     enabled: !!currentSimulation?.id,
     refetchInterval: currentSimulation?.status && 
       !["completed", "failed"].includes(currentSimulation.status) ? 2000 : false,
+    suspense: false,
   });
 
   // Create simulation mutation

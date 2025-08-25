@@ -26,7 +26,8 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   // --- Metrics (to reconstruct FR duty if server didn't put it on pipeline) ---
   const { data: systemMetrics } = useQuery({
     queryKey: ["/api/helix/metrics"],
-    refetchInterval: 5000
+    refetchInterval: 5000,
+    suspense: false,
   });
 
   // Helper type guards

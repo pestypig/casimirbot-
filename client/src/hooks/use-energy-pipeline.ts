@@ -97,6 +97,7 @@ export function useEnergyPipeline(options?: {
     refetchInterval: options?.refetchInterval ?? 1000, // Refresh every second
     staleTime: options?.staleTime,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
+    suspense: false,
   });
 }
 
