@@ -121,9 +121,9 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       }
     };
 
-    // Hoist grid building for performance - rebuild only on uniform changes
+    // Build grid once - only rebuild on canvas size changes
     let cachedGrid = buildGrid(32, 20, 32);
-    let lastUniformsHash = JSON.stringify(uniforms);
+    let lastCanvasSize = { width: canvas.width, height: canvas.height };
     
     // Render function
     const render = () => {
@@ -132,11 +132,10 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
       
-      // Rebuild grid only if uniforms changed
-      const currentHash = JSON.stringify(uniforms);
-      if (currentHash !== lastUniformsHash) {
+      // Rebuild grid only if canvas size changed
+      if (width !== lastCanvasSize.width || height !== lastCanvasSize.height) {
         cachedGrid = buildGrid(32, 20, 32);
-        lastUniformsHash = currentHash;
+        lastCanvasSize = { width, height };
       }
       
       const grid = cachedGrid;
