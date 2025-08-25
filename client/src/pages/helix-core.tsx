@@ -1973,7 +1973,11 @@ export default function HelixCore() {
                       <Switch
                         id="deep-zoom-toggle"
                         checked={useDeepZoom}
-                        onCheckedChange={setUseDeepZoom}
+                        onCheckedChange={(checked) => {
+                          startTransition(() => {
+                            setUseDeepZoom(checked);
+                          });
+                        }}
                       />
                     </div>
                   )}

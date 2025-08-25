@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, startTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown, Sliders, Play, FileCode, Cpu, Zap, Activity, Rocket } from "lucide-react";
@@ -385,7 +385,11 @@ export default function ParameterPanel({
 
             {/* Advanced Parameters */}
             <div className="pt-6 border-t border-slate-200">
-              <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <Collapsible open={showAdvanced} onOpenChange={(open) => {
+                startTransition(() => {
+                  setShowAdvanced(open);
+                });
+              }}>
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost" className="flex items-center justify-between w-full p-0 h-auto">
                     <span className="text-sm font-medium">Advanced Parameters</span>

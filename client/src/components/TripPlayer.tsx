@@ -1,4 +1,5 @@
 import * as React from "react";
+import { startTransition } from "react";
 import { Button } from "@/components/ui/button";
 
 type Phase = "Preflight" | "SpoolUp" | "Cruise" | "StationKeep" | "Return" | "Complete";
@@ -114,7 +115,12 @@ export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPla
       <div className="text-sm font-semibold mb-2">Trip Player</div>
       <div className="text-xs mb-2">Phase: <span className="font-mono">{phase}</span> — {Math.round(progress*100)}%</div>
       <div className="flex gap-2 mb-3">
-        <Button onClick={()=>{ resetTrip(); setRunning(true); }}>Start</Button>
+        <Button onClick={()=>{ 
+          resetTrip(); 
+          startTransition(() => {
+            setRunning(true);
+          });
+        }}>Start</Button>
         <Button variant="secondary" onClick={()=>setRunning(false)} disabled={!running}>Pause</Button>
         <Button variant="outline" onClick={resetTrip}>Reset</Button>
       </div>
