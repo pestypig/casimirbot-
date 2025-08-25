@@ -153,26 +153,29 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   const dN = useMemo(() => normalize(divVec(driveDir, safeAxes)), [driveDir, safeAxes]);
 
   const amp = useMemo(() => {
+    // geometry
     const A_geo = Math.pow(gammaGeo, 3);
-    
-    // Use FR-averaged duty if provided, otherwise fall back to UI duty
-    const effectiveDuty = dutyEffectiveFR ?? dutyCycle;
-    const avg = viewAvg ? Math.sqrt(Math.max(1e-12, effectiveDuty) / Math.max(1, sectors)) : 1.0;
-    const A_base = A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
-    
-    // Physics parity mode: disable all visual boosts (unity viz chain)
-    if (physicsParityMode) {
-      return A_base; // Raw physics, no visual amplification
-    }
-    
-    // Apply curvature gain blend: A_vis = A_base * boost * modeScale
-    // curvatureGain: 0-8 → curvatureGainT: 0-1
+
+    // averaging: viewerAvg uses sqrt(duty/sectors); REAL uses sqrt(dutyEffectiveFR)
+    const avg = viewAvg
+      ? (Number.isFinite(dutyEffectiveFR)
+          ? Math.sqrt(Math.max(1e-12, dutyEffectiveFR as number))
+          : Math.sqrt(Math.max(1e-12, dutyCycle) / Math.max(1, sectors)))
+      : 1.0;
+
+    // parity mode kills boosts (unity), otherwise respect viewer gain
     const curvatureGainT = Math.max(0, Math.min(1, curvatureGain / 8));
-    const boost = (1 - curvatureGainT) + curvatureGainT * curvatureBoostMax;
-    const modeScale = 1.0; // SliceViewer uses consistent scaling
-    
-    return A_base * boost * modeScale;
-  }, [gammaGeo, qSpoilingFactor, gammaVdB, dutyCycle, sectors, viewAvg, dutyEffectiveFR, physicsParityMode, curvatureGain, curvatureBoostMax]);
+    const boost = physicsParityMode ? 1 : (1 - curvatureGainT) + curvatureGainT * curvatureBoostMax;
+
+    // keep gammaVdB ≥ 1 for stability; qSpoiling ≥ tiny
+    const A_base = A_geo * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
+
+    return A_base * boost;
+  }, [
+    gammaGeo, qSpoilingFactor, gammaVdB,
+    viewAvg, dutyEffectiveFR, dutyCycle, sectors,
+    physicsParityMode, curvatureGain, curvatureBoostMax
+  ]);
 
   const ampRef = useMemo(() => {
     if (!diffMode) return 0;
