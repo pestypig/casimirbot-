@@ -213,10 +213,11 @@ function useCheckpointList(
     rows.push({ label: "Grid buffers", detail: `${verts}/${orig} floats`, state: gridOk ? "ok" : "fail" });
 
     // Strobing sanity
-    const s = Math.max(1, N(u?.sectors, 1));
-    const sp = Math.max(0, Math.min(s - 1, N(u?.split, 0)));
-    const strobeOk = s >= 1 && sp < s;
-    rows.push({ label: "Strobing", detail: `sectors=${s} • split=${sp}` , state: strobeOk ? "ok" : "warn" });
+    const sConcurrent = u?.sectors ?? 1;
+    const sTotal = liveSnap?.sectorCount ?? 400;
+    const sp = Math.max(0, Math.min(sConcurrent - 1, N(u?.split, 0)));
+    const strobeOk = sConcurrent >= 1 && sp < sConcurrent;
+    rows.push({ label: "Strobing", detail: `concurrent=${sConcurrent} • total=${sTotal} • split=${sp}`, state: strobeOk ? "ok" : "warn" });
 
     // Heartbeat (did diagnostics run in the last ~2s?)
     const dt = Date.now() - hb;
