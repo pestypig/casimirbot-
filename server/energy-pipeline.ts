@@ -295,6 +295,17 @@ function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
   return E_overA * area_m2; // J
 }
 
+// Memoize hull surface area to avoid repeated pow/roots in tight loops
+const hullAreaCache = new Map<string, number>();
+function getHullArea(Lx_m: number, Ly_m: number, Lz_m: number) {
+  const key = `${Lx_m}|${Ly_m}|${Lz_m}`;
+  const hit = hullAreaCache.get(key);
+  if (hit) return hit;
+  const area = surfaceAreaEllipsoidFromHullDims(Lx_m, Ly_m, Lz_m);
+  hullAreaCache.set(key, area);
+  return area;
+}
+
 // Main pipeline calculation
 export async function calculateEnergyPipeline(state: EnergyPipelineState): Promise<EnergyPipelineState> {
   // --- Surface area & tile count from actual hull dims ---
@@ -307,7 +318,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     Ly_m: state.shipRadius_m * 2,
     Lz_m: state.shipRadius_m * 2,
   };
-  const hullArea_m2 = surfaceAreaEllipsoidFromHullDims(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
+  const hullArea_m2 = getHullArea(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
   
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
