@@ -158,49 +158,90 @@ export function useSwitchMode() {
   });
 }
 
+// --- Types
+export type ModeKey = "standby" | "hover" | "cruise" | "emergency";
+
+export type ModeConfig = {
+  name: string;
+  color: string;
+  description?: string;
+
+  // UI duty knob (not FR-averaged)
+  dutyCycle: number;
+
+  // 🔁 NEW: how many sectors exist vs. are live at once
+  sectorsTotal: number;        // e.g., 400 (grid partitions across the hull)
+  sectorsConcurrent: number;   // e.g., 1 in Hover/Cruise, maybe 4–8 in Emergency
+
+  // 🔦 NEW: per-sector ON window (fraction of dwell, 0..1)
+  localBurstFrac: number;      // e.g., 0.01 in Hover/Cruise; 0.50 in Emergency; 0 in Standby
+
+  // 🎯 Optional: what the mode is aiming to produce (display only)
+  powerTarget_W?: number;
+
+  // 🧹 Legacy back-compat (many places still reference this)
+  // Keep it equal to sectorsConcurrent so older code "just works".
+  sectorStrobing?: number;
+
+  // Legacy fields for backward compatibility
+  qSpoilingFactor?: number;
+  gammaVanDenBroeck?: number;
+};
+
 // Mode configurations for UI display (synchronized with backend)
-export const MODE_CONFIGS = {
-  hover: {
-    name: "Hover Mode",
-    dutyCycle: 0.14,
-    sectorStrobing: 1,
-    qSpoilingFactor: 1,
-    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
-    description: "High-power hover mode for station-keeping",
-    // Store targets in **watts** to match the server pipeline MODE_POLICY
-    powerTarget_W: 83.3e6,
-    color: "text-cyan-400"
-  },
-  cruise: {
-    name: "Cruise Mode",
-    dutyCycle: 0.005,
-    sectorStrobing: 1,       // concurrent sectors
-    qSpoilingFactor: 0.625,  // matches server defaults
-    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
-    description: "Low-power cruise mode for sustained travel",
-    powerTarget_W: 7.437,    // keep in W as per policy
-    color: "text-green-400"
-  },
-  emergency: {
-    name: "Emergency Mode",
-    dutyCycle: 0.50,
-    sectorStrobing: 2,
-    qSpoilingFactor: 1,
-    gammaVanDenBroeck: 1e11,  // Paper-authentic value (server-authoritative)
-    description: "Maximum power emergency mode",
-    powerTarget_W: 297.5e6,
-    color: "text-red-400"
-  },
+export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
   standby: {
-    name: "Standby Mode",
-    dutyCycle: 0.001,
-    sectorStrobing: 0,
+    name: "Standby",
+    color: "text-slate-300",
+    description: "Field idle / safed",
+    dutyCycle: 0.0,
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,        // harmless placeholder; FR duty will be 0 because burst=0
+    localBurstFrac: 0.0,         // no RF
+    powerTarget_W: 0,
+    sectorStrobing: 1,
     qSpoilingFactor: 0.1,
     gammaVanDenBroeck: 1,
-    description: "Minimal power standby mode",
-    powerTarget_W: 0,
-    color: "text-slate-400"
-  }
+  },
+  hover: {
+    name: "Hover",
+    color: "text-sky-300",
+    description: "Gentle bulge / training profile",
+    dutyCycle: 0.14,
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,        // one live sector at a time (classic sweep)
+    localBurstFrac: 0.01,        // 1% local ON inside dwell
+    powerTarget_W: 83.3e6,       // match your display target
+    sectorStrobing: 1,
+    qSpoilingFactor: 1,
+    gammaVanDenBroeck: 1e11,
+  },
+  cruise: {
+    name: "Cruise",
+    color: "text-cyan-300",
+    description: "Coherent 400× sweep; FR duty mostly from averaging",
+    dutyCycle: 0.005,
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,        // keep 1 unless you want faster pass speed
+    localBurstFrac: 0.01,        // keep 1% local ON; FR change comes from S_live/S_total
+    powerTarget_W: 40e6,
+    sectorStrobing: 1,
+    qSpoilingFactor: 0.625,
+    gammaVanDenBroeck: 1e11,
+  },
+  emergency: {
+    name: "Emergency",
+    color: "text-rose-300",
+    description: "Max response window; fewer averages",
+    dutyCycle: 0.50,
+    sectorsTotal: 400,
+    sectorsConcurrent: 8,        // widen the live window (try 4, 8, or 16)
+    localBurstFrac: 0.50,        // big local ON fraction
+    powerTarget_W: 120e6,
+    sectorStrobing: 8,
+    qSpoilingFactor: 1,
+    gammaVanDenBroeck: 1e11,
+  },
 };
 
 // Optional: helper if other components want to apply mode knobs explicitly

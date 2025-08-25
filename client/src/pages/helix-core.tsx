@@ -14,10 +14,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey } from "@/hooks/use-energy-pipeline";
 
 // Utils for live mode descriptions
-type ModeKey = "hover" | "cruise" | "emergency" | "standby";
 
 const formatPower = (P_MW?: number, P_W?: number) => {
   if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
@@ -87,13 +86,7 @@ import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
 
-// Mode-specific RF burst fractions for proper curvature variation
-const LOCAL_BURST_BY_MODE = {
-  standby: 0.0,     // no RF
-  hover: 0.01,      // 1% local ON window
-  cruise: 0.01,     // keep 1% local, FR changes via strobing plan
-  emergency: 0.50,  // wide local ON window
-} as const;
+// Mode-specific RF burst fractions now sourced from MODE_CONFIGS
 
 const DEV = process.env.NODE_ENV !== "production";
 
@@ -471,18 +464,7 @@ export default function HelixCore() {
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
     hull: { a: hull.a, b: hull.b, c: hull.c },   // use live hull geometry
     wallWidth_m: 6.0,
-    localBurstFrac: LOCAL_BURST_BY_MODE[effectiveMode as keyof typeof LOCAL_BURST_BY_MODE] ?? 0.01, // mode-aware burst duty
-  });
-
-  // Quick validation snippet - log mode-aware calculations
-  console.table({
-    mode: effectiveMode,
-    totalSectors,
-    concurrentSectors,
-    dwell_ms: lc.dwell_ms,
-    burst_ms: lc.burst_ms,
-    localBurstFrac: LOCAL_BURST_BY_MODE[effectiveMode as keyof typeof LOCAL_BURST_BY_MODE],
-    dutyFR: dutyEffectiveFR_safe,
+    localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac ?? 0.01, // mode-aware burst duty
   });
 
   const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor)
@@ -514,6 +496,17 @@ export default function HelixCore() {
   const isStandby = String(effectiveMode).toLowerCase() === 'standby';
   const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
   const dutyUI_safe = isStandby ? 0 : dutyUI;
+
+  // Quick validation snippet - log mode-aware calculations
+  console.table({
+    mode: effectiveMode,
+    totalSectors,
+    concurrentSectors,
+    dwell_ms: lc.dwell_ms,
+    burst_ms: lc.burst_ms,
+    localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac,
+    dutyFR: dutyEffectiveFR_safe,
+  });
 
   // --- Active tiles: robust fallback calc (replace the useActiveTiles(...) line) ---
   const TOTAL_SECTORS_FALLBACK = 400;
