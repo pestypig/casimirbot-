@@ -695,6 +695,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     axes_m: [a, b, c],
     axesScene,                         // for immediate camera fit
+    cameraZ_hint: Math.max(1.2, 1.8 * Math.max(...axesScene)), // camera positioning hint
     wallWidth_m: w_m,
     wallWidth_rho: w_rho_harm,         // ✅ unified with renderer (harmonic-mean ρ)
     wallWidth_rho_geo: w_rho_geo,      // legacy (do not use for viewer)
