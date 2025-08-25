@@ -299,7 +299,12 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   // If a full rectangular needle + rounded caps is added later, we can refine this.
   // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
-  const hullArea_m2 = surfaceAreaEllipsoidFromHullDims(state.hull!.Lx_m, state.hull!.Ly_m, state.hull!.Lz_m);
+  const hullDims = state.hull ?? {
+    Lx_m: state.shipRadius_m * 2,
+    Ly_m: state.shipRadius_m * 2,
+    Lz_m: state.shipRadius_m * 2,
+  };
+  const hullArea_m2 = surfaceAreaEllipsoidFromHullDims(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
   
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
