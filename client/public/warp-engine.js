@@ -882,7 +882,10 @@ class WarpEngine {
         const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
         // --- Parity / visualization ---
-        const parity = !!parameters?.physicsParityMode || !!prev?.physicsParityMode;
+        // let incoming value override; if missing, keep previous
+        const parity = (parameters?.physicsParityMode != null)
+          ? !!parameters.physicsParityMode
+          : !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
         const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2 };
@@ -914,6 +917,17 @@ class WarpEngine {
 
         const frFromParams =
           parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
+
+        // total sectors (ship-wide), concurrent sectors (pane)
+        const sectorsConcurrent =
+          Math.max(1, Math.floor(
+            Number(parameters?.sectors ?? prev?.sectors ?? 1)
+          ));
+        const sectorsTotal =
+          Math.max(1, Math.floor(
+            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? sectorsConcurrent)
+          ));
+        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
 
         // --- build next uniforms without mutating prev ---
         const nextUniforms = {
@@ -966,9 +980,8 @@ class WarpEngine {
         } else if (frFromParams != null) {
           dutyEffFR = Math.max(0, +frFromParams);
         } else {
-          // only clamp non-standby; and allow 0
-          const base = (nextUniforms.dutyCycle ?? 0) / Math.max(1, nextUniforms.sectors ?? 1);
-          dutyEffFR = Math.max(0, base);
+          // ✅ Ford–Roman fallback: duty_local × (S_concurrent / S_total)
+          dutyEffFR = dutyLocal * (sectorsConcurrent / sectorsTotal);
         }
 
         // build theta scale
@@ -1197,7 +1210,9 @@ class WarpEngine {
 
         // ---- Existing physics chain (do not change) ----
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
-        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
+        const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
+        const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
         
         const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);

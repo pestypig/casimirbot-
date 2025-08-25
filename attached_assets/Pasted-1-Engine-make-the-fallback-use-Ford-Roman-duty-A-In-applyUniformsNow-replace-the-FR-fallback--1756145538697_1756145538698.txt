@@ -1,0 +1,47 @@
+1) Engine: make the θ fallback use Ford–Roman duty
+A. In _applyUniformsNow, replace the FR fallback and make parity assignment explicit
+- const parity = !!parameters?.physicsParityMode || !!prev?.physicsParityMode;
++ // let incoming value override; if missing, keep previous
++ const parity = (parameters?.physicsParityMode != null)
++   ? !!parameters.physicsParityMode
++   : !!prev?.physicsParityMode;
+
+  // ...
+  const frFromParams =
+    parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
+
++ // total sectors (ship-wide), concurrent sectors (pane)
++ const sectorsConcurrent =
++   Math.max(1, Math.floor(
++     Number(parameters?.sectors ?? prev?.sectors ?? 1)
++   ));
++ const sectorsTotal =
++   Math.max(1, Math.floor(
++     Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? sectorsConcurrent)
++   ));
++ const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
+
+  // --- Bullet-proof θ-scale (…)
+  let dutyEffFR;
+  if (zeroStandby) {
+    dutyEffFR = 0;
+  } else if (frFromParams != null) {
+    dutyEffFR = Math.max(0, +frFromParams);
+  } else {
+-   const base = (nextUniforms.dutyCycle ?? 0) / Math.max(1, nextUniforms.sectors ?? 1);
+-   dutyEffFR = Math.max(0, base);
++   // ✅ Ford–Roman fallback: duty_local × (S_concurrent / S_total)
++   dutyEffFR = dutyLocal * (sectorsConcurrent / sectorsTotal);
+  }
+
+B. In the CPU-side helper (_warpGridVertices) update the internal beta fallback too
+
+This keeps diagnostics consistent even if thetaScale wasn’t pushed:
+
+- const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyCycleUniform / Math.max(1, sectorsUniform)) : 1.0;
++ const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
++ const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
++ const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
+
+
+(Leave the “last-resort” assignment to this.uniforms.thetaScale as-is—now it’ll also be FR-based.)
