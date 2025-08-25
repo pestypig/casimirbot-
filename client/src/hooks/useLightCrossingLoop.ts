@@ -31,7 +31,7 @@ export function useLightCrossingLoop({
 
   // --- Mode-aware local ON window inside each sector's dwell (authentic physics)
   const dwell_ms = Math.max(0.01, sectorPeriod_ms);
-  const burst_ms = Math.max(tauLC_ms, dwell_ms * localBurstFrac); // enforce τLC bound
+  const burst_ms = Math.max(tauLC_ms, dwell_ms * Math.max(0, Math.min(1, localBurstFrac))); // enforce τLC bound
 
   // --- Phase clock synced to server's sector pointer
   const [phase, setPhase] = useState(0);           // 0..1 within current sector

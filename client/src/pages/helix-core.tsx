@@ -89,10 +89,10 @@ import { useActiveTiles } from "@/hooks/use-active-tiles";
 
 // Mode-specific RF burst fractions for proper curvature variation
 const LOCAL_BURST_BY_MODE = {
-  hover: 0.01,      // 1% burst duty
-  cruise: 0.005,    // 0.5% burst duty for efficiency
-  emergency: 0.02,  // 2% burst duty for maximum power
-  standby: 0.0,     // No burst in standby
+  standby: 0.0,     // no RF
+  hover: 0.01,      // 1% local ON window
+  cruise: 0.01,     // keep 1% local, FR changes via strobing plan
+  emergency: 0.50,  // wide local ON window
 } as const;
 
 const DEV = process.env.NODE_ENV !== "production";
