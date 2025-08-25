@@ -36,6 +36,19 @@ const buildLiveDesc = (snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: 
   const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
   return `${P} • ${M} • ${Z}`;
 };
+
+// Mode select items built outside component to prevent re-renders
+const buildModeSelectItems = (pipeline: any) => {
+  return Object.entries(MODE_CONFIGS).map(([key, cfg]) => {
+    const k = key as ModeKey;
+    // For current mode, use live values; for others, use config fallback
+    const isCurrentMode = k === pipeline?.currentMode;
+    const snap = isCurrentMode ? 
+      { P_avg_MW: pipeline?.P_avg, M_exotic_kg: pipeline?.M_exotic, zeta: pipeline?.zeta } : 
+      undefined;
+    return { key, cfg, snap, k };
+  });
+};
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
@@ -224,6 +237,7 @@ export default function HelixCore() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
+  const [visualizersInitialized, setVisualizersInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Mode change signal system
@@ -1163,24 +1177,16 @@ export default function HelixCore() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(MODE_CONFIGS).map(([key, cfg]) => {
-                      const k = key as ModeKey;
-                      // For current mode, use live values; for others, use config fallback
-                      const isCurrentMode = k === pipeline?.currentMode;
-                      const snap = isCurrentMode ? 
-                        { P_avg_MW: pipeline?.P_avg, M_exotic_kg: pipeline?.M_exotic, zeta: pipeline?.zeta } : 
-                        null;
-                      return (
-                        <SelectItem key={key} value={key}>
-                          <div className="flex flex-col">
-                            <span className={`font-medium ${cfg.color}`}>{cfg?.name ?? key}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {buildLiveDesc(snap, cfg)}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      );
-                    })}
+                    {buildModeSelectItems(pipeline).map(({ key, cfg, snap }) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex flex-col">
+                          <span className={`font-medium ${cfg.color}`}>{cfg?.name ?? key}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {buildLiveDesc(snap, cfg)}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {pipeline && (
