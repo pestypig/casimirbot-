@@ -42,6 +42,28 @@ function compactCameraZ(axesScene?: number[] | null) {
   return Math.max(1.2, 1.8 * R);
 }
 
+// Optional: estimate pixel density across wall band (debugging helper)
+function estimatePxAcrossWall({
+  canvasPxW,
+  canvasPxH,
+  gridSpan,
+  hull,           // {a,b,c} in meters
+  wallWidth_m,    // in meters
+}: {
+  canvasPxW: number; canvasPxH: number;
+  gridSpan: number; hull: {a:number;b:number;c:number};
+  wallWidth_m: number;
+}) {
+  const Rmax = Math.max(hull.a, hull.b, hull.c);
+  const Rgeom = Math.cbrt(hull.a * hull.b * hull.c);
+  const deltaRho = wallWidth_m / Rgeom;       // ≈ thickness in ρ
+  // use the limiting axis (worst case)
+  const pxPerMeter_X = canvasPxW / (2 * gridSpan * Rmax);
+  const pxPerMeter_Y = canvasPxH / (2 * gridSpan * Rmax);
+  const pxPerMeter = Math.min(pxPerMeter_X, pxPerMeter_Y);
+  return deltaRho * Rgeom * pxPerMeter;       // pixels across wall
+}
+
 // Mode → visual seasoning presets (so changes are obvious)
 type ModeKey = 'hover' | 'cruise' | 'emergency' | 'standby';
 const MODE_PRESET: Record<ModeKey, {curvT:number; boost:number; displayGain:number}> = {
@@ -66,7 +88,6 @@ export default function WarpRenderInspector(props: {
 
   // Live energy pipeline data for diagnostics
   const { data: live } = useEnergyPipeline({
-    suspense: false,
     refetchOnWindowFocus: false,
     staleTime: 10_000,
   });
