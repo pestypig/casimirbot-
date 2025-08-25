@@ -259,23 +259,22 @@ export default function WarpRenderInspector(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Ford-Roman duty computation (outside useEffect for prop access)
+  const dutyLocal = (() => {
+    const b = Number(props.lightCrossing?.burst_ms);
+    const d = Number(props.lightCrossing?.dwell_ms);
+    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
+  })();
+  const sTotal    = Math.max(1, +(live?.sectorCount ?? 400));
+  const sConcREAL = Math.max(1, +((realPayload as any).sectors ?? (shared as any).sectors ?? 1));
+  const sConcSHOW = Math.max(1, +((showPayload as any).sectors ?? (shared as any).sectors ?? 1));
+
+  const dutyFR_REAL = dutyLocal * (sConcREAL / sTotal);
+  const dutyUI_SHOW = dutyLocal * (1 / sTotal); // SHOW averages across all sectors
+
   // Apply payloads any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
-
-    // --- Pane-specific Ford–Roman duty (from LC burst × conc/total)
-    const dutyLocal = (() => {
-      const b = Number(props.lightCrossing?.burst_ms);
-      const d = Number(props.lightCrossing?.dwell_ms);
-      return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
-    })();
-    const totalSectors = Math.max(1, Math.floor(
-      Number((props.baseShared as any)?.sectorCount ?? (props.baseShared as any)?.sectors ?? 400)
-    ));
-    const sLeft  = Math.max(1, Math.floor(Number((realPayload as any)?.sectors ?? 1)));
-    const sRight = Math.max(1, Math.floor(Number((showPayload as any)?.sectors ?? sLeft)));
-    const dutyFR_left  = dutyLocal * (sLeft  / totalSectors);
-    const dutyFR_right = dutyLocal * (sRight / totalSectors);
 
     // sanitize a few hot-path values
     const safe = (o:any)=> {
@@ -305,9 +304,10 @@ export default function WarpRenderInspector(props: {
       ...safe(realPayload),
       ...physicalScale,
       ridgeMode: 0,
-      physicsParityMode: true, parityMode: true,        // alias for older builds
-      sectorCount: totalSectors,
-      dutyEffectiveFR: dutyFR_left,
+      physicsParityMode: true,
+      parityMode: true,                 // back-compat alias
+      sectorCount: sTotal,
+      dutyEffectiveFR: dutyFR_REAL,     // 🔑 authoritative duty for θ
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       displayGain: 1,
@@ -319,9 +319,10 @@ export default function WarpRenderInspector(props: {
       ...safe(showPayload),
       ...physicalScale,
       ridgeMode: 1,
-      physicsParityMode: false, parityMode: false,
-      sectorCount: totalSectors,
-      dutyEffectiveFR: dutyFR_right,
+      physicsParityMode: false,
+      parityMode: false,
+      sectorCount: sTotal,
+      dutyEffectiveFR: dutyUI_SHOW,     // (optional) unify θ path
     });
 
     // Optional camera sweetener so both keep same framing
@@ -499,7 +500,7 @@ export default function WarpRenderInspector(props: {
           burst_ms: (live as any)?.burst_ms,
           dwell_ms: (live as any)?.dwell_ms,
         }}
-        totalSectors={(live as any)?.sectorsTotal ?? 400}
+        totalSectors={sTotal}
         concurrentSectors={(live as any)?.sectorsConcurrent ?? 1}
         gammaGeo={(live as any)?.gammaGeo}
         gammaVdB={(live as any)?.gammaVanDenBroeck}
