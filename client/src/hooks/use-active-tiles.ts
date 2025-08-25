@@ -32,8 +32,14 @@ export function useActiveTiles(opts: {
     }
   }, [lc?.phase, lc?.burst_ms, lc?.dwell_ms]);
 
+  // Hardened input sanitization
+  const T  = Math.max(0, Number(totalTiles) || 0);
+  const fr = Math.max(0, Math.min(1, Number(dutyEffectiveFR) || 0));
+  const S  = Math.max(1, Number(totalSectors) || 1);
+  const live = Math.max(1, Number(concurrentSectors) || 1);
+  
   // Use consistent authority for sector count (prefer passed totalSectors)
-  const S_total = Math.max(1, Math.floor(totalSectors || 400));
+  const S_total = Math.max(1, Math.floor(S));
   
   // Warn if dutyEffectiveFR was computed with different sector assumptions
   useEffect(() => {
@@ -45,36 +51,33 @@ export function useActiveTiles(opts: {
       });
     }
   }, [S_total, lc?.sectorCount]);
-  const S_live  = Math.max(1, Math.floor(concurrentSectors || 1));
+  const S_live  = Math.max(1, Math.floor(live));
 
   // average (FR) energized tiles across the whole ship
   const avgTiles = useMemo(() => {
-    return Number.isFinite(totalTiles) ? Math.round((totalTiles as number) * dutyEffectiveFR) : undefined;
-  }, [totalTiles, dutyEffectiveFR]);
+    const result = T * fr;
+    return Number.isFinite(result) ? Math.round(result) : 0;
+  }, [T, fr]);
 
   // local burst fraction & instantaneous gate
-  const burstLocal = (Number.isFinite(lc?.burst_ms) && Number.isFinite(lc?.dwell_ms) && lc!.dwell_ms! > 0)
-    ? (lc!.burst_ms! / lc!.dwell_ms!)
+  const burstLocal = Number.isFinite(lc?.burst_ms) && Number.isFinite(lc?.dwell_ms) && lc!.dwell_ms! > 0
+    ? Math.max(0, Math.min(1, lc!.burst_ms! / lc!.dwell_ms!))
     : 0.01;
 
   const inBurstNow = !!lc && Number.isFinite(lc.phase) && Number.isFinite(lc.burst_ms)
     ? ((lc.phase as number) % (lc!.dwell_ms as number)) < (lc!.burst_ms as number)
     : false;
 
-  const tps = Number.isFinite(tilesPerSector)
-    ? (tilesPerSector as number)
-    : (Number.isFinite(totalTiles) ? Math.floor((totalTiles as number) / S_total) : 0);
-
-  const instantTiles = (Number.isFinite(totalTiles) && tps > 0)
-    ? (inBurstNow ? (S_live * tps) : 0)
-    : undefined;
+  const instBase = tilesPerSector ?? Math.floor(T / S);
+  const instantTiles = instBase * live * burstLocal;
+  const instantResult = inBurstNow ? instantTiles : 0;
 
   // EMA smoothing for "now"
   const [instantSmooth, setInstantSmooth] = useState(0);
   useEffect(() => {
-    const target = Number.isFinite(instantTiles) ? (instantTiles as number) : 0;
+    const target = Number.isFinite(instantResult) ? instantResult : 0;
     setInstantSmooth(prev => prev + ema * (target - prev));
-  }, [instantTiles, ema]);
+  }, [instantResult, ema]);
 
   // drift monitor (warn if server vs derived >5% for 3 consecutive samples)
   const badStreak = useRef(0);
@@ -90,10 +93,10 @@ export function useActiveTiles(opts: {
   }, [serverActiveTiles, avgTiles]);
 
   return {
-    avgTiles,                // time-averaged across ship
-    instantTiles,            // hard on/off
-    instantTilesSmooth: Math.round(instantSmooth),
-    burstLocal,              // local duty fraction
+    avgTiles: Number.isFinite(avgTiles) ? avgTiles : 0,
+    instantTiles: Number.isFinite(instantResult) ? instantResult : 0,
+    instantTilesSmooth: Number.isFinite(instantSmooth) ? Math.round(instantSmooth) : 0,
+    burstLocal,
     inBurstNow,
   };
 }

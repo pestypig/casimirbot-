@@ -1276,7 +1276,9 @@ export default function HelixCore() {
 
                       {/* FR-averaged count (matches pipeline's FR duty) */}
                       <p className="text-lg font-mono text-cyan-400">
-                        {(activeTiles.avgTiles ?? 2_800_000).toLocaleString()}
+                        {Number.isFinite(activeTiles?.avgTiles)
+                          ? Math.round(activeTiles!.avgTiles!).toLocaleString()
+                          : '2,800,000'}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <span className="ml-2 text-xs text-slate-400 underline decoration-dotted cursor-help">
@@ -1291,8 +1293,8 @@ export default function HelixCore() {
 
                       {/* Instantaneous energized tiles */}
                       <p className="text-sm font-mono text-emerald-400 mt-1">
-                        {Number.isFinite(activeTiles.instantTilesSmooth)
-                          ? activeTiles.instantTilesSmooth.toLocaleString()
+                        {Number.isFinite(activeTiles?.instantTilesSmooth)
+                          ? Math.round(activeTiles!.instantTilesSmooth!).toLocaleString()
                           : '—'}
                         <span className="ml-2 text-xs text-slate-400">instant</span>
                       </p>
