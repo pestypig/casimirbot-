@@ -305,8 +305,9 @@ export default function WarpRenderInspector(props: {
       ...safe(realPayload),
       ...physicalScale,
       ridgeMode: 0,
-      physicsParityMode: true, parityMode: true,        // ⬅️ set both flags for old engines
-      dutyEffectiveFR: dutyFR_left,                     // ⬅️ authoritative FR duty
+      physicsParityMode: true, parityMode: true,        // alias for older builds
+      sectorCount: totalSectors,
+      dutyEffectiveFR: dutyFR_left,
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       displayGain: 1,
@@ -319,7 +320,8 @@ export default function WarpRenderInspector(props: {
       ...physicalScale,
       ridgeMode: 1,
       physicsParityMode: false, parityMode: false,
-      dutyEffectiveFR: dutyFR_right,                    // ⬅️ averaged/FR as well
+      sectorCount: totalSectors,
+      dutyEffectiveFR: dutyFR_right,
     });
 
     // Optional camera sweetener so both keep same framing
