@@ -33,8 +33,10 @@ function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
 
   // numeric coercions + clamps
-  // allow explicit zero; engine will still hard-zero on standby via currentMode
-  s.thetaScale        = Math.max(0,      finite(s.thetaScale,        1));
+  if (s.thetaScale != null) {
+    const v = +s.thetaScale;
+    s.thetaScale = Number.isFinite(v) ? v : 0;
+  }
   s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
   s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
   s.wallWidth         = Math.max(1e-4,    finite(s.wallWidth,  0.016));
