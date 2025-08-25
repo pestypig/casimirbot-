@@ -1,0 +1,94 @@
+Patch A — fix duty math & expose canonical names (getSystemMetrics)
+
+Replace your viz block with this:
+
+// --- Duty & θ chain (canonical) ---
+const totalSectors = Math.max(1, s.sectorCount);
+const concurrent   = Math.max(1, s.concurrentSectors || 1);
+const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
+  ? Math.max(1e-12, (s as any).localBurstFrac as number)
+  : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
+
+// UI duty (per-sector knob, averaged by UI over all sectors)
+const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
+
+// Ford–Roman ship-wide duty (used for REAL)
+const dutyFR = Math.max(1e-12, (s as any).dutyEffectiveFR ??
+                                   (s as any).dutyEffective_FR ??
+                                   (dutyLocal * (concurrent / totalSectors)));
+
+const gammaGeo = s.gammaGeo ?? 26;
+const dAA      = s.qSpoilingFactor ?? 1;
+const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5;
+
+const theta_UI = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyUI / concurrent);
+const theta_FR = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyFR);
+
+// Canonical, engine-facing bundle
+const warpUniforms = {
+  // geometry (semi-axes in meters)
+  hull: { a, b, c },
+  axesScene,
+  wallWidth_m: w_m,
+  wallWidth_rho: w_rho_harm,
+
+  // sectors & duties
+  sectorCount: totalSectors,    // total
+  sectors: concurrent,          // concurrent
+  dutyCycle: dutyUI,            // UI knob
+  dutyEffectiveFR: dutyFR,      // REAL θ uses this
+
+  // physics chain
+  gammaGeo,
+  gammaVdB,                     // ✅ canonical short key
+  deltaAOverA: dAA,             // ✅ canonical for qSpoilingFactor
+  currentMode: s.currentMode ?? 'hover'
+};
+
+
+Then in the JSON response:
+
+res.json({
+  /* ...existing fields you want to keep... */
+
+  // ✅ canonical packet the renderer consumes
+  warpUniforms,
+
+  // ✅ hint-only values (never applied as uniforms)
+  viewerHints: {
+    theta_FR_like: theta_FR,
+    theta_UI_like: theta_UI,
+    ridgeMode: 1,
+    colorMode: 'theta'
+  },
+
+  // ✅ strobe/time window (for dutyLocal provenance)
+  lightCrossing: {
+    tauLC_ms: tauLC * 1000,
+    dwell_ms: sectorPeriod_ms,
+    burst_ms: dutyLocal * sectorPeriod_ms,
+    sectorIdx: sweepIdx,
+    onWindowDisplay: true
+  },
+
+  // ❌ remove these top-level stomps:
+  // physicsParityMode, ridgeMode, thetaScale
+});
+
+
+Do remove these 3 top-level keys from /getSystemMetrics:
+
+// ❌ remove
+physicsParityMode
+ridgeMode
+thetaScale
+
+
+Keep them only as viewerHints if you want them for dashboards; they must not be merged into engine uniforms.
+
+Also, export both long & short physics keys for compatibility (e.g., in /getPipelineState too):
+
+gammaVdB: s.gammaVanDenBroeck,
+gammaVanDenBroeck: s.gammaVanDenBroeck,
+qSpoilingFactor: s.qSpoilingFactor,
+deltaAOverA: s.qSpoilingFactor

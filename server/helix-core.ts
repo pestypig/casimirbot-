@@ -583,20 +583,48 @@ export function getSystemMetrics(req: Request, res: Response) {
   
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
 
-  // Compute viz scales once so we can also emit viewer hints
-  const viz = (() => {
-    const gammaGeo = s.gammaGeo ?? 26;
-    const dAa      = s.qSpoilingFactor ?? 1;
-    const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5; // align with Energy Pipeline default
-    const sectors  = Math.max(1, s.concurrentSectors || 1);
-    const dutyUI   = Math.max(1e-12, s.dutyCycle ?? 0.14);
-    const thetaScale_UI_like =
-      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyUI / sectors);
-    const dutyFR   = Math.max(1e-12, s.dutyEffective_FR ?? dutyUI / sectors);
-    const thetaScale_FR_like =
-      Math.pow(gammaGeo,3) * dAa * gammaVdB * Math.sqrt(dutyFR);
-    return { thetaScale_UI_like, thetaScale_FR_like, dutyUI, dutyFR, sectors, defaultThetaScale: "FR_like" as const };
-  })();
+  // --- Duty & θ chain (canonical) ---
+  const totalSectors = Math.max(1, s.sectorCount);
+  const concurrent   = Math.max(1, s.concurrentSectors || 1);
+  const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
+    ? Math.max(1e-12, (s as any).localBurstFrac as number)
+    : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
+
+  // UI duty (per-sector knob, averaged by UI over all sectors)
+  const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
+
+  // Ford–Roman ship-wide duty (used for REAL)
+  const dutyFR = Math.max(1e-12, (s as any).dutyEffectiveFR ??
+                                     (s as any).dutyEffective_FR ??
+                                     (dutyLocal * (concurrent / totalSectors)));
+
+  const gammaGeo = s.gammaGeo ?? 26;
+  const dAA      = s.qSpoilingFactor ?? 1;
+  const gammaVdB = s.gammaVanDenBroeck ?? 2.86e5;
+
+  const theta_UI = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyUI / concurrent);
+  const theta_FR = Math.pow(gammaGeo,3) * dAA * gammaVdB * Math.sqrt(dutyFR);
+
+  // Canonical, engine-facing bundle
+  const warpUniforms = {
+    // geometry (semi-axes in meters)
+    hull: { a, b, c },
+    axesScene,
+    wallWidth_m: w_m,
+    wallWidth_rho: w_rho_harm,
+
+    // sectors & duties
+    sectorCount: totalSectors,    // total
+    sectors: concurrent,          // concurrent
+    dutyCycle: dutyUI,            // UI knob
+    dutyEffectiveFR: dutyFR,      // REAL θ uses this
+
+    // physics chain
+    gammaGeo,
+    gammaVdB,                     // ✅ canonical short key
+    deltaAOverA: dAA,             // ✅ canonical for qSpoilingFactor
+    currentMode: s.currentMode ?? 'hover'
+  };
   const tauLC = Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C;
   const f_m_Hz = (s.modulationFreq_GHz ?? 15) * 1e9;
   const T_m = 1 / f_m_Hz;
@@ -672,20 +700,27 @@ export function getSystemMetrics(req: Request, res: Response) {
     aEff_geo_m: aEff_geo,
     aEff_harm_m: aEff_harm,
 
-    viz,
-    modelMode: "calibrated-single-pass",
-    // top-level viewer knobs (some clients read these here)
-    ridgeMode: 1,
-    physicsParityMode: false,
-    thetaScale: viz.thetaScale_FR_like,
-    // 🔎 Viewer hints to prevent accidental multi-layer/df overlays
-    viewer: {
-      overlayMode: "single-pass",
-      ridgeMode: 1,                    // 0=physics(df), 1=single crest f(ρ)
-      colorMode: "theta",
-      physicsParityMode: false,
-      thetaScale: viz.thetaScale_FR_like
-    }
+    // ✅ canonical packet the renderer consumes
+    warpUniforms,
+
+    // ✅ hint-only values (never applied as uniforms)
+    viewerHints: {
+      theta_FR_like: theta_FR,
+      theta_UI_like: theta_UI,
+      ridgeMode: 1,
+      colorMode: 'theta'
+    },
+
+    // ✅ strobe/time window (for dutyLocal provenance)
+    lightCrossing: {
+      tauLC_ms: tauLC * 1000,
+      dwell_ms: sectorPeriod_ms,
+      burst_ms: dutyLocal * sectorPeriod_ms,
+      sectorIdx: sweepIdx,
+      onWindowDisplay: true
+    },
+
+    modelMode: "calibrated-single-pass"
   });
 }
 
@@ -707,7 +742,12 @@ export function getPipelineState(req: Request, res: Response) {
     // Mode-aware physics fields from MODE_CONFIGS
     sectorsTotal: modeConfig?.sectorsTotal ?? 400,
     sectorsConcurrent: modeConfig?.sectorsConcurrent ?? 1,
-    localBurstFrac: modeConfig?.localBurstFrac ?? 0.01
+    localBurstFrac: modeConfig?.localBurstFrac ?? 0.01,
+    // Export both long & short physics keys for compatibility
+    gammaVdB: s.gammaVanDenBroeck,
+    gammaVanDenBroeck: s.gammaVanDenBroeck,
+    qSpoilingFactor: s.qSpoilingFactor,
+    deltaAOverA: s.qSpoilingFactor
   });
 }
 
