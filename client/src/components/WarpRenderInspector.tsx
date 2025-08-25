@@ -5,7 +5,6 @@ import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
-import WarpGrid3D from "@/components/warp/WarpGrid3D";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 
@@ -129,10 +128,6 @@ export default function WarpRenderInspector(props: {
   const [lockRidge, setLockRidge] = useState(true);
   const [forceAvg, setForceAvg] = useState(true);
   const [useMassGamma, setUseMassGamma] = useState(false);
-
-  // SHOW mode options
-  type ShowMode = 'ship-fr' | 'sector-fr' | 'sector-instant' | 'grid-3d';
-  const [showMode, setShowMode] = useState<ShowMode>('ship-fr');
 
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
@@ -382,26 +377,6 @@ export default function WarpRenderInspector(props: {
   };
   const { expected, used, delta } = reportThetaConsistency(bound);
 
-  // SHOW mode-specific parameters
-  const dutyEffectiveFR_safe = dutyEffectiveFR || 2.5e-5;
-  const effectiveMode = currentMode || 'hover';
-  const MODE_CONFIGS = {
-    hover: { localBurstFrac: 0.01 },
-    cruise: { localBurstFrac: 0.01 },
-    emergency: { localBurstFrac: 0.01 },
-    standby: { localBurstFrac: 0 }
-  };
-  
-  const showDuty = (showMode === 'sector-instant')
-    ? Math.max(dutyEffectiveFR_safe, MODE_CONFIGS[effectiveMode]?.localBurstFrac || 0.01)
-    : dutyEffectiveFR_safe;
-
-  const showSectors = (showMode.startsWith('sector-')) ? 1 : sConcurrent;
-
-  const showStencil = (showMode.startsWith('sector-'))
-    ? { maskCenter: ((props.lightCrossing as any)?.currentSector ?? 0), maskWidth: 1 }
-    : undefined;
-
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
@@ -437,6 +412,11 @@ export default function WarpRenderInspector(props: {
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
       sectors: sConcurrent,                    // 1
+      viewAvg: viewAvgUsed,       // Use debug toggle
+      // Apply debug toggles to display controls
+      ridgeMode: ridgeModeUsed,
+      exposure: tonemapExp,
+      zeroStop: zeroStop,
       // ✅ give the sweep window so duty_local can be computed
       lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
       // Physical scaling
@@ -450,37 +430,11 @@ export default function WarpRenderInspector(props: {
       // ❌ do NOT include thetaScale anywhere
     };
 
-    // Gate engine updates until all required physics parameters are present
-    const realUniforms = { ...shared, physicsParityMode: true };
-    const ready = Number.isFinite(realUniforms.dutyEffectiveFR)
-                && Number.isFinite(realUniforms.gammaGeo)
-                && Number.isFinite(realUniforms.gammaVanDenBroeck);
-
-    if (!ready) {
-      // Skip draw + log this frame until all physics params are available
-      return;
-    }
-
     // REAL engine - physics truth
-    gatedUpdateUniforms(leftEngine.current, realUniforms, 'inspector-real');
+    gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
     
-    // Handle different renderers for SHOW pane
-    if (showMode === 'grid-3d') {
-      // 3D grid mode - will be handled by conditional rendering
-      // No need to update right engine for 3D mode
-    } else {
-      // SHOW engine - enhanced visuals with mode-specific overrides
-      const showUniforms = {
-        ...shared,
-        physicsParityMode: false,
-        // Apply SHOW mode overrides
-        dutyEffectiveFR: showDuty,
-        sectors: showSectors,
-        viewAvg: showMode !== 'sector-instant', // instant = no FR averaging
-        ...(showStencil && { sectorMask: showStencil })
-      };
-      gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show');
-    }
+    // SHOW engine - enhanced visuals  
+    gatedUpdateUniforms(rightEngine.current, { ...shared, physicsParityMode: false }, 'inspector-show');
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
@@ -495,7 +449,7 @@ export default function WarpRenderInspector(props: {
       // Report theta consistency after engine updates
       reportThetaConsistency(bound);
     }, 100);
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms, showMode, showDuty, showSectors, showStencil]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
@@ -593,27 +547,11 @@ export default function WarpRenderInspector(props: {
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">SHOW — {showMode}</h3>
+            <h3 className="text-sm font-semibold">SHOW — Boosted (UI)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {showMode === 'grid-3d' ? (
-              <WarpGrid3D
-                hull={shared.hull || { a: 503.5, b: 132, c: 86.5 }}
-                wallWidth_m={shared.wallWidth_m || 6.0}
-                sectorCount={shared.sectorCount || 400}
-                sectors={showSectors}
-                dutyEffectiveFR={showDuty}
-                lightCrossing={props.lightCrossing}
-                gammaGeo={shared.gammaGeo || 26}
-                gammaVdB={gammaVdBBound}
-                qSpoilingFactor={shared.qSpoilingFactor || 1}
-                width={400}
-                height={300}
-              />
-            ) : (
-              <canvas ref={rightRef} className="w-full h-full block"/>
-            )}
+            <canvas ref={rightRef} className="w-full h-full block"/>
           </div>
         </article>
       </section>
@@ -670,15 +608,6 @@ export default function WarpRenderInspector(props: {
               use calibrated γ_VdB (for test)
             </label>
           </fieldset>
-          <fieldset className="text-xs mt-2 pt-2 border-t border-blue-300">
-            <label className="text-blue-400 mb-2 block">SHOW Mode:</label>
-            <select value={showMode} onChange={e=>setShowMode(e.target.value as ShowMode)} className="border rounded px-2 py-1 text-xs bg-slate-800 text-blue-300">
-              <option value="ship-fr">Ship FR (default)</option>
-              <option value="sector-fr">Single Sector FR</option>
-              <option value="sector-instant">Single Sector Instant</option>
-              <option value="grid-3d">Grid 3D</option>
-            </select>
-          </fieldset>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -695,7 +624,6 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
-            <div className="text-blue-400">SHOW mode: {showMode} | duty: {(showDuty * 100).toExponential(2)}% | sectors: {showSectors}</div>
           </div>
           <button
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
