@@ -209,9 +209,9 @@ function useCheckpointList(
       const expParity = expectations.parity;
       const expRidge = expectations.ridge;
       if (expParity != null) {
-        const parity = (u?.physicsParityMode ?? u?.parityMode ?? false) ? true : false;
+        const parity = !!(u.physicsParityMode ?? u.parityMode);
         const ok = parity === !!expParity;
-        rows.push({ label: "Parity mode", detail: String(!!u?.physicsParityMode), state: ok ? "ok" : "fail" });
+        rows.push({ label: "Parity mode", detail: String(parity), state: ok ? "ok" : "fail" });
       }
       if (expRidge != null) {
         const ok = (u?.ridgeMode | 0) === (expRidge | 0);
