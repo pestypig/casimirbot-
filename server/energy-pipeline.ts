@@ -12,6 +12,9 @@ import { HBAR, C } from "./physics-const.js";
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
 const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish helpers (use aggregate)
+
+// Production-quiet logging toggle
+const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
 import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
 import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
@@ -172,7 +175,7 @@ if (process.env.NODE_ENV !== 'production') {
   const bad = Object.entries(MODE_POLICY)
     .filter(([k,v]) => k !== 'standby')
     .some(([,v]) => v.P_target_W < 1e3);
-  if (bad) console.warn("[PIPELINE] Power targets must be in watts (>= 1kW).");
+  if (bad && DEBUG_PIPE) console.warn("[PIPELINE] Power targets must be in watts (>= 1kW).");
 }
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
@@ -487,7 +490,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.fordRomanCompliance = state.zeta < 1.0;
 
   // Physics logging for debugging (before UI field updates)
-  console.log("[PIPELINE]", {
+  if (DEBUG_PIPE) console.log("[PIPELINE]", {
     mode: state.currentMode, model: MODEL_MODE,
     dutyShip: d_eff, dutyUI_before: state.dutyCycle, S_live, N: state.N_tiles,
     gammaGeo: state.gammaGeo, qCavity: state.qCavity, gammaVdB: state.gammaVanDenBroeck,
@@ -550,7 +553,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     const P_tile = Math.abs(state.U_Q) * omega / Q;
     const P_exp  = P_tile * state.N_tiles * d_eff / 1e6;
     if (Math.abs(state.P_avg - P_exp) > 1e-6 * Math.max(1, P_exp)) {
-      console.warn("[AUDIT] P_avg drift; correcting", {reported: state.P_avg, expected: P_exp});
+      if (DEBUG_PIPE) console.warn("[AUDIT] P_avg drift; correcting", {reported: state.P_avg, expected: P_exp});
       state.P_avg = P_exp;
     }
 
@@ -558,7 +561,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
                  * Q_BURST * state.gammaVanDenBroeck * d_eff;
     const M_exp  = (E_tile_mass / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
-      console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
+      if (DEBUG_PIPE) console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
       state.M_exotic_raw = state.M_exotic = M_exp;
     }
   })();
@@ -577,7 +580,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
   
   // UI field updates logging (after MODE_CONFIGS applied)
-  console.log("[PIPELINE_UI]", {
+  if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
     dutyUI_after: state.dutyCycle, 
     sectorCount: state.sectorCount,
     concurrentSectors: state.concurrentSectors,
@@ -677,7 +680,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       (state as any).dynamic = { note: 'skipped (tilecount hard cap)', totalEnergy: staticResult.totalEnergy };
     }
   } catch (e) {
-    console.warn('Dynamic Casimir calculation failed:', e);
+    if (DEBUG_PIPE) console.warn('Dynamic Casimir calculation failed:', e);
   }
   
   // Calculate stress-energy tensor from pipeline parameters
@@ -704,7 +707,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     // Expose stress-energy tensor components in the shared snapshot
     (state as any).stressEnergy = SE;
   } catch (e) {
-    console.warn('Stress-energy calculation failed:', e);
+    if (DEBUG_PIPE) console.warn('Stress-energy calculation failed:', e);
   }
   
   // Calculate Natário warp bubble results (now pipeline-true)
@@ -750,7 +753,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     // Store warp results in state for API access
     (state as any).warp = warp;
   } catch (e) {
-    console.warn('Warp bubble calculation failed:', e);
+    if (DEBUG_PIPE) console.warn('Warp bubble calculation failed:', e);
   }
   
   return state;
