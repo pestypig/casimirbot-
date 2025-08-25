@@ -119,18 +119,34 @@ export default function WarpRenderInspector(props: {
     T: (decades/8), boost: 40, userGain
   }), [wu, decades, userGain]);
 
-  // Belt-and-suspenders: lock parity flags at the engine edge
-  function hardLockParity(e:any, force:boolean) {
-    if (!e || e.__parityLocked) return;
-    const orig = e.updateUniforms?.bind(e);
-    e.updateUniforms = (patch:any) => {
-      if (!patch) patch = {};
-      // refuse any external parity toggles
-      delete patch.physicsParityMode;
-      delete patch.parityMode;
-      return orig?.({ ...patch, physicsParityMode: force, parityMode: force });
+  // Hard-lock parity and block direct thetaScale writes at the engine edge
+  function hardLockUniforms(engine: any, {
+    forceParity,
+    allowThetaScaleDirect = false,
+    tag = 'ENGINE'
+  }: { forceParity: boolean; allowThetaScaleDirect?: boolean; tag?: string }) {
+    if (!engine || engine.__locked) return;
+    const orig = engine.updateUniforms?.bind(engine);
+    engine.updateUniforms = (patch: any) => {
+      const safe = { ...(patch || {}) };
+
+      // 🔒 never allow external parity toggles
+      if ('physicsParityMode' in safe) delete (safe as any).physicsParityMode;
+      if ('parityMode'        in safe) delete (safe as any).parityMode;
+
+      // 🔒 block direct thetaScale injections (we compute it from FR duty)
+      if (!allowThetaScaleDirect && 'thetaScale' in safe) {
+        console.warn(`[LOCK] ${tag}: blocked thetaScale override`, safe.thetaScale);
+        delete (safe as any).thetaScale;
+      }
+
+      // force correct parity every call
+      (safe as any).physicsParityMode = forceParity;
+      (safe as any).parityMode        = forceParity;
+
+      return orig?.(safe);
     };
-    e.__parityLocked = true;
+    engine.__locked = true;
   }
 
   // Reuse-or-create guard so we never attach twice to the same canvas
@@ -163,9 +179,9 @@ export default function WarpRenderInspector(props: {
       rightEngine.current = getOrCreateEngine(W, rightRef.current);
     }
 
-    // Lock parity flags to prevent late writers from flipping REAL back to SHOW
-    leftEngine.current  && hardLockParity(leftEngine.current,  true);  // REAL
-    rightEngine.current && hardLockParity(rightEngine.current, false); // SHOW
+    // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
+    if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
+    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
 
     // Bootstrap; fit camera after link using derived axes
     leftEngine.current?.bootstrap({ ...realPayload });
