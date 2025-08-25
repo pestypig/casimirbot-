@@ -662,7 +662,7 @@ export default function HelixCore() {
       // physics amps
       gammaGeo:         num(pipeline?.gammaGeo)         ?? 26,
       qSpoilingFactor:  num(pipeline?.qSpoilingFactor)  ?? 1,
-      gammaVanDenBroeck: isStandby ? 1 : (num(pipeline?.gammaVanDenBroeck) ?? 0),
+      gammaVanDenBroeck: isStandby ? 1 : (Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1) ?? 0),
 
       // viewer niceties
       viewAvg: true,
@@ -1019,7 +1019,7 @@ export default function HelixCore() {
                             colorMode: "theta",         // consistent color
                             lockFraming: true,          // no auto zoom change with gain
                             // conservative in standby
-                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
+                            gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
                             powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
                             exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
                           }}
@@ -1044,7 +1044,10 @@ export default function HelixCore() {
                       vShip={1.0}
                       gammaGeo={pipeline?.gammaGeo ?? 26}
                       qSpoilingFactor={qSpoilUI}
-                      gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 0}
+                      gammaVdB={(() => {
+                        const gammaVdB_vis = Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1);
+                        return isFiniteNumber(gammaVdB_vis) ? gammaVdB_vis : 0;
+                      })()}
                       dutyCycle={dutyUI_safe}
                       dutyEffectiveFR={dutyEffectiveFR_safe}  // ⬅️ ensures same averaging as REAL
                       sectors={totalSectors}      // ⬅️ use total sectors for averaging
@@ -1181,7 +1184,7 @@ export default function HelixCore() {
                 parityPhys={{
                   gammaGeo:        pipeline?.gammaGeo ?? 26,
                   qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
+                  gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
                   dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
                   dutyCycle:        dutyUI_safe,           // UI duty (for display)
               }}
@@ -1189,7 +1192,7 @@ export default function HelixCore() {
                 // same as above unless you want explicit "seasoning" in SHOW
                 gammaGeo:        pipeline?.gammaGeo ?? 26,
                 qSpoilingFactor: qSpoilUI,
-                gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck ?? 0),
+                gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
                 dutyEffectiveFR:  dutyEffectiveFR_safe,
                 dutyCycle:        dutyUI_safe,
               }}
@@ -1474,9 +1477,9 @@ export default function HelixCore() {
                       <TooltipTrigger asChild>
                         <span className="cursor-help underline decoration-dotted">
                           γ<sub>VdB</sub>: {fexp(
-                            (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
+                            (pipelineState as any)?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck_vis ?? (pipelineState as any)?.gammaVanDenBroeck ?? pipeline?.gammaVanDenBroeck,
                             1,
-                            '2.86e+5'
+                            '1.00e+11'
                           )}
                         </span>
                       </TooltipTrigger>
@@ -1679,7 +1682,7 @@ export default function HelixCore() {
                       <div>P_loss: {fmt(pipelineState?.P_loss_raw, 3, '—')} W/tile</div>
                       <div>N_tiles: {fexp(pipelineState?.N_tiles, 2, '—')}</div>
                       <div className="col-span-2 text-yellow-300 border-t border-slate-700 pt-2 mt-1">
-                        γ_VdB: {fexp(pipelineState?.gammaVanDenBroeck, 2, '—')} (Van den Broeck)
+                        γ_VdB (visual): {fexp(pipelineState?.gammaVanDenBroeck_vis ?? pipelineState?.gammaVanDenBroeck, 2, '—')} (Van den Broeck)
                       </div>
                     </div>
                   </div>
