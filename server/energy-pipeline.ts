@@ -337,6 +337,9 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.activeFraction  = S_live / S_total;
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
   state.activeTiles     = state.tilesPerSector * S_live;
+  
+  // Safety alias for consumers that assume ≥1 sectors for math
+  (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
@@ -405,6 +408,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   
   // --- Cryo power AFTER calibration and AFTER mode qSpoilingFactor is applied ---
   const Q_on  = Q;
+  // qSpoilingFactor is idle Q multiplier: >1 ⇒ less idle loss (higher Q_off)
   const Q_off = Math.max(1, Q_on * state.qSpoilingFactor); // use mode-specific qSpoilingFactor
   const P_tile_on   = Math.abs(state.U_Q) * omega / Q_on;
   const P_tile_idle = Math.abs(state.U_Q) * omega / Q_off;
@@ -529,9 +533,9 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       state.P_avg = P_exp;
     }
 
-    const E_tile = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
+    const E_tile_mass = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
                  * Q_BURST * state.gammaVanDenBroeck * d_eff;
-    const M_exp  = (E_tile / (C*C)) * state.N_tiles;
+    const M_exp  = (E_tile_mass / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
       state.M_exotic_raw = state.M_exotic = M_exp;
