@@ -5,6 +5,7 @@ import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import Grid3DEngine from "@/components/engines/Grid3DEngine";
+import { SliceViewer } from "@/components/SliceViewer";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
@@ -218,6 +219,30 @@ export default function WarpRenderInspector(props: {
     (cv as any)[ENGINE_KEY] = eng;
     return eng;
   }
+  
+  // Helper to create engine with conditional selection and 3D fallback
+  function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
+    const W: any = (window as any).WarpEngine;
+    
+    if (rendererType === 'grid3d') {
+      // Try 3D engine first
+      try {
+        const engine3d = getOrCreateEngine(W, canvas);
+        const ok = engine3d.init ? engine3d.init(canvas) : true;
+        if (ok) {
+          return engine3d;
+        } else {
+          // 3D context failed, dispose and fallback
+          engine3d.dispose?.();
+        }
+      } catch (e) {
+        console.warn('Grid3D engine failed, falling back to slice2d:', e);
+      }
+    }
+    
+    // Use slice2d (either requested or as fallback)
+    return getOrCreateEngine(W, canvas);
+  }
 
   // Engine creation & lifecycle
   useEffect(() => {
@@ -229,13 +254,13 @@ export default function WarpRenderInspector(props: {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
-      leftEngine.current  = getOrCreateEngine(W, leftRef.current);
+      leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
     }
     if (rightRef.current && !rightEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
       rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-      rightEngine.current = getOrCreateEngine(W, rightRef.current);
+      rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
     }
 
     // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW

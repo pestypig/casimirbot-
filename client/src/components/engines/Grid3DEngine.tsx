@@ -144,15 +144,19 @@ export default function Grid3DEngine({ uniforms, ...rest }: { uniforms: any; [ke
     };
 
     (canvas as any).updateUniforms = (newUniforms: any) => {
-      // Updates will trigger re-render via useEffect dependency
+      // Store uniforms and trigger re-render via useEffect dependency
+      Object.assign(uniforms, newUniforms);
     };
 
     (canvas as any).bootstrap = (payload: any) => {
       // Initialize with payload data
+      Object.assign(uniforms, payload);
     };
 
     (canvas as any).isLoaded = true;
     (canvas as any).gridProgram = true; // Mock for readiness checks
+    (canvas as any).init = () => true; // Always succeeds for Canvas 2D
+    (canvas as any).dispose = () => {}; // No-op for Canvas 2D
   }, []);
 
   return (
