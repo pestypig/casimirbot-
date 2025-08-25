@@ -54,8 +54,6 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     const timeout = setTimeout(setupCanvas, 100);
     
     const startRendering = (ctx: CanvasRenderingContext2D) => {
-
-    let isDestroyed = false;
     
     // Build a rectilinear lattice in model space (64×40×64)
     const buildGrid = (nx: number, ny: number, nz: number) => {
@@ -123,6 +121,10 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       }
     };
 
+    // Hoist grid building for performance - rebuild only on uniform changes
+    let cachedGrid = buildGrid(32, 20, 32);
+    let lastUniformsHash = JSON.stringify(uniforms);
+    
     // Render function
     const render = () => {
       if (isDestroyed) return;
@@ -130,8 +132,14 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
       
-      // Build grid
-      const grid = buildGrid(32, 20, 32); // Moderate resolution for performance
+      // Rebuild grid only if uniforms changed
+      const currentHash = JSON.stringify(uniforms);
+      if (currentHash !== lastUniformsHash) {
+        cachedGrid = buildGrid(32, 20, 32);
+        lastUniformsHash = currentHash;
+      }
+      
+      const grid = cachedGrid;
       
       // Apply displacement and render
       const exposure = uniforms.exposure || 5;

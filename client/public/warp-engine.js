@@ -2015,7 +2015,9 @@ class WarpEngine {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = WarpEngine;
 } else {
-    globalThis.WarpEngine = globalThis.WarpEngine || {};
+    // Keep BUILD token on the class
+    WarpEngine.BUILD = BUILD;
+    globalThis.__WarpEngineBuild = BUILD;
     globalThis.WarpEngine = WarpEngine;
     console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
 }
