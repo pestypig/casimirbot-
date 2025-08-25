@@ -4,6 +4,7 @@
  * Eliminates "secret defaults" by driving WarpEngine directly from EnergyPipelineState.
  * Single source of truth for all physics parameters.
  */
+import { gatedUpdateUniforms } from "./warp-uniforms-gate";
 
 export interface EnergyPipelineState {
   // Hull geometry
@@ -72,8 +73,8 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
 
   // --- Mode & parity (MODEL_MODE=raw ⇒ parity visuals) ---
 
-  // Push everything into the renderer in one shot
-  engine.updateUniforms({
+  // Push everything into the renderer in one shot using gated uniforms
+  gatedUpdateUniforms(engine, {
     // Physics/ops
     currentMode: s.currentMode,
     // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
@@ -92,5 +93,5 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
     // cosmeticLevel: 10,
     // curvatureBoostMax: 40,
     // curvatureGainT: 0.0,
-  });
+  }, 'pipeline-adapter');
 }

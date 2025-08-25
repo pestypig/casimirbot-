@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 
 type MechanicalParams = {
   /** Power-only mechanical knob from pipeline (used to back out damping) */
@@ -128,7 +129,7 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
       lightCrossing: parameters?.lightCrossing,
       zeta: parameters?.zeta
     };
-    engineRef.current.updateUniforms(updatedUniforms);
+    gatedUpdateUniforms(engineRef.current, updatedUniforms, 'shell-outline');
   }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain, parameters?.dutyEffectiveFR, parameters?.lightCrossing, parameters?.zeta]);
 
   return (

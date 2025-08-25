@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 
 // Build token: read lazily so SSR never touches `window`
 const getAppBuild = () =>
@@ -116,9 +117,9 @@ function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'RE
     clean = paneSanitize(pane, clean);
   }
   if (!e.isLoaded || !e.gridProgram) {
-    e.onceReady(() => { e.updateUniforms(clean); e.forceRedraw?.(); });
+    e.onceReady(() => { gatedUpdateUniforms(e, clean, 'bubble-compare-ready'); e.forceRedraw?.(); });
   } else {
-    e.updateUniforms(clean);
+    gatedUpdateUniforms(e, clean, 'bubble-compare-direct');
     e.forceRedraw?.();
   }
 }
@@ -323,9 +324,9 @@ function applyShowSafe(e:any, payload:any) {
       applied = true;
       const clean = sanitizeUniforms({ cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
       if (e.isLoaded && e.gridProgram) {
-        e.updateUniforms(clean);
+        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
       } else {
-        e.onceReady?.(() => e.updateUniforms(clean));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
       }
       e.setDisplayGain?.(1);
       console.warn('[SHOW] cosmetics disabled as safety fallback');
@@ -333,9 +334,9 @@ function applyShowSafe(e:any, payload:any) {
       // re-apply SHOW once; use whatever you computed in applyShow
       const clean = sanitizeUniforms(payload);
       if (e.isLoaded && e.gridProgram) {
-        e.updateUniforms(clean);
+        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
       } else {
-        e.onceReady?.(() => e.updateUniforms(clean));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
       }
       console.log('[SHOW] re-applied boosted settings after grid ready');
     }
@@ -404,7 +405,7 @@ function scrubOverlays(e: any) {
   if ('hullAxes' in u && !patch.hullAxes) patch.hullAxes = u.hullAxes;
   if ('axesScene' in u && !patch.axesScene) patch.axesScene = u.axesScene;
 
-  e.updateUniforms(patch);
+  gatedUpdateUniforms(e, patch, 'bubble-compare-scrub');
 }
 
 /* ---------------- Safe uniform push with compatibility shim ---------------- */
@@ -474,9 +475,9 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
     setTimeout(() => {
       const clean = sanitizeUniforms(payload);
       if (e.isLoaded && e.gridProgram) {
-        e.updateUniforms(clean);
+        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
       } else {
-        e.onceReady?.(() => e.updateUniforms(clean));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
       }
     }, 0); // microtick delay
     return;
@@ -748,7 +749,7 @@ export default function WarpBubbleCompare({
         const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
         tick();
       });
-      eng.updateUniforms?.(uniforms);
+      gatedUpdateUniforms(eng, uniforms, 'bubble-compare-engine-init');
       eng.isLoaded = true;
       if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
       eng.start?.();

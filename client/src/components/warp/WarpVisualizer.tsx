@@ -69,6 +69,7 @@ const VIS_LOCAL = {
 
 // --- Pipeline θ-scale (unified) ----------------------------------------------
 import { resolveThetaScale } from '@/lib/warp-theta';
+import { gatedUpdateUniforms } from '@/lib/warp-uniforms-gate';
 
 // Safe formatters and parameter extractors (fixes accuracy/safety during mode switches)
 const isFiniteNum = (v: any): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -330,7 +331,7 @@ useEffect(() => {
     engine.bootstrap(uniforms);
     
     // Prime θ-scale for the first frame (single source of truth)
-    engine.updateUniforms({
+    gatedUpdateUniforms(engine, {
       thetaScale: resolveThetaScale({
         dutyCycle: dutyResolved,
         sectorCount: sectorCountResolved,   // ← total for averaging
@@ -341,14 +342,14 @@ useEffect(() => {
       }),
       sectorCount: sectorCountResolved,     // make it explicit on the engine too
       sectors: sectorsResolved,
-    });
+    }, 'visualizer-prime');
     
     // Apply viz overrides if provided
     // Normalize colorMode to numeric (engine: 0=solid,1=theta,2=shear) and send synonyms
     const cmRaw = parameters.viz?.colorMode ?? 'theta';
     const cmMap: any = { solid:0, theta:1, shear:2 };
     const cmIndex = typeof cmRaw === 'string' ? (cmMap[cmRaw] ?? 1) : Number(cmRaw);
-    engine.updateUniforms({
+    gatedUpdateUniforms(engine, {
       colorMode: cmIndex,
       colorModeIndex: cmIndex,
       colorModeName: typeof cmRaw === 'string' ? cmRaw : (['solid','theta','shear'][cmIndex] ?? 'theta'),
@@ -357,22 +358,22 @@ useEffect(() => {
       exposure: parameters.viz?.exposure ?? undefined,
       zeroStop: parameters.viz?.zeroStop ?? undefined,
       cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
-    });
+    }, 'visualizer-color');
 
     // Pipeline-timed gating
     if (lc) {
-      engine.updateUniforms({
+      gatedUpdateUniforms(engine, {
         phase: lc.phase,                  // 0..1 sweep position
         onWindow: !!lc.onWindowDisplay,   // gate visuals to FR-compliant window
         sectorIdx: Math.max(0, lc.sectorIdx % sectorsResolved),
         tauLC_ms: lc.tauLC_ms,
         dwell_ms: lc.dwell_ms,
         burst_ms: lc.burst_ms,
-      });
+      }, 'visualizer-pipeline');
     }
 
     // visual knobs that aren't strictly physics
-    engine.updateUniforms({
+    gatedUpdateUniforms(engine, {
       vizGain: parity ? 1 : (
         mode === 'emergency' ? VIS_LOCAL.vizGainEmergency :
         mode === 'cruise'    ? VIS_LOCAL.vizGainCruise    :
@@ -386,7 +387,7 @@ useEffect(() => {
       powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
       exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
       tsRatio: parameters.tsRatio || VIS.tsRatioDefault
-    });
+    }, 'visualizer-knobs');
 
     // start render explicitly so we get a first frame
     engine._startRenderLoop?.();

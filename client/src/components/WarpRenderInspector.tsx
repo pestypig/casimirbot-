@@ -4,6 +4,7 @@ import CurvaturePhysicsPanel from "@/components/CurvaturePhysicsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 
 /**
  * WarpRenderInspector
@@ -23,10 +24,10 @@ type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Push only after shaders are ready
-function pushUniformsWhenReady(engine: any, patch: Record<string, any>) {
+// Push only after shaders are ready - now with gating
+function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
   if (!engine) return;
-  const push = () => engine.updateUniforms?.(patch);
+  const push = () => gatedUpdateUniforms(engine, patch, source);
   if (engine.isLoaded && engine.gridProgram) {
     push();
   } else if (typeof engine.onceReady === "function") {
@@ -176,7 +177,8 @@ export default function WarpRenderInspector(props: {
       (safe as any).physicsParityMode = forceParity;
       (safe as any).parityMode        = forceParity;
 
-      return orig?.(safe);
+      // Use gated uniforms instead of direct call
+      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${tag.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }
@@ -221,12 +223,12 @@ export default function WarpRenderInspector(props: {
     leftEngine.current?.onceReady?.(() => {
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
-      leftEngine.current.updateUniforms({ cameraZ: cz, lockFraming: true });
+      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
     });
     rightEngine.current?.onceReady?.(() => {
       const ax = rightEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
-      rightEngine.current.updateUniforms({ cameraZ: cz, lockFraming: true });
+      gatedUpdateUniforms(rightEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-right-init');
       // optional: mirror display gain through helper
       const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
       rightEngine.current.setDisplayGain?.(dg);
@@ -304,16 +306,16 @@ export default function WarpRenderInspector(props: {
     };
 
     // REAL engine - physics truth
-    leftEngine.current.updateUniforms({ ...shared, physicsParityMode: true });
+    gatedUpdateUniforms(leftEngine.current, { ...shared, physicsParityMode: true }, 'inspector-real');
     
     // SHOW engine - enhanced visuals  
-    rightEngine.current.updateUniforms({ ...shared, physicsParityMode: false });
+    gatedUpdateUniforms(rightEngine.current, { ...shared, physicsParityMode: false }, 'inspector-show');
 
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    leftEngine.current.updateUniforms({ cameraZ: cz });
-    rightEngine.current.updateUniforms({ cameraZ: cz });
+    gatedUpdateUniforms(leftEngine.current, { cameraZ: cz }, 'inspector-camera');
+    gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'inspector-camera');
     
     // Sanity check parity modes
     setTimeout(() => {
