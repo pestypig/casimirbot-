@@ -221,6 +221,20 @@ export default function WarpRenderInspector(props: {
     return eng;
   }
   
+  // Hard-lock parity & block late thetaScale writers at the engine edge
+  function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
+    if (!engine || engine.__locked) return;
+    const orig = engine.updateUniforms?.bind(engine);
+    engine.updateUniforms = (patch: any) => {
+      const safe = normalizeKeys({ ...(patch || {}) });
+      if ('thetaScale' in safe) delete safe.thetaScale;
+      safe.physicsParityMode = (pane === 'REAL');
+      safe.parityMode = (pane === 'REAL');
+      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
+    };
+    engine.__locked = true;
+  }
+
   // Helper to create engine with conditional selection and 3D fallback
   function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
     const W: any = (window as any).WarpEngine;
@@ -259,6 +273,8 @@ export default function WarpRenderInspector(props: {
       // Mute engine until canonical uniforms arrive (prevents first-frame spike)
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       leftEngine.current?.setVisible?.(false);
+      // Hard-lock REAL pane against parity flips and thetaScale writers
+      lockPane(leftEngine.current, 'REAL');
     }
     if (rightRef.current && !rightEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -268,6 +284,8 @@ export default function WarpRenderInspector(props: {
       // Mute engine until canonical uniforms arrive (prevents first-frame spike)
       gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       rightEngine.current?.setVisible?.(false);
+      // Hard-lock SHOW pane against parity flips and thetaScale writers
+      lockPane(rightEngine.current, 'SHOW');
     }
 
     // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
@@ -294,6 +312,25 @@ export default function WarpRenderInspector(props: {
     // Diagnostics -> window for quick comparison
     leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
     rightEngine.current && (rightEngine.current.onDiagnostics = (d: any) => ((window as any).__diagSHOW = d));
+    
+    // Wire lost/restored guards to both canvases
+    const handleContextLost = (e: Event) => {
+      e.preventDefault();
+      console.warn('WebGL context lost, will attempt restore');
+    };
+    const handleContextRestored = () => {
+      console.log('WebGL context restored, reinitializing engines');
+      // Engines will auto-reinitialize on next render
+    };
+    
+    if (leftRef.current) {
+      leftRef.current.addEventListener('webglcontextlost', handleContextLost);
+      leftRef.current.addEventListener('webglcontextrestored', handleContextRestored);
+    }
+    if (rightRef.current) {
+      rightRef.current.addEventListener('webglcontextlost', handleContextLost);
+      rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
+    }
 
     // Subscribe to canonical server uniforms
     const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
@@ -344,6 +381,16 @@ export default function WarpRenderInspector(props: {
       // Unsubscribe from canonical uniforms
       unsubscribe(unsubscribeHandler);
       setHaveUniforms(false); // Reset on cleanup
+      
+      // Remove WebGL context event listeners
+      if (leftRef.current) {
+        leftRef.current.removeEventListener('webglcontextlost', handleContextLost);
+        leftRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+      }
+      if (rightRef.current) {
+        rightRef.current.removeEventListener('webglcontextlost', handleContextLost);
+        rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+      }
       
       try { leftEngine.current?.destroy(); } catch {}
       try { rightEngine.current?.destroy(); } catch {}
@@ -488,17 +535,8 @@ export default function WarpRenderInspector(props: {
       gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
       eng.setVisible?.(false);
       
-      // Block stray thetaScale writes for Grid3D engine
-      if (rightEngine.current && !rightEngine.current.__locked) {
-        const orig = rightEngine.current.updateUniforms?.bind(rightEngine.current);
-        rightEngine.current.updateUniforms = (patch: any) => {
-          const safe = { ...(patch || {}) };
-          if ('thetaScale' in safe) delete (safe as any).thetaScale; // physics derives it
-          (safe as any).physicsParityMode = false;
-          return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), 'show-locked');
-        };
-        rightEngine.current.__locked = true;
-      }
+      // Hard-lock Grid3D engine as SHOW pane
+      lockPane(rightEngine.current, 'SHOW');
     }
   }, [showRendererType]);
 
