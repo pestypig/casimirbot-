@@ -288,8 +288,12 @@ export default function WarpRenderInspector(props: {
     pushUniformsWhenReady(leftEngine.current, {
       ...safe(realPayload),
       ...physicalScale,
-      ridgeMode: 0,
       physicsParityMode: true,
+      ridgeMode: 0,
+      curvatureGainT: 0,
+      curvatureBoostMax: 1,
+      displayGain: 1,
+      userGain: 1,
     });
 
     // SHOW

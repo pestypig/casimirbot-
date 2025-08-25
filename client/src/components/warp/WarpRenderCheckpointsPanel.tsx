@@ -32,7 +32,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(x)?+x:d;
-  const parity = !!engine?.uniforms?.physicsParityMode; // REAL=true, SHOW=false
+  const parity = (engine?.uniforms?.physicsParityMode ?? engine?.uniforms?.parityMode ?? false) ? true : false; // REAL=true, SHOW=false
   const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
   if (mode === 'standby') return 0;
 
@@ -196,7 +196,8 @@ function useCheckpointList(
       const expParity = expectations.parity;
       const expRidge = expectations.ridge;
       if (expParity != null) {
-        const ok = !!u?.physicsParityMode === !!expParity;
+        const parity = (u?.physicsParityMode ?? u?.parityMode ?? false) ? true : false;
+        const ok = parity === !!expParity;
         rows.push({ label: "Parity mode", detail: String(!!u?.physicsParityMode), state: ok ? "ok" : "fail" });
       }
       if (expRidge != null) {
