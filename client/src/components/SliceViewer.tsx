@@ -232,6 +232,18 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       const pHat: Vec3 = [Math.cos(phi), 0, Math.sin(phi)];
       const xs_over_rs = dot(pHat, dN); // equals cos(angle between p and drive)
 
+      // Optional: REAL strobing sign tied to current split
+      let strobeSign = 1;
+      if (instantStrobe && sectors >= 1) {
+        const S = Math.max(1, sectors);
+        const splitIdx = Math.max(0, Math.min(S - 1, Math.floor(split ?? S / 2)));
+        const u = (phi % (2 * Math.PI)) / (2 * Math.PI);        // [0,1)
+        const k = Math.floor(u * S);                             // sector index at this φ
+        const distToSplit = (k - splitIdx + 0.5);                // sector units
+        const w = strobeWidth ?? 0.75;
+        strobeSign = Math.tanh(-distToSplit / Math.max(1e-6, w)); // smooth ±1
+      }
+
       for (let i = 0; i < nX; i++) {
         // xSigma ∈ [-sigmaRange, +sigmaRange]
         const xSigma = -sigmaRange + (2 * sigmaRange * i) / Math.max(1, (nX - 1));
@@ -243,15 +255,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
         const dfdr = (-2 * (rho - 1) / (w * w)) * f; // d/dρ
 
         // York-time proxy (matches your shader form)
-        let theta = vShip * xs_over_rs * dfdr; // 1/ρ cancels because pHat has |p|=1
-
-        // Live strobing: sector polarity (matches engine samplers/inspector)
-        if (instantStrobe && sectors > 1) {
-          // Soft sign based on current split boundary
-          const sectorIndex = Math.floor(i * sectors / nX); // map pixel to sector
-          const sectorSign = Math.tanh((sectorIndex - split) / Math.max(1e-6, strobeWidth));
-          theta *= sectorSign; // apply live sector polarity
-        }
+        let theta = vShip * xs_over_rs * dfdr * strobeSign;
 
         // Apply amplitude chain (viewer-only)
         let value = theta * amp;
