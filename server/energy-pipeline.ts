@@ -426,6 +426,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   (state as any).qMechanicalClamped = (state.qMechanical !== qMech_before);
   state.P_loss_raw = Math.abs(state.U_Q) * omega / Q;  // per-tile (with qMechanical)
   state.P_avg      = P_total_W / 1e6; // MW for HUD
+  (state as any).P_avg_W = P_total_W; // W (explicit)
   
   // Expose labeled electrical power for dual-bar dashboards
   (state as any).P_elec_MW = state.P_avg;  // Electrical power (same as P_avg, but clearly labeled)
@@ -555,6 +556,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     if (Math.abs(state.P_avg - P_exp) > 1e-6 * Math.max(1, P_exp)) {
       if (DEBUG_PIPE) console.warn("[AUDIT] P_avg drift; correcting", {reported: state.P_avg, expected: P_exp});
       state.P_avg = P_exp;
+      (state as any).P_avg_W = P_exp * 1e6; // W (explicit)
     }
 
     const E_tile_mass = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
