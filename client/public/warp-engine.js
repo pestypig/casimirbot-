@@ -916,7 +916,8 @@ class WarpEngine {
           N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
 
         const frFromParams =
-          parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff;
+          parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff ??
+          prev?.dutyEffectiveFR      ?? prev?.dutyShip      ?? prev?.dutyEff;
 
         // total sectors (ship-wide), concurrent sectors (pane)
         const sectorsConcurrent =
@@ -995,6 +996,7 @@ class WarpEngine {
           ? +parameters.thetaScale
           : thetaScaleFromChain;
         nextUniforms.dutyUsed   = dutyEffFR;   // 🔍 for checkpoints UI
+        nextUniforms.dutyEffectiveFR = dutyEffFR; // <- for UI & future patches
 
         // If amplitude just went "off", restore the pristine grid
         const wasActive = (prev.thetaScale ?? 0) > 1e-12;
