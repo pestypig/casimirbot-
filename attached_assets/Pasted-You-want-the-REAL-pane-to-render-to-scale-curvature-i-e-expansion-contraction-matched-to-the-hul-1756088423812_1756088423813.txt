@@ -1,0 +1,85 @@
+You want the REAL pane to render “to-scale” curvature—i.e., expansion/contraction matched to the hull ellipsoid, with no cosmetic boosts—so a single-plane grid view is physically useful.
+
+Below is a minimal patch that makes the REAL viewer strictly physical and scaled to the hull:
+
+✅ What this does
+
+Uses hull dimensions to convert a meter wall thickness to ρ-units (what the shader expects).
+
+Forces REAL to: parity on, no boosts, no display gain, no user gain, vShip=0, and ridgeMode=0 (double-lobe physics).
+
+Tightens the camera to the hull’s size so the grid cut looks like a proper physical cross-section.
+
+Leaves SHOW alone.
+
+1) Push wall thickness in ρ-units + set a “true scale” camera for REAL
+
+In your useEffect that pushes from parameters, add the block marked // ⟵ REAL: draw to physical scale:
+
+// Build shared geometry data
+const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+
+// --- ⟵ REAL: draw to physical scale --- //
+const a = Number(parameters?.hull?.a) ?? 503.5;
+const b = Number(parameters?.hull?.b) ?? 132.0;
+const c = Number(parameters?.hull?.c) ?? 86.5;
+// effective radius: geometric mean maps meters → ρ-units
+const aEff = Math.cbrt(a * b * c);
+// convert meters to ρ (shader’s wall pulse uses ρ)
+const wallWidth_m = Number(parameters?.wallWidth_m ?? 6.0);
+const wallWidth_rho = Math.max(1e-6, wallWidth_m / Math.max(1e-6, aEff));
+// compact camera exactly to hull scale
+const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
+// make the grid span just outside the hull so the ridge is readable
+const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene as [number,number,number])) * 1.10);
+// -------------------------------------- //
+
+
+Now when you push REAL and SHOW, add the to-scale fields to the REAL packet and set cameraZ:
+
+// REAL (parity / Ford–Roman)
+pushSafe(leftEngine, {
+  ...shared,
+  gridSpan: gridSpanReal,            // tight framing around hull
+  ...real,
+  currentMode: parameters.currentMode,
+  physicsParityMode: true,
+  ridgeMode: 0,
+  vShip: 0,                          // never “fly” in REAL
+  // strictly physical: no boosts, no gains, wall to ρ-units
+  userGain: 1,
+  displayGain: 1,
+  curvatureGainT: 0,
+  curvatureBoostMax: 1,
+  wallWidth: wallWidth_rho,          // ⟵ key: ρ-units for shader pulse
+  gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+  deltaAOverA: real.qSpoilingFactor,
+  dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
+  sectors: Math.max(1, parameters.sectors),
+  colorMode: 2,                      // shear proxy is a clear “truth” view
+  cameraZ: camZ,                     // ⟵ key: to-scale camera
+});
+
+// SHOW (UI)
+const showTheta = parameters.currentMode === 'standby'
+  ? 0
+  : Math.max(1e-6, show.thetaScale || 0);
+
+pushSafe(rightEngine, {
+  ...shared,
+  ...show,
+  currentMode: parameters.currentMode,
+  physicsParityMode: false,
+  ridgeMode: 1,
+  vShip: parameters.currentMode === 'standby' ? 0 : 1,
+  thetaScale: showTheta,
+  gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+  deltaAOverA: show.qSpoilingFactor,
+  sectors: Math.max(1, parameters.sectors),
+  // SHOW camera can share the same camZ for easy side-by-side comparison
+  cameraZ: camZ
+});
+
+
+Why wallWidth not wallWidth_m?
+Your engine’s draw path consumes u_wallWidth (ρ-units). Passing wallWidth_rho ensures the ridge thickness and the df/dr shape sit exactly at the correct physical radius relative to the axes.

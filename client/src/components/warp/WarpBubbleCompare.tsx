@@ -907,18 +907,42 @@ export default function WarpBubbleCompare({
     // Build shared geometry data
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
 
+    // --- ⟵ REAL: draw to physical scale --- //
+    const a = Number(parameters?.hull?.a) ?? 503.5;
+    const b = Number(parameters?.hull?.b) ?? 132.0;
+    const c = Number(parameters?.hull?.c) ?? 86.5;
+    // effective radius: geometric mean maps meters → ρ-units
+    const aEff = Math.cbrt(a * b * c);
+    // convert meters to ρ (shader's wall pulse uses ρ)
+    const wallWidth_m = Number(parameters?.wallWidth_m ?? 6.0);
+    const wallWidth_rho = Math.max(1e-6, wallWidth_m / Math.max(1e-6, aEff));
+    // compact camera exactly to hull scale
+    const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
+    // make the grid span just outside the hull so the ridge is readable
+    const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene as [number,number,number])) * 1.10);
+    // -------------------------------------- //
+
     // REAL (parity / Ford–Roman)
     pushSafe(leftEngine, {
       ...shared,
+      gridSpan: gridSpanReal,            // tight framing around hull
       ...real,
-      currentMode: parameters.currentMode,       // ← add this
+      currentMode: parameters.currentMode,
       physicsParityMode: true,
-      vShip: 0, // explicit
+      ridgeMode: 0,
+      vShip: 0,                          // never "fly" in REAL
+      // strictly physical: no boosts, no gains, wall to ρ-units
+      userGain: 1,
+      displayGain: 1,
+      curvatureGainT: 0,
+      curvatureBoostMax: 1,
+      wallWidth: wallWidth_rho,          // ⟵ key: ρ-units for shader pulse
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
       deltaAOverA: real.qSpoilingFactor,
       dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
       sectors: Math.max(1, parameters.sectors),
-      ridgeMode: 0,
+      colorMode: 2,                      // shear proxy is a clear "truth" view
+      cameraZ: camZ,                     // ⟵ key: to-scale camera
     });
 
     // SHOW (UI)
@@ -929,14 +953,16 @@ export default function WarpBubbleCompare({
     pushSafe(rightEngine, {
       ...shared,
       ...show,
-      currentMode: parameters.currentMode,       // ← add this
+      currentMode: parameters.currentMode,
       physicsParityMode: false,
-      vShip: parameters.currentMode === 'standby' ? 0 : 1, // explicit
-      thetaScale: showTheta,  // ← floored
+      ridgeMode: 1,
+      vShip: parameters.currentMode === 'standby' ? 0 : 1,
+      thetaScale: showTheta,
       gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
       deltaAOverA: show.qSpoilingFactor,
       sectors: Math.max(1, parameters.sectors),
-      ridgeMode: 1,
+      // SHOW camera can share the same camZ for easy side-by-side comparison
+      cameraZ: camZ
     });
 
     // Force a draw so the user sees the change immediately
