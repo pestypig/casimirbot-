@@ -630,38 +630,47 @@ export default function WarpBubbleCompare({
 
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
+  const ENGINE_PROMISE = '__warpEnginePromise';
 
-  function getOrCreateEngine<WarpType = any>(
-    W: any,
+  function hasLiveEngine(cv: HTMLCanvasElement) {
+    const e: any = (cv as any)[ENGINE_KEY];
+    return e && !e._destroyed;
+  }
+
+  async function getOrCreateEngine<WarpType = any>(
+    Ctor: new (c: HTMLCanvasElement) => WarpType,
     cv: HTMLCanvasElement
-  ): WarpType {
-    // 1) Prefer cached instance on the canvas
-    const existing = (cv as any)[ENGINE_KEY] as any;
-    if (existing && !existing._destroyed) return existing as WarpType;
+  ): Promise<WarpType> {
+    // Reuse existing
+    if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
 
-    // 2) If the engine exposes a lookup, try that too
-    const byMap = W?.getForCanvas?.(cv);
-    if (byMap && !byMap._destroyed) {
-      (cv as any)[ENGINE_KEY] = byMap;
-      return byMap as WarpType;
-    }
+    // Someone else is attaching? wait for it
+    if ((cv as any)[ENGINE_PROMISE]) return (cv as any)[ENGINE_PROMISE];
 
-    // 3) Last resort: try to construct, but handle "already attached"
-    try {
-      const eng = new W(cv);
-      (cv as any)[ENGINE_KEY] = eng;
-      return eng as WarpType;
-    } catch (err: any) {
-      const msg = String(err?.message || err);
-      if (msg.includes('already attached')) {
-        // The engine still owns the canvas internally; reuse it.
-        const fallback =
-          (cv as any)[ENGINE_KEY] ||
-          W?.getForCanvas?.(cv);
-        if (fallback) return fallback as WarpType;
+    // Single-flight lock
+    (cv as any)[ENGINE_PROMISE] = (async () => {
+      try {
+        if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
+
+        let eng: any;
+        try {
+          eng = new Ctor(cv);
+        } catch (err: any) {
+          const msg = String(err?.message || err).toLowerCase();
+          if (msg.includes('already attached')) {
+            // Another call won the race; reuse the survivor
+            if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
+          }
+          throw err;
+        }
+        (cv as any)[ENGINE_KEY] = eng;
+        return eng as WarpType;
+      } finally {
+        delete (cv as any)[ENGINE_PROMISE];
       }
-      throw err; // real error
-    }
+    })();
+
+    return (cv as any)[ENGINE_PROMISE];
   }
 
 
@@ -707,39 +716,8 @@ export default function WarpBubbleCompare({
     killEngine(leftEngine, leftRef.current);
     killEngine(rightEngine, rightRef.current);
 
-    // 2) Make fresh instances using the robust constructor
-    const getOrCreateEngineLocal = (cv: HTMLCanvasElement) => {
-      // 1) Prefer cached instance on the canvas
-      const existing = (cv as any)[ENGINE_KEY] as any;
-      if (existing && !existing._destroyed) return existing;
-
-      // 2) If the engine exposes a lookup, try that too
-      const byMap = W?.getForCanvas?.(cv);
-      if (byMap && !byMap._destroyed) {
-        (cv as any)[ENGINE_KEY] = byMap;
-        return byMap;
-      }
-
-      // 3) Last resort: try to construct, but handle "already attached"
-      try {
-        const eng = new W(cv);
-        (cv as any)[ENGINE_KEY] = eng;
-        return eng;
-      } catch (err: any) {
-        const msg = String(err?.message || err);
-        if (msg.includes('already attached')) {
-          // The engine still owns the canvas internally; reuse it.
-          const fallback =
-            (cv as any)[ENGINE_KEY] ||
-            W?.getForCanvas?.(cv);
-          if (fallback) return fallback;
-        }
-        throw err; // real error
-      }
-    };
-
     const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-      const eng = getOrCreateEngineLocal(cv);
+      const eng: any = await getOrCreateEngine(W, cv);
       const { w, h } = sizeCanvas(cv);
       eng.gl.viewport(0, 0, w, h);
       try { eng._initializeGrid?.(); } catch {}
@@ -859,7 +837,7 @@ export default function WarpBubbleCompare({
         // Don't kill existing engines - let getOrCreateEngine handle reuse
 
         const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-        const eng = getOrCreateEngine(W, cv);   // ← reuse or create
+        const eng = await getOrCreateEngine(W, cv);   // ← reuse or create
         const { w: canvasW, h: canvasH } = sizeCanvas(cv);
         eng.gl.viewport(0, 0, canvasW, canvasH);
 
