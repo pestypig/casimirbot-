@@ -631,12 +631,37 @@ export default function WarpBubbleCompare({
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
 
-  function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
-    const existing = (cv as any)[ENGINE_KEY];
+  function getOrCreateEngine<WarpType = any>(
+    W: any,
+    cv: HTMLCanvasElement
+  ): WarpType {
+    // 1) Prefer cached instance on the canvas
+    const existing = (cv as any)[ENGINE_KEY] as any;
     if (existing && !existing._destroyed) return existing as WarpType;
-    const eng = new Ctor(cv);
-    (cv as any)[ENGINE_KEY] = eng;
-    return eng;
+
+    // 2) If the engine exposes a lookup, try that too
+    const byMap = W?.getForCanvas?.(cv);
+    if (byMap && !byMap._destroyed) {
+      (cv as any)[ENGINE_KEY] = byMap;
+      return byMap as WarpType;
+    }
+
+    // 3) Last resort: try to construct, but handle "already attached"
+    try {
+      const eng = new W(cv);
+      (cv as any)[ENGINE_KEY] = eng;
+      return eng as WarpType;
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+      if (msg.includes('already attached')) {
+        // The engine still owns the canvas internally; reuse it.
+        const fallback =
+          (cv as any)[ENGINE_KEY] ||
+          W?.getForCanvas?.(cv);
+        if (fallback) return fallback as WarpType;
+      }
+      throw err; // real error
+    }
   }
 
 
@@ -682,17 +707,39 @@ export default function WarpBubbleCompare({
     killEngine(leftEngine, leftRef.current);
     killEngine(rightEngine, rightRef.current);
 
-    // 2) Make fresh instances
-    const getOrCreateEngine = (cv: HTMLCanvasElement) => {
-      const existing = (cv as any).__warpEngine;
+    // 2) Make fresh instances using the robust constructor
+    const getOrCreateEngineLocal = (cv: HTMLCanvasElement) => {
+      // 1) Prefer cached instance on the canvas
+      const existing = (cv as any)[ENGINE_KEY] as any;
       if (existing && !existing._destroyed) return existing;
-      const eng = new W(cv);
-      (cv as any).__warpEngine = eng;
-      return eng;
+
+      // 2) If the engine exposes a lookup, try that too
+      const byMap = W?.getForCanvas?.(cv);
+      if (byMap && !byMap._destroyed) {
+        (cv as any)[ENGINE_KEY] = byMap;
+        return byMap;
+      }
+
+      // 3) Last resort: try to construct, but handle "already attached"
+      try {
+        const eng = new W(cv);
+        (cv as any)[ENGINE_KEY] = eng;
+        return eng;
+      } catch (err: any) {
+        const msg = String(err?.message || err);
+        if (msg.includes('already attached')) {
+          // The engine still owns the canvas internally; reuse it.
+          const fallback =
+            (cv as any)[ENGINE_KEY] ||
+            W?.getForCanvas?.(cv);
+          if (fallback) return fallback;
+        }
+        throw err; // real error
+      }
     };
 
     const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-      const eng = getOrCreateEngine(cv);
+      const eng = getOrCreateEngineLocal(cv);
       const { w, h } = sizeCanvas(cv);
       eng.gl.viewport(0, 0, w, h);
       try { eng._initializeGrid?.(); } catch {}
