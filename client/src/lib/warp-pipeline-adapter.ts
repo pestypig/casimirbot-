@@ -38,17 +38,7 @@ export interface EnergyPipelineState {
 export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   if (!engine || !s) return;
 
-  // HARD parity kill switch
-  if (engine.uniforms?.physicsParityMode) {
-    engine.updateUniforms?.({
-      vizGain: 1,
-      curvatureGainDec: 0,
-      curvatureBoostMax: 1,
-      curvatureGainT: 0
-    });
-    engine.setDisplayGain?.(1);
-    return; // nothing visual is allowed to boost in REAL
-  }
+  // Do not set global parity flags here; let the caller (REAL/SHOW) control them
 
   // --- Hull semi-axes in meters (renderer expects [a,b,c]) ---
   const a = (s.hull?.Lx_m ?? s.shipRadius_m * 2) / 2;
@@ -86,8 +76,7 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   engine.updateUniforms({
     // Physics/ops
     currentMode: s.currentMode,
-    physicsParityMode: s.modelMode === 'raw',  // truth
-    ridgeMode:        s.modelMode === 'raw' ? 0 : 1,
+    // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
     dutyCycle: d_ship,                // ship-wide effective duty
     sectors, split,
     gammaGeo, gammaVdB, Qburst,
