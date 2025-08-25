@@ -52,14 +52,23 @@ export default function CurvatureSlicePanel() {
   const isStandby = mode === "standby";
   const dutyFR = useMemo(() => {
     if (isStandby) return 0;
-    const fromServer =
+    const frFromPipeline =
       (live as any)?.dutyEffectiveFR ??
       (live as any)?.dutyShip ??
       (live as any)?.dutyEff;
-    if (Number.isFinite(fromServer)) return Math.max(0, Math.min(1, Number(fromServer)));
-    // fallback: local burst duty (1%) × (concurrent / total)
-    return PIPE_CONST.BURST_DUTY_LOCAL * (concurrent / totalSectors);
-  }, [live, isStandby, concurrent]);
+
+    if (Number.isFinite(frFromPipeline)) return Math.max(0, Math.min(1, Number(frFromPipeline)));
+
+    const burst = Number((live as any)?.burst_ms);
+    const dwell = Number((live as any)?.dwell_ms);
+    const dutyLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
+      ? burst / dwell : 0.01;
+
+    const S_total = Math.max(1, Math.floor(totalSectors || 400));
+    const S_live  = Math.max(1, Math.min(S_total, Math.floor(concurrentSectors || 1)));
+
+    return Math.max(0, Math.min(1, dutyLocal * (S_live / S_total))); // ← with S_live=1 this is 0.01/400
+  }, [live, isStandby, concurrentSectors, totalSectors]);
 
   // Physics chain from pipeline (keep unity-safe minimums)
   const gammaGeo = Number.isFinite(live?.gammaGeo) ? Number(live!.gammaGeo) : 26;

@@ -50,14 +50,14 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
     const burst = Number((live as any)?.burst_ms);
     const dwell = Number((live as any)?.dwell_ms);
-    const burstLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
-      ? burst / dwell
-      : 0.01;
+    const dutyLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
+      ? burst / dwell : 0.01;
 
-    const S_live  = Math.max(0, Math.floor((systemMetrics as any)?.sectorStrobing ?? (live?.sectorStrobing ?? 1)));
     const S_total = Math.max(1, Math.floor((systemMetrics as any)?.totalSectors ?? 400));
+    const concurrentSectors = Math.max(1, Math.min(S_total, Math.floor((live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors ?? 1)));
+    const S_live = Math.max(1, Math.min(S_total, Math.floor(concurrentSectors || 1)));
 
-    return clamp01(burstLocal * (S_live / S_total));
+    return clamp01(dutyLocal * (S_live / S_total)); // ← with S_live=1 this is 0.01/400
   }, [live, systemMetrics]);
 
   // UI duty (for display only)
