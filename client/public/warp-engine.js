@@ -883,10 +883,8 @@ class WarpEngine {
 
         // --- Parity / visualization ---
         // let incoming value override; if missing, keep previous
-        const parity = (parameters?.physicsParityMode != null)
+        const parity = (parameters?.physicsParityMode !== undefined)
           ? !!parameters.physicsParityMode
-          : (parameters?.parityMode != null)
-          ? !!parameters.parityMode  
           : !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
         const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
