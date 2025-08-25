@@ -56,7 +56,7 @@ import { computeSolarXY, solarToBodies, getSolarBodiesAsPc } from "@/lib/solar-a
 import { Switch } from "@/components/ui/switch";
 import { calibrateToImage, SVG_CALIB } from "@/lib/galaxy-calibration";
 
-import { publish } from "@/lib/luma-bus";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
@@ -227,7 +227,15 @@ export default function HelixCore() {
   const scrollRef = useRef<HTMLDivElement>(null);
   
   // Mode change signal system
+  const [renderNonce, setRenderNonce] = useState(0);
   const [modeNonce, setModeNonce] = useState(0 as number);
+
+  // Re-mount viz engines whenever the server says "reload"
+  useEffect(() => {
+    const off = subscribe("warp:reload", () => setRenderNonce(n => n + 1));
+    return () => off ? unsubscribe(off) : undefined;
+  }, []);
+
   const [optimisticMode, setOptimisticMode] = useState<ModeKey | null>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   
@@ -313,6 +321,11 @@ export default function HelixCore() {
   
   // Type-safe access to pipeline state
   const pipeline = pipelineState as EnergyPipelineState;
+
+  // Also rebind when core FR/sector knobs actually change (local safety net)
+  useEffect(() => {
+    setRenderNonce(n => n + 1);
+  }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
   // Optional: expose for quick console checks
   useEffect(() => { (window as any).__energyLive = pipeline; }, [pipeline]);
@@ -818,6 +831,7 @@ export default function HelixCore() {
                     <div className="rounded-lg overflow-hidden bg-slate-950">
                       <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}>
                         <WarpBubbleCompare
+                          key={`hero-${renderNonce}`}
                           parameters={{
                             ...compareParams,
                             currentMode: effectiveMode,         // ensure present
@@ -991,6 +1005,7 @@ export default function HelixCore() {
           <CardContent>
             <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading inspector…</div>}>
               <WarpRenderInspector
+                key={`inspector-${renderNonce}`}
                 modeKey={effectiveMode}
                 reloadToken={modeNonce}
                 parityPhys={{
