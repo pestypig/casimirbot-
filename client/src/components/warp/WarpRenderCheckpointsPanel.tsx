@@ -27,11 +27,11 @@ import React, {useEffect, useMemo, useRef, useState} from "react";
 */
 
 // tiny helpers
-const N = (x: any, d = 0) => (Number.isFinite(x) ? +x : d);
+const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 function expectedThetaForPane(live: any, engine: any) {
-  const N = (x:any,d=0)=>Number.isFinite(x)?+x:d;
+  const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   const parity = (engine?.uniforms?.physicsParityMode ?? engine?.uniforms?.parityMode ?? false) ? true : false; // REAL=true, SHOW=false
   const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
   if (mode === 'standby') return 0;
