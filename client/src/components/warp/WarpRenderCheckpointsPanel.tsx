@@ -173,10 +173,18 @@ function useCheckpointList(
     let tsState: "ok" | "warn" | "fail" = tsOk ? "ok" : "fail";
     let tsDetail = tsOk ? ts.toExponential(2) : "invalid";
 
-    if (liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
-      // Use shader-matched theta calculation with Ford-Roman duty
-      const tsExp = thetaExpectedFn(u, dutyFR);
-      const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
+    // Get bound uniforms from engine's __warpEcho for self-consistency
+    const echo = (window as any).__warpEcho;
+    const thetaExpectedFromBound = echo && echo.terms 
+      ? Math.pow(echo.terms.γ_geo || 26, 3) * (echo.terms.q || 1) * (echo.terms.γ_VdB || 1) * (echo.terms.d_FR || 0)
+      : undefined;
+    
+    const mismatch = echo && thetaExpectedFromBound && tsOk
+      ? (ts / thetaExpectedFromBound) : 1;
+    
+    if (echo && thetaExpectedFromBound !== undefined) {
+      // Use bound uniforms for perfect self-consistency
+      const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
       
       // Smart θ mismatch detection
       const parity = !!(u.physicsParityMode ?? u.parityMode);
@@ -196,12 +204,22 @@ function useCheckpointList(
           tsDetail += ` • (transition)`;
         } else {
           if (rel > 0.25) tsState = "warn"; // large disagreement
-          const pct = (ts / tsExp - 1) * 100;
-          tsDetail += ` • exp ${tsExp.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
+          const pct = (mismatch * 100 - 100);
+          tsDetail += ` • exp ${thetaExpectedFromBound.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
         }
       }
+    } else if (liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
+      // Fallback to old method when echo unavailable
+      const tsExp = thetaExpectedFn(u, dutyFR);
+      const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
+      
+      if (tsOk && Number.isFinite(rel) && rel > 0.25) {
+        tsState = "warn";
+        const pct = (ts / tsExp - 1) * 100;
+        tsDetail += ` • exp ${tsExp.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
+      }
     } else if (liveSnap) {
-      // Fallback to old method
+      // Final fallback to old method
       const tsExp = expectedThetaForPane(liveSnap, e);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
       
@@ -240,6 +258,13 @@ function useCheckpointList(
     }
     
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
+    
+    // Show detailed breakdown from bound uniforms if available
+    if (echo && echo.terms) {
+      const terms = echo.terms;
+      const breakdown = `src=${echo.src || 'unknown'} v=${echo.v || '?'} · γ_geo=${terms.γ_geo || '?'}^3 · q=${terms.q || '?'} · γ_VdB=${(terms.γ_VdB || 0).toExponential(2)} · d_FR=${((terms.d_FR || 0) * 100).toExponential(2)}%`;
+      rows.push({ label: "θ breakdown", detail: breakdown, state: "ok" });
+    }
 
     // Parity & ridge expectations
     if (expectations) {
