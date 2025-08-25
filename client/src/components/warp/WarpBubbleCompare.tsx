@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef } from "react";
-import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 // Build token: read lazily so SSR never touches `window`
 const getAppBuild = () =>
@@ -618,28 +617,15 @@ export default function WarpBubbleCompare({
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
 
-  // Live pipeline snapshot (same hook used by Energy Control panel)
-  const { data: live } = useEnergyPipeline();
-
-  // tolerant extraction – supports live.byMode, live.modes, or flat legacy shapes
-  const liveForMode = (key: ModeKey) =>
-    (live?.byMode && live.byMode[key]) ||
-    (live?.modes && live.modes[key]) ||
-    (live && (live as any)[key]) || null;
-
-  // current UI mode key (prefer parameters, fallback to live, then 'hover')
-  const currentModeKey =
-    ((parameters?.currentMode as ModeKey) ??
-     (live?.currentMode as ModeKey) ??
-     "hover") as ModeKey;
+  // current UI mode key from parameters only
+  const currentModeKey = ((parameters?.currentMode as ModeKey) ?? "hover") as ModeKey;
 
   // optional: read UI configs if present on window; safe fallback to empty
   const modeCfgs: Record<string, { name?: string; powerTarget_W?: number }> =
     (typeof window !== "undefined" && (window as any).MODE_CONFIGS) || {};
 
-  const currentSnap = liveForMode(currentModeKey);
   const currentCfg = modeCfgs[currentModeKey];
-  const currentSubtitle = buildLiveDesc(currentSnap, currentCfg);
+  const currentSubtitle = "Parameter-driven";
 
   // Titles for the two panels
   const realPanelTitle = `REAL • ${currentSubtitle}`;   // parity/FR view
@@ -758,44 +744,9 @@ export default function WarpBubbleCompare({
     };
   };
 
-  const toRealUniforms = (snap: LiveSnap) => ({
-    ...toSharedUniforms(snap),
-    physicsParityMode: true,
-    ridgeMode: 0,
-    colorMode: 2,          // shear is a nice truth default; change if you prefer
-    exposure: 3.5,
-    zeroStop: 1e-5,
-    curvatureGainT: 0.0,
-    curvatureBoostMax: 1.0,
-    userGain: 1.0,
-    vizGain: 1.0,
-    vShip: 0.0,                       // REAL: never "fly"
-  });
+  // Removed toRealUniforms and toShowUniforms - using buildEngineUniforms from parameters only
 
-  const toShowUniforms = (snap: LiveSnap) => {
-    const T = clamp01(N(snap.curvatureGainT, 0.6));
-    const B = Math.max(1, N(snap.curvatureBoostMax, 40));
-    const isStandby = String(snap.currentMode || '').toLowerCase() === 'standby';
-    return {
-      ...toSharedUniforms(snap),
-      physicsParityMode: false,
-      ridgeMode: 1,
-      colorMode: 1,       // theta diverging palette
-      exposure: N(snap.exposure, 6.0),
-      zeroStop: N(snap.zeroStop, 1e-7),
-      // Do NOT push thetaScale from live ticks; parameters effect is source of truth
-      curvatureGainT: isStandby ? 0 : T,
-      curvatureBoostMax: isStandby ? 1 : B,
-      userGain: isStandby ? 1 : N(snap.userGain, 4.0),
-      vizGain: isStandby ? 1 : 1.0,
-      vShip: isStandby ? 0.0 : N((snap as any).vShip, 1.0),  // SHOW can "fly", but not in standby
-      displayGain: isStandby ? 1 : (1 + T * (B - 1)),
-    };
-  };
-
-  // 7.2 — Choose the live snapshot for the current mode (byMode or flat)
-  const snapAll = live?.byMode ?? live?.modes ?? null;
-  const snapForMode: LiveSnap = (snapAll && (snapAll as any)[currentModeKey]) || (live as any) || {};
+  // No more live snapshots - using parameters only
 
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
@@ -863,13 +814,12 @@ export default function WarpBubbleCompare({
 
       if (cancelled) return;
 
-      // Build initial uniform packets for each side
-      const baseSnap = snapForMode ?? {};
-      const realU = toRealUniforms(baseSnap);
-      const showU = toShowUniforms(baseSnap);
-
-      leftEngine.current  = await initOne(left,  realU);
-      rightEngine.current = await initOne(right, showU);
+      // Build initial uniform packets from parameters only
+      // Temporarily empty - will be populated by parameters effect
+      const emptyU = {};
+      
+      leftEngine.current  = await initOne(left,  emptyU);
+      rightEngine.current = await initOne(right, emptyU);
     })();
 
     return () => {
@@ -985,73 +935,21 @@ export default function WarpBubbleCompare({
       pushSafe(rightEngine, lcPayload);
     }
 
+    // Set deterministic camera for both engines to avoid auto-fit order dependencies
+    if (leftRef.current && rightRef.current) {
+      const shared = { hull: { a: real.hullAxes[0], b: real.hullAxes[1], c: real.hullAxes[2] } };
+      // Use a fixed camera Z for consistent framing
+      const camZ = 1.8; // Fixed deterministic camera position
+      pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true });
+      pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true });
+    }
+
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
     const displayGain = Math.max(1, (1) * (heroX ? 1 + 0.5*Math.log10(Math.max(1, heroX)) : 1));
     rightEngine.current.setDisplayGain?.(displayGain);
   }, [parameters, colorMode, lockFraming, heroX]);
 
-  // 7.3 — Push uniforms into both engines whenever live values change
-  useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
-
-    // assuming parameters.currentMode is the UI/page truth:
-    if ((snapForMode as any)?.currentMode && parameters?.currentMode &&
-        String((snapForMode as any).currentMode) !== String(parameters.currentMode)) {
-      // the live tick still reflects the previous mode; ignore this tick
-      return;
-    }
-
-    const realU = toRealUniforms(snapForMode);
-    const showU = toShowUniforms(snapForMode);
-
-    // kill amplitude from live ticks
-    delete (realU as any).thetaScale;
-    delete (showU as any).thetaScale;
-    // (optional, if you've ever computed these in shaders)
-    // delete (realU as any).gammaVdB;
-    // delete (showU as any).gammaVdB;
-
-    // Keep vShip consistent with the *current* parameters mode, not stale live
-    const isStandby = String(parameters?.currentMode || '').toLowerCase() === 'standby';
-    realU.vShip = 0;                 // REAL never "flies"
-    showU.vShip = isStandby ? 0 : 1; // SHOW only "flies" when not standby
-
-    // Now only push cosmetics/visibility + sector mux from the live tick
-    pushSafe(leftEngine, {
-      exposure: realU.exposure,
-      zeroStop: realU.zeroStop,
-      colorMode: realU.colorMode,
-      ridgeMode: realU.ridgeMode
-    });
-
-    pushSafe(rightEngine, {
-      exposure: showU.exposure,
-      zeroStop: showU.zeroStop,
-      curvatureGainT: showU.curvatureGainT,
-      curvatureBoostMax: showU.curvatureBoostMax,
-      userGain: showU.userGain,
-      vizGain: showU.vizGain,
-      displayGain: showU.displayGain,
-      colorMode: showU.colorMode,
-      ridgeMode: showU.ridgeMode,
-      vShip: showU.vShip
-    });
-  }, [
-    // Cosmetic/visual dependencies only
-    snapForMode?.exposure, snapForMode?.zeroStop,
-    snapForMode?.curvatureGainT, snapForMode?.curvatureBoostMax,
-    snapForMode?.userGain, snapForMode?.displayGain,
-    parameters?.currentMode
-  ]);
-
-  // 7.4 — Mirror strobing (sectoring) to the global mux that WarpEngine listens to
-  useEffect(() => {
-    const sTotal = Math.max(1, Math.floor(N(snapForMode?.sectorCount ?? 1, 1)));
-    const sLive  = Math.max(1, Math.floor(N(snapForMode?.sectorStrobing ?? snapForMode?.sectors ?? sTotal, sTotal)));
-    const cur    = Math.max(0, Math.floor(N(snapForMode?.currentSector ?? 0, 0)) % sLive);
-    const split  = Math.max(0, Math.min(sLive - 1, Math.floor(N(snapForMode?.sectorSplit ?? snapForMode?.split ?? cur, cur))));
-    (window as any).setStrobingState?.({ sectorCount: sTotal, currentSector: cur, split });
-  }, [snapForMode?.sectorCount, snapForMode?.sectorStrobing, snapForMode?.sectors, snapForMode?.currentSector, snapForMode?.sectorSplit, snapForMode?.split]);
+  // No more live-driven uniform pushes or strobing - parameters effect handles everything
 
   // DPR-aware sizing + resize observer (keeps "WebGL context — alive / Render loop — active")
   useEffect(() => {
