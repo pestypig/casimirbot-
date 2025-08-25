@@ -391,12 +391,20 @@ export default function WarpRenderInspector(props: {
 
   function reportThetaConsistency(bound:{
     gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number;
-  }) {
-    const expected = thetaGainExpected(bound);
-    const used = thetaGainExpected(bound);
+  }, u: any = {}, isShow: boolean = false) {
+    const canonical = thetaGainExpected(bound);
+    const expected = canonical; // Keep expected honest (canonical)
+    const used = canonical * (u.viewMassFraction ?? 1.0); // Apply view fraction to used
     const delta = pctDelta(used, expected);
-    const msg = `θ-scale — used=${used.toExponential(3)} • expected=${expected.toExponential(3)} • Δ=${isFinite(delta)?delta.toFixed(1):'—'}%`;
-    console.log(`[HELIX][θ] ${msg}`);
+    const range = Math.max(expected, used) || 1;
+    
+    const fmt = (v: number) => v.toExponential(2);
+    const fmtPct = (v: number) => (v * 100).toFixed(1) + '%';
+    
+    console.log(`[HELIX][θ] θ-scale — ${fmt(canonical)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
+    console.log(`[HELIX][θ] view fraction: ${fmtPct(u.viewMassFraction ?? 1.0)}`);
+    console.log(`[HELIX][θ] renderer: ${isShow ? 'grid3d' : 'slice2d'}`);
+    
     return { expected, used, delta };
   }
 
@@ -413,7 +421,7 @@ export default function WarpRenderInspector(props: {
     gammaVdB: gammaVdBBound,
     dutyEffectiveFR: dutyEffectiveFR
   };
-  const { expected, used, delta } = reportThetaConsistency(bound);
+  const { expected, used, delta } = reportThetaConsistency(bound, toUniforms(props.showPhys || {}), showRendererType === 'grid3d');
 
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
