@@ -34,6 +34,8 @@ export type CurvaturePhysicsPanelProps = {
   // Optional sectoring overrides
   totalSectors?: number;         // e.g., 400
   concurrentSectors?: number;    // e.g., 1 (hover) or 400 (cruise)
+  // Engine reference for reading uniforms directly
+  leftEngineRef?: React.RefObject<any>;
   // Optional physics overrides
   gammaGeo?: number;             // γ_geo
   gammaVdB?: number;             // γ_VdB
@@ -71,6 +73,7 @@ export default function CurvaturePhysicsPanel({
   lightCrossing,
   totalSectors,
   concurrentSectors,
+  leftEngineRef,
   gammaGeo,
   gammaVdB,
   qSpoilingFactor,
@@ -83,9 +86,14 @@ export default function CurvaturePhysicsPanel({
 
   // Live mode + defaults
   const mode = (pipeline as any)?.currentMode ?? "hover";
-  const S_total = Math.max(1, Math.floor(isNum(totalSectors) ? totalSectors! : 400));
-  // Prefer explicit override → pipeline.sectorStrobing → conservative 1
-  const S_live = Math.max(1, Math.floor(isNum(concurrentSectors) ? concurrentSectors! : ((pipeline as any)?.sectorStrobing ?? 1)));
+  
+  // derive S_concurrent / S_total straight from the left engine uniforms
+  const U = leftEngineRef?.current?.uniforms ?? {};
+  const sConc = Math.max(1, +(U.sectors ?? 1));
+  const sTot  = Math.max(1, +(totalSectors ?? (pipeline as any)?.sectorCount ?? 400));
+  
+  const S_total = sTot;
+  const S_live = sConc;
 
   // Timing: prefer actual loop measurements if provided
   const burst_ms = isNum(lightCrossing?.burst_ms) ? lightCrossing!.burst_ms! : undefined;

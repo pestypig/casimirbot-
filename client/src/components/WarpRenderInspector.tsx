@@ -501,7 +501,7 @@ export default function WarpRenderInspector(props: {
           dwell_ms: (live as any)?.dwell_ms,
         }}
         totalSectors={sTotal}
-        concurrentSectors={(live as any)?.sectorsConcurrent ?? 1}
+        leftEngineRef={leftEngine}
         gammaGeo={(live as any)?.gammaGeo}
         gammaVdB={(live as any)?.gammaVanDenBroeck}
         qSpoilingFactor={(live as any)?.qSpoilingFactor}
