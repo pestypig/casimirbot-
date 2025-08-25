@@ -43,7 +43,8 @@ function compactCameraZ(axesScene?: number[] | null) {
 }
 
 // Mode → visual seasoning presets (so changes are obvious)
-const MODE_PRESET: Record<string, {curvT:number; boost:number; displayGain:number}> = {
+type ModeKey = 'hover' | 'cruise' | 'emergency' | 'standby';
+const MODE_PRESET: Record<ModeKey, {curvT:number; boost:number; displayGain:number}> = {
   hover:     { curvT: 0.25, boost: 20, displayGain: 1.0 },
   cruise:    { curvT: 0.45, boost: 30, displayGain: 2.0 },
   emergency: { curvT: 0.70, boost: 40, displayGain: 6.0 },
