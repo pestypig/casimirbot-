@@ -818,13 +818,16 @@ export default function WarpBubbleCompare({
   const roRef = useRef<ResizeObserver | null>(null);
   const busyRef = useRef<boolean>(false);
   const lastModeRef = useRef<string | null>(null);
+  const lastTokenRef = useRef<any>(null);
 
-  // Mode change effect: hard renderer reset on each mode change
+  // Mode change effect: hard renderer reset on each mode change or reload token
   useEffect(() => {
     const mode = String(parameters?.currentMode || '');
+    const token = parameters?.reloadToken;
     if (!mode) return;
-    if (lastModeRef.current === mode) return; // no-op if same
+    if (lastModeRef.current === mode && lastTokenRef.current === token) return; // no-op if same
     lastModeRef.current = mode;
+    lastTokenRef.current = token;
 
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
@@ -832,7 +835,7 @@ export default function WarpBubbleCompare({
         finally { reinitInFlight.current = null; }
       })();
     }
-  }, [parameters?.currentMode]);
+  }, [parameters?.currentMode, parameters?.reloadToken]);
 
   // Mount-only effect: guarantee initial attach
   useEffect(() => {

@@ -1,0 +1,69 @@
+A) Emit an explicit “mode changed” signal
+
+Add a tiny nonce you bump whenever the operational mode flips. Use it both as a prop the inspectors can watch and to guarantee a fresh parameters object.
+
+// near other React state
++ const [modeNonce, setModeNonce] = useState(0 as number);
++ const [optimisticMode, setOptimisticMode] = useState<ModeKey | null>(null);
+
+// wherever you derive effectiveMode:
+- const effectiveMode = (
+-   pipeline?.currentMode ??
+-   (systemMetrics as any)?.currentMode ??
+-   'hover'
+- ) as 'standby' | 'hover' | 'cruise' | 'emergency';
++ const serverMode = (pipeline?.currentMode ??
++   (systemMetrics as any)?.currentMode ??
++   'hover') as ModeKey;
++ const effectiveMode = (optimisticMode ?? serverMode) as 'standby'|'hover'|'cruise'|'emergency';
+
+// watch for server mode actually changing; bump nonce so children can re-init
++ const prevServerModeRef = useRef<string>(serverMode);
++ useEffect(() => {
++   if (prevServerModeRef.current !== serverMode) {
++     prevServerModeRef.current = serverMode;
++     setModeNonce(n => n + 1);
++     setOptimisticMode(null); // clear optimism once server confirms
++   }
++ }, [serverMode]);
+
+// in ALL places you change mode (buttons + <Select> onValueChange), add:
+- switchMode.mutate(m.key as any, { onSuccess: () => { /* invalidate... */ }});
++ setOptimisticMode(m.key as ModeKey);
++ setModeNonce(n => n + 1);
++ switchMode.mutate(m.key as any, { onSuccess: () => { /* invalidate... */ }});
+
+
+Now pass the nonce so children can reinit deterministically:
+
+<Suspense fallback={...}>
+  <WarpBubbleCompare
+-   parameters={{ ...compareParams, lightCrossing: lc, ... }}
++   parameters={{
++     ...compareParams,
++     currentMode: effectiveMode,   // ensure present
++     reloadToken: modeNonce,       // explicit re-init signal
++     lightCrossing: lc,
++     dutyEffectiveFR: dutyEffectiveFR_safe,
++     dutyCycle: dutyUI_safe,
++     ...
++   }}
+    ...
+  />
+</Suspense>
+
+
+And for the inspector:
+
+<Suspense fallback={...}>
+  <WarpRenderInspector
++   modeKey={effectiveMode}
++   reloadToken={modeNonce}
+    parityPhys={{ ... }}
+    showPhys={{ ... }}
+    baseShared={{ ... }}
+  />
+</Suspense>
+
+
+(Inside those components, have a useEffect(() => reinit(), [modeKey || parameters.reloadToken])—your WarpBubbleCompare already does that for parameters.currentMode; adding reloadToken just makes it bullet-proof.)

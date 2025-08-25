@@ -225,6 +225,10 @@ export default function HelixCore() {
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
   const scrollRef = useRef<HTMLDivElement>(null);
+  
+  // Mode change signal system
+  const [modeNonce, setModeNonce] = useState(0 as number);
+  const [optimisticMode, setOptimisticMode] = useState<ModeKey | null>(null);
   const [route, setRoute] = useState<string[]>(["SOL","ORI_OB1","VEL_OB2","SOL"]);
   
   // Fade memory for trailing glow (per-sector intensity 0..1)
@@ -335,11 +339,20 @@ export default function HelixCore() {
   });
 
   // Unified, defensive mode fallback for the whole page
-  const effectiveMode = (
-    pipeline?.currentMode ??
+  const serverMode = (pipeline?.currentMode ??
     (systemMetrics as any)?.currentMode ??
-    'hover'
-  ) as 'standby' | 'hover' | 'cruise' | 'emergency';
+    'hover') as ModeKey;
+  const effectiveMode = (optimisticMode ?? serverMode) as 'standby'|'hover'|'cruise'|'emergency';
+
+  // Watch for server mode actually changing; bump nonce so children can re-init
+  const prevServerModeRef = useRef<string>(serverMode);
+  useEffect(() => {
+    if (prevServerModeRef.current !== serverMode) {
+      prevServerModeRef.current = serverMode;
+      setModeNonce(n => n + 1);
+      setOptimisticMode(null); // clear optimism once server confirms
+    }
+  }, [serverMode]);
 
   // --- Derived mode knobs for UI (always reflect the selected mode)
   const modeCfg = MODE_CONFIGS[pipeline?.currentMode || effectiveMode] || MODE_CONFIGS.hover;
@@ -756,6 +769,8 @@ export default function HelixCore() {
                   className={`font-mono ${isActive ? 'bg-cyan-600 text-white' : 'bg-slate-900'}`}
                   onClick={() => {
                     if (!isActive) {
+                      setOptimisticMode(m.key as ModeKey);
+                      setModeNonce(n => n + 1);
                       switchMode.mutate(m.key as any, {
                         onSuccess: () => {
                           // make both sides refresh
@@ -805,6 +820,8 @@ export default function HelixCore() {
                         <WarpBubbleCompare
                           parameters={{
                             ...compareParams,
+                            currentMode: effectiveMode,         // ensure present
+                            reloadToken: modeNonce,             // explicit re-init signal
                             lightCrossing: lc,                  // ✅ use the live loop
                             sectorCount: totalSectors,          // TOTAL (averaging)
                             sectors: concurrentSectors,         // concurrent (sweep)
@@ -974,6 +991,8 @@ export default function HelixCore() {
           <CardContent>
             <Suspense fallback={<div className="h-64 grid place-items-center text-slate-400">Loading inspector…</div>}>
               <WarpRenderInspector
+                modeKey={effectiveMode}
+                reloadToken={modeNonce}
                 parityPhys={{
                   hull: { a: 503.5, b: 132, c: 86.5 },
                   gammaGeo: pipeline?.gammaGeo ?? 26,
@@ -1093,6 +1112,8 @@ export default function HelixCore() {
                 <Select 
                   value={pipeline?.currentMode || 'hover'}
                   onValueChange={(mode) => {
+                    setOptimisticMode(mode as ModeKey);
+                    setModeNonce(n => n + 1);
                     switchMode.mutate(mode as any, {
                       onSuccess: () => {
                         // make both sides refresh
@@ -1795,6 +1816,8 @@ export default function HelixCore() {
               })}
               setMode={(mode) => {
                 if (switchMode) {
+                  setOptimisticMode(mode as ModeKey);
+                  setModeNonce(n => n + 1);
                   switchMode.mutate(mode as any, {
                     onSuccess: () => {
                       // make both sides refresh
