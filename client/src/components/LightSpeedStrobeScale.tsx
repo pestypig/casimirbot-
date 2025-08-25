@@ -15,7 +15,12 @@ type ScaleProps = {
 export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const { data: metrics } = useMetrics();
   const { data: pipeline } = useEnergyPipeline();
-  const hud = toHUDModel({ ...(pipeline || {}), ...(metrics || {}) } as any);
+  const wu  = metrics?.warpUniforms ?? pipeline?.warpUniforms ?? null;
+  const hud = toHUDModel({
+    warpUniforms: wu || {},
+    viewerHints: metrics?.viewerHints || {},
+    lightCrossing: metrics?.lightCrossing || {},
+  });
 
   // Prefer props; fall back to HUD
   const fGHz  = (pipeline as any)?.modulationFreq_GHz ?? 15.0;

@@ -426,7 +426,13 @@ export default function HelixCasimirAmplifier({
   });
 
   // Use HUD adapter for drift-proof field access
-  const hud = toHUDModel({ ...(state || {}), ...(metrics || {}) } as any);
+  const wu  = metrics?.warpUniforms ?? state?.warpUniforms ?? null;
+  const hud = toHUDModel({
+    warpUniforms: wu || {},
+    viewerHints: metrics?.viewerHints || {},
+    lightCrossing: metrics?.lightCrossing || {},
+    // keep any *explicit* HUD inputs you need; do NOT spread raw metrics
+  });
 
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
