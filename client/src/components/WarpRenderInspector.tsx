@@ -467,6 +467,10 @@ export default function WarpRenderInspector(props: {
         leftCanvasRef={leftRef}
         rightCanvasRef={rightRef}
         live={live}
+        lightCrossing={{
+          burst_ms: (live as any)?.burst_ms,
+          dwell_ms: (live as any)?.dwell_ms,
+        }}
       />
 
       {/* Physics equation panel showing REAL-pane calculation chain */}

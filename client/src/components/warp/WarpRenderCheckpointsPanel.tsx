@@ -247,6 +247,7 @@ export default function WarpRenderCheckpointsPanel({
   rightCanvasRef,
   live,
   parameters,
+  lightCrossing,
 }: {
   leftLabel?: string;
   rightLabel?: string;
@@ -256,9 +257,23 @@ export default function WarpRenderCheckpointsPanel({
   rightCanvasRef: React.RefObject<HTMLCanvasElement>;
   live?: any;
   parameters?: any; // Optional parameters object from renderer for perfect consistency
+  lightCrossing?: { burst_ms?: number; dwell_ms?: number };
 }) {
   const modeKey = (live?.currentMode as string) || "hover";
   const snap = (live?.byMode && live?.byMode[modeKey]) || (live?.modes && live?.modes[modeKey]) || live || undefined;
+
+  // Compute Ford-Roman duty from light-crossing loop
+  const dutyLocal = (lightCrossing?.burst_ms && lightCrossing?.dwell_ms)
+    ? (lightCrossing.burst_ms / lightCrossing.dwell_ms)    // ~0.01
+    : 0.01;                                                 // fallback
+
+  const sConcurrent = leftEngineRef.current?.uniforms?.sectors ?? 1;
+  const sTotal = snap?.sectorCount ?? 400;
+  const dutyFR = dutyLocal * (sConcurrent / sTotal);
+
+  // Pretty strings
+  const dutyLocalPct = `${(dutyLocal*100).toFixed(3)}%`;
+  const dutyFRPct = `${(dutyFR*100).toFixed(4)}%`;
 
   const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 });
   const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 });
@@ -319,12 +334,12 @@ export default function WarpRenderCheckpointsPanel({
           }</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-white/70">Duty / sectors:</span>
-          <span className="font-mono">{
-            parameters
-              ? `${N(parameters.dutyCycle, 0.14).toFixed(3)} / ${Math.max(1, Math.floor(N(parameters.sectorCount ?? parameters.sectors, 1)))}`
-              : `${N(snap?.dutyCycle, 0.14).toFixed(3)} / ${Math.max(1, Math.floor(N(snap?.sectorCount ?? snap?.sectors ?? 1, 1)))}`
-          }</span>
+          <span className="text-white/70">Duty local / Ford-Roman:</span>
+          <span className="font-mono">{dutyLocalPct} / {dutyFRPct}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-white/70">Sectors conc/total:</span>
+          <span className="font-mono">{sConcurrent}/{sTotal}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">View averaging:</span>
