@@ -123,7 +123,6 @@ export function useSwitchMode() {
           dutyCycle: cfg.dutyCycle,
           sectorStrobing: cfg.sectorStrobing,
           qSpoilingFactor: cfg.qSpoilingFactor,
-          gammaVanDenBroeck: cfg.gammaVanDenBroeck,  // ← include this
         });
       }
       return data;
