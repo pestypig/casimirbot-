@@ -33,9 +33,9 @@ function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
 
   // numeric coercions + clamps
-  if (s.thetaScale != null) {
-    const v = +s.thetaScale;
-    s.thetaScale = Number.isFinite(v) ? v : 0;
+  if ('thetaScale' in s) {
+    // allow 0 (standby), clamp negatives to 0
+    s.thetaScale = Math.max(0, finite(s.thetaScale, 0));
   }
   s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
   s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
