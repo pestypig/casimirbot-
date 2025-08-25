@@ -1082,7 +1082,9 @@ class WarpEngine {
         const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
         const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
         const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m)   ? bubbleParams.wallWidth_m   : undefined;
-        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho : undefined;
+        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho :
+                              Number.isFinite(this.uniforms?.wallWidth)  ? this.uniforms.wallWidth    :
+                              undefined;
         const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
         
         // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.

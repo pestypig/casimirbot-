@@ -905,7 +905,7 @@ export default function WarpBubbleCompare({
       displayGain: 1,
       curvatureGainT: 0,
       curvatureBoostMax: 1,
-      wallWidth: wallWidth_rho,          // ⟵ key: ρ-units for shader pulse
+      wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
       deltaAOverA: real.qSpoilingFactor,
       dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
