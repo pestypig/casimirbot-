@@ -875,6 +875,7 @@ export default function HelixCore() {
                       qSpoilingFactor={qSpoilUI}
                       gammaVdB={isFiniteNumber(pipeline?.gammaVanDenBroeck) ? pipeline!.gammaVanDenBroeck! : 2.86e5}
                       dutyCycle={dutyUI_safe}
+                      dutyEffectiveFR={dutyEffectiveFR_safe}  // ⬅️ ensures same averaging as REAL
                       sectors={totalSectors}      // ⬅️ use total sectors for averaging
                       viewAvg={true}
                       diffMode={false}
