@@ -346,6 +346,11 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
 
+    // Gate first paint until canonical uniforms arrive (prevents averaging race)
+    const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
+    leftEngine.current.setVisible?.(ready);
+    rightEngine.current.setVisible?.(ready);
+
     // Debug toggle calculations
     const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
     const autoZero = N(props.parityPhys?.zeroStop ?? live?.zeroStop, 1e-7);
@@ -363,6 +368,11 @@ export default function WarpRenderInspector(props: {
       qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
       // Use debug-controlled γ_VdB to prove physics separation
       gammaVanDenBroeck: gammaVdBBound,
+      // Lock seasoning to prevent first-frame breathing
+      viewAvg: true,
+      ridgeMode: 0,
+      exposure: 5.0,
+      zeroStop: 1e-7,
       dutyEffectiveFR,            // 0.01 × (1/400) here  
       dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
       sectorCount: sTotal,                    // 400
@@ -402,7 +412,7 @@ export default function WarpRenderInspector(props: {
       console.log('REAL parity?', leftEngine.current?.uniforms?.physicsParityMode);
       console.log('SHOW parity?', rightEngine.current?.uniforms?.physicsParityMode);
     }, 100);
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
   // Keep canvases crisp on container resize
   useEffect(() => {
