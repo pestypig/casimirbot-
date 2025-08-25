@@ -833,46 +833,48 @@ export default function WarpBubbleCompare({
   }, [parameters?.currentMode]);
 
   useEffect(() => {
-    const left = leftRef.current;
-    const right = rightRef.current;
-
-    if (!left || !right) return;
-
     let cancelled = false;
-    const kill = (ref: any) => {
-      const e = ref.current;
-      if (!e) return;
-      e.__ro?.disconnect?.();
-      e.stop?.();
-      e.dispose?.();
-      ref.current = null;
-    };
+    
+    // Poll for canvas availability since we use empty deps
+    const waitForCanvases = () => {
+      const left = leftRef.current;
+      const right = rightRef.current;
 
-    (async () => {
-      await ensureScript();
-      const W = (window as any).WarpEngine;
-      if (!W) { console.error('[Warp] engine script not available'); return; }
+      if (!left || !right) {
+        if (!cancelled) {
+          requestAnimationFrame(waitForCanvases);
+        }
+        return;
+      }
 
-      // idempotent (React StrictMode)
-      kill(leftEngine); kill(rightEngine);
+      // Canvases are ready, proceed with initialization
+      (async () => {
+        await ensureScript();
+        const W = (window as any).WarpEngine;
+        if (!W || cancelled) { 
+          console.error('[Warp] engine script not available'); 
+          return; 
+        }
 
-      const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-        const eng = getOrCreateEngine(W, cv);           // reuse existing or create new engine
-        const { w, h } = sizeCanvas(cv);
-        eng.gl.viewport(0, 0, w, h);
+        // Don't kill existing engines - let getOrCreateEngine handle reuse
 
-        // Fallback init if constructor didn't prepare grid/shaders
-        try { eng._initializeGrid?.(); } catch {}
-        try { eng._compileGridShaders?.(); } catch {}
+        const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+        const eng = getOrCreateEngine(W, cv);   // ← reuse or create
+        const { w: canvasW, h: canvasH } = sizeCanvas(cv);
+        eng.gl.viewport(0, 0, canvasW, canvasH);
 
-        // Wait until program + VBO exist (handles async shader path)
-        await new Promise<void>((resolve) => {
-          const tick = () => {
-            if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
-            requestAnimationFrame(tick);
-          };
-          tick();
-        });
+        // Make sure program + VBO exist (handles async shader path)
+        if (!eng.gridProgram || !eng.gridVbo || !eng._vboBytes) {
+          try { eng._initializeGrid?.(); } catch {}
+          try { eng._compileGridShaders?.(); } catch {}
+          await new Promise<void>((resolve) => {
+            const tick = () => {
+              if (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) return resolve();
+              requestAnimationFrame(tick);
+            };
+            tick();
+          });
+        }
 
         // Push initial uniforms (parity/cosmetics set in toReal/toShow)
         eng.updateUniforms?.(uniforms);
@@ -899,32 +901,41 @@ export default function WarpBubbleCompare({
       // Temporarily empty - will be populated by parameters effect
       const emptyU = {};
       
-      leftEngine.current  = await initOne(left,  emptyU);
-      rightEngine.current = await initOne(right, emptyU);
-    })();
+        leftEngine.current  = await initOne(left,  emptyU);
+        rightEngine.current = await initOne(right, emptyU);
+      })();
+    };
+
+    // Start polling for canvases
+    waitForCanvases();
 
     return () => {
       cancelled = true;
-      kill(leftEngine);
-      kill(rightEngine);
+      const left = leftRef.current as any;
+      const right = rightRef.current as any;
 
-      // Robust cleanup for HMR/StrictMode
-      try {
-        if ((left as any)[ENGINE_KEY] && !(left as any)[ENGINE_KEY]._destroyed) {
-          (left as any)[ENGINE_KEY].destroy?.();
+      const nuke = (cv?: HTMLCanvasElement, ref?: any) => {
+        try {
+          const e = ref?.current;
+          e?.__ro?.disconnect?.();
+          e?._offStrobe?.();
+          e?.stop?.();
+          e?.dispose?.();
+          e?.destroy?.();
+        } catch {}
+        if (cv) {
+          delete (cv as any)[ENGINE_KEY];
+          delete (cv as any).__warpEngineAttached; // in case the engine uses its own flag
+          delete (cv as any).__warpAttached;
         }
-        delete (left as any)[ENGINE_KEY];
-      } catch {}
+        if (ref) ref.current = null;
+      };
 
-      try {
-        if ((right as any)[ENGINE_KEY] && !(right as any)[ENGINE_KEY]._destroyed) {
-          (right as any)[ENGINE_KEY].destroy?.();
-        }
-        delete (right as any)[ENGINE_KEY];
-      } catch {}
+      nuke(left, leftEngine);
+      nuke(right, rightEngine);
     };
-    // IMPORTANT: keep deps minimal; do not include uniforms objects that change every tick
-  }, [leftRef.current, rightRef.current]);
+    // Run once and guard inside for canvas availability
+  }, []);
 
   // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {
