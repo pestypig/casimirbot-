@@ -40,16 +40,23 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
   // FR duty ≈ local on-window × (concurrent / total). local on-window ≈ 1% if not provided
   const dutyEffectiveFR: number = useMemo(() => {
-    const fromPipe =
+    const frFromPipeline =
       (live as any)?.dutyEffectiveFR ??
       (live as any)?.dutyShip ??
       (live as any)?.dutyEff;
-    if (isFiniteNum(fromPipe)) return clamp01(fromPipe);
 
-    const burstLocal = 0.01; // 1% default (same assumption used in Helix-Core when missing)
-    const liveSectors = Math.max(1, Math.floor((systemMetrics as any)?.sectorStrobing ?? (live?.sectorStrobing ?? 1)));
-    const totalSectors = Math.max(1, Math.floor((systemMetrics as any)?.totalSectors ?? 400));
-    return clamp01(burstLocal * (liveSectors / totalSectors));
+    if (isFiniteNum(frFromPipeline)) return clamp01(frFromPipeline);
+
+    const burst = Number((live as any)?.burst_ms);
+    const dwell = Number((live as any)?.dwell_ms);
+    const burstLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
+      ? burst / dwell
+      : 0.01;
+
+    const S_live  = Math.max(0, Math.floor((systemMetrics as any)?.sectorStrobing ?? (live?.sectorStrobing ?? 1)));
+    const S_total = Math.max(1, Math.floor((systemMetrics as any)?.totalSectors ?? 400));
+
+    return clamp01(burstLocal * (S_live / S_total));
   }, [live, systemMetrics]);
 
   // UI duty (for display only)

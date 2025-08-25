@@ -440,29 +440,24 @@ export default function HelixCore() {
 
   // ⬇️ add this block
   const dutyEffectiveFR = useMemo(() => {
-    // 1) If helix-core already gave us the ship-wide FR duty, trust it.
     const frFromPipeline =
       (pipelineState as any)?.dutyEffectiveFR ??
       (pipelineState as any)?.dutyShip ??
       (pipelineState as any)?.dutyEff;
+
     if (isFiniteNumber(frFromPipeline)) return clamp01(frFromPipeline);
 
-    // 2) Otherwise compute: local burst duty × (concurrent / total)
-    //    BURST_LOCAL ≈ 0.01 from lc (burst_ms/dwell_ms)
     const burst = Number(lc?.burst_ms);
     const dwell = Number(lc?.dwell_ms);
     const burstLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
       ? burst / dwell
-      : 0.01; // safe default
+      : 0.01;
 
     const S_live  = Math.max(0, Math.floor(concurrentSectors ?? 1));
     const S_total = Math.max(1, Math.floor(totalSectors ?? 400));
 
     return clamp01(burstLocal * (S_live / S_total));
-  }, [
-    pipelineState, lc?.burst_ms, lc?.dwell_ms,
-    concurrentSectors, totalSectors
-  ]);
+  }, [pipelineState, lc?.burst_ms, lc?.dwell_ms, concurrentSectors, totalSectors]);
 
   // after you compute effectiveMode and dutyEffectiveFR:
   const isStandby = String(effectiveMode).toLowerCase() === 'standby';
