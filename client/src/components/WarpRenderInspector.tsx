@@ -273,9 +273,20 @@ export default function WarpRenderInspector(props: {
         zeroStop: Math.max(1e-9, N(o.zeroStop, 1e-7)),
       };
     };
+    
+    // Unified physical scale across panels
+    const hull = live?.hull ?? { a:503.5, b:132, c:86.5 };
+    const wallWidth_m = 6.0;
+    const gridSpan = 2.6;
+    const Rgeom = Math.cbrt(hull.a * hull.b * hull.c);
+    const deltaRho = wallWidth_m / Rgeom;
+    
+    const physicalScale = { hull, gridSpan, wallWidth_m, deltaRho };
+    
     // REAL
     pushUniformsWhenReady(leftEngine.current, {
       ...safe(realPayload),
+      ...physicalScale,
       ridgeMode: 0,
       physicsParityMode: true,
     });
@@ -283,6 +294,7 @@ export default function WarpRenderInspector(props: {
     // SHOW
     pushUniformsWhenReady(rightEngine.current, {
       ...safe(showPayload),
+      ...physicalScale,
       ridgeMode: 1,
       physicsParityMode: false,
     });
