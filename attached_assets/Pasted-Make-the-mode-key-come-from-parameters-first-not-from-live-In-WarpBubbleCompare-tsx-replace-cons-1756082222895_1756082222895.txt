@@ -1,0 +1,58 @@
+Make the mode key come from parameters first, not from live:
+In WarpBubbleCompare.tsx replace:
+
+const currentModeKey = ((live?.currentMode as ModeKey) || "hover") as ModeKey;
+
+
+with:
+
+const currentModeKey =
+  ((parameters?.currentMode as ModeKey) ??
+   (live?.currentMode as ModeKey) ??
+   "hover") as ModeKey;
+
+
+Don’t let the live-tick effect push physics amplitude (or anything that can change θ)
+In the “7.3 — Push uniforms when live values change” effect, strip θ (and anything that back-doors amplitude) before pushing:
+
+const realU = toRealUniforms(snapForMode);
+const showU = toShowUniforms(snapForMode);
+
+// kill amplitude from live ticks
+delete (realU as any).thetaScale;
+delete (showU as any).thetaScale;
+// (optional, if you’ve ever computed these in shaders)
+// delete (realU as any).gammaVdB;
+// delete (showU as any).gammaVdB;
+
+// Keep vShip consistent with the *current* parameters mode, not stale live
+const isStandby = String(parameters?.currentMode || '').toLowerCase() === 'standby';
+realU.vShip = 0;                 // REAL never “flies”
+showU.vShip = isStandby ? 0 : 1; // SHOW only “flies” when not standby
+
+// Now only push cosmetics/visibility + sector mux from the live tick
+pushSafe(leftEngine, {
+  exposure: realU.exposure,
+  zeroStop: realU.zeroStop,
+  colorMode: realU.colorMode,
+  ridgeMode: realU.ridgeMode
+});
+
+pushSafe(rightEngine, {
+  exposure: showU.exposure,
+  zeroStop: showU.zeroStop,
+  curvatureGainT: showU.curvatureGainT,
+  curvatureBoostMax: showU.curvatureBoostMax,
+  userGain: showU.userGain,
+  vizGain: showU.vizGain,
+  displayGain: showU.displayGain,
+  colorMode: showU.colorMode,
+  ridgeMode: showU.ridgeMode,
+  vShip: showU.vShip
+});
+
+
+(The parameters-driven effect remains the single source for thetaScale, sectors/duty, γ’s, etc.)
+
+Make the checkpoint “expected θ” choose its source consistently
+When computing “expected” in the checkpoint panel, prefer parameters semantics for that pane (REAL = FR duty; SHOW = UI duty/sector avg; standby = 0). Even if you keep using live for the display, this eliminates the “100% off” that appears when the pane is on the new mode but live is still on the old one for ~1s.

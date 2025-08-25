@@ -593,8 +593,11 @@ export default function WarpBubbleCompare({
     (live?.modes && live.modes[key]) ||
     (live && (live as any)[key]) || null;
 
-  // current UI mode key (fallback to 'hover')
-  const currentModeKey = ((live?.currentMode as ModeKey) || "hover") as ModeKey;
+  // current UI mode key (prefer parameters, fallback to live, then 'hover')
+  const currentModeKey =
+    ((parameters?.currentMode as ModeKey) ??
+     (live?.currentMode as ModeKey) ??
+     "hover") as ModeKey;
 
   // optional: read UI configs if present on window; safe fallback to empty
   const modeCfgs: Record<string, { name?: string; powerTarget_W?: number }> =
@@ -960,38 +963,44 @@ export default function WarpBubbleCompare({
     const realU = toRealUniforms(snapForMode);
     const showU = toShowUniforms(snapForMode);
 
-    // Belt & suspenders: strip θ right before pushing live uniforms
+    // kill amplitude from live ticks
     delete (realU as any).thetaScale;
     delete (showU as any).thetaScale;
+    // (optional, if you've ever computed these in shaders)
+    // delete (realU as any).gammaVdB;
+    // delete (showU as any).gammaVdB;
 
-    // REAL (parity)
-    pushSafe(leftEngine, realU);
+    // Keep vShip consistent with the *current* parameters mode, not stale live
+    const isStandby = String(parameters?.currentMode || '').toLowerCase() === 'standby';
+    realU.vShip = 0;                 // REAL never "flies"
+    showU.vShip = isStandby ? 0 : 1; // SHOW only "flies" when not standby
 
-    // SHOW (boosted)
-    pushSafe(rightEngine, showU);
-    // Optional: also set display gain explicitly on the instance
-    rightEngine.current.setDisplayGain?.(N(showU.displayGain, 1));
+    // Now only push cosmetics/visibility + sector mux from the live tick
+    pushSafe(leftEngine, {
+      exposure: realU.exposure,
+      zeroStop: realU.zeroStop,
+      colorMode: realU.colorMode,
+      ridgeMode: realU.ridgeMode
+    });
 
-    // Camera nudge: if you track a shared axesScene span, you can enforce a safe cameraZ
-    // (kept conservative by default; uncomment if you have helpers like compactCameraZ/safeCamZ)
-    // const axesScene = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
-    // const z = safeCamZ(compactCameraZ(leftRef.current!, axesScene));
-    // pushSafe(leftEngine,  { cameraZ: z });
-    // pushSafe(rightEngine, { cameraZ: z });
+    pushSafe(rightEngine, {
+      exposure: showU.exposure,
+      zeroStop: showU.zeroStop,
+      curvatureGainT: showU.curvatureGainT,
+      curvatureBoostMax: showU.curvatureBoostMax,
+      userGain: showU.userGain,
+      vizGain: showU.vizGain,
+      displayGain: showU.displayGain,
+      colorMode: showU.colorMode,
+      ridgeMode: showU.ridgeMode,
+      vShip: showU.vShip
+    });
   }, [
-    // remove the .current refs; keep your live/pipeline deps
-    snapForMode?.gammaGeo, snapForMode?.gammaVdB, (snapForMode as any)?.g_y,
-    snapForMode?.deltaAOverA, (snapForMode as any)?.qSpoilingFactor,
-    snapForMode?.dutyCycle, snapForMode?.sectorCount, snapForMode?.sectorStrobing,
-    snapForMode?.sectors, snapForMode?.sectorSplit, snapForMode?.split, snapForMode?.currentSector,
-    snapForMode?.viewAvg,
-    snapForMode?.hullAxes?.[0], snapForMode?.hullAxes?.[1], snapForMode?.hullAxes?.[2],
-    snapForMode?.hull?.a, snapForMode?.hull?.b, snapForMode?.hull?.c,
-    snapForMode?.wallWidth_m, snapForMode?.wallWidth_rho,
+    // Cosmetic/visual dependencies only
+    snapForMode?.exposure, snapForMode?.zeroStop,
     snapForMode?.curvatureGainT, snapForMode?.curvatureBoostMax,
-    snapForMode?.exposure, snapForMode?.zeroStop, snapForMode?.userGain,
-    snapForMode?.displayGain,
-    live?.currentMode
+    snapForMode?.userGain, snapForMode?.displayGain,
+    parameters?.currentMode
   ]);
 
   // 7.4 — Mirror strobing (sectoring) to the global mux that WarpEngine listens to
