@@ -1654,7 +1654,7 @@ export default function HelixCore() {
             </Card>
 
             {/* Amplification Panel */}
-            <AmplificationPanel />
+            <AmplificationPanel readOnly />
 
             {/* Curvature Key */}
             <CurvatureKey />
@@ -2232,6 +2232,7 @@ export default function HelixCore() {
         {/* ====== CASIMIR AMPLIFIER: Complete Physics Pipeline Visualization ====== */}
         <div className="mt-8">
           <HelixCasimirAmplifier 
+            readOnly
             metricsEndpoint="/api/helix/metrics"
             stateEndpoint="/api/helix/pipeline" 
             fieldEndpoint="/api/helix/displacement"

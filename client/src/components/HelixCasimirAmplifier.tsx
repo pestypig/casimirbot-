@@ -409,13 +409,15 @@ export default function HelixCasimirAmplifier({
   stateEndpoint = "/api/helix/state",
   fieldEndpoint = "/api/helix/displacement",
   modeEndpoint = "/api/helix/mode",
-  lightCrossing
+  lightCrossing,
+  readOnly = false
 }: {
   metricsEndpoint?: string;
   stateEndpoint?: string;
   fieldEndpoint?: string;
   modeEndpoint?: string;
   lightCrossing?: LightCrossing;
+  readOnly?: boolean;
 }) {
   const { data: metrics } = usePollingSmart<HelixMetrics>(metricsEndpoint, {
     minMs: 10000, maxMs: 30000, dedupeKey: "helix:metrics"
@@ -541,6 +543,9 @@ export default function HelixCasimirAmplifier({
 
   // Wire pipeline strobing to drive the WarpEngine (if present) for phase synchronization
   useEffect(() => {
+    // Early return if readOnly - prevent engine interference
+    if (readOnly) return;
+    
     const sectorCount =
       metrics?.totalSectors ??
       state?.sectorStrobing ??
@@ -560,7 +565,7 @@ export default function HelixCasimirAmplifier({
         console.warn("setStrobingState failed (visualizer will ignore this tick):", err);
       }
     }
-  }, [metrics?.totalSectors, metrics?.activeSectors, state?.sectorStrobing, lightCrossing?.sectorIdx, lightCrossing?.sectorCount]);
+  }, [readOnly, metrics?.totalSectors, metrics?.activeSectors, state?.sectorStrobing, lightCrossing?.sectorIdx, lightCrossing?.sectorCount]);
 
   // Safe U_inf target - use physics-driven value with robust fallback
   const U_inf = (() => {

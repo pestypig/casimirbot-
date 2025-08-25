@@ -46,7 +46,7 @@ function Bar({
   );
 }
 
-export default function AmplificationPanel() {
+export default function AmplificationPanel({ readOnly = false }: { readOnly?: boolean } = {}) {
   const { data } = useEnergyPipeline();
   if (!data) return null;
 
