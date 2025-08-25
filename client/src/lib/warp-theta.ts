@@ -53,7 +53,7 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
   
   const viewAvg  = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
   const A_geo    = Math.pow(Math.max(1, gammaGeo), 3);
-  const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
+  const dutyTerm = viewAvg ? Math.max(1e-12, duty / sectors) : 1;
   const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
   
   // Debug: Track exact thetaScale calculation (can be disabled in production)

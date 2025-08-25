@@ -66,7 +66,7 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState) {
   const thetaScale =
     Math.pow(gammaGeo, 3) *
     gammaVdB *
-    Math.sqrt(Math.max(1e-12, d_ship / sectors));
+    Math.max(1e-12, d_ship / sectors);
 
   // --- Burst Q for visuals (matches HELIX Q_BURST semantics) ---
   const Qburst = s.qCavity ?? 1e9;

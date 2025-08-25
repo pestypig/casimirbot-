@@ -156,11 +156,11 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     // geometry
     const A_geo = Math.pow(gammaGeo, 3);
 
-    // averaging: viewerAvg uses sqrt(duty/sectors); REAL uses sqrt(dutyEffectiveFR)
+    // averaging: viewerAvg uses duty/sectors; REAL uses dutyEffectiveFR
     const avg = viewAvg
       ? (Number.isFinite(dutyEffectiveFR)
-          ? Math.sqrt(Math.max(1e-12, dutyEffectiveFR as number))
-          : Math.sqrt(Math.max(1e-12, dutyCycle) / Math.max(1, sectors)))
+          ? Math.max(1e-12, dutyEffectiveFR as number)
+          : Math.max(1e-12, dutyCycle) / Math.max(1, sectors))
       : 1.0;
 
     // parity mode kills boosts (unity), otherwise respect viewer gain
@@ -186,9 +186,9 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     // Reference averaging mirrors primary averaging rule:
     const avgRef = (refParams?.viewAvg ?? viewAvg)
       ? (Number.isFinite(dutyEffectiveFR)
-          ? Math.sqrt(Math.max(1e-12, dutyEffectiveFR as number))
-          : Math.sqrt(Math.max(1e-12, (refParams?.dutyCycle ?? dutyCycle)) /
-                      Math.max(1, (refParams?.sectors ?? sectors))))
+          ? Math.max(1e-12, dutyEffectiveFR as number)
+          : Math.max(1e-12, (refParams?.dutyCycle ?? dutyCycle)) /
+                      Math.max(1, (refParams?.sectors ?? sectors)))
       : 1.0;
 
     return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avgRef;

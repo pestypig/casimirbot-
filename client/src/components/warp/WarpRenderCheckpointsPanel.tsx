@@ -64,7 +64,7 @@ function expectedThetaForPane(live: any, engine: any) {
 
   const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
   const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
-  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, duty)) : betaInst;
+  return viewAvg ? betaInst * Math.max(1e-12, duty) : betaInst;
 }
 
 // Same θ computation as WarpBubbleCompare.tsx for perfect consistency
@@ -77,7 +77,7 @@ function computeThetaScaleFromParams(v: any) {
   const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
   const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
   const effDuty = Math.max(1e-12, duty / sectors);
-  return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+  return viewAvg ? betaInst * effDuty : betaInst;
 }
 
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {

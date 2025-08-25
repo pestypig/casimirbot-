@@ -38,7 +38,7 @@ export function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0,
   // gentle scaling with current tuning (kept bounded)
   const g = Math.min(40, Math.max(10, gammaGeo || 26));
   const qn = Math.log10(Math.max(1, q || 1e9)) - 6; // ~3 when q~1e9
-  const dutyBoost = Math.sqrt(Math.max(0, duty || 0));     // 0..1
+  const dutyBoost = Math.max(0, duty || 0);     // 0..1
   const safety = clamp01(zeta / 0.84) * clamp01(tsRatio / 100);
 
   // small multipliers so we don't explode estimates

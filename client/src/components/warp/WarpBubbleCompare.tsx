@@ -177,9 +177,9 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
     : clampValue(base.dutyCycle / Math.max(1, base.sectorCount)); // UI duty averaged over all sectors
 
   const sectorsAvg = Math.max(1, base.sectorCount);
-  const dutySqrt = Math.sqrt(Math.max(1e-12, duty));    // √(duty) ; sectors already averaged in "duty" above
+  const dutyTerm = Math.max(1e-12, duty);    // duty ; sectors already averaged in "duty" above
 
-  return g3 * dAA * gVdB * dutySqrt;
+  return g3 * dAA * gVdB * dutyTerm;
 }
 
 function buildCommonUniforms(base: BaseInputs) {

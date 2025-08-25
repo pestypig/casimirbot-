@@ -88,7 +88,7 @@ export default function AmplificationPanel({ readOnly = false }: { readOnly?: bo
 
   // effective duty factor used in the renderer (averaged if viewAvg=true)
   const effDuty = viewAvg ? Math.max(1e-12, (Number(duty) || 0) / sectors) : 1.0;
-  const dutyTerm = Math.sqrt(effDuty);
+  const dutyTerm = effDuty;
 
   // final θ-scale used by the grid shader / CPU geometry
   const thetaScale = A_total * dutyTerm;

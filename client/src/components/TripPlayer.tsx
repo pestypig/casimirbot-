@@ -32,7 +32,7 @@ function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=26, qFactor=1e
 
   const g = Math.min(40, Math.max(10, gammaGeo));
   const qn = Math.log10(Math.max(1, qFactor)) - 6;
-  const dutyBoost = Math.sqrt(Math.max(0, duty));
+  const dutyBoost = Math.max(0, duty);
   const safety = Math.max(0, Math.min(1, zeta / 0.84)) * Math.max(0, Math.min(1, tsRatio / 100));
 
   v *= (1 + 0.01*(g - 26)) * (1 + 0.05*qn) * (0.5 + 0.5*dutyBoost) * (0.5 + 0.5*safety);
