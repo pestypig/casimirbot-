@@ -384,7 +384,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-500">T={(decades/8).toFixed(2)} • boost≤40</div>
           </div>
           <div className="mb-2">
-            <label className="text-sm">User Gain (both)</label>
+            <label className="text-sm">User Gain (SHOW)</label>
             <input type="range" min={1} max={64} step={0.1} value={userGain}
               onChange={e=>setUserGain(Number(e.target.value))} className="w-full"/>
             <div className="text-xs text-neutral-500">{userGain.toFixed(2)}×</div>
