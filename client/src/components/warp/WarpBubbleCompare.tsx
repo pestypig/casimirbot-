@@ -63,6 +63,18 @@ function sizeCanvas(cv: HTMLCanvasElement) {
   return { w, h };
 }
 
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  const p = { ...patch };
+  if (pane === 'REAL') { 
+    p.physicsParityMode = true;  
+    p.ridgeMode = 0; 
+  } else {
+    p.physicsParityMode = false; 
+    p.ridgeMode = 1; 
+  }
+  return p;
+}
+
 function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
 
@@ -95,10 +107,14 @@ function sanitizeUniforms(u: any = {}) {
   return s;
 }
 
-function pushSafe(engineRef: React.MutableRefObject<any>, patch: any) {
+function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'REAL'|'SHOW') {
   const e = engineRef?.current;
   if (!e) return;
-  const clean = sanitizeUniforms(patch);
+  let clean = sanitizeUniforms(patch);
+  // Apply pane-specific sanitization to prevent cross-contamination
+  if (pane) {
+    clean = paneSanitize(pane, clean);
+  }
   if (!e.isLoaded || !e.gridProgram) {
     e.onceReady(() => { e.updateUniforms(clean); e.forceRedraw?.(); });
   } else {
@@ -787,8 +803,8 @@ export default function WarpBubbleCompare({
 
     // 5) Deterministic camera for both panes
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
-    pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true });
-    pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true });
+    pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true }, 'REAL');
+    pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true }, 'SHOW');
 
     // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
     ensureStrobeMux();
@@ -870,8 +886,6 @@ export default function WarpBubbleCompare({
       gridSpan: gridSpanReal,            // tight framing around hull
       ...real,
       currentMode: parameters.currentMode,
-      physicsParityMode: true,
-      ridgeMode: 0,
       vShip: 0,                          // never "fly" in REAL
       // strictly physical: no boosts, no gains, wall to ρ-units
       userGain: 1,
@@ -885,7 +899,7 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, parameters.sectors),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-    });
+    }, 'REAL');
 
     // SHOW (UI)
     const showTheta = parameters.currentMode === 'standby'
@@ -896,8 +910,6 @@ export default function WarpBubbleCompare({
       ...shared,
       ...show,
       currentMode: parameters.currentMode,
-      physicsParityMode: false,
-      ridgeMode: 1,
       vShip: parameters.currentMode === 'standby' ? 0 : 1,
       thetaScale: showTheta,
       gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
@@ -905,7 +917,7 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, parameters.sectors),
       // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ
-    });
+    }, 'SHOW');
 
     // Force a draw so the user sees the change immediately
     leftEngine.current.forceRedraw?.();
@@ -933,8 +945,8 @@ export default function WarpBubbleCompare({
         burst_ms: lc.burst_ms,
         sectors: s
       };
-      pushSafe(leftEngine,  lcPayload);
-      pushSafe(rightEngine, lcPayload);
+      pushSafe(leftEngine,  lcPayload, 'REAL');
+      pushSafe(rightEngine, lcPayload, 'SHOW');
     }
 
     // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
@@ -943,12 +955,12 @@ export default function WarpBubbleCompare({
       zeroStop: real.zeroStop,
       colorMode: 2,             // pin shear proxy permanently for REAL
       ridgeMode: 0              // pin double-lobe physics mode
-    });
+    }, 'REAL');
 
     // SHOW: can have live camera and display adjustments
     if (leftRef.current && rightRef.current) {
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
-      pushSafe(rightEngine, { cameraZ: fixedCamZ, lockFraming: true });
+      pushSafe(rightEngine, { cameraZ: fixedCamZ, lockFraming: true }, 'SHOW');
     }
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
