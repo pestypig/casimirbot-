@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, Suspense, lazy } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Cpu, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +55,13 @@ const WarpBubbleCompare = lazy(() =>
   import("@/components/warp/WarpBubbleCompare").then(m => ({ default: m.default || m.WarpBubbleCompare }))
 );
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
+
+// Preload lazy bundles to avoid suspending during user input
+useEffect(() => {
+  import("@/components/warp/WarpBubbleCompare");
+  import("@/components/WarpRenderInspector");
+}, []);
+
 import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
@@ -217,6 +224,12 @@ interface ChatMessage {
 }
 
 export default function HelixCore() {
+  // Preload lazy bundles to avoid suspending during user input
+  useEffect(() => {
+    import("@/components/warp/WarpBubbleCompare");
+    import("@/components/WarpRenderInspector");
+  }, []);
+
   // Generate logical sector list (no physics here)
   const SECTORS = useMemo(
     () => Array.from({ length: 400 }, (_, i) => ({ id: `S${i + 1}` })), []
@@ -816,8 +829,10 @@ export default function HelixCore() {
                   className={`font-mono ${isActive ? 'bg-cyan-600 text-white' : 'bg-slate-900'}`}
                   onClick={() => {
                     if (!isActive) {
-                      setOptimisticMode(m.key as ModeKey);
-                      setModeNonce(n => n + 1);
+                      startTransition(() => {
+                        setOptimisticMode(m.key as ModeKey);
+                        setModeNonce(n => n + 1);
+                      });
                       switchMode.mutate(m.key as any, {
                         onSuccess: () => {
                           // make both sides refresh
@@ -1162,8 +1177,10 @@ export default function HelixCore() {
                 <Select 
                   value={pipeline?.currentMode || 'hover'}
                   onValueChange={(mode) => {
-                    setOptimisticMode(mode as ModeKey);
-                    setModeNonce(n => n + 1);
+                    startTransition(() => {
+                      setOptimisticMode(mode as ModeKey);
+                      setModeNonce(n => n + 1);
+                    });
                     switchMode.mutate(mode as any, {
                       onSuccess: () => {
                         // make both sides refresh
