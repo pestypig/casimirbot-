@@ -432,20 +432,7 @@ export default function HelixCore() {
     return Math.max(1, Math.floor(s));
   }, [systemMetrics?.totalSectors]);
 
-  // Total tiles (prefer metrics, then pipeline, then a sane fallback)
-  const totalTilesSafe = useMemo(() => {
-    const a = npos(systemMetrics?.totalTiles, 0);
-    const b = npos(pipeline?.N_tiles, 0);
-    // use the first positive source, else fall back to your UI default
-    return a || b || 2_800_000;
-  }, [systemMetrics?.totalTiles, pipeline?.N_tiles]);
-
-  // Tiles per sector (prefer metrics; else derive from totalTiles/totalSectors)
-  const tilesPerSectorSafe = useMemo(() => {
-    const fromMetrics = npos(systemMetrics?.tilesPerSector, 0);
-    if (fromMetrics) return Math.floor(fromMetrics);
-    return Math.max(1, Math.floor(totalTilesSafe / Math.max(1, totalSectors)));
-  }, [systemMetrics?.tilesPerSector, totalTilesSafe, totalSectors]);
+  // NOTE: totalTilesSafe and tilesPerSectorSafe are defined later in the robust calculation
 
   // Keep the trail array sized to totalSectors
   useEffect(() => {
@@ -507,16 +494,71 @@ export default function HelixCore() {
   const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
   const dutyUI_safe = isStandby ? 0 : dutyUI;
 
-  // Use the compact hook for active tiles computation
-  const activeTiles = useActiveTiles({
-    totalTiles: totalTilesSafe,
-    totalSectors,
-    concurrentSectors,
-    dutyEffectiveFR_safe: nnonneg(dutyEffectiveFR_safe, 0),
-    tilesPerSector: tilesPerSectorSafe,
-    lc,
-    serverActiveTiles: nnonneg(systemMetrics?.activeTiles, NaN),
-  });
+  // --- Active tiles: robust fallback calc (replace the useActiveTiles(...) line) ---
+  const TOTAL_SECTORS_FALLBACK = 400;
+  const TOTAL_TILES_FALLBACK = 2_800_000;
+  const LOCAL_BURST_DEFAULT = 0.01;
+
+  const totalSectorsSafe =
+    Number.isFinite(totalSectors) ? Math.max(1, Number(totalSectors)) : TOTAL_SECTORS_FALLBACK;
+
+  const concurrentSectorsSafe =
+    isStandby ? 0 : Math.max(1, Number(concurrentSectors) || 1);
+
+  const totalTilesSafe = (() => {
+    const a = Number(systemMetrics?.totalTiles);
+    const b = Number(pipeline?.N_tiles);
+    if (Number.isFinite(a) && a > 0) return Math.floor(a);
+    if (Number.isFinite(b) && b > 0) return Math.floor(b);
+    return TOTAL_TILES_FALLBACK; // sane default so UI never shows 0 by accident
+  })();
+
+  const tilesPerSectorSafe = (() => {
+    const tps = Number(systemMetrics?.tilesPerSector);
+    if (Number.isFinite(tps) && tps > 0) return Math.floor(tps);
+    return Math.max(1, Math.floor(totalTilesSafe / totalSectorsSafe));
+  })();
+
+  const burstLocal = (() => {
+    const b = Number(lc?.burst_ms), d = Number(lc?.dwell_ms);
+    if (Number.isFinite(b) && Number.isFinite(d) && d > 0) {
+      return Math.max(0, Math.min(1, b / d));
+    }
+    return LOCAL_BURST_DEFAULT;
+  })();
+
+  const dutyFRSafe = (() => {
+    if (isStandby) return 0;
+    const fr =
+      Number((pipelineState as any)?.dutyEffectiveFR) ??
+      Number((pipelineState as any)?.dutyEff) ??
+      NaN;
+    if (Number.isFinite(fr)) return Math.max(0, Math.min(1, fr));
+    // fallback to FR window model
+    return Math.max(
+      0,
+      Math.min(1, burstLocal * (concurrentSectorsSafe / totalSectorsSafe))
+    );
+  })();
+
+  const computedAvgTiles = Math.round(totalTilesSafe * dutyFRSafe);
+  const computedInstantTiles = Math.round(
+    tilesPerSectorSafe * concurrentSectorsSafe * burstLocal
+  );
+
+  // If server emitted 0 but we're not in Standby, prefer computed
+  const serverAvgTiles = Number(systemMetrics?.activeTiles);
+  const avgTilesSafe =
+    (!isStandby && Number.isFinite(serverAvgTiles) && serverAvgTiles > 0)
+      ? Math.floor(serverAvgTiles)
+      : computedAvgTiles;
+
+  // Provide the object your JSX expects
+  const activeTiles = {
+    avgTiles: avgTilesSafe,
+    instantTilesSmooth: isStandby ? 0 : computedInstantTiles,
+    burstLocal,
+  };
 
   // Removed mode version tracking to prevent forced remounts that cause black screens
   

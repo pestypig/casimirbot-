@@ -1,0 +1,84 @@
+Why it’s showing 0
+
+In your panel you call useActiveTiles({ ... }), but some inputs can be undefined/0 at first paint (or in certain modes). Common culprits:
+
+systemMetrics.activeTiles is 0 (server not populated yet) and the hook trusts it.
+
+systemMetrics.totalTiles and pipeline.N_tiles are both missing → multiply NaN * duty → coerced to 0.
+
+concurrentSectors is 0 in standby (expected), but your hook reuses that path for non-standby too when metrics lag.
+
+The fix is to sanitize inputs and prefer a computed value whenever the server reports 0 but we’re not in Standby.
+
+Minimal patch (apply inside HelixCore)
+
+Replace your useActiveTiles(...) block with this safe local computation (same API to your JSX):
+
+// --- Active tiles: robust fallback calc (replace the useActiveTiles(...) line) ---
+const TOTAL_SECTORS_FALLBACK = 400;
+const TOTAL_TILES_FALLBACK = 2_800_000;
+const LOCAL_BURST_DEFAULT = 0.01;
+
+const totalSectorsSafe =
+  Number.isFinite(totalSectors) ? Math.max(1, Number(totalSectors)) : TOTAL_SECTORS_FALLBACK;
+
+const concurrentSectorsSafe =
+  isStandby ? 0 : Math.max(1, Number(concurrentSectors) || 1);
+
+const totalTilesSafe = (() => {
+  const a = Number(systemMetrics?.totalTiles);
+  const b = Number(pipeline?.N_tiles);
+  if (Number.isFinite(a) && a > 0) return Math.floor(a);
+  if (Number.isFinite(b) && b > 0) return Math.floor(b);
+  return TOTAL_TILES_FALLBACK; // sane default so UI never shows 0 by accident
+})();
+
+const tilesPerSectorSafe = (() => {
+  const tps = Number(systemMetrics?.tilesPerSector);
+  if (Number.isFinite(tps) && tps > 0) return Math.floor(tps);
+  return Math.max(1, Math.floor(totalTilesSafe / totalSectorsSafe));
+})();
+
+const burstLocal = (() => {
+  const b = Number(lc?.burst_ms), d = Number(lc?.dwell_ms);
+  if (Number.isFinite(b) && Number.isFinite(d) && d > 0) {
+    return Math.max(0, Math.min(1, b / d));
+  }
+  return LOCAL_BURST_DEFAULT;
+})();
+
+const dutyFRSafe = (() => {
+  if (isStandby) return 0;
+  const fr =
+    Number((pipelineState as any)?.dutyEffectiveFR) ??
+    Number((pipelineState as any)?.dutyEff) ??
+    NaN;
+  if (Number.isFinite(fr)) return Math.max(0, Math.min(1, fr));
+  // fallback to FR window model
+  return Math.max(
+    0,
+    Math.min(1, burstLocal * (concurrentSectorsSafe / totalSectorsSafe))
+  );
+})();
+
+const computedAvgTiles = Math.round(totalTilesSafe * dutyFRSafe);
+const computedInstantTiles = Math.round(
+  tilesPerSectorSafe * concurrentSectorsSafe * burstLocal
+);
+
+// If server emitted 0 but we’re not in Standby, prefer computed
+const serverAvgTiles = Number(systemMetrics?.activeTiles);
+const avgTilesSafe =
+  (!isStandby && Number.isFinite(serverAvgTiles) && serverAvgTiles > 0)
+    ? Math.floor(serverAvgTiles)
+    : computedAvgTiles;
+
+// Provide the object your JSX expects
+const activeTiles = {
+  avgTiles: avgTilesSafe,
+  instantTilesSmooth: isStandby ? 0 : computedInstantTiles,
+  burstLocal,
+};
+
+
+No other JSX changes required—your panel that reads activeTiles.avgTiles and activeTiles.instantTilesSmooth will light back up for hover / cruise / emergency, while remaining 0 in standby (which is correct).
