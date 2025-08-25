@@ -288,7 +288,8 @@ export default function WarpRenderCheckpointsPanel({
 
   // Pretty strings
   const dutyLocalPct = `${(dutyLocal*100).toFixed(3)}%`;
-  const dutyFRPct = `${(dutyFR*100).toFixed(4)}%`;
+  const dutyFRPct_left = `${(dutyFR_left*100).toFixed(4)}%`;
+  const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
   // Theta expected function using same chain as shader  
   function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
@@ -349,9 +350,11 @@ export default function WarpRenderCheckpointsPanel({
         <div className="flex justify-between">
           <span className="text-white/70">θ-scale expected:</span>
           <span className="font-mono">{
-            parameters 
-              ? computeThetaScaleFromParams(parameters).toExponential(2)
-              : expectedThetaForPane(snap, null).toExponential(2)
+            (() => {
+              const u = (leftEngineRef.current?.uniforms ?? {}); // pick REAL as reference
+              const exp = thetaExpected(u, dutyFR_left, snap);
+              return Number.isFinite(exp) ? exp.toExponential(2) : '—';
+            })()
           }</span>
         </div>
         <div className="flex justify-between">
@@ -364,7 +367,7 @@ export default function WarpRenderCheckpointsPanel({
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">Duty local / Ford-Roman:</span>
-          <span className="font-mono">{dutyLocalPct} / {dutyFRPct}</span>
+          <span className="font-mono">{dutyLocalPct} / {dutyFRPct_left} (REAL) • {dutyFRPct_right} (SHOW)</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">Sectors conc/total:</span>
