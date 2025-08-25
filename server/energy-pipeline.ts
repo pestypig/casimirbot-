@@ -190,25 +190,41 @@ export const MODE_CONFIGS = {
     dutyCycle: 0.14,
     sectorStrobing: 1,
     qSpoilingFactor: 1,
-    description: "High-power hover mode for station-keeping"
+    description: "High-power hover mode for station-keeping",
+    // New fields for mode-aware physics
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.01
   },
   cruise: {
     dutyCycle: 0.005,
     sectorStrobing: 1,       // Consistent with MODE_POLICY.cruise.S_live: 1 (concurrent sectors)
     qSpoilingFactor: 0.625,  // keep this consistent with UI defaults below
-    description: "Low-power cruise mode for sustained travel"
+    description: "Low-power cruise mode for sustained travel",
+    // New fields for mode-aware physics
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.01
   },
   emergency: {
     dutyCycle: 0.50,
-    sectorStrobing: 1,
+    sectorStrobing: 8,       // Updated to match client-side emergency mode
     qSpoilingFactor: 1,
-    description: "Maximum power emergency mode"
+    description: "Maximum power emergency mode",
+    // New fields for mode-aware physics
+    sectorsTotal: 400,
+    sectorsConcurrent: 8,
+    localBurstFrac: 0.50
   },
   standby: {
     dutyCycle: 0.001,
     sectorStrobing: 1,
     qSpoilingFactor: 0.1,
-    description: "Minimal power standby mode"
+    description: "Minimal power standby mode",
+    // New fields for mode-aware physics
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.0
   }
 };
 

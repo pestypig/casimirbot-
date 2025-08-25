@@ -695,10 +695,19 @@ export function getPipelineState(req: Request, res: Response) {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const s = getGlobalPipelineState();
+  
+  // Include mode-specific configuration fields for client consumption
+  const currentMode = s.currentMode || 'hover';
+  const modeConfig = MODE_CONFIGS[currentMode as keyof typeof MODE_CONFIGS];
+  
   res.json({
     ...s,
     // stable camel alias for all clients
-    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR
+    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
+    // Mode-aware physics fields from MODE_CONFIGS
+    sectorsTotal: modeConfig?.sectorsTotal ?? 400,
+    sectorsConcurrent: modeConfig?.sectorsConcurrent ?? 1,
+    localBurstFrac: modeConfig?.localBurstFrac ?? 0.01
   });
 }
 
