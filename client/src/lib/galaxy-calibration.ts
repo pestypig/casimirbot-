@@ -1,5 +1,7 @@
 // client/src/lib/galaxy-calibration.ts
 
+const DEV = process.env.NODE_ENV !== "production";
+
 export type SvgCalib = {
   svgW: number; svgH: number;         // 3178.3178, 4493.4838
   sunSvgX: number; sunSvgY: number;    // 1608.7281, 2130.0217
@@ -22,7 +24,7 @@ export function calibrateToImage(
   const svgPxPerPc = (svg.svgW / 2) / svg.radiusPc; // ≈ 0.2648598167
   const pxPerPc = svgPxPerPc * sx; // consistent in X; map is circular so sx≈sy
 
-  console.log(`🌌 Galaxy calibration computed:`, {
+  if (DEV) console.log(`🌌 Galaxy calibration computed:`, {
     imageSize: `${imgNatW}×${imgNatH}`,
     svgSize: `${svg.svgW}×${svg.svgH}`,
     scaleFactors: { sx, sy },

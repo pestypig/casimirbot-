@@ -85,6 +85,8 @@ import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
 
+const DEV = process.env.NODE_ENV !== "production";
+
 declare global {
   interface Window {
     setStrobingState?: (args: { sectorCount: number; currentSector: number; split?: number }) => void;
@@ -275,7 +277,7 @@ export default function HelixCore() {
     img.onload = () => {
       const { originPx, pxPerPc } = calibrateToImage(img.naturalWidth, img.naturalHeight, SVG_CALIB);
       setGalaxyCalibration({ originPx, pxPerPc });
-      console.log('🗺️ Galaxy calibration:', { 
+      if (DEV) console.log('🗺️ Galaxy calibration:', { 
         imageSize: { w: img.naturalWidth, h: img.naturalHeight },
         sunPixel: originPx, 
         scale: `${pxPerPc.toFixed(4)} px/pc` 
@@ -1867,7 +1869,7 @@ export default function HelixCore() {
               }}
               onTick={(phase, t) => {
                 // Optional: Log trip progress
-                console.log(`Trip phase: ${phase}, time: ${t}s`);
+                if (DEV) console.log(`Trip phase: ${phase}, time: ${t}s`);
               }}
             />
 
