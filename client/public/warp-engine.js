@@ -1868,7 +1868,9 @@ class WarpEngine {
             const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
             const dfdr=(-2.0*(rs-1)/(w*w))*f;
 
-            const theta = vShip * (xs/rs) * dfdr;               // York-time proxy
+            const theta = (U.ridgeMode===1)
+                ? vShip * (xs/rs) * f      // single crest
+                : vShip * (xs/rs) * dfdr;  // double-lobe
             const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
 
             if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
