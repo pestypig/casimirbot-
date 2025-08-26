@@ -54,7 +54,7 @@ class WarpEngine {
         return new this(canvas);
     }
 
-    constructor(canvas) {
+    constructor(canvas, _gl, _opts) {
         // Per-canvas guard: allow multiple engines across different canvases
         if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
         if (window.__WARP_ENGINES.has(canvas) && !window.__WARP_ENGINE_ALLOW_MULTI) {
