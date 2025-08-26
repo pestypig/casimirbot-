@@ -1,4 +1,14 @@
 ;(() => {
+// Always ensure GRID_DEFAULTS exists, even if this file short-circuits later
+(function initGridDefaults(g){
+  const e = g.GRID_DEFAULTS || {};
+  g.GRID_DEFAULTS = {
+    divisions:   (Number.isFinite(e.divisions) && e.divisions > 0) ? (e.divisions|0) : 64,
+    minSpan:     (Number.isFinite(e.minSpan)   && e.minSpan   > 0) ? e.minSpan       : 2.6,
+    spanPadding: (typeof e.spanPadding === 'number') ? e.spanPadding : 1.35,
+  };
+})(globalThis);
+
   // Prevent duplicate loads (HMR, script re-inject, etc.)
   const BUILD = globalThis.__APP_WARP_BUILD || 'dev';
   // Only skip if we've *already* executed this exact build.
@@ -14,40 +24,6 @@
 
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
-
-// ---- harden GRID_DEFAULTS even if file is reloaded / short-circuited ----
-(function (g) {
-  const existing = g.GRID_DEFAULTS || {};
-  const safe = {
-    spanPadding: existing.spanPadding ?? (
-      g.matchMedia && g.matchMedia('(max-width: 768px)').matches ? 1.45 : 1.35
-    ),
-    minSpan: existing.minSpan ?? 2.6,
-    divisions: Number.isFinite(existing.divisions) && existing.divisions > 0
-      ? (existing.divisions|0)
-      : 100,
-  };
-  g.GRID_DEFAULTS = safe;
-})(globalThis);
-
-// --- Grid defaults (scientifically scaled for needle hull) ---
-if (typeof window.GRID_DEFAULTS === 'undefined') {
-  window.GRID_DEFAULTS = {
-    spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
-      ? 1.45   // a touch more padding on phones so the first fit is perfect
-      : 1.35,  // tighter framing for closer view on desktop
-    minSpan: 2.6,        // never smaller than this (in clip-space units)
-    divisions: 100       // more lines so a larger grid still looks dense
-  };
-}
-function getGridDefaults() {
-  const d = (typeof globalThis !== 'undefined' && globalThis.GRID_DEFAULTS) || {};
-  return {
-    divisions:   (Number.isFinite(d.divisions) && d.divisions > 0) ? (d.divisions|0) : 64,
-    minSpan:     (Number.isFinite(d.minSpan)   && d.minSpan   > 0) ? d.minSpan       : 2.6,
-    spanPadding: (typeof d.spanPadding === 'number') ? d.spanPadding : 1.35,
-  };
-}
 
 if (typeof window.SCENE_SCALE === 'undefined') {
   window.SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
@@ -364,7 +340,7 @@ class WarpEngine {
 
     _initializeGrid() {
         const gl = this.gl;
-        const GD = getGridDefaults();
+        const GD = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
         
         // Create spacetime grid geometry
         // Start with default span, will be adjusted when hull params are available
@@ -422,7 +398,7 @@ class WarpEngine {
             this._updateGrid?.(); // if you have an updater
         } catch {
             // Fallback: minimal in-place rebuild
-            const gd = getGridDefaults();
+            const gd = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
             const span = gd.minSpan;
             const data = this._createGrid(span, this._divisionsOverride);
             this.gridVertices = new Float32Array(data);
@@ -433,7 +409,7 @@ class WarpEngine {
     _updateGrid() {
         // Base implementation - rebuild grid with current span and override divisions
         if (!this._divisionsOverride) return;
-        const gd = getGridDefaults();
+        const gd = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
         const span = this.currentGridSpan || gd.minSpan;
         const data = this._createGrid(span, this._divisionsOverride);
         if (this.gridVertices) {
@@ -1143,9 +1119,10 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const spanPadding = bubbleParams.gridScale || getGridDefaults().spanPadding;
+        const GD = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
+        const spanPadding = bubbleParams.gridScale || GD.spanPadding;
         let targetSpan = Math.max(
-          getGridDefaults().minSpan,
+          GD.minSpan,
           hullMaxClip * spanPadding
         );
         
