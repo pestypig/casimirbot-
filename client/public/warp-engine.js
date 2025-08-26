@@ -1,13 +1,6 @@
+globalThis.GRID_DEFAULTS ||= { divisions: 64, minSpan: 2.6, spanPadding: 1.35 };
+
 ;(() => {
-// Always ensure GRID_DEFAULTS exists, even if this file short-circuits later
-(function initGridDefaults(g){
-  const e = g.GRID_DEFAULTS || {};
-  g.GRID_DEFAULTS = {
-    divisions:   (Number.isFinite(e.divisions) && e.divisions > 0) ? (e.divisions|0) : 64,
-    minSpan:     (Number.isFinite(e.minSpan)   && e.minSpan   > 0) ? e.minSpan       : 2.6,
-    spanPadding: (typeof e.spanPadding === 'number') ? e.spanPadding : 1.35,
-  };
-})(globalThis);
 
   // Prevent duplicate loads (HMR, script re-inject, etc.)
   const BUILD = globalThis.__APP_WARP_BUILD || 'dev';
@@ -340,7 +333,7 @@ class WarpEngine {
 
     _initializeGrid() {
         const gl = this.gl;
-        const GD = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
+        const GD = globalThis.GRID_DEFAULTS;
         
         // Create spacetime grid geometry
         // Start with default span, will be adjusted when hull params are available
@@ -398,7 +391,7 @@ class WarpEngine {
             this._updateGrid?.(); // if you have an updater
         } catch {
             // Fallback: minimal in-place rebuild
-            const gd = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
+            const gd = globalThis.GRID_DEFAULTS;
             const span = gd.minSpan;
             const data = this._createGrid(span, this._divisionsOverride);
             this.gridVertices = new Float32Array(data);
@@ -409,7 +402,7 @@ class WarpEngine {
     _updateGrid() {
         // Base implementation - rebuild grid with current span and override divisions
         if (!this._divisionsOverride) return;
-        const gd = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
+        const gd = globalThis.GRID_DEFAULTS;
         const span = this.currentGridSpan || gd.minSpan;
         const data = this._createGrid(span, this._divisionsOverride);
         if (this.gridVertices) {
@@ -1119,7 +1112,7 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const GD = globalThis.GRID_DEFAULTS || { divisions:64, minSpan:2.6, spanPadding:1.35 };
+        const GD = globalThis.GRID_DEFAULTS;
         const spanPadding = bubbleParams.gridScale || GD.spanPadding;
         let targetSpan = Math.max(
           GD.minSpan,
