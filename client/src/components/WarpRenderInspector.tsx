@@ -3,13 +3,12 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
 import { SliceViewer } from "@/components/SliceViewer";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 import MarginHunterPanel from "./MarginHunterPanel";
-import CurvatureMenu from "@/components/CurvatureMenu";
-import { useShowCanvasDensity } from "@/hooks/use-show-canvas-density";
 
 /**
  * WarpRenderInspector
@@ -95,58 +94,6 @@ const TONEMAP_LOCK = {
   viewAvg: true 
 };
 
-// --- width helpers ------------------------------------------------------------
-type WidthMetric = 'sector-arc-equator' | 'sector-arc-mean' | 'wall-thickness' | 'rho-thickness';
-
-// Ramanujan ellipse circumference (a,c are semi-axes in meters)
-function ellipseCircumference(a:number, c:number) {
-  const h = Math.pow(a - c, 2) / Math.pow(a + c, 2);
-  return Math.PI * (a + c) * (1 + (3*h)/(10 + Math.sqrt(4 - 3*h)));
-}
-
-// Harmonic mean radius in meters (for converting wall width to ρ-units)
-function harmonicMean(a:number,b:number,c:number){
-  return 3 / (1/a + 1/b + 1/c);
-}
-
-function computeOneWidth({
-  metric, hull, wallWidth_m, sectorTotal
-}: {
-  metric: WidthMetric;
-  hull: {a:number;b:number;c:number};
-  wallWidth_m: number;
-  sectorTotal: number;
-}){
-  const a=hull.a, b=hull.b, c=hull.c;
-  const R_h = harmonicMean(a,b,c);
-  // ρ-thickness from meters:
-  const w_rho = wallWidth_m / R_h;
-
-  if (metric === 'wall-thickness') {
-    return { label: 'Wall thickness (m)', value: wallWidth_m, units: 'm', details: `ρ≈${w_rho.toFixed(4)} (a_H=${R_h.toFixed(1)}m)` };
-  }
-  if (metric === 'rho-thickness') {
-    return { label: 'Wall thickness (ρ)', value: w_rho, units: 'ρ', details: `${wallWidth_m.toFixed(3)} m (a_H=${R_h.toFixed(1)}m)` };
-  }
-
-  const S = Math.max(1, sectorTotal|0);
-  // "Equator" = ellipse in X–Z plane with semi-axes a,c
-  const C_eq = ellipseCircumference(a, c);
-  // "Mean" = average of three great-ellipse circumferences in the principal planes
-  const C_xz = C_eq;
-  const C_xy = ellipseCircumference(a, b);
-  const C_yz = ellipseCircumference(b, c);
-  const C_mean = (C_xz + C_xy + C_yz) / 3;
-
-  if (metric === 'sector-arc-equator') {
-    const w = C_eq / S;
-    return { label: 'Sector arc @ equator', value: w, units: 'm', details: `C_eq=${C_eq.toFixed(1)} m, S=${S}` };
-  } else { // 'sector-arc-mean'
-    const w = C_mean / S;
-    return { label: 'Sector arc @ mean', value: w, units: 'm', details: `C̄=${C_mean.toFixed(1)} m, S=${S}` };
-  }
-}
-
 // ---- Component --------------------------------------------------------------
 export default function WarpRenderInspector(props: {
   // Optional: calculator outputs. Pass exactly what your calculator returns
@@ -162,6 +109,7 @@ export default function WarpRenderInspector(props: {
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
+  const grid3dRef = useRef<Grid3DHandle>(null);
   const leftOwnedRef = useRef(false);
   const rightOwnedRef = useRef(false);
   
@@ -200,30 +148,6 @@ export default function WarpRenderInspector(props: {
   
   // Curvature control
   const [curvT, setCurvT] = useState(0.45);
-  
-  // Width definition state
-  const [widthMetric, setWidthMetric] = useState<WidthMetric>('sector-arc-equator');
-  
-
-  // Auto canvas density management
-  useShowCanvasDensity({
-    engineRef: rightEngine,
-    canvasRef: rightRef,
-    maxDPR: 2,       // good default cap
-    ssaa: 1.25,      // gentle sharpening
-    adaptive: true,  // auto drop SSAA if target gets huge
-    targetMP: 3.0,   // ~3 megapixels budget at effective DPR
-  });
-
-  // Keep REAL crisp too
-  useShowCanvasDensity({
-    engineRef: leftEngine,
-    canvasRef: leftRef,
-    maxDPR: 2,
-    ssaa: 1.0,       // parity pane can stay non-SSAA
-    adaptive: true,
-    targetMP: 2.5,
-  });
   
 
   const wu = useMemo(() => normalizeWU(
@@ -292,111 +216,31 @@ export default function WarpRenderInspector(props: {
       (safe as any).physicsParityMode = forceParity;
       (safe as any).parityMode        = forceParity;
 
-      // ✅ forward to the gate using a valid target
-      const target = (typeof orig === 'function') ? { updateUniforms: orig } : engine;
-      return gatedUpdateUniforms(target, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
+      // Use gated uniforms instead of direct call
+      return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }
 
-  function seedGridDefaultsHard() {
-    const g: any = (typeof window !== 'undefined' ? window : globalThis) as any;
-    const d = g.GRID_DEFAULTS || {};
-    g.GRID_DEFAULTS = {
-      divisions: Number.isFinite(d.divisions) && d.divisions > 0 ? (d.divisions|0) : 64,
-      minSpan: typeof d.minSpan === 'number' && d.minSpan > 0 ? d.minSpan : 2.6,
-      spanPadding: typeof d.spanPadding === 'number' ? d.spanPadding : 1.35,
-    };
-  }
+  // Reuse-or-create guard so we never attach twice to the same canvas
+  const ENGINE_KEY = '__warpEngine';
 
-  function purgeCanvasEngineGuards(cv: HTMLCanvasElement) {
-    try { (window as any).__WARP_ENGINES?.delete?.(cv); } catch {}
-    try { delete (cv as any).__warpEngine; } catch {}
-    try { delete (cv as any).__engine; } catch {}
-    try { delete (cv as any).warpEngine; } catch {}
-  }
-
-  function getOrCreateEngine<WarpType = any>(
-    Ctor: new (...args: any[]) => WarpType,
-    cv: HTMLCanvasElement
-  ): WarpType {
-    // Reuse if one is already attached & alive
-    const existing =
-      (cv as any).__warpEngine ||
-      (cv as any).warpEngine ||
-      (cv as any).__engine ||
-      (Ctor as any).fromCanvas?.(cv) ||
-      (Ctor as any).getForCanvas?.(cv);
+  function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
+    const existing = (cv as any)[ENGINE_KEY];
     if (existing && !existing._destroyed) return existing as WarpType;
-
-    // Prefer factory if available
-    const viaFactory =
-      (Ctor as any).getOrCreate?.(cv) ||
-      (Ctor as any).fromCanvas?.(cv) ||
-      (Ctor as any).getForCanvas?.(cv);
-    if (viaFactory) {
-      (cv as any).__warpEngine = viaFactory;
-      return viaFactory as WarpType;
-    }
-
-    // Ensure defaults exist *before* first construction
-    seedGridDefaultsHard();
-
-    // Hand the ctor explicit safe options (covers both shapes: top-level + nested grid)
-    const SAFE_OPTS = {
-      divisions: 64,
-      grid: { divisions: 64, minSpan: 2.6, spanPadding: 1.35 }
-    };
-
+    let eng: any;
     try {
-      const eng = new (Ctor as any)(cv, SAFE_OPTS);
-      (cv as any).__warpEngine = eng;
-      return eng as WarpType;
-    } catch (e1: any) {
-      const msg1 = String(e1?.message || e1);
-
-      // If GRID_DEFAULTS/opts were the problem, seed & retry — but first clear any half-attach
-      if (/\b(divisions|minSpan|spanPadding)\b/i.test(msg1)) {
-        seedGridDefaultsHard();
-        purgeCanvasEngineGuards(cv);
-        try {
-          const eng2 = new (Ctor as any)(cv, SAFE_OPTS); // <-- pass opts on retry too
-          (cv as any).__warpEngine = eng2;
-          return eng2 as WarpType;
-        } catch (e2: any) {
-          const msg2 = String(e2?.message || e2);
-          if (/already attached/i.test(msg2)) {
-            const rebound =
-              (cv as any).__warpEngine ||
-              (Ctor as any).fromCanvas?.(cv) ||
-              (Ctor as any).getForCanvas?.(cv);
-            if (rebound && !rebound._destroyed) return rebound as WarpType;
-          }
-          throw e2;
-        }
+      eng = new Ctor(cv);
+    } catch (err: any) {
+      const msg = String(err?.message || err).toLowerCase();
+      if (msg.includes('already attached')) {
+        // Another owner (e.g., Grid3DEngine) already attached; reuse theirs
+        return ((cv as any)[ENGINE_KEY] || (eng as any)) as WarpType;
       }
-
-      // If the first attempt already tripped the "attached" guard
-      if (/already attached/i.test(msg1)) {
-        const rebound =
-          (cv as any).__warpEngine ||
-          (Ctor as any).fromCanvas?.(cv) ||
-          (Ctor as any).getForCanvas?.(cv);
-        if (rebound && !rebound._destroyed) return rebound as WarpType;
-
-        // Last-ditch: temporarily bypass guard, still providing SAFE_OPTS
-        try {
-          (window as any).__WARP_ENGINE_ALLOW_MULTI = true;
-          const eng3 = new (Ctor as any)(cv, SAFE_OPTS);
-          (cv as any).__warpEngine = eng3;
-          return eng3 as WarpType;
-        } finally {
-          (window as any).__WARP_ENGINE_ALLOW_MULTI = false;
-        }
-      }
-
-      throw e1;
+      throw err;
     }
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
   }
   
   // Hard-lock parity & block late thetaScale writers at the engine edge
@@ -408,26 +252,33 @@ export default function WarpRenderInspector(props: {
       if ('thetaScale' in safe) delete safe.thetaScale;
       safe.physicsParityMode = (pane === 'REAL');
       safe.parityMode = (pane === 'REAL');
-      // ✅ same fallback as above
-      const target = (typeof orig === 'function') ? { updateUniforms: orig } : engine;
-      return gatedUpdateUniforms(target, safe, `${pane.toLowerCase()}-locked`);
+      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }
 
-  function createEngineWithFallback(
-    rendererType: 'slice2d' | 'grid3d',
-    canvas: HTMLCanvasElement
-  ) {
+  // Helper to create engine with conditional selection and 3D fallback
+  function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
     const W: any = (window as any).WarpEngine;
-    const G: any = (window as any).Grid3DShowEngine;
-
-    if (rendererType === 'grid3d' && G) {
-      const e = getOrCreateEngine(G, canvas);
-      return e;
+    
+    if (rendererType === 'grid3d') {
+      // Try 3D engine first
+      try {
+        const engine3d = getOrCreateEngine(W, canvas);
+        const ok = engine3d.init ? engine3d.init(canvas) : true;
+        if (ok) {
+          return engine3d;
+        } else {
+          // 3D context failed, dispose and fallback
+          engine3d.dispose?.();
+        }
+      } catch (e) {
+        console.warn('Grid3D engine failed, falling back to slice2d:', e);
+      }
     }
-    const e = getOrCreateEngine(W, canvas);
-    return e;
+    
+    // Use slice2d (either requested or as fallback)
+    return getOrCreateEngine(W, canvas);
   }
 
   // Engine creation & lifecycle
@@ -442,53 +293,46 @@ export default function WarpRenderInspector(props: {
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
       leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
       leftOwnedRef.current = true;
-      // safe "mute" seed after create, before locks, but we let the gate defer it:
+      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       leftEngine.current?.setVisible?.(false);
+      // Hard-lock REAL pane against parity flips and thetaScale writers
+      lockPane(leftEngine.current, 'REAL');
     }
-    if (rightRef.current && !rightEngine.current) {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-      rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
-      rightOwnedRef.current = true;
-      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
-      rightEngine.current?.setVisible?.(false);
+    if (showRendererType !== 'grid3d') {
+      if (rightRef.current && !rightEngine.current) {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+        rightEngine.current = createEngineWithFallback('slice2d', rightRef.current);
+        rightOwnedRef.current = true; // we own this engine
+        // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+        gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
+        rightEngine.current?.setVisible?.(false);
+        // Hard-lock SHOW pane against parity flips and thetaScale writers
+        lockPane(rightEngine.current, 'SHOW');
+      }
     }
 
+    // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
+    if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
+    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
+
+    // Bootstrap; fit camera after link using derived axes
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
-
     leftEngine.current?.onceReady?.(() => {
-      // now it has a working updateUniforms + GL program
-      lockPane(leftEngine.current, 'REAL');
-      hardLockUniforms(leftEngine.current, { forceParity: true, tag: 'REAL' });
-
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-left-init');
     });
-
     rightEngine.current?.onceReady?.(() => {
-      lockPane(rightEngine.current, 'SHOW');
-      hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
-
       const ax = rightEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
-
-      // mesh planes & grid density
-      rightEngine.current?.setGridResolution?.({ divisions: 64 });
-      rightEngine.current?.setMeshOptions?.({
-        showXZ: true, layersXZ: 5,
-        showXY: true, layersXY: 3,
-        showYZ: true, layersYZ: 3,
-        alignToGrid: true,
-      });
-
-      if (!rightEngine.current?.setMeshOptions) {
-        console.warn('Grid3DShowEngine not active — check public/grid3d-engine.js load order.');
-      }
+      // optional: mirror display gain through helper
+      const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
+      rightEngine.current.setDisplayGain?.(dg);
     });
 
     // Diagnostics -> window for quick comparison
@@ -514,47 +358,56 @@ export default function WarpRenderInspector(props: {
       rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
     }
 
-    // At mount, keep hidden
-    leftEngine.current?.setVisible?.(false);
-    rightEngine.current?.setVisible?.(false);
-
     // Subscribe to canonical server uniforms
     const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
-      setHaveUniforms(true);
-
-      // let the server payload set ALL physics; we do not add gamma/duty/etc. here
-      applyToEngine(leftEngine.current,  u); // REAL
-      applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
-
-      // only now show canvases
+      setHaveUniforms(true); // Mark that we've received first uniforms
+      if (leftEngine.current) {
+        applyToEngine(leftEngine.current, u);          // REAL
+      }
+      if (rightEngine.current) {
+        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
+      }
+      
+      // Unmute engines when canonical uniforms arrive
       leftEngine.current?.setVisible?.(true);
       rightEngine.current?.setVisible?.(true);
-
-      // optional: immediately harmonize framing after uniforms are in
-      const ax = rightEngine.current?.uniforms?.axesClip;
-      const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(leftEngine.current,  { cameraZ: cz }, 'post-uniforms-camera');
-      gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'post-uniforms-camera');
+      // Also unmute Grid3D engine if active
+      if (showRendererType === 'grid3d') {
+        grid3dRef.current?.getEngine()?.setVisible?.(true);
+      }
     });
 
+    // Keep engines muted until first canonical uniforms arrive
+    if (!haveUniforms) {
+      leftEngine.current?.setVisible?.(false);
+      rightEngine.current?.setVisible?.(false);
+      if (leftEngine.current) {
+        leftEngine.current.updateUniforms?.({
+          physicsParityMode: true, 
+          ridgeMode: TONEMAP_LOCK.ridgeMode,
+          exposure: TONEMAP_LOCK.exp,
+          zeroStop: TONEMAP_LOCK.zero,
+          colorMode: TONEMAP_LOCK.colorMode,
+          viewAvg: TONEMAP_LOCK.viewAvg
+        });
+      }
+      if (rightEngine.current) {
+        rightEngine.current.updateUniforms?.({
+          physicsParityMode: false, 
+          ridgeMode: TONEMAP_LOCK.ridgeMode,
+          exposure: TONEMAP_LOCK.exp,
+          zeroStop: TONEMAP_LOCK.zero,
+          colorMode: TONEMAP_LOCK.colorMode,
+          viewAvg: TONEMAP_LOCK.viewAvg
+        });
+      }
+    }
 
     return () => {
+      // Unsubscribe from canonical uniforms
       unsubscribe(unsubscribeHandler);
-      setHaveUniforms(false);
-
-      const canvases = [leftRef.current, rightRef.current].filter(Boolean) as HTMLCanvasElement[];
-      for (const c of canvases) {
-        try { (c as any)[ENGINE_KEY]?.destroy?.(); } catch {}
-        try { (c as any).__warpEngine?.destroy?.(); } catch {}
-        try { (c as any).__engine?.destroy?.(); } catch {}
-        try { (c as any).warpEngine?.destroy?.(); } catch {}
-        CANVAS_ENG.delete(c);
-        try { delete (c as any)[ENGINE_KEY]; } catch {}
-        try { delete (c as any).__warpEngine; } catch {}
-        try { delete (c as any).__engine; } catch {}
-        try { delete (c as any).warpEngine; } catch {}
-      }
-
+      setHaveUniforms(false); // Reset on cleanup
+      
       // Remove WebGL context event listeners
       if (leftRef.current) {
         leftRef.current.removeEventListener('webglcontextlost', handleContextLost);
@@ -565,14 +418,34 @@ export default function WarpRenderInspector(props: {
         rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
       }
       
+      try { if (leftOwnedRef.current)  leftEngine.current?.destroy(); } catch {}
+      try { if (rightOwnedRef.current) rightEngine.current?.destroy(); } catch {}
       leftOwnedRef.current = false;
       rightOwnedRef.current = false;
       leftEngine.current = null as any;
       rightEngine.current = null as any;
+
+      // Robust cleanup for HMR/StrictMode
+      if (leftRef.current) {
+        try {
+          if ((leftRef.current as any)[ENGINE_KEY] && !(leftRef.current as any)[ENGINE_KEY]._destroyed) {
+            (leftRef.current as any)[ENGINE_KEY].destroy?.();
+          }
+          delete (leftRef.current as any)[ENGINE_KEY];
+        } catch {}
+      }
+      
+      if (rightRef.current && rightOwnedRef.current) {
+        try {
+          if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
+            (rightRef.current as any)[ENGINE_KEY].destroy?.();
+          }
+          delete (rightRef.current as any)[ENGINE_KEY];
+        } catch {}
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
 
   // Ford-Roman duty computation (outside useEffect for prop access)
   const dutyLocal = (() => {
@@ -678,40 +551,144 @@ export default function WarpRenderInspector(props: {
   const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
 
+  // Bridge Grid3D engine to checkpoints panel
+  useEffect(() => {
+    if (showRendererType !== 'grid3d') return;
+    const eng = grid3dRef.current?.getEngine();
+    const cvs = grid3dRef.current?.getCanvas();
+    if (!eng || !cvs) return;
 
+    rightEngine.current = eng;
+    (rightRef as any).current = cvs;      // so checkpoints see the real canvas
+    rightOwnedRef.current = false;
+
+    // Mute until uniforms arrive
+    gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
+    eng.setVisible?.(false);
+
+    // Seed axes/camera from REAL (or hull) immediately so buffers build
+    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+    const span = 1; // or live?.gridSpan ?? 1
+    const ax = leftEngine.current?.uniforms?.axesClip ?? deriveAxesClip(hull, span);
+    const cz = compactCameraZ(ax);
+
+    pushUniformsWhenReady(eng, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'fit-show');
+
+    // Mirror REAL's DPR and enable optional SSAA
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    grid3dRef.current?.setPixelRatio?.(dpr);
+    grid3dRef.current?.setSupersample?.(1.25); // 1.0 = off; 1.25-1.5 is a cheap sharpener
+
+    // Match grid detail to available pixels
+    const pxAcross = estimatePxAcrossWall({
+      canvasPxW: cvs.width,
+      canvasPxH: cvs.height,
+      gridSpan: 1,
+      hull,
+      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+    });
+
+    // Convert pixels into a sensible grid resolution
+    const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
+    console.log(`[GRID] Canvas: ${cvs.width}×${cvs.height}, pxAcross: ${pxAcross.toFixed(1)}, gridRes: ${seg}`);
+    grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
+
+    // SHOW is always UI mode
+    lockPane(rightEngine.current, 'SHOW');
+  }, [showRendererType]);
+
+  // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
+  useEffect(() => {
+    if (showRendererType !== 'grid3d') return;
+    const cv = grid3dRef.current?.getCanvas?.();
+    if (!cv) return;
+    const ro = new ResizeObserver(() => {
+      if (cv.width > 0 && cv.height > 0) {
+        rightEngine.current?.forceRedraw?.();
+      }
+    });
+    ro.observe(cv);
+    return () => ro.disconnect();
+  }, [showRendererType]);
 
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
-    if (!haveUniforms) return;                        // ⬅️ no pre-push, no seeding
+    if (!leftEngine.current || (!rightEngine.current && showRendererType !== 'grid3d')) return;
 
-    // Display-only controls (do not include gamma*, duty*, sectors, etc.)
-    const tonemapExp = lockTone ? 5.0 : N(live?.exposure, 5.0);
-    const zeroStop   = lockTone ? 1e-7 : N(live?.zeroStop, 1e-7);
-    const ridgeUsed  = lockRidge ? 0 : N(live?.ridgeMode, 0);
-    const viewAvgUsed= forceAvg ? true : (live?.viewAvg ?? true);
+    // Gate first paint until canonical uniforms arrive (prevents averaging race)
+    const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
+    leftEngine.current.setVisible?.(ready);
+    rightEngine.current.setVisible?.(ready);
 
-    const displayOnly = {
+    // Debug toggle calculations
+    const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
+    const autoZero = N(props.parityPhys?.zeroStop ?? live?.zeroStop, 1e-7);
+    const autoRidge = N(props.parityPhys?.ridgeMode ?? ridgeMode, 0);
+    const autoAvg = props.parityPhys?.viewAvg ?? true;
+
+    const tonemapExp = lockTone ? 5.0 : autoExp;
+    const zeroStop = lockTone ? 1e-7 : autoZero;
+    const ridgeModeUsed = lockRidge ? 0 : autoRidge;
+    const viewAvgUsed = forceAvg ? true : autoAvg;
+
+    // Shared physics parameters for both engines
+    const shared = {
+      gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
+      qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
+      // Use debug-controlled γ_VdB to prove physics separation
+      gammaVanDenBroeck: gammaVdBBound,
+      dutyEffectiveFR,            // 0.01 × (1/400) here  
+      dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
+      sectorCount: sTotal,                    // 400
+      sectors: sConcurrent,                    // 1
+      // Apply debug toggles to display controls
+      viewAvg: viewAvgUsed,       // Use debug toggle
+      ridgeMode: ridgeModeUsed,
       exposure: tonemapExp,
-      zeroStop,
-      ridgeMode: ridgeUsed,
-      viewAvg: viewAvgUsed,
-      colorMode: 'theta' as const,
+      zeroStop: zeroStop,
+      // ✅ give the sweep window so duty_local can be computed
+      lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
+      // Physical scaling
+      hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
+      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+      driveDir: props.baseShared?.driveDir ?? [1,0,0],
+      vShip: props.baseShared?.vShip ?? 0,
+      colorMode: props.baseShared?.colorMode ?? 'theta',
       lockFraming: true,
+      currentMode: props.baseShared?.currentMode ?? 'hover',
+      // ❌ do NOT include thetaScale anywhere
     };
 
-    leftEngine.current.setVisible?.(haveUniforms);
-    rightEngine.current.setVisible?.(haveUniforms);
+    // Just before first uniforms push - seed FR to avoid transition spike
+    const seedFR = 0.01 * (1 / Math.max(1, sTotal)); // 1% × 1/400
+    gatedUpdateUniforms(leftEngine.current,  { dutyEffectiveFR: seedFR }, 'seed-fr');
+    gatedUpdateUniforms(rightEngine.current, { dutyEffectiveFR: seedFR }, 'seed-fr');
+    
+    // REAL engine - physics truth with per-width view fraction
+    const realUniforms = toUniforms({
+      ...shared, 
+      physicsParityMode: true,
+      viewMassFraction: viewFracREAL
+    });
+    gatedUpdateUniforms(leftEngine.current, normalizeKeys(realUniforms), 'inspector-real');
+    
+    // SHOW engine - enhanced visuals with full bubble
+    const showUniforms = toUniforms({
+      ...shared, 
+      physicsParityMode: false,
+      viewMassFraction: 1.0
+    });
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
+    
+    // Unmute engines after first normalized payloads are pushed
+    leftEngine.current?.setVisible?.(true);
+    rightEngine.current?.setVisible?.(true);
 
-    // push only display knobs; physics came from server
-    gatedUpdateUniforms(leftEngine.current,  displayOnly, 'display-only');
-    gatedUpdateUniforms(rightEngine.current, displayOnly, 'display-only');
-
-    // keep framing in sync
-    const ax = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
+    // Optional camera sweetener so both keep same framing
+    const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    gatedUpdateUniforms(leftEngine.current,  { cameraZ: cz }, 'display-only-camera');
-    gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'display-only-camera');
+    gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
     
     // Sanity check parity modes
     setTimeout(() => {
@@ -720,7 +697,7 @@ export default function WarpRenderInspector(props: {
       // Report theta consistency after engine updates (use SHOW view fraction for consistency)
       reportThetaConsistency(bound, showViewMassFraction);
     }, 100);
-  }, [haveUniforms, live, lockTone, lockRidge, forceAvg]);
+  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
   // Dummy uniforms for render (updated via useEffect)
   const realUniforms = useMemo(() => toUniforms({
@@ -840,7 +817,15 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={leftRef} className="w-full h-full block"/>
+            {realRendererType === 'grid3d' ? (
+              <Grid3DEngine 
+                uniforms={realUniforms} 
+                className="w-full h-full block" 
+                style={{background: 'black'}} 
+              />
+            ) : (
+              <canvas ref={leftRef} className="w-full h-full block"/>
+            )}
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -848,45 +833,22 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">SHOW — Boosted (UI) ({showRendererType})</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
-          <div className="relative aspect-square rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={rightRef} className="w-full h-full block"/>
+          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
+            {showRendererType === 'grid3d' ? (
+              <Grid3DEngine 
+                ref={grid3dRef}
+                uniforms={showUniforms} 
+                className="w-full h-full block" 
+                style={{background: 'black'}} 
+              />
+            ) : (
+              <canvas ref={rightRef} className="w-full h-full block"/>
+            )}
           </div>
         </article>
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* REAL width definition */}
-        <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">REAL — "one-width" definition</h4>
-          <div className="flex items-center gap-2 mb-2">
-            <label className="text-sm text-neutral-700">Width metric</label>
-            <select
-              className="px-2 py-1 text-sm border rounded"
-              value={widthMetric}
-              onChange={e => setWidthMetric(e.target.value as WidthMetric)}
-            >
-              <option value="sector-arc-equator">Sector arc @ equator (X–Z)</option>
-              <option value="sector-arc-mean">Sector arc @ mean (3 planes)</option>
-              <option value="wall-thickness">Wall thickness (meters)</option>
-              <option value="rho-thickness">Wall thickness (ρ-units)</option>
-            </select>
-          </div>
-          {(() => {
-            const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-            const wallWidth_m = props.baseShared?.wallWidth_m ?? 6.0;
-            const sectorTotal = Math.max(1, +(live?.sectorCount ?? 400));
-            const r = computeOneWidth({ metric: widthMetric, hull, wallWidth_m, sectorTotal });
-            return (
-              <div className="text-xs text-neutral-700">
-                <div className="font-medium">{r.label}: <span className="text-black">{r.value.toFixed(r.units==='ρ'?4:2)} {r.units}</span></div>
-                <div className="text-neutral-500">Hull a×b×c = {hull.a.toFixed(1)} × {hull.b.toFixed(1)} × {hull.c.toFixed(1)} m · sectors={sectorTotal}</div>
-                <div className="text-neutral-500">{r.details}</div>
-              </div>
-            );
-          })()}
-        </div>
-
-
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Debug Toggles</h4>
           <fieldset className="flex gap-3 text-xs">
@@ -912,19 +874,22 @@ export default function WarpRenderInspector(props: {
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">Curvature / Equations</h4>
-          <CurvatureMenu
-            onApply={(patch) => {
-              // never flip parity here; both panes read the same visual knobs
-              pushUniformsWhenReady(leftEngine.current,  patch, 'curvature-menu');
-              pushUniformsWhenReady(rightEngine.current, patch, 'curvature-menu');
-
-              // Optional: keep the public helper in sync for devtools
-              if ((window as any).__warp_setGainDec && patch.curvatureGainT != null) {
-                (window as any).__warp_setGainDec(patch.curvatureGainT * 8, patch.curvatureBoostMax ?? 40);
-              }
+          <h4 className="font-medium mb-3">Curvature</h4>
+          <select
+            className="px-2 py-1 text-sm border rounded"
+            value={curvT}
+            onChange={e => {
+              const v = Number(e.target.value);
+              setCurvT(v);
+              pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
+              pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
             }}
-          />
+          >
+            <option value={0.00}>Flat</option>
+            <option value={0.25}>Mild</option>
+            <option value={0.45}>Cruise</option>
+            <option value={0.70}>Steep</option>
+          </select>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -981,7 +946,7 @@ export default function WarpRenderInspector(props: {
         leftEngineRef={leftEngine}
         rightEngineRef={rightEngine}
         leftCanvasRef={leftRef}
-        rightCanvasRef={rightRef}
+        rightCanvasRef={showRendererType==='grid3d' ? { current: grid3dRef.current?.getCanvas() } : rightRef}
         live={live}
         lightCrossing={{
           burst_ms: (live as any)?.burst_ms,
@@ -989,6 +954,7 @@ export default function WarpRenderInspector(props: {
         }}
       />
 
+      {/* Visual controls removed - using hardcoded defaults */}
     </div>
   );
 }

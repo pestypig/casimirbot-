@@ -1,7 +1,4 @@
-globalThis.GRID_DEFAULTS ||= { divisions: 64, minSpan: 2.6, spanPadding: 1.35 };
-
 ;(() => {
-
   // Prevent duplicate loads (HMR, script re-inject, etc.)
   const BUILD = globalThis.__APP_WARP_BUILD || 'dev';
   // Only skip if we've *already* executed this exact build.
@@ -18,26 +15,32 @@ globalThis.GRID_DEFAULTS ||= { divisions: 64, minSpan: 2.6, spanPadding: 1.35 };
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
+
+// --- Grid defaults (scientifically scaled for needle hull) ---
+if (typeof window.GRID_DEFAULTS === 'undefined') {
+  window.GRID_DEFAULTS = {
+    spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
+      ? 1.45   // a touch more padding on phones so the first fit is perfect
+      : 1.35,  // tighter framing for closer view on desktop
+    minSpan: 2.6,        // never smaller than this (in clip-space units)
+    divisions: 100       // more lines so a larger grid still looks dense
+  };
+}
+const GRID_DEFAULTS = window.GRID_DEFAULTS;
+
 if (typeof window.SCENE_SCALE === 'undefined') {
   window.SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
 }
 const SCENE_SCALE = window.SCENE_SCALE;
 
 class WarpEngine {
-    static fromCanvas(canvas) { return canvas && canvas.__warpEngine ? canvas.__warpEngine : null; }
-    static getForCanvas(canvas) { return this.fromCanvas(canvas); }
     static getOrCreate(canvas) {
-        const e = this.fromCanvas(canvas);
-        return (e && !e._destroyed) ? e : new this(canvas);
+        const existing = canvas.__warpEngine;
+        if (existing && !existing._destroyed) return existing;
+        return new this(canvas);
     }
 
-    constructor(canvas, _gl, _opts) {
-        if (!globalThis.GRID_DEFAULTS) {
-          console.warn('[WarpEngine] GRID_DEFAULTS missing at construct time; using fallbacks.');
-        } else {
-          console.log('[WarpEngine] GRID_DEFAULTS @construct:', globalThis.GRID_DEFAULTS);
-        }
-        
+    constructor(canvas) {
         // Per-canvas guard: allow multiple engines across different canvases
         if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
         if (window.__WARP_ENGINES.has(canvas) && !window.__WARP_ENGINE_ALLOW_MULTI) {
@@ -333,12 +336,11 @@ class WarpEngine {
 
     _initializeGrid() {
         const gl = this.gl;
-        const GD = globalThis.GRID_DEFAULTS;
         
         // Create spacetime grid geometry
         // Start with default span, will be adjusted when hull params are available
-        const initialSpan = GD.minSpan;
-        const gridData = this._createGrid(initialSpan, GD.divisions);
+        const initialSpan = GRID_DEFAULTS.minSpan;
+        const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
         this.gridVertices = new Float32Array(gridData);
         
         // Store original vertex positions for warp calculations
@@ -357,58 +359,61 @@ class WarpEngine {
     }
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
-    _createGrid(span = 1.6, divisions) {
-        const vertices = [];
-        const divs = Number.isFinite(divisions) && divisions > 0 ? divisions : 64;
-        const step = (span * 2) / divs;
-        const half = span;
+    _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
+        // ---- guards ----
+        const spanSafe = Number.isFinite(span) && span > 0 ? span : 1.6;
+        const divIn    = Number.isFinite(divisions) && divisions > 0 ? divisions : GRID_DEFAULTS.divisions || 160;
 
-        // XZ plane (horizontal) lines
-        for (let z = 0; z <= divs; z++) {
+        const baseDiv  = Math.max(divIn, 160);
+        const hullAxes = Array.isArray(this.currentParams?.hullAxes) ? this.currentParams.hullAxes : [503.5,132,86.5];
+        const wallWidth_m = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : 6.0;
+
+        const minAxis = Math.max(1e-6, Math.min(...hullAxes));
+        const span_rho = (3 * wallWidth_m) / minAxis;
+        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * baseDiv));
+
+        let div = Math.min(320, Math.floor(baseDiv * scale));
+        if (!Number.isFinite(div) || div < 1) div = baseDiv;   // final fallback
+
+        divisions = div;
+        const verts = [];
+        const step = (spanSafe * 2) / divisions;  // Full span width divided by divisions
+        const half = spanSafe;  // Half-extent
+        
+        // Create a slight height variation across the grid for proper 3D visualization
+        const yBase = -0.15;  // Base Y level
+        const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
+
+        for (let z = 0; z <= divisions; ++z) {
             const zPos = -half + z * step;
-            for (let x = 0; x < divs; x++) {
+            for (let x = 0; x < divisions; ++x) {
                 const x0 = -half + x * step;
                 const x1 = -half + (x + 1) * step;
-                vertices.push(x0, -0.15, zPos, x1, -0.15, zPos);
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                const y1 = yBase + yVariation * Math.sin(x1 * 2) * Math.cos(zPos * 3);
+                
+                verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
             }
         }
-        for (let x = 0; x <= divs; x++) {
+        for (let x = 0; x <= divisions; ++x) {
             const xPos = -half + x * step;
-            for (let z = 0; z < divs; z++) {
+            for (let z = 0; z < divisions; ++z) {
                 const z0 = -half + z * step;
                 const z1 = -half + (z + 1) * step;
-                vertices.push(xPos, -0.15, z0, xPos, -0.15, z1);
+                
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                const y1 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z1 * 3);
+                
+                verts.push(xPos, y0, z0, xPos, y1, z1);     // z–lines with height variation
             }
         }
-        return vertices;
-    }
-
-    setGridResolution({ divisions, radial, angular, axial } = {}) {
-        const pick = [divisions, radial, angular, axial].find(v => Number.isFinite(v) && v > 0);
-        if (!pick) return;
-        this._divisionsOverride = (pick|0);
-        try {
-            this._updateGrid?.(); // if you have an updater
-        } catch {
-            // Fallback: minimal in-place rebuild
-            const gd = globalThis.GRID_DEFAULTS;
-            const span = gd.minSpan;
-            const data = this._createGrid(span, this._divisionsOverride);
-            this.gridVertices = new Float32Array(data);
-            // TODO: reupload VBO if your engine requires (bindBuffer + bufferData)
-        }
-    }
-
-    _updateGrid() {
-        // Base implementation - rebuild grid with current span and override divisions
-        if (!this._divisionsOverride) return;
-        const gd = globalThis.GRID_DEFAULTS;
-        const span = this.currentGridSpan || gd.minSpan;
-        const data = this._createGrid(span, this._divisionsOverride);
-        if (this.gridVertices) {
-            this.gridVertices = new Float32Array(data);
-            // TODO: reupload VBO if needed
-        }
+        
+        console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
+        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${spanSafe*2})`);
+        return new Float32Array(verts);
     }
 
     _compileGridShaders() {
@@ -1112,10 +1117,9 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const GD = globalThis.GRID_DEFAULTS;
-        const spanPadding = bubbleParams.gridScale || GD.spanPadding;
+        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
         let targetSpan = Math.max(
-          GD.minSpan,
+          GRID_DEFAULTS.minSpan,
           hullMaxClip * spanPadding
         );
         

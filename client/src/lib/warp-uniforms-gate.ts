@@ -118,54 +118,18 @@ export function applyToEngine(
  * Convenience wrapper for legacy updateUniforms calls
  * Automatically adds version and source tracking
  */
-export function gatedUpdateUniforms(engineLike: any, uniforms: any, source = 'legacy') {
-  // Normalize engine input: we allow either a real engine or a {updateUniforms} shim
-  const eng = engineLike && typeof engineLike.updateUniforms === 'function'
-    ? engineLike
-    : engineLike && engineLike.updateUniforms != null
-      ? engineLike     // allow undefined here; we'll defer
-      : null;
-
-  if (!eng) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('[gatedUpdateUniforms] missing engine; skip', { source, patch: uniforms });
-    }
-    return;
-  }
-
-  // Compute your lockedUniforms as before
+export function gatedUpdateUniforms(
+  engine: { updateUniforms: (u: any) => void },
+  uniforms: any,
+  source: string = 'legacy'
+) {
   const gatedUniforms: WarpUniforms = {
     ...uniforms,
     __src: source,
     __version: Date.now()
   };
-
-  const send = () => {
-    try {
-      if (typeof eng.updateUniforms === 'function') {
-        applyToEngine(eng, gatedUniforms);
-      } else {
-        // try once after init completes if the engine exposes a ready hook
-        if (typeof eng.onceReady === 'function') {
-          eng.onceReady(() => eng.updateUniforms && applyToEngine(eng, gatedUniforms));
-        } else {
-          // last-resort microtask; harmless no-op if still not available
-          queueMicrotask(() => eng.updateUniforms && applyToEngine(eng, gatedUniforms));
-        }
-      }
-    } catch (e) {
-      console.error('[gatedUpdateUniforms] failed', { source, e });
-    }
-  };
-
-  // If the engine exposes readiness signals, honor them
-  if (eng.isLoaded && eng.gridProgram) {
-    send();
-  } else if (typeof eng.onceReady === 'function') {
-    eng.onceReady(send);
-  } else {
-    queueMicrotask(send);
-  }
+  
+  applyToEngine(engine, gatedUniforms);
 }
 
 /**
