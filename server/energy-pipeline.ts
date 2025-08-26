@@ -847,10 +847,41 @@ export async function computeEnergySnapshot(sim: any) {
   // Trust the pipeline's FR duty (ship-wide, sector-averaged)
   const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
 
+  const warpUniforms = {
+    // physics (visual) — mass stays split and separate
+    gammaGeo: result.gammaGeo,
+    qSpoilingFactor: result.qSpoilingFactor,
+    gammaVanDenBroeck: (result as any).gammaVanDenBroeck_vis,   // visual gamma
+    gammaVanDenBroeck_vis: (result as any).gammaVanDenBroeck_vis,
+    gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
+
+    // Ford–Roman duty (ship-wide, sector-averaged)
+    dutyEffectiveFR,
+
+    // UI label fields (harmless to include)
+    dutyCycle: result.dutyCycle,
+    sectorCount: result.sectorCount,
+    sectors: result.concurrentSectors,   // concurrent/live
+    currentMode: result.currentMode,
+
+    // viewer defaults — visual policy only; parity/ridge set client-side
+    viewAvg: true,
+    colorMode: 'theta',
+
+    // optional: hull/wall for overlays
+    hull: result.hull,
+    wallWidth_m: result.hull?.wallThickness_m ?? 1.0,
+
+    // meta
+    __src: 'server',
+    __version: Number((result as any)?.seq ?? Date.now()),
+  };
+
   // Expose to clients (names match what adapters expect)
   return {
     // Core pipeline state
     ...result,
+    warpUniforms,
     
     // Amplification parameters 
     gammaGeo: result.gammaGeo,
