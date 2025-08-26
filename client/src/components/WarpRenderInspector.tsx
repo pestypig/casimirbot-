@@ -48,6 +48,11 @@ function compactCameraZ(axesScene?: number[] | null) {
   return Math.max(1.2, 1.8 * R);
 }
 
+function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1) {
+  const m = Math.max(hull.a, hull.b, hull.c) || 1;
+  return [ (hull.a/m)*span, (hull.b/m)*span, (hull.c/m)*span ];
+}
+
 // Optional: estimate pixel density across wall band (debugging helper)
 function estimatePxAcrossWall({
   canvasPxW,
@@ -546,17 +551,26 @@ export default function WarpRenderInspector(props: {
     if (showRendererType !== 'grid3d') return;
     const eng = grid3dRef.current?.getEngine();
     const cvs = grid3dRef.current?.getCanvas();
-    if (eng && cvs) {
-      rightEngine.current = eng;
-      (rightRef as any).current = cvs;   // so checkpoints can read size/diag
-      rightOwnedRef.current = false;     // foreign engine — do not destroy
-      // Mute Grid3D engine until canonical uniforms arrive
-      gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
-      eng.setVisible?.(false);
-      
-      // Hard-lock Grid3D engine as SHOW pane
-      lockPane(rightEngine.current, 'SHOW');
-    }
+    if (!eng || !cvs) return;
+
+    rightEngine.current = eng;
+    (rightRef as any).current = cvs;      // so checkpoints see the real canvas
+    rightOwnedRef.current = false;
+
+    // Mute until uniforms arrive
+    gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
+    eng.setVisible?.(false);
+
+    // Seed axes/camera from REAL (or hull) immediately so buffers build
+    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+    const span = 1; // or live?.gridSpan ?? 1
+    const ax = leftEngine.current?.uniforms?.axesClip ?? deriveAxesClip(hull, span);
+    const cz = compactCameraZ(ax);
+
+    pushUniformsWhenReady(eng, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'fit-show');
+
+    // SHOW is always UI mode
+    lockPane(rightEngine.current, 'SHOW');
   }, [showRendererType]);
 
   // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
