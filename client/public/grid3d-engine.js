@@ -5,8 +5,9 @@
 
   class Grid3DShowEngine extends WE {
     constructor(canvas, opts = {}) {
-      // forward opts so WE never sees undefined
-      super(canvas, opts);
+      // WarpEngine signature: (canvas, gl?, opts?)
+      // we don't provide a GL, so pass undefined in slot #2
+      super(canvas, undefined, opts);
       this._dprOverride = null;
       this._ssaa = 1;
       this._forceDivisions = null;
