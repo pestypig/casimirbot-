@@ -342,17 +342,19 @@ export default function WarpRenderInspector(props: {
   // Helper to create engine with conditional selection and 3D fallback
   function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
     const W: any = (window as any).WarpEngine;
-    const G3: any = (window as any).Grid3DShowEngine; // from grid3d-engine.js
-    
+    const G: any = (window as any).Grid3DShowEngine;
+
     if (rendererType === 'grid3d') {
-      const Ctor = G3 || W;                // prefer Grid3DShowEngine if loaded
-      const engine3d = getOrCreateEngine(Ctor, canvas);
-      const ok = engine3d.init ? engine3d.init(canvas) : true;
-      if (ok) return engine3d;
-      engine3d.dispose?.();
+      try {
+        const Ctor = G || W;                   // ← prefer child if present
+        const engine3d = getOrCreateEngine(Ctor, canvas);
+        const ok = engine3d.init ? engine3d.init(canvas) : true;
+        if (ok) return engine3d;
+        engine3d.dispose?.();
+      } catch (e) {
+        console.warn('Grid3D engine failed, falling back to slice2d:', e);
+      }
     }
-    
-    // Fallback
     return getOrCreateEngine(W, canvas);
   }
 
