@@ -210,17 +210,17 @@ function useCheckpointList(
     const viewFraction = side === 'REAL' ? (1 / sectors) : 1; // REAL uses per-sector, SHOW uses whole ship
     const viewAveraging = liveSnap?.viewAvg ?? true;
     
-    const thetaUsed = thetaScaleUsed(thetaExpected, {
-      concurrent, total, dutyLocal, viewFraction, viewAveraging
-    });
+    const thetaUsed = thetaExpectedFn
+      ? thetaExpectedFn(u, dutyFR)
+      : expectedThetaForPane(liveSnap, e);
 
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs used=${thetaUsed.toExponential(2)}`,
+      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUsed.toExponential(2)}`,
       expect: thetaUsed, actual: ts,
-      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUsed, 0.1) ? 'info' : 'warn'),
-      meta: { concurrent, total, dutyLocal, viewFraction, viewAveraging }
+      sev: !Number.isFinite(ts) || ts <= 0 ? 'error'
+          : (within(ts, thetaUsed, 0.10) ? 'info' : 'warn')
     });
 
     checkpoint({
