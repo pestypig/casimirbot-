@@ -63,6 +63,12 @@ class WarpEngine {
     }
 
     constructor(canvas, _gl, _opts) {
+        if (!globalThis.GRID_DEFAULTS) {
+          console.warn('[WarpEngine] GRID_DEFAULTS missing at construct time; using fallbacks.');
+        } else {
+          console.log('[WarpEngine] GRID_DEFAULTS @construct:', globalThis.GRID_DEFAULTS);
+        }
+        
         // Per-canvas guard: allow multiple engines across different canvases
         if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
         if (window.__WARP_ENGINES.has(canvas) && !window.__WARP_ENGINE_ALLOW_MULTI) {
