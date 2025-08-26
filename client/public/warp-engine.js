@@ -1684,23 +1684,19 @@ class WarpEngine {
             const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
             
             if (done) {
-                // Check if linking was successful
-                if (gl.getProgramParameter(program, gl.LINK_STATUS)) {
-                    console.log("⚡ Shader compilation completed successfully");
+                const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
+                if (ok) {
                     onReady(program);
+                    this.onLoadingStateChange?.(true);
                 } else {
                     console.error('Shader program link error:', gl.getProgramInfoLog(program));
                     gl.deleteProgram(program);
                     onReady(null);
+                    this.onLoadingStateChange?.(false);
                 }
             } else {
-                // Still compiling, check again next frame
                 requestAnimationFrame(poll);
-                
-                // Update loading state if callback is available
-                if (this.onLoadingStateChange) {
-                    this.onLoadingStateChange({ type: 'compiling', message: 'Compiling shaders...' });
-                }
+                this.onLoadingStateChange?.(false);
             }
         };
         
