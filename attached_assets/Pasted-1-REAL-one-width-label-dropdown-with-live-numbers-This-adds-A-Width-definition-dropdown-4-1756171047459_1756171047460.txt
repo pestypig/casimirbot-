@@ -1,0 +1,107 @@
+1) REAL “one-width” label + dropdown (with live numbers)
+
+This adds:
+
+A Width definition dropdown (4 formulas).
+
+A live label that shows the computed width (meters), the ρ-thickness, and which inputs were used.
+
+It updates in real-time from your pipeline (sectorCount, hull, wallWidth_m).
+
+Patch in WarpRenderInspector (minimal, drop-in)
+
+Add these helpers near your other utils:
+
+// --- width helpers ------------------------------------------------------------
+type WidthMetric = 'sector-arc-equator' | 'sector-arc-mean' | 'wall-thickness' | 'rho-thickness';
+
+// Ramanujan ellipse circumference (a,c are semi-axes in meters)
+function ellipseCircumference(a:number, c:number) {
+  const h = Math.pow(a - c, 2) / Math.pow(a + c, 2);
+  return Math.PI * (a + c) * (1 + (3*h)/(10 + Math.sqrt(4 - 3*h)));
+}
+
+// Harmonic mean radius in meters (for converting wall width to ρ-units)
+function harmonicMean(a:number,b:number,c:number){
+  return 3 / (1/a + 1/b + 1/c);
+}
+
+function computeOneWidth({
+  metric, hull, wallWidth_m, sectorTotal
+}: {
+  metric: WidthMetric;
+  hull: {a:number;b:number;c:number};
+  wallWidth_m: number;
+  sectorTotal: number;
+}){
+  const a=hull.a, b=hull.b, c=hull.c;
+  const R_h = harmonicMean(a,b,c);
+  // ρ-thickness from meters:
+  const w_rho = wallWidth_m / R_h;
+
+  if (metric === 'wall-thickness') {
+    return { label: 'Wall thickness (m)', value: wallWidth_m, units: 'm', details: `ρ≈${w_rho.toFixed(4)} (a_H=${R_h.toFixed(1)}m)` };
+  }
+  if (metric === 'rho-thickness') {
+    return { label: 'Wall thickness (ρ)', value: w_rho, units: 'ρ', details: `${wallWidth_m.toFixed(3)} m (a_H=${R_h.toFixed(1)}m)` };
+  }
+
+  const S = Math.max(1, sectorTotal|0);
+  // “Equator” = ellipse in X–Z plane with semi-axes a,c
+  const C_eq = ellipseCircumference(a, c);
+  // “Mean” = average of three great-ellipse circumferences in the principal planes
+  const C_xz = C_eq;
+  const C_xy = ellipseCircumference(a, b);
+  const C_yz = ellipseCircumference(b, c);
+  const C_mean = (C_xz + C_xy + C_yz) / 3;
+
+  if (metric === 'sector-arc-equator') {
+    const w = C_eq / S;
+    return { label: 'Sector arc @ equator', value: w, units: 'm', details: `C_eq=${C_eq.toFixed(1)} m, S=${S}` };
+  } else { // 'sector-arc-mean'
+    const w = C_mean / S;
+    return { label: 'Sector arc @ mean', value: w, units: 'm', details: `C̄=${C_mean.toFixed(1)} m, S=${S}` };
+  }
+}
+
+
+Add state near your other UI states:
+
+const [widthMetric, setWidthMetric] = useState<WidthMetric>('sector-arc-equator');
+
+
+Inside render (I tucked it next to the REAL card), insert this panel:
+
+{/* REAL width definition */}
+<div className="rounded-2xl border border-neutral-200 p-4">
+  <h4 className="font-medium mb-3">REAL — “one-width” definition</h4>
+  <div className="flex items-center gap-2 mb-2">
+    <label className="text-sm text-neutral-700">Width metric</label>
+    <select
+      className="px-2 py-1 text-sm border rounded"
+      value={widthMetric}
+      onChange={e => setWidthMetric(e.target.value as WidthMetric)}
+    >
+      <option value="sector-arc-equator">Sector arc @ equator (X–Z)</option>
+      <option value="sector-arc-mean">Sector arc @ mean (3 planes)</option>
+      <option value="wall-thickness">Wall thickness (meters)</option>
+      <option value="rho-thickness">Wall thickness (ρ-units)</option>
+    </select>
+  </div>
+  {(() => {
+    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+    const wallWidth_m = props.baseShared?.wallWidth_m ?? 6.0;
+    const sectorTotal = Math.max(1, +(live?.sectorCount ?? 400));
+    const r = computeOneWidth({ metric: widthMetric, hull, wallWidth_m, sectorTotal });
+    return (
+      <div className="text-xs text-neutral-700">
+        <div className="font-medium">{r.label}: <span className="text-black">{r.value.toFixed(r.units==='ρ'?4:2)} {r.units}</span></div>
+        <div className="text-neutral-500">Hull a×b×c = {hull.a.toFixed(1)} × {hull.b.toFixed(1)} × {hull.c.toFixed(1)} m · sectors={sectorTotal}</div>
+        <div className="text-neutral-500">{r.details}</div>
+      </div>
+    );
+  })()}
+</div>
+
+
+This is display-only (doesn’t change physics), but it gives everyone a precise, consistent notion of what the REAL pane’s “one width” represents, and you can switch the definition live.

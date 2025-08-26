@@ -95,6 +95,58 @@ const TONEMAP_LOCK = {
   viewAvg: true 
 };
 
+// --- width helpers ------------------------------------------------------------
+type WidthMetric = 'sector-arc-equator' | 'sector-arc-mean' | 'wall-thickness' | 'rho-thickness';
+
+// Ramanujan ellipse circumference (a,c are semi-axes in meters)
+function ellipseCircumference(a:number, c:number) {
+  const h = Math.pow(a - c, 2) / Math.pow(a + c, 2);
+  return Math.PI * (a + c) * (1 + (3*h)/(10 + Math.sqrt(4 - 3*h)));
+}
+
+// Harmonic mean radius in meters (for converting wall width to ρ-units)
+function harmonicMean(a:number,b:number,c:number){
+  return 3 / (1/a + 1/b + 1/c);
+}
+
+function computeOneWidth({
+  metric, hull, wallWidth_m, sectorTotal
+}: {
+  metric: WidthMetric;
+  hull: {a:number;b:number;c:number};
+  wallWidth_m: number;
+  sectorTotal: number;
+}){
+  const a=hull.a, b=hull.b, c=hull.c;
+  const R_h = harmonicMean(a,b,c);
+  // ρ-thickness from meters:
+  const w_rho = wallWidth_m / R_h;
+
+  if (metric === 'wall-thickness') {
+    return { label: 'Wall thickness (m)', value: wallWidth_m, units: 'm', details: `ρ≈${w_rho.toFixed(4)} (a_H=${R_h.toFixed(1)}m)` };
+  }
+  if (metric === 'rho-thickness') {
+    return { label: 'Wall thickness (ρ)', value: w_rho, units: 'ρ', details: `${wallWidth_m.toFixed(3)} m (a_H=${R_h.toFixed(1)}m)` };
+  }
+
+  const S = Math.max(1, sectorTotal|0);
+  // "Equator" = ellipse in X–Z plane with semi-axes a,c
+  const C_eq = ellipseCircumference(a, c);
+  // "Mean" = average of three great-ellipse circumferences in the principal planes
+  const C_xz = C_eq;
+  const C_xy = ellipseCircumference(a, b);
+  const C_yz = ellipseCircumference(b, c);
+  const C_mean = (C_xz + C_xy + C_yz) / 3;
+
+  if (metric === 'sector-arc-equator') {
+    const w = C_eq / S;
+    return { label: 'Sector arc @ equator', value: w, units: 'm', details: `C_eq=${C_eq.toFixed(1)} m, S=${S}` };
+  } else { // 'sector-arc-mean'
+    const w = C_mean / S;
+    return { label: 'Sector arc @ mean', value: w, units: 'm', details: `C̄=${C_mean.toFixed(1)} m, S=${S}` };
+  }
+}
+
 // ---- Component --------------------------------------------------------------
 export default function WarpRenderInspector(props: {
   // Optional: calculator outputs. Pass exactly what your calculator returns
@@ -148,6 +200,29 @@ export default function WarpRenderInspector(props: {
   
   // Curvature control
   const [curvT, setCurvT] = useState(0.45);
+  
+  // Width definition state
+  const [widthMetric, setWidthMetric] = useState<WidthMetric>('sector-arc-equator');
+
+  // Auto canvas density management
+  useShowCanvasDensity({
+    engineRef: rightEngine,
+    canvasRef: rightRef,
+    maxDPR: 2,       // good default cap
+    ssaa: 1.25,      // gentle sharpening
+    adaptive: true,  // auto drop SSAA if target gets huge
+    targetMP: 3.0,   // ~3 megapixels budget at effective DPR
+  });
+
+  // Keep REAL crisp too
+  useShowCanvasDensity({
+    engineRef: leftEngine,
+    canvasRef: leftRef,
+    maxDPR: 2,
+    ssaa: 1.0,       // parity pane can stay non-SSAA
+    adaptive: true,
+    targetMP: 2.5,
+  });
   
 
   const wu = useMemo(() => normalizeWU(
@@ -744,15 +819,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {realRendererType === 'grid3d' ? (
-              <Grid3DEngine 
-                uniforms={realUniforms} 
-                className="w-full h-full block" 
-                style={{background: 'black'}} 
-              />
-            ) : (
-              <canvas ref={leftRef} className="w-full h-full block"/>
-            )}
+            <canvas ref={leftRef} className="w-full h-full block"/>
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -767,6 +834,37 @@ export default function WarpRenderInspector(props: {
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* REAL width definition */}
+        <div className="rounded-2xl border border-neutral-200 p-4">
+          <h4 className="font-medium mb-3">REAL — "one-width" definition</h4>
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-sm text-neutral-700">Width metric</label>
+            <select
+              className="px-2 py-1 text-sm border rounded"
+              value={widthMetric}
+              onChange={e => setWidthMetric(e.target.value as WidthMetric)}
+            >
+              <option value="sector-arc-equator">Sector arc @ equator (X–Z)</option>
+              <option value="sector-arc-mean">Sector arc @ mean (3 planes)</option>
+              <option value="wall-thickness">Wall thickness (meters)</option>
+              <option value="rho-thickness">Wall thickness (ρ-units)</option>
+            </select>
+          </div>
+          {(() => {
+            const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+            const wallWidth_m = props.baseShared?.wallWidth_m ?? 6.0;
+            const sectorTotal = Math.max(1, +(live?.sectorCount ?? 400));
+            const r = computeOneWidth({ metric: widthMetric, hull, wallWidth_m, sectorTotal });
+            return (
+              <div className="text-xs text-neutral-700">
+                <div className="font-medium">{r.label}: <span className="text-black">{r.value.toFixed(r.units==='ρ'?4:2)} {r.units}</span></div>
+                <div className="text-neutral-500">Hull a×b×c = {hull.a.toFixed(1)} × {hull.b.toFixed(1)} × {hull.c.toFixed(1)} m · sectors={sectorTotal}</div>
+                <div className="text-neutral-500">{r.details}</div>
+              </div>
+            );
+          })()}
+        </div>
+
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Debug Toggles</h4>
           <fieldset className="flex gap-3 text-xs">
@@ -869,25 +967,6 @@ export default function WarpRenderInspector(props: {
         }}
       />
 
-      {/* Auto canvas density management */}
-      {useShowCanvasDensity({
-        engineRef: rightEngine,
-        canvasRef: rightRef,
-        maxDPR: 2,       // good default cap
-        ssaa: 1.25,      // gentle sharpening
-        adaptive: true,  // auto drop SSAA if target gets huge
-        targetMP: 3.0,   // ~3 megapixels budget at effective DPR
-      })}
-
-      {/* Keep REAL crisp too */}
-      {useShowCanvasDensity({
-        engineRef: leftEngine,
-        canvasRef: leftRef,
-        maxDPR: 2,
-        ssaa: 1.0,       // parity pane can stay non-SSAA
-        adaptive: true,
-        targetMP: 2.5,
-      })}
     </div>
   );
 }
