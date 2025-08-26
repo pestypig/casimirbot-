@@ -431,6 +431,22 @@ class WarpEngine {
         return new Float32Array(verts);
     }
 
+    setGridResolution({ divisions, radial, angular, axial } = {}) {
+        const pick = [divisions, radial, angular, axial].find(v => Number.isFinite(v) && v > 0);
+        if (!pick) return;
+        this._divisionsOverride = (pick|0);
+        try {
+            this._updateGrid?.(); // if you have an updater
+        } catch {
+            // Fallback: minimal in-place rebuild
+            const gd = globalThis.GRID_DEFAULTS || {};
+            const span = Number.isFinite(gd.minSpan) ? gd.minSpan : 2.6;
+            const data = this._createGrid(span, this._divisionsOverride);
+            this.gridVertices = new Float32Array(data);
+            // TODO: reupload VBO if your engine requires (bindBuffer + bufferData)
+        }
+    }
+
     _compileGridShaders() {
         const gl = this.gl;
         if (!gl) return;
