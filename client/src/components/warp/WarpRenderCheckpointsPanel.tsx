@@ -333,19 +333,18 @@ function useCheckpointList(
     let tsDetail = tsOk ? ts.toExponential(2) : "invalid";
 
     // Get bound uniforms from engine's __warpEcho for self-consistency
-    // ✅ Use echo terms but apply the correct √d_FR law
     const echo = (window as any).__warpEcho;
-    const viewAvg = (engine?.uniforms?.viewAvg ?? live?.viewAvg ?? true);
+
+    // use the engine's own viewAvg if set, else live snapshot, else default true
+    const viewAvg = (u?.viewAvg ?? liveSnap?.viewAvg ?? true);
+
+    // Build expected θ from the bound terms, honoring √d_FR when averaging
     const thetaExpectedFromBound =
       echo && echo.terms
-        ? (() => {
-            const g   = Math.max(1, +echo.terms.γ_geo || 26);
-            const q   = Math.max(1e-12, +echo.terms.q || 1);
-            const gv  = Math.max(1, +echo.terms.γ_VdB || 1.4e5);
-            const dFR = Math.max(1e-12, +echo.terms.d_FR || 0);
-            const base = Math.pow(g,3) * q * gv;
-            return viewAvg ? base * Math.sqrt(dFR) : base;
-          })()
+        ? Math.pow(N(echo.terms.γ_geo, 26), 3) *
+          Math.max(1e-12, N(echo.terms.q, 1)) *
+          Math.max(1, N(echo.terms.γ_VdB, 1.4e5)) *
+          (viewAvg ? Math.sqrt(Math.max(1e-12, N(echo.terms.d_FR, 0))) : 1)
         : undefined;
     
     const mismatch = echo && thetaExpectedFromBound && tsOk
