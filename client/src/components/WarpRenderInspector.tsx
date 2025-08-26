@@ -299,11 +299,15 @@ export default function WarpRenderInspector(props: {
     engine.__locked = true;
   }
 
-  const ENGINE_KEY = '__warpEngine';
-
-  // Keep our own registry so we can always reuse across HMR/StrictMode
-  const CANVAS_ENG = new WeakMap<HTMLCanvasElement, any>();
-
+  function seedGridDefaultsHard() {
+    const g: any = (typeof window !== 'undefined' ? window : globalThis) as any;
+    const d = g.GRID_DEFAULTS || {};
+    g.GRID_DEFAULTS = {
+      divisions: Number.isFinite(d.divisions) && d.divisions > 0 ? (d.divisions|0) : 64,
+      minSpan: typeof d.minSpan === 'number' && d.minSpan > 0 ? d.minSpan : 2.6,
+      spanPadding: typeof d.spanPadding === 'number' ? d.spanPadding : 1.35,
+    };
+  }
 
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
@@ -313,17 +317,30 @@ export default function WarpRenderInspector(props: {
     const existing = (cv as any).__warpEngine || (cv as any).warpEngine || (cv as any).__engine;
     if (existing && !existing._destroyed) return existing as WarpType;
 
-    // Prefer factory if provided
+    // Prefer factory if class provides one
     const viaFactory =
       (Ctor as any).getOrCreate?.(cv) ||
       (Ctor as any).fromCanvas?.(cv) ||
       (Ctor as any).getForCanvas?.(cv);
-    if (viaFactory) return viaFactory as WarpType;
+    if (viaFactory) { (cv as any).__warpEngine = viaFactory; return viaFactory as WarpType; }
 
-    // Plain constructor
-    const eng = new (Ctor as any)(cv);
-    (cv as any).__warpEngine = eng;
-    return eng as WarpType;
+    // 🔒 Make sure GRID_DEFAULTS exists *right now*
+    seedGridDefaultsHard();
+
+    try {
+      const eng = new (Ctor as any)(cv);
+      (cv as any).__warpEngine = eng;
+      return eng as WarpType;
+    } catch (e: any) {
+      // If the constructor complained about divisions/minSpan, seed again and retry once
+      if (/\b(divisions|minSpan|spanPadding)\b/i.test(String(e?.message))) {
+        seedGridDefaultsHard();
+        const eng2 = new (Ctor as any)(cv);
+        (cv as any).__warpEngine = eng2;
+        return eng2 as WarpType;
+      }
+      throw e;
+    }
   }
   
   // Hard-lock parity & block late thetaScale writers at the engine edge
