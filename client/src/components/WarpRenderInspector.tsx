@@ -1022,6 +1022,8 @@ export default function WarpRenderInspector(props: {
             ) : (
               <canvas ref={leftRef} className="w-full h-full block"/>
             )}
+            {/* ⬇️ live badge */}
+            <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewFracREAL}/>
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -1031,6 +1033,8 @@ export default function WarpRenderInspector(props: {
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             <canvas ref={rightRef} className="w-full h-full block"/>
+            {/* ⬇️ live badge */}
+            <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>
           </div>
         </article>
       </section>
