@@ -108,7 +108,9 @@ export function applyToEngine(
       γ_VdB: gammaVdB_vis,  // use visual version for debug display
       γ_VdB_mass: normalizedUniforms.gammaVanDenBroeck_mass, // also show mass version  
       d_FR: normalizedUniforms.dutyEffectiveFR,
-      sectors: { total: normalizedUniforms.sectorCount, live: normalizedUniforms.sectors }
+      sectors: { total: normalizedUniforms.sectorCount, live: normalizedUniforms.sectors },
+      viewAvg: normalizedUniforms.viewAvg,
+      viewMassFraction: normalizedUniforms.viewMassFraction
     }
   };
 

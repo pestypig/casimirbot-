@@ -1,0 +1,38 @@
+c) update useCheckpointList to compare uniforms θ directly to the expected θ (no extra “used” multiplier)
+
+@@ function useCheckpointList(...)
+-    // Calculate what the engine should be using based on its context
+-    const concurrent = Math.max(1, u?.sectors ?? 1);
+-    const total = Math.max(1, liveSnap?.sectorCount ?? 400);
+-    const dutyLocal = 0.01; // Ford-Roman burst duty
+-    const viewFraction = side === 'REAL' ? (1 / sectors) : 1; // REAL uses per-sector, SHOW uses whole ship
+-    const viewAveraging = liveSnap?.viewAvg ?? true;
+-    
+-    const thetaUsed = thetaScaleUsed(thetaExpected, {
+-      concurrent, total, dutyLocal, viewFraction, viewAveraging
+-    });
++    // Expected uniforms θ from the same chain the engine uses
++    const thetaExpected = expectedUniformTheta(u, liveSnap, e);
+ 
+     checkpoint({
+-      id: 'uniforms.theta_scale', side, stage: 'uniforms',
++      id: 'uniforms.theta_scale', side, stage: 'uniforms',
+       pass: Number.isFinite(ts) && ts > 0,
+-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs used=${thetaUsed.toExponential(2)}`,
+-      expect: thetaUsed, actual: ts,
+-      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUsed, 0.1) ? 'info' : 'warn'),
+-      meta: { concurrent, total, dutyLocal, viewFraction, viewAveraging }
++      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaExpected.toExponential(2)}`,
++      expect: thetaExpected, actual: ts,
++      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaExpected, 0.10) ? 'info' : 'warn'),
++      meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
+     });
+
+
+d) keep the rest of the panel as-is (parity/ridge checks, GPU rows, heartbeat, camera “Fit” button, etc.).
+This one change removes the double-application of sector/duty that was giving you lines like:
+
+θ_uniforms=4.45e+7 vs used=1.11e+3  // ← bogus “used” path
+
+
+and replaces it with a direct apples-to-apples comparison against the same chain the engine used.
