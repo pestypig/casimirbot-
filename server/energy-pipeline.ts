@@ -376,6 +376,10 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   state.activeSectors   = S_live;
   state.activeFraction  = S_live / S_total;
+
+  // 🔎 HINT for clients: fraction of the bubble "visible" from a single concurrent pane.
+  // The REAL pane can multiply this with its band/slice coverage to scale extrema and mass proxy.
+  (state as any).viewMassFractionHint = S_live / Math.max(1, S_total);
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
   state.activeTiles     = state.tilesPerSector * S_live;
   
