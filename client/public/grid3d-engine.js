@@ -9,7 +9,7 @@
       const isGL = glOrOpts && typeof glOrOpts.getContext === 'function';
       const gl = isGL ? glOrOpts : undefined;
       const opts = isGL ? (maybeOpts ?? {}) : (glOrOpts ?? {});
-      super(canvas, gl, opts);
+      super(canvas); // base will create its own GL; extra args are unnecessary
       // ALWAYS guard local reads
       const o = opts || {};
       const divisions = (o.grid && o.grid.divisions) ?? o.divisions ?? 64;
