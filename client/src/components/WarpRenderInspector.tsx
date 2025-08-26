@@ -151,7 +151,12 @@ function harmonicMean3(a:number,b:number,c:number){
 function fmtSI(x:number, unit:string){
   if (!Number.isFinite(x)) return `— ${unit}`;
   const abs = Math.abs(x);
-  if (abs >= 1e3) return `${(x/1e3).toFixed(2)} k${unit}`;
+  if (abs >= 1e3) {
+    // Insert a dot before m²/m³ so it can't be read as km²/km³
+    const needsDot = unit.includes('m²') || unit.includes('m³');
+    const label = needsDot ? `k·${unit}` : `k${unit}`;
+    return `${(x/1e3).toFixed(2)} ${label}`;
+  }
   if (abs >= 1)   return `${x.toFixed(3)} ${unit}`;
   if (abs >= 1e-3)return `${(x*1e3).toFixed(2)} m${unit}`;
   if (abs >= 1e-6)return `${(x*1e6).toFixed(2)} µ${unit}`;
