@@ -1,0 +1,399 @@
+import React, {useEffect, useMemo, useRef, useState} from "react";
+// Optional project hooks/utilities — if you have them in your app, uncomment:
+// import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+// import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+// import { subscribe, unsubscribe } from "@/lib/luma-bus";
+
+/**
+ * WarpMarginPanel
+ * -------------------------------------------------------------
+ * A safe, on-device optimization panel that continuously searches for
+ * higher margin warp-bubble operating points (within constraints) and can
+ * ghost-preview candidates on the SHOW renderer only. It runs a tiny
+ * trust-region Cross-Entropy Method (CEM) inside a Web Worker so UI stays
+ * smooth. No θScale writes; parity stays SHOW. All pushes go through a
+ * gated path.
+ *
+ * Pluggable objective: maximize Tchebychev margin across constraints
+ * with a small performance bonus (θ reach). Defaults assume you want to
+ * keep Ford–Roman duty and θ within budgets while expanding q, γVdB, and
+ * sectors where safe.
+ */
+
+// ---------- Types -----------------------------------------------------------
+
+type LiveInputs = {
+  sectorCount: number;    // total sectors on the ring (e.g. 400)
+  gammaGeo: number;       // geometry factor (e.g. 26)
+  qSpoilingFactor: number;// baseline q
+  gammaVdB: number;       // baseline γ_VdB (visual or mass bound)
+  dwell_ms: number;       // light-crossing dwell window
+  thetaBudget?: number;   // optional: hard budget for θ-scale
+  dutyFR_max?: number;    // Ford–Roman effective duty cap (fraction)
+  sectorCap?: number;     // max concurrent sectors allowed
+};
+
+type Bounds = {
+  qScale: [number, number];             // multiplier on baseline q
+  gammaVdBScale: [number, number];      // multiplier on baseline γ_VdB
+  sectors: [number, number];            // integer range for concurrent sectors
+  dutyLocal: [number, number];          // local duty = burst/dwell
+};
+
+// Candidate (worker-native, compact)
+type Vec = [number, number, number, number]; // [qScale, γScale, sectorsU, dutyU]
+
+// Candidate decoded to physical params
+interface Candidate {
+  q: number;
+  gammaVdB: number;
+  sectors: number;
+  dutyLocal: number; // burst/dwell
+}
+
+interface Metrics {
+  dutyEffectiveFR: number;
+  theta: number;
+  margin: number;   // scalar objective (higher is better)
+  slacks: Record<string, number>;
+}
+
+// ---------- Minimal gated update stub --------------------------------------
+// Replace with your project's gatedUpdateUniforms if available.
+function gated(engine: any, patch: Record<string, any>, source = "optimizer") {
+  try { engine?.updateUniforms?.(patch); } catch {}
+}
+
+// ---------- Helper math ----------------------------------------------------
+const clamp = (x:number, lo:number, hi:number) => Math.max(lo, Math.min(hi, x));
+const lerp  = (a:number,b:number,t:number)=>a+(b-a)*t;
+
+// ---------- Worker code (as a string) --------------------------------------
+const WORKER_SRC = `
+  const clamp=(x,l,h)=>Math.max(l,Math.min(h,x));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+
+  // Decode normalized vector -> Candidate within bounds
+  function decode(vec, bounds, live){
+    const [uQ,uG,uS,uD] = vec; // each in [0,1]
+    const qScale = lerp(bounds.qScale[0], bounds.qScale[1], uQ);
+    const gScale = lerp(bounds.gammaVdBScale[0], bounds.gammaVdBScale[1], uG);
+    const secMin = Math.max(1, Math.floor(bounds.sectors[0]));
+    const secMax = Math.max(secMin, Math.floor(bounds.sectors[1]));
+    const sectors = Math.round(lerp(secMin, secMax, uS));
+    const dutyLocal = lerp(bounds.dutyLocal[0], bounds.dutyLocal[1], uD);
+    return {
+      q: live.qSpoilingFactor * qScale,
+      gammaVdB: live.gammaVdB * gScale,
+      sectors,
+      dutyLocal
+    };
+  }
+
+  function evaluate(c, live){
+    const dutyEffectiveFR = c.dutyLocal * (c.sectors / Math.max(1, live.sectorCount));
+    const theta = Math.pow(live.gammaGeo||1, 3) * (c.q||1) * (c.gammaVdB||1) * (dutyEffectiveFR||0);
+
+    // Constraints -> normalized slacks (positive = safe)
+    const slacks = {};
+    const dutyCap = live.dutyFR_max ?? 2.5e-5; // default 0.0025%
+    slacks.FR = (dutyCap - dutyEffectiveFR) / dutyCap;
+
+    if (Number.isFinite(live.thetaBudget)) {
+      const B = live.thetaBudget;
+      // Keep theta <= budget
+      slacks.theta = (B - theta) / B;
+    } else {
+      // No budget set: use mild regularization, don\'t let theta explode
+      const B = 1e16; // generous ceiling
+      slacks.theta = (B - theta) / B;
+    }
+
+    // Optional: cap sectors by policy
+    if (Number.isFinite(live.sectorCap)){
+      slacks.sectors = (live.sectorCap - c.sectors) / Math.max(1, live.sectorCap);
+    }
+
+    // Aggregate margin: min slack (Tchebychev), clipped
+    let margin = Infinity;
+    for (const k in slacks){ margin = Math.min(margin, slacks[k]); }
+
+    // Performance bonus (tiny): reward theta while feasible
+    const feasible = margin > 0 ? 1 : 0;
+    const perf = Math.log10(Math.max(1, theta)) / 16; // scale to ~[0,1]
+    const score = margin + 0.1 * feasible * perf;
+
+    return { dutyEffectiveFR, theta, margin: score, slacks };
+  }
+
+  function sampleNormal(mu, sigma){
+    let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+    const z = Math.sqrt(-2.0*Math.log(u)) * Math.cos(2*Math.PI*v);
+    return mu + sigma * z;
+  }
+
+  function project01(x){ return clamp(x, 0, 1); }
+
+  let state = {
+    running: false,
+    mean: [0.5,0.5,0.5,0.2],     // center of bounds
+    sigma:[0.2,0.2,0.3,0.15],    // exploration radii
+    bounds: null,
+    live: null,
+    batch: 24,
+    elite: 0.25,
+    iter: 0,
+    best: null
+  };
+
+  onmessage = (e)=>{
+    const { type, payload } = e.data || {};
+    if (type === 'config') {
+      state.bounds = payload.bounds;
+      state.live = payload.live;
+      state.batch = payload.batch || state.batch;
+      state.elite = payload.elite || state.elite;
+      state.mean  = payload.initMean || state.mean;
+      state.sigma = payload.initSigma || state.sigma;
+      postMessage({ type:'ready' });
+      return;
+    }
+    if (type === 'tick') {
+      if (!state.running || !state.bounds || !state.live) return;
+      // One optimization step (CEM-TR)
+      const samples = [];
+      for (let i=0;i<state.batch;i++){
+        const v = state.mean.map((m,j)=> project01(sampleNormal(m, state.sigma[j])));
+        const c = decode(v, state.bounds, state.live);
+        const m = evaluate(c, state.live);
+        samples.push({ v, c, m });
+      }
+      samples.sort((a,b)=>b.m.margin - a.m.margin);
+      const E = Math.max(1, Math.floor(samples.length * state.elite));
+      const elites = samples.slice(0, E);
+      const mean = [0,0,0,0], sig=[0,0,0,0];
+      for (const s of elites){
+        for (let j=0;j<4;j++){ mean[j]+=s.v[j]; }
+      }
+      for (let j=0;j<4;j++){ mean[j] /= E; }
+      for (const s of elites){
+        for (let j=0;j<4;j++){ const d=s.v[j]-mean[j]; sig[j]+=d*d; }
+      }
+      for (let j=0;j<4;j++){ sig[j] = Math.sqrt(sig[j]/E); }
+
+      // Trust-region adaptation
+      const improved = !state.best || elites[0].m.margin > state.best.m.margin;
+      const shrink = improved ? 0.95 : 1.05; // zoom in if improved, else explore
+      state.mean = mean.map(project01);
+      state.sigma = sig.map((s, j)=> project01(clamp(s*shrink, 0.05, 0.35)));
+      state.iter++;
+
+      if (!state.best || elites[0].m.margin > state.best.m.margin) state.best = elites[0];
+
+      postMessage({ type:'batch', payload:{
+        iter: state.iter,
+        best: state.best,
+        top: elites.slice(0,3)
+      }});
+      return;
+    }
+    if (type === 'start') { state.running = true; return; }
+    if (type === 'stop')  { state.running = false; return; }
+    if (type === 'update-live') { state.live = payload.live; return; }
+  };
+`;
+
+// ---------- Create worker from inline source -------------------------------
+function createWorker() {
+  const blob = new Blob([WORKER_SRC], { type: "application/javascript" });
+  const url = URL.createObjectURL(blob);
+  const w = new Worker(url, { type: "module" });
+  // Caller should revokeObjectURL when done
+  (w as any)._url = url;
+  return w;
+}
+
+// ---------- UI Component ----------------------------------------------------
+export default function WarpMarginPanel(props: {
+  /** SHOW engine only. We never touch REAL. */
+  showEngineRef: React.MutableRefObject<any | null>;
+  /** Live inputs; if you have a hook, pass its values here. */
+  live: Partial<LiveInputs>;
+  /** Bounds for the search (sane defaults provided). */
+  bounds?: Partial<Bounds>;
+  /** Optional: ghost-push best candidate into SHOW for preview. */
+  ghostPreview?: boolean;
+  /** Optional: batch size and elite fraction */
+  batch?: number;
+  elite?: number;
+}){
+  const showEngine = props.showEngineRef?.current;
+
+  // Derive live inputs with safe defaults
+  const live: LiveInputs = {
+    sectorCount: Math.max(1, Math.floor(props.live.sectorCount ?? 400)),
+    gammaGeo: props.live.gammaGeo ?? 26,
+    qSpoilingFactor: props.live.qSpoilingFactor ?? 1,
+    gammaVdB: props.live.gammaVdB ?? 1e11,
+    dwell_ms: props.live.dwell_ms ?? 1,
+    thetaBudget: props.live.thetaBudget ?? 8.79e12,     // from your diag example
+    dutyFR_max: props.live.dutyFR_max ?? 2.5e-5,        // 0.0025%
+    sectorCap: props.live.sectorCap ?? 16
+  };
+
+  // Search bounds
+  const bounds: Bounds = {
+    qScale: props.bounds?.qScale ?? [0.5, 2.0],
+    gammaVdBScale: props.bounds?.gammaVdBScale ?? [0.5, 2.0],
+    sectors: props.bounds?.sectors ?? [1, Math.min(16, live.sectorCap ?? 16)],
+    dutyLocal: props.bounds?.dutyLocal ?? [1e-4, 2e-2], // 0.01% .. 2%
+  };
+
+  // Worker lifecycle
+  const workerRef = useRef<Worker | null>(null);
+  const [ready, setReady] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [iter, setIter] = useState(0);
+  const [best, setBest] = useState<null | { c: Candidate; m: Metrics }>(null);
+  const [top, setTop] = useState<any[]>([]);
+
+  useEffect(() => {
+    const w = createWorker();
+    workerRef.current = w;
+    w.onmessage = (e: MessageEvent) => {
+      const { type, payload } = e.data || {};
+      if (type === 'ready') setReady(true);
+      if (type === 'batch') {
+        setIter(payload.iter);
+        setBest(payload.best ? { c: payload.best.c, m: payload.best.m } : null);
+        setTop(payload.top || []);
+      }
+    };
+    w.postMessage({ type: 'config', payload: {
+      bounds,
+      live,
+      batch: props.batch ?? 24,
+      elite: props.elite ?? 0.25
+    }});
+
+    const id = setInterval(() => { w.postMessage({ type:'tick' }); }, 200);
+
+    return () => {
+      clearInterval(id);
+      try { w.postMessage({ type:'stop' }); } catch {}
+      try { w.terminate(); URL.revokeObjectURL((w as any)._url); } catch {}
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Stream live updates to worker (sectorCount etc.)
+  useEffect(() => {
+    const w = workerRef.current; if (!w) return;
+    w.postMessage({ type:'update-live', payload: { live } });
+  }, [live.sectorCount, live.gammaGeo, live.qSpoilingFactor, live.gammaVdB, live.dwell_ms, live.thetaBudget, live.dutyFR_max, live.sectorCap]);
+
+  // Ghost preview: push best candidate into SHOW engine (never REAL)
+  useEffect(() => {
+    if (!props.ghostPreview) return;
+    if (!best || !showEngine) return;
+
+    const dwell = live.dwell_ms;
+    const burst = Math.max(1e-9, best.c.dutyLocal * dwell);
+
+    const patch = {
+      physicsParityMode: false, // SHOW
+      parityMode: false,
+      qSpoilingFactor: best.c.q,
+      gammaVdB: best.c.gammaVdB,
+      sectors: best.c.sectors,
+      lightCrossing: { burst_ms: burst, dwell_ms: dwell },
+      // No direct thetaScale writes!
+    };
+    gated(showEngine, patch, 'warp-margin-ghost');
+  }, [best, props.ghostPreview, showEngine, live.dwell_ms]);
+
+  const start = () => { workerRef.current?.postMessage({ type:'start' }); setRunning(true); };
+  const stop  = () => { workerRef.current?.postMessage({ type:'stop'  }); setRunning(false); };
+
+  const commitToShow = () => {
+    if (!best || !showEngine) return;
+    const dwell = live.dwell_ms;
+    const burst = Math.max(1e-9, best.c.dutyLocal * dwell);
+    gated(showEngine, {
+      physicsParityMode: false,
+      parityMode: false,
+      qSpoilingFactor: best.c.q,
+      gammaVdB: best.c.gammaVdB,
+      sectors: best.c.sectors,
+      lightCrossing: { burst_ms: burst, dwell_ms: dwell },
+    }, 'warp-margin-commit');
+  };
+
+  // ---------- UI ------------------------------------------------------------
+  const frPct = (best?.m.dutyEffectiveFR ?? 0) * 100;
+  const theta = best?.m.theta ?? 0;
+
+  return (
+    <div className="rounded-2xl border p-4 bg-white/5 text-sm">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-semibold">Active Margin Search (SHOW‑only)</h3>
+        <div className="flex gap-2">
+          {!running ? (
+            <button onClick={start} disabled={!ready} className="px-3 py-1.5 rounded-2xl bg-emerald-600 text-white shadow disabled:opacity-50">Start</button>
+          ) : (
+            <button onClick={stop} className="px-3 py-1.5 rounded-2xl bg-rose-600 text-white shadow">Stop</button>
+          )}
+          <button onClick={commitToShow} disabled={!best} className="px-3 py-1.5 rounded-2xl border border-neutral-300 bg-white/10 disabled:opacity-50">Commit best → SHOW</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="rounded-xl border p-3 bg-black/30">
+          <div className="text-xs text-neutral-400">Iteration</div>
+          <div className="text-lg font-mono">{iter}</div>
+          <div className="text-xs text-neutral-400 mt-2">Worker</div>
+          <div className={`text-xs font-medium ${ready? 'text-emerald-500':'text-neutral-400'}`}>{ready? 'ready' : '…'}</div>
+        </div>
+        <div className="rounded-xl border p-3 bg-black/30">
+          <div className="text-xs text-neutral-400">Best FR duty (eff.)</div>
+          <div className="text-lg font-mono">{frPct.toExponential(2)}%</div>
+          <div className="text-xs text-neutral-400 mt-2">θ-scale</div>
+          <div className="text-lg font-mono">{theta.toExponential(3)}</div>
+        </div>
+        <div className="rounded-xl border p-3 bg-black/30">
+          <div className="text-xs text-neutral-400">Best candidate</div>
+          {best ? (
+            <div className="text-xs font-mono space-y-1">
+              <div>q={best.c.q.toExponential(2)}</div>
+              <div>γVdB={best.c.gammaVdB.toExponential(2)}</div>
+              <div>sectors={best.c.sectors}</div>
+              <div>duty_local={(best.c.dutyLocal*100).toExponential(2)}%</div>
+              <div className={`mt-1 ${best.m.margin>0?'text-emerald-400':'text-yellow-400'}`}>margin={best.m.margin.toFixed(3)}</div>
+            </div>
+          ) : (
+            <div className="text-xs text-neutral-500">—</div>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <div className="text-xs text-neutral-400 mb-2">Top elites (last batch)</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+          {top.map((t:any, i:number)=> (
+            <div key={i} className="rounded-lg border p-2 bg-black/20">
+              <div className="text-[10px] text-neutral-400">rank {i+1}</div>
+              <div className="text-[11px] font-mono">θ={t.m.theta.toExponential(2)}</div>
+              <div className="text-[11px] font-mono">FR={(t.m.dutyEffectiveFR*100).toExponential(2)}%</div>
+              <div className={`text-[11px] font-mono ${t.m.margin>0?'text-emerald-400':'text-yellow-400'}`}>m={t.m.margin.toFixed(3)}</div>
+              <div className="text-[10px] font-mono text-neutral-400">q×={(t.c.q / Math.max(1e-12, live.qSpoilingFactor)).toFixed(2)}, γ×={(t.c.gammaVdB / Math.max(1e-12, live.gammaVdB)).toFixed(2)}, s={t.c.sectors}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="mt-4 text-[11px] text-neutral-500">
+        <p>Objective: maximize min-slack across constraints (Ford–Roman duty, θ-budget, sector cap) with a small bonus for θ reach. Writes to SHOW only; no θScale writes.</p>
+      </div>
+    </div>
+  );
+}

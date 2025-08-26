@@ -8,6 +8,7 @@ import { SliceViewer } from "@/components/SliceViewer";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
+import WarpMarginPanel from "./WarpMarginPanel";
 
 /**
  * WarpRenderInspector
@@ -147,6 +148,9 @@ export default function WarpRenderInspector(props: {
   
   // Curvature control
   const [curvT, setCurvT] = useState(0.45);
+  
+  // Margin panel controls
+  const [ghostPreview, setGhostPreview] = useState(false);
 
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
@@ -920,6 +924,37 @@ export default function WarpRenderInspector(props: {
           <p className="text-xs text-neutral-500 mt-2">Opens a concise table/diagnostics in DevTools.</p>
         </div>
       </section>
+
+      {/* Active Margin Search Panel */}
+      <WarpMarginPanel
+        showEngineRef={rightEngine}
+        live={{
+          sectorCount: (live as any)?.totalSectors ?? 400,
+          gammaGeo: 26, // from MODE_PRESET calculations
+          qSpoilingFactor: (live as any)?.qSpoilingFactor ?? 1,
+          gammaVdB: gammaVdBBound,
+          dwell_ms: props.lightCrossing?.dwell_ms ?? 1,
+          thetaBudget: 8.79e12, // from your diagnostics
+          dutyFR_max: 2.5e-5,  // 0.0025%
+          sectorCap: 16
+        }}
+        ghostPreview={ghostPreview}
+        batch={24}
+        elite={0.25}
+      />
+      
+      {/* Ghost preview toggle */}
+      <div className="rounded-2xl border border-neutral-200 p-4 mt-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input 
+            type="checkbox" 
+            checked={ghostPreview} 
+            onChange={e => setGhostPreview(e.target.checked)} 
+          />
+          Ghost preview candidates on SHOW pane
+        </label>
+        <p className="text-xs text-neutral-500 mt-1">When enabled, shows optimization candidates in real-time on the SHOW renderer</p>
+      </div>
 
       {/* Comprehensive WebGL diagnostics panel */}
       <WarpRenderCheckpointsPanel
