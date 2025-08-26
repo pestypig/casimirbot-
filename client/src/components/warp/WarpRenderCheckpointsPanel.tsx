@@ -1,6 +1,6 @@
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
-import { checkpoint, Check, Side, Stage, within } from "@/lib/checkpoints";
+import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import CheckpointViewer from "./CheckpointViewer";
 
@@ -474,6 +474,155 @@ function useCheckpointList(
   }, [engineRef.current, canvasRef.current, liveSnap, hb, label, dutyFR, thetaExpectedFn]);
 }
 
+// D) Compact checkpoint table component
+function CompactCheckpointTable() {
+  const [checks, setChecks] = useState<Check[]>([]);
+  const [stopOnError, setStopOnError] = useState(false);
+  const [renderPaused, setRenderPaused] = useState(false);
+
+  useEffect(() => {
+    const handleCheck = (check: Check) => {
+      setChecks(prev => {
+        // Keep last 50 checks, grouped by id+side
+        const key = `${check.side}:${check.id}`;
+        const updated = prev.filter(c => `${c.side}:${c.id}` !== key);
+        updated.push(check);
+        return updated.slice(-50);
+      });
+
+      // Stop render loop on first error if enabled
+      if (stopOnError && !check.pass && check.sev === 'error' && !renderPaused) {
+        setRenderPaused(true);
+        // Pause both engines' render loops
+        const engines = [
+          (window as any).__leftEngine, 
+          (window as any).__rightEngine
+        ].filter(Boolean);
+        
+        engines.forEach(engine => {
+          if (engine._raf) {
+            cancelAnimationFrame(engine._raf);
+            engine._raf = null;
+          }
+        });
+        
+        console.warn('🛑 Render loop halted due to checkpoint error:', check);
+      }
+    };
+
+    onCheck(handleCheck);
+    return () => {
+      // No cleanup needed - onCheck just pushes to array
+    };
+  }, [stopOnError, renderPaused]);
+
+  const resumeRender = () => {
+    setRenderPaused(false);
+    // Resume engines
+    const engines = [
+      (window as any).__leftEngine, 
+      (window as any).__rightEngine
+    ].filter(Boolean);
+    
+    engines.forEach(engine => {
+      if (!engine._raf && engine._render) {
+        const renderLoop = () => {
+          engine._render();
+          engine._raf = requestAnimationFrame(renderLoop);
+        };
+        renderLoop();
+      }
+    });
+  };
+
+  // Group by stage for cleaner display
+  const byStage = checks.reduce((acc, check) => {
+    if (!acc[check.stage]) acc[check.stage] = [];
+    acc[check.stage].push(check);
+    return acc;
+  }, {} as Record<Stage, Check[]>);
+
+  const getStateColor = (check: Check) => {
+    if (!check.pass) {
+      if (check.sev === 'error') return 'text-red-400';
+      if (check.sev === 'warn') return 'text-yellow-400';
+    }
+    return 'text-green-400';
+  };
+
+  const getStateIcon = (check: Check) => {
+    if (!check.pass) {
+      if (check.sev === 'error') return '❌';
+      if (check.sev === 'warn') return '⚠️';
+    }
+    return '✅';
+  };
+
+  return (
+    <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 max-h-96 overflow-y-auto">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-medium text-sm">Live Checkpoints</h4>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={stopOnError}
+              onChange={(e) => setStopOnError(e.target.checked)}
+              className="w-3 h-3"
+            />
+            Stop on error
+          </label>
+          {renderPaused && (
+            <button
+              onClick={resumeRender}
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+            >
+              Resume
+            </button>
+          )}
+        </div>
+      </div>
+      
+      {renderPaused && (
+        <div className="bg-red-900/30 border border-red-700 rounded p-2 mb-3 text-xs text-red-300">
+          🛑 Render loop paused due to checkpoint error. Click Resume to continue.
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {Object.entries(byStage).map(([stage, stageChecks]) => (
+          <div key={stage}>
+            <div className="text-xs font-medium text-slate-400 mb-1 uppercase tracking-wide">
+              {stage}
+            </div>
+            <div className="space-y-1">
+              {stageChecks.map((check, i) => (
+                <div key={`${check.side}:${check.id}:${i}`} className="flex items-start gap-2 text-xs">
+                  <span className="text-slate-500 w-8 shrink-0">{check.side}</span>
+                  <span className="shrink-0">{getStateIcon(check)}</span>
+                  <span className="font-mono text-slate-300 min-w-0 flex-1">
+                    <span className="text-slate-400">{check.id}</span>
+                    <span className={`ml-2 ${getStateColor(check)}`}>{check.msg}</span>
+                  </span>
+                  <span className="text-slate-500 text-xs shrink-0">
+                    {new Date(check.at).toLocaleTimeString().slice(-8)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {checks.length === 0 && (
+        <div className="text-slate-500 text-xs text-center py-4">
+          No checkpoints recorded yet...
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function WarpRenderCheckpointsPanel({
   leftLabel = "REAL",
   rightLabel = "SHOW",
@@ -495,6 +644,11 @@ export default function WarpRenderCheckpointsPanel({
   parameters?: any; // Optional parameters object from renderer for perfect consistency
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };
 }) {
+  // Store engine refs globally for the CompactCheckpointTable
+  useEffect(() => {
+    (window as any).__leftEngine = leftEngineRef.current;
+    (window as any).__rightEngine = rightEngineRef.current;
+  }, [leftEngineRef.current, rightEngineRef.current]);
   const modeKey = (live?.currentMode as string) || "hover";
   const snap = (live?.byMode && live?.byMode[modeKey]) || (live?.modes && live?.modes[modeKey]) || live || undefined;
 
@@ -615,6 +769,9 @@ export default function WarpRenderCheckpointsPanel({
 
   return (
     <div className="mt-3 space-y-3">
+      {/* D) Compact checkpoint table with stop-on-error toggle */}
+      <CompactCheckpointTable />
+      
       {/* DAG Checkpoint System */}
       <CheckpointViewer title="DAG: Props → Calc → Uniforms → GPU → Frame" />
       

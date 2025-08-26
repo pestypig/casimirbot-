@@ -1893,6 +1893,11 @@ class WarpEngine {
         this._accumShear = 0; 
         this._accumShearN = 0;
 
+        // C) WarpEngine.js wire-in: Return physics values for CPU comparison
+        const d_FR = Math.max(1e-12, (U.dutyCycle||0.01) / Math.max(1, U.sectors||1));
+        const viewFraction = U.viewMassFraction ?? 1.0;
+        const sectorFraction = (U.sectors||1) / Math.max(1, U.sectorCount||400);
+
         return {
             mode: U.currentMode||'hover',
             duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
@@ -1904,7 +1909,12 @@ class WarpEngine {
             T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
             shear_avg_proxy: shear_avg_proxy,
             york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
-            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6)
+            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6),
+            // C) Additional physics values for CPU comparison
+            d_FR: d_FR,
+            viewFraction: viewFraction,
+            sectorFraction: sectorFraction,
+            frameHash8x8: this.sampleHash8x8()
         };
     }
 
@@ -1935,6 +1945,48 @@ class WarpEngine {
     setUserGain(gain) {
         // strictly the shader's u_userGain (multiplies both modes)
         this.updateUniforms({ userGain: Math.max(1, +gain) });
+    }
+
+    // C) Frame hash for checkpoint validation
+    sampleHash8x8() {
+        if (!this.gl || !this.canvas) return 0;
+        
+        try {
+            const gl = this.gl;
+            const w = this.canvas.width;
+            const h = this.canvas.height;
+            
+            // Sample 8x8 grid across canvas
+            const pixels = new Uint8Array(64 * 4); // 8x8 RGBA
+            const stepX = Math.max(1, Math.floor(w / 8));
+            const stepY = Math.max(1, Math.floor(h / 8));
+            
+            let hash = 0;
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    const px = Math.min(w - 1, x * stepX);
+                    const py = Math.min(h - 1, y * stepY);
+                    
+                    const rgba = new Uint8Array(4);
+                    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+                    
+                    // XOR + simple hash
+                    const idx = (y * 8 + x) * 4;
+                    pixels[idx] = rgba[0];
+                    pixels[idx + 1] = rgba[1]; 
+                    pixels[idx + 2] = rgba[2];
+                    pixels[idx + 3] = rgba[3];
+                    
+                    hash ^= (rgba[0] << 24) | (rgba[1] << 16) | (rgba[2] << 8) | rgba[3];
+                    hash = ((hash << 1) | (hash >>> 31)) & 0xFFFFFFFF; // rotate left
+                }
+            }
+            
+            return hash;
+        } catch (e) {
+            console.warn('sampleHash8x8 error:', e);
+            return 0;
+        }
     }
 
     setPresetParity() {
