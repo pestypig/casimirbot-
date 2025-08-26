@@ -672,24 +672,20 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct_left = `${(dutyFR_left*100).toFixed(4)}%`;
   const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
-  // Theta expected function using single source of truth  
   function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
     const gammaGeo = N(u.gammaGeo, 26);
-    const deltaAA  = N(u.deltaAOverA, 0.625);
-    const gammaVdB = N(u.gammaVdB, 1.35e5);
-    
-    // Use canonical expected calculation
-    const expectedLinear = thetaScaleExpected({
-      gammaGeo: Math.max(1, gammaGeo),
-      q: Math.max(1e-12, deltaAA), 
-      gammaVdB: Math.max(1, gammaVdB),
-      dFR: Math.max(1e-12, dutyFR)
-    });
-    // Convert the linear export to the renderer's sqrt(d_FR) law.
-    const expected = expectedLinear * Math.sqrt(1) / Math.max(1e-6, Math.sqrt(Math.max(1e-12, dutyFR))); // normalize
-    const expectedSqrt = Math.pow(Math.max(1, gammaGeo),3) * Math.max(1e-12, deltaAA) * Math.max(1, gammaVdB) * Math.sqrt(Math.max(1e-12, dutyFR));
-    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
-    return averaged ? expectedSqrt : expectedSqrt / Math.sqrt(Math.max(1e-12, dutyFR));
+    const q        = N(u.deltaAOverA ?? u.qSpoilingFactor, 1);
+    const gVdB     = N(u.gammaVdB ?? u.gammaVanDenBroeck, 1.35e5);
+
+    const betaInst = Math.pow(Math.max(1, gammaGeo), 3)
+                   * Math.max(1e-12, q)
+                   * Math.max(1, gVdB);
+
+    const d        = Math.max(1e-12, dutyFR);
+    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true);
+
+    // Engine's θ law
+    return averaged ? betaInst * Math.sqrt(d) : betaInst;
   }
 
   const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
