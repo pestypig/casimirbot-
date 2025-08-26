@@ -82,6 +82,20 @@ function computeThetaScaleFromParams(v: any) {
   return averaging ? base * Math.sqrt(dFR) : base;
 }
 
+// ✅ Single-source expected θ; caller provides dutyFR for the pane
+function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
+  const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
+  const g  = Math.max(1, N(u.gammaGeo, 26));
+  const q  = Math.max(1e-12, N(u.deltaAOverA ?? u.qSpoilingFactor, 1));
+  const gv = Math.max(1, N(u.gammaVdB ?? u.gammaVanDenBroeck, 1.35e5));
+
+  const dFR = Math.max(1e-12, dutyFR);
+  const base = Math.pow(g, 3) * q * gv;
+
+  const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+  return averaged ? base * Math.sqrt(dFR) : base;
+}
+
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
   const [tickMs, setTickMs] = useState<number>(0);
   const timerRef = useRef<any>(null);
@@ -660,8 +674,8 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
 
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>expectedThetaForPane(snap, leftEngineRef.current));
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>expectedThetaForPane(snap, rightEngineRef.current));
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>thetaExpected(u, dutyFR_right, snap));
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
