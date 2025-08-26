@@ -33,41 +33,35 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Canonical uniforms θ expected by the engine:
-//
-// θ = γ_geo^3 · q · γ_VdB · (viewAvg ? √d_FR : 1)
-// d_FR is exactly what the engine used (prefer dutyEffectiveFR / dutyUsed).
-function expectedUniformTheta(u: any, liveSnap: any, engine: any) {
-  const eU = (engine?.uniforms ?? {}) as any;
-  const getNum = (v: any, d: number) => (Number.isFinite(+v) ? +v : d);
+// ✅ Pane-specific expected θ using one duty law (√d_FR) and engine authority
+function expectedThetaForPane(live: any, engine: any) {
+  const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
 
-  const gammaGeo = Math.max(1, getNum(eU.gammaGeo ?? liveSnap?.gammaGeo, 26));
-  const q        = Math.max(1e-12, getNum(eU.qSpoilingFactor ?? eU.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
-  const gammaVdB = Math.max(1, getNum(
-    eU.gammaVdB ??
-    eU.gammaVanDenBroeck ??
-    liveSnap?.gammaVanDenBroeck ??
-    liveSnap?.gammaVdB,
-    1.4e5
-  ));
+  // Mode gate
+  const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
+  if (mode === 'standby') return 0;
 
-  // Duty — use what the engine actually applied.
-  let dFR = eU.dutyEffectiveFR ?? eU.dutyUsed ?? liveSnap?.dutyEffectiveFR ?? liveSnap?.dutyShip ?? liveSnap?.dutyEff;
-  if (!Number.isFinite(dFR)) {
-    const dutyLocal = 0.01; // 1% local ON
-    const S_total = Math.max(1, getNum(eU.sectorCount ?? liveSnap?.sectorCount, 400));
-    const S_live  = Math.max(1, getNum(eU.sectors, 1));
-    dFR = dutyLocal * (S_live / S_total);
-  }
-  dFR = Math.max(1e-12, +dFR);
+  // Prefer values bound to the engine (authoritative for the pane)
+  const gammaGeo = Math.max(1, N(engine?.uniforms?.gammaGeo ?? live?.gammaGeo ?? live?.g_y, 26));
+  const q        = Math.max(1e-12, N(engine?.uniforms?.qSpoilingFactor ?? engine?.uniforms?.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
+  const gVdB     = Math.max(1, N(engine?.uniforms?.gammaVdB ?? engine?.uniforms?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
 
-  const viewAvgOn = (eU.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+  // Duty: prefer the pane's actual d_FR from uniforms/echo; else compute
+  const echo = (window as any).__warpEcho;
+  const dFR_echo = Number.isFinite(echo?.terms?.d_FR) ? Math.max(1e-12, +echo.terms.d_FR) : NaN;
+  const dFR_u    = Number.isFinite(engine?.uniforms?.dutyEffectiveFR) ? Math.max(1e-12, +engine.uniforms.dutyEffectiveFR) : NaN;
 
-  // When view-averaging is on, include √d_FR (canonical law).
-  // When off, show instantaneous β_inst (no duty factor).
-  return viewAvgOn
-    ? thetaScaleExpected({ gammaGeo, q, gammaVdB, dFR })   // includes √d_FR
-    : Math.pow(gammaGeo, 3) * q * gammaVdB;               // β_inst
+  // Fallback from UI knobs only if needed (dutyCycle/sectorCount)
+  const sectorsTotal = Math.max(1, N(live?.sectorCount ?? engine?.uniforms?.sectorCount, 400));
+  const sectorsLive  = Math.max(1, N(engine?.uniforms?.sectors ?? 1, 1));
+  const dutyLocal    = 0.01; // from light-crossing loop
+  const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
+
+  const dFR = Number.isFinite(dFR_u) ? dFR_u : (Number.isFinite(dFR_echo) ? dFR_echo : dFR_fallback);
+
+  const base = Math.pow(gammaGeo, 3) * q * gVdB;
+  const viewAvg = (engine?.uniforms?.viewAvg ?? live?.viewAvg ?? true) ? 1 : 0;
+  return viewAvg ? base * Math.sqrt(dFR) : base; // (no √ term when not averaging)
 }
 
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
@@ -187,7 +181,7 @@ function useCheckpointList(
     const ts = N(u?.thetaScale, NaN);
     
     // Expected uniforms θ from the same chain the engine uses
-    const thetaUniformExpected = expectedUniformTheta(u, liveSnap, e);
+    const thetaUniformExpected = expectedThetaForPane(liveSnap, e);
 
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
@@ -353,7 +347,7 @@ function useCheckpointList(
       }
     } else if (liveSnap) {
       // Final fallback to old method
-      const tsExp = expectedUniformTheta(u, liveSnap, e);
+      const tsExp = expectedThetaForPane(liveSnap, e);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
       
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
@@ -648,8 +642,8 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
 
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>expectedUniformTheta(u, snap, leftEngineRef.current));
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>expectedUniformTheta(u, snap, rightEngineRef.current));
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>expectedThetaForPane(snap, leftEngineRef.current));
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>expectedThetaForPane(snap, rightEngineRef.current));
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
@@ -695,7 +689,7 @@ export default function WarpRenderCheckpointsPanel({
           <span className="font-mono">{
             (() => {
               const u = (leftEngineRef.current?.uniforms ?? {}); // pick REAL as reference
-              const exp = expectedUniformTheta(u, snap, leftEngineRef.current);
+              const exp = expectedThetaForPane(snap, leftEngineRef.current);
               return Number.isFinite(exp) ? exp.toExponential(2) : '—';
             })()
           }</span>
