@@ -204,12 +204,6 @@ export default function WarpRenderInspector(props: {
   // Width definition state
   const [widthMetric, setWidthMetric] = useState<WidthMetric>('sector-arc-equator');
   
-  // Mesh controls for SHOW pane
-  const [meshOpts, setMeshOpts] = useState({
-    showXZ: true, layersXZ: 2,   // horizontal decks
-    showXY: true, layersXY: 1,   // front/back slices
-    showYZ: true, layersYZ: 1,   // side slices
-  });
 
   // Auto canvas density management
   useShowCanvasDensity({
@@ -406,6 +400,22 @@ export default function WarpRenderInspector(props: {
       // optional: mirror display gain through helper
       const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
       rightEngine.current.setDisplayGain?.(dg);
+
+      // === NEW: force a cube of mesh planes, aligned to grid ===
+      // pick a sane grid density (matches your square grid scale)
+      rightEngine.current?.setGridResolution?.({ divisions: 64 });
+      // show several planes on each axis; aligned to grid increments
+      rightEngine.current?.setMeshOptions?.({
+        showXZ: true, layersXZ: 5,   // "decks"
+        showXY: true, layersXY: 3,   // front/back
+        showYZ: true, layersYZ: 3,   // sides
+        alignToGrid: true
+      });
+
+      // Optional: quick console proof if subclass isn't loaded
+      if (!rightEngine.current?.setMeshOptions) {
+        console.warn('Grid3DShowEngine not active — did you load public/grid3d-engine.js after warp-engine.js?');
+      }
     });
 
     // Diagnostics -> window for quick comparison
@@ -516,12 +526,6 @@ export default function WarpRenderInspector(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Apply mesh options to SHOW engine when they change
-  useEffect(() => {
-    if (rightEngine.current?.setMeshOptions) {
-      rightEngine.current.setMeshOptions(meshOpts);
-    }
-  }, [meshOpts]);
 
   // Ford-Roman duty computation (outside useEffect for prop access)
   const dutyLocal = (() => {
@@ -881,66 +885,6 @@ export default function WarpRenderInspector(props: {
           })()}
         </div>
 
-        {/* SHOW mesh controls */}
-        <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">SHOW — 3D Mesh Planes</h4>
-          <div className="grid grid-cols-3 gap-3 text-xs">
-            <div>
-              <label className="flex items-center gap-1 mb-1">
-                <input 
-                  type="checkbox" 
-                  checked={meshOpts.showXZ}
-                  onChange={e => setMeshOpts(prev => ({ ...prev, showXZ: e.target.checked }))}
-                />
-                XZ decks
-              </label>
-              <input 
-                type="range" 
-                min="0" max="8" 
-                value={meshOpts.layersXZ}
-                onChange={e => setMeshOpts(prev => ({ ...prev, layersXZ: +e.target.value }))}
-                className="w-full"
-              />
-              <div className="text-center text-neutral-500">{meshOpts.layersXZ}</div>
-            </div>
-            <div>
-              <label className="flex items-center gap-1 mb-1">
-                <input 
-                  type="checkbox" 
-                  checked={meshOpts.showXY}
-                  onChange={e => setMeshOpts(prev => ({ ...prev, showXY: e.target.checked }))}
-                />
-                XY front/back
-              </label>
-              <input 
-                type="range" 
-                min="0" max="8" 
-                value={meshOpts.layersXY}
-                onChange={e => setMeshOpts(prev => ({ ...prev, layersXY: +e.target.value }))}
-                className="w-full"
-              />
-              <div className="text-center text-neutral-500">{meshOpts.layersXY}</div>
-            </div>
-            <div>
-              <label className="flex items-center gap-1 mb-1">
-                <input 
-                  type="checkbox" 
-                  checked={meshOpts.showYZ}
-                  onChange={e => setMeshOpts(prev => ({ ...prev, showYZ: e.target.checked }))}
-                />
-                YZ sides
-              </label>
-              <input 
-                type="range" 
-                min="0" max="8" 
-                value={meshOpts.layersYZ}
-                onChange={e => setMeshOpts(prev => ({ ...prev, layersYZ: +e.target.value }))}
-                className="w-full"
-              />
-              <div className="text-center text-neutral-500">{meshOpts.layersYZ}</div>
-            </div>
-          </div>
-        </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Debug Toggles</h4>
