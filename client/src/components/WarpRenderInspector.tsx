@@ -387,24 +387,12 @@ export default function WarpRenderInspector(props: {
     const W: any = (window as any).WarpEngine;
     const G: any = (window as any).Grid3DShowEngine;
 
-    if (rendererType === 'grid3d') {
-      try {
-        const Ctor = G || W;
-        const engine3d = getOrCreateEngine(Ctor, canvas);
-        // Only call init if the engine isn't loaded yet (avoid double-attach paths)
-        if (typeof (engine3d as any).init === 'function' && !(engine3d as any).isLoaded) {
-          (engine3d as any).init(canvas);
-        }
-        return engine3d;
-      } catch (e) {
-        console.warn('Grid3D engine failed, falling back to slice2d:', e);
-      }
+    if (rendererType === 'grid3d' && G) {
+      const e = getOrCreateEngine(G, canvas);
+      return e;
     }
-    const engine2d = getOrCreateEngine(W, canvas);
-    if (typeof (engine2d as any).init === 'function' && !(engine2d as any).isLoaded) {
-      (engine2d as any).init(canvas);
-    }
-    return engine2d;
+    const e = getOrCreateEngine(W, canvas);
+    return e;
   }
 
   // Engine creation & lifecycle
@@ -516,10 +504,22 @@ export default function WarpRenderInspector(props: {
 
 
     return () => {
-      // Unsubscribe from canonical uniforms
       unsubscribe(unsubscribeHandler);
-      setHaveUniforms(false); // Reset on cleanup
-      
+      setHaveUniforms(false);
+
+      const canvases = [leftRef.current, rightRef.current].filter(Boolean) as HTMLCanvasElement[];
+      for (const c of canvases) {
+        try { (c as any)[ENGINE_KEY]?.destroy?.(); } catch {}
+        try { (c as any).__warpEngine?.destroy?.(); } catch {}
+        try { (c as any).__engine?.destroy?.(); } catch {}
+        try { (c as any).warpEngine?.destroy?.(); } catch {}
+        CANVAS_ENG.delete(c);
+        try { delete (c as any)[ENGINE_KEY]; } catch {}
+        try { delete (c as any).__warpEngine; } catch {}
+        try { delete (c as any).__engine; } catch {}
+        try { delete (c as any).warpEngine; } catch {}
+      }
+
       // Remove WebGL context event listeners
       if (leftRef.current) {
         leftRef.current.removeEventListener('webglcontextlost', handleContextLost);
@@ -530,31 +530,10 @@ export default function WarpRenderInspector(props: {
         rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
       }
       
-      try { if (leftOwnedRef.current)  leftEngine.current?.destroy(); } catch {}
-      try { if (rightOwnedRef.current) rightEngine.current?.destroy(); } catch {}
       leftOwnedRef.current = false;
       rightOwnedRef.current = false;
       leftEngine.current = null as any;
       rightEngine.current = null as any;
-
-      // Robust cleanup for HMR/StrictMode
-      if (leftRef.current) {
-        try {
-          if ((leftRef.current as any)[ENGINE_KEY] && !(leftRef.current as any)[ENGINE_KEY]._destroyed) {
-            (leftRef.current as any)[ENGINE_KEY].destroy?.();
-          }
-          delete (leftRef.current as any)[ENGINE_KEY];
-        } catch {}
-      }
-      
-      if (rightRef.current && rightOwnedRef.current) {
-        try {
-          if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
-            (rightRef.current as any)[ENGINE_KEY].destroy?.();
-          }
-          delete (rightRef.current as any)[ENGINE_KEY];
-        } catch {}
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

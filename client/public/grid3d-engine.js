@@ -5,7 +5,8 @@
 
   class Grid3DShowEngine extends WE {
     constructor(canvas, opts = {}) {
-      super(canvas, opts);            // ✅ base sees an options object
+      // Ensure base always gets a valid options object
+      super(canvas, opts || {});      // ✅ base sees an options object
       this._dprOverride = null;
       this._ssaa = 1;
       this._forceDivisions = null;
