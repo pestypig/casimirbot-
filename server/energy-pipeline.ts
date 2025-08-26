@@ -502,7 +502,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     Math.pow(state.gammaGeo, 3) *
     (state.qSpoilingFactor ?? 1) *
     ((state as any).gammaVanDenBroeck_vis ?? GAMMA_VDB) *
-    (state.dutyEffective_FR ?? d_eff);
+    Math.sqrt(Math.max(1e-12, state.dutyEffective_FR ?? d_eff));
   
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
