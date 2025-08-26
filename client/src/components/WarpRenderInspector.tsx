@@ -304,11 +304,22 @@ export default function WarpRenderInspector(props: {
   // Keep our own registry so we can always reuse across HMR/StrictMode
   const CANVAS_ENG = new WeakMap<HTMLCanvasElement, any>();
 
+  function ensureGridDefaults() {
+    const g: any = (typeof window !== 'undefined') ? window : {};
+    const d = g.GRID_DEFAULTS ?? (g.GRID_DEFAULTS = {});
+    if (!Number.isFinite(d.divisions) || d.divisions <= 0) d.divisions = 64;
+    if (!Number.isFinite(d.minSpan)   || d.minSpan <= 0)   d.minSpan   = 2.6;
+    if (typeof d.spanPadding !== 'number')                 d.spanPadding = 1.35;
+  }
+
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
     cv: HTMLCanvasElement
   ): WarpType {
-    // 0) If we already know about it, reuse
+    // 0) Ensure grid defaults are properly initialized
+    ensureGridDefaults();
+    
+    // 1) If we already know about it, reuse
     const known = CANVAS_ENG.get(cv);
     if (known && !known._destroyed) return known as WarpType;
 

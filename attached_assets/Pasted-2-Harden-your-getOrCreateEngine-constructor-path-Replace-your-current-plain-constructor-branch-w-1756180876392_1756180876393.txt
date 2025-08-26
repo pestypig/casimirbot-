@@ -1,0 +1,67 @@
+2) Harden your getOrCreateEngine constructor path
+
+Replace your current “plain constructor” branch with this exact block:
+
+// 2) Prefer engine-provided factories (no double-attach)
+const viaFactory =
+  (Ctor as any).getOrCreate?.(cv) ||
+  (Ctor as any).fromCanvas?.(cv) ||
+  (Ctor as any).getForCanvas?.(cv);
+
+if (viaFactory) {
+  CANVAS_ENG.set(cv, viaFactory);
+  (cv as any)[ENGINE_KEY] = viaFactory;
+  return viaFactory as WarpType;
+}
+
+// 3) As soon as we’re about to construct, guarantee GRID_DEFAULTS is set
+ensureGridDefaults();
+
+try {
+  // Fallback: plain constructor with just the canvas
+  const eng = new (Ctor as any)(cv);
+  CANVAS_ENG.set(cv, eng);
+  (cv as any)[ENGINE_KEY] = eng;
+  return eng;
+} catch (err: any) {
+  const msg = String(err?.message || err);
+
+  // If the error smells like the classic "…divisions" read, fix & retry once
+  if (/divisions/i.test(msg)) {
+    // Belt & suspenders: reassert safe defaults and try again
+    (window as any).GRID_DEFAULTS = {
+      ...(window as any).GRID_DEFAULTS,
+      divisions: 64,
+      minSpan: 2.6,
+      spanPadding: 1.35,
+    };
+    try {
+      const eng2 = new (Ctor as any)(cv);
+      CANVAS_ENG.set(cv, eng2);
+      (cv as any)[ENGINE_KEY] = eng2;
+      return eng2;
+    } catch (err2) {
+      // fall through to existing “already attached” handling below, or rethrow
+    }
+  }
+
+  // Existing “already attached” recovery you already have
+  const m = msg.toLowerCase();
+  if (m.includes('already attached')) {
+    const byClass =
+      (Ctor as any).getOrCreate?.(cv) ||
+      (Ctor as any).fromCanvas?.(cv) ||
+      (Ctor as any).getForCanvas?.(cv);
+    if (byClass) {
+      CANVAS_ENG.set(cv, byClass);
+      (cv as any)[ENGINE_KEY] = byClass;
+      return byClass as WarpType;
+    }
+  }
+
+  throw err;
+}
+
+
+Why this works
+Even if the base engine still does GRID_DEFAULTS.divisions in _initializeGrid or as a default parameter in _createGrid, ensureGridDefaults() guarantees window.GRID_DEFAULTS exists before those lines execute. If a stale bundle was still missing it, the retry path force-writes safe values and tries again.
