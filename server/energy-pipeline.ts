@@ -62,6 +62,7 @@ export interface FieldRequest {
   wallWidth_m?: number; // bell width wρ in meters (default from sag_nm)
   sectors?: number;     // sector count (default state.sectorCount)
   split?: number;       // (+)/(−) split index (default floor(sectors/2))
+  clamp?: Partial<SampleClamp>; // ⬅️ new, optional
 }
 
 export interface TileParams {
@@ -157,6 +158,10 @@ const BURST_DUTY_LOCAL = 0.01;   // 10 µs / 1 ms
 const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
 const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
 const RADIAL_LAYERS    = 10;     // surface × radial lattice
+
+// Public clamp constants for display-only symmetry (do not affect θ/mass)
+export const SAMPLE_CLAMP = { maxPush: 0.10, softness: 0.60 } as const;
+export type SampleClamp = typeof SAMPLE_CLAMP;
 
 // Export paper constants so UI and docs can reference the single source of truth
 export const PAPER_GEO = { PACKING: 0.88, RADIAL_LAYERS: 10 } as const;
@@ -1001,8 +1006,8 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       let disp = vizGain * geoAmp * qSpoil * wallWin * bell * sgn * front;
       
       // Soft clamp (same as renderer to avoid flat shelves)
-      const maxPush = 0.10;
-      const softness = 0.6;
+      const clamp = { ...SAMPLE_CLAMP, ...(req?.clamp ?? {}) };
+      const { maxPush, softness } = clamp;
       disp = maxPush * Math.tanh(disp / (softness * maxPush));
 
       samples.push({ p, rho, bell, n, sgn, disp });
