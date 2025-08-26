@@ -73,6 +73,8 @@ import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
+import { checkpoint } from "@/lib/checkpoints";
+import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
 import { CurvatureKey } from "@/components/CurvatureKey";
@@ -1184,14 +1186,39 @@ export default function HelixCore() {
             <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
               <WarpRenderInspector
                 key={`inspector-${modeNonce}-${totalSectors}-${concurrentSectors}`}
-                parityPhys={{
-                  gammaGeo:        pipeline?.gammaGeo ?? 26,
-                  qSpoilingFactor: qSpoilUI,
-                  gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                  dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
-                  dutyCycle:        dutyUI_safe,           // UI duty (for display)
-                  viewMassFraction: viewMassFracReal,      // ← per-width view
-              }}
+                parityPhys={(() => {
+                  // A) helix-core.tsx wire-in: Compute θ_expected and θ_used before rendering
+                  const realPhys = {
+                    gammaGeo: pipeline?.gammaGeo ?? 26,
+                    q: qSpoilUI,
+                    gammaVdB: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+                    dFR: dutyEffectiveFR_safe
+                  };
+                  
+                  const expREAL = thetaScaleExpected(realPhys);
+                  const usedREAL = thetaScaleUsed(expREAL, {
+                    concurrent: 1, total: 400, dutyLocal: 0.010, viewFraction: 0.0025, viewAveraging: true
+                  });
+                  
+                  checkpoint({ 
+                    id:'θ-expected', side:'REAL', stage:'expect', pass:true,
+                    msg:`θ_expected=${expREAL.toExponential()}`, expect:expREAL 
+                  });
+                  
+                  checkpoint({ 
+                    id:'θ-used', side:'REAL', stage:'expect', pass:true,
+                    msg:`θ_used=${usedREAL.toExponential()}`, expect:usedREAL 
+                  });
+                  
+                  return {
+                    gammaGeo:        pipeline?.gammaGeo ?? 26,
+                    qSpoilingFactor: qSpoilUI,
+                    gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+                    dutyEffectiveFR:  dutyEffectiveFR_safe,  // ← FR-averaged duty
+                    dutyCycle:        dutyUI_safe,           // UI duty (for display)
+                    viewMassFraction: viewMassFracReal,      // ← per-width view
+                  };
+                })()}
               showPhys={{
                 // same as above unless you want explicit "seasoning" in SHOW
                 gammaGeo:        pipeline?.gammaGeo ?? 26,

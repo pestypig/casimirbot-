@@ -9,6 +9,8 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 import MarginHunterPanel from "./MarginHunterPanel";
+import { checkpoint, within } from "@/lib/checkpoints";
+import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 
 /**
  * WarpRenderInspector
@@ -52,6 +54,64 @@ function compactCameraZ(axesScene?: number[] | null) {
 function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1) {
   const m = Math.max(hull.a, hull.b, hull.c) || 1;
   return [ (hull.a/m)*span, (hull.b/m)*span, (hull.c/m)*span ];
+}
+
+// B) Setup engine checkpoints (wire-in point)
+function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any) {
+  if (!engine) return;
+  
+  // Get expected values from payload
+  const realPhys = {
+    gammaGeo: payload?.gammaGeo ?? 26,
+    q: payload?.qSpoilingFactor ?? 1,
+    gammaVdB: payload?.gammaVanDenBroeck_vis ?? 1,
+    dFR: payload?.dutyEffectiveFR ?? 0.000025
+  };
+  
+  const expREAL = thetaScaleExpected(realPhys);
+  
+  // Setup RAF-based validation
+  const validateUniforms = () => {
+    const U = engine.uniforms || {};
+    const θu = U.thetaScale as number;
+
+    checkpoint({
+      id:'uniforms/θ', side, stage:'uniforms',
+      pass: within(θu, expREAL, 0.05),
+      sev: within(θu, expREAL, 0.2) ? 'warn' : 'error',
+      msg:`uniform θ=${θu?.toExponential()} vs expected=${expREAL.toExponential()}`,
+      expect: expREAL, actual: θu
+    });
+
+    checkpoint({
+      id:'modes', side, stage:'uniforms',
+      pass: (U.ridgeMode===0 || U.ridgeMode===1) && U.physicsParityMode!=null,
+      sev:'warn',
+      msg:`ridge=${U.ridgeMode} parity=${U.physicsParityMode}`
+    });
+
+    // GPU health
+    const gl = engine.gl;
+    const ok = gl?.isProgram(engine.program) && !gl.getError();
+    checkpoint({ id:'gpu/link', side, stage:'gpu', pass: !!ok, msg:'shader linked' });
+
+    // CameraZ
+    const camSet = !!engine.cameraZ && Number.isFinite(engine.cameraZ);
+    checkpoint({ id:'cameraZ', side, stage:'uniforms', pass: camSet, sev: camSet?'info':'error',
+      msg: camSet ? `cameraZ=${engine.cameraZ.toFixed(3)}` : 'CameraZ unset' });
+  };
+  
+  // Hook into RAF if available
+  if (engine._render) {
+    const originalRender = engine._render.bind(engine);
+    engine._render = function(...args: any[]) {
+      validateUniforms();
+      return originalRender(...args);
+    };
+  }
+  
+  // Also validate immediately
+  setTimeout(validateUniforms, 100);
 }
 
 // Optional: estimate pixel density across wall band (debugging helper)
@@ -458,6 +518,9 @@ export default function WarpRenderInspector(props: {
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
+      
+      // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
+      setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
     });
 
     rightEngine.current?.onceReady?.(() => {
@@ -474,6 +537,9 @@ export default function WarpRenderInspector(props: {
         ridgeMode: 1, colorMode: 'theta',
       });
       rightEngine.current?.forceRedraw?.();
+      
+      // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
+      setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
     });
 
     // Diagnostics -> window for quick comparison
