@@ -175,12 +175,12 @@ const MODE_PRESET: Record<ModeKey, {curvT:number; boost:number; displayGain:numb
 };
 
 // Locked display settings - modes only change physics, not visuals
-const TONEMAP_LOCK = { 
-  exp: 5.0, 
-  zero: 1e-7, 
-  ridgeMode: 0, 
+const TONEMAP_LOCK = {
+  exp: 5.0,
+  zero: 1e-7,
+  // no ridgeMode here — ridge is enforced per-pane in the lock
   colorMode: 'theta' as const,
-  viewAvg: true 
+  viewAvg: true
 };
 
 // ---- PaneOverlay Component --------------------------------------------------
@@ -403,9 +403,19 @@ export default function WarpRenderInspector(props: {
         delete (safe as any).thetaScale;
       }
 
+      // ridge writes are forbidden; enforce pane ridge here
+      if ('ridgeMode' in safe) {
+        emitDebug('warn', tag, 'blocked ridgeMode override', {
+          value: (safe as any).ridgeMode, from: findCaller()
+        });
+        delete (safe as any).ridgeMode;
+      }
+
       // force correct parity every call
       (safe as any).physicsParityMode = forceParity;
       (safe as any).parityMode        = forceParity;
+      // force ridge per pane: REAL→0, SHOW→1
+      (safe as any).ridgeMode         = forceParity ? 0 : 1;
 
       // Use gated uniforms instead of direct call
       return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
@@ -591,7 +601,6 @@ export default function WarpRenderInspector(props: {
       if (leftEngine.current) {
         leftEngine.current.updateUniforms?.({
           physicsParityMode: true, 
-          ridgeMode: TONEMAP_LOCK.ridgeMode,
           exposure: TONEMAP_LOCK.exp,
           zeroStop: TONEMAP_LOCK.zero,
           colorMode: TONEMAP_LOCK.colorMode,
@@ -601,7 +610,6 @@ export default function WarpRenderInspector(props: {
       if (rightEngine.current) {
         rightEngine.current.updateUniforms?.({
           physicsParityMode: false, 
-          ridgeMode: TONEMAP_LOCK.ridgeMode,
           exposure: TONEMAP_LOCK.exp,
           zeroStop: TONEMAP_LOCK.zero,
           colorMode: TONEMAP_LOCK.colorMode,
