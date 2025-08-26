@@ -357,6 +357,13 @@ export default function WarpRenderInspector(props: {
 
     // 3) As soon as we're about to construct, guarantee GRID_DEFAULTS is set
     ensureGridDefaults();
+    // Belt-and-suspenders: force good values in case engine captured undefined earlier
+    (window as any).GRID_DEFAULTS = {
+      divisions: 64,
+      minSpan: 2.6,
+      spanPadding: 1.35,
+      ...(window as any).GRID_DEFAULTS
+    };
 
     try {
       // Fallback: plain constructor with just the canvas

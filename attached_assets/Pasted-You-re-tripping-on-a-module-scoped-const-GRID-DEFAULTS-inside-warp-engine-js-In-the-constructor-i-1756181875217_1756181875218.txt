@@ -1,0 +1,54 @@
+You're tripping on a module-scoped const GRID_DEFAULTS inside warp-engine.js. In the constructor, _initializeGrid() does:
+
+const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
+
+
+If that const GRID_DEFAULTS = window.GRID_DEFAULTS; was bound when window.GRID_DEFAULTS didn’t exist yet (or after a duplicate-load short-circuit), it stays undefined, so reading .divisions throws—exactly at your new (Ctor as any)(cv) call.
+
+Fix (robust + minimal)
+
+Make the engine read defaults at runtime (from globalThis) with sane fallbacks instead of a captured const.
+
+1) Replace the top-level const GRID_DEFAULTS = window.GRID_DEFAULTS with a helper:
+
+// put near the top of warp-engine.js
+function getGridDefaults() {
+  const g = (typeof globalThis !== 'undefined' ? globalThis : {});
+  const d = (g && g.GRID_DEFAULTS) || {};
+  const divisions   = Number.isFinite(d.divisions) && d.divisions > 0 ? (d.divisions|0) : 64;
+  const minSpan     = Number.isFinite(d.minSpan)   && d.minSpan   > 0 ? d.minSpan       : 2.6;
+  const spanPadding = (typeof d.spanPadding === 'number') ? d.spanPadding : 1.35;
+  return { divisions, minSpan, spanPadding };
+}
+
+
+2) Use it where you currently touch GRID_DEFAULTS:
+
+In _initializeGrid():
+
+_initializeGrid() {
+  const gl = this.gl;
+  const GD = getGridDefaults();
+  const initialSpan = GD.minSpan;
+  const gridData = this._createGrid(initialSpan, GD.divisions);
+  // ...unchanged...
+}
+
+
+In _warpGridVertices() where you compute spanPadding:
+
+const spanPadding = bubbleParams.gridScale || getGridDefaults().spanPadding;
+
+
+(Your setGridResolution fallback already guards with globalThis.GRID_DEFAULTS || {} – that’s fine.)
+
+Belt-and-suspenders at the call site (optional)
+
+Right before constructing the engine you can keep this one-liner (you already have ensureGridDefaults(); this just ensures good values if the engine file captured undefined earlier):
+
+(window as any).GRID_DEFAULTS = {
+  divisions: 64,
+  minSpan: 2.6,
+  spanPadding: 1.35,
+  ...(window as any).GRID_DEFAULTS
+};

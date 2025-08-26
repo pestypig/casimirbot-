@@ -40,7 +40,15 @@ if (typeof window.GRID_DEFAULTS === 'undefined') {
     divisions: 100       // more lines so a larger grid still looks dense
   };
 }
-const GRID_DEFAULTS = window.GRID_DEFAULTS;
+// Runtime grid defaults helper to avoid stale const binding
+function getGridDefaults() {
+  const g = (typeof globalThis !== 'undefined' ? globalThis : {});
+  const d = (g && g.GRID_DEFAULTS) || {};
+  const divisions   = Number.isFinite(d.divisions) && d.divisions > 0 ? (d.divisions|0) : 64;
+  const minSpan     = Number.isFinite(d.minSpan)   && d.minSpan   > 0 ? d.minSpan       : 2.6;
+  const spanPadding = (typeof d.spanPadding === 'number') ? d.spanPadding : 1.35;
+  return { divisions, minSpan, spanPadding };
+}
 
 if (typeof window.SCENE_SCALE === 'undefined') {
   window.SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
@@ -351,11 +359,12 @@ class WarpEngine {
 
     _initializeGrid() {
         const gl = this.gl;
+        const GD = getGridDefaults();
         
         // Create spacetime grid geometry
         // Start with default span, will be adjusted when hull params are available
-        const initialSpan = GRID_DEFAULTS.minSpan;
-        const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
+        const initialSpan = GD.minSpan;
+        const gridData = this._createGrid(initialSpan, GD.divisions);
         this.gridVertices = new Float32Array(gridData);
         
         // Store original vertex positions for warp calculations
@@ -1117,9 +1126,9 @@ class WarpEngine {
         
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        const spanPadding = bubbleParams.gridScale || getGridDefaults().spanPadding;
         let targetSpan = Math.max(
-          GRID_DEFAULTS.minSpan,
+          getGridDefaults().minSpan,
           hullMaxClip * spanPadding
         );
         
