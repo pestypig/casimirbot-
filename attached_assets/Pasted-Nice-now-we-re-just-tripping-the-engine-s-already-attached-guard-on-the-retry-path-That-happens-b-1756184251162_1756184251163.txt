@@ -1,0 +1,99 @@
+Nice—now we’re just tripping the engine’s “already attached” guard on the retry path. That happens because the first failed constructor call added your canvas to the engine’s __WARP_ENGINES WeakSet (and often set canvas.__warpEngine) before it crashed. When you retry, the guard fires.
+
+Patch: before the retry, purge any half-attached handles and the WeakSet entry; if the guard still fires, fall back to grabbing whatever’s already on the canvas.
+
+Drop this in, replacing your current getOrCreateEngine (keep your seedGridDefaultsHard() from before).
+
+function purgeCanvasEngineGuards(cv: HTMLCanvasElement) {
+  try { (window as any).__WARP_ENGINES?.delete?.(cv); } catch {}
+  try { delete (cv as any).__warpEngine; } catch {}
+  try { delete (cv as any).__engine; } catch {}
+  try { delete (cv as any).warpEngine; } catch {}
+}
+
+function getOrCreateEngine<WarpType = any>(
+  Ctor: new (...args: any[]) => WarpType,
+  cv: HTMLCanvasElement
+): WarpType {
+  // Reuse if one is already attached & alive
+  const existing =
+    (cv as any).__warpEngine ||
+    (cv as any).warpEngine ||
+    (cv as any).__engine ||
+    (Ctor as any).fromCanvas?.(cv) ||
+    (Ctor as any).getForCanvas?.(cv);
+  if (existing && !existing._destroyed) return existing as WarpType;
+
+  // Prefer factory if available
+  const viaFactory =
+    (Ctor as any).getOrCreate?.(cv) ||
+    (Ctor as any).fromCanvas?.(cv) ||
+    (Ctor as any).getForCanvas?.(cv);
+  if (viaFactory) {
+    (cv as any).__warpEngine = viaFactory;
+    return viaFactory as WarpType;
+  }
+
+  // Ensure defaults exist *before* first construction
+  seedGridDefaultsHard();
+
+  try {
+    const eng = new (Ctor as any)(cv);
+    (cv as any).__warpEngine = eng;
+    return eng as WarpType;
+  } catch (e1: any) {
+    const msg1 = String(e1?.message || e1);
+
+    // If GRID_DEFAULTS was the problem, seed & retry — but first clear any half-attach
+    if (/\b(divisions|minSpan|spanPadding)\b/i.test(msg1)) {
+      seedGridDefaultsHard();
+      purgeCanvasEngineGuards(cv);
+      try {
+        const eng2 = new (Ctor as any)(cv);
+        (cv as any).__warpEngine = eng2;
+        return eng2 as WarpType;
+      } catch (e2: any) {
+        const msg2 = String(e2?.message || e2);
+        if (/already attached/i.test(msg2)) {
+          // Something attached during the first attempt; return whatever we can find.
+          const rebound =
+            (cv as any).__warpEngine ||
+            (Ctor as any).fromCanvas?.(cv) ||
+            (Ctor as any).getForCanvas?.(cv);
+          if (rebound && !rebound._destroyed) return rebound as WarpType;
+        }
+        throw e2;
+      }
+    }
+
+    // If the first attempt already tripped the “attached” guard
+    if (/already attached/i.test(msg1)) {
+      const rebound =
+        (cv as any).__warpEngine ||
+        (Ctor as any).fromCanvas?.(cv) ||
+        (Ctor as any).getForCanvas?.(cv);
+      if (rebound && !rebound._destroyed) return rebound as WarpType;
+
+      // Last-ditch: temporarily bypass guard (safer than wedging)
+      try {
+        (window as any).__WARP_ENGINE_ALLOW_MULTI = true;
+        const eng3 = new (Ctor as any)(cv);
+        (cv as any).__warpEngine = eng3;
+        return eng3 as WarpType;
+      } finally {
+        (window as any).__WARP_ENGINE_ALLOW_MULTI = false;
+      }
+    }
+
+    throw e1;
+  }
+}
+
+
+What this does:
+
+Before retrying, it cleans __WARP_ENGINES and any __warpEngine pointer so the guard doesn’t fire.
+
+If the guard still fires, it returns the already-attached instance (or, as a last resort, briefly flips __WARP_ENGINE_ALLOW_MULTI to recover).
+
+This should eliminate the “[already attached]” crash without changing your UI or layout changes (like the SHOW square).

@@ -309,37 +309,88 @@ export default function WarpRenderInspector(props: {
     };
   }
 
+  function purgeCanvasEngineGuards(cv: HTMLCanvasElement) {
+    try { (window as any).__WARP_ENGINES?.delete?.(cv); } catch {}
+    try { delete (cv as any).__warpEngine; } catch {}
+    try { delete (cv as any).__engine; } catch {}
+    try { delete (cv as any).warpEngine; } catch {}
+  }
+
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
     cv: HTMLCanvasElement
   ): WarpType {
-    // Reuse if already attached
-    const existing = (cv as any).__warpEngine || (cv as any).warpEngine || (cv as any).__engine;
+    // Reuse if one is already attached & alive
+    const existing =
+      (cv as any).__warpEngine ||
+      (cv as any).warpEngine ||
+      (cv as any).__engine ||
+      (Ctor as any).fromCanvas?.(cv) ||
+      (Ctor as any).getForCanvas?.(cv);
     if (existing && !existing._destroyed) return existing as WarpType;
 
-    // Prefer factory if class provides one
+    // Prefer factory if available
     const viaFactory =
       (Ctor as any).getOrCreate?.(cv) ||
       (Ctor as any).fromCanvas?.(cv) ||
       (Ctor as any).getForCanvas?.(cv);
-    if (viaFactory) { (cv as any).__warpEngine = viaFactory; return viaFactory as WarpType; }
+    if (viaFactory) {
+      (cv as any).__warpEngine = viaFactory;
+      return viaFactory as WarpType;
+    }
 
-    // 🔒 Make sure GRID_DEFAULTS exists *right now*
+    // Ensure defaults exist *before* first construction
     seedGridDefaultsHard();
 
     try {
       const eng = new (Ctor as any)(cv);
       (cv as any).__warpEngine = eng;
       return eng as WarpType;
-    } catch (e: any) {
-      // If the constructor complained about divisions/minSpan, seed again and retry once
-      if (/\b(divisions|minSpan|spanPadding)\b/i.test(String(e?.message))) {
+    } catch (e1: any) {
+      const msg1 = String(e1?.message || e1);
+
+      // If GRID_DEFAULTS was the problem, seed & retry — but first clear any half-attach
+      if (/\b(divisions|minSpan|spanPadding)\b/i.test(msg1)) {
         seedGridDefaultsHard();
-        const eng2 = new (Ctor as any)(cv);
-        (cv as any).__warpEngine = eng2;
-        return eng2 as WarpType;
+        purgeCanvasEngineGuards(cv);
+        try {
+          const eng2 = new (Ctor as any)(cv);
+          (cv as any).__warpEngine = eng2;
+          return eng2 as WarpType;
+        } catch (e2: any) {
+          const msg2 = String(e2?.message || e2);
+          if (/already attached/i.test(msg2)) {
+            // Something attached during the first attempt; return whatever we can find.
+            const rebound =
+              (cv as any).__warpEngine ||
+              (Ctor as any).fromCanvas?.(cv) ||
+              (Ctor as any).getForCanvas?.(cv);
+            if (rebound && !rebound._destroyed) return rebound as WarpType;
+          }
+          throw e2;
+        }
       }
-      throw e;
+
+      // If the first attempt already tripped the "attached" guard
+      if (/already attached/i.test(msg1)) {
+        const rebound =
+          (cv as any).__warpEngine ||
+          (Ctor as any).fromCanvas?.(cv) ||
+          (Ctor as any).getForCanvas?.(cv);
+        if (rebound && !rebound._destroyed) return rebound as WarpType;
+
+        // Last-ditch: temporarily bypass guard (safer than wedging)
+        try {
+          (window as any).__WARP_ENGINE_ALLOW_MULTI = true;
+          const eng3 = new (Ctor as any)(cv);
+          (cv as any).__warpEngine = eng3;
+          return eng3 as WarpType;
+        } finally {
+          (window as any).__WARP_ENGINE_ALLOW_MULTI = false;
+        }
+      }
+
+      throw e1;
     }
   }
   
