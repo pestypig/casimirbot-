@@ -864,7 +864,7 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">SHOW — Boosted (UI) ({showRendererType})</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
+          <div className="relative aspect-square rounded-xl overflow-hidden bg-black/90">
             <canvas ref={rightRef} className="w-full h-full block"/>
           </div>
         </article>
