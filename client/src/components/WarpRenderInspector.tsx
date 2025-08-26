@@ -330,9 +330,9 @@ export default function WarpRenderInspector(props: {
       return pre as WarpType;
     }
 
-    // 2) First (and only) construction attempt
+    // 2) First (and only) construction attempt (always pass {})
     try {
-      const eng = new (Ctor as any)(cv);  // ⚠️ don't pass opts; it broke earlier
+      const eng = new (Ctor as any)(cv, {});  // OK now that subclass forwards opts
       CANVAS_ENG.set(cv, eng);
       (cv as any)[ENGINE_KEY] = eng;
       return eng;
