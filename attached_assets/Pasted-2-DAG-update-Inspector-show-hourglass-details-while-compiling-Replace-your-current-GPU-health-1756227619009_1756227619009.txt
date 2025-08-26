@@ -1,0 +1,58 @@
+2) DAG update (Inspector): show hourglass + details while compiling
+
+Replace your current GPU health block in WarpRenderInspector.tsx with this helper + usage. It honors engine.loadingState and, if missing, infers compile state via KHR:
+
+function getLinkStatus(engine: any) {
+  const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
+  const prog = engine?.gridProgram || engine?.program || engine?._program || null;
+  const ext  = (engine?.parallelShaderExt || null) as any;
+
+  if (!gl || !prog) return { stage: engine?.loadingState || 'idle', ok: false, reason: 'no GL or program' };
+
+  // If engine told us, trust it
+  if (engine?.loadingState === 'compiling') {
+    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+  }
+  if (engine?.loadingState === 'failed') {
+    const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
+    return { stage: 'failed', ok: false, reason: log };
+  }
+  if (engine?.loadingState === 'linked') {
+    return { stage: 'linked', ok: true, reason: '' };
+  }
+
+  // Infer via KHR if state not provided
+  if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
+    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+  }
+
+  // Final truth from LINK_STATUS
+  const ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+  const reason = ok ? '' : (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
+  return { stage: ok ? 'linked' : 'failed', ok, reason };
+}
+
+
+Then in your validation:
+
+const { stage, ok: linked, reason } = getLinkStatus(engine);
+
+checkpoint({
+  id: 'gpu/link', side, stage: 'gpu',
+  pass: linked, // keeps ✅ / ✗ semantics
+  sev: linked ? 'info' : (stage === 'compiling' ? 'warn' : 'error'),
+  msg: linked
+    ? 'shader linked'
+    : (stage === 'compiling'
+        ? '⏳ compiling shaders…'
+        : `link error: ${reason || 'unknown'}`)
+});
+
+
+You’ll now see:
+
+⏳ compiling shaders… (yellow/warn) while the driver is still linking, then
+
+shader linked (info/green) when done, or
+
+a precise link error: ... (red) if it fails.

@@ -752,6 +752,15 @@ class WarpEngine {
         }
     }
 
+    // New: canonical loading state for DAG
+    // 'idle' | 'compiling' | 'linked' | 'failed'
+    _setLoadingState(state) {
+        this.loadingState = state;               // ← DAG reads this
+        this.isLoaded = (state === 'linked');    // ← keep boolean for legacy paths
+        // keep existing handler behavior (boolean) so nothing breaks:
+        try { this.onLoadingStateChange?.(this.isLoaded); } catch {}
+    }
+
     // Run a callback when the engine is fully ready (shaders linked)
     onceReady(fn) {
         if (this.isLoaded && this.gridProgram) {
@@ -1610,96 +1619,95 @@ class WarpEngine {
     // Matrix math utilities
     _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
         const gl = this.gl;
-        
-        const vertexShader = this._compileShader(gl.VERTEX_SHADER, vertexSource);
+
+        const vertexShader   = this._compileShader(gl.VERTEX_SHADER,   vertexSource);
         const fragmentShader = this._compileShader(gl.FRAGMENT_SHADER, fragmentSource);
-        
-        if (!vertexShader || !fragmentShader) {
-            return null;
-        }
-        
+        if (!vertexShader || !fragmentShader) return null;
+
         const program = gl.createProgram();
         gl.attachShader(program, vertexShader);
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
-        
-        // Set initial debug status (do NOT decide success yet)
+
+        // record initial debug
         this._glStatus = {
-          vertOK:   !!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS),
-          fragOK:   !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS),
-          linkOK:   !!gl.getProgramParameter(program, gl.LINK_STATUS),
-          vertLog: (gl.getShaderInfoLog(vertexShader)   || '').trim(),
-          fragLog: (gl.getShaderInfoLog(fragmentShader) || '').trim(),
-          linkLog: (gl.getProgramInfoLog(program)       || '').trim(),
+            vertOK: !!gl.getShaderParameter(vertexShader,   gl.COMPILE_STATUS),
+            fragOK: !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS),
+            linkOK: !!gl.getProgramParameter(program,       gl.LINK_STATUS),
+            vertLog: (gl.getShaderInfoLog(vertexShader)   || '').trim(),
+            fragLog: (gl.getShaderInfoLog(fragmentShader) || '').trim(),
+            linkLog: (gl.getProgramInfoLog(program)       || '').trim(),
         };
-        // Expose for tooling early
-        window.__glDiag = window.__glDiag || {};
-        window.__glDiag[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
+        (window.__glDiag ||= {})[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
 
-        // If async compile is available, POLL until complete; don't fail early
-        if (this.parallelShaderExt && onReady) {
-          // keep a handle so panels can see there *is* a program being built
-          this.program = this.gridProgram = program;
-          this._setLoaded?.(false);
-          this.onLoadingStateChange?.(false);
-          this._pollShaderCompletion(program, (p) => {
-            if (!p) { onReady?.(null); return; }
-            if (this._onProgramLinked(p)) {
-              this.program = this.gridProgram = p;
-              this._setLoaded?.(true);
-              this.onLoadingStateChange?.(true);
-              onReady?.(p);
-            } else {
-              onReady?.(null);
-            }
-          });
-          return program;
-        }
-
-        // Sync path: validate now
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-          const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
-          const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
-          const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
-          console.error('[WarpEngine] Link error:', { vsLog, fsLog, pgLog });
-          gl.deleteProgram(program);
-          this.onLoadingStateChange?.(false);
-          return null;
-        }
-
-        // Success (sync)
+        // expose a live program handle even during compile so panels can query status
         this.program = this.gridProgram = program;
-        this._onProgramLinked(program);
-        this._setLoaded?.(true);
-        this.onLoadingStateChange?.(true);
-        onReady?.(program);
-        return program;
+
+        // --- Async path (KHR) ---
+        if (this.parallelShaderExt && onReady) {
+            this._setLoadingState('compiling');
+            this._pollShaderCompletion(program, (p) => {
+                if (!p) {
+                    this._setLoadingState('failed');
+                    onReady?.(null);
+                    return;
+                }
+                if (this._onProgramLinked(p)) {
+                    this.program = this.gridProgram = p;
+                    this._setLoadingState('linked');
+                    onReady?.(p);
+                } else {
+                    this._setLoadingState('failed');
+                    onReady?.(null);
+                }
+            });
+            return program;
+        }
+
+        // --- Sync path ---
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
+            const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
+            const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
+            console.error('[WarpEngine] Link error:', { vsLog, fsLog, pgLog });
+            gl.deleteProgram(program);
+            this._setLoadingState('failed');
+            return null;
+        }
+
+        // success (sync)
+        if (this._onProgramLinked(program)) {
+            this.program = this.gridProgram = program;
+            this._setLoadingState('linked');
+            onReady?.(program);
+            return program;
+        }
+        this._setLoadingState('failed');
+        return null;
     }
     
     _pollShaderCompletion(program, onReady) {
         const gl = this.gl;
         const ext = this.parallelShaderExt;
-        
+
         const poll = () => {
             const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
-            
             if (done) {
                 const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
                 if (ok) {
                     onReady(program);
-                    this.onLoadingStateChange?.(true);
+                    this._setLoadingState('linked');
                 } else {
                     console.error('Shader program link error:', gl.getProgramInfoLog(program));
                     gl.deleteProgram(program);
                     onReady(null);
-                    this.onLoadingStateChange?.(false);
+                    this._setLoadingState('failed');
                 }
             } else {
                 requestAnimationFrame(poll);
-                this.onLoadingStateChange?.(false);
+                this._setLoadingState('compiling'); // keep telling the world we're compiling
             }
         };
-        
         poll();
     }
 
