@@ -64,6 +64,24 @@ function expectedThetaForPane(live: any, engine: any) {
   return viewAvg ? base * Math.sqrt(dFR) : base; // (no √ term when not averaging)
 }
 
+// ✅ Prefer pipeline/engine d_FR; fall back to dutyCycle/sectors
+function computeThetaScaleFromParams(v: any) {
+  const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
+  const gammaGeo = Math.max(1, N(v.gammaGeo, 26));
+  const q        = Math.max(1e-12, N(v.qSpoilingFactor ?? v.deltaAOverA, 1));
+  const gVdB     = Math.max(1, N(v.gammaVanDenBroeck ?? v.gammaVdB, 1.4e5));
+
+  const sectors   = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectors, 1)));
+  const dutyUI    = Math.max(0, N(v.dutyCycle, 0));
+  const dFR_ui    = Math.max(1e-12, dutyUI / sectors);
+
+  const dFR = Math.max(1e-12, N(v.dutyEffectiveFR, dFR_ui));
+  const base = Math.pow(gammaGeo, 3) * q * gVdB;
+  const averaging = (v.viewAvg ?? true);
+
+  return averaging ? base * Math.sqrt(dFR) : base;
+}
+
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
   const [tickMs, setTickMs] = useState<number>(0);
   const timerRef = useRef<any>(null);
