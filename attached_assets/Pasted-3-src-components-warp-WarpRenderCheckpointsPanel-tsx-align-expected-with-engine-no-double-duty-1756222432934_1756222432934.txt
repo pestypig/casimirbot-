@@ -1,0 +1,60 @@
+3) src/components/warp/WarpRenderCheckpointsPanel.tsx — align expected-θ with engine (no double-duty)
+
+a) imports
+
+-// (imports unchanged above)
++import { thetaScaleExpected } from "@/lib/expectations";
+
+
+b) replace the old “expectedThetaForPane / computeThetaScaleFromParams / thetaExpected” with one aligned helper
+
+@@
+-// Same θ computation as WarpBubbleCompare.tsx for perfect consistency
+-function computeThetaScaleFromParams(v: any) { ... }
+-
+-// Theta expected function using single source of truth  
+-function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
+-  const gammaGeo = N(u.gammaGeo, 26);
+-  const deltaAA  = N(u.deltaAOverA, 0.625);
+-  const gammaVdB = N(u.gammaVdB, 1.35e5);
+-  
+-  // Use canonical expected calculation
+-  const expectedLinear = thetaScaleExpected({
+-    gammaGeo: Math.max(1, gammaGeo),
+-    q: Math.max(1e-12, deltaAA), 
+-    gammaVdB: Math.max(1, gammaVdB),
+-    dFR: Math.max(1e-12, dutyFR)
+-  });
+-  // Convert the linear export to the renderer's sqrt(d_FR) law.
+-  const expected = expectedLinear * Math.sqrt(1) / Math.max(1e-6, Math.sqrt(Math.max(1e-12, dutyFR))); // normalize
+-  const expectedSqrt = Math.pow(Math.max(1, gammaGeo),3) * Math.max(1e-12, deltaAA) * Math.max(1, gammaVdB) * Math.sqrt(Math.max(1e-12, dutyFR));
+-  const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+-  return averaged ? expectedSqrt : expectedSqrt / Math.sqrt(Math.max(1e-12, dutyFR));
+-}
++// Canonical pane-aligned expected θ that matches the engine:
++//  θ = γ_geo^3 · q · γ_VdB · (viewAvg ? √d_FR : 1)
++function expectedUniformTheta(u: any, liveSnap: any, engine: any) {
++  const eU = engine?.uniforms || {};
++  const getNum = (v: any, d: number) => (Number.isFinite(+v) ? +v : d);
++  const gammaGeo = Math.max(1, getNum(eU.gammaGeo ?? liveSnap?.gammaGeo, 26));
++  const q        = Math.max(1e-12, getNum(eU.qSpoilingFactor ?? eU.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
++  const gammaVdB = Math.max(1, getNum(eU.gammaVdB ?? eU.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, 1.4e5));
++
++  // Duty: prefer what the engine actually used
++  let dFR = eU.dutyEffectiveFR ?? eU.dutyUsed ?? liveSnap?.dutyEffectiveFR ?? liveSnap?.dutyShip ?? liveSnap?.dutyEff;
++  if (!Number.isFinite(dFR)) {
++    const dutyLocal = 0.01;
++    const S_total = Math.max(1, getNum(eU.sectorCount ?? liveSnap?.sectorCount, 400));
++    const S_live  = Math.max(1, getNum(eU.sectors, 1));
++    dFR = dutyLocal * (S_live / S_total);
++  }
++  dFR = Math.max(1e-12, +dFR);
++
++  const viewAvg = (eU.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
++  if (viewAvg) {
++    return thetaScaleExpected({ gammaGeo, q, gammaVdB, dFR }); // includes √d_FR
++  } else {
++    // non-averaged path: engine uses β_inst (no duty factor)
++    return Math.pow(gammaGeo, 3) * q * gammaVdB;
++  }
++}
