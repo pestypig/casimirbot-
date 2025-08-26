@@ -292,8 +292,9 @@ export default function WarpRenderInspector(props: {
       (safe as any).physicsParityMode = forceParity;
       (safe as any).parityMode        = forceParity;
 
-      // Use gated uniforms instead of direct call
-      return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
+      // ✅ forward to the gate using a valid target
+      const target = (typeof orig === 'function') ? { updateUniforms: orig } : engine;
+      return gatedUpdateUniforms(target, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }
@@ -328,7 +329,9 @@ export default function WarpRenderInspector(props: {
       if ('thetaScale' in safe) delete safe.thetaScale;
       safe.physicsParityMode = (pane === 'REAL');
       safe.parityMode = (pane === 'REAL');
-      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
+      // ✅ same fallback as above
+      const target = (typeof orig === 'function') ? { updateUniforms: orig } : engine;
+      return gatedUpdateUniforms(target, safe, `${pane.toLowerCase()}-locked`);
     };
     engine.__locked = true;
   }

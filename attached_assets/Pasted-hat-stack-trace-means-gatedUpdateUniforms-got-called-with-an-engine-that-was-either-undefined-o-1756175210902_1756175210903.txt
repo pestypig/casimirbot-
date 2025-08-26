@@ -1,0 +1,55 @@
+hat stack trace means gatedUpdateUniforms(...) got called with an engine that was either undefined or didn’t have a callable updateUniforms yet (very early in init). Two safe fixes:
+
+A) Harden the gate (drop-in change)
+
+In src/lib/warp-uniforms-gate.ts, wrap the call so we never deref a missing engine. Replace the body of your gate with this tolerant version:
+
+// src/lib/warp-uniforms-gate.ts
+export function gatedUpdateUniforms(engineLike: any, patch: Record<string, any>, source = 'gate') {
+  // Normalize engine input: we allow either a real engine or a {updateUniforms} shim
+  const eng = engineLike && typeof engineLike.updateUniforms === 'function'
+    ? engineLike
+    : engineLike && engineLike.updateUniforms != null
+      ? engineLike     // allow undefined here; we’ll defer
+      : null;
+
+  if (!eng) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[gatedUpdateUniforms] missing engine; skip', { source, patch });
+    }
+    return;
+  }
+
+  // Compute your lockedUniforms as you already do
+  const lockedUniforms = /* whatever your code builds here */ patch;
+
+  const send = () => {
+    try {
+      if (typeof eng.updateUniforms === 'function') {
+        eng.updateUniforms(lockedUniforms);
+      } else {
+        // try once after init completes if the engine exposes a ready hook
+        if (typeof eng.onceReady === 'function') {
+          eng.onceReady(() => eng.updateUniforms?.(lockedUniforms));
+        } else {
+          // last-resort microtask; harmless no-op if still not available
+          queueMicrotask(() => eng.updateUniforms?.(lockedUniforms));
+        }
+      }
+    } catch (e) {
+      console.error('[gatedUpdateUniforms] failed', { source, e });
+    }
+  };
+
+  // If the engine exposes readiness signals, honor them
+  if (eng.isLoaded && eng.gridProgram) {
+    send();
+  } else if (typeof eng.onceReady === 'function') {
+    eng.onceReady(send);
+  } else {
+    queueMicrotask(send);
+  }
+}
+
+
+This makes the gate a no-throw no-op until updateUniforms exists, then applies the patch.
