@@ -48,10 +48,11 @@ if (typeof window.SCENE_SCALE === 'undefined') {
 const SCENE_SCALE = window.SCENE_SCALE;
 
 class WarpEngine {
+    static fromCanvas(canvas) { return canvas && canvas.__warpEngine ? canvas.__warpEngine : null; }
+    static getForCanvas(canvas) { return this.fromCanvas(canvas); }
     static getOrCreate(canvas) {
-        const existing = canvas.__warpEngine;
-        if (existing && !existing._destroyed) return existing;
-        return new this(canvas);
+        const e = this.fromCanvas(canvas);
+        return (e && !e._destroyed) ? e : new this(canvas);
     }
 
     constructor(canvas, _gl, _opts) {
