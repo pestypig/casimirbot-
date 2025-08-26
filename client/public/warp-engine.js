@@ -425,6 +425,18 @@ class WarpEngine {
         }
     }
 
+    _updateGrid() {
+        // Base implementation - rebuild grid with current span and override divisions
+        if (!this._divisionsOverride) return;
+        const gd = getGridDefaults();
+        const span = this.currentGridSpan || gd.minSpan;
+        const data = this._createGrid(span, this._divisionsOverride);
+        if (this.gridVertices) {
+            this.gridVertices = new Float32Array(data);
+            // TODO: reupload VBO if needed
+        }
+    }
+
     _compileGridShaders() {
         const gl = this.gl;
         if (!gl) return;

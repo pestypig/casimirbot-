@@ -366,6 +366,10 @@ export default function WarpRenderInspector(props: {
     };
 
     try {
+      // Debug: Check GRID_DEFAULTS state before construction
+      console.log('Pre-construction GRID_DEFAULTS:', (window as any).GRID_DEFAULTS);
+      console.log('Constructor name:', Ctor.name);
+      
       // Fallback: plain constructor with just the canvas
       const eng = new (Ctor as any)(cv);
       CANVAS_ENG.set(cv, eng);
