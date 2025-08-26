@@ -3,7 +3,6 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
-import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
 import { SliceViewer } from "@/components/SliceViewer";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
@@ -109,7 +108,6 @@ export default function WarpRenderInspector(props: {
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
-  const grid3dRef = useRef<Grid3DHandle>(null);
   const leftOwnedRef = useRef(false);
   const rightOwnedRef = useRef(false);
   
@@ -260,24 +258,17 @@ export default function WarpRenderInspector(props: {
   // Helper to create engine with conditional selection and 3D fallback
   function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
     const W: any = (window as any).WarpEngine;
+    const G3: any = (window as any).Grid3DShowEngine; // from grid3d-engine.js
     
     if (rendererType === 'grid3d') {
-      // Try 3D engine first
-      try {
-        const engine3d = getOrCreateEngine(W, canvas);
-        const ok = engine3d.init ? engine3d.init(canvas) : true;
-        if (ok) {
-          return engine3d;
-        } else {
-          // 3D context failed, dispose and fallback
-          engine3d.dispose?.();
-        }
-      } catch (e) {
-        console.warn('Grid3D engine failed, falling back to slice2d:', e);
-      }
+      const Ctor = G3 || W;                // prefer Grid3DShowEngine if loaded
+      const engine3d = getOrCreateEngine(Ctor, canvas);
+      const ok = engine3d.init ? engine3d.init(canvas) : true;
+      if (ok) return engine3d;
+      engine3d.dispose?.();
     }
     
-    // Use slice2d (either requested or as fallback)
+    // Fallback
     return getOrCreateEngine(W, canvas);
   }
 
@@ -299,19 +290,15 @@ export default function WarpRenderInspector(props: {
       // Hard-lock REAL pane against parity flips and thetaScale writers
       lockPane(leftEngine.current, 'REAL');
     }
-    if (showRendererType !== 'grid3d') {
-      if (rightRef.current && !rightEngine.current) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-        rightEngine.current = createEngineWithFallback('slice2d', rightRef.current);
-        rightOwnedRef.current = true; // we own this engine
-        // Mute engine until canonical uniforms arrive (prevents first-frame spike)
-        gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
-        rightEngine.current?.setVisible?.(false);
-        // Hard-lock SHOW pane against parity flips and thetaScale writers
-        lockPane(rightEngine.current, 'SHOW');
-      }
+    if (rightRef.current && !rightEngine.current) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+      rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
+      rightOwnedRef.current = true;
+      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
+      rightEngine.current?.setVisible?.(false);
+      lockPane(rightEngine.current, 'SHOW');
     }
 
     // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
@@ -371,10 +358,6 @@ export default function WarpRenderInspector(props: {
       // Unmute engines when canonical uniforms arrive
       leftEngine.current?.setVisible?.(true);
       rightEngine.current?.setVisible?.(true);
-      // Also unmute Grid3D engine if active
-      if (showRendererType === 'grid3d') {
-        grid3dRef.current?.getEngine()?.setVisible?.(true);
-      }
     });
 
     // Keep engines muted until first canonical uniforms arrive
@@ -551,69 +534,11 @@ export default function WarpRenderInspector(props: {
   const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
 
-  // Bridge Grid3D engine to checkpoints panel
-  useEffect(() => {
-    if (showRendererType !== 'grid3d') return;
-    const eng = grid3dRef.current?.getEngine();
-    const cvs = grid3dRef.current?.getCanvas();
-    if (!eng || !cvs) return;
 
-    rightEngine.current = eng;
-    (rightRef as any).current = cvs;      // so checkpoints see the real canvas
-    rightOwnedRef.current = false;
-
-    // Mute until uniforms arrive
-    gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
-    eng.setVisible?.(false);
-
-    // Seed axes/camera from REAL (or hull) immediately so buffers build
-    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-    const span = 1; // or live?.gridSpan ?? 1
-    const ax = leftEngine.current?.uniforms?.axesClip ?? deriveAxesClip(hull, span);
-    const cz = compactCameraZ(ax);
-
-    pushUniformsWhenReady(eng, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'fit-show');
-
-    // Mirror REAL's DPR and enable optional SSAA
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    grid3dRef.current?.setPixelRatio?.(dpr);
-    grid3dRef.current?.setSupersample?.(1.25); // 1.0 = off; 1.25-1.5 is a cheap sharpener
-
-    // Match grid detail to available pixels
-    const pxAcross = estimatePxAcrossWall({
-      canvasPxW: cvs.width,
-      canvasPxH: cvs.height,
-      gridSpan: 1,
-      hull,
-      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
-    });
-
-    // Convert pixels into a sensible grid resolution
-    const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
-    console.log(`[GRID] Canvas: ${cvs.width}×${cvs.height}, pxAcross: ${pxAcross.toFixed(1)}, gridRes: ${seg}`);
-    grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
-
-    // SHOW is always UI mode
-    lockPane(rightEngine.current, 'SHOW');
-  }, [showRendererType]);
-
-  // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
-  useEffect(() => {
-    if (showRendererType !== 'grid3d') return;
-    const cv = grid3dRef.current?.getCanvas?.();
-    if (!cv) return;
-    const ro = new ResizeObserver(() => {
-      if (cv.width > 0 && cv.height > 0) {
-        rightEngine.current?.forceRedraw?.();
-      }
-    });
-    ro.observe(cv);
-    return () => ro.disconnect();
-  }, [showRendererType]);
 
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
-    if (!leftEngine.current || (!rightEngine.current && showRendererType !== 'grid3d')) return;
+    if (!leftEngine.current || !rightEngine.current) return;
 
     // Gate first paint until canonical uniforms arrive (prevents averaging race)
     const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
@@ -834,16 +759,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {showRendererType === 'grid3d' ? (
-              <Grid3DEngine 
-                ref={grid3dRef}
-                uniforms={showUniforms} 
-                className="w-full h-full block" 
-                style={{background: 'black'}} 
-              />
-            ) : (
-              <canvas ref={rightRef} className="w-full h-full block"/>
-            )}
+            <canvas ref={rightRef} className="w-full h-full block"/>
           </div>
         </article>
       </section>
@@ -874,22 +790,69 @@ export default function WarpRenderInspector(props: {
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">Curvature</h4>
-          <select
-            className="px-2 py-1 text-sm border rounded"
-            value={curvT}
-            onChange={e => {
-              const v = Number(e.target.value);
-              setCurvT(v);
-              pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
-              pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
-            }}
-          >
-            <option value={0.00}>Flat</option>
-            <option value={0.25}>Mild</option>
-            <option value={0.45}>Cruise</option>
-            <option value={0.70}>Steep</option>
-          </select>
+          <h4 className="font-medium mb-3">Curvature & Equations</h4>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-neutral-600 mb-1">Spacetime Curvature</label>
+              <select
+                className="w-full px-2 py-1 text-sm border rounded"
+                value={curvT}
+                onChange={e => {
+                  const v = Number(e.target.value);
+                  setCurvT(v);
+                  pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
+                  pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
+                }}
+              >
+                <option value={0.00}>Flat Space (η_μν)</option>
+                <option value={0.25}>Mild Curvature</option>
+                <option value={0.45}>Cruise Settings</option>
+                <option value={0.70}>High Curvature</option>
+                <option value={1.00}>Maximum Deformation</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                className="px-2 py-1 text-xs border rounded hover:bg-neutral-100"
+                onClick={() => {
+                  const patch = { exposure: 3.0, zeroStop: 1e-8, ridgeMode: 0 };
+                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-enhance');
+                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-enhance');
+                }}
+              >
+                Enhance Detail
+              </button>
+              <button
+                className="px-2 py-1 text-xs border rounded hover:bg-neutral-100"
+                onClick={() => {
+                  const patch = { exposure: 5.0, zeroStop: 1e-7, ridgeMode: 1 };
+                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-reset');
+                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-reset');
+                }}
+              >
+                Reset View
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-600 mb-1">Field Equations</label>
+              <select
+                className="w-full px-2 py-1 text-sm border rounded"
+                onChange={e => {
+                  const mode = e.target.value;
+                  let patch = {};
+                  if (mode === 'einstein') patch = { colorMode: 'theta', viewAvg: true };
+                  else if (mode === 'stress') patch = { colorMode: 'stress', viewAvg: false };
+                  else if (mode === 'alcubierre') patch = { colorMode: 'velocity', viewAvg: true };
+                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-mode');
+                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-mode');
+                }}
+              >
+                <option value="einstein">Einstein Field Equations</option>
+                <option value="stress">Stress-Energy Tensor</option>
+                <option value="alcubierre">Alcubierre Metric</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
@@ -946,7 +909,7 @@ export default function WarpRenderInspector(props: {
         leftEngineRef={leftEngine}
         rightEngineRef={rightEngine}
         leftCanvasRef={leftRef}
-        rightCanvasRef={showRendererType==='grid3d' ? { current: grid3dRef.current?.getCanvas() } : rightRef}
+        rightCanvasRef={rightRef}
         live={live}
         lightCrossing={{
           burst_ms: (live as any)?.burst_ms,

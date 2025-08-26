@@ -1,0 +1,58 @@
+A) Use a real WebGL engine for SHOW (no 2D canvas)
+
+What changes: stop rendering SHOW with the React 2D Grid3DEngine component; render a plain <canvas> and attach the WebGL engine (same pattern you already use for REAL). Also, let createEngineWithFallback('grid3d', …) pick a specialized class if present.
+
+Patch inside WarpRenderInspector
+
+// 1) Remove this import (we won't use the 2D React wrapper):
+// import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
+
+// 2) Keep your refs, but rightRef is a canvas again:
+const rightRef = useRef<HTMLCanvasElement>(null);
+const grid3dRef = useRef<any>(null); // optional leftover; can delete
+
+// 3) Teach createEngineWithFallback to prefer Grid3DShowEngine (below)
+//    and fall back to WarpEngine (your warp-engine.js)
+function createEngineWithFallback(
+  rendererType: 'slice2d' | 'grid3d', 
+  canvas: HTMLCanvasElement
+) {
+  const W: any = (window as any).WarpEngine;
+  const G3: any = (window as any).Grid3DShowEngine; // from grid3d-engine.js (next section)
+
+  if (rendererType === 'grid3d') {
+    const Ctor = G3 || W;                // prefer Grid3DShowEngine if loaded
+    const engine3d = getOrCreateEngine(Ctor, canvas);
+    const ok = engine3d.init ? engine3d.init(canvas) : true;
+    if (ok) return engine3d;
+    engine3d.dispose?.();
+  }
+
+  // Fallback
+  return getOrCreateEngine(W, canvas);
+}
+
+
+Then, in your JSX where you render SHOW:
+
+{/* SHOW — use a <canvas> for WebGL just like REAL */}
+<div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
+  <canvas ref={rightRef} className="w-full h-full block"/>
+</div>
+
+
+And in your engine bootstrap effect, initialize SHOW when showRendererType === 'grid3d':
+
+if (rightRef.current && !rightEngine.current && showRendererType === 'grid3d') {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+  rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+  rightEngine.current = createEngineWithFallback('grid3d', rightRef.current);
+  rightOwnedRef.current = true;
+  gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
+  rightEngine.current?.setVisible?.(false);
+  lockPane(rightEngine.current, 'SHOW');
+}
+
+
+That alone kills the ctx.clearRect error and gives SHOW a proper GL context.
