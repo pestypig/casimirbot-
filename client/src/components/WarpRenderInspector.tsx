@@ -304,115 +304,26 @@ export default function WarpRenderInspector(props: {
   // Keep our own registry so we can always reuse across HMR/StrictMode
   const CANVAS_ENG = new WeakMap<HTMLCanvasElement, any>();
 
-  function ensureGridDefaults() {
-    const g: any = (typeof window !== 'undefined') ? window : {};
-    const d = g.GRID_DEFAULTS ?? (g.GRID_DEFAULTS = {});
-    if (!Number.isFinite(d.divisions) || d.divisions <= 0) d.divisions = 64;
-    if (!Number.isFinite(d.minSpan)   || d.minSpan <= 0)   d.minSpan   = 2.6;
-    if (typeof d.spanPadding !== 'number')                 d.spanPadding = 1.35;
-  }
 
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
     cv: HTMLCanvasElement
   ): WarpType {
-    // 0) Ensure grid defaults are properly initialized
-    ensureGridDefaults();
-    
-    // 1) If we already know about it, reuse
-    const known = CANVAS_ENG.get(cv);
-    if (known && !known._destroyed) return known as WarpType;
+    // Reuse if already attached
+    const existing = (cv as any).__warpEngine || (cv as any).warpEngine || (cv as any).__engine;
+    if (existing && !existing._destroyed) return existing as WarpType;
 
-    // 1) Try to sniff anything already attached by the base engine
-    const sniffExisting = () => {
-      const candidates = [
-        (cv as any).__warpEngine,
-        (cv as any).__engine,
-        (cv as any).warpEngine,
-        (cv as any)[ENGINE_KEY],
-      ].filter(Boolean);
-      // Prefer ones that look like engines
-      return candidates.find(e => typeof e?.updateUniforms === 'function' && !e._destroyed);
-    };
-    const pre = sniffExisting();
-    if (pre) {
-      CANVAS_ENG.set(cv, pre);
-      (cv as any)[ENGINE_KEY] = pre;
-      return pre as WarpType;
-    }
-
-    const SAFE_OPTS = { divisions: 64, grid: { divisions: 64 } };
-
-    // 2) Prefer engine-provided factories (no double-attach)
+    // Prefer factory if provided
     const viaFactory =
       (Ctor as any).getOrCreate?.(cv) ||
       (Ctor as any).fromCanvas?.(cv) ||
       (Ctor as any).getForCanvas?.(cv);
+    if (viaFactory) return viaFactory as WarpType;
 
-    if (viaFactory) {
-      CANVAS_ENG.set(cv, viaFactory);
-      (cv as any)[ENGINE_KEY] = viaFactory;
-      return viaFactory as WarpType;
-    }
-
-    // 3) As soon as we're about to construct, guarantee GRID_DEFAULTS is set
-    ensureGridDefaults();
-    // Belt-and-suspenders: force good values in case engine captured undefined earlier
-    (window as any).GRID_DEFAULTS = {
-      divisions: 64,
-      minSpan: 2.6,
-      spanPadding: 1.35,
-      ...(window as any).GRID_DEFAULTS
-    };
-
-    try {
-      // Debug: Check GRID_DEFAULTS state before construction
-      console.log('Pre-construction GRID_DEFAULTS:', (window as any).GRID_DEFAULTS);
-      console.log('Constructor name:', Ctor.name);
-      
-      // Fallback: plain constructor with just the canvas
-      const eng = new (Ctor as any)(cv);
-      CANVAS_ENG.set(cv, eng);
-      (cv as any)[ENGINE_KEY] = eng;
-      return eng;
-    } catch (err: any) {
-      const msg = String(err?.message || err);
-
-      // If the error smells like the classic "…divisions" read, fix & retry once
-      if (/divisions/i.test(msg)) {
-        // Belt & suspenders: reassert safe defaults and try again
-        (window as any).GRID_DEFAULTS = {
-          ...(window as any).GRID_DEFAULTS,
-          divisions: 64,
-          minSpan: 2.6,
-          spanPadding: 1.35,
-        };
-        try {
-          const eng2 = new (Ctor as any)(cv);
-          CANVAS_ENG.set(cv, eng2);
-          (cv as any)[ENGINE_KEY] = eng2;
-          return eng2;
-        } catch (err2) {
-          // fall through to existing "already attached" handling below, or rethrow
-        }
-      }
-
-      // Existing "already attached" recovery you already have
-      const m = msg.toLowerCase();
-      if (m.includes('already attached')) {
-        const byClass =
-          (Ctor as any).getOrCreate?.(cv) ||
-          (Ctor as any).fromCanvas?.(cv) ||
-          (Ctor as any).getForCanvas?.(cv);
-        if (byClass) {
-          CANVAS_ENG.set(cv, byClass);
-          (cv as any)[ENGINE_KEY] = byClass;
-          return byClass as WarpType;
-        }
-      }
-
-      throw err;
-    }
+    // Plain constructor
+    const eng = new (Ctor as any)(cv);
+    (cv as any).__warpEngine = eng;
+    return eng as WarpType;
   }
   
   // Hard-lock parity & block late thetaScale writers at the engine edge
