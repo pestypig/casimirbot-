@@ -35,39 +35,27 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
-  const parity = (engine?.uniforms?.physicsParityMode ?? engine?.uniforms?.parityMode ?? false) ? true : false; // REAL=true, SHOW=false
+
   const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
   if (mode === 'standby') return 0;
 
-  const gammaGeo = Math.max(1, N(live?.gammaGeo ?? live?.g_y, 26));
-  const dAa      = Math.max(1e-12, N(live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
+  // Pull params from engine uniforms first (pane-authoritative), then live snapshot
+  const gammaGeo = Math.max(1, N(engine?.uniforms?.gammaGeo ?? live?.gammaGeo ?? live?.g_y, 26));
+  const q        = Math.max(1e-12, N(engine?.uniforms?.deltaAOverA ?? engine?.uniforms?.qSpoilingFactor ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
+  const gVdB     = Math.max(1, N(engine?.uniforms?.gammaVdB ?? engine?.uniforms?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
 
-  // Pull γ_VdB from the engine uniforms if present (authoritative for that pane)
-  const gVdB = Math.max(
-    1,
-    N(
-      engine?.uniforms?.gammaVdB ??
-      engine?.uniforms?.gammaVanDenBroeck ??
-      live?.gammaVanDenBroeck ?? live?.gammaVdB,
-      1.4e5
-    )
+  // ✅ Single duty source: what the engine is actually using
+  const dFR = N(
+    engine?.uniforms?.dutyEffectiveFR ??
+    live?.dutyEffectiveFR ?? live?.dutyShip ?? live?.dutyEff,
+    0.01 / 400 // conservative fallback: 1% local × 1/400 sectors
   );
 
-  // Duty per pane
-  let duty: number;
-  if (parity) {
-    // REAL: ship-wide Ford–Roman duty
-    const dFR = live?.dutyEffectiveFR ?? live?.dutyShip ?? live?.dutyEff;
-    duty = Number.isFinite(+dFR) ? Math.max(0, +dFR) : 0;
-  } else {
-    // SHOW: UI duty averaged over total sectors
-    const S = Math.max(1, Math.floor(N(live?.sectorCount ?? live?.sectors ?? 1, 1)));
-    duty = Math.max(0, N(live?.dutyCycle, 0)) / S;
-  }
+  const betaInst = Math.pow(gammaGeo, 3) * q * gVdB;
+  const viewAvg  = (engine?.uniforms?.viewAvg ?? live?.viewAvg ?? true);
 
-  const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
-  const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
-  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, duty)) : betaInst;
+  // Engine law: γ_geo³ · q · γ_VdB × (viewAvg ? √d_FR : 1)
+  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, dFR)) : betaInst;
 }
 
 // Same θ computation as WarpBubbleCompare.tsx for perfect consistency
