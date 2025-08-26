@@ -605,7 +605,8 @@ export default function WarpRenderInspector(props: {
 
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
-    if (!leftEngine.current || (!rightEngine.current && showRendererType !== 'grid3d')) return;
+    if (!leftEngine.current) return;
+    if (showRendererType === 'grid3d' && !rightEngine.current) return;
 
     // Gate first paint until canonical uniforms arrive (prevents averaging race)
     const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
