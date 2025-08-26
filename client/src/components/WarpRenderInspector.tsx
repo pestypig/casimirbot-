@@ -375,58 +375,7 @@ export default function WarpRenderInspector(props: {
     } catch { return undefined; }
   }
 
-  // Hard-lock parity and block direct thetaScale writes at the engine edge
-  function hardLockUniforms(engine: any, {
-    forceParity,
-    allowThetaScaleDirect = false,
-    tag = 'ENGINE'
-  }: { forceParity: boolean; allowThetaScaleDirect?: boolean; tag?: string }) {
-    if (!engine || engine.__locked) return;
-    const orig = engine.updateUniforms?.bind(engine);
-    engine.updateUniforms = (patch: any) => {
-      const safe = { ...(patch || {}) };
-
-      // parity writes are forbidden
-      if ('physicsParityMode' in safe) {
-        emitDebug('warn', tag, 'blocked physicsParityMode override', {
-          value: (safe as any).physicsParityMode, from: findCaller()
-        });
-        delete (safe as any).physicsParityMode;
-      }
-      if ('parityMode' in safe) {
-        emitDebug('warn', tag, 'blocked parityMode override', {
-          value: (safe as any).parityMode, from: findCaller()
-        });
-        delete (safe as any).parityMode;
-      }
-
-      // thetaScale writes are forbidden (computed from FR duty internally)
-      if (!allowThetaScaleDirect && 'thetaScale' in safe) {
-        emitDebug('warn', tag, 'blocked thetaScale override', {
-          value: (safe as any).thetaScale, from: findCaller()
-        });
-        delete (safe as any).thetaScale;
-      }
-
-      // ridge writes are forbidden; enforce pane ridge here
-      if ('ridgeMode' in safe) {
-        emitDebug('warn', tag, 'blocked ridgeMode override', {
-          value: (safe as any).ridgeMode, from: findCaller()
-        });
-        delete (safe as any).ridgeMode;
-      }
-
-      // force correct parity every call
-      (safe as any).physicsParityMode = forceParity;
-      (safe as any).parityMode        = forceParity;
-      // force ridge per pane: REAL→0, SHOW→1
-      (safe as any).ridgeMode         = forceParity ? 0 : 1;
-
-      // Use gated uniforms instead of direct call
-      return gatedUpdateUniforms({ updateUniforms: orig }, normalizeKeys(safe), `${tag.toLowerCase()}-locked`);
-    };
-    engine.__locked = true;
-  }
+  // NOTE: removed hardLockUniforms — having two wrappers races fields.
 
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
@@ -455,11 +404,12 @@ export default function WarpRenderInspector(props: {
     const orig = engine.updateUniforms?.bind(engine);
     engine.updateUniforms = (patch: any) => {
       const safe = normalizeKeys({ ...(patch || {}) });
+      // Never accept direct θ writes; renderer derives θ from physics.
       if ('thetaScale' in safe) delete safe.thetaScale;
-      if ('ridgeMode'  in safe) delete safe.ridgeMode;
       safe.physicsParityMode = (pane === 'REAL');
       safe.parityMode        = (pane === 'REAL');
-      safe.ridgeMode         = (pane === 'REAL') ? 0 : 1;
+      // Respect caller's ridgeMode if set; else enforce pane default.
+      if (safe.ridgeMode == null) safe.ridgeMode = (pane === 'REAL') ? 0 : 1;
       return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
     };
     engine.__locked = true;
@@ -521,19 +471,22 @@ export default function WarpRenderInspector(props: {
       bindShowCheckpoints(rightEngine.current, rightRef.current);
     }
 
-    // parity hard-locks (keep)
-    if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
-    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, allowThetaScaleDirect: true, tag: 'SHOW' });
+    // No extra hard lock — lockPane is the single authority now.
 
     // bootstrap both
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
 
     leftEngine.current?.onceReady?.(() => {
-      const ax = leftEngine.current?.uniforms?.axesClip;
+      // Ensure axesClip exists for a reliable cameraZ
+      let ax = leftEngine.current?.uniforms?.axesClip;
+      if (!ax) {
+        const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+        ax = deriveAxesClip(hull, 1);
+        gatedUpdateUniforms(leftEngine.current, { axesClip: ax }, 'inspector-left-axes');
+      }
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
-      
       // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
       setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
     });
@@ -543,12 +496,13 @@ export default function WarpRenderInspector(props: {
       const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
       const ax = deriveAxesClip(hull, 1);
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'inspector-right-init');
+      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true, ridgeMode: 1 }, 'inspector-right-init');
       
       // (Nice-to-have) instant grid buffers for the "0/0 floats" row
       rightEngine.current?.updateUniforms?.({
         hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
         wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
+        physicsParityMode: false,
         ridgeMode: 1, colorMode: 'theta',
       });
       rightEngine.current?.forceRedraw?.();
