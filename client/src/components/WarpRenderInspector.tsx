@@ -470,7 +470,7 @@ export default function WarpRenderInspector(props: {
       // (Nice-to-have) instant grid buffers for the "0/0 floats" row
       rightEngine.current?.updateUniforms?.({
         hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-        wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+        wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
         ridgeMode: 1, colorMode: 'theta',
       });
       rightEngine.current?.forceRedraw?.();
@@ -780,7 +780,7 @@ export default function WarpRenderInspector(props: {
         const pxAcross = estimatePxAcrossWall({
           canvasPxW: W, canvasPxH: H,
           gridSpan: 1, hull,
-          wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+          wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
         });
         const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
         grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
@@ -851,7 +851,7 @@ export default function WarpRenderInspector(props: {
       lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
       // Physical scaling
       hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+      wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
       driveDir: props.baseShared?.driveDir ?? [1,0,0],
       vShip: props.baseShared?.vShip ?? 0,
       colorMode: props.baseShared?.colorMode ?? 'theta',
@@ -879,7 +879,14 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: false,
       viewMassFraction: 1.0
     });
-    gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys({
+      ...showUniforms,
+      displayGain: 4.0,
+      curvatureGainT: 0.6,
+      curvatureBoostMax: 40,
+      exposure: 6.0,
+      zeroStop: 1e-7
+    }), 'inspector-show');
     
     // Unmute engines after first normalized payloads are pushed
     leftEngine.current?.setVisible?.(true);
