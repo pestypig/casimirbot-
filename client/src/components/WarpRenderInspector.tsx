@@ -9,6 +9,7 @@ import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 import MarginHunterPanel from "./MarginHunterPanel";
 import CurvatureMenu from "@/components/CurvatureMenu";
+import { useShowCanvasDensity } from "@/hooks/use-show-canvas-density";
 
 /**
  * WarpRenderInspector
@@ -868,7 +869,25 @@ export default function WarpRenderInspector(props: {
         }}
       />
 
-      {/* Visual controls removed - using hardcoded defaults */}
+      {/* Auto canvas density management */}
+      {useShowCanvasDensity({
+        engineRef: rightEngine,
+        canvasRef: rightRef,
+        maxDPR: 2,       // good default cap
+        ssaa: 1.25,      // gentle sharpening
+        adaptive: true,  // auto drop SSAA if target gets huge
+        targetMP: 3.0,   // ~3 megapixels budget at effective DPR
+      })}
+
+      {/* Keep REAL crisp too */}
+      {useShowCanvasDensity({
+        engineRef: leftEngine,
+        canvasRef: leftRef,
+        maxDPR: 2,
+        ssaa: 1.0,       // parity pane can stay non-SSAA
+        adaptive: true,
+        targetMP: 2.5,
+      })}
     </div>
   );
 }
