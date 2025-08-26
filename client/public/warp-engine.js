@@ -1912,6 +1912,7 @@ class WarpEngine {
             ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
             : 1.0;
 
+        const f_view = Math.max(1e-12, U.viewMassFraction ?? 1.0);
         return {
             mode: U.currentMode||'hover',
             duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
@@ -1928,7 +1929,11 @@ class WarpEngine {
             d_FR,
             viewFraction,
             sectorFraction,
-            frameHash8x8: this.sampleHash8x8()
+            frameHash8x8: this.sampleHash8x8(),
+
+            // pane-aware (display only)
+            theta_front_max_viewed: Y.thetaFrontMax * Math.sqrt(f_view),
+            theta_rear_min_viewed:  Y.thetaRearMin  * Math.sqrt(f_view),
         };
     }
 

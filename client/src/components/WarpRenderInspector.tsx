@@ -222,16 +222,14 @@ function PaneOverlay(props:{
 
       // pull contraction/expansion from diagnostics if available
       const diag = (e?.computeDiagnostics?.() || {}) as any;
-      const frontMax = diag.theta_front_max, rearMin = diag.theta_rear_min;
-
+      const frontRaw  = diag.theta_front_max;
+      const rearRaw   = diag.theta_rear_min;
       const f = (flavor === 'REAL') ? Math.max(1e-12, viewFraction) : 1;
-
-      // display-only pane scaling: keep mass law correct (θ²·V·f) and show reduced curvature
-      const frontShown = Number.isFinite(frontMax) ? frontMax * Math.sqrt(f) : frontMax;
-      const rearShown  = Number.isFinite(rearMin)  ? rearMin  * Math.sqrt(f)  : rearMin;
+      const frontMax  = diag.theta_front_max_viewed ?? (Number.isFinite(frontRaw) ? frontRaw * Math.sqrt(f) : frontRaw);
+      const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax: frontShown, rearMin: rearShown,
+        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
       });
       raf = requestAnimationFrame(tick);
