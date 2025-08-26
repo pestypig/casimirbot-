@@ -224,8 +224,14 @@ function PaneOverlay(props:{
       const diag = (e?.computeDiagnostics?.() || {}) as any;
       const frontMax = diag.theta_front_max, rearMin = diag.theta_rear_min;
 
+      const f = (flavor === 'REAL') ? Math.max(1e-12, viewFraction) : 1;
+
+      // display-only pane scaling: keep mass law correct (θ²·V·f) and show reduced curvature
+      const frontShown = Number.isFinite(frontMax) ? frontMax * Math.sqrt(f) : frontMax;
+      const rearShown  = Number.isFinite(rearMin)  ? rearMin  * Math.sqrt(f)  : rearMin;
+
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax, rearMin,
+        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax: frontShown, rearMin: rearShown,
         sectors: Math.max(1,(U.sectorCount|0)||1),
       });
       raf = requestAnimationFrame(tick);
@@ -639,6 +645,20 @@ export default function WarpRenderInspector(props: {
   const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
   const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
   
+  // after you compute sTotal etc.
+  const wallWidth_m      = N(props.baseShared?.wallWidth_m ?? live?.hull?.wallThickness_m, 1.0);
+  // let callers optionally provide a thinner analytical slice (else assume full wall)
+  const sliceThickness_m = N(props.baseShared?.sliceThickness_m, wallWidth_m);
+
+  // 0..1 of the wall band covered by the slice grid
+  const bandCover = Math.max(0, Math.min(1, sliceThickness_m / Math.max(1e-9, wallWidth_m)));
+
+  // sector (azimuthal) fraction already represented by REAL's "one pane"
+  const sectorFrac = 1 / Math.max(1, sTotal);
+
+  // final view mass fraction for REAL's diagnostics & proxies
+  const viewMassFracREAL = sectorFrac * bandCover;
+  
   // Visual-only mass fraction scaling
   const total = Math.max(1, Number(live?.sectorCount) || 400);
   const viewFracREAL = 1 / total;
@@ -911,7 +931,7 @@ export default function WarpRenderInspector(props: {
     const realUniforms = toUniforms({
       ...shared, 
       physicsParityMode: true,
-      viewMassFraction: viewFracREAL
+      viewMassFraction: viewMassFracREAL
     });
     gatedUpdateUniforms(leftEngine.current, normalizeKeys(realUniforms), 'inspector-real');
     
@@ -1077,7 +1097,7 @@ export default function WarpRenderInspector(props: {
               <canvas ref={leftRef} className="w-full h-full block"/>
             )}
             {/* ⬇️ live badge */}
-            <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewFracREAL}/>
+            <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
