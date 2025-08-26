@@ -1,0 +1,156 @@
+Patch A — precision + profile-aware shader selection (drop-in)
+
+Add a small factory to build the right shader pair for the current context and precision support:
+
+// warp-engine.js
+function _makeShaderSources(gl) {
+  const isGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
+
+  // precision probe for WebGL1 FS
+  const hi = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+  const med = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT);
+  const wantHighp = !!hi && hi.precision > 0;
+  const prec = wantHighp ? 'precision highp float;' : 'precision mediump float;';
+
+  // --- Vertex ---
+  const vs2 = `#version 300 es
+    in vec3 a_position;
+    uniform mat4 u_mvpMatrix;
+    out vec3 v_pos;
+    void main() {
+      v_pos = a_position;
+      gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+    }`;
+
+  const vs1 = `
+    attribute vec3 a_position;
+    uniform mat4 u_mvpMatrix;
+    varying vec3 v_pos;
+    void main() {
+      v_pos = a_position;
+      gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+    }`;
+
+  // --- Fragment (shared body) ---
+  const fsBody = `
+    ${prec}
+    uniform vec3  u_sheetColor;
+    uniform float u_thetaScale;
+    uniform int   u_sectorCount;
+    uniform int   u_split;
+    uniform vec3  u_axesScene;
+    uniform vec3  u_axes;
+    uniform vec3  u_driveDir;
+    uniform float u_wallWidth;
+    uniform float u_vShip;
+    uniform float u_epsTilt;
+    uniform float u_intWidth;
+    uniform float u_tiltViz;
+    uniform float u_exposure;
+    uniform float u_zeroStop;
+    uniform float u_userGain;
+    uniform bool  u_physicsParityMode;
+    uniform float u_displayGain;
+    uniform float u_vizGain;
+    uniform float u_curvatureGainT;
+    uniform float u_curvatureBoostMax;
+    uniform int   u_colorMode;
+    uniform int   u_ridgeMode;
+    VARY_DECL vec3 v_pos;
+    VEC4_DECL frag;
+
+    vec3 diverge(float t) {
+      float x = clamp((t+1.0)*0.5, 0.0, 1.0);
+      vec3 c1 = vec3(0.15, 0.45, 1.0);
+      vec3 c2 = vec3(1.0);
+      vec3 c3 = vec3(1.0, 0.45, 0.0);
+      return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);
+    }
+    vec3 seqTealLime(float u) {
+      vec3 a = vec3(0.05, 0.30, 0.35);
+      vec3 b = vec3(0.00, 1.00, 0.60);
+      return mix(a,b, pow(u, 0.8));
+    }
+    void main() {
+      if (u_colorMode == 0) {
+        SET_FRAG(vec4(u_sheetColor, 0.85));
+        return;
+      }
+
+      vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0 ? u_axesScene : u_axes;
+
+      float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;
+      float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;
+      float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);
+      float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);
+
+      vec3 pN = v_pos / axes;
+      float rs = length(pN) + 1e-6;
+      vec3 dN = normalize(u_driveDir / axes);
+      float xs = dot(pN, dN);
+      float w = max(1e-4, u_wallWidth);
+      float delta = (rs - 1.0) / w;
+      float f     = exp(-delta*delta);
+      float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;
+
+      float thetaField = (u_ridgeMode == 0)
+        ? u_vShip * (xs/rs) * dfdrs
+        : u_vShip * (xs/rs) * f;
+
+      float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));
+      float shearProxy = (u_ridgeMode == 0)
+        ? abs(dfdrs) * sinphi * u_vShip
+        : f * sinphi * u_vShip;
+
+      float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
+      amp *= (1.0 + tBlend * (tBoost - 1.0));
+      float valTheta  = thetaField * amp;
+      float valShear  = shearProxy * amp;
+
+      float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
+      float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
+      float norm = log(1.0 + max(1.0, u_exposure));
+
+      float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);
+      float sVis = clamp( magS / norm, 0.0, 1.0);
+
+      vec3 col = (u_colorMode == 1) ? diverge(tVis) : seqTealLime(sVis);
+
+      // interior-tilt violet blend
+      vec3 pN_int = v_pos / axes;
+      float rs_int = length(pN_int) + 1e-6;
+      float wInt = max(1e-4, u_intWidth);
+      float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);
+      float interior = s*s*(3.0 - 2.0*s);
+      float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);
+      vec3 violet = vec3(0.70, 0.30, 1.00);
+      col = mix(col, violet, blendAmt);
+      SET_FRAG(vec4(col, 0.9));
+    }`;
+
+  const fs2 = `#version 300 es
+    ${fsBody.replace('VARY_DECL', 'in').replace('VEC4_DECL frag;', 'out vec4 frag;').replace(/SET_FRAG/g,'frag=')}`;
+
+  const fs1 = `
+    ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(/SET_FRAG/g,'gl_FragColor=')}`;
+
+  return isGL2 ? { vs: vs2, fs: fs2, profile: 'webgl2', wantHighp }
+               : { vs: vs1, fs: fs1, profile: 'webgl1', wantHighp };
+}
+
+
+Then, where you currently build gridVs/gridFs, do:
+
+const src = this._makeShaderSources ? this._makeShaderSources(this.gl) : _makeShaderSources(this.gl);
+this.shaderProfile = src.profile; // for DAG display/debug
+const onReady = (program) => { /* unchanged */ };
+
+if (this.parallelShaderExt) {
+  this.gridProgram = this._createShaderProgram(src.vs, src.fs, onReady);
+} else {
+  this.gridProgram = this._createShaderProgram(src.vs, src.fs);
+  onReady(this.gridProgram);
+}
+
+
+side-effect: we now always emit a valid precision line for WebGL1. that alone fixes a big class of “works on my machine / red X on someone else’s” issues.
