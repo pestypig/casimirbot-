@@ -381,8 +381,10 @@ export default function WarpRenderInspector(props: {
     engine.updateUniforms = (patch: any) => {
       const safe = normalizeKeys({ ...(patch || {}) });
       if ('thetaScale' in safe) delete safe.thetaScale;
+      if ('ridgeMode'  in safe) delete safe.ridgeMode;
       safe.physicsParityMode = (pane === 'REAL');
-      safe.parityMode = (pane === 'REAL');
+      safe.parityMode        = (pane === 'REAL');
+      safe.ridgeMode         = (pane === 'REAL') ? 0 : 1;
       return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
     };
     engine.__locked = true;
@@ -446,7 +448,7 @@ export default function WarpRenderInspector(props: {
 
     // parity hard-locks (keep)
     if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
-    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
+    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, allowThetaScaleDirect: true, tag: 'SHOW' });
 
     // bootstrap both
     leftEngine.current?.bootstrap({ ...realPayload });
@@ -501,10 +503,10 @@ export default function WarpRenderInspector(props: {
     const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
       setHaveUniforms(true); // Mark that we've received first uniforms
       if (leftEngine.current) {
-        applyToEngine(leftEngine.current, u);          // REAL
+        applyToEngine(leftEngine.current,  { ...u, physicsParityMode: true,  ridgeMode: 0 });
       }
       if (rightEngine.current) {
-        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
+        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 });
       }
       
       // Unmute engines when canonical uniforms arrive
@@ -743,6 +745,9 @@ export default function WarpRenderInspector(props: {
   // Extract view fractions for consistency check (SHOW renderer)
   const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
+  
+  // Push UI θ for SHOW (after computing { expected, used, delta })
+  pushUniformsWhenReady(rightEngine.current, { thetaScale: expected }, 'show-ui-theta');
 
   // --- BRIDGE Grid3D wrapper → inspector refs (engine + canvas)
   useEffect(() => {
