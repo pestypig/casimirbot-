@@ -33,58 +33,32 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-function expectedThetaForPane(live: any, engine: any) {
-  const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
+// Canonical pane-aligned expected θ that matches the engine:
+//  θ = γ_geo^3 · q · γ_VdB · (viewAvg ? √d_FR : 1)
+function expectedUniformTheta(u: any, liveSnap: any, engine: any) {
+  const eU = engine?.uniforms || {};
+  const getNum = (v: any, d: number) => (Number.isFinite(+v) ? +v : d);
+  const gammaGeo = Math.max(1, getNum(eU.gammaGeo ?? liveSnap?.gammaGeo, 26));
+  const q        = Math.max(1e-12, getNum(eU.qSpoilingFactor ?? eU.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
+  const gammaVdB = Math.max(1, getNum(eU.gammaVdB ?? eU.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, 1.4e5));
 
-  const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
-  if (mode === 'standby') return 0;
-
-  // Pull params from engine uniforms first (pane-authoritative), then live snapshot
-  const gammaGeo = Math.max(1, N(engine?.uniforms?.gammaGeo ?? live?.gammaGeo ?? live?.g_y, 26));
-  const q        = Math.max(1e-12, N(engine?.uniforms?.deltaAOverA ?? engine?.uniforms?.qSpoilingFactor ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
-  const gVdB     = Math.max(1, N(engine?.uniforms?.gammaVdB ?? engine?.uniforms?.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
-
-  // ✅ Single duty source: what the engine is actually using
-  const dFR = N(
-    engine?.uniforms?.dutyEffectiveFR ??
-    live?.dutyEffectiveFR ?? live?.dutyShip ?? live?.dutyEff,
-    0.01 / 400 // conservative fallback: 1% local × 1/400 sectors
-  );
-
-  const betaInst = Math.pow(gammaGeo, 3) * q * gVdB;
-  const viewAvg  = (engine?.uniforms?.viewAvg ?? live?.viewAvg ?? true);
-
-  // Engine law: γ_geo³ · q · γ_VdB × (viewAvg ? √d_FR : 1)
-  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, dFR)) : betaInst;
-}
-
-function computeThetaScaleFromParams(v: any) {
-  const gammaGeo = N(v.gammaGeo, 26);
-  const q        = N(v.qSpoilingFactor ?? v.deltaAOverA, 1);
-  const gVdB     = N(v.gammaVanDenBroeck ?? v.gammaVdB, 1.4e5);
-
-  const betaInst = Math.pow(Math.max(1, gammaGeo), 3)
-                 * Math.max(1e-12, q)
-                 * Math.max(1, gVdB);
-
-  // Prefer authoritative FR duty if present
-  let d = N(v.dutyEffectiveFR ?? v.dutyShip ?? v.dutyEff, NaN);
-
-  // Fallback: compute FR duty from local burst × (concurrent/total)
-  if (!Number.isFinite(d)) {
-    const sectorsTotal = Math.max(1, N(v.sectorCount ?? v.sectors, 400));
-    const sectorsConc  = Math.max(1, N(v.sectors ?? 1, 1));
-    const dutyLocal    = N(
-      (v.lightCrossing?.burst_ms && v.lightCrossing?.dwell_ms)
-        ? v.lightCrossing.burst_ms / v.lightCrossing.dwell_ms
-        : v.dutyLocal,
-      0.01 // default 1% local
-    );
-    d = dutyLocal * (sectorsConc / sectorsTotal);
+  // Duty: prefer what the engine actually used
+  let dFR = eU.dutyEffectiveFR ?? eU.dutyUsed ?? liveSnap?.dutyEffectiveFR ?? liveSnap?.dutyShip ?? liveSnap?.dutyEff;
+  if (!Number.isFinite(dFR)) {
+    const dutyLocal = 0.01;
+    const S_total = Math.max(1, getNum(eU.sectorCount ?? liveSnap?.sectorCount, 400));
+    const S_live  = Math.max(1, getNum(eU.sectors, 1));
+    dFR = dutyLocal * (S_live / S_total);
   }
+  dFR = Math.max(1e-12, +dFR);
 
-  const viewAvg = (v.viewAvg ?? true);
-  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, d)) : betaInst;
+  const viewAvg = (eU.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+  if (viewAvg) {
+    return thetaScaleExpected({ gammaGeo, q, gammaVdB, dFR }); // includes √d_FR
+  } else {
+    // non-averaged path: engine uses β_inst (no duty factor)
+    return Math.pow(gammaGeo, 3) * q * gammaVdB;
+  }
 }
 
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
@@ -212,7 +186,7 @@ function useCheckpointList(
     
     const thetaUsed = thetaExpectedFn
       ? thetaExpectedFn(u, dutyFR)
-      : expectedThetaForPane(liveSnap, e);
+      : expectedUniformTheta(u, liveSnap, e);
 
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
@@ -378,7 +352,7 @@ function useCheckpointList(
       }
     } else if (liveSnap) {
       // Final fallback to old method
-      const tsExp = expectedThetaForPane(liveSnap, e);
+      const tsExp = expectedUniformTheta(u, liveSnap, e);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
       
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
@@ -672,24 +646,9 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct_left = `${(dutyFR_left*100).toFixed(4)}%`;
   const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
-  function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
-    const gammaGeo = N(u.gammaGeo, 26);
-    const q        = N(u.deltaAOverA ?? u.qSpoilingFactor, 1);
-    const gVdB     = N(u.gammaVdB ?? u.gammaVanDenBroeck, 1.35e5);
 
-    const betaInst = Math.pow(Math.max(1, gammaGeo), 3)
-                   * Math.max(1e-12, q)
-                   * Math.max(1, gVdB);
-
-    const d        = Math.max(1e-12, dutyFR);
-    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true);
-
-    // Engine's θ law
-    return averaged ? betaInst * Math.sqrt(d) : betaInst;
-  }
-
-  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
-  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>thetaExpected(u, dutyFR_right, snap));
+  const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>expectedUniformTheta(u, snap, leftEngineRef.current));
+  const rightRows = useCheckpointList(rightLabel, rightEngineRef, rightCanvasRef, snap, { parity: false, ridge: 1 }, dutyFR_right, (u)=>expectedUniformTheta(u, snap, rightEngineRef.current));
 
   // quick reasons summary if anything hard-fails
   const hardFailsLeft  = leftRows.filter(r => r.state === 'fail').map(r => r.label);
@@ -735,7 +694,7 @@ export default function WarpRenderCheckpointsPanel({
           <span className="font-mono">{
             (() => {
               const u = (leftEngineRef.current?.uniforms ?? {}); // pick REAL as reference
-              const exp = thetaExpected(u, dutyFR_left, snap);
+              const exp = expectedUniformTheta(u, snap, leftEngineRef.current);
               return Number.isFinite(exp) ? exp.toExponential(2) : '—';
             })()
           }</span>
