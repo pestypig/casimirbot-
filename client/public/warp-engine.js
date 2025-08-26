@@ -1623,6 +1623,27 @@ class WarpEngine {
         gl.attachShader(program, fragmentShader);
         gl.linkProgram(program);
         
+        // After you compile/link:
+        this._glStatus = this._glStatus || {};
+        this._glStatus.vertOK = !!gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
+        this._glStatus.fragOK = !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS);
+        this._glStatus.linkOK = !!gl.getProgramParameter(program, gl.LINK_STATUS);
+        this._glStatus.vertLog = (gl.getShaderInfoLog(vertexShader) || '').trim();
+        this._glStatus.fragLog = (gl.getShaderInfoLog(fragmentShader) || '').trim();
+        this._glStatus.linkLog = (gl.getProgramInfoLog(program) || '').trim();
+
+        // Normalize the public handle so all panels find it
+        this.program = program;
+        this.gridProgram = program;
+
+        // Fire a loading-state event if you have one
+        this.isLoaded = this._glStatus.linkOK && !!this.gridProgram;
+        this.onLoadingStateChange?.(this.isLoaded);
+
+        // Optional: quick global for ad-hoc debugging
+        window.__glDiag = window.__glDiag || {};
+        window.__glDiag[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
+        
         // Shader link logging (helps if you ever see "Shaders linked — no program" again)
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
           const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
