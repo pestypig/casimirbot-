@@ -120,13 +120,19 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
   if (engine._render) {
     const originalRender = engine._render.bind(engine);
     engine._render = function(...args: any[]) {
+      if (!engine?.gridProgram) return originalRender(...args);
       validateUniforms();
       return originalRender(...args);
     };
   }
   
-  // Also validate immediately
-  setTimeout(validateUniforms, 100);
+  // when wiring validateUniforms
+  if (engine?.onceReady) {
+    engine.onceReady(validateUniforms);
+  } else {
+    // fallback: wait a tick so linking can happen
+    setTimeout(validateUniforms, 0);
+  }
 }
 
 // Optional: estimate pixel density across wall band (debugging helper)
