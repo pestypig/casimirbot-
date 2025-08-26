@@ -483,46 +483,29 @@ export default function WarpRenderInspector(props: {
       rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
     }
 
+    // At mount, keep hidden
+    leftEngine.current?.setVisible?.(false);
+    rightEngine.current?.setVisible?.(false);
+
     // Subscribe to canonical server uniforms
     const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
-      setHaveUniforms(true); // Mark that we've received first uniforms
-      if (leftEngine.current) {
-        applyToEngine(leftEngine.current, u);          // REAL
-      }
-      if (rightEngine.current) {
-        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
-      }
-      
-      // Unmute engines when canonical uniforms arrive
+      setHaveUniforms(true);
+
+      // let the server payload set ALL physics; we do not add gamma/duty/etc. here
+      applyToEngine(leftEngine.current,  u); // REAL
+      applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 }); // SHOW
+
+      // only now show canvases
       leftEngine.current?.setVisible?.(true);
       rightEngine.current?.setVisible?.(true);
+
+      // optional: immediately harmonize framing after uniforms are in
+      const ax = rightEngine.current?.uniforms?.axesClip;
+      const cz = compactCameraZ(ax);
+      gatedUpdateUniforms(leftEngine.current,  { cameraZ: cz }, 'post-uniforms-camera');
+      gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'post-uniforms-camera');
     });
 
-    // Keep engines muted until first canonical uniforms arrive
-    if (!haveUniforms) {
-      leftEngine.current?.setVisible?.(false);
-      rightEngine.current?.setVisible?.(false);
-      if (leftEngine.current) {
-        leftEngine.current.updateUniforms?.({
-          physicsParityMode: true, 
-          ridgeMode: TONEMAP_LOCK.ridgeMode,
-          exposure: TONEMAP_LOCK.exp,
-          zeroStop: TONEMAP_LOCK.zero,
-          colorMode: TONEMAP_LOCK.colorMode,
-          viewAvg: TONEMAP_LOCK.viewAvg
-        });
-      }
-      if (rightEngine.current) {
-        rightEngine.current.updateUniforms?.({
-          physicsParityMode: false, 
-          ridgeMode: TONEMAP_LOCK.ridgeMode,
-          exposure: TONEMAP_LOCK.exp,
-          zeroStop: TONEMAP_LOCK.zero,
-          colorMode: TONEMAP_LOCK.colorMode,
-          viewAvg: TONEMAP_LOCK.viewAvg
-        });
-      }
-    }
 
     return () => {
       // Unsubscribe from canonical uniforms
@@ -694,6 +677,9 @@ export default function WarpRenderInspector(props: {
       colorMode: 'theta' as const,
       lockFraming: true,
     };
+
+    leftEngine.current.setVisible?.(haveUniforms);
+    rightEngine.current.setVisible?.(haveUniforms);
 
     // push only display knobs; physics came from server
     gatedUpdateUniforms(leftEngine.current,  displayOnly, 'display-only');
