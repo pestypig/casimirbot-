@@ -91,9 +91,24 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
     });
 
     // GPU health
-    const gl = engine.gl;
-    const ok = gl?.isProgram(engine.program) && !gl.getError();
-    checkpoint({ id:'gpu/link', side, stage:'gpu', pass: !!ok, msg:'shader linked' });
+    const gl = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
+    const prog = engine?.gridProgram || engine?.program || engine?._program || null;
+
+    let linked = false, reason = 'no GL or program';
+    try {
+      if (gl && prog) {
+        linked = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+        if (!linked) reason = (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
+      }
+    } catch (e: any) { 
+      reason = `exception: ${e?.message || e}`;
+    }
+
+    checkpoint({
+      id: 'gpu/link', side, stage: 'gpu',
+      pass: linked, sev: linked ? 'info' : 'error',
+      msg: linked ? 'shader linked' : `link error: ${reason}`
+    });
 
     // CameraZ
     const camSet = !!engine.cameraZ && Number.isFinite(engine.cameraZ);
