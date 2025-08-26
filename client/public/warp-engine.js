@@ -373,34 +373,35 @@ class WarpEngine {
     }
 
     // Authentic spacetime grid from gravity_sim.cpp with proper normalization
-    _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
+    _createGrid(span = 1.6, divisions) {
         // ---- guards ----
+        const gd = globalThis.GRID_DEFAULTS || {};
+        const fallbackDiv = Number.isFinite(gd.divisions) && gd.divisions > 0 ? (gd.divisions|0) : 160;
         const spanSafe = Number.isFinite(span) && span > 0 ? span : 1.6;
-        const divIn    = Number.isFinite(divisions) && divisions > 0 ? divisions : GRID_DEFAULTS.divisions || 160;
+        const divIn = Number.isFinite(divisions) && divisions > 0 ? (divisions|0) : fallbackDiv;
+        const finalDiv = Math.max(divIn, 24); // never below 24 to keep geometry stable
 
-        const baseDiv  = Math.max(divIn, 160);
         const hullAxes = Array.isArray(this.currentParams?.hullAxes) ? this.currentParams.hullAxes : [503.5,132,86.5];
         const wallWidth_m = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : 6.0;
 
         const minAxis = Math.max(1e-6, Math.min(...hullAxes));
         const span_rho = (3 * wallWidth_m) / minAxis;
-        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * baseDiv));
+        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * finalDiv));
 
-        let div = Math.min(320, Math.floor(baseDiv * scale));
-        if (!Number.isFinite(div) || div < 1) div = baseDiv;   // final fallback
+        let computedDiv = Math.min(320, Math.floor(finalDiv * scale));
+        if (!Number.isFinite(computedDiv) || computedDiv < 24) computedDiv = finalDiv;   // final fallback
 
-        divisions = div;
         const verts = [];
-        const step = (spanSafe * 2) / divisions;  // Full span width divided by divisions
+        const step = (spanSafe * 2) / computedDiv;
         const half = spanSafe;  // Half-extent
         
         // Create a slight height variation across the grid for proper 3D visualization
         const yBase = -0.15;  // Base Y level
         const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
 
-        for (let z = 0; z <= divisions; ++z) {
+        for (let z = 0; z <= computedDiv; ++z) {
             const zPos = -half + z * step;
-            for (let x = 0; x < divisions; ++x) {
+            for (let x = 0; x < computedDiv; ++x) {
                 const x0 = -half + x * step;
                 const x1 = -half + (x + 1) * step;
                 
@@ -411,9 +412,9 @@ class WarpEngine {
                 verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
             }
         }
-        for (let x = 0; x <= divisions; ++x) {
+        for (let x = 0; x <= computedDiv; ++x) {
             const xPos = -half + x * step;
-            for (let z = 0; z < divisions; ++z) {
+            for (let z = 0; z < computedDiv; ++z) {
                 const z0 = -half + z * step;
                 const z1 = -half + (z + 1) * step;
                 
@@ -425,7 +426,7 @@ class WarpEngine {
             }
         }
         
-        console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
+        console.log(`Spacetime grid: ${verts.length/6} lines, ${computedDiv}x${computedDiv} divisions`);
         console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${spanSafe*2})`);
         return new Float32Array(verts);
     }
