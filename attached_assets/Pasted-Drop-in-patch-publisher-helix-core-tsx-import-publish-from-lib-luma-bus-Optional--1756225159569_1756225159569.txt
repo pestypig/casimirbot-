@@ -1,0 +1,74 @@
+Drop-in patch (publisher)
+// helix-core.tsx
+import { publish } from "@/lib/luma-bus";
+
+// Optional: local fallback counter if seq is missing
+let __busSeq = 0;
+
+const toNumber = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
+
+function sanitizeServerUniforms(raw: any, version: number) {
+  const gammaVdB_vis  = toNumber(raw.gammaVanDenBroeck_vis ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, 1.4e5);
+  const gammaVdB_mass = toNumber(raw.gammaVanDenBroeck_mass ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis);
+  const gammaGeo      = Math.max(1, toNumber(raw.gammaGeo, 26));
+  const q             = Math.max(1e-12, toNumber(raw.qSpoilingFactor ?? raw.deltaAOverA, 1));
+  const dFR           = Math.max(1e-12, toNumber(raw.dutyEffectiveFR, 0.01 / Math.max(1, toNumber(raw.sectorCount, 400))));
+  const viewAvg       = (raw.viewAvg ?? true) ? true : false;
+
+  // Canonical expected θ (renderer flavor: uses γ_VdB_vis and √d_FR when viewAvg=true)
+  const thetaScaleExpected =
+    Math.pow(gammaGeo, 3) * q * gammaVdB_vis * (viewAvg ? Math.sqrt(dFR) : 1);
+
+  // Keep only physics + scheduling + geometry + timing
+  const out = {
+    // physics
+    gammaGeo,
+    qSpoilingFactor: q,
+    gammaVanDenBroeck_vis: gammaVdB_vis,
+    gammaVanDenBroeck_mass: gammaVdB_mass,
+    gammaVdB: gammaVdB_vis, // alias for consumers
+
+    // scheduling
+    sectorCount: Math.max(1, toNumber(raw.sectorCount, 400)),
+    sectors:     Math.max(1, toNumber(raw.sectors, 1)),
+    dutyCycle:   Math.max(0,  toNumber(raw.dutyCycle, 0.01)),
+    dutyEffectiveFR: dFR,
+    currentMode: String(raw.currentMode ?? 'hover').toLowerCase() as
+      'hover'|'cruise'|'emergency'|'standby',
+
+    // timing (for FR derivations / panels)
+    lightCrossing: raw.lightCrossing && {
+      burst_ms: toNumber(raw.lightCrossing.burst_ms, 0.01),
+      dwell_ms: toNumber(raw.lightCrossing.dwell_ms, 1.00),
+    },
+
+    // geometry passthrough (if present)
+    hull: raw.hull,
+
+    // averaging flag the renderer actually honors
+    viewAvg,
+
+    // helpful derived for checkpoint UIs
+    thetaScaleExpected,
+
+    // bus meta
+    __src: 'server' as const,
+    __version: version
+  };
+
+  // Do NOT include UI/display knobs; pane locks set those:
+  //   physicsParityMode, ridgeMode, colorMode, userGain, curvatureGainT, curvatureBoostMax
+  // Do NOT include thetaScale; engine computes from the chain.
+
+  return out;
+}
+
+useEffect(() => {
+  const wu = (systemMetrics as any)?.warpUniforms;
+  if (!wu) return;
+
+  const seq = Number((systemMetrics as any)?.seq);
+  const version = Number.isFinite(seq) ? seq : ++__busSeq;
+
+  publish('warp:uniforms', sanitizeServerUniforms(wu, version));
+}, [systemMetrics]);
