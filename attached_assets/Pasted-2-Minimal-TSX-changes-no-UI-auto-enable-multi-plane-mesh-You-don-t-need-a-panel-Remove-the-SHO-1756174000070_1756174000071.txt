@@ -1,0 +1,58 @@
+2) Minimal TSX changes (no UI; auto-enable multi-plane mesh)
+
+You don’t need a panel. Remove the SHOW — 3D Mesh Planes JSX block and the meshOpts React state/effect. Then, just set the mesh once when the SHOW engine is ready.
+
+What to delete from your component
+
+The meshOpts state:
+
+// REMOVE this:
+// const [meshOpts, setMeshOpts] = useState({
+//   showXZ: true, layersXZ: 2,
+//   showXY: true, layersXY: 1,
+//   showYZ: true, layersYZ: 1,
+// });
+
+
+The effect that applied meshOpts:
+
+// REMOVE this:
+// useEffect(() => {
+//   if (rightEngine.current?.setMeshOptions) {
+//     rightEngine.current.setMeshOptions(meshOpts);
+//   }
+// }, [meshOpts]);
+
+
+The entire JSX card titled “SHOW — 3D Mesh Planes”.
+
+What to add (inside your existing engine-init effect)
+
+Find this block in your effect where you already do rightEngine.current?.onceReady?.(() => { ... }) and insert the lines marked // NEW:
+
+rightEngine.current?.onceReady?.(() => {
+  const ax = rightEngine.current?.uniforms?.axesClip;
+  const cz = compactCameraZ(ax);
+  gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
+  const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
+  rightEngine.current.setDisplayGain?.(dg);
+
+  // === NEW: force a cube of mesh planes, aligned to grid ===
+  // pick a sane grid density (matches your square grid scale)
+  rightEngine.current?.setGridResolution?.({ divisions: 64 });
+  // show several planes on each axis; aligned to grid increments
+  rightEngine.current?.setMeshOptions?.({
+    showXZ: true, layersXZ: 5,   // “decks”
+    showXY: true, layersXY: 3,   // front/back
+    showYZ: true, layersYZ: 3,   // sides
+    alignToGrid: true
+  });
+
+  // Optional: quick console proof if subclass isn’t loaded
+  if (!rightEngine.current?.setMeshOptions) {
+    console.warn('Grid3DShowEngine not active — did you load public/grid3d-engine.js after warp-engine.js?');
+  }
+});
+
+
+That’s it. When SHOW mounts, it will render a cube of mesh slices (XZ/XY/YZ) using the same square-grid spacing already on screen, so you’ll see multiple planes intersecting the warp bubble with no extra UI.

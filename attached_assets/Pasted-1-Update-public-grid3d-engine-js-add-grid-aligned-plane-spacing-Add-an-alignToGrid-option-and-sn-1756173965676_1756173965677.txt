@@ -1,3 +1,7 @@
+1) Update public/grid3d-engine.js (add grid-aligned plane spacing)
+
+Add an alignToGrid option and snap plane positions to the grid step. Drop this into your child engine (only the changed bits shown):
+
 // public/grid3d-engine.js
 (function (global) {
   const WE = global.WarpEngine;
@@ -6,39 +10,16 @@
   class Grid3DShowEngine extends WE {
     constructor(canvas){
       super(canvas);
-      // defaults
-      this._dprOverride = null;
-      this._ssaa = 1;
-      this._forceDivisions = null;
       this._meshOpts = {
-        showXZ: true,  // horizontal "decks" (stack along Y)
-        showXY: false, // front/back slices (stack along Z)
-        showYZ: false, // side slices (stack along X)
-        layersXZ: 1,   // how many deck planes
-        layersXY: 0,   // how many XY planes
-        layersYZ: 0,   // how many YZ planes
-        divisions: null, // base divisions per plane (falls back to WarpEngine logic)
+        showXZ: true,  showXY: false, showYZ: false,
+        layersXZ: 1,   layersXY: 0,   layersYZ: 0,
+        divisions: null,
         alignToGrid: true,   // NEW: snap planes to the same square-grid spacing
       };
     }
 
-    // ---- public knobs ---------------------------------------------------------
-    setPixelRatio(pr) {
-      this._dprOverride = Math.max(1, Math.min(3, +pr || 1));
-      this._resizeCanvasToDisplaySize();
-    }
-    setSupersample(ss) {
-      this._ssaa = Math.max(1, Math.min(2, +ss || 1));
-      this._resizeCanvasToDisplaySize();
-    }
-    setGridResolution({ divisions, radial, angular, axial } = {}) {
-      const pick = [divisions, radial, angular, axial].find(v => Number.isFinite(v));
-      if (Number.isFinite(pick)) this._forceDivisions = Math.max(24, pick | 0);
-      this._updateGrid?.();
-    }
     setMeshOptions(opts = {}) {
       this._meshOpts = { ...this._meshOpts, ...opts };
-      // keep counts sane
       const clampN = v => Math.max(0, Math.min(32, v|0));
       this._meshOpts.layersXZ = clampN(this._meshOpts.layersXZ);
       this._meshOpts.layersXY = clampN(this._meshOpts.layersXY);
@@ -46,22 +27,6 @@
       this._updateGrid?.();
     }
 
-    // ---- DPR + SSAA aware resize ---------------------------------------------
-    _resizeCanvasToDisplaySize() {
-      const base = global.devicePixelRatio || 1;
-      const dpr = Math.min(2.5, (this._dprOverride || base) * (this._ssaa || 1));
-      const { clientWidth, clientHeight } = this.canvas;
-      const width  = Math.max(1, Math.floor(clientWidth  * dpr));
-      const height = Math.max(1, Math.floor(clientHeight * dpr));
-      if (this.canvas.width !== width || this.canvas.height !== height) {
-        this.canvas.width = width;
-        this.canvas.height = height;
-        this.gl.viewport(0, 0, width, height);
-        this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
-      }
-    }
-
-    // ---- mesh generator (overrides parent) -----------------------------------
     _createGrid(span, divisions) {
       const div = (this._meshOpts.divisions || this._forceDivisions || divisions);
       const base = super._createGrid(span, div);
@@ -125,3 +90,6 @@
 
   global.Grid3DShowEngine = Grid3DShowEngine;
 })(globalThis);
+
+
+That keeps everything cubic in grid space and guarantees your extra planes land exactly on the existing square-grid increments.
