@@ -1,7 +1,7 @@
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoints";
-import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
+import { thetaScaleExpected } from "@/lib/expectations";
 import CheckpointViewer from "./CheckpointViewer";
 
 /*
