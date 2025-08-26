@@ -333,6 +333,14 @@ export default function WarpRenderInspector(props: {
       const ax = deriveAxesClip(hull, 1);
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'inspector-right-init');
+      
+      // (Nice-to-have) instant grid buffers for the "0/0 floats" row
+      rightEngine.current?.updateUniforms?.({
+        hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
+        wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+        ridgeMode: 1, colorMode: 'theta',
+      });
+      rightEngine.current?.forceRedraw?.();
     });
 
     // Diagnostics -> window for quick comparison
@@ -992,14 +1000,11 @@ export default function WarpRenderInspector(props: {
         leftLabel="REAL"
         rightLabel="SHOW"
         leftEngineRef={leftEngine}
-        rightEngineRef={rightEngine}
+        rightEngineRef={rightEngine}   // ⬅️ this is now the JS WarpEngine
         leftCanvasRef={leftRef}
-        rightCanvasRef={rightRef}
+        rightCanvasRef={rightRef}      // ⬅️ same canvas the engine draws into
         live={live}
-        lightCrossing={{
-          burst_ms: (live as any)?.burst_ms,
-          dwell_ms: (live as any)?.dwell_ms,
-        }}
+        lightCrossing={{ burst_ms: (live as any)?.burst_ms, dwell_ms: (live as any)?.dwell_ms }}
       />
 
       {/* Visual controls removed - using hardcoded defaults */}
