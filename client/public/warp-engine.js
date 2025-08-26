@@ -417,8 +417,8 @@ class WarpEngine {
             this._updateGrid?.(); // if you have an updater
         } catch {
             // Fallback: minimal in-place rebuild
-            const gd = globalThis.GRID_DEFAULTS || {};
-            const span = Number.isFinite(gd.minSpan) ? gd.minSpan : 2.6;
+            const gd = getGridDefaults();
+            const span = gd.minSpan;
             const data = this._createGrid(span, this._divisionsOverride);
             this.gridVertices = new Float32Array(data);
             // TODO: reupload VBO if your engine requires (bindBuffer + bufferData)
