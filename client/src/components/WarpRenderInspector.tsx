@@ -682,7 +682,7 @@ export default function WarpRenderInspector(props: {
     return Math.pow(Number(gammaGeo)||0, 3)
          * (Number(qSpoilingFactor)||1)
          * (Number(gammaVdB)||1)
-         * (Number(dutyEffectiveFR)||0);
+         * Math.sqrt(Math.max(1e-12, Number(dutyEffectiveFR)||0));
   }
 
   function pctDelta(a:number, b:number){

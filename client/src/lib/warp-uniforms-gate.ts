@@ -78,11 +78,12 @@ export function applyToEngine(
   // Canonical θ if server didn't precompute
   // Use visual-only γ_VdB to keep mass calibration away from theta calculations
   const gammaVdB_vis = normalizedUniforms.gammaVanDenBroeck_vis ?? normalizedUniforms.gammaVanDenBroeck;
+  // Unify duty law with renderer: use sqrt(d_FR)
   const θ = normalizedUniforms.thetaScale ?? (
     Math.pow(normalizedUniforms.gammaGeo, 3) *
     normalizedUniforms.qSpoilingFactor *
     gammaVdB_vis *
-    normalizedUniforms.dutyEffectiveFR
+    Math.sqrt(normalizedUniforms.dutyEffectiveFR)
   );
 
   // Apply locked display settings - modes only change physics, not visuals

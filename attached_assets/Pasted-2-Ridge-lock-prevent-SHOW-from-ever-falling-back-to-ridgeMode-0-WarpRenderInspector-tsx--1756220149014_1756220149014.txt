@@ -1,0 +1,92 @@
+2) Ridge lock — prevent SHOW from ever falling back to ridgeMode=0
+*** WarpRenderInspector.tsx ***
+@@
+-const TONEMAP_LOCK = { 
+-  exp: 5.0, 
+-  zero: 1e-7, 
+-  ridgeMode: 0, 
+-  colorMode: 'theta' as const,
+-  viewAvg: true 
+-};
++const TONEMAP_LOCK = {
++  exp: 5.0,
++  zero: 1e-7,
++  // no ridgeMode here — ridge is enforced per-pane in the lock
++  colorMode: 'theta' as const,
++  viewAvg: true
++};
+@@
+-function hardLockUniforms(engine: any, {
+-  forceParity,
+-  allowThetaScaleDirect = false,
+-  tag = 'ENGINE'
+-}: { forceParity: boolean; allowThetaScaleDirect?: boolean; tag?: string }) {
++function hardLockUniforms(engine: any, {
++  forceParity,
++  allowThetaScaleDirect = false,
++  tag = 'ENGINE'
++}: { forceParity: boolean; allowThetaScaleDirect?: boolean; tag?: string }) {
+@@
+-      // parity writes are forbidden
++      // parity writes are forbidden
+       if ('physicsParityMode' in safe) {
+         emitDebug('warn', tag, 'blocked physicsParityMode override', {
+           value: (safe as any).physicsParityMode, from: findCaller()
+         });
+         delete (safe as any).physicsParityMode;
+       }
+       if ('parityMode' in safe) {
+         emitDebug('warn', tag, 'blocked parityMode override', {
+           value: (safe as any).parityMode, from: findCaller()
+         });
+         delete (safe as any).parityMode;
+       }
+ 
+-      // thetaScale writes are forbidden (computed from FR duty internally)
++      // thetaScale writes are forbidden (computed from FR duty internally)
+       if (!allowThetaScaleDirect && 'thetaScale' in safe) {
+         emitDebug('warn', tag, 'blocked thetaScale override', {
+           value: (safe as any).thetaScale, from: findCaller()
+         });
+         delete (safe as any).thetaScale;
+       }
+ 
++      // ridge writes are forbidden; enforce pane ridge here
++      if ('ridgeMode' in safe) {
++        emitDebug('warn', tag, 'blocked ridgeMode override', {
++          value: (safe as any).ridgeMode, from: findCaller()
++        });
++        delete (safe as any).ridgeMode;
++      }
++
+       // force correct parity every call
+       (safe as any).physicsParityMode = forceParity;
+       (safe as any).parityMode        = forceParity;
++      // force ridge per pane: REAL→0, SHOW→1
++      (safe as any).ridgeMode         = forceParity ? 0 : 1;
+@@
+-    if (!haveUniforms) {
++    if (!haveUniforms) {
+       leftEngine.current?.setVisible?.(false);
+       rightEngine.current?.setVisible?.(false);
+       if (leftEngine.current) {
+         leftEngine.current.updateUniforms?.({
+           physicsParityMode: true, 
+-          ridgeMode: TONEMAP_LOCK.ridgeMode,
+           exposure: TONEMAP_LOCK.exp,
+           zeroStop: TONEMAP_LOCK.zero,
+           colorMode: TONEMAP_LOCK.colorMode,
+           viewAvg: TONEMAP_LOCK.viewAvg
+         });
+       }
+       if (rightEngine.current) {
+         rightEngine.current.updateUniforms?.({
+           physicsParityMode: false, 
+-          ridgeMode: TONEMAP_LOCK.ridgeMode,
+           exposure: TONEMAP_LOCK.exp,
+           zeroStop: TONEMAP_LOCK.zero,
+           colorMode: TONEMAP_LOCK.colorMode,
+           viewAvg: TONEMAP_LOCK.viewAvg
+         });
+       }
+     }

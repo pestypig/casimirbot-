@@ -1,0 +1,79 @@
+three tiny diffs you can drop in. They line up with what you pasted (filenames just for reference).
+
+1) θ duty law — unify everything to √d_FR (pipeline + inspector + checkpoints)
+*** HELIX-CORE energy pipeline (ts file) ***
+@@
+-  (state as any).thetaScaleExpected = 
+-    Math.pow(state.gammaGeo, 3) *
+-    (state.qSpoilingFactor ?? 1) *
+-    ((state as any).gammaVanDenBroeck_vis ?? GAMMA_VDB) *
+-    (state.dutyEffective_FR ?? d_eff);
++  // Unify duty law with renderer: use sqrt(d_FR)
++  (state as any).thetaScaleExpected =
++    Math.pow(state.gammaGeo, 3) *
++    (state.qSpoilingFactor ?? 1) *
++    ((state as any).gammaVanDenBroeck_vis ?? GAMMA_VDB) *
++    Math.sqrt(state.dutyEffective_FR ?? d_eff);
+
+*** WarpRenderInspector.tsx ***
+@@
+-  function thetaGainExpected({
+-    gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR
+-  }: {gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number}) {
+-    return Math.pow(Number(gammaGeo)||0, 3)
+-         * (Number(qSpoilingFactor)||1)
+-         * (Number(gammaVdB)||1)
+-         * (Number(dutyEffectiveFR)||0);
+-  }
++  function thetaGainExpected({
++    gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR
++  }: {gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number}) {
++    return Math.pow(Number(gammaGeo)||0, 3)
++         * (Number(qSpoilingFactor)||1)
++         * (Number(gammaVdB)||1)
++         * Math.sqrt(Math.max(1e-12, Number(dutyEffectiveFR)||0));
++  }
+
+*** WarpRenderCheckpointsPanel.tsx ***
+@@
+-function expectedThetaForPane(live: any, engine: any) {
++function expectedThetaForPane(live: any, engine: any) {
+@@
+-  const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
+-  const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
+-  return viewAvg ? betaInst * Math.max(1e-12, duty) : betaInst;
++  const betaInst = Math.pow(gammaGeo, 3) * dAa * gVdB;
++  const viewAvg  = (live?.viewAvg ?? true) ? 1 : 0;
++  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, duty)) : betaInst;
+}
+@@
+-function computeThetaScaleFromParams(v: any) {
++function computeThetaScaleFromParams(v: any) {
+@@
+-  const effDuty = Math.max(1e-12, duty / sectors);
+-  return viewAvg ? betaInst * effDuty : betaInst;
++  const effDuty = Math.max(1e-12, duty / sectors);
++  return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+}
+@@
+-  function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
++  function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
+@@
+-    const expected = thetaScaleExpected({
++    const expectedLinear = thetaScaleExpected({
+       gammaGeo: Math.max(1, gammaGeo),
+       q: Math.max(1e-12, deltaAA), 
+       gammaVdB: Math.max(1, gammaVdB),
+-      dFR: Math.max(1e-12, dutyFR)
++      dFR: Math.max(1e-12, dutyFR)
+     });
+-    
+-    // Apply view averaging if enabled (this affects the final result)
+-    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+-    return averaged ? expected : expected / Math.sqrt(Math.max(1e-12, dutyFR));
++    // Convert the linear export to the renderer’s sqrt(d_FR) law.
++    const expected = expectedLinear * Math.sqrt(1) / Math.max(1e-6, Math.sqrt(Math.max(1e-12, dutyFR))); // normalize
++    const expectedSqrt = Math.pow(Math.max(1, gammaGeo),3) * Math.max(1e-12, deltaAA) * Math.max(1, gammaVdB) * Math.sqrt(Math.max(1e-12, dutyFR));
++    const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
++    return averaged ? expectedSqrt : expectedSqrt / Math.sqrt(Math.max(1e-12, dutyFR));
+  }
