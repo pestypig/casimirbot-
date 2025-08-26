@@ -1,6 +1,7 @@
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import { checkpoint, Check, Side, Stage, within } from "@/lib/checkpoints";
+import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import CheckpointViewer from "./CheckpointViewer";
 
 /*
@@ -175,29 +176,47 @@ function useCheckpointList(
       sev: gammaVdB < 1 || gammaVdB > 1e15 ? 'error' : 'info'
     });
 
-    // === DAG Stage 2: EXPECTATIONS ===
-    const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, deltaAOverA) * Math.max(1, gammaVdB);
-    const dutyEff = Math.max(1e-12, duty / sectors);
-    const thetaExpected = betaInst * dutyEff;
+    // === DAG Stage 2: EXPECTATIONS (Single Source of Truth) ===
+    // Calculate the expected θ-scale using canonical formula
+    const dutyFR = Math.max(1e-12, duty / sectors);
+    const thetaExpected = thetaScaleExpected({
+      gammaGeo: Math.max(1, gammaGeo),
+      q: Math.max(1e-12, deltaAOverA), 
+      gammaVdB: Math.max(1, gammaVdB),
+      dFR: dutyFR
+    });
 
     checkpoint({
       id: 'expect.theta_scale', side, stage: 'expect',
       pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
       msg: `θ_expected=${thetaExpected.toExponential(2)}`,
       expect: '>0', actual: thetaExpected,
-      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info'
+      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info',
+      meta: { gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
     });
 
     // === DAG Stage 3: UNIFORMS ===
     const u = e?.uniforms || {};
     const ts = N(u?.thetaScale, NaN);
     
+    // Calculate what the engine should be using based on its context
+    const concurrent = Math.max(1, u?.sectors ?? 1);
+    const total = Math.max(1, liveSnap?.sectorCount ?? 400);
+    const dutyLocal = 0.01; // Ford-Roman burst duty
+    const viewFraction = side === 'REAL' ? (1 / sectors) : 1; // REAL uses per-sector, SHOW uses whole ship
+    const viewAveraging = liveSnap?.viewAvg ?? true;
+    
+    const thetaUsed = thetaScaleUsed(thetaExpected, {
+      concurrent, total, dutyLocal, viewFraction, viewAveraging
+    });
+
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'}`,
-      expect: thetaExpected, actual: ts,
-      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : 'info'
+      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs used=${thetaUsed.toExponential(2)}`,
+      expect: thetaUsed, actual: ts,
+      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUsed, 0.1) ? 'info' : 'warn'),
+      meta: { concurrent, total, dutyLocal, viewFraction, viewAveraging }
     });
 
     checkpoint({
@@ -495,18 +514,23 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFRPct_left = `${(dutyFR_left*100).toFixed(4)}%`;
   const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
 
-  // Theta expected function using same chain as shader  
+  // Theta expected function using single source of truth  
   function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
     const gammaGeo = N(u.gammaGeo, 26);
     const deltaAA  = N(u.deltaAOverA, 0.625);
     const gammaVdB = N(u.gammaVdB, 1.35e5);
-    const geomExp  = 3; // cubic
-    const betaInst = Math.pow(Math.max(1, gammaGeo), geomExp)
-                   * Math.max(1e-12, deltaAA)
-                   * Math.max(1, gammaVdB);
+    
+    // Use canonical expected calculation
+    const expected = thetaScaleExpected({
+      gammaGeo: Math.max(1, gammaGeo),
+      q: Math.max(1e-12, deltaAA), 
+      gammaVdB: Math.max(1, gammaVdB),
+      dFR: Math.max(1e-12, dutyFR)
+    });
+    
+    // Apply view averaging if enabled (this affects the final result)
     const averaged = (u.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
-    const d = Math.max(1e-12, dutyFR);
-    return averaged ? betaInst * Math.sqrt(d) : betaInst;
+    return averaged ? expected : expected / Math.sqrt(Math.max(1e-12, dutyFR));
   }
 
   const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
