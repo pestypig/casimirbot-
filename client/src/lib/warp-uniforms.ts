@@ -32,6 +32,7 @@ export function normalizeWU(raw:any): WarpUniforms {
     sectorCount: Math.max(1, N(raw.sectorCount, 400)),
     sectors: Math.max(1, N(raw.sectors, 1)),
     dutyCycle: Math.max(1e-12, N(raw.dutyCycle, 0.01)),
+    // Ford–Roman duty = dutyLocal × (S_live / S_total)
     dutyEffectiveFR: Math.max(
       1e-12,
       N(
