@@ -348,16 +348,60 @@ export default function WarpRenderInspector(props: {
       (Ctor as any).getOrCreate?.(cv) ||
       (Ctor as any).fromCanvas?.(cv) ||
       (Ctor as any).getForCanvas?.(cv);
+
     if (viaFactory) {
       CANVAS_ENG.set(cv, viaFactory);
       (cv as any)[ENGINE_KEY] = viaFactory;
       return viaFactory as WarpType;
     }
-    // Fallback: plain constructor with just the canvas
-    const eng = new (Ctor as any)(cv);
-    CANVAS_ENG.set(cv, eng);
-    (cv as any)[ENGINE_KEY] = eng;
-    return eng;
+
+    // 3) As soon as we're about to construct, guarantee GRID_DEFAULTS is set
+    ensureGridDefaults();
+
+    try {
+      // Fallback: plain constructor with just the canvas
+      const eng = new (Ctor as any)(cv);
+      CANVAS_ENG.set(cv, eng);
+      (cv as any)[ENGINE_KEY] = eng;
+      return eng;
+    } catch (err: any) {
+      const msg = String(err?.message || err);
+
+      // If the error smells like the classic "…divisions" read, fix & retry once
+      if (/divisions/i.test(msg)) {
+        // Belt & suspenders: reassert safe defaults and try again
+        (window as any).GRID_DEFAULTS = {
+          ...(window as any).GRID_DEFAULTS,
+          divisions: 64,
+          minSpan: 2.6,
+          spanPadding: 1.35,
+        };
+        try {
+          const eng2 = new (Ctor as any)(cv);
+          CANVAS_ENG.set(cv, eng2);
+          (cv as any)[ENGINE_KEY] = eng2;
+          return eng2;
+        } catch (err2) {
+          // fall through to existing "already attached" handling below, or rethrow
+        }
+      }
+
+      // Existing "already attached" recovery you already have
+      const m = msg.toLowerCase();
+      if (m.includes('already attached')) {
+        const byClass =
+          (Ctor as any).getOrCreate?.(cv) ||
+          (Ctor as any).fromCanvas?.(cv) ||
+          (Ctor as any).getForCanvas?.(cv);
+        if (byClass) {
+          CANVAS_ENG.set(cv, byClass);
+          (cv as any)[ENGINE_KEY] = byClass;
+          return byClass as WarpType;
+        }
+      }
+
+      throw err;
+    }
   }
   
   // Hard-lock parity & block late thetaScale writers at the engine edge
