@@ -187,14 +187,14 @@ function useCheckpointList(
     const ts = N(u?.thetaScale, NaN);
     
     // Expected uniforms θ from the same chain the engine uses
-    const thetaUniformsExpected = expectedUniformTheta(u, liveSnap, e);
+    const thetaUniformExpected = expectedUniformTheta(u, liveSnap, e);
 
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformsExpected.toExponential(2)}`,
-      expect: thetaUniformsExpected, actual: ts,
-      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUniformsExpected, 0.10) ? 'info' : 'warn'),
+      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformExpected.toExponential(2)}`,
+      expect: thetaUniformExpected, actual: ts,
+      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUniformExpected, 0.10) ? 'info' : 'warn'),
       meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
     });
 
