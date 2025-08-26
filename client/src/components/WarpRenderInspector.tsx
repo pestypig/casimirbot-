@@ -144,6 +144,9 @@ export default function WarpRenderInspector(props: {
   const [lockRidge, setLockRidge] = useState(true);
   const [forceAvg, setForceAvg] = useState(true);
   const [useMassGamma, setUseMassGamma] = useState(false);
+  
+  // Curvature control
+  const [curvT, setCurvT] = useState(0.45);
 
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
@@ -866,6 +869,25 @@ export default function WarpRenderInspector(props: {
               use calibrated γ_VdB (for test)
             </label>
           </fieldset>
+        </div>
+
+        <div className="rounded-2xl border border-neutral-200 p-4">
+          <h4 className="font-medium mb-3">Curvature</h4>
+          <select
+            className="px-2 py-1 text-sm border rounded"
+            value={curvT}
+            onChange={e => {
+              const v = Number(e.target.value);
+              setCurvT(v);
+              pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
+              pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
+            }}
+          >
+            <option value={0.00}>Flat</option>
+            <option value={0.25}>Mild</option>
+            <option value={0.45}>Cruise</option>
+            <option value={0.70}>Steep</option>
+          </select>
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
