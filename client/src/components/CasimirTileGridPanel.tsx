@@ -49,7 +49,8 @@ export function CasimirTileGridPanel({
   // draw
   React.useEffect(() => {
     const cvs = ref.current; if (!cvs) return;
-    const ctx = cvs.getContext("2d")!;
+    const ctx = cvs.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== 'function') return;
 
     const dpr = window.devicePixelRatio || 1;
     cvs.width = Math.floor(width * dpr);

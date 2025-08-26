@@ -33,7 +33,8 @@ export function GalaxyOverlays({
     if (!viewer || !canvasRef.current) return;
     
     const cvs = canvasRef.current;
-    const ctx = cvs.getContext("2d")!;
+    const ctx = cvs.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== 'function') return;
     
     function draw() {
       const tiled = viewer.world.getItemAt(0);
@@ -44,7 +45,7 @@ export function GalaxyOverlays({
       
       cvs.width = vw; 
       cvs.height = vh;
-      ctx.clearRect(0, 0, vw, vh);
+      ctx!.clearRect(0, 0, vw, vh);
 
       const imageToViewport = (pt: {x: number; y: number}) => {
         const vp = tiled.imageToViewportCoordinates(pt.x, pt.y);
@@ -58,16 +59,16 @@ export function GalaxyOverlays({
       const routeBodies = routeIds.map(id => bodies.find(b => b.id === id)).filter(Boolean) as Body[];
       if (routeBodies.length >= 2) {
         for (const pass of [10, 6, 3]) {
-          ctx.beginPath();
+          ctx!.beginPath();
           routeBodies.forEach((b, i) => {
             const img = pcToImage(b.x_pc, b.y_pc);
             const p = imageToViewport(img);
-            if (i === 0) ctx.moveTo(p.x, p.y); 
-            else ctx.lineTo(p.x, p.y);
+            if (i === 0) ctx!.moveTo(p.x, p.y); 
+            else ctx!.lineTo(p.x, p.y);
           });
-          ctx.strokeStyle = `rgba(120, 90, 255, ${pass === 10 ? 0.08 : pass === 6 ? 0.18 : 0.9})`;
-          ctx.lineWidth = pass;
-          ctx.stroke();
+          ctx!.strokeStyle = `rgba(120, 90, 255, ${pass === 10 ? 0.08 : pass === 6 ? 0.18 : 0.9})`;
+          ctx!.lineWidth = pass;
+          ctx!.stroke();
         }
       }
 
@@ -75,17 +76,17 @@ export function GalaxyOverlays({
       bodies.forEach(b => {
         const img = pcToImage(b.x_pc, b.y_pc);
         const p = imageToViewport(img);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = routeIds.includes(b.id) ? "#ffd166" : "#7dd3fc";
-        ctx.fill();
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx!.fillStyle = routeIds.includes(b.id) ? "#ffd166" : "#7dd3fc";
+        ctx!.fill();
       });
 
       // Draw labels with view culling
       const bounds = viewer.viewport.getBounds(true);
       const zoom = viewer.viewport.getZoom(true);
       
-      ctx.textBaseline = "top";
+      ctx!.textBaseline = "top";
       labels.forEach(L => {
         const p = imageToViewport({ x: L.x, y: L.y });
         
@@ -93,15 +94,15 @@ export function GalaxyOverlays({
         if (p.x < -100 || p.x > vw + 100 || p.y < -50 || p.y > vh + 50) return;
         
         const size = Math.max(10, Math.min(22, (L.fontSize ?? 12) * zoom * 0.5));
-        ctx.font = `${size}px ui-sans-serif, system-ui`;
+        ctx!.font = `${size}px ui-sans-serif, system-ui`;
         
         // Drop shadow for readability
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillText(L.text, p.x + 1, p.y + 1);
+        ctx!.fillStyle = "rgba(0,0,0,0.6)";
+        ctx!.fillText(L.text, p.x + 1, p.y + 1);
         
         // Main text
-        ctx.fillStyle = L.fill ?? "#f5e1ff";
-        ctx.fillText(L.text, p.x, p.y);
+        ctx!.fillStyle = L.fill ?? "#f5e1ff";
+        ctx!.fillText(L.text, p.x, p.y);
       });
     }
 
@@ -138,7 +139,7 @@ export function GalaxyOverlays({
       });
       
       if (hitBody) {
-        onBodyClick(hitBody.id);
+        onBodyClick((hitBody as Body).id);
       }
     };
     

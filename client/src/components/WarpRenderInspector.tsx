@@ -928,7 +928,7 @@ export default function WarpRenderInspector(props: {
         leftEngineRef={leftEngine}
         rightEngineRef={rightEngine}
         leftCanvasRef={leftRef}
-        rightCanvasRef={rightRef}
+        rightCanvasRef={showRendererType==='grid3d' ? { current: grid3dRef.current?.getCanvas() } : rightRef}
         live={live}
         lightCrossing={{
           burst_ms: (live as any)?.burst_ms,

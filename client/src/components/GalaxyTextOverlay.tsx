@@ -29,7 +29,8 @@ export function GalaxyTextOverlay({
 
   React.useEffect(()=>{
     const cvs = cvsRef.current; if(!cvs || !labels) return;
-    const ctx = cvs.getContext("2d"); if(!ctx) return;
+    const ctx = cvs.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== 'function') return;
     ctx.clearRect(0,0,width,height);
     ctx.save();
     ctx.globalAlpha = alpha;

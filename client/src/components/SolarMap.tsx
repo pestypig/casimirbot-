@@ -233,7 +233,8 @@ export function SolarMap({
     const dpr = Math.max(1, Math.floor(window.devicePixelRatio || 1));
     cvs.width = Math.floor(size.w * dpr);
     cvs.height = Math.floor(size.h * dpr);
-    const ctx = cvs.getContext("2d")!;
+    const ctx = cvs.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== 'function') return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.w, size.h);
 
@@ -263,7 +264,7 @@ export function SolarMap({
       const isHighlighted = routeIds.includes(p.id);
       const bodySize = p.id === "SUN" ? 8 : p.id === "JUPITER" ? 4 : 3;
       
-      ctx.fillStyle = isHighlighted ? "#ff6b35" : p.color || "#ffffff";
+      ctx.fillStyle = isHighlighted ? "#ff6b35" : (p as any).color || "#ffffff";
       ctx.beginPath();
       ctx.arc(x, y, bodySize, 0, Math.PI * 2);
       ctx.fill();

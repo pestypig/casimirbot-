@@ -68,7 +68,8 @@ export function GalaxyMapPanZoom({
   // drawing
   React.useEffect(()=>{
     const cvs = canvasRef.current; if (!cvs) return;
-    const ctx = cvs.getContext("2d"); if (!ctx) return;
+    const ctx = cvs.getContext("2d");
+    if (!ctx || typeof ctx.clearRect !== 'function') return;
     ctx.clearRect(0,0,width,height);
 
     // helper transforms
