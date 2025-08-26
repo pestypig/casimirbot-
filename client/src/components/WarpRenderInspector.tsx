@@ -569,6 +569,11 @@ export default function WarpRenderInspector(props: {
 
     pushUniformsWhenReady(eng, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'fit-show');
 
+    // Mirror REAL's DPR and enable optional SSAA
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    grid3dRef.current?.setPixelRatio?.(dpr);
+    grid3dRef.current?.setSupersample?.(1.25); // 1.0 = off; 1.25-1.5 is a cheap sharpener
+
     // SHOW is always UI mode
     lockPane(rightEngine.current, 'SHOW');
   }, [showRendererType]);

@@ -10,6 +10,8 @@ export type Grid3DHandle = {
   destroy: () => void;
   _resize: () => void;
   setVisible?: (on: boolean) => void;
+  setPixelRatio?: (pr: number) => void;
+  setSupersample?: (ss: number) => void;
 };
 
 // Minimal 3D grid engine that samples the Natário displacement field
@@ -19,6 +21,10 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const engineRef = useRef<any>(null);
+  
+  // Pixel resolution controls
+  const pixelRatioRef = useRef(1);
+  const supersampleRef = useRef(1);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -30,14 +36,17 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     const setupCanvas = () => {
       if (isDestroyed) return;
       
-      // Set canvas size
+      // Set canvas size with pixel ratio and supersample
       const rect = canvas.getBoundingClientRect();
+      const dpr = pixelRatioRef.current * supersampleRef.current;
       if (rect.width && rect.height) {
-        canvas.width = rect.width;
-        canvas.height = rect.height;
+        const w = Math.max(1, Math.floor(rect.width * dpr));
+        const h = Math.max(1, Math.floor(rect.height * dpr));
+        canvas.width = w;
+        canvas.height = h;
       } else {
-        canvas.width = 800;
-        canvas.height = 600;
+        canvas.width = Math.floor(800 * dpr);
+        canvas.height = Math.floor(600 * dpr);
       }
       
       // Get 2D context
@@ -45,6 +54,11 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       if (!ctx || typeof (ctx as any).clearRect !== 'function') {
         console.error('Failed to get Canvas 2D context');
         return;
+      }
+      
+      // Scale context for high-DPI rendering
+      if (rect.width && rect.height && dpr > 1) {
+        ctx.scale(dpr, dpr);
       }
       
       startRendering(ctx);
@@ -214,7 +228,25 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
         }
       },
       _resize: () => {
-        // Canvas will re-render automatically on next frame
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const dpr = pixelRatioRef.current * supersampleRef.current;
+        if (rect.width && rect.height) {
+          const w = Math.max(1, Math.floor(rect.width * dpr));
+          const h = Math.max(1, Math.floor(rect.height * dpr));
+          if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+          }
+        }
+      },
+      setPixelRatio: (pr: number) => {
+        pixelRatioRef.current = Math.max(1, Math.min(3, pr));
+        engineRef.current?._resize();
+      },
+      setSupersample: (ss: number) => {
+        supersampleRef.current = Math.max(1, Math.min(2, ss));
+        engineRef.current?._resize();
       },
       setDisplayGain: (gain: number) => {
         // Apply display gain to rendering
@@ -246,7 +278,9 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     setDisplayGain: (g) => engineRef.current?.setDisplayGain?.(g),
     destroy: () => engineRef.current?.destroy?.(),
     _resize: () => engineRef.current?._resize?.(),
-    setVisible: (on) => engineRef.current?.setVisible?.(on)
+    setVisible: (on) => engineRef.current?.setVisible?.(on),
+    setPixelRatio: (pr) => engineRef.current?.setPixelRatio?.(pr),
+    setSupersample: (ss) => engineRef.current?.setSupersample?.(ss)
   }));
 
   return (
