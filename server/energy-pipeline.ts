@@ -159,7 +159,10 @@ const GAMMA_VDB        = 1e11;   // fixed seed (raw physics)
 const RADIAL_LAYERS    = 10;     // surface × radial lattice
 
 // Export paper constants so UI and docs can reference the single source of truth
-export const PAPER = { TOTAL_SECTORS, BURST_DUTY_LOCAL, Q_BURST, GAMMA_VDB };
+export const PAPER_GEO = { PACKING: 0.88, RADIAL_LAYERS: 10 } as const;
+export const PAPER_DUTY = { TOTAL_SECTORS, BURST_DUTY_LOCAL } as const;
+export const PAPER_Q    = { Q_BURST } as const;
+export const PAPER_VDB  = { GAMMA_VDB } as const;
 
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
@@ -180,11 +183,11 @@ if (process.env.NODE_ENV !== 'production') {
 
 function resolveSLive(mode: EnergyPipelineState['currentMode']): number {
   const pol = MODE_POLICY[mode];
-  return Math.max(0, Math.min(TOTAL_SECTORS, pol.S_live));
+  return Math.max(0, Math.min(PAPER_DUTY.TOTAL_SECTORS, pol.S_live));
 }
 
 // Mode configurations (physics parameters only, no hard locks)
-// NOTE: Concurrent sectors come from MODE_POLICY.*.S_live, total sectors = TOTAL_SECTORS = 400
+// NOTE: Concurrent sectors come from MODE_POLICY.*.S_live, total sectors = PAPER_DUTY.TOTAL_SECTORS = 400
 export const MODE_CONFIGS = {
   hover: {
     dutyCycle: 0.14,
@@ -273,8 +276,8 @@ export function initializePipelineState(): EnergyPipelineState {
     // Physics defaults (paper-backed)
     gammaGeo: 26,
     qMechanical: 1,               // Set to 1 (was 5e4) - power knob only
-    qCavity: Q_BURST,             // Use paper-backed Q_BURST 
-    gammaVanDenBroeck: GAMMA_VDB, // Use paper-backed γ_VdB seed
+    qCavity: PAPER_Q.Q_BURST,             // Use paper-backed Q_BURST 
+    gammaVanDenBroeck: PAPER_VDB.GAMMA_VDB, // Use paper-backed γ_VdB seed
     exoticMassTarget_kg: 1405,    // Reference target (not a lock)
     
     // Initial calculated values
@@ -344,11 +347,11 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   // 1) N_tiles — paper-authentic tile census
   const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
-  const PACKING = 0.88; // edge/packing factor to match paper's ~1.96e9
-  state.N_tiles = Math.max(1, Math.round(surfaceTiles * RADIAL_LAYERS * PACKING));
+  // Use centralized PAPER_GEO constants
+  state.N_tiles = Math.max(1, Math.round(surfaceTiles * PAPER_GEO.RADIAL_LAYERS * PAPER_GEO.PACKING));
   
   // Surface packing factor for future geometry modules to replace fudge
-  (state as any).__packing = PACKING;
+  (state as any).__packing = PAPER_GEO.PACKING;
   
   // Step 1: Static Casimir energy
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
@@ -360,7 +363,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
   
   // 4) Sector scheduling — per-mode policy
-  state.sectorCount = Math.max(1, state.sectorCount || TOTAL_SECTORS); // respect override; else default to 400
+  state.sectorCount = Math.max(1, state.sectorCount || PAPER_DUTY.TOTAL_SECTORS); // respect override; else default to 400
   state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
   const S_total = state.sectorCount;
   const S_live = state.concurrentSectors;
@@ -369,7 +372,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   const isStandby = String(state.currentMode || '').toLowerCase() === 'standby';
   const d_eff = isStandby
     ? 0
-    : BURST_DUTY_LOCAL * (S_live / Math.max(1, S_total)); // existing calc
+    : PAPER_DUTY.BURST_DUTY_LOCAL * (S_live / Math.max(1, S_total)); // existing calc
 
   state.activeSectors   = S_live;
   state.activeFraction  = S_live / S_total;
@@ -380,7 +383,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
 
   // 🔧 expose both duties explicitly and consistently
-  state.dutyBurst        = BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
+  state.dutyBurst        = PAPER_DUTY.BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
   state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
   (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   // (dutyCycle already set from MODE_CONFIGS above)
@@ -413,7 +416,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   // 6) Power — raw first, then power-only calibration via qMechanical
   const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? 15) * 1e9;
-  const Q = state.qCavity ?? Q_BURST;
+  const Q = state.qCavity ?? PAPER_Q.Q_BURST;
   const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
 
@@ -456,10 +459,10 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   (state as any).P_cryo_MW = ((P_tile_on * d_eff + P_tile_idle * (1 - d_eff)) * state.N_tiles) / 1e6;
 
   // 7) Mass — raw first, then mass-only calibration via γ_VdB
-  state.gammaVanDenBroeck = GAMMA_VDB;     // seed (paper)
+  state.gammaVanDenBroeck = PAPER_VDB.GAMMA_VDB;     // seed (paper)
   const U_abs = Math.abs(state.U_static);
   const geo3  = Math.pow(state.gammaGeo ?? 26, 3);
-  let   E_tile = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (burst-window Q for mass)
+  let   E_tile = U_abs * geo3 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff; // J per tile (burst-window Q for mass)
   let   M_total = (E_tile / (C * C)) * state.N_tiles;
 
   // Mass-only calibration: hit per-mode mass target without changing power
@@ -469,7 +472,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     const scaleM = userM / M_total;
     const gammaVdB_raw = state.gammaVanDenBroeck * scaleM;
     state.gammaVanDenBroeck = Math.max(0, Math.min(1e16, gammaVdB_raw)); // knob #2: mass only (clamped)
-    E_tile  = U_abs * geo3 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+    E_tile  = U_abs * geo3 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
     M_total = (E_tile / (C * C)) * state.N_tiles;
   } else if (userM <= 0) {
     state.gammaVanDenBroeck = 0;
@@ -484,15 +487,15 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   (state as any).gammaVanDenBroeckClamped = (state.gammaVanDenBroeck !== gammaVdB_before);
   
   // Mass calibration readout
-  state.massCalibration = state.gammaVanDenBroeck / GAMMA_VDB;
+  state.massCalibration = state.gammaVanDenBroeck / PAPER_VDB.GAMMA_VDB;
   
   // Split γ_VdB into visual vs mass knobs to keep calibrator away from renderer
   (state as any).gammaVanDenBroeck_mass = state.gammaVanDenBroeck;   // ← calibrated value used to hit M_target
-  (state as any).gammaVanDenBroeck_vis  = GAMMA_VDB;                 // ← fixed "physics/visual" seed for renderer
+  (state as any).gammaVanDenBroeck_vis  = PAPER_VDB.GAMMA_VDB;                 // ← fixed "physics/visual" seed for renderer
   
   // Make visual factor mode-invariant (except standby)
   if (state.currentMode !== 'standby') {
-    (state as any).gammaVanDenBroeck_vis = GAMMA_VDB; // constant across modes
+    (state as any).gammaVanDenBroeck_vis = PAPER_VDB.GAMMA_VDB; // constant across modes
   } else {
     (state as any).gammaVanDenBroeck_vis = 1; // keep standby dark
   }
@@ -501,7 +504,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   (state as any).thetaScaleExpected = 
     Math.pow(state.gammaGeo, 3) *
     (state.qSpoilingFactor ?? 1) *
-    ((state as any).gammaVanDenBroeck_vis ?? GAMMA_VDB) *
+    ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB) *
     Math.sqrt(Math.max(1e-12, state.dutyEffective_FR ?? d_eff));
   
   // Overall clamping status for UI warnings
@@ -519,7 +522,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   // 7) Quantum-safety proxy (scaled against baseline ship-wide duty)
   const d_ship = d_eff;                              // ship-wide
-  const d0 = BURST_DUTY_LOCAL / TOTAL_SECTORS;       // 0.01/400
+  const d0 = PAPER_DUTY.BURST_DUTY_LOCAL / PAPER_DUTY.TOTAL_SECTORS;       // 0.01/400
   const zeta0 = 0.84;                                // baseline fit
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
   state.fordRomanCompliance = state.zeta < 1.0;
@@ -594,7 +597,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     }
 
     const E_tile_mass = Math.abs(state.U_static) * Math.pow(state.gammaGeo,3)
-                 * Q_BURST * state.gammaVanDenBroeck * d_eff;
+                 * PAPER_Q.Q_BURST * state.gammaVanDenBroeck * d_eff;
     const M_exp  = (E_tile_mass / (C*C)) * state.N_tiles;
     if (Math.abs(state.M_exotic - M_exp) > 1e-6 * Math.max(1, M_exp)) {
       if (DEBUG_PIPE) console.warn("[AUDIT] M_exotic drift; correcting", {reported: state.M_exotic, expected: M_exp});
@@ -630,7 +633,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   const tauLC_s = (state.hull?.wallThickness_m ?? 1.0) / C;
   const lightCrossing = {
     tauLC_ms: tauLC_s * 1e3,
-    burst_ms: BURST_DUTY_LOCAL * T_m_s * 1e3,
+    burst_ms: PAPER_DUTY.BURST_DUTY_LOCAL * T_m_s * 1e3,
     dwell_ms: T_m_s * 1e3,
   };
   (state as any).lightCrossing = lightCrossing;
