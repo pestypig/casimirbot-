@@ -40,14 +40,13 @@ if (typeof window.GRID_DEFAULTS === 'undefined') {
     divisions: 100       // more lines so a larger grid still looks dense
   };
 }
-// Runtime grid defaults helper to avoid stale const binding
 function getGridDefaults() {
-  const g = (typeof globalThis !== 'undefined' ? globalThis : {});
-  const d = (g && g.GRID_DEFAULTS) || {};
-  const divisions   = Number.isFinite(d.divisions) && d.divisions > 0 ? (d.divisions|0) : 64;
-  const minSpan     = Number.isFinite(d.minSpan)   && d.minSpan   > 0 ? d.minSpan       : 2.6;
-  const spanPadding = (typeof d.spanPadding === 'number') ? d.spanPadding : 1.35;
-  return { divisions, minSpan, spanPadding };
+  const d = (typeof globalThis !== 'undefined' && globalThis.GRID_DEFAULTS) || {};
+  return {
+    divisions:   (Number.isFinite(d.divisions) && d.divisions > 0) ? (d.divisions|0) : 64,
+    minSpan:     (Number.isFinite(d.minSpan)   && d.minSpan   > 0) ? d.minSpan       : 2.6,
+    spanPadding: (typeof d.spanPadding === 'number') ? d.spanPadding : 1.35,
+  };
 }
 
 if (typeof window.SCENE_SCALE === 'undefined') {
