@@ -58,17 +58,33 @@ function expectedThetaForPane(live: any, engine: any) {
   return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, dFR)) : betaInst;
 }
 
-// Same θ computation as WarpBubbleCompare.tsx for perfect consistency
 function computeThetaScaleFromParams(v: any) {
   const gammaGeo = N(v.gammaGeo, 26);
-  const dAa = N(v.qSpoilingFactor, 1);
-  const gammaVdB = N(v.gammaVanDenBroeck, 1.4e5);
-  const sectors = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectors, 1)));
-  const duty = Math.max(0, N(v.dutyCycle, 0));
-  const viewAvg = (v.viewAvg ?? true) ? 1 : 0;
-  const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
-  const effDuty = Math.max(1e-12, duty / sectors);
-  return viewAvg ? betaInst * Math.sqrt(effDuty) : betaInst;
+  const q        = N(v.qSpoilingFactor ?? v.deltaAOverA, 1);
+  const gVdB     = N(v.gammaVanDenBroeck ?? v.gammaVdB, 1.4e5);
+
+  const betaInst = Math.pow(Math.max(1, gammaGeo), 3)
+                 * Math.max(1e-12, q)
+                 * Math.max(1, gVdB);
+
+  // Prefer authoritative FR duty if present
+  let d = N(v.dutyEffectiveFR ?? v.dutyShip ?? v.dutyEff, NaN);
+
+  // Fallback: compute FR duty from local burst × (concurrent/total)
+  if (!Number.isFinite(d)) {
+    const sectorsTotal = Math.max(1, N(v.sectorCount ?? v.sectors, 400));
+    const sectorsConc  = Math.max(1, N(v.sectors ?? 1, 1));
+    const dutyLocal    = N(
+      (v.lightCrossing?.burst_ms && v.lightCrossing?.dwell_ms)
+        ? v.lightCrossing.burst_ms / v.lightCrossing.dwell_ms
+        : v.dutyLocal,
+      0.01 // default 1% local
+    );
+    d = dutyLocal * (sectorsConc / sectorsTotal);
+  }
+
+  const viewAvg = (v.viewAvg ?? true);
+  return viewAvg ? betaInst * Math.sqrt(Math.max(1e-12, d)) : betaInst;
 }
 
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
