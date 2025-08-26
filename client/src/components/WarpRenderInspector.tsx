@@ -574,6 +574,20 @@ export default function WarpRenderInspector(props: {
     grid3dRef.current?.setPixelRatio?.(dpr);
     grid3dRef.current?.setSupersample?.(1.25); // 1.0 = off; 1.25-1.5 is a cheap sharpener
 
+    // Match grid detail to available pixels
+    const pxAcross = estimatePxAcrossWall({
+      canvasPxW: cvs.width,
+      canvasPxH: cvs.height,
+      gridSpan: 1,
+      hull,
+      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+    });
+
+    // Convert pixels into a sensible grid resolution
+    const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
+    console.log(`[GRID] Canvas: ${cvs.width}×${cvs.height}, pxAcross: ${pxAcross.toFixed(1)}, gridRes: ${seg}`);
+    grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
+
     // SHOW is always UI mode
     lockPane(rightEngine.current, 'SHOW');
   }, [showRendererType]);

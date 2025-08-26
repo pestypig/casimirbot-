@@ -12,6 +12,7 @@ export type Grid3DHandle = {
   setVisible?: (on: boolean) => void;
   setPixelRatio?: (pr: number) => void;
   setSupersample?: (ss: number) => void;
+  setGridResolution?: (res: { radial?: number; angular?: number; axial?: number }) => void;
 };
 
 // Minimal 3D grid engine that samples the Natário displacement field
@@ -25,6 +26,9 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
   // Pixel resolution controls
   const pixelRatioRef = useRef(1);
   const supersampleRef = useRef(1);
+  
+  // Grid resolution controls
+  const gridResolutionRef = useRef({ radial: 32, angular: 20, axial: 32 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -135,9 +139,10 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       }
     };
 
-    // Build grid once - only rebuild on canvas size changes
-    let cachedGrid = buildGrid(32, 20, 32);
+    // Build grid once - only rebuild on canvas size or grid resolution changes
+    let cachedGrid = buildGrid(gridResolutionRef.current.radial, gridResolutionRef.current.angular, gridResolutionRef.current.axial);
     let lastCanvasSize = { width: canvas.width, height: canvas.height };
+    let lastGridResolution = { ...gridResolutionRef.current };
     
     // Render function
     const render = () => {
@@ -146,10 +151,15 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
       
-      // Rebuild grid only if canvas size changed
-      if (width !== lastCanvasSize.width || height !== lastCanvasSize.height) {
-        cachedGrid = buildGrid(32, 20, 32);
+      // Rebuild grid if canvas size or grid resolution changed
+      const currentRes = gridResolutionRef.current;
+      if (width !== lastCanvasSize.width || height !== lastCanvasSize.height ||
+          currentRes.radial !== lastGridResolution.radial ||
+          currentRes.angular !== lastGridResolution.angular ||
+          currentRes.axial !== lastGridResolution.axial) {
+        cachedGrid = buildGrid(currentRes.radial, currentRes.angular, currentRes.axial);
         lastCanvasSize = { width, height };
+        lastGridResolution = { ...currentRes };
       }
       
       const grid = cachedGrid;
@@ -167,8 +177,11 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
         point.z = point.originalZ + displacement * 0.1;
         
         // Project to 2D (simple orthographic projection)
-        const screenX = (point.x * 0.3 + 0.5) * width;
-        const screenY = (point.y * 0.3 + 0.5) * height;
+        // Use logical canvas dimensions for proper scaling
+        const logicalWidth = width / (pixelRatioRef.current * supersampleRef.current);
+        const logicalHeight = height / (pixelRatioRef.current * supersampleRef.current);
+        const screenX = (point.x * 0.3 + 0.5) * logicalWidth;
+        const screenY = (point.y * 0.3 + 0.5) * logicalHeight;
         const screenZ = point.z; // For depth sorting
         
         // Color based on theta
@@ -248,6 +261,14 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
         supersampleRef.current = Math.max(1, Math.min(2, ss));
         engineRef.current?._resize();
       },
+      setGridResolution: (res: { radial?: number; angular?: number; axial?: number }) => {
+        gridResolutionRef.current = {
+          radial: res.radial ?? gridResolutionRef.current.radial,
+          angular: res.angular ?? gridResolutionRef.current.angular,
+          axial: res.axial ?? gridResolutionRef.current.axial
+        };
+        // Grid will be rebuilt on next frame
+      },
       setDisplayGain: (gain: number) => {
         // Apply display gain to rendering
       },
@@ -280,7 +301,8 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     _resize: () => engineRef.current?._resize?.(),
     setVisible: (on) => engineRef.current?.setVisible?.(on),
     setPixelRatio: (pr) => engineRef.current?.setPixelRatio?.(pr),
-    setSupersample: (ss) => engineRef.current?.setSupersample?.(ss)
+    setSupersample: (ss) => engineRef.current?.setSupersample?.(ss),
+    setGridResolution: (res) => engineRef.current?.setGridResolution?.(res)
   }));
 
   return (
