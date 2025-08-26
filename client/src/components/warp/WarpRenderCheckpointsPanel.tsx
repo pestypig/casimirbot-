@@ -33,6 +33,37 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// GPU link status helper
+function getLinkStatus(engine: any) {
+  const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
+  const prog = engine?.gridProgram || engine?.program || engine?._program || null;
+  const ext  = (engine?.parallelShaderExt || null) as any;
+
+  if (!gl || !prog) return { stage: engine?.loadingState || 'idle', ok: false, reason: 'no GL or program' };
+
+  // If engine told us, trust it
+  if (engine?.loadingState === 'compiling') {
+    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+  }
+  if (engine?.loadingState === 'failed') {
+    const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
+    return { stage: 'failed', ok: false, reason: log };
+  }
+  if (engine?.loadingState === 'linked') {
+    return { stage: 'linked', ok: true, reason: '' };
+  }
+
+  // Infer via KHR if state not provided
+  if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
+    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+  }
+
+  // Final truth from LINK_STATUS
+  const ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+  const reason = ok ? '' : (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
+  return { stage: ok ? 'linked' : 'failed', ok, reason };
+}
+
 // ✅ Pane-specific expected θ using one duty law (√d_FR) and engine authority
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
@@ -269,15 +300,24 @@ function useCheckpointList(
 
     rows.push({ label: "WebGL context", detail: gl ? (ctxOk ? "alive" : "lost") : "missing", state: ctxOk ? "ok" : gl ? "fail" : "fail" });
 
-    // Shaders/program
-    const progOk = !!e?.gridProgram && !!e?.gridUniforms && !!e?.gridAttribs;
-    
+    // Primary: ask the driver
+    const { stage, ok: gpuLinked, reason } = getLinkStatus(e);
+
+    // Secondary: once linked, we expect locations/attribs too
+    const shapeOK = !!e?.gridProgram && !!e?.gridUniforms && !!e?.gridAttribs;
+    const pass = gpuLinked && shapeOK;
+
     checkpoint({
       id: 'gpu.shaders_linked', side, stage: 'gpu',
-      pass: progOk,
-      msg: progOk ? "Shaders compiled & linked" : "no program",
-      expect: 'linked', actual: progOk ? 'linked' : 'missing',
-      sev: !progOk ? 'error' : 'info'
+      pass,
+      sev: pass ? 'info' : (stage === 'compiling' ? 'warn' : 'error'),
+      msg: pass
+        ? "Shaders compiled & linked"
+        : (stage === 'compiling'
+            ? "⏳ compiling shaders…"
+            : (gpuLinked ? "linked but missing locations" : `link error: ${reason || 'unknown'}`)),
+      expect: 'linked',
+      actual: pass ? 'linked' : (stage === 'compiling' ? 'compiling' : 'unlinked')
     });
 
     // Grid buffers
