@@ -76,6 +76,35 @@ function estimatePxAcrossWall({
   return deltaRho * Rgeom * pxPerMeter;       // pixels across wall
 }
 
+// --- Ellipsoid + wall math ---------------------------------------------------
+function volEllipsoid(a:number,b:number,c:number){ return (4/3)*Math.PI*a*b*c; }
+// Knud Thomsen surface area approximation (p≈1.6075)
+function areaEllipsoid(a:number,b:number,c:number){
+  const p = 1.6075;
+  const t = (Math.pow(a,p)*Math.pow(b,p) + Math.pow(a,p)*Math.pow(c,p) + Math.pow(b,p)*Math.pow(c,p))/3;
+  return 4*Math.PI*Math.pow(t, 1/p);
+}
+function harmonicMean3(a:number,b:number,c:number){
+  const d = (1/Math.max(a,1e-12) + 1/Math.max(b,1e-12) + 1/Math.max(c,1e-12));
+  return 3/Math.max(d,1e-12);
+}
+function fmtSI(x:number, unit:string){
+  if (!Number.isFinite(x)) return `— ${unit}`;
+  const abs = Math.abs(x);
+  if (abs >= 1e3) return `${(x/1e3).toFixed(2)} k${unit}`;
+  if (abs >= 1)   return `${x.toFixed(3)} ${unit}`;
+  if (abs >= 1e-3)return `${(x*1e3).toFixed(2)} m${unit}`;
+  if (abs >= 1e-6)return `${(x*1e6).toFixed(2)} µ${unit}`;
+  if (abs >= 1e-9)return `${(x*1e9).toFixed(1)} n${unit}`;
+  return x.toExponential(2) + ' ' + unit;
+}
+
+// Exotic mass proxy: M* ~ θ^2 · V_shell · viewFraction   (arb units; display-only)
+function massProxy(theta:number, shellVol_m3:number, viewFraction:number){
+  const th = Math.max(0, theta||0);
+  return th*th * Math.max(0, shellVol_m3||0) * Math.max(0, viewFraction||0);
+}
+
 // Mode → visual seasoning presets (so changes are obvious)
 type ModeKey = 'hover' | 'cruise' | 'emergency' | 'standby';
 const MODE_PRESET: Record<ModeKey, {curvT:number; boost:number; displayGain:number}> = {
