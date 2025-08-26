@@ -302,20 +302,32 @@ export default function WarpRenderInspector(props: {
   // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
 
-  function getOrCreateEngine<WarpType = any>(Ctor: new (c: HTMLCanvasElement) => WarpType, cv: HTMLCanvasElement): WarpType {
+  function getOrCreateEngine<WarpType = any>(
+    Ctor: new (...args: any[]) => WarpType,
+    cv: HTMLCanvasElement
+  ): WarpType {
     const existing = (cv as any)[ENGINE_KEY];
     if (existing && !existing._destroyed) return existing as WarpType;
+
     let eng: any;
     try {
-      eng = new Ctor(cv);
-    } catch (err: any) {
-      const msg = String(err?.message || err).toLowerCase();
-      if (msg.includes('already attached')) {
-        // Another owner (e.g., Grid3DEngine) already attached; reuse theirs
-        return ((cv as any)[ENGINE_KEY] || (eng as any)) as WarpType;
+      // Prefer (canvas, opts) when available
+      if (Ctor && typeof Ctor === 'function') {
+        // If the constructor is declared with ≥2 params, pass {}. If not, try both ways safely.
+        if ((Ctor as any).length >= 2) {
+          eng = new (Ctor as any)(cv, {});           // ✅ opts exists
+        } else {
+          try { eng = new (Ctor as any)(cv, {}); }   // try with {}
+          catch { eng = new (Ctor as any)(cv); }     // then without
+        }
+      } else {
+        throw new Error('Engine constructor is not a function');
       }
-      throw err;
+    } catch (err) {
+      // Last-chance fallback
+      eng = new (Ctor as any)(cv);
     }
+
     (cv as any)[ENGINE_KEY] = eng;
     return eng;
   }
