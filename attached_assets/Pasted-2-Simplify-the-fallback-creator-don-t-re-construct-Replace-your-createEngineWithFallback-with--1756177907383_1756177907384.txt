@@ -1,0 +1,58 @@
+2) Simplify the fallback creator (don’t re-construct)
+
+Replace your createEngineWithFallback with:
+
+function createEngineWithFallback(
+  rendererType: 'slice2d' | 'grid3d',
+  canvas: HTMLCanvasElement
+) {
+  const W: any = (window as any).WarpEngine;
+  const G: any = (window as any).Grid3DShowEngine;
+
+  if (rendererType === 'grid3d' && G) {
+    const e = getOrCreateEngine(G, canvas);
+    return e;
+  }
+  const e = getOrCreateEngine(W, canvas);
+  return e;
+}
+
+
+(If your base engine needs an explicit init, keep it inside the class; don’t call init here unless you’re certain it’s safe to call more than once.)
+
+3) Make cleanup symmetrical and robust
+
+In your effect cleanup, make sure you always clear both our registry and any canvas fields, regardless of “owned” flags (HMR paths sometimes skip those):
+
+return () => {
+  unsubscribe(unsubscribeHandler);
+  setHaveUniforms(false);
+
+  const canvases = [leftRef.current, rightRef.current].filter(Boolean) as HTMLCanvasElement[];
+  for (const c of canvases) {
+    try { (c as any)[ENGINE_KEY]?.destroy?.(); } catch {}
+    try { (c as any).__warpEngine?.destroy?.(); } catch {}
+    try { (c as any).__engine?.destroy?.(); } catch {}
+    try { (c as any).warpEngine?.destroy?.(); } catch {}
+    CANVAS_ENG.delete(c);
+    try { delete (c as any)[ENGINE_KEY]; } catch {}
+    try { delete (c as any).__warpEngine; } catch {}
+    try { delete (c as any).__engine; } catch {}
+    try { delete (c as any).warpEngine; } catch {}
+  }
+
+  // remove webgl listeners, etc. (your existing code)
+};
+
+
+This prevents “ghost” attachments surviving hot reloads or failed mounts.
+
+4) (Optional) Remove the seed lines again
+
+You said you prefer no seeding—delete these two lines from the “Apply shared physics inputs” effect:
+
+gatedUpdateUniforms(leftEngine.current,  { dutyEffectiveFR: seedFR }, 'seed-fr');
+gatedUpdateUniforms(rightEngine.current, { dutyEffectiveFR: seedFR }, 'seed-fr');
+
+
+And keep canvases hidden until canonical uniforms arrive (you already do via setHaveUniforms(true) in the subscriber).

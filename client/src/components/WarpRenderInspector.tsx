@@ -301,58 +301,66 @@ export default function WarpRenderInspector(props: {
 
   const ENGINE_KEY = '__warpEngine';
 
-  function sniffExisting(cv: HTMLCanvasElement) {
-    // Try common attachment points the base might use
-    const candidates = [
-      (cv as any)[ENGINE_KEY],
-      (cv as any).__warpEngine,
-      (cv as any).__engine,
-      (cv as any).warpEngine,
-    ];
-    return candidates.find(e => e && !e._destroyed && typeof e.updateUniforms === 'function');
-  }
+  // Keep our own registry so we can always reuse across HMR/StrictMode
+  const CANVAS_ENG = new WeakMap<HTMLCanvasElement, any>();
 
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
     cv: HTMLCanvasElement
   ): WarpType {
-    // 1) If something is already attached, reuse it
-    const existing = sniffExisting(cv);
-    if (existing) {
-      // cache it to our key for future calls
-      (cv as any)[ENGINE_KEY] = existing;
-      return existing as WarpType;
+    // 0) If we already know about it, reuse
+    const known = CANVAS_ENG.get(cv);
+    if (known && !known._destroyed) return known as WarpType;
+
+    // 1) Try to sniff anything already attached by the base engine
+    const sniffExisting = () => {
+      const candidates = [
+        (cv as any).__warpEngine,
+        (cv as any).__engine,
+        (cv as any).warpEngine,
+        (cv as any)[ENGINE_KEY],
+      ].filter(Boolean);
+      // Prefer ones that look like engines
+      return candidates.find(e => typeof e?.updateUniforms === 'function' && !e._destroyed);
+    };
+    const pre = sniffExisting();
+    if (pre) {
+      CANVAS_ENG.set(cv, pre);
+      (cv as any)[ENGINE_KEY] = pre;
+      return pre as WarpType;
     }
 
-    // 2) Try constructing with opts (covers WE reading opts.divisions, etc.)
-    const tryConstruct = (opts?: any) => new (Ctor as any)(cv, opts);
-
+    // 2) First (and only) construction attempt
     try {
-      const eng = tryConstruct({});            // ✅ (canvas, {})
+      const eng = new (Ctor as any)(cv);  // ⚠️ don't pass opts; it broke earlier
+      CANVAS_ENG.set(cv, eng);
       (cv as any)[ENGINE_KEY] = eng;
       return eng;
     } catch (err: any) {
       const msg = String(err?.message || '').toLowerCase();
+
+      // 3) If the engine says it's already attached, DO NOT try constructing again.
       if (msg.includes('already attached')) {
-        const reuse = sniffExisting(cv);
-        if (reuse) return reuse as WarpType;
-        // last resort: if class exposes a helper
-        const from = (Ctor as any).fromCanvas?.(cv);
-        if (from) return from as WarpType;
-      }
-      // 3) One more attempt without opts (for older signatures)
-      try {
-        const eng = new (Ctor as any)(cv);
-        (cv as any)[ENGINE_KEY] = eng;
-        return eng;
-      } catch (err2: any) {
-        const msg2 = String(err2?.message || '').toLowerCase();
-        if (msg2.includes('already attached')) {
-          const reuse = sniffExisting(cv) || (Ctor as any).fromCanvas?.(cv);
-          if (reuse) return reuse as WarpType;
+        // Ask the class for a handle if it exposes one
+        const byClass = (Ctor as any).fromCanvas?.(cv) || (Ctor as any).getForCanvas?.(cv);
+        if (byClass) {
+          CANVAS_ENG.set(cv, byClass);
+          (cv as any)[ENGINE_KEY] = byClass;
+          return byClass as WarpType;
         }
-        throw err2; // real failure
+        // Last chance: sniff again (the constructor may have attached before throwing)
+        const post = sniffExisting();
+        if (post) {
+          CANVAS_ENG.set(cv, post);
+          (cv as any)[ENGINE_KEY] = post;
+          return post as WarpType;
+        }
+        // Nothing to reuse; surface a clear message and stop here
+        console.error('WarpEngine reports canvas is already attached but no handle was found on the canvas. Check load order and duplicate mounts.');
       }
+
+      // Not an "already attached" error → bubble up
+      throw err;
     }
   }
   

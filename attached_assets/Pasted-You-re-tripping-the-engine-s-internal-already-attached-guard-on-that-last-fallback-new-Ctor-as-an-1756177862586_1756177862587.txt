@@ -1,0 +1,71 @@
+You’re tripping the engine’s internal “already attached” guard on that last fallback new (Ctor as any)(cv) path. Once that exception happens, you must not try to construct again—just reuse the existing instance. Here’s a drop-in fix that makes the constructor idempotent and HMR/StrictMode-safe.
+
+1) Replace getOrCreateEngine with a safe, idempotent version
+
+Add this once at module top (near your ENGINE_KEY):
+
+// Keep our own registry so we can always reuse across HMR/StrictMode
+const CANVAS_ENG = new WeakMap<HTMLCanvasElement, any>();
+
+
+Now replace your current getOrCreateEngine with this:
+
+function getOrCreateEngine<WarpType = any>(
+  Ctor: new (...args: any[]) => WarpType,
+  cv: HTMLCanvasElement
+): WarpType {
+  // 0) If we already know about it, reuse
+  const known = CANVAS_ENG.get(cv);
+  if (known && !known._destroyed) return known as WarpType;
+
+  // 1) Try to sniff anything already attached by the base engine
+  const sniffExisting = () => {
+    const candidates = [
+      (cv as any).__warpEngine,
+      (cv as any).__engine,
+      (cv as any).warpEngine,
+      (cv as any)[ENGINE_KEY],
+    ].filter(Boolean);
+    // Prefer ones that look like engines
+    return candidates.find(e => typeof e?.updateUniforms === 'function' && !e._destroyed);
+  };
+  const pre = sniffExisting();
+  if (pre) {
+    CANVAS_ENG.set(cv, pre);
+    (cv as any)[ENGINE_KEY] = pre;
+    return pre as WarpType;
+  }
+
+  // 2) First (and only) construction attempt
+  try {
+    const eng = new (Ctor as any)(cv);  // ⚠️ don't pass opts; it broke earlier
+    CANVAS_ENG.set(cv, eng);
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+
+    // 3) If the engine says it's already attached, DO NOT try constructing again.
+    if (msg.includes('already attached')) {
+      // Ask the class for a handle if it exposes one
+      const byClass = (Ctor as any).fromCanvas?.(cv) || (Ctor as any).getForCanvas?.(cv);
+      if (byClass) {
+        CANVAS_ENG.set(cv, byClass);
+        (cv as any)[ENGINE_KEY] = byClass;
+        return byClass as WarpType;
+      }
+      // Last chance: sniff again (the constructor may have attached before throwing)
+      const post = sniffExisting();
+      if (post) {
+        CANVAS_ENG.set(cv, post);
+        (cv as any)[ENGINE_KEY] = post;
+        return post as WarpType;
+      }
+      // Nothing to reuse; surface a clear message and stop here
+      console.error('WarpEngine reports canvas is already attached but no handle was found on the canvas. Check load order and duplicate mounts.');
+    }
+
+    // Not an "already attached" error → bubble up
+    throw err;
+  }
+}
