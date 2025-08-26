@@ -4,21 +4,21 @@
   if (!WE) throw new Error('warp-engine.js must load before grid3d-engine.js');
 
   class Grid3DShowEngine extends WE {
-    constructor(canvas){
-      super(canvas);
+    constructor(canvas, opts = {}) {
+      super(canvas, opts);     // ✅ base sees an object, can read opts.divisions etc.
       // defaults
       this._dprOverride = null;
       this._ssaa = 1;
       this._forceDivisions = null;
       this._meshOpts = {
-        showXZ: true,  // horizontal "decks" (stack along Y)
-        showXY: false, // front/back slices (stack along Z)
-        showYZ: false, // side slices (stack along X)
-        layersXZ: 1,   // how many deck planes
-        layersXY: 0,   // how many XY planes
-        layersYZ: 0,   // how many YZ planes
-        divisions: null, // base divisions per plane (falls back to WarpEngine logic)
-        alignToGrid: true,   // NEW: snap planes to the same square-grid spacing
+        showXZ: true,
+        showXY: false,
+        showYZ: false,
+        layersXZ: 1,
+        layersXY: 0,
+        layersYZ: 0,
+        divisions: null,
+        alignToGrid: true,
       };
     }
 
