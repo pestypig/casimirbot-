@@ -551,51 +551,43 @@ export default function WarpRenderInspector(props: {
   const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
 
-  // Bridge Grid3D engine to checkpoints panel
+  // --- BRIDGE Grid3D wrapper → inspector refs (engine + canvas)
   useEffect(() => {
     if (showRendererType !== 'grid3d') return;
-    const eng = grid3dRef.current?.getEngine();
-    const cvs = grid3dRef.current?.getCanvas();
-    if (!eng || !cvs) return;
 
-    rightEngine.current = eng;
-    (rightRef as any).current = cvs;      // so checkpoints see the real canvas
-    rightOwnedRef.current = false;
+    let raf = 0, tries = 0;
+    const attach = () => {
+      const g  = grid3dRef.current?.getEngine?.();
+      const cv = grid3dRef.current?.getCanvas?.();
 
-    // Mute until uniforms arrive
-    gatedUpdateUniforms(eng, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'grid3d-mute');
-    eng.setVisible?.(false);
+      if (g && cv) {
+        // Hand the real objects to the inspector/checkpoints
+        rightEngine.current = g;
+        (rightRef as any).current = cv;
+        rightOwnedRef.current = false;
 
-    // Seed axes/camera from REAL (or hull) immediately so buffers build
-    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-    const span = 1; // or live?.gridSpan ?? 1
-    const ax = leftEngine.current?.uniforms?.axesClip ?? deriveAxesClip(hull, span);
-    const cz = compactCameraZ(ax);
+        // Seed framing so buffers build promptly
+        const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+        const ax = deriveAxesClip(hull, 1);
+        const cz = compactCameraZ(ax);
+        pushUniformsWhenReady(g, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'grid3d-bridge');
 
-    pushUniformsWhenReady(eng, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'fit-show');
+        // Sensible render quality
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        grid3dRef.current?.setPixelRatio?.(dpr);
+        grid3dRef.current?.setSupersample?.(1.25);
 
-    // Mirror REAL's DPR and enable optional SSAA
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    grid3dRef.current?.setPixelRatio?.(dpr);
-    grid3dRef.current?.setSupersample?.(1.25); // 1.0 = off; 1.25-1.5 is a cheap sharpener
+        // Match visibility gate
+        g.setVisible?.(haveUniforms);
+        return; // stop loop
+      }
 
-    // Match grid detail to available pixels
-    const pxAcross = estimatePxAcrossWall({
-      canvasPxW: cvs.width,
-      canvasPxH: cvs.height,
-      gridSpan: 1,
-      hull,
-      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
-    });
+      if (tries++ < 90) raf = requestAnimationFrame(attach);
+    };
 
-    // Convert pixels into a sensible grid resolution
-    const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
-    console.log(`[GRID] Canvas: ${cvs.width}×${cvs.height}, pxAcross: ${pxAcross.toFixed(1)}, gridRes: ${seg}`);
-    grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
-
-    // SHOW is always UI mode
-    lockPane(rightEngine.current, 'SHOW');
-  }, [showRendererType]);
+    attach();
+    return () => cancelAnimationFrame(raf);
+  }, [showRendererType, haveUniforms]);
 
   // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
   useEffect(() => {
