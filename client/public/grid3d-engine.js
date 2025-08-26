@@ -5,18 +5,13 @@
 
   class Grid3DShowEngine extends WE {
     constructor(canvas, opts = {}) {
-      super(canvas, opts);     // ✅ base sees an object, can read opts.divisions etc.
-      // defaults
+      super(canvas, opts);            // ✅ base sees an options object
       this._dprOverride = null;
       this._ssaa = 1;
       this._forceDivisions = null;
       this._meshOpts = {
-        showXZ: true,
-        showXY: false,
-        showYZ: false,
-        layersXZ: 1,
-        layersXY: 0,
-        layersYZ: 0,
+        showXZ: true, showXY: false, showYZ: false,
+        layersXZ: 1, layersXY: 0, layersYZ: 0,
         divisions: null,
         alignToGrid: true,
       };
@@ -56,7 +51,7 @@
       if (this.canvas.width !== width || this.canvas.height !== height) {
         this.canvas.width = width;
         this.canvas.height = height;
-        if (this.gl) this.gl.viewport(0, 0, width, height);
+        if (this.gl) this.gl.viewport(0, 0, width, height);  // ✅ guard
         this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
       }
     }

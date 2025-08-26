@@ -1,0 +1,96 @@
+B) WarpRenderInspector.tsx — bullet-proof engine reuse
+
+Replace your getOrCreateEngine and tweak createEngineWithFallback slightly.
+
+const ENGINE_KEY = '__warpEngine';
+
+function sniffExisting(cv: HTMLCanvasElement) {
+  // Try common attachment points the base might use
+  const candidates = [
+    (cv as any)[ENGINE_KEY],
+    (cv as any).__warpEngine,
+    (cv as any).__engine,
+    (cv as any).warpEngine,
+  ];
+  return candidates.find(e => e && !e._destroyed && typeof e.updateUniforms === 'function');
+}
+
+function getOrCreateEngine<WarpType = any>(
+  Ctor: new (...args: any[]) => WarpType,
+  cv: HTMLCanvasElement
+): WarpType {
+  // 1) If something is already attached, reuse it
+  const existing = sniffExisting(cv);
+  if (existing) {
+    // cache it to our key for future calls
+    (cv as any)[ENGINE_KEY] = existing;
+    return existing as WarpType;
+  }
+
+  // 2) Try constructing with opts (covers WE reading opts.divisions, etc.)
+  const tryConstruct = (opts?: any) => new (Ctor as any)(cv, opts);
+
+  try {
+    const eng = tryConstruct({});            // ✅ (canvas, {})
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (msg.includes('already attached')) {
+      const reuse = sniffExisting(cv);
+      if (reuse) return reuse as WarpType;
+      // last resort: if class exposes a helper
+      const from = (Ctor as any).fromCanvas?.(cv);
+      if (from) return from as WarpType;
+    }
+    // 3) One more attempt without opts (for older signatures)
+    try {
+      const eng = new (Ctor as any)(cv);
+      (cv as any)[ENGINE_KEY] = eng;
+      return eng;
+    } catch (err2: any) {
+      const msg2 = String(err2?.message || '').toLowerCase();
+      if (msg2.includes('already attached')) {
+        const reuse = sniffExisting(cv) || (Ctor as any).fromCanvas?.(cv);
+        if (reuse) return reuse as WarpType;
+      }
+      throw err2; // real failure
+    }
+  }
+}
+
+function createEngineWithFallback(
+  rendererType: 'slice2d' | 'grid3d',
+  canvas: HTMLCanvasElement
+) {
+  const W: any = (window as any).WarpEngine;
+  const G: any = (window as any).Grid3DShowEngine;
+
+  if (rendererType === 'grid3d') {
+    try {
+      const Ctor = G || W;
+      const engine3d = getOrCreateEngine(Ctor, canvas);
+      // Only call init if the engine isn't loaded yet (avoid double-attach paths)
+      if (typeof (engine3d as any).init === 'function' && !(engine3d as any).isLoaded) {
+        (engine3d as any).init(canvas);
+      }
+      return engine3d;
+    } catch (e) {
+      console.warn('Grid3D engine failed, falling back to slice2d:', e);
+    }
+  }
+  const engine2d = getOrCreateEngine(W, canvas);
+  if (typeof (engine2d as any).init === 'function' && !(engine2d as any).isLoaded) {
+    (engine2d as any).init(canvas);
+  }
+  return engine2d;
+}
+
+
+That removes the “already attached” crash by:
+
+Reusing anything already bound to that canvas,
+
+Not calling init again if the engine reports isLoaded,
+
+Avoiding the second constructor attempt when the first throw says “already attached”.
