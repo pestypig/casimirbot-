@@ -56,7 +56,7 @@
       if (this.canvas.width !== width || this.canvas.height !== height) {
         this.canvas.width = width;
         this.canvas.height = height;
-        this.gl.viewport(0, 0, width, height);
+        if (this.gl) this.gl.viewport(0, 0, width, height);
         this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
       }
     }

@@ -340,19 +340,10 @@ export default function WarpRenderInspector(props: {
   function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
     const W: any = (window as any).WarpEngine;
     const G: any = (window as any).Grid3DShowEngine;
-
-    if (rendererType === 'grid3d') {
-      try {
-        const Ctor = G || W;                   // ← prefer child if present
-        const engine3d = getOrCreateEngine(Ctor, canvas);
-        const ok = engine3d.init ? engine3d.init(canvas) : true;
-        if (ok) return engine3d;
-        engine3d.dispose?.();
-      } catch (e) {
-        console.warn('Grid3D engine failed, falling back to slice2d:', e);
-      }
-    }
-    return getOrCreateEngine(W, canvas);
+    const Ctor = (rendererType === 'grid3d' && G) ? G : W;
+    const engine = getOrCreateEngine(Ctor, canvas);
+    // ❌ no engine.init(...) here
+    return engine;
   }
 
   // Engine creation & lifecycle
@@ -367,11 +358,9 @@ export default function WarpRenderInspector(props: {
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
       leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
       leftOwnedRef.current = true;
-      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
+      // safe "mute" seed after create, before locks, but we let the gate defer it:
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       leftEngine.current?.setVisible?.(false);
-      // Hard-lock REAL pane against parity flips and thetaScale writers
-      lockPane(leftEngine.current, 'REAL');
     }
     if (rightRef.current && !rightEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -381,43 +370,40 @@ export default function WarpRenderInspector(props: {
       rightOwnedRef.current = true;
       gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
       rightEngine.current?.setVisible?.(false);
-      lockPane(rightEngine.current, 'SHOW');
     }
 
-    // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
-    if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
-    if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
-
-    // Bootstrap; fit camera after link using derived axes
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
+
     leftEngine.current?.onceReady?.(() => {
+      // now it has a working updateUniforms + GL program
+      lockPane(leftEngine.current, 'REAL');
+      hardLockUniforms(leftEngine.current, { forceParity: true, tag: 'REAL' });
+
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-left-init');
     });
+
     rightEngine.current?.onceReady?.(() => {
+      lockPane(rightEngine.current, 'SHOW');
+      hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
+
       const ax = rightEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
       gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
-      // optional: mirror display gain through helper
-      const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
-      rightEngine.current.setDisplayGain?.(dg);
 
-      // === NEW: force a cube of mesh planes, aligned to grid ===
-      // pick a sane grid density (matches your square grid scale)
+      // mesh planes & grid density
       rightEngine.current?.setGridResolution?.({ divisions: 64 });
-      // show several planes on each axis; aligned to grid increments
       rightEngine.current?.setMeshOptions?.({
-        showXZ: true, layersXZ: 5,   // "decks"
-        showXY: true, layersXY: 3,   // front/back
-        showYZ: true, layersYZ: 3,   // sides
-        alignToGrid: true
+        showXZ: true, layersXZ: 5,
+        showXY: true, layersXY: 3,
+        showYZ: true, layersYZ: 3,
+        alignToGrid: true,
       });
 
-      // Optional: quick console proof if subclass isn't loaded
       if (!rightEngine.current?.setMeshOptions) {
-        console.warn('Grid3DShowEngine not active — did you load public/grid3d-engine.js after warp-engine.js?');
+        console.warn('Grid3DShowEngine not active — check public/grid3d-engine.js load order.');
       }
     });
 

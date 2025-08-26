@@ -1,0 +1,65 @@
+Pasted-Got-it-your-SHOW-pane-is-black-because-we-wrapped-updateUniforms-too-early-and-then-drove-the-engine-1756175879895_1756175879896.txt
+Got it—your SHOW pane is black because we wrapped updateUniforms too early and then drove the engine before it had a real updateUniforms/WebGL program. That stalls shader linking and your checkpoint panel cascades to “WebGL context — missing / no program / θ invalid”.
+
+Here’s a tight, surgical fix set:
+
+1) Don’t call init(...) in the factory
+
+Let WarpEngine do its own init during bootstrap()/first render.
+
+// replace your createEngineWithFallback with this
+function createEngineWithFallback(
+  rendererType: 'slice2d' | 'grid3d',
+  canvas: HTMLCanvasElement
+) {
+  const W: any = (window as any).WarpEngine;
+  const G: any = (window as any).Grid3DShowEngine;
+  const Ctor = (rendererType === 'grid3d' && G) ? G : W;
+  const engine = getOrCreateEngine(Ctor, canvas);
+  // ❌ no engine.init(...) here
+  return engine;
+}
+
+2) Delay the “locks” until the engine is ready
+
+Wrapping updateUniforms before the engine provides the real one can lead to recursion/no-ops. Move both lockPane and hardLockUniforms inside onceReady.
+
+// remove these early calls:
+// lockPane(leftEngine.current, 'REAL');
+// lockPane(rightEngine.current, 'SHOW');
+// hardLockUniforms(...)
+
+leftEngine.current?.bootstrap({ ...realPayload });
+rightEngine.current?.bootstrap({ ...showPayload });
+
+leftEngine.current?.onceReady?.(() => {
+  // now it has a working updateUniforms + GL program
+  lockPane(leftEngine.current, 'REAL');
+  hardLockUniforms(leftEngine.current, { forceParity: true, tag: 'REAL' });
+
+  const ax = leftEngine.current?.uniforms?.axesClip;
+  const cz = compactCameraZ(ax);
+  gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-left-init');
+});
+
+rightEngine.current?.onceReady?.(() => {
+  lockPane(rightEngine.current, 'SHOW');
+  hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
+
+  const ax = rightEngine.current?.uniforms?.axesClip;
+  const cz = compactCameraZ(ax);
+  gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
+
+  // mesh planes & grid density
+  rightEngine.current?.setGridResolution?.({ divisions: 64 });
+  rightEngine.current?.setMeshOptions?.({
+    showXZ: true, layersXZ: 5,
+    showXY: true, layersXY: 3,
+    showYZ: true, layersYZ: 3,
+    alignToGrid: true,
+  });
+
+  if (!rightEngine.current?.setMeshOptions) {
+    console.warn('Grid3DShowEngine not active — check public/grid3d-engine.js load order.');
+  }
+});
