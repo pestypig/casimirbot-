@@ -577,6 +577,16 @@ export default function WarpRenderInspector(props: {
         grid3dRef.current?.setPixelRatio?.(dpr);
         grid3dRef.current?.setSupersample?.(1.25);
 
+        // Nudge grid density once the canvas has real pixels
+        const W = cv.width, H = cv.height;
+        const pxAcross = estimatePxAcrossWall({
+          canvasPxW: W, canvasPxH: H,
+          gridSpan: 1, hull,
+          wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
+        });
+        const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
+        grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
+
         // Match visibility gate
         g.setVisible?.(haveUniforms);
         return; // stop loop
