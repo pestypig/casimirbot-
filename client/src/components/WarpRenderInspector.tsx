@@ -8,6 +8,7 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { applyToEngine } from "@/lib/warp-uniforms-gate";
 import MarginHunterPanel from "./MarginHunterPanel";
+import CurvatureMenu from "@/components/CurvatureMenu";
 
 /**
  * WarpRenderInspector
@@ -790,69 +791,19 @@ export default function WarpRenderInspector(props: {
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
-          <h4 className="font-medium mb-3">Curvature & Equations</h4>
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs text-neutral-600 mb-1">Spacetime Curvature</label>
-              <select
-                className="w-full px-2 py-1 text-sm border rounded"
-                value={curvT}
-                onChange={e => {
-                  const v = Number(e.target.value);
-                  setCurvT(v);
-                  pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
-                  pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
-                }}
-              >
-                <option value={0.00}>Flat Space (η_μν)</option>
-                <option value={0.25}>Mild Curvature</option>
-                <option value={0.45}>Cruise Settings</option>
-                <option value={0.70}>High Curvature</option>
-                <option value={1.00}>Maximum Deformation</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                className="px-2 py-1 text-xs border rounded hover:bg-neutral-100"
-                onClick={() => {
-                  const patch = { exposure: 3.0, zeroStop: 1e-8, ridgeMode: 0 };
-                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-enhance');
-                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-enhance');
-                }}
-              >
-                Enhance Detail
-              </button>
-              <button
-                className="px-2 py-1 text-xs border rounded hover:bg-neutral-100"
-                onClick={() => {
-                  const patch = { exposure: 5.0, zeroStop: 1e-7, ridgeMode: 1 };
-                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-reset');
-                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-reset');
-                }}
-              >
-                Reset View
-              </button>
-            </div>
-            <div>
-              <label className="block text-xs text-neutral-600 mb-1">Field Equations</label>
-              <select
-                className="w-full px-2 py-1 text-sm border rounded"
-                onChange={e => {
-                  const mode = e.target.value;
-                  let patch = {};
-                  if (mode === 'einstein') patch = { colorMode: 'theta', viewAvg: true };
-                  else if (mode === 'stress') patch = { colorMode: 'stress', viewAvg: false };
-                  else if (mode === 'alcubierre') patch = { colorMode: 'velocity', viewAvg: true };
-                  pushUniformsWhenReady(leftEngine.current, patch, 'eq-mode');
-                  pushUniformsWhenReady(rightEngine.current, patch, 'eq-mode');
-                }}
-              >
-                <option value="einstein">Einstein Field Equations</option>
-                <option value="stress">Stress-Energy Tensor</option>
-                <option value="alcubierre">Alcubierre Metric</option>
-              </select>
-            </div>
-          </div>
+          <h4 className="font-medium mb-3">Curvature / Equations</h4>
+          <CurvatureMenu
+            onApply={(patch) => {
+              // never flip parity here; both panes read the same visual knobs
+              pushUniformsWhenReady(leftEngine.current,  patch, 'curvature-menu');
+              pushUniformsWhenReady(rightEngine.current, patch, 'curvature-menu');
+
+              // Optional: keep the public helper in sync for devtools
+              if ((window as any).__warp_setGainDec && patch.curvatureGainT != null) {
+                (window as any).__warp_setGainDec(patch.curvatureGainT * 8, patch.curvatureBoostMax ?? 40);
+              }
+            }}
+          />
         </div>
 
         <div className="rounded-2xl border border-neutral-200 p-4">
