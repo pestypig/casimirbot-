@@ -678,81 +678,32 @@ export default function WarpRenderInspector(props: {
   // Apply shared physics inputs any time calculator/shared/controls change
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current) return;
+    if (!haveUniforms) return;                        // ⬅️ no pre-push, no seeding
 
-    // Gate first paint until canonical uniforms arrive (prevents averaging race)
-    const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
-    leftEngine.current.setVisible?.(ready);
-    rightEngine.current.setVisible?.(ready);
+    // Display-only controls (do not include gamma*, duty*, sectors, etc.)
+    const tonemapExp = lockTone ? 5.0 : N(live?.exposure, 5.0);
+    const zeroStop   = lockTone ? 1e-7 : N(live?.zeroStop, 1e-7);
+    const ridgeUsed  = lockRidge ? 0 : N(live?.ridgeMode, 0);
+    const viewAvgUsed= forceAvg ? true : (live?.viewAvg ?? true);
 
-    // Debug toggle calculations
-    const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
-    const autoZero = N(props.parityPhys?.zeroStop ?? live?.zeroStop, 1e-7);
-    const autoRidge = N(props.parityPhys?.ridgeMode ?? ridgeMode, 0);
-    const autoAvg = props.parityPhys?.viewAvg ?? true;
-
-    const tonemapExp = lockTone ? 5.0 : autoExp;
-    const zeroStop = lockTone ? 1e-7 : autoZero;
-    const ridgeModeUsed = lockRidge ? 0 : autoRidge;
-    const viewAvgUsed = forceAvg ? true : autoAvg;
-
-    // Shared physics parameters for both engines
-    const shared = {
-      gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
-      qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-      // Use debug-controlled γ_VdB to prove physics separation
-      gammaVanDenBroeck: gammaVdBBound,
-      dutyEffectiveFR,            // 0.01 × (1/400) here  
-      dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),                    // UI only (for labels)
-      sectorCount: sTotal,                    // 400
-      sectors: sConcurrent,                    // 1
-      // Apply debug toggles to display controls
-      viewAvg: viewAvgUsed,       // Use debug toggle
-      ridgeMode: ridgeModeUsed,
+    const displayOnly = {
       exposure: tonemapExp,
-      zeroStop: zeroStop,
-      // ✅ give the sweep window so duty_local can be computed
-      lightCrossing: { burst_ms: props.lightCrossing?.burst_ms ?? 0.01, dwell_ms: props.lightCrossing?.dwell_ms ?? 1 },
-      // Physical scaling
-      hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-      wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
-      driveDir: props.baseShared?.driveDir ?? [1,0,0],
-      vShip: props.baseShared?.vShip ?? 0,
-      colorMode: props.baseShared?.colorMode ?? 'theta',
+      zeroStop,
+      ridgeMode: ridgeUsed,
+      viewAvg: viewAvgUsed,
+      colorMode: 'theta' as const,
       lockFraming: true,
-      currentMode: props.baseShared?.currentMode ?? 'hover',
-      // ❌ do NOT include thetaScale anywhere
     };
 
-    // Just before first uniforms push - seed FR to avoid transition spike
-    const seedFR = 0.01 * (1 / Math.max(1, sTotal)); // 1% × 1/400
-    gatedUpdateUniforms(leftEngine.current,  { dutyEffectiveFR: seedFR }, 'seed-fr');
-    gatedUpdateUniforms(rightEngine.current, { dutyEffectiveFR: seedFR }, 'seed-fr');
-    
-    // REAL engine - physics truth with per-width view fraction
-    const realUniforms = toUniforms({
-      ...shared, 
-      physicsParityMode: true,
-      viewMassFraction: viewFracREAL
-    });
-    gatedUpdateUniforms(leftEngine.current, normalizeKeys(realUniforms), 'inspector-real');
-    
-    // SHOW engine - enhanced visuals with full bubble
-    const showUniforms = toUniforms({
-      ...shared, 
-      physicsParityMode: false,
-      viewMassFraction: 1.0
-    });
-    gatedUpdateUniforms(rightEngine.current, normalizeKeys(showUniforms), 'inspector-show');
-    
-    // Unmute engines after first normalized payloads are pushed
-    leftEngine.current?.setVisible?.(true);
-    rightEngine.current?.setVisible?.(true);
+    // push only display knobs; physics came from server
+    gatedUpdateUniforms(leftEngine.current,  displayOnly, 'display-only');
+    gatedUpdateUniforms(rightEngine.current, displayOnly, 'display-only');
 
-    // Optional camera sweetener so both keep same framing
-    const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
+    // keep framing in sync
+    const ax = leftEngine.current?.uniforms?.axesClip || rightEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
-    gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
+    gatedUpdateUniforms(leftEngine.current,  { cameraZ: cz }, 'display-only-camera');
+    gatedUpdateUniforms(rightEngine.current, { cameraZ: cz }, 'display-only-camera');
     
     // Sanity check parity modes
     setTimeout(() => {
@@ -761,7 +712,7 @@ export default function WarpRenderInspector(props: {
       // Report theta consistency after engine updates (use SHOW view fraction for consistency)
       reportThetaConsistency(bound, showViewMassFraction);
     }, 100);
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
+  }, [haveUniforms, live, lockTone, lockRidge, forceAvg]);
 
   // Dummy uniforms for render (updated via useEffect)
   const realUniforms = useMemo(() => toUniforms({
