@@ -1,0 +1,56 @@
+Fix #3: computeDiagnostics() should read the same duty the engine used
+
+Right now it computes
+
+const d_FR = Math.max(1e-12, (U.dutyCycle||0.01) / Math.max(1, U.sectors||1));
+
+
+which is not the engine’s Ford–Roman duty. Your engine already computed and stored dutyEffectiveFR (and dutyUsed). Use that first; only fall back if truly missing.
+
+Patch:
+
+ function computeDiagnostics(){
+   const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+   const P=this._computePipelineBetas(U);
+   const Y=this._sampleYorkAndEnergy(U);
+
+   // ... other calculations ...
+
+-  // C) WarpEngine.js wire-in: Return physics values for CPU comparison
+-  const d_FR = Math.max(1e-12, (U.dutyCycle||0.01) / Math.max(1, U.sectors||1));
+-  const viewFraction = U.viewMassFraction ?? 1.0;
+-  const sectorFraction = (U.sectors||1) / Math.max(1, U.sectorCount||400);
++  // C) WarpEngine.js wire-in: Return physics values for CPU comparison
++  // Single source of truth for duty: what the engine actually used
++  let d_FR = U.dutyEffectiveFR;
++  if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
++  if (!Number.isFinite(d_FR)) {
++    // final fallback: duty_local × (S_concurrent / S_total)
++    const dutyLocal = Number.isFinite(U.dutyLocal) ? U.dutyLocal : 0.01; // 1% default
++    const S_total   = Math.max(1, U.sectorCount ?? 400);
++    const S_live    = Math.max(1, U.sectors ?? 1);
++    d_FR = dutyLocal * (S_live / S_total);
++  }
++  d_FR = Math.max(1e-12, d_FR);
++
++  // View mass fraction for displays (REAL shows ~1/sectorCount; SHOW uses 1.0)
++  const sectorFraction = Math.max(1, (U.sectors||1)) / Math.max(1, U.sectorCount||400);
++  const viewFraction = (U.viewAvg ?? true)
++    ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
++    : 1.0;
+
+   return {
+     mode: U.currentMode||'hover',
+     duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+     dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+     sectors:P.sectors, phase:P.phase,
+     beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+     // ... other diagnostic values ...
+-    d_FR: d_FR,
+-    viewFraction: viewFraction,
+-    sectorFraction: sectorFraction
++    d_FR,
++    viewFraction,
++    sectorFraction
+   };
+ }

@@ -1894,9 +1894,23 @@ class WarpEngine {
         this._accumShearN = 0;
 
         // C) WarpEngine.js wire-in: Return physics values for CPU comparison
-        const d_FR = Math.max(1e-12, (U.dutyCycle||0.01) / Math.max(1, U.sectors||1));
-        const viewFraction = U.viewMassFraction ?? 1.0;
-        const sectorFraction = (U.sectors||1) / Math.max(1, U.sectorCount||400);
+        // Single source of truth for duty: what the engine actually used
+        let d_FR = U.dutyEffectiveFR;
+        if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
+        if (!Number.isFinite(d_FR)) {
+            // final fallback: duty_local × (S_concurrent / S_total)
+            const dutyLocal = Number.isFinite(U.dutyLocal) ? U.dutyLocal : 0.01; // 1% default
+            const S_total   = Math.max(1, U.sectorCount ?? 400);
+            const S_live    = Math.max(1, U.sectors ?? 1);
+            d_FR = dutyLocal * (S_live / S_total);
+        }
+        d_FR = Math.max(1e-12, d_FR);
+
+        // View mass fraction for displays (REAL shows ~1/sectorCount; SHOW uses 1.0)
+        const sectorFraction = Math.max(1, (U.sectors||1)) / Math.max(1, U.sectorCount||400);
+        const viewFraction = (U.viewAvg ?? true)
+            ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
+            : 1.0;
 
         return {
             mode: U.currentMode||'hover',
@@ -1911,9 +1925,9 @@ class WarpEngine {
             york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
             hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6),
             // C) Additional physics values for CPU comparison
-            d_FR: d_FR,
-            viewFraction: viewFraction,
-            sectorFraction: sectorFraction,
+            d_FR,
+            viewFraction,
+            sectorFraction,
             frameHash8x8: this.sampleHash8x8()
         };
     }
