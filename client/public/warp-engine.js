@@ -15,6 +15,20 @@
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
+// ---- harden GRID_DEFAULTS even if file is reloaded / short-circuited ----
+(function (g) {
+  const existing = g.GRID_DEFAULTS || {};
+  const safe = {
+    spanPadding: existing.spanPadding ?? (
+      g.matchMedia && g.matchMedia('(max-width: 768px)').matches ? 1.45 : 1.35
+    ),
+    minSpan: existing.minSpan ?? 2.6,
+    divisions: Number.isFinite(existing.divisions) && existing.divisions > 0
+      ? (existing.divisions|0)
+      : 100,
+  };
+  g.GRID_DEFAULTS = safe;
+})(globalThis);
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 if (typeof window.GRID_DEFAULTS === 'undefined') {
