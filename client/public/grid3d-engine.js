@@ -52,14 +52,13 @@
     // ---- DPR + SSAA aware resize ---------------------------------------------
     _resizeCanvasToDisplaySize() {
       const base = global.devicePixelRatio || 1;
-      const dpr = Math.min(2.5, (this._dprOverride || base) * (this._ssaa || 1));
+      const dpr  = Math.min(2.5, (this._dprOverride || base) * (this._ssaa || 1));
       const { clientWidth, clientHeight } = this.canvas;
-      const width  = Math.max(1, Math.floor(clientWidth  * dpr));
-      const height = Math.max(1, Math.floor(clientHeight * dpr));
-      if (this.canvas.width !== width || this.canvas.height !== height) {
-        this.canvas.width = width;
-        this.canvas.height = height;
-        if (this.gl) this.gl.viewport(0, 0, width, height);  // ✅ guard
+      const side   = Math.max(1, Math.floor(Math.min(clientWidth, clientHeight) * dpr));
+      if (this.canvas.width !== side || this.canvas.height !== side) {
+        this.canvas.width  = side;
+        this.canvas.height = side;
+        this.gl && this.gl.viewport(0, 0, side, side);
         this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
       }
     }
