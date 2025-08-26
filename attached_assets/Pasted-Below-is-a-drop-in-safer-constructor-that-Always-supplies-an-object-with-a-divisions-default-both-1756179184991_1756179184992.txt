@@ -1,0 +1,64 @@
+Below is a drop-in safer constructor that:
+
+Always supplies an object with a divisions default (both flat and nested).
+
+Tries both signatures, and preserves your “already attached” reuse path.
+
+Falls back to the simplest signature if both enriched calls fail.
+
+Patch 1: robust constructor helper
+
+Replace your “First (and only) construction attempt” block in getOrCreateEngine with this:
+
+// ---- inside getOrCreateEngine just before the try/catch ----
+const SAFE_OPTS = { divisions: 64, grid: { divisions: 64 } };
+
+// 2) First construction attempt(s) — try both ctor shapes
+try {
+  // (canvas, opts?) — base WE often uses this
+  const eng = new (Ctor as any)(cv, SAFE_OPTS);
+  CANVAS_ENG.set(cv, eng);
+  (cv as any)[ENGINE_KEY] = eng;
+  return eng;
+} catch (e1: any) {
+  try {
+    // (canvas, gl?, opts?) — SHOW/Grid3D friendly
+    const eng = new (Ctor as any)(cv, undefined, SAFE_OPTS);
+    CANVAS_ENG.set(cv, eng);
+    (cv as any)[ENGINE_KEY] = eng;
+    return eng;
+  } catch (e2: any) {
+    const msg = String(e2?.message || e1?.message || '').toLowerCase();
+
+    // If engine reports "already attached", reuse
+    if (msg.includes('already attached')) {
+      const byClass = (Ctor as any).fromCanvas?.(cv) || (Ctor as any).getForCanvas?.(cv);
+      if (byClass) {
+        CANVAS_ENG.set(cv, byClass);
+        (cv as any)[ENGINE_KEY] = byClass;
+        return byClass as WarpType;
+      }
+      const post = (([
+        (cv as any).__warpEngine,
+        (cv as any).__engine,
+        (cv as any).warpEngine,
+        (cv as any)[ENGINE_KEY],
+      ]).find(e => e && !e._destroyed && typeof e.updateUniforms === 'function'));
+      if (post) {
+        CANVAS_ENG.set(cv, post);
+        (cv as any)[ENGINE_KEY] = post;
+        return post as WarpType;
+      }
+    }
+
+    // Final fallback: simplest signature (canvas)
+    try {
+      const eng = new (Ctor as any)(cv);
+      CANVAS_ENG.set(cv, eng);
+      (cv as any)[ENGINE_KEY] = eng;
+      return eng;
+    } catch (e3) {
+      throw e2; // surface the meaningful error
+    }
+  }
+}
