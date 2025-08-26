@@ -177,24 +177,16 @@ function useCheckpointList(
     const u = e?.uniforms || {};
     const ts = N(u?.thetaScale, NaN);
     
-    // Calculate what the engine should be using based on its context
-    const concurrent = Math.max(1, u?.sectors ?? 1);
-    const total = Math.max(1, liveSnap?.sectorCount ?? 400);
-    const dutyLocal = 0.01; // Ford-Roman burst duty
-    const viewFraction = side === 'REAL' ? (1 / sectors) : 1; // REAL uses per-sector, SHOW uses whole ship
-    const viewAveraging = liveSnap?.viewAvg ?? true;
-    
-    const thetaUsed = thetaExpectedFn
-      ? thetaExpectedFn(u, dutyFR)
-      : expectedUniformTheta(u, liveSnap, e);
+    // Expected uniforms θ from the same chain the engine uses
+    const thetaUniformsExpected = expectedUniformTheta(u, liveSnap, e);
 
     checkpoint({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUsed.toExponential(2)}`,
-      expect: thetaUsed, actual: ts,
-      sev: !Number.isFinite(ts) || ts <= 0 ? 'error'
-          : (within(ts, thetaUsed, 0.10) ? 'info' : 'warn')
+      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformsExpected.toExponential(2)}`,
+      expect: thetaUniformsExpected, actual: ts,
+      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUniformsExpected, 0.10) ? 'info' : 'warn'),
+      meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
     });
 
     checkpoint({
