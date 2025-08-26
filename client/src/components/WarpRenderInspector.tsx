@@ -299,37 +299,61 @@ export default function WarpRenderInspector(props: {
     engine.__locked = true;
   }
 
-  // Reuse-or-create guard so we never attach twice to the same canvas
   const ENGINE_KEY = '__warpEngine';
+
+  function sniffExisting(cv: HTMLCanvasElement) {
+    // Try common attachment points the base might use
+    const candidates = [
+      (cv as any)[ENGINE_KEY],
+      (cv as any).__warpEngine,
+      (cv as any).__engine,
+      (cv as any).warpEngine,
+    ];
+    return candidates.find(e => e && !e._destroyed && typeof e.updateUniforms === 'function');
+  }
 
   function getOrCreateEngine<WarpType = any>(
     Ctor: new (...args: any[]) => WarpType,
     cv: HTMLCanvasElement
   ): WarpType {
-    const existing = (cv as any)[ENGINE_KEY];
-    if (existing && !existing._destroyed) return existing as WarpType;
-
-    let eng: any;
-    try {
-      // Prefer (canvas, opts) when available
-      if (Ctor && typeof Ctor === 'function') {
-        // If the constructor is declared with ≥2 params, pass {}. If not, try both ways safely.
-        if ((Ctor as any).length >= 2) {
-          eng = new (Ctor as any)(cv, {});           // ✅ opts exists
-        } else {
-          try { eng = new (Ctor as any)(cv, {}); }   // try with {}
-          catch { eng = new (Ctor as any)(cv); }     // then without
-        }
-      } else {
-        throw new Error('Engine constructor is not a function');
-      }
-    } catch (err) {
-      // Last-chance fallback
-      eng = new (Ctor as any)(cv);
+    // 1) If something is already attached, reuse it
+    const existing = sniffExisting(cv);
+    if (existing) {
+      // cache it to our key for future calls
+      (cv as any)[ENGINE_KEY] = existing;
+      return existing as WarpType;
     }
 
-    (cv as any)[ENGINE_KEY] = eng;
-    return eng;
+    // 2) Try constructing with opts (covers WE reading opts.divisions, etc.)
+    const tryConstruct = (opts?: any) => new (Ctor as any)(cv, opts);
+
+    try {
+      const eng = tryConstruct({});            // ✅ (canvas, {})
+      (cv as any)[ENGINE_KEY] = eng;
+      return eng;
+    } catch (err: any) {
+      const msg = String(err?.message || '').toLowerCase();
+      if (msg.includes('already attached')) {
+        const reuse = sniffExisting(cv);
+        if (reuse) return reuse as WarpType;
+        // last resort: if class exposes a helper
+        const from = (Ctor as any).fromCanvas?.(cv);
+        if (from) return from as WarpType;
+      }
+      // 3) One more attempt without opts (for older signatures)
+      try {
+        const eng = new (Ctor as any)(cv);
+        (cv as any)[ENGINE_KEY] = eng;
+        return eng;
+      } catch (err2: any) {
+        const msg2 = String(err2?.message || '').toLowerCase();
+        if (msg2.includes('already attached')) {
+          const reuse = sniffExisting(cv) || (Ctor as any).fromCanvas?.(cv);
+          if (reuse) return reuse as WarpType;
+        }
+        throw err2; // real failure
+      }
+    }
   }
   
   // Hard-lock parity & block late thetaScale writers at the engine edge
@@ -348,14 +372,31 @@ export default function WarpRenderInspector(props: {
     engine.__locked = true;
   }
 
-  // Helper to create engine with conditional selection and 3D fallback
-  function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
+  function createEngineWithFallback(
+    rendererType: 'slice2d' | 'grid3d',
+    canvas: HTMLCanvasElement
+  ) {
     const W: any = (window as any).WarpEngine;
     const G: any = (window as any).Grid3DShowEngine;
-    const Ctor = (rendererType === 'grid3d' && G) ? G : W;
-    const engine = getOrCreateEngine(Ctor, canvas);
-    // ❌ no engine.init(...) here
-    return engine;
+
+    if (rendererType === 'grid3d') {
+      try {
+        const Ctor = G || W;
+        const engine3d = getOrCreateEngine(Ctor, canvas);
+        // Only call init if the engine isn't loaded yet (avoid double-attach paths)
+        if (typeof (engine3d as any).init === 'function' && !(engine3d as any).isLoaded) {
+          (engine3d as any).init(canvas);
+        }
+        return engine3d;
+      } catch (e) {
+        console.warn('Grid3D engine failed, falling back to slice2d:', e);
+      }
+    }
+    const engine2d = getOrCreateEngine(W, canvas);
+    if (typeof (engine2d as any).init === 'function' && !(engine2d as any).isLoaded) {
+      (engine2d as any).init(canvas);
+    }
+    return engine2d;
   }
 
   // Engine creation & lifecycle
