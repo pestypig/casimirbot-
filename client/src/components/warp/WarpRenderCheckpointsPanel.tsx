@@ -33,32 +33,41 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Canonical pane-aligned expected θ that matches the engine:
-//  θ = γ_geo^3 · q · γ_VdB · (viewAvg ? √d_FR : 1)
+// Canonical uniforms θ expected by the engine:
+//
+// θ = γ_geo^3 · q · γ_VdB · (viewAvg ? √d_FR : 1)
+// d_FR is exactly what the engine used (prefer dutyEffectiveFR / dutyUsed).
 function expectedUniformTheta(u: any, liveSnap: any, engine: any) {
-  const eU = engine?.uniforms || {};
+  const eU = (engine?.uniforms ?? {}) as any;
   const getNum = (v: any, d: number) => (Number.isFinite(+v) ? +v : d);
+
   const gammaGeo = Math.max(1, getNum(eU.gammaGeo ?? liveSnap?.gammaGeo, 26));
   const q        = Math.max(1e-12, getNum(eU.qSpoilingFactor ?? eU.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
-  const gammaVdB = Math.max(1, getNum(eU.gammaVdB ?? eU.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, 1.4e5));
+  const gammaVdB = Math.max(1, getNum(
+    eU.gammaVdB ??
+    eU.gammaVanDenBroeck ??
+    liveSnap?.gammaVanDenBroeck ??
+    liveSnap?.gammaVdB,
+    1.4e5
+  ));
 
-  // Duty: prefer what the engine actually used
+  // Duty — use what the engine actually applied.
   let dFR = eU.dutyEffectiveFR ?? eU.dutyUsed ?? liveSnap?.dutyEffectiveFR ?? liveSnap?.dutyShip ?? liveSnap?.dutyEff;
   if (!Number.isFinite(dFR)) {
-    const dutyLocal = 0.01;
+    const dutyLocal = 0.01; // 1% local ON
     const S_total = Math.max(1, getNum(eU.sectorCount ?? liveSnap?.sectorCount, 400));
     const S_live  = Math.max(1, getNum(eU.sectors, 1));
     dFR = dutyLocal * (S_live / S_total);
   }
   dFR = Math.max(1e-12, +dFR);
 
-  const viewAvg = (eU.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
-  if (viewAvg) {
-    return thetaScaleExpected({ gammaGeo, q, gammaVdB, dFR }); // includes √d_FR
-  } else {
-    // non-averaged path: engine uses β_inst (no duty factor)
-    return Math.pow(gammaGeo, 3) * q * gammaVdB;
-  }
+  const viewAvgOn = (eU.viewAvg ?? liveSnap?.viewAvg ?? true) ? 1 : 0;
+
+  // When view-averaging is on, include √d_FR (canonical law).
+  // When off, show instantaneous β_inst (no duty factor).
+  return viewAvgOn
+    ? thetaScaleExpected({ gammaGeo, q, gammaVdB, dFR })   // includes √d_FR
+    : Math.pow(gammaGeo, 3) * q * gammaVdB;               // β_inst
 }
 
 function useEngineHeartbeat(engineRef: React.MutableRefObject<any | null>) {
