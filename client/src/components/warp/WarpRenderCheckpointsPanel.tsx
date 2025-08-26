@@ -300,25 +300,65 @@ function useCheckpointList(
 
     rows.push({ label: "WebGL context", detail: gl ? (ctxOk ? "alive" : "lost") : "missing", state: ctxOk ? "ok" : gl ? "fail" : "fail" });
 
-    // Primary: ask the driver
-    const { stage, ok: gpuLinked, reason } = getLinkStatus(e);
+    // ── Shaders / program (driver-queried, GL1/GL2 + async aware) ─────────────────
+    {
+      const gl = e?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
+      const prog =
+        (e as any)?.gridProgram ||
+        (e as any)?.program ||
+        (e as any)?._program ||
+        null;
 
-    // Secondary: once linked, we expect locations/attribs too
-    const shapeOK = !!e?.gridProgram && !!e?.gridUniforms && !!e?.gridAttribs;
-    const pass = gpuLinked && shapeOK;
+      let progOk = false;
+      let compiling = false;
+      let reason = 'no GL or program';
 
-    checkpoint({
-      id: 'gpu.shaders_linked', side, stage: 'gpu',
-      pass,
-      sev: pass ? 'info' : (stage === 'compiling' ? 'warn' : 'error'),
-      msg: pass
-        ? "Shaders compiled & linked"
-        : (stage === 'compiling'
-            ? "⏳ compiling shaders…"
-            : (gpuLinked ? "linked but missing locations" : `link error: ${reason || 'unknown'}`)),
-      expect: 'linked',
-      actual: pass ? 'linked' : (stage === 'compiling' ? 'compiling' : 'unlinked')
-    });
+      try {
+        if (gl && prog) {
+          // Async compile support (KHR_parallel_shader_compile)
+          const ext =
+            (e as any)?.parallelShaderExt ||
+            (gl.getExtension ? gl.getExtension('KHR_parallel_shader_compile') : null);
+
+          if (ext) {
+            const done = gl.getProgramParameter(prog, (ext as any).COMPLETION_STATUS_KHR);
+            compiling = !done;
+          }
+
+          // Link status (works for both GL1/GL2)
+          progOk = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+
+          if (progOk) {
+            reason = 'linked';
+          } else if (compiling) {
+            reason = 'compiling…';
+          } else {
+            reason = (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
+          }
+        }
+      } catch (e: any) {
+        reason = `exception: ${e?.message || e}`;
+      }
+
+      // Checkpoint row (GPU → shaders_linked)
+      checkpoint({
+        id: 'gpu.shaders_linked',
+        side,
+        stage: 'gpu',
+        pass: progOk,
+        msg: progOk ? 'Shaders compiled & linked' : (compiling ? 'Compiling shaders…' : reason),
+        expect: 'linked',
+        actual: reason,
+        sev: progOk ? 'info' : (compiling ? 'warn' : 'error'),
+      });
+
+      // DAG row
+      rows.push({
+        label: 'Shaders linked',
+        detail: reason,
+        state: progOk ? 'ok' : (compiling ? 'warn' : 'fail'),
+      });
+    }
 
     // Grid buffers
     const verts = (e?.gridVertices?.length || 0);
@@ -353,8 +393,6 @@ function useCheckpointList(
       expect: { exp: [0, 12], zs: [0, 1e-3] }, actual: {},
       sev: 'info'
     });
-
-    rows.push({ label: "Shaders linked", detail: progOk ? "gridProgram ready" : "no program", state: progOk ? "ok" : "fail" });
 
     // Engine readiness
     rows.push({ label: "Engine ready", detail: e?.isLoaded ? "isLoaded=true" : "waiting", state: e?.isLoaded ? "ok" : "warn" });
