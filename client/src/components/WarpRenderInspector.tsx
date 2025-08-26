@@ -123,6 +123,108 @@ const TONEMAP_LOCK = {
   viewAvg: true 
 };
 
+// ---- PaneOverlay Component --------------------------------------------------
+function PaneOverlay(props:{
+  title: string;
+  flavor: 'REAL'|'SHOW';
+  engineRef: React.MutableRefObject<any>;
+  viewFraction: number; // REAL uses 1/sectorCount, SHOW uses 1.0
+}){
+  const { engineRef, flavor, viewFraction, title } = props;
+  const [snap, setSnap] = useState<any>(null);
+
+  // live pull from the engine every frame
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const e = engineRef.current;
+      const U = e?.uniforms || {};
+      const H = U.hullAxes || [503.5,132,86.5];
+      const a = +H[0]||503.5, b = +H[1]||132.0, c = +H[2]||86.5;
+      const aH = harmonicMean3(a,b,c);
+
+      // prefer explicit meters if present, else convert ρ→m using aH
+      const w_m = (U.hullDimensions?.wallWidth_m != null)
+        ? +U.hullDimensions.wallWidth_m
+        : (Number.isFinite(U.wallWidth) ? (+U.wallWidth) * aH : 0.016*aH);
+
+      const V  = volEllipsoid(a,b,c);
+      const S  = areaEllipsoid(a,b,c);
+      const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
+
+      const theta = Number.isFinite(U.thetaScale) ? +U.thetaScale : 0;
+      const mStar = massProxy(theta, Vshell, flavor==='REAL' ? viewFraction : 1.0);
+
+      // pull contraction/expansion from diagnostics if available
+      const diag = (e?.computeDiagnostics?.() || {}) as any;
+      const frontMax = diag.theta_front_max, rearMin = diag.theta_rear_min;
+
+      setSnap({
+        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax, rearMin,
+        sectors: Math.max(1,(U.sectorCount|0)||1),
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [engineRef, flavor, viewFraction]);
+
+  const s = snap || {};
+  const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
+
+  return (
+    <div className="pointer-events-none absolute left-2 top-2 z-[5]">
+      <div className="pointer-events-auto rounded-xl bg-black/65 border border-white/10 text-white px-3 py-2 shadow-lg max-w-[92%]">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase tracking-wide px-2 py-0.5 rounded bg-blue-600/80">
+            {title}
+          </span>
+          <span className="text-xs text-white/80">
+            wall width: <b>{fmtSI(s.w_m,'m')}</b> {Number.isFinite(widthNm) ? `(${widthNm.toFixed(0)} nm)` : ''}
+          </span>
+        </div>
+
+        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
+          <div>θ-scale: <b>{Number.isFinite(s.theta)? s.theta.toExponential(2) : '—'}</b></div>
+          <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
+          <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
+          <div>exotic mass* : <b>{Number.isFinite(s.mStar)? s.mStar.toExponential(3) : '—'} arb</b></div>
+          <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
+          <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
+        </div>
+
+        {/* dropdown with filled equations */}
+        <details className="mt-2">
+          <summary className="text-xs text-white/70 hover:text-white cursor-pointer">equations & filled values</summary>
+          <div className="mt-2 text-[11px] leading-5 text-white/85 space-y-2">
+            <div>
+              <div className="opacity-80">Ellipsoid geometry</div>
+              <div><code>V = 4/3 · π · a · b · c</code> = <b>{Number.isFinite(s.V)? fmtSI(s.V,'m³') : '—'}</b></div>
+              <div><code>S ≈ 4π · ((a^p b^p + a^p c^p + b^p c^p)/3)^(1/p)</code>, <i>p</i>=1.6075 → <b>{Number.isFinite(s.S)? fmtSI(s.S,'m²'):'—'}</b></div>
+              <div><code>a_H = 3 / (1/a + 1/b + 1/c)</code> = <b>{Number.isFinite(s.aH)? fmtSI(s.aH,'m'):'—'}</b></div>
+              <div><code>w_m = wallWidth_m ⟂</code> (or <code>w_ρ · a_H</code>) → <b>{fmtSI(s.w_m,'m')}</b></div>
+              <div><code>V_shell ≈ S · w_m</code> → <b>{Number.isFinite(s.Vshell)? fmtSI(s.Vshell,'m³'):'—'}</b></div>
+            </div>
+            <div>
+              <div className="opacity-80">Curvature (York-time proxy)</div>
+              <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
+              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
+            </div>
+            <div>
+              <div className="opacity-80">Exotic mass proxy (display-only)</div>
+              <div>
+                <code>M* = θ² · V_shell · {flavor==='REAL' ? 'viewFraction' : '1'}</code>
+                {' '}→ <b>{Number.isFinite(s.mStar)? s.mStar.toExponential(3):'—'} arb</b>
+              </div>
+              <div className="text-white/60">(* proportional units for visualization; not a calibrated mass)</div>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+}
+
 // ---- Component --------------------------------------------------------------
 export default function WarpRenderInspector(props: {
   // Optional: calculator outputs. Pass exactly what your calculator returns
