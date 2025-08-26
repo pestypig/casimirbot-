@@ -1,5 +1,7 @@
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
+import { checkpoint, Check, Side, Stage, within } from "@/lib/checkpoints";
+import CheckpointViewer from "./CheckpointViewer";
 
 /*
   WarpRenderCheckpointsPanel
@@ -139,27 +141,161 @@ function useCheckpointList(
     const e = engineRef.current;
     const cv = canvasRef.current || (e?.canvas ?? null);
     const rows: { label: string; detail?: string; state: "ok" | "warn" | "fail" }[] = [];
+    const side: Side = label === "REAL" ? "REAL" : "SHOW";
 
-    // Canvas
+    // === DAG Stage 1: INPUT CHECKPOINTS ===
+    // Pipeline inputs validation
+    const gammaGeo = N(liveSnap?.gammaGeo ?? liveSnap?.g_y, 26);
+    const deltaAOverA = N(liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1);
+    const gammaVdB = N(liveSnap?.gammaVdB ?? liveSnap?.gammaVanDenBroeck, 1.4e5);
+    const sectors = Math.max(1, Math.floor(N(liveSnap?.sectorCount ?? liveSnap?.sectors, 1)));
+    const duty = N(liveSnap?.dutyCycle, 0);
+    
+    checkpoint({
+      id: 'input.gamma_geo', side, stage: 'input',
+      pass: gammaGeo >= 1 && gammaGeo <= 1000,
+      msg: `γ_geo=${gammaGeo}`,
+      expect: [1, 1000], actual: gammaGeo,
+      sev: gammaGeo < 1 || gammaGeo > 1000 ? 'error' : 'info'
+    });
+
+    checkpoint({
+      id: 'input.delta_aa', side, stage: 'input',
+      pass: deltaAOverA >= 1e-12 && deltaAOverA <= 100,
+      msg: `δA/A=${deltaAOverA}`,
+      expect: [1e-12, 100], actual: deltaAOverA,
+      sev: deltaAOverA < 1e-12 || deltaAOverA > 100 ? 'error' : 'info'
+    });
+
+    checkpoint({
+      id: 'input.gamma_vdb', side, stage: 'input',
+      pass: gammaVdB >= 1 && gammaVdB <= 1e15,
+      msg: `γ_VdB=${gammaVdB.toExponential(1)}`,
+      expect: [1, 1e15], actual: gammaVdB,
+      sev: gammaVdB < 1 || gammaVdB > 1e15 ? 'error' : 'info'
+    });
+
+    // === DAG Stage 2: EXPECTATIONS ===
+    const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, deltaAOverA) * Math.max(1, gammaVdB);
+    const dutyEff = Math.max(1e-12, duty / sectors);
+    const thetaExpected = betaInst * dutyEff;
+
+    checkpoint({
+      id: 'expect.theta_scale', side, stage: 'expect',
+      pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
+      msg: `θ_expected=${thetaExpected.toExponential(2)}`,
+      expect: '>0', actual: thetaExpected,
+      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info'
+    });
+
+    // === DAG Stage 3: UNIFORMS ===
+    const u = e?.uniforms || {};
+    const ts = N(u?.thetaScale, NaN);
+    
+    checkpoint({
+      id: 'uniforms.theta_scale', side, stage: 'uniforms',
+      pass: Number.isFinite(ts) && ts > 0,
+      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'}`,
+      expect: thetaExpected, actual: ts,
+      sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : 'info'
+    });
+
+    checkpoint({
+      id: 'uniforms.ridge_mode', side, stage: 'uniforms',
+      pass: expectations?.ridge != null ? (u?.ridgeMode | 0) === (expectations.ridge | 0) : true,
+      msg: `ridgeMode=${u?.ridgeMode}`,
+      expect: expectations?.ridge, actual: u?.ridgeMode,
+      sev: expectations?.ridge != null && (u?.ridgeMode | 0) !== (expectations.ridge | 0) ? 'warn' : 'info'
+    });
+
+    checkpoint({
+      id: 'uniforms.parity_mode', side, stage: 'uniforms', 
+      pass: expectations?.parity != null ? !!(u.physicsParityMode ?? u.parityMode) === !!expectations.parity : true,
+      msg: `parity=${!!(u.physicsParityMode ?? u.parityMode)}`,
+      expect: expectations?.parity, actual: !!(u.physicsParityMode ?? u.parityMode),
+      sev: expectations?.parity != null && !!(u.physicsParityMode ?? u.parityMode) !== !!expectations.parity ? 'warn' : 'info'
+    });
+
+    // === DAG Stage 4: GPU STATE ===
     const cw = N(cv?.clientWidth || cv?.width, 0);
     const ch = N(cv?.clientHeight || cv?.height, 0);
     const canvasOk = cw >= 64 && ch >= 64;
+
+    checkpoint({
+      id: 'gpu.canvas_size', side, stage: 'gpu',
+      pass: canvasOk,
+      msg: `Canvas ${cw}×${ch}px`,
+      expect: '>=64x64', actual: `${cw}×${ch}`,
+      sev: !canvasOk ? 'error' : 'info'
+    });
+
     rows.push({ label: "Canvas sized", detail: `${cw}×${ch}px`, state: canvasOk ? "ok" : "fail" });
 
     // GL context
     const gl = e?.gl;
     const ctxOk = !!gl && !(gl?.isContextLost && gl.isContextLost());
+    
+    checkpoint({
+      id: 'gpu.webgl_context', side, stage: 'gpu',
+      pass: ctxOk,
+      msg: gl ? (ctxOk ? "WebGL alive" : "context lost") : "missing",
+      expect: 'alive', actual: gl ? (ctxOk ? 'alive' : 'lost') : 'missing',
+      sev: !ctxOk ? 'error' : 'info'
+    });
+
     rows.push({ label: "WebGL context", detail: gl ? (ctxOk ? "alive" : "lost") : "missing", state: ctxOk ? "ok" : gl ? "fail" : "fail" });
 
     // Shaders/program
     const progOk = !!e?.gridProgram && !!e?.gridUniforms && !!e?.gridAttribs;
+    
+    checkpoint({
+      id: 'gpu.shaders_linked', side, stage: 'gpu',
+      pass: progOk,
+      msg: progOk ? "Shaders compiled & linked" : "no program",
+      expect: 'linked', actual: progOk ? 'linked' : 'missing',
+      sev: !progOk ? 'error' : 'info'
+    });
+
+    // Grid buffers
+    const verts = (e?.gridVertices?.length || 0);
+    const orig = (e?.originalGridVertices?.length || 0);
+    const gridOk = verts > 0 && orig > 0;
+    
+    checkpoint({
+      id: 'gpu.grid_buffers', side, stage: 'gpu',
+      pass: gridOk,
+      msg: `Grid buffers ${verts}/${orig} floats`,
+      expect: '>0', actual: { verts, orig },
+      sev: !gridOk ? 'error' : 'info'
+    });
+
+    // === DAG Stage 5: FRAME PROVENANCE ===
+    // Frame analysis would need readPixels - simplified for now
+    const frameAlive = !!e?._raf;
+    
+    checkpoint({
+      id: 'frame.render_loop', side, stage: 'frame',
+      pass: frameAlive,
+      msg: frameAlive ? "RAF active" : "render stopped",
+      expect: 'active', actual: frameAlive ? 'active' : 'stopped',
+      sev: !frameAlive ? 'warn' : 'info'
+    });
+
+    // Tone mapping checkpoint (exp/zs/toneOk declared later in original code)
+    checkpoint({
+      id: 'frame.tone_mapping', side, stage: 'frame',
+      pass: true, // will be updated when exp/zs are calculated below
+      msg: `tone mapping params pending...`,
+      expect: { exp: [0, 12], zs: [0, 1e-3] }, actual: {},
+      sev: 'info'
+    });
+
     rows.push({ label: "Shaders linked", detail: progOk ? "gridProgram ready" : "no program", state: progOk ? "ok" : "fail" });
 
     // Engine readiness
     rows.push({ label: "Engine ready", detail: e?.isLoaded ? "isLoaded=true" : "waiting", state: e?.isLoaded ? "ok" : "warn" });
 
-    // Uniforms
-    const u = e?.uniforms || {};
+    // Camera uniforms (reusing existing u)
     const camOk = Number.isFinite(u?.cameraZ);
     rows.push({ label: "CameraZ set", detail: camOk ? u.cameraZ.toFixed(2) : "unset", state: camOk ? "ok" : "warn" });
 
@@ -167,8 +303,7 @@ function useCheckpointList(
     const axesOk = !!axes && axes.every((n: any) => Number.isFinite(n) && Math.abs(n) > 0);
     rows.push({ label: "Axes/clip", detail: axesOk ? `[${axes!.map((n: number) => n.toFixed(2)).join(", ")}]` : "unset", state: axesOk ? "ok" : "warn" });
 
-    // Theta-scale
-    const ts = N(u?.thetaScale, NaN);
+    // Theta-scale (reusing existing ts)
     const tsOk = Number.isFinite(ts) && ts > 0;
     let tsState: "ok" | "warn" | "fail" = tsOk ? "ok" : "fail";
     let tsDetail = tsOk ? ts.toExponential(2) : "invalid";
@@ -281,10 +416,7 @@ function useCheckpointList(
       }
     }
 
-    // Grid data present
-    const verts = (e?.gridVertices?.length || 0);
-    const orig = (e?.originalGridVertices?.length || 0);
-    const gridOk = verts > 0 && orig > 0;
+    // Grid data present (using already declared variables)
     rows.push({ label: "Grid buffers", detail: `${verts}/${orig} floats`, state: gridOk ? "ok" : "fail" });
 
     // Strobing sanity
@@ -302,8 +434,18 @@ function useCheckpointList(
     // Display/exposure sanity (SHOW should be bright; REAL conservative)
     const exp = N(u?.exposure, 0);
     const zs = N(u?.zeroStop, 0);
-    const expOk = exp > 0 && exp <= 12 && zs > 0 && zs < 1e-3;
-    rows.push({ label: "Tone mapping", detail: `exp=${exp} • zero=${zs}` , state: expOk ? "ok" : "warn" });
+    const toneOk = exp > 0 && exp <= 12 && zs > 0 && zs < 1e-3;
+    
+    // Update the frame tone mapping checkpoint with actual values
+    checkpoint({
+      id: 'frame.tone_mapping_actual', side, stage: 'frame',
+      pass: toneOk,
+      msg: `exposure=${exp} zero=${zs}`,
+      expect: { exp: [0, 12], zs: [0, 1e-3] }, actual: { exp, zs },
+      sev: !toneOk ? 'warn' : 'info'
+    });
+    
+    rows.push({ label: "Tone mapping", detail: `exp=${exp} • zero=${zs}` , state: toneOk ? "ok" : "warn" });
 
     // Render loop alive (RAF attached)
     const rafAlive = !!e?._raf;
@@ -448,11 +590,15 @@ export default function WarpRenderCheckpointsPanel({
   ) : null;
 
   return (
-    <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-semibold text-white/90">{leftLabel} — Checkpoints</h4>
-          <div className="flex gap-1">
+    <div className="mt-3 space-y-3">
+      {/* DAG Checkpoint System */}
+      <CheckpointViewer title="DAG: Props → Calc → Uniforms → GPU → Frame" />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-semibold text-white/90">{leftLabel} — Legacy Checks</h4>
+            <div className="flex gap-1">
             <FixButton onClick={() => act.presets.real(L)}>Preset</FixButton>
             <FixButton onClick={() => act.forceResize(L)}>Resize</FixButton>
             <FixButton onClick={() => act.fitCamera(L)}>Fit</FixButton>
@@ -472,10 +618,10 @@ export default function WarpRenderCheckpointsPanel({
           </div>
         )}
       </div>
-      <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
-        <div className="flex items-center justify-between mb-2">
-          <h4 className="text-sm font-semibold text-white/90">{rightLabel} — Checkpoints</h4>
-          <div className="flex gap-1">
+        <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h4 className="text-sm font-semibold text-white/90">{rightLabel} — Legacy Checks</h4>
+            <div className="flex gap-1">
             <FixButton onClick={() => act.presets.show(R)}>Preset</FixButton>
             <FixButton onClick={() => act.forceResize(R)}>Resize</FixButton>
             <FixButton onClick={() => act.fitCamera(R)}>Fit</FixButton>
@@ -495,7 +641,8 @@ export default function WarpRenderCheckpointsPanel({
           </div>
         )}
       </div>
-      {pipelineSummary}
+        {pipelineSummary}
+      </div>
     </div>
   );
 }
