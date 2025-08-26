@@ -557,6 +557,15 @@ export default function WarpRenderInspector(props: {
       setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
     });
 
+    // Additional guard to ensure cameraZ is set after onceReady
+    setTimeout(() => {
+      // After onceReady has fired and axes are known:
+      const cz = compactCameraZ(leftEngine.current?.uniforms?.axesClip);
+      leftEngine.current?.updateUniforms?.({ cameraZ: cz, lockFraming: true });
+      const czR = compactCameraZ(rightEngine.current?.uniforms?.axesClip);
+      rightEngine.current?.updateUniforms?.({ cameraZ: czR, lockFraming: true });
+    }, 100);
+
     // Diagnostics -> window for quick comparison
     leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
     rightEngine.current && (rightEngine.current.onDiagnostics = (d: any) => ((window as any).__diagSHOW = d));
