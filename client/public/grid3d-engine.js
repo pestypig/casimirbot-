@@ -4,10 +4,16 @@
   if (!WE) throw new Error('warp-engine.js must load before grid3d-engine.js');
 
   class Grid3DShowEngine extends WE {
-    constructor(canvas, opts = {}) {
-      // WarpEngine signature: (canvas, gl?, opts?)
-      // we don't provide a GL, so pass undefined in slot #2
-      super(canvas, undefined, opts);
+    constructor(canvas, glOrOpts, maybeOpts) {
+      // normalize to (gl, opts)
+      const isGL = glOrOpts && typeof glOrOpts.getContext === 'function';
+      const gl = isGL ? glOrOpts : undefined;
+      const opts = isGL ? (maybeOpts ?? {}) : (glOrOpts ?? {});
+      super(canvas, gl, opts);
+      // ALWAYS guard local reads
+      const o = opts || {};
+      const divisions = (o.grid && o.grid.divisions) ?? o.divisions ?? 64;
+      this.setGridResolution?.({ divisions });
       this._dprOverride = null;
       this._ssaa = 1;
       this._forceDivisions = null;
