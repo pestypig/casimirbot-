@@ -286,53 +286,53 @@ export default function WarpRenderInspector(props: {
     const W: any = (window as any).WarpEngine;
     if (!W) { console.error("WarpEngine not found on window. Load warp-engine.js first."); return; }
 
-    if (leftRef.current && !leftEngine.current)  {
-      // DPR-safe size before GL init
+    // REAL (unchanged)
+    if (leftRef.current && !leftEngine.current) {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
       leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
-      leftEngine.current = createEngineWithFallback(realRendererType, leftRef.current);
+      leftEngine.current = W.getOrCreate?.(leftRef.current) || new W(leftRef.current);
       leftOwnedRef.current = true;
-      // Mute engine until canonical uniforms arrive (prevents first-frame spike)
-      gatedUpdateUniforms(leftEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
+      gatedUpdateUniforms(leftEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
       leftEngine.current?.setVisible?.(false);
-      // Hard-lock REAL pane against parity flips and thetaScale writers
       lockPane(leftEngine.current, 'REAL');
     }
-    if (showRendererType !== 'grid3d') {
-      if (rightRef.current && !rightEngine.current) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-        rightEngine.current = createEngineWithFallback('slice2d', rightRef.current);
-        rightOwnedRef.current = true; // we own this engine
-        // Mute engine until canonical uniforms arrive (prevents first-frame spike)
-        gatedUpdateUniforms(rightEngine.current, normalizeKeys({ exposure: 5.0, zeroStop: 1e-7 }), 'mute');
-        rightEngine.current?.setVisible?.(false);
-        // Hard-lock SHOW pane against parity flips and thetaScale writers
-        lockPane(rightEngine.current, 'SHOW');
-      }
+
+    // SHOW — use plain WarpEngine (fast path), not the TSX wrapper
+    if (rightRef.current && !rightEngine.current) {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+      rightEngine.current = W.getOrCreate?.(rightRef.current) || new W(rightRef.current);
+      rightOwnedRef.current = true;
+      gatedUpdateUniforms(rightEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
+      rightEngine.current?.setVisible?.(false);
+      lockPane(rightEngine.current, 'SHOW');
+
+      // attach SHOW checkpoints so the panel/devtools get live data
+      bindShowCheckpoints(rightEngine.current, rightRef.current);
     }
 
-    // Lock parity flags and block thetaScale to prevent late writers from flipping REAL back to SHOW
+    // parity hard-locks (keep)
     if (leftEngine.current)  hardLockUniforms(leftEngine.current,  { forceParity: true,  tag: 'REAL' });
     if (rightEngine.current) hardLockUniforms(rightEngine.current, { forceParity: false, tag: 'SHOW' });
 
-    // Bootstrap; fit camera after link using derived axes
+    // bootstrap both
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
+
     leftEngine.current?.onceReady?.(() => {
       const ax = leftEngine.current?.uniforms?.axesClip;
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-left-init');
+      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
     });
+
     rightEngine.current?.onceReady?.(() => {
-      const ax = rightEngine.current?.uniforms?.axesClip;
+      // seed axes/camera immediately so buffers build and checkpoints flip to "set"
+      const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+      const ax = deriveAxesClip(hull, 1);
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz, lockFraming: true }), 'inspector-right-init');
-      // optional: mirror display gain through helper
-      const dg = Math.max(1, (showPayload as any)?.displayGain || 1);
-      rightEngine.current.setDisplayGain?.(dg);
+      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'inspector-right-init');
     });
 
     // Diagnostics -> window for quick comparison
@@ -481,6 +481,60 @@ export default function WarpRenderInspector(props: {
   function pctDelta(a:number, b:number){
     if (!isFinite(a) || !isFinite(b) || b === 0) return NaN;
     return (a/b - 1) * 100;
+  }
+
+  // -- SHOW checkpoints binder: exports a full snapshot every frame
+  function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
+    const publish = () => {
+      const u = engine?.uniforms || {};
+      const floats = (engine?.gridVertices?.length || 0);
+      const snap = {
+        // canvas / GL
+        canvasW: canvas?.width || 0,
+        canvasH: canvas?.height || 0,
+        hasGL: !!engine?.gl,
+
+        // readiness
+        programReady: !!engine?.gridProgram,
+        isLoaded: !!engine?.isLoaded,
+
+        // critical fields the panel cares about
+        cameraZSet: Number.isFinite(u?.cameraZ || null),
+        axesClipSet: Array.isArray(u?.axesClip) && u.axesClip.length === 3,
+        thetaValid: Number.isFinite(u?.thetaScale) && (u.thetaScale as number) > 0,
+
+        // runtime viz
+        parity: !!u?.physicsParityMode,
+        ridgeMode: (u?.ridgeMode ?? undefined),
+        toneExp: u?.exposure ?? 0,
+        toneZero: u?.zeroStop ?? 0,
+
+        // grid + sectoring
+        gridFloats: floats,                       // total vertex floats
+        sectors: Math.max(1, (u?.sectors|0) || 1),
+        sectorTotal: Math.max(1, (u?.sectorCount|0) || (u?.sectors|0) || 1),
+        split: Math.max(0, (u?.split|0) || 0),
+
+        // loop
+        running: !!engine?._raf,
+        ts: Date.now(),
+      };
+
+      // Expose to devtools and a UI listener (if the panel listens)
+      (window as any).__chkSHOW = snap;
+      try {
+        window.dispatchEvent(new CustomEvent('helix:show-checkpoints', { detail: snap }));
+      } catch {}
+      // Also ship full diagnostics if available
+      try {
+        (window as any).__diagSHOW = engine?.computeDiagnostics?.() || null;
+      } catch {}
+    };
+
+    // fire on every diagnostics beat & on loading state changes
+    engine.onDiagnostics = () => publish();
+    engine.onLoadingStateChange = () => publish();
+    publish(); // kick once now
   }
 
   function normalizeKeys(u: any) {
