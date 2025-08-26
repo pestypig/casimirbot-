@@ -342,25 +342,30 @@ export default function WarpRenderInspector(props: {
     // Ensure defaults exist *before* first construction
     seedGridDefaultsHard();
 
+    // Hand the ctor explicit safe options (covers both shapes: top-level + nested grid)
+    const SAFE_OPTS = {
+      divisions: 64,
+      grid: { divisions: 64, minSpan: 2.6, spanPadding: 1.35 }
+    };
+
     try {
-      const eng = new (Ctor as any)(cv);
+      const eng = new (Ctor as any)(cv, SAFE_OPTS);
       (cv as any).__warpEngine = eng;
       return eng as WarpType;
     } catch (e1: any) {
       const msg1 = String(e1?.message || e1);
 
-      // If GRID_DEFAULTS was the problem, seed & retry — but first clear any half-attach
+      // If GRID_DEFAULTS/opts were the problem, seed & retry — but first clear any half-attach
       if (/\b(divisions|minSpan|spanPadding)\b/i.test(msg1)) {
         seedGridDefaultsHard();
         purgeCanvasEngineGuards(cv);
         try {
-          const eng2 = new (Ctor as any)(cv);
+          const eng2 = new (Ctor as any)(cv, SAFE_OPTS); // <-- pass opts on retry too
           (cv as any).__warpEngine = eng2;
           return eng2 as WarpType;
         } catch (e2: any) {
           const msg2 = String(e2?.message || e2);
           if (/already attached/i.test(msg2)) {
-            // Something attached during the first attempt; return whatever we can find.
             const rebound =
               (cv as any).__warpEngine ||
               (Ctor as any).fromCanvas?.(cv) ||
@@ -379,10 +384,10 @@ export default function WarpRenderInspector(props: {
           (Ctor as any).getForCanvas?.(cv);
         if (rebound && !rebound._destroyed) return rebound as WarpType;
 
-        // Last-ditch: temporarily bypass guard (safer than wedging)
+        // Last-ditch: temporarily bypass guard, still providing SAFE_OPTS
         try {
           (window as any).__WARP_ENGINE_ALLOW_MULTI = true;
-          const eng3 = new (Ctor as any)(cv);
+          const eng3 = new (Ctor as any)(cv, SAFE_OPTS);
           (cv as any).__warpEngine = eng3;
           return eng3 as WarpType;
         } finally {
