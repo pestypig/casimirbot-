@@ -837,16 +837,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {showRendererType === 'grid3d' ? (
-              <Grid3DEngine 
-                ref={grid3dRef}
-                uniforms={showUniforms} 
-                className="w-full h-full block" 
-                style={{background: 'black'}} 
-              />
-            ) : (
-              <canvas ref={rightRef} className="w-full h-full block"/>
-            )}
+            <canvas ref={rightRef} className="w-full h-full block"/>
           </div>
         </article>
       </section>
