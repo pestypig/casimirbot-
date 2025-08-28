@@ -821,7 +821,10 @@ export default function WarpBubbleCompare({
         const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
         tick();
       });
-      gatedUpdateUniforms(eng, uniforms, 'client');
+      // Only apply uniforms if they're provided
+      if (uniforms && Object.keys(uniforms).length > 0) {
+        gatedUpdateUniforms(eng, uniforms, 'client');
+      }
       eng.isLoaded = true;
       if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
       eng.start?.();
@@ -863,9 +866,9 @@ export default function WarpBubbleCompare({
       ridgeMode: 1,
     };
 
-    // 4) Init both engines with fresh packets
-    leftEngine.current  = await initOne(leftRef.current,  realPacket);
-    rightEngine.current = await initOne(rightRef.current, showPacket);
+    // 4) Init both engines without uniforms first
+    leftEngine.current  = await initOne(leftRef.current,  {});
+    rightEngine.current = await initOne(rightRef.current, {});
 
     // 5) After creating both engines and building `shared` once:
     await firstCorrectFrame({
@@ -884,6 +887,36 @@ export default function WarpBubbleCompare({
     // Enable low-FPS mode for mobile after first correct frame
     enableLowFps(leftEngine.current, 12);
     enableLowFps(rightEngine.current, 12);
+
+    // 6) Single combined uniforms write per pane using batchers
+    const heroExaggeration = 82; // default visual boost
+    
+    // REAL — physics truth
+    pushLeft.current?.(paneSanitize('REAL', sanitizeUniforms({
+      ...shared,
+      ...real,
+      vShip: 0,
+      curvatureGainT: 0,
+      curvatureBoostMax: 1,
+      userGain: 1,
+      displayGain: 1,
+      colorMode: 2, // shear for truth view
+      physicsParityMode: true,
+      ridgeMode: 0,
+    })), 'REAL/combined');
+
+    // SHOW — boosted visuals
+    pushRight.current?.(paneSanitize('SHOW', sanitizeUniforms({
+      ...shared,
+      ...show,
+      vShip: parameters.currentMode === 'standby' ? 0 : 1,
+      curvatureGainT: 0.70,
+      curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
+      userGain: 4,
+      displayGain: 1,
+      physicsParityMode: false,
+      ridgeMode: 1,
+    })), 'SHOW/combined');
 
     // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
     ensureStrobeMux();
