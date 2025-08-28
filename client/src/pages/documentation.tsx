@@ -247,6 +247,7 @@ export default function Documentation() {
             </div>
           </TabsContent>
 
+          {/* UPDATED PHYSICS-GUIDE TAB */}
           <TabsContent value="physics-guide" className="space-y-6">
             <Card>
               <CardHeader>
@@ -260,17 +261,36 @@ export default function Documentation() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Energy Pipeline Sequence</h3>
                     <ol className="list-decimal list-inside space-y-2 text-sm">
-                      <li><strong>Static Casimir Energy:</strong> U_static = -(π²ℏc/(720a³)) × A_tile</li>
-                      <li><strong>Geometric Amplification:</strong> U_geo = γ_geo × U_static</li>
-                      <li><strong>Q-Enhancement:</strong> U_Q = Q_mechanical × U_geo</li>
-                      <li><strong>Duty Cycling:</strong> U_cycle = U_Q × duty_factor</li>
-                      <li><strong>Van-den-Broeck Pocket:</strong> U_final = U_cycle × γ_pocket</li>
-                      <li><strong>Power Loss:</strong> P_loss = |U_geo × ω| / Q_cavity</li>
-                      <li><strong>Throttling:</strong> P_avg = P_loss × duty × (1/sectors) × Q_spoiling</li>
-                      <li><strong>Mass Calculation:</strong> M_exotic = |U_final × N_tiles| / c²</li>
+                      <li><strong>Static Casimir energy per tile:</strong>{' '}
+                        U_static = −(π²ℏc/(720 a³))·A_tile
+                      </li>
+                      <li><strong>Geometry amplification:</strong>{' '}
+                        U_geo = γ_geo·U_static
+                      </li>
+                      <li><strong>Mechanical Q enhancement:</strong>{' '}
+                        U_Q = Q_mechanical·U_geo
+                      </li>
+                      <li><strong>Duty-averaged energy:</strong>{' '}
+                        U_cycle = U_Q·d_eff<br/>
+                        <em>(d_eff ≡ local burst% × sectors_live⁄sectors_total ≈ 0.01×1/400 ≈ 2.5×10⁻⁵)</em>
+                      </li>
+                      <li><strong>Van-den-Broeck (visual):</strong>{' '}
+                        U_vis = U_cycle·γ_VdB(vis)
+                      </li>
+                      <li><strong>Raw power out:</strong>{' '}
+                        P_loss = |U_Q|·ω / Q_cavity
+                      </li>
+                      <li><strong>Pipeline-calibrated average power:</strong>{' '}
+                        P_raw = P_loss·d_eff<br/>
+                        P_avg = P_raw·κ_power&nbsp;<em>(κ_power≈3.2×10⁻⁶)</em>
+                      </li>
+                      <li><strong>Exotic mass budget:</strong>{' '}
+                        U_mass = U_cycle·γ_VdB(mass)<br/>
+                        M_exotic = |U_mass|·N_tiles / c²
+                      </li>
                     </ol>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Key Physics Constants</h3>
                     <ul className="list-disc list-inside space-y-1 text-sm">
@@ -287,19 +307,27 @@ export default function Documentation() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-3 border rounded">
                         <h4 className="font-medium">Hover Mode</h4>
-                        <p className="text-sm text-muted-foreground">14% duty, 83.3 MW, station-hold</p>
+                        <p className="text-sm text-muted-foreground">
+                          14% duty, 83.3 MW, station-hold
+                        </p>
                       </div>
                       <div className="p-3 border rounded">
                         <h4 className="font-medium">Cruise Mode</h4>
-                        <p className="text-sm text-muted-foreground">0.5% duty, 400 sectors, 7.4 W</p>
+                        <p className="text-sm text-muted-foreground">
+                          0.5% duty, 83.3 MW, low-power cruise
+                        </p>
                       </div>
                       <div className="p-3 border rounded">
                         <h4 className="font-medium">Emergency Mode</h4>
-                        <p className="text-sm text-muted-foreground">50% duty, 297+ MW, fast-burn</p>
+                        <p className="text-sm text-muted-foreground">
+                          50% duty, 297.5 MW, fast-burn
+                        </p>
                       </div>
                       <div className="p-3 border rounded">
                         <h4 className="font-medium">Standby Mode</h4>
-                        <p className="text-sm text-muted-foreground">0% duty, system-off</p>
+                        <p className="text-sm text-muted-foreground">
+                          0% duty, system-off
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -327,7 +355,7 @@ export default function Documentation() {
                       <div className="p-2 bg-muted rounded">POST /api/simulations/:id/scuffgeo - Generate geometry</div>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-semibold mb-2">Viability Calculation</h3>
                     <div className="space-y-2 text-sm font-mono">
