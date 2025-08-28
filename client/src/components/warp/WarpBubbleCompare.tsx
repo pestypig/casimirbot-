@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -1243,9 +1244,13 @@ export default function WarpBubbleCompare({
       if (!leftRef.current || !rightRef.current) return;
       const L = leftEngine.current, R = rightEngine.current;
       const { w: wL, h: hL } = sizeCanvas(leftRef.current);
-      L?.gl?.viewport(0, 0, wL, hL); L?.forceRedraw?.();
+      L?.gl?.viewport(0, 0, wL, hL);
       const { w: wR, h: hR } = sizeCanvas(rightRef.current);
-      R?.gl?.viewport(0, 0, wR, hR); R?.forceRedraw?.();
+      R?.gl?.viewport(0, 0, wR, hR);
+      
+      // Use batched redraws instead of immediate forceRedraw
+      pushLeft.current?.({}, 'dpr-change');
+      pushRight.current?.({}, 'dpr-change');
     };
     const mql = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
     mql.addEventListener?.('change', onDpr);
@@ -1264,6 +1269,14 @@ export default function WarpBubbleCompare({
   useEffect(() => {
     pushLeft.current = makeUniformBatcher(leftEngine);
     pushRight.current = makeUniformBatcher(rightEngine);
+  }, []);
+
+  // Mobile DPR clamping and canvas sizing
+  useEffect(() => {
+    if (!IS_COARSE) return;
+    try { sizeCanvasSafe(leftRef.current!); sizeCanvasSafe(rightRef.current!); } catch {}
+    // DPR is already handled by sizeCanvasSafe; on phones, keep it at ~1
+    if (typeof clampMobileDPR === 'function') clampMobileDPR(1);
   }, []);
 
   // Debug probe to verify physics parameters are changing with mode switches

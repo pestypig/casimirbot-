@@ -936,22 +936,24 @@ export default function WarpRenderInspector(props: {
     };
 
     // After creating both engines and building `shared` once:
-    await firstCorrectFrame({
-      engine: leftEngine.current,
-      canvas: leftRef.current!,
-      sharedAxesScene: shared.axesScene,
-      pane: 'REAL'
-    });
-    await firstCorrectFrame({
-      engine: rightEngine.current,
-      canvas: rightRef.current!,
-      sharedAxesScene: shared.axesScene,
-      pane: 'SHOW'
-    });
+    (async () => {
+      await firstCorrectFrame({
+        engine: leftEngine.current,
+        canvas: leftRef.current!,
+        sharedAxesScene: shared.axesScene,
+        pane: 'REAL'
+      });
+      await firstCorrectFrame({
+        engine: rightEngine.current,
+        canvas: rightRef.current!,
+        sharedAxesScene: shared.axesScene,
+        pane: 'SHOW'
+      });
 
-    // Enable low-FPS mode for mobile after first correct frame
-    enableLowFps(leftEngine.current, 12);
-    enableLowFps(rightEngine.current, 12);
+      // Enable low-FPS mode for mobile after first correct frame
+      enableLowFps(leftEngine.current, 12);
+      enableLowFps(rightEngine.current, 12);
+    })();
 
     // Setup engine checkpoints after first frame is guaranteed correct
     setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
@@ -1315,7 +1317,8 @@ export default function WarpRenderInspector(props: {
     if (!cv) return;
     const ro = new ResizeObserver(() => {
       if (cv.width > 0 && cv.height > 0) {
-        rightEngine.current?.forceRedraw?.();
+        // Use batched redraw instead of immediate forceRedraw
+        pushRight.current?.({}, 'grid3d-resize');
       }
     });
     ro.observe(cv);
@@ -1509,8 +1512,10 @@ export default function WarpRenderInspector(props: {
       }
       leftEngine.current?.gl?.viewport?.(0, 0, leftRef.current?.width || 1, leftRef.current?.height || 1);
       rightEngine.current?.gl?.viewport?.(0, 0, rightRef.current?.width || 1, rightRef.current?.height || 1);
-      leftEngine.current?.forceRedraw?.();
-      rightEngine.current?.forceRedraw?.();
+      
+      // Use batched redraws instead of immediate forceRedraw
+      pushLeft.current?.({}, 'resize');
+      pushRight.current?.({}, 'resize');
     });
     leftRef.current && ro.observe(leftRef.current);
     rightRef.current && ro.observe(rightRef.current);
@@ -1556,6 +1561,14 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     pushLeft.current = makeUniformBatcher(leftEngine);
     pushRight.current = makeUniformBatcher(rightEngine);
+  }, []);
+
+  // Mobile DPR clamping and canvas sizing
+  useEffect(() => {
+    if (!IS_COARSE) return;
+    try { sizeCanvasSafe(leftRef.current!); sizeCanvasSafe(rightRef.current!); } catch {}
+    // DPR is already handled by sizeCanvasSafe; on phones, keep it at ~1
+    if (typeof clampMobileDPR === 'function') clampMobileDPR(1);
   }, []);
 
   // UI events - use global mode switching instead of local state
