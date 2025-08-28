@@ -202,7 +202,8 @@ export const MODE_CONFIGS = {
     // New fields for mode-aware physics
     sectorsTotal: 400,
     sectorsConcurrent: 1,
-    localBurstFrac: 0.01
+    localBurstFrac: 0.01,
+    zeta_max: 1.0 // standard quantum bound (Ford-Roman limit)
   },
   cruise: {
     dutyCycle: 0.005,
@@ -534,7 +535,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   const d0 = PAPER_DUTY.BURST_DUTY_LOCAL / PAPER_DUTY.TOTAL_SECTORS;       // 0.01/400
   const zeta0 = 0.84;                                // baseline fit
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
-  state.fordRomanCompliance = state.zeta < 1.0;
+  state.fordRomanCompliance = state.zeta < (ui.zeta_max ?? 1.0); // Use mode-specific max
 
   // Physics logging for debugging (before UI field updates)
   if (DEBUG_PIPE) console.log("[PIPELINE]", {
