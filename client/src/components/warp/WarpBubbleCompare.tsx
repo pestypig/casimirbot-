@@ -281,7 +281,7 @@ type BaseInputs = {
   sectorCount: number;        // total sectors (averaging)
   sectors: number;            // concurrent (strobing)
 
-  // physics chain
+  // physics parameters
   gammaGeo: number;           // γ_geo
   qSpoilingFactor: number;    // ΔA/A
   gammaVanDenBroeck: number;  // γ_VdB
@@ -601,7 +601,7 @@ const applyShow = (
     lockFraming: true,
     physicsParityMode: false,   // enable amplification
     ridgeMode: 1,
-    // Force numeric (engine canonical) + provide synonyms
+    // Force numeric color mode for engine compatibility (engine: 0=solid,1=theta,2=shear)
     colorMode: colorModeIndex,
     colorModeIndex,
     colorModeName: colorMode,
@@ -1341,9 +1341,9 @@ export default function WarpBubbleCompare({
     (window as any).__debugWarpEngines = () => {
       const leftState = leftEngine.current ? {
         isLoaded: leftEngine.current.isLoaded,
-        hasProgram: !!leftEngine.current.gridProgram,
-        uniforms: leftEngine.current.uniforms,
-        isRendering: leftEngine.current._raf !== null,
+        hasProgram: !!(leftEngine.current as any)?.gridProgram,
+        uniforms: (leftEngine.current as any)?.uniforms,
+        isRendering: (leftEngine.current as any)?._raf !== null,
         canvas: {
           width: leftRef.current?.width,
           height: leftRef.current?.height,
@@ -1353,9 +1353,9 @@ export default function WarpBubbleCompare({
 
       const rightState = rightEngine.current ? {
         isLoaded: rightEngine.current.isLoaded,
-        hasProgram: !!rightEngine.current.gridProgram,
-        uniforms: rightEngine.current.uniforms,
-        isRendering: rightEngine.current._raf !== null,
+        hasProgram: !!(rightEngine.current as any)?.gridProgram,
+        uniforms: (rightEngine.current as any)?.uniforms,
+        isRendering: (rightEngine.current as any)?._raf !== null,
         canvas: {
           width: rightRef.current?.width,
           height: rightRef.current?.height,
@@ -1428,6 +1428,7 @@ export default function WarpBubbleCompare({
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '280px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
         <canvas
+          id="realCanvas" // Added ID for diagnostic purposes
           ref={leftRef}
           className="w-full h-[calc(100%-32px)] block min-h-[240px]"
           style={{ background: '#111', display: 'block' }}
