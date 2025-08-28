@@ -705,14 +705,29 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
-  // WebGL detection helper
-  const isWebGLSupported = () => {
+  // WebGL detection helper (soft): presence of APIs is enough.
+  // Some mobile browsers/webviews return null for off-DOM test canvases even though
+  // real canvases will create a context just fine.
+  const isWebGLAvailable = () => {
+    if (typeof window === 'undefined') return false;
+    const hasAPI =
+      !!(window as any).WebGL2RenderingContext ||
+      !!(window as any).WebGLRenderingContext;
+    if (!hasAPI) return false;
+    // Try a context, but don't treat failure here as fatal.
     try {
       const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-      return !!gl;
+      const attrs: WebGLContextAttributes = {
+        alpha: false, antialias: false, depth: false, stencil: false,
+        preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false,
+      };
+      const gl =
+        (canvas.getContext('webgl2', attrs) as any) ||
+        (canvas.getContext('webgl', attrs) as any) ||
+        (canvas.getContext('experimental-webgl' as any, attrs as any) as any);
+      return !!gl || hasAPI;
     } catch {
-      return false;
+      return hasAPI;
     }
   };
 
@@ -725,10 +740,10 @@ export default function WarpRenderInspector(props: {
       return;
     }
 
-    // Check WebGL support before attempting to create engines
-    if (!isWebGLSupported()) {
-      console.warn("WebGL not supported - WarpRenderInspector will not function");
-      setLoadError("WebGL not supported in this environment");
+    // Only hard-fail if the APIs are genuinely absent.
+    // Otherwise let the engine try to create a real context on real canvases.
+    if (!isWebGLAvailable()) {
+      setLoadError("WebGL not supported in this browser");
       return;
     }
 
