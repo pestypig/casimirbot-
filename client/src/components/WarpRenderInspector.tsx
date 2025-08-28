@@ -10,6 +10,7 @@ import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * WarpRenderInspector
@@ -1394,10 +1395,13 @@ export default function WarpRenderInspector(props: {
     physicsParityMode: false
   }), [props.showPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared]);
 
-  // Keep canvases crisp on container resize
+  // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
     const ro = new ResizeObserver(() => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // Mobile-optimized device pixel ratio (avoid excessive resolution on mobile)
+      const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      const dpr = isMobile ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1);
+      
       for (const c of [leftRef.current, rightRef.current]) {
         if (!c) continue;
         const w = Math.max(1, Math.floor((c.clientWidth  || 1) * dpr));
@@ -1480,25 +1484,25 @@ export default function WarpRenderInspector(props: {
   }
 
   return (
-    <div className="w-full grid gap-4 p-4">
-      <header className="flex items-end justify-between">
+    <div className="w-full grid gap-4 p-2 sm:p-4">
+      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold">Operational Render Inspector</h2>
-          <p className="text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
+          <h2 className="text-lg sm:text-xl font-semibold">Operational Render Inspector</h2>
+          <p className="text-xs sm:text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium">Mode</label>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <label className="text-xs sm:text-sm font-medium">Mode</label>
           {(['hover','cruise','emergency','standby'] as const).map(m => (
             <button
               key={m}
               onClick={() => onMode(m)}
-              className={`px-3 py-1 rounded-2xl text-sm border ${mode===m? 'bg-blue-600 text-white border-blue-600' : 'border-neutral-300 hover:bg-neutral-100'}`}
+              className={`px-2 sm:px-3 py-1 rounded-2xl text-xs sm:text-sm border touch-manipulation ${mode===m? 'bg-blue-600 text-white border-blue-600' : 'border-neutral-300 hover:bg-neutral-100 active:bg-neutral-200'}`}
             >{m}</button>
           ))}
         </div>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) ({realRendererType})</h3>
@@ -1512,7 +1516,7 @@ export default function WarpRenderInspector(props: {
                 style={{background: 'black'}}
               />
             ) : (
-              <canvas ref={leftRef} className="w-full h-full block"/>
+              <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
             )}
             {/* ⬇️ live badge */}
             <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>
@@ -1524,7 +1528,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={rightRef} className="w-full h-full block"/>
+            <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>
           </div>

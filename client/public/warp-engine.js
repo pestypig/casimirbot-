@@ -18,12 +18,17 @@
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 if (typeof window.GRID_DEFAULTS === 'undefined') {
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  
   window.GRID_DEFAULTS = {
-    spanPadding: (window.matchMedia && window.matchMedia('(max-width: 768px)').matches)
-      ? 1.45   // a touch more padding on phones so the first fit is perfect
+    spanPadding: isMobile 
+      ? 1.55   // extra padding on phones for better visibility and touch interaction
       : 1.35,  // tighter framing for closer view on desktop
-    minSpan: 2.6,        // never smaller than this (in clip-space units)
-    divisions: 100       // more lines so a larger grid still looks dense
+    minSpan: isMobile ? 2.8 : 2.6,  // slightly larger minimum on mobile for performance
+    divisions: isMobile ? 75 : 100,  // fewer grid lines on mobile for better performance
+    mobileOptimized: isMobile,
+    touchEnabled: isTouch
   };
 }
 const GRID_DEFAULTS = window.GRID_DEFAULTS;
@@ -326,8 +331,19 @@ class WarpEngine {
 
     _recreateGL() {
         // Reacquire context, rebuild buffers & shaders
-        this.gl = this.canvas.getContext('webgl2', { alpha:false, antialias:false, powerPreference:'high-performance', desynchronized:true })
-            || this.canvas.getContext('webgl', { alpha:false, antialias:false, powerPreference:'high-performance', desynchronized:true });
+        // Mobile-optimized context recreation
+        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        const contextOptions = {
+            alpha: false,
+            antialias: false,
+            powerPreference: isMobile ? 'default' : 'high-performance',
+            desynchronized: !isMobile,
+            failIfMajorPerformanceCaveat: false
+        };
+        
+        this.gl = this.canvas.getContext('webgl2', contextOptions) ||
+                  this.canvas.getContext('webgl', contextOptions) ||
+                  this.canvas.getContext('experimental-webgl', contextOptions);
         if (!this.gl) throw new Error('WebGL not supported after restore');
 
         // Clear old program/handles so panels don't read stale LINK_STATUS
