@@ -639,6 +639,15 @@ export default function WarpRenderInspector(props: {
     return eng;
   }
 
+  // Create engine instance using the JS WarpEngine
+  function createEngine(canvas: HTMLCanvasElement): any {
+    const W: any = (window as any).WarpEngine;
+    if (!W) {
+      throw new Error("WarpEngine not found. Ensure warp-engine.js is loaded.");
+    }
+    return getOrCreateEngine(W, canvas);
+  }
+
   // Hard-lock parity & block late thetaScale writers at the engine edge
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
@@ -764,7 +773,7 @@ export default function WarpRenderInspector(props: {
           engine.uniforms.physicsParityMode = forcedParity;
           engine.uniforms.parityMode = forcedParity;
           engine.uniforms.ridgeMode = forcedRidge;
-          
+
           // Force a redraw to ensure changes are applied
           engine.forceRedraw?.();
         }
@@ -789,7 +798,7 @@ export default function WarpRenderInspector(props: {
     };
 
     console.log(`[${pane}] Setting initial parity:`, initialParity);
-    
+
     // Apply via all available methods
     if (originalUpdateUniforms) {
       originalUpdateUniforms(initialParity);
@@ -797,33 +806,9 @@ export default function WarpRenderInspector(props: {
     if (engine.uniforms) {
       Object.assign(engine.uniforms, initialParity);
     }
-    
+
     // Force immediate redraw
     engine.forceRedraw?.();
-  }
-
-  // Helper to create engine with conditional selection and 3D fallback
-  function createEngineWithFallback(rendererType: 'slice2d' | 'grid3d', canvas: HTMLCanvasElement) {
-    const W: any = (window as any).WarpEngine;
-
-    if (rendererType === 'grid3d') {
-      // Try 3D engine first
-      try {
-        const engine3d = getOrCreateEngine(W, canvas);
-        const ok = engine3d.init ? engine3d.init(canvas) : true;
-        if (ok) {
-          return engine3d;
-        } else {
-          // 3D context failed, dispose and fallback
-          engine3d.dispose?.();
-        }
-      } catch (e) {
-        console.warn('Grid3D engine failed, falling back to slice2d:', e);
-      }
-    }
-
-    // Use slice2d (either requested or as fallback)
-    return getOrCreateEngine(W, canvas);
   }
 
   // Initialize engines with enhanced error handling and validation
@@ -832,7 +817,7 @@ export default function WarpRenderInspector(props: {
 
     const initEngines = async () => {
       if (!mounted) return;
-      
+
       if (!isWebGLAvailable()) {
         setLoadError("WebGL not supported in this browser");
         return;
@@ -857,24 +842,24 @@ export default function WarpRenderInspector(props: {
       const waitForEngineReady = async (engine: any, label: string, timeoutMs = 5000) => {
         return new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => reject(new Error(`${label} engine init timeout after ${timeoutMs}ms`)), timeoutMs);
-          
+
           let attempts = 0;
           const checkReady = () => {
             attempts++;
             console.log(`[${label}] Readiness check #${attempts}: isLoaded=${engine?.isLoaded}, hasProgram=${!!engine?.gridProgram}, hasGL=${!!engine?.gl}`);
-            
+
             if (engine?._destroyed) {
               clearTimeout(timeout);
               reject(new Error(`${label} engine was destroyed during initialization`));
               return;
             }
-            
+
             // More comprehensive readiness check
-            const isReady = engine?.isLoaded && 
-                           engine?.gridProgram && 
-                           engine?.gl && 
+            const isReady = engine?.isLoaded &&
+                           engine?.gridProgram &&
+                           engine?.gl &&
                            !engine?.gl?.isContextLost?.();
-            
+
             if (isReady) {
               clearTimeout(timeout);
               console.log(`[${label}] Engine ready after ${attempts} attempts`);
@@ -883,7 +868,7 @@ export default function WarpRenderInspector(props: {
               setTimeout(checkReady, 50);
             }
           };
-          
+
           checkReady();
         });
       };
@@ -894,16 +879,16 @@ export default function WarpRenderInspector(props: {
           sizeCanvasSafe(leftRef.current);
 
           // Clear any existing engine on this canvas
-          delete (leftRef.current as any).__warpEngine;
+          delete (leftRef.current as any)[ENGINE_KEY];
 
           console.log("Creating REAL engine...");
-          leftEngine.current = new W(leftRef.current);
+          leftEngine.current = createEngine(leftRef.current);
           leftOwnedRef.current = true;
           console.log("REAL engine instance created");
 
           // Wait for engine to be fully ready
           await waitForEngineReady(leftEngine.current, 'REAL');
-          
+
           if (!mounted) return;
 
           // Initialize with ENFORCED parity mode for REAL
@@ -919,13 +904,13 @@ export default function WarpRenderInspector(props: {
 
           console.log("Applying REAL initial uniforms:", realInitUniforms);
           gatedUpdateUniforms(leftEngine.current, realInitUniforms, 'client');
-          
+
           // Verify parity was set
           console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
 
           leftEngine.current?.setVisible?.(true);
           lockPane(leftEngine.current, 'REAL');
-          
+
           console.log("REAL engine fully initialized");
 
         } catch (error) {
@@ -941,16 +926,16 @@ export default function WarpRenderInspector(props: {
           sizeCanvasSafe(rightRef.current);
 
           // Clear any existing engine on this canvas
-          delete (rightRef.current as any).__warpEngine;
+          delete (rightRef.current as any)[ENGINE_KEY];
 
           console.log("Creating SHOW engine...");
-          rightEngine.current = new W(rightRef.current);
+          rightEngine.current = createEngine(rightRef.current);
           rightOwnedRef.current = true;
           console.log("SHOW engine instance created");
 
           // Wait for engine to be fully ready
           await waitForEngineReady(rightEngine.current, 'SHOW');
-          
+
           if (!mounted) return;
 
           // Initialize with ENFORCED non-parity mode for SHOW
@@ -969,13 +954,13 @@ export default function WarpRenderInspector(props: {
 
           console.log("Applying SHOW initial uniforms:", showInitUniforms);
           gatedUpdateUniforms(rightEngine.current, showInitUniforms, 'client');
-          
+
           // Verify parity was set
           console.log("SHOW engine parity after init:", rightEngine.current.uniforms?.physicsParityMode);
 
           rightEngine.current?.setVisible?.(true);
           lockPane(rightEngine.current, 'SHOW');
-          
+
           console.log("SHOW engine fully initialized");
 
         } catch (error) {
