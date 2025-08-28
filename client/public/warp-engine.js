@@ -57,20 +57,16 @@ class WarpEngine {
         this._destroyed = false;
         this.canvas = canvas;
         canvas.__warpEngine = this;
-        // Create WebGL context with mobile-optimized settings
+        // Create WebGL context with comprehensive error handling
         let gl = null;
-        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-        const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        
         const contextOptions = {
             antialias: false,
             alpha: false,
             depth: true,
             stencil: false,
             preserveDrawingBuffer: false,
-            powerPreference: (isMobile || isTouch) ? "low-power" : "default",
-            failIfMajorPerformanceCaveat: false,
-            desynchronized: true
+            powerPreference: "default",
+            failIfMajorPerformanceCaveat: false
         };
 
         // Try different context creation strategies

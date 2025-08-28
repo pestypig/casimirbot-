@@ -316,10 +316,10 @@ function useCheckpointList(
 
     checkpoint({
       id: 'uniforms.ridge_mode', side, stage: 'uniforms',
-      pass: expectations?.ridge != null ? ((u?.ridgeMode || 0) === (expectations.ridge || 0)) : true,
+      pass: expectations?.ridge != null ? (u?.ridgeMode | 0) === (expectations.ridge | 0) : true,
       msg: `ridgeMode=${u?.ridgeMode}`,
       expect: expectations?.ridge, actual: u?.ridgeMode,
-      sev: expectations?.ridge != null && (u?.ridgeMode || 0) !== (expectations.ridge || 0) ? 'warn' : 'info'
+      sev: expectations?.ridge != null && (u?.ridgeMode | 0) !== (expectations.ridge | 0) ? 'warn' : 'info'
     });
 
     checkpoint({
@@ -529,7 +529,7 @@ function useCheckpointList(
     const mismatch = echo && thetaExpectedFromBound && tsOk
       ? (ts / thetaExpectedFromBound) : 1;
 
-    if (echo && echo.terms && thetaExpectedFromBound !== undefined) {
+    if (echo && echo.terms) {
       // Use bound uniforms for perfect self-consistency
       const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
 
@@ -552,7 +552,7 @@ function useCheckpointList(
         } else {
           if (rel > 0.25) tsState = "warn"; // large disagreement
           const pct = (mismatch * 100 - 100);
-          tsDetail += ` • exp ${thetaExpectedFromBound!.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
+          tsDetail += ` • exp ${thetaExpectedFromBound.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
         }
       }
     } else if (liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
@@ -636,8 +636,8 @@ function useCheckpointList(
         });
       }
       if (expRidge != null) {
-        const actualRidge = u?.ridgeMode || 0;
-        const expectedRidge = expRidge || 0;
+        const actualRidge = u?.ridgeMode | 0;
+        const expectedRidge = expRidge | 0;
         const ok = actualRidge === expectedRidge;
 
         if (!ok) {

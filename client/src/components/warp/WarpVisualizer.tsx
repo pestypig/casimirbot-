@@ -456,7 +456,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     engine._startRenderLoop?.();
 
     // mark loaded on the next frame (ensures WebGL context is live)
-    requestAnimationFrame(() => setLoaded());
+    requestAnimationFrame(() => !cancelled && setLoaded());
 
     return engine;
   };
@@ -477,7 +477,111 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     w.__addStrobingListener = (fn:Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
   };
 
-  // Helper functions for WarpEngine initialization
+  // Remove duplicate init function - this is handled in the useEffect above
+
+    try {
+      if ((window as any).WarpEngine) {
+        engineRef.current = makeEngine((window as any).WarpEngine);
+        ensureStrobeMux(); // wrap the engine's handler into the mux
+
+        // Add ResizeObserver to react to container changes
+        const resizeObserver = new ResizeObserver(() => {
+          if (engineRef.current?._resizeCanvasToDisplaySize) {
+            engineRef.current._resizeCanvasToDisplaySize();
+          }
+          // keep cameraZ fresh on container resizes
+          try {
+            const u = engineRef.current?.uniforms;
+            if (u && Array.isArray(u.axesClip) && canvasRef.current) {
+              const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
+              gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
+            }
+          } catch {}
+        });
+        if (canvasRef.current?.parentElement) {
+          resizeObserver.observe(canvasRef.current.parentElement);
+        }
+        (engineRef.current as any).__resizeObserver = resizeObserver;
+
+        // Register with strobing multiplexer
+        const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+          if (!engineRef.current) return;
+          const s = Math.max(1, Math.floor(sectorCount||1));
+          gatedUpdateUniforms(engineRef.current, {
+            sectors: s,
+            split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+            sectorIdx: Math.max(0, currentSector % s)
+          }, 'client');
+          engineRef.current.requestRewarp?.();
+        });
+        (engineRef.current as any).__strobingCleanup = off;
+
+        return;
+      }
+
+      // --- Robust asset base resolution ---
+      const resolveAssetBase = () => {
+        const w: any = window;
+        if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
+        if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+        if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
+        if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
+        const baseEl = document.querySelector('base[href]');
+        if (baseEl) return (baseEl as HTMLBaseElement).href;
+        return '/';
+      };
+
+      const assetBase = resolveAssetBase();
+      const stamp = (w => (w.__APP_WARP_BUILD || 'dev'))(window as any);
+      const mk = (p: string) => {
+        try { return new URL(p, assetBase).toString(); } catch { return p; }
+      };
+
+      const trySrcs = [
+        (window as any).__WARP_ENGINE_SRC__,
+        mk(`warp-engine.js?v=${encodeURIComponent(stamp)}`),
+        'warp-engine.js',
+        '/warp-engine.js?v=canonical'
+      ].filter(Boolean) as string[];
+
+      for (const src of trySrcs) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = src;
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error(`Failed to load ${src}`));
+          document.head.appendChild(script);
+        }).catch((e) => { console.warn(e.message); });
+
+        if ((window as any).WarpEngine) {
+          engineRef.current = makeEngine((window as any).WarpEngine);
+          ensureStrobeMux(); // wrap the engine's handler into the mux
+
+          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+            if (!engineRef.current) return;
+            const s = Math.max(1, Math.floor(sectorCount||1));
+            gatedUpdateUniforms(engineRef.current, {
+              sectors: s,
+              split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+              sectorIdx: Math.max(0, currentSector % s)
+            }, 'client');
+            engineRef.current.requestRewarp?.();
+          });
+          (engineRef.current as any).__strobingCleanup = off;
+
+          return;
+        }
+      }
+
+      throw new Error("WarpEngine not found on window after script load (check public path / base URL)");
+    } catch (err: any) {
+      console.error('WarpEngine init error:', err);
+      setFailed(err?.message || "Engine initialization failed");
+    } finally {
+      if (watchdog) clearTimeout(watchdog);
+    }
+  };
 
   // Initialize engine on intersection or directly
   useEffect(() => {
@@ -528,7 +632,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number) : Math.floor(s/2))),
+                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -542,7 +646,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         const resolveAssetBase = () => {
           const w: any = window;
           if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
-          if (import.meta && (import.meta as any).env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+          if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
           if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
           if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
           const baseEl = document.querySelector('base[href]');
@@ -582,7 +686,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number) : Math.floor(s/2))),
+                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -1339,5 +1443,3 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     </Card>
   );
 }
-
-export default WarpVisualizer;

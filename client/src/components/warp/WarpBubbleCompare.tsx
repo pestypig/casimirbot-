@@ -296,7 +296,7 @@ function resolveAssetBase() {
   // explicit override wins
   if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
   // Vite
-  if (import.meta && (import.meta as any).env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+  if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
   // Webpack public path
   if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
   // Next.js base path
@@ -744,9 +744,9 @@ export default function WarpBubbleCompare({
           throw new Error('WebGL context test failed');
         }
         console.log(`[${label}] WebGL pre-test passed`);
-      } catch (webglError: any) {
+      } catch (webglError) {
         console.error(`[${label}] WebGL pre-test failed:`, webglError);
-        throw new Error(`WebGL not available for ${label}: ${webglError?.message || webglError}`);
+        throw new Error(`WebGL not available for ${label}: ${webglError.message}`);
       }
 
       console.log(`[${label}] Creating engine for canvas:`, canvas);
@@ -769,11 +769,11 @@ export default function WarpBubbleCompare({
 
       console.log(`[${label}] Engine created successfully`);
       return engine;
-    } catch (error: any) {
+    } catch (error) {
       console.error(`[${label}] Engine creation failed:`, error);
 
       // Additional debugging for WebGL errors
-      if (error?.message?.includes('WebGL')) {
+      if (error.message.includes('WebGL')) {
         console.error(`[${label}] WebGL-specific debugging:`, {
           webglSupported: !!window.WebGLRenderingContext,
           webgl2Supported: !!window.WebGL2RenderingContext,

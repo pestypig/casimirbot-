@@ -743,15 +743,9 @@ export default function WarpRenderInspector(props: {
     // REAL engine
     if (leftRef.current && !leftEngine.current) {
       try {
-        // Mobile-friendly canvas sizing
-        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-        const rect = leftRef.current.getBoundingClientRect();
-        const dpr = isMobile ? 1.0 : Math.min(1.5, window.devicePixelRatio || 1);
-        
-        leftRef.current.width  = Math.max(32, Math.floor((rect.width || 400) * dpr));
-        leftRef.current.height = Math.max(32, Math.floor((rect.height || 300) * dpr));
-        leftRef.current.style.width = (rect.width || 400) + 'px';
-        leftRef.current.style.height = (rect.height || 300) + 'px';
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
+        leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
 
         // Clear any existing engine on this canvas
         delete (leftRef.current as any).__warpEngine;
@@ -781,15 +775,9 @@ export default function WarpRenderInspector(props: {
     // SHOW engine
     if (rightRef.current && !rightEngine.current) {
       try {
-        // Mobile-friendly canvas sizing
-        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-        const rect = rightRef.current.getBoundingClientRect();
-        const dpr = isMobile ? 1.0 : Math.min(1.5, window.devicePixelRatio || 1);
-        
-        rightRef.current.width  = Math.max(32, Math.floor((rect.width || 400) * dpr));
-        rightRef.current.height = Math.max(32, Math.floor((rect.height || 300) * dpr));
-        rightRef.current.style.width = (rect.width || 400) + 'px';
-        rightRef.current.style.height = (rect.height || 300) + 'px';
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
 
         // Clear any existing engine on this canvas
         delete (rightRef.current as any).__warpEngine;
@@ -1187,22 +1175,19 @@ export default function WarpRenderInspector(props: {
         const cz = compactCameraZ(ax);
         pushUniformsWhenReady(g, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'grid3d-bridge');
 
-        // Mobile-optimized render quality
-        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-        const dpr = isMobile ? 1.0 : Math.min(1.5, window.devicePixelRatio || 1);
+        // Sensible render quality
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
         grid3dRef.current?.setPixelRatio?.(dpr);
-        grid3dRef.current?.setSupersample?.(isMobile ? 1.0 : 1.1);
+        grid3dRef.current?.setSupersample?.(1.25);
 
-        // Mobile-optimized grid density
+        // Nudge grid density once the canvas has real dimensions
         const W = cv.width, H = cv.height;
         const pxAcross = estimatePxAcrossWall({
           canvasPxW: W, canvasPxH: H,
           gridSpan: 1, hull,
           wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
         });
-        const maxSeg = isMobile ? 128 : 256;
-        const minSeg = isMobile ? 16 : 24;
-        const seg = Math.max(minSeg, Math.min(maxSeg, Math.ceil(pxAcross * (isMobile ? 1.5 : 2))));
+        const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
         grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
 
         // Match visibility gate
@@ -1413,30 +1398,21 @@ export default function WarpRenderInspector(props: {
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
     const ro = new ResizeObserver(() => {
-      // Conservative mobile device pixel ratio - avoid performance issues
+      // Mobile-optimized device pixel ratio (avoid excessive resolution on mobile)
       const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const dpr = (isMobile || isTouch) ? 1.0 : Math.min(1.5, window.devicePixelRatio || 1);
+      const dpr = isMobile ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1);
       
       for (const c of [leftRef.current, rightRef.current]) {
         if (!c) continue;
-        const rect = c.getBoundingClientRect();
-        const w = Math.max(32, Math.floor(rect.width * dpr));
-        const h = Math.max(32, Math.floor(rect.height * dpr));
-        if (c.width !== w || c.height !== h) { 
-          c.width = w; 
-          c.height = h; 
-          c.style.width = rect.width + 'px';
-          c.style.height = rect.height + 'px';
-        }
+        const w = Math.max(1, Math.floor((c.clientWidth  || 1) * dpr));
+        const h = Math.max(1, Math.floor((c.clientHeight || 1) * dpr));
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
       }
       leftEngine.current?._resize?.();
       rightEngine.current?._resize?.();
     });
-    
-    // Observe parent containers instead of canvases directly for better mobile handling
-    leftRef.current?.parentElement && ro.observe(leftRef.current.parentElement);
-    rightRef.current?.parentElement && ro.observe(rightRef.current.parentElement);
+    leftRef.current && ro.observe(leftRef.current);
+    rightRef.current && ro.observe(rightRef.current);
     return () => ro.disconnect();
   }, []);
 
@@ -1509,24 +1485,22 @@ export default function WarpRenderInspector(props: {
 
   return (
     <div className="w-full grid gap-4 p-2 sm:p-4">
-      <header className="flex flex-col gap-3">
+      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
         <div>
           <h2 className="text-lg sm:text-xl font-semibold">Operational Render Inspector</h2>
           <p className="text-xs sm:text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs sm:text-sm font-medium whitespace-nowrap">Mode</label>
-          <div className="flex flex-wrap gap-1 sm:gap-2">
-            {(['hover','cruise','emergency','standby'] as const).map(m => (
-              <button
-                key={m}
-                onClick={() => onMode(m)}
-                className={`px-3 py-2 rounded-2xl text-xs sm:text-sm border touch-manipulation min-h-[44px] min-w-[60px] ${mode===m? 'bg-blue-600 text-white border-blue-600' : 'border-neutral-300 hover:bg-neutral-100 active:bg-neutral-200'}`}
-              >{m}</button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <label className="text-xs sm:text-sm font-medium">Mode</label>
+          {(['hover','cruise','emergency','standby'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => onMode(m)}
+              className={`px-2 sm:px-3 py-1 rounded-2xl text-xs sm:text-sm border touch-manipulation ${mode===m? 'bg-blue-600 text-white border-blue-600' : 'border-neutral-300 hover:bg-neutral-100 active:bg-neutral-200'}`}
+            >{m}</button>
+          ))}
         </div>
-      </header></header>
+      </header>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -1542,16 +1516,7 @@ export default function WarpRenderInspector(props: {
                 style={{background: 'black'}}
               />
             ) : (
-              <canvas 
-                ref={leftRef} 
-                className="w-full h-full block touch-manipulation select-none"
-                style={{
-                  touchAction: 'none',
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none',
-                  imageRendering: 'pixelated'
-                }}
-              />
+              <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
             )}
             {/* ⬇️ live badge */}
             <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>
@@ -1563,16 +1528,7 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas 
-              ref={rightRef} 
-              className="w-full h-full block touch-manipulation select-none"
-              style={{
-                touchAction: 'none',
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                imageRendering: 'pixelated'
-              }}
-            />
+            <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>
           </div>
