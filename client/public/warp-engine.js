@@ -52,43 +52,116 @@ class WarpEngine {
         this._destroyed = false;
         this.canvas = canvas;
         canvas.__warpEngine = this;
-        this.gl = canvas.getContext('webgl2', {
-            alpha: false,
+        // Create WebGL context with comprehensive error handling
+        let gl = null;
+        const contextOptions = {
             antialias: false,
-            powerPreference: 'high-performance',
-            desynchronized: true
-        }) || canvas.getContext('webgl', {
             alpha: false,
-            antialias: false,
-            powerPreference: 'high-performance',
-            desynchronized: true
-        });
+            depth: true,
+            stencil: false,
+            preserveDrawingBuffer: false,
+            powerPreference: "default",
+            failIfMajorPerformanceCaveat: false
+        };
+
+        // Try different context creation strategies
+        try {
+            // First try WebGL2
+            gl = canvas.getContext('webgl2', contextOptions);
+            if (gl) {
+                console.log('✅ WebGL2 context created successfully');
+            }
+        } catch (e) {
+            console.warn('WebGL2 context creation failed:', e.message);
+        }
+
+        if (!gl) {
+            try {
+                // Fallback to WebGL1
+                gl = canvas.getContext('webgl', contextOptions) || 
+                     canvas.getContext('experimental-webgl', contextOptions);
+                if (gl) {
+                    console.log('✅ WebGL1 context created successfully');
+                }
+            } catch (e) {
+                console.warn('WebGL1 context creation failed:', e.message);
+            }
+        }
+
+        // If still no context, try with different options
+        if (!gl) {
+            try {
+                const relaxedOptions = {
+                    antialias: false,
+                    alpha: true,
+                    depth: false,
+                    stencil: false,
+                    preserveDrawingBuffer: true,
+                    powerPreference: "high-performance",
+                    failIfMajorPerformanceCaveat: false
+                };
+                gl = canvas.getContext('webgl', relaxedOptions) || 
+                     canvas.getContext('experimental-webgl', relaxedOptions);
+                if (gl) {
+                    console.log('✅ WebGL context created with relaxed options');
+                }
+            } catch (e) {
+                console.warn('Relaxed WebGL context creation failed:', e.message);
+            }
+        }
+
+        this.gl = gl;
 
         if (!this.gl) {
             console.error('🚨 WebGL Debug Info:');
             console.error('  - Canvas:', canvas);
+            console.error('  - Canvas size:', canvas.width, 'x', canvas.height);
             console.error('  - Canvas.getContext available:', typeof canvas.getContext === 'function');
-            console.error('  - WebGL2 test:', canvas.getContext('webgl2') !== null);
-            console.error('  - WebGL test:', canvas.getContext('webgl') !== null);
-            console.error('  - Navigator GPU info:', navigator.gpu ? 'Available' : 'Not available');
-            console.error('  - Hardware concurrency:', navigator.hardwareConcurrency || 'Unknown');
-            console.error('  - User Agent:', navigator.userAgent.slice(0, 100) + '...');
-            
-            // Try to get more detailed info
+            console.error('  - Environment:', {
+                isHeadless: typeof window === 'undefined',
+                isWorker: typeof importScripts === 'function',
+                isNode: typeof process !== 'undefined' && process?.versions?.node,
+                isReplit: typeof window !== 'undefined' && window.location?.hostname?.includes('replit')
+            });
+
+            // Test basic WebGL availability
             try {
                 const testCanvas = document.createElement('canvas');
-                const testGl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
-                if (testGl) {
+                testCanvas.width = 1;
+                testCanvas.height = 1;
+
+                const testGl2 = testCanvas.getContext('webgl2');
+                const testGl1 = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+
+                console.error('  - WebGL2 available:', !!testGl2);
+                console.error('  - WebGL1 available:', !!testGl1);
+
+                if (testGl1 || testGl2) {
+                    const testGl = testGl2 || testGl1;
                     console.error('  - WebGL Renderer:', testGl.getParameter(testGl.RENDERER));
                     console.error('  - WebGL Vendor:', testGl.getParameter(testGl.VENDOR));
                     console.error('  - WebGL Version:', testGl.getParameter(testGl.VERSION));
-                } else {
-                    console.error('  - Test canvas WebGL context: FAILED');
+                    console.error('  - Max Texture Size:', testGl.getParameter(testGl.MAX_TEXTURE_SIZE));
+                    console.error('  - Max Viewport Dims:', testGl.getParameter(testGl.MAX_VIEWPORT_DIMS));
+
+                    // Test basic shader compilation
+                    const vertexShader = testGl.createShader(testGl.VERTEX_SHADER);
+                    testGl.shaderSource(vertexShader, 'attribute vec4 a_position; void main() { gl_Position = a_position; }');
+                    testGl.compileShader(vertexShader);
+                    console.error('  - Vertex shader compilation:', testGl.getShaderParameter(vertexShader, testGl.COMPILE_STATUS));
                 }
             } catch (e) {
                 console.error('  - WebGL detection error:', e.message);
             }
-            
+
+            console.error('  - System Info:', {
+                userAgent: navigator.userAgent.slice(0, 100) + '...',
+                hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown',
+                platform: navigator.platform,
+                gpu: (navigator as any)?.gpu ? 'Available' : 'Not available',
+                onLine: navigator.onLine
+            });
+
             throw new Error('WebGL not supported in this environment');
         }
 
@@ -174,35 +247,6 @@ class WarpEngine {
             tsRatio: 4102.74,
             powerAvg_MW: 83.3,
             exoticMass_kg: 1405
-        };
-
-        // Display-only controls (safe defaults; no baked ring)
-        this.uniforms = {
-            vizGain: 1.0,
-            vShip: 1.0,
-            wallWidth: 0.06,
-
-            // IMPORTANT: don't seed a unit ellipsoid here – we compute it from the hull each update
-            axesClip: null,
-
-            driveDir: [1, 0, 0],
-            epsilonTilt: 0.0,
-            betaTiltVec: [0, -1, 0],
-            tiltGain: 0.55,
-
-            // visual system
-            cosmeticLevel: 10,
-            colorMode: 'theta',
-            exposure: 6.0,
-            zeroStop: 1e-7,
-
-            // comparison helpers
-            physicsParityMode: false,
-            lockFraming: true,
-            cameraZ: null,
-
-            // ridge visualization mode
-            ridgeMode: 1  // default to single crest at ρ=1 (clean outline)
         };
 
         // Initialize rendering pipeline
@@ -1049,12 +1093,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         nextUniforms.dutyUsed   = dutyEffFR;   // 🔍 for checkpoints UI
         nextUniforms.dutyEffectiveFR = dutyEffFR; // <- for UI & future patches
 
-        // If amplitude just went "off", restore the pristine grid
+        // --- If amplitude just went "off", restore the pristine grid ---
         const wasActive = (prev.thetaScale ?? 0) > 1e-12;
         const nowActive = (nextUniforms.thetaScale ?? 0) > 1e-12;
         if (wasActive && !nowActive) this._restoreOriginalGrid?.();
 
-        // Neutralize visual boosts in standby (only for REAL parity)
+        // --- Neutralize visual boosts in standby (only for REAL parity) ---
         if (zeroStandby) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
@@ -1063,7 +1107,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           nextUniforms.vShip = 0;
         }
 
-        // decide if the CPU warp needs recompute
+        // --- decide if the CPU warp needs recompute ---
         const geoChanged =
           (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
           (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
@@ -1340,6 +1384,19 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             const R_eff = 1.0 / Math.max(invR, 1e-6);
             // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
             const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
+
+            // ---- Existing physics chain (do not change) ----
+            const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+            const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
+            const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
+            const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
+
+            const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
+            const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+            const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+
+            // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
+            const betaVisUniform = betaUsedUniform;
 
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps

@@ -70,7 +70,14 @@ export default function WebGLFallback({
     setCapabilities(caps);
   }, []);
 
-  const commonIssues = [
+  const commonIssues = isReplit ? [
+    "Browser security settings blocking WebGL",
+    "Hardware acceleration disabled in browser",
+    "Browser extensions interfering with WebGL",
+    "Temporary Replit environment issues",
+    "Browser cache corruption",
+    "Incompatible browser version"
+  ] : [
     "Headless environments or CI/CD systems",
     "Browsers with WebGL disabled",
     "Virtual machines without GPU acceleration",
@@ -78,7 +85,19 @@ export default function WebGLFallback({
     "Hardware acceleration disabled in browser settings"
   ];
 
-  const troubleshootingSteps = [
+  const isReplit = typeof window !== 'undefined' && 
+                  (window.location?.hostname?.includes('replit') || 
+                   window.location?.hostname?.includes('repl.co'));
+
+  const troubleshootingSteps = isReplit ? [
+    "Try refreshing the page (F5 or Ctrl+R)",
+    "Open the Repl in a new tab/window",
+    "Clear browser cache and cookies for this Repl",
+    "Try opening the Repl in an incognito/private window",
+    "Switch to a different browser (Chrome recommended for Replit)",
+    "Check if you're using the Replit Desktop App (try the web version)",
+    "Ensure hardware acceleration is enabled in browser settings"
+  ] : [
     "Check if hardware acceleration is enabled in browser settings",
     "Update graphics drivers to the latest version",
     "Try a different browser (Chrome, Firefox, Edge)",

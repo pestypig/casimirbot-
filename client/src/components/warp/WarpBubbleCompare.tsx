@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 
@@ -68,15 +68,15 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const p = { ...patch };
 
   // Force parity mode based on pane - this is critical for physics validation
-  if (pane === 'REAL') { 
+  if (pane === 'REAL') {
     p.physicsParityMode = true;
     p.parityMode = true;  // Also set the fallback field
-    p.ridgeMode = 0; 
+    p.ridgeMode = 0;
     console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
     p.physicsParityMode = false;
     p.parityMode = false; // Also set the fallback field
-    p.ridgeMode = 1; 
+    p.ridgeMode = 1;
     console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
@@ -137,9 +137,9 @@ function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'RE
   });
 
   if (!e.isLoaded || !e.gridProgram) {
-    e.onceReady(() => { 
-      gatedUpdateUniforms(e, clean, 'client'); 
-      e.forceRedraw?.(); 
+    e.onceReady(() => {
+      gatedUpdateUniforms(e, clean, 'client');
+      e.forceRedraw?.();
       console.log(`[${pane}] Deferred uniforms applied on ready`);
     });
   } else {
@@ -197,7 +197,7 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
   const dAA  = Math.max(1e-12, base.qSpoilingFactor);
   const gVdB = Math.max(1, base.gammaVanDenBroeck);
 
-  const duty = (flavor === 'fr') 
+  const duty = (flavor === 'fr')
     ? clampValue(base.dutyEffectiveFR)                     // ship-averaged FR duty
     : clampValue(base.dutyCycle / Math.max(1, base.sectorCount)); // UI duty averaged over all sectors
 
@@ -233,12 +233,12 @@ function buildCommonUniforms(base: BaseInputs) {
 }
 
 // Locked display settings - modes only change physics, not visuals
-const TONEMAP_LOCK = { 
-  exp: 5.0, 
-  zero: 1e-7, 
-  ridgeMode: 0, 
+const TONEMAP_LOCK = {
+  exp: 5.0,
+  zero: 1e-7,
+  ridgeMode: 0,
   colorMode: 'theta' as const,
-  viewAvg: true 
+  viewAvg: true
 };
 
 export function buildEngineUniforms(base: BaseInputs) {
@@ -714,6 +714,78 @@ export default function WarpBubbleCompare({
     return e && !e._destroyed;
   }
 
+  const makeEngine = useCallback(async (canvasId: string, label: string): Promise<any> => {
+    if (!window.WarpEngine) {
+      console.warn(`[${label}] WarpEngine class not loaded, waiting...`);
+      return null;
+    }
+
+    try {
+      const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
+      if (!canvas) {
+        console.error(`[${label}] Canvas ${canvasId} not found`);
+        return null;
+      }
+
+      // Check canvas state before engine creation
+      console.log(`[${label}] Canvas state:`, {
+        id: canvas.id,
+        width: canvas.width,
+        height: canvas.height,
+        clientWidth: canvas.clientWidth,
+        clientHeight: canvas.clientHeight,
+        style: canvas.style.cssText
+      });
+
+      // Test WebGL availability before creating engine
+      try {
+        const testGl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!testGl) {
+          throw new Error('WebGL context test failed');
+        }
+        console.log(`[${label}] WebGL pre-test passed`);
+      } catch (webglError) {
+        console.error(`[${label}] WebGL pre-test failed:`, webglError);
+        throw new Error(`WebGL not available for ${label}: ${webglError.message}`);
+      }
+
+      console.log(`[${label}] Creating engine for canvas:`, canvas);
+
+      // Create engine instance with timeout
+      const enginePromise = new Promise((resolve, reject) => {
+        try {
+          const engine = new window.WarpEngine(canvas);
+          resolve(engine);
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Engine creation timeout')), 5000);
+      });
+
+      const engine = await Promise.race([enginePromise, timeoutPromise]);
+
+      console.log(`[${label}] Engine created successfully`);
+      return engine;
+    } catch (error) {
+      console.error(`[${label}] Engine creation failed:`, error);
+
+      // Additional debugging for WebGL errors
+      if (error.message.includes('WebGL')) {
+        console.error(`[${label}] WebGL-specific debugging:`, {
+          webglSupported: !!window.WebGLRenderingContext,
+          webgl2Supported: !!window.WebGL2RenderingContext,
+          canvasSupported: !!window.HTMLCanvasElement,
+          documentReady: document.readyState
+        });
+      }
+
+      return null;
+    }
+  }, []);
+
   async function getOrCreateEngine<WarpType = any>(
     Ctor: new (c: HTMLCanvasElement) => WarpType,
     cv: HTMLCanvasElement
@@ -1082,7 +1154,7 @@ export default function WarpBubbleCompare({
       parityExaggeration
     });
 
-    // Also push FR-window/light-crossing controls if present  
+    // Also push FR-window/light-crossing controls if present
     if (parameters.lightCrossing) {
       const lc = parameters.lightCrossing;
       const s = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
