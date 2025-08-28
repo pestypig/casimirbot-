@@ -31,8 +31,8 @@ function resolveDutyEff(params: SimulationParameters): number {
     dutyEff: (params as any).dutyEff
   });
 
-  const dyn = params.dynamicConfig ?? {};
-  const S_total = Math.max(1, Math.floor(dyn.sectorCount ?? 1));
+  const dyn = params.dynamicConfig;
+  const S_total = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
   
   console.log('[WarpModule] Sector count:', S_total);
 
@@ -51,8 +51,8 @@ function resolveDutyEff(params: SimulationParameters): number {
   }
 
   // 2) If burst/dwell provided, infer local duty and convert to FR with sector count
-  const burst = dyn.burstLengthUs;
-  const dwell = dyn.cycleLengthUs;
+  const burst = dyn?.burstLengthUs;
+  const dwell = dyn?.cycleLengthUs;
   
   console.log('[WarpModule] Burst/dwell timing:', { burst, dwell });
   
@@ -61,7 +61,7 @@ function resolveDutyEff(params: SimulationParameters): number {
     console.log('[WarpModule] Calculated local duty:', d_local);
     
     // If a sectorDuty is provided and already ≤ local, assume it's FR and don't divide again
-    if (Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) <= d_local) {
+    if (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) <= d_local) {
       const result = Math.max(0, Math.min(1, dyn.sectorDuty as number));
       console.log('[WarpModule] Using provided sectorDuty as FR:', result);
       return result;
@@ -74,7 +74,7 @@ function resolveDutyEff(params: SimulationParameters): number {
   // 3) Fall back to sectorDuty:
   //    - If very small (e.g., ≤2e-2 with many sectors), treat as FR (already averaged).
   //    - Otherwise treat as local and divide by S_total.
-  const dProvided = Number.isFinite(dyn.sectorDuty) ? (dyn.sectorDuty as number) : 0.14;
+  const dProvided = (dyn && Number.isFinite(dyn.sectorDuty)) ? (dyn.sectorDuty as number) : 0.14;
   console.log('[WarpModule] Fallback sectorDuty:', dProvided);
   
   if (S_total > 1 && dProvided <= 2e-2) {
@@ -93,7 +93,7 @@ function resolveDutyEff(params: SimulationParameters): number {
 function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   console.log('[WarpModule] convertToWarpParams input:', params);
   
-  const dyn = params.dynamicConfig ?? ({} as NonNullable<SimulationParameters["dynamicConfig"]>);
+  const dyn = params.dynamicConfig;
   console.log('[WarpModule] Dynamic config:', dyn);
 
   // Prefer pipeline hull if present; else fallback to Needle Hull (~1.007 km × 264 m × 173 m overall)
@@ -106,7 +106,7 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   console.log('[WarpModule] Hull geometry:', { hull, R_geom_m, R_geom_um });
 
   // Sector counts / duty
-  const sectorCount = Math.max(1, Math.floor(dyn.sectorCount ?? 1));
+  const sectorCount = Math.max(1, Math.floor(dyn?.sectorCount ?? 1));
   const d_eff = resolveDutyEff(params);
   
   console.log('[WarpModule] Sector/duty resolution:', { sectorCount, d_eff });
@@ -149,8 +149,8 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
 
   const dutyFactor = ((): number => {
     // "Local" duty (burst window) if we can infer it; otherwise keep provided value (do not double-divide)
-    if (Number.isFinite(dyn.sectorDuty)) return dyn.sectorDuty as number;
-    if (Number.isFinite(dyn.burstLengthUs) && Number.isFinite(dyn.cycleLengthUs) && (dyn.cycleLengthUs as number) > 0) {
+    if (dyn && Number.isFinite(dyn.sectorDuty)) return dyn.sectorDuty as number;
+    if (dyn && Number.isFinite(dyn.burstLengthUs) && Number.isFinite(dyn.cycleLengthUs) && (dyn.cycleLengthUs as number) > 0) {
       return Math.max(0, Math.min(1, (dyn.burstLengthUs as number) / (dyn.cycleLengthUs as number)));
     }
     return 0.01; // conservative default
@@ -165,9 +165,9 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     gap: params.gap ?? 1,                               // nm
 
     // Dynamics (from pipeline)
-    cavityQ: dyn.cavityQ ?? 1e9,
-    burstDuration: dyn.burstLengthUs ?? 10,             // µs
-    cycleDuration: dyn.cycleLengthUs ?? 1000,           // µs
+    cavityQ: dyn?.cavityQ ?? 1e9,
+    burstDuration: dyn?.burstLengthUs ?? 10,             // µs
+    cycleDuration: dyn?.cycleLengthUs ?? 1000,           // µs
 
     // Strobing (pipeline values only)
     sectorCount,
@@ -175,10 +175,10 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     effectiveDuty: d_eff,                               // ship-wide FR duty (0..1)
 
     // Warp-field microscopic stroke
-    shiftAmplitude: (dyn.strokeAmplitudePm ?? 50) * 1e-12, // pm → m
+    shiftAmplitude: (dyn?.strokeAmplitudePm ?? 50) * 1e-12, // pm → m
 
     // Tolerance
-    expansionTolerance: dyn.expansionTolerance ?? 1e-12,
+    expansionTolerance: dyn?.expansionTolerance ?? 1e-12,
 
     // --- Pipeline seeds (threaded through) ---
     gammaGeo,
