@@ -571,7 +571,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
   // Canonical geometry fields for visualizer
-  const a, b, c: number;
+  let a: number, b: number, c: number;
   if (hull) {
     a = hull.Lx_m / 2;
     b = hull.Ly_m / 2;
