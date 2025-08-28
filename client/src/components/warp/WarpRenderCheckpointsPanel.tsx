@@ -33,6 +33,24 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// Enhanced canvas/GL inspection that works with both slice2d and grid3d engines
+  const getCanvasEngine = (engineRef: React.MutableRefObject<any>, canvasRef: React.MutableRefObject<HTMLCanvasElement | null>) => {
+    const engine = engineRef.current;
+    const canvas = canvasRef.current;
+
+    // For Grid3DEngine, the engine has a canvas property pointing to the actual canvas with real WebGL context
+    if (engine?.canvas && engine.canvas instanceof HTMLCanvasElement) {
+      console.log(`[Checkpoints] Using Grid3D engine canvas: ${engine.canvas.width}x${engine.canvas.height}`);
+      return { engine, canvas: engine.canvas };
+    }
+
+    // For regular WarpEngine, use the canvas ref directly
+    if (canvas) {
+      console.log(`[Checkpoints] Using slice2d engine canvas: ${canvas.width}x${canvas.height}`);
+    }
+    return { engine, canvas };
+  };
+
 // GPU link status helper with enhanced diagnostics
 function getLinkStatus(engine: any) {
   const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
@@ -227,8 +245,7 @@ function useCheckpointList(
   const hb = useEngineHeartbeat(engineRef);
 
   return useMemo(() => {
-    const e = engineRef.current;
-    const cv = canvasRef.current || (e?.canvas ?? null);
+    const { engine: e, canvas: cv } = getCanvasEngine(engineRef, canvasRef); // Use the utility function
     const rows: { label: string; detail?: string; state: "ok" | "warn" | "fail" }[] = [];
     const side: Side = label === "REAL" ? "REAL" : "SHOW";
 
@@ -840,6 +857,53 @@ function CompactCheckpointTable() {
   );
 }
 
+// Helper function to validate engines, now using the enhanced getCanvasEngine
+function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObject<any | null>, canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  const { engine: e, canvas: cv } = getCanvasEngine(engineRef, canvasRef); // Use the utility function
+
+  if (!e || !cv) {
+    checkpoint({ id: 'gpu.canvas_size', side, stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
+    checkpoint({ id: 'gpu.webgl_context', side, stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
+    return;
+  }
+
+  const cw = N(cv?.clientWidth || cv?.width, 0);
+  const ch = N(cv?.clientHeight || cv?.height, 0);
+  const canvasOk = cw >= 64 && ch >= 64;
+
+  checkpoint({
+    id: 'gpu.canvas_size', side, stage: 'gpu',
+    pass: canvasOk,
+    msg: `Canvas ${cw}×${ch}px`,
+    expect: '>=64x64', actual: `${cw}×${ch}`,
+    sev: !canvasOk ? 'error' : 'info'
+  });
+
+  const gl = e?.gl;
+  const ctxOk = !!gl && !(gl?.isContextLost && gl.isContextLost());
+
+  checkpoint({
+    id: 'gpu.webgl_context', side, stage: 'gpu',
+    pass: ctxOk,
+    msg: gl ? (ctxOk ? "WebGL alive" : "context lost") : "missing",
+    expect: 'alive', actual: gl ? (ctxOk ? 'alive' : 'lost') : 'missing',
+    sev: !ctxOk ? 'error' : 'info'
+  });
+
+  // Re-evaluate shaders linked status as well
+  const glStatus = getLinkStatus(e);
+  checkpoint({
+    id: 'gpu.shaders_linked',
+    side,
+    stage: 'gpu',
+    pass: glStatus.ok,
+    msg: glStatus.reason,
+    expect: 'linked',
+    actual: glStatus.stage,
+    sev: glStatus.ok ? 'info' : (glStatus.stage === 'compiling' ? 'warn' : 'error'),
+  });
+}
+
 export default function WarpRenderCheckpointsPanel({
   leftLabel = "REAL",
   rightLabel = "SHOW",
@@ -964,6 +1028,33 @@ export default function WarpRenderCheckpointsPanel({
       </div>
     </div>
   ) : null;
+
+  // Validate both engines every 2 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const leftEngineCanvas = getCanvasEngine(leftEngineRef, leftCanvasRef);
+      const rightEngineCanvas = getCanvasEngine(rightEngineRef, rightCanvasRef);
+
+      validateEngine('LEFT', { current: leftEngineCanvas.engine }, { current: leftEngineCanvas.canvas });
+      validateEngine('RIGHT', { current: rightEngineCanvas.engine }, { current: rightEngineCanvas.canvas });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Real-time updates every frame for critical metrics
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const leftEngineCanvas = getCanvasEngine(leftEngineRef, leftCanvasRef);
+      const rightEngineCanvas = getCanvasEngine(rightEngineRef, rightCanvasRef);
+
+      validateEngine('LEFT', { current: leftEngineCanvas.engine }, { current: leftEngineCanvas.canvas });
+      validateEngine('RIGHT', { current: rightEngineCanvas.engine }, { current: rightEngineCanvas.canvas });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   return (
     <div className="mt-3 space-y-3">
