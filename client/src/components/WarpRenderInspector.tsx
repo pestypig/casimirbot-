@@ -518,7 +518,37 @@ export default function WarpRenderInspector(props: {
   showPhys?: Record<string, any>;
   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
-}){
+}) {
+  // Error boundary wrapper
+  const [componentError, setComponentError] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      if (event.filename?.includes('WarpRenderInspector') || 
+          event.message?.includes('WarpRenderInspector')) {
+        setComponentError(event.message);
+        console.error('[WarpRenderInspector] Runtime error:', event);
+      }
+    };
+    
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+  
+  if (componentError) {
+    return (
+      <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+        <h3 className="text-red-400 font-medium mb-2">WarpRenderInspector Error</h3>
+        <p className="text-sm text-red-300">{componentError}</p>
+        <button 
+          onClick={() => setComponentError(null)}
+          className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
   const leftRef = useRef<HTMLCanvasElement>(null);   // REAL
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);

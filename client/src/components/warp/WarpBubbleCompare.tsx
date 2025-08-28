@@ -85,7 +85,7 @@ function batcherCalculateCameraZ(canvas: HTMLCanvasElement, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
-// Build token: read lazily so SSR never touches `window`
+// Get App Build Version
 const getAppBuild = () =>
   (typeof window !== 'undefined' && (window as any).__APP_WARP_BUILD) || 'dev';
 
@@ -96,7 +96,7 @@ const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
 // Parameter validation and clamping helper
 const validatePhysicsParams = (params: any, label: string) => {
   const validated = { ...params };
-  
+
   // Clamp gamma values to reasonable ranges
   if ('gammaGeo' in validated) {
     validated.gammaGeo = Math.max(1, Math.min(1000, validated.gammaGeo || 26));
@@ -106,19 +106,19 @@ const validatePhysicsParams = (params: any, label: string) => {
     validated.gammaVdB = Math.max(1, Math.min(1000, gamma));
     validated.gammaVanDenBroeck = validated.gammaVdB;
   }
-  
+
   // Clamp q-spoiling factor
   if ('qSpoilingFactor' in validated || 'deltaAOverA' in validated) {
     const q = validated.qSpoilingFactor || validated.deltaAOverA || 1;
     validated.qSpoilingFactor = Math.max(0.01, Math.min(10, q));
     validated.deltaAOverA = validated.qSpoilingFactor;
   }
-  
+
   // Clamp theta scale
   if ('thetaScale' in validated) {
     validated.thetaScale = Math.max(0, Math.min(1e15, validated.thetaScale || 0));
   }
-  
+
   // Clamp duty cycles
   if ('dutyEffectiveFR' in validated) {
     validated.dutyEffectiveFR = Math.max(1e-6, Math.min(1, validated.dutyEffectiveFR || 0.000025));
@@ -126,7 +126,7 @@ const validatePhysicsParams = (params: any, label: string) => {
   if ('dutyCycle' in validated) {
     validated.dutyCycle = Math.max(0, Math.min(1, validated.dutyCycle || 0.14));
   }
-  
+
   // Clamp sectors
   if ('sectors' in validated) {
     validated.sectors = Math.max(1, Math.min(1000, validated.sectors || 400));
@@ -134,7 +134,7 @@ const validatePhysicsParams = (params: any, label: string) => {
   if ('sectorCount' in validated) {
     validated.sectorCount = Math.max(1, Math.min(1000, validated.sectorCount || 400));
   }
-  
+
   console.log(`[${label}] Parameter validation:`, {
     gammaGeo: validated.gammaGeo,
     gammaVdB: validated.gammaVdB,
@@ -143,7 +143,7 @@ const validatePhysicsParams = (params: any, label: string) => {
     dutyFR: validated.dutyEffectiveFR,
     sectors: validated.sectors
   });
-  
+
   return validated;
 };
 
@@ -333,7 +333,7 @@ function buildCommonUniforms(base: BaseInputs) {
   };
 }
 
-// Locked display settings - modes only change physics, not visuals
+// Locked display settings - modes only change visuals, not visuals
 const TONEMAP_LOCK = {
   exp: 5.0,
   zero: 1e-7,
@@ -678,7 +678,7 @@ export default function WarpBubbleCompare({
   const rightEngine = useRef<any>(null);
   const reinitInFlight = useRef<Promise<void> | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  
+
   // Batched push system for performance optimization
   const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
   const pushRight = useRef<(p:any, tag?:string)=>void>(() => {});
@@ -746,7 +746,7 @@ export default function WarpBubbleCompare({
 
       // Test WebGL availability before creating engine
       try {
-        const testGl = canvas.getContext('webgl', { preserveDrawingBuffer: true }) || 
+        const testGl = canvas.getContext('webgl', { preserveDrawingBuffer: true }) ||
                        canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
         if (!testGl) {
           throw new Error('WebGL context test failed');
@@ -770,23 +770,23 @@ export default function WarpBubbleCompare({
       const enginePromise = new Promise((resolve, reject) => {
         try {
           const engine = new window.WarpEngine(canvas);
-          
+
           // Immediate validation
           if (!engine) {
             reject(new Error('Engine constructor returned null'));
             return;
           }
-          
+
           if (!engine.gl) {
             reject(new Error('Engine has no WebGL context'));
             return;
           }
-          
+
           if (engine.gl.isContextLost()) {
             reject(new Error('WebGL context was lost during engine creation'));
             return;
           }
-          
+
           console.log(`[${label}] Engine instance created, validating...`);
           resolve(engine);
         } catch (error) {
@@ -822,7 +822,7 @@ export default function WarpBubbleCompare({
           canvasInDOM: canvas?.isConnected,
           canvasSize: canvas ? `${canvas.clientWidth}x${canvas.clientHeight}` : 'N/A'
         });
-        
+
         // Try to get more WebGL debug info
         try {
           const debugCanvas = document.createElement('canvas');
@@ -860,12 +860,12 @@ export default function WarpBubbleCompare({
 
         // Ensure canvas has proper dimensions before creating engine
         ensureCanvasSize(cv);
-        
+
         let eng: any;
         try {
           console.log(`[WarpBubbleCompare] Creating engine for canvas:`, cv.id, cv.width, cv.height);
           eng = new Ctor(cv);
-          
+
           // Wait for engine to be fully ready
           await new Promise<void>((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('Engine initialization timeout')), 5000);
@@ -879,7 +879,7 @@ export default function WarpBubbleCompare({
             };
             checkReady();
           });
-          
+
         } catch (err: any) {
           const msg = String(err?.message || err).toLowerCase();
           if (msg.includes('already attached')) {
@@ -937,138 +937,143 @@ export default function WarpBubbleCompare({
 
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
-    // Strong detection up-front
-    const support = webglSupport();
-    if (!support.ok) {
-      setLoadError(support.reason || 'WebGL not available');
-      return;
-    }
-    
-    await ensureScript();
-    const W = (window as any).WarpEngine;
-    if (!W || !parameters) return;
-    try { await waitForCanvases(leftRef, rightRef); } catch {}
-    if (!leftRef.current || !rightRef.current) return;
-
-    // 1) Cleanly kill any existing engines
-    killEngine(leftEngine, leftRef.current);
-    killEngine(rightEngine, rightRef.current);
-
-    const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
-      const eng: any = await getOrCreateEngine(W, cv);
-      const { w, h } = sizeCanvas(cv);
-      eng.gl.viewport(0, 0, w, h);
-      try { eng._initializeGrid?.(); } catch {}
-      try { eng._compileGridShaders?.(); } catch {}
-      await new Promise<void>(res => {
-        const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
-        tick();
-      });
-      // Only apply uniforms if they're provided
-      if (uniforms && Object.keys(uniforms).length > 0) {
-        gatedUpdateUniforms(eng, uniforms, 'client');
+    try {
+      // Strong detection up-front
+      const support = webglSupport();
+      if (!support.ok) {
+        setLoadError(support.reason || 'WebGL not available');
+        return;
       }
-      eng.isLoaded = true;
-      if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
-      eng.start?.();
 
-      // Sizing handled by top-level ResizeObserver
-      return eng;
-    };
+      await ensureScript();
+      const W = (window as any).WarpEngine;
+      if (!W || !parameters) return;
+      try { await waitForCanvases(leftRef, rightRef); } catch {}
+      if (!leftRef.current || !rightRef.current) return;
 
-    // 3) Build uniforms from parameters (single source of truth)
-    const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
-    const { real, show } = buildPacketsFromParams(parameters);
+      // 1) Cleanly kill any existing engines
+      killEngine(leftEngine, leftRef.current);
+      killEngine(rightEngine, rightRef.current);
 
-    // REAL packet
-    const realPacket = {
-      ...shared,
-      ...real,
-      currentMode: parameters.currentMode,
-      physicsParityMode: true,
-      vShip: 0,
-      gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
-      deltaAOverA: real.qSpoilingFactor,
-      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
-      sectors: Math.max(1, parameters.sectors),
-      ridgeMode: 0,
-    };
+      const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+        const eng: any = await getOrCreateEngine(W, cv);
+        const { w, h } = sizeCanvas(cv);
+        eng.gl.viewport(0, 0, w, h);
+        try { eng._initializeGrid?.(); } catch {}
+        try { eng._compileGridShaders?.(); } catch {}
+        await new Promise<void>(res => {
+          const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
+          tick();
+        });
+        // Only apply uniforms if they're provided
+        if (uniforms && Object.keys(uniforms).length > 0) {
+          gatedUpdateUniforms(eng, uniforms, 'client');
+        }
+        eng.isLoaded = true;
+        if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
+        eng.start?.();
 
-    // SHOW packet
-    const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
-    const showPacket = {
-      ...shared,
-      ...show,
-      currentMode: parameters.currentMode,
-      physicsParityMode: false,
-      vShip: parameters.currentMode === 'standby' ? 0 : 1,
-      thetaScale: showTheta,
-      gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
-      deltaAOverA: show.qSpoilingFactor,
-      sectors: Math.max(1, parameters.sectors),
-      ridgeMode: 1,
-    };
+        // Sizing handled by top-level ResizeObserver
+        return eng;
+      };
 
-    // 4) Init both engines without uniforms first
-    leftEngine.current  = await initOne(leftRef.current,  {});
-    rightEngine.current = await initOne(rightRef.current, {});
+      // 3) Build uniforms from parameters (single source of truth)
+      const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+      const { real, show } = buildPacketsFromParams(parameters);
 
-    // 5) After creating both engines and building `shared` once:
-    await firstCorrectFrame({
-      engine: leftEngine.current,
-      canvas: leftRef.current!,
-      sharedAxesScene: shared.axesScene as [number,number,number],
-      pane: 'REAL'
-    });
-    await firstCorrectFrame({
-      engine: rightEngine.current,
-      canvas: rightRef.current!,
-      sharedAxesScene: shared.axesScene as [number,number,number],
-      pane: 'SHOW'
-    });
+      // REAL packet
+      const realPacket = {
+        ...shared,
+        ...real,
+        currentMode: parameters.currentMode,
+        physicsParityMode: true,
+        vShip: 0,
+        gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+        deltaAOverA: real.qSpoilingFactor,
+        dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
+        sectors: Math.max(1, parameters.sectors),
+        ridgeMode: 0,
+      };
 
-    // Enable low-FPS mode for mobile after first correct frame
-    enableLowFps(leftEngine.current, 12);
-    enableLowFps(rightEngine.current, 12);
+      // SHOW packet
+      const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
+      const showPacket = {
+        ...shared,
+        ...show,
+        currentMode: parameters.currentMode,
+        physicsParityMode: false,
+        vShip: parameters.currentMode === 'standby' ? 0 : 1,
+        thetaScale: showTheta,
+        gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+        deltaAOverA: show.qSpoilingFactor,
+        sectors: Math.max(1, parameters.sectors),
+        ridgeMode: 1,
+      };
 
-    // 6) Single combined uniforms write per pane using batchers
-    const heroExaggeration = 82; // default visual boost
-    
-    // REAL — physics truth
-    pushLeft.current?.(paneSanitize('REAL', sanitizeUniforms({
-      ...shared,
-      ...real,
-      vShip: 0,
-      curvatureGainT: 0,
-      curvatureBoostMax: 1,
-      userGain: 1,
-      displayGain: 1,
-      colorMode: 2, // shear for truth view
-      physicsParityMode: true,
-      ridgeMode: 0,
-    })), 'REAL/combined');
+      // 4) Init both engines without uniforms first
+      leftEngine.current  = await initOne(leftRef.current,  {});
+      rightEngine.current = await initOne(rightRef.current, {});
 
-    // SHOW — boosted visuals
-    pushRight.current?.(paneSanitize('SHOW', sanitizeUniforms({
-      ...shared,
-      ...show,
-      vShip: parameters.currentMode === 'standby' ? 0 : 1,
-      curvatureGainT: 0.70,
-      curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
-      userGain: 4,
-      displayGain: 1,
-      physicsParityMode: false,
-      ridgeMode: 1,
-    })), 'SHOW/combined');
+      // 5) After creating both engines and building `shared` once:
+      await firstCorrectFrame({
+        engine: leftEngine.current,
+        canvas: leftRef.current!,
+        sharedAxesScene: shared.axesScene as [number,number,number],
+        pane: 'REAL'
+      });
+      await firstCorrectFrame({
+        engine: rightEngine.current,
+        canvas: rightRef.current!,
+        sharedAxesScene: shared.axesScene as [number,number,number],
+        pane: 'SHOW'
+      });
 
-    // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
-    ensureStrobeMux();
-    const lc = parameters.lightCrossing;
-    if (lc) {
-      const total = Math.max(1, Number(parameters.sectorCount) || 1);
-      const live  = Math.max(1, Number(parameters.sectors) || total);
-      const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
-      (window as any).setStrobingState?.({ sectorCount: total, currentSector: cur, split: cur });
+      // Enable low-FPS mode for mobile after first correct frame
+      enableLowFps(leftEngine.current, 12);
+      enableLowFps(rightEngine.current, 12);
+
+      // 6) Single combined uniforms write per pane using batchers
+      const heroExaggeration = 82; // default visual boost
+
+      // REAL — physics truth
+      pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
+        ...shared,
+        ...real,
+        vShip: 0,
+        curvatureGainT: 0,
+        curvatureBoostMax: 1,
+        userGain: 1,
+        displayGain: 1,
+        colorMode: 2, // shear for truth view
+        physicsParityMode: true,
+        ridgeMode: 0,
+      })), 'REAL/combined');
+
+      // SHOW — boosted visuals
+      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
+        ...shared,
+        ...show,
+        vShip: parameters.currentMode === 'standby' ? 0 : 1,
+        curvatureGainT: 0.70,
+        curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
+        userGain: 4,
+        displayGain: 1,
+        physicsParityMode: false,
+        ridgeMode: 1,
+      })), 'SHOW/combined');
+
+      // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
+      ensureStrobeMux();
+      const lc = parameters.lightCrossing;
+      if (lc) {
+        const total = Math.max(1, Number(parameters.sectorCount) || 1);
+        const live  = Math.max(1, Number(parameters.sectors) || total);
+        const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
+        (window as any).setStrobingState?.({ sectorCount: total, currentSector: cur, split: cur });
+      }
+    } catch (error) {
+      console.error('[WarpBubbleCompare] Error in reinitEnginesFromParams:', error);
+      setLoadError(String(error));
     }
   }
 
@@ -1113,7 +1118,7 @@ export default function WarpBubbleCompare({
     const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
     let real = buildREAL(wu);
     let show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
-    
+
     // Validate and clamp physics parameters
     real = validatePhysicsParams(real, 'REAL');
     show = validatePhysicsParams(show, 'SHOW');
@@ -1190,15 +1195,15 @@ export default function WarpBubbleCompare({
     });
 
     console.log('Applying physics to engines:', {
-      real: { 
-        parity: realPhysicsPayload.physicsParityMode, 
+      real: {
+        parity: realPhysicsPayload.physicsParityMode,
         ridge: realPhysicsPayload.ridgeMode,
         theta: realPhysicsPayload.thetaScale,
         gammaVdB: realPhysicsPayload.gammaVdB,
         qSpoil: realPhysicsPayload.deltaAOverA
       },
-      show: { 
-        parity: showPhysicsPayload.physicsParityMode, 
+      show: {
+        parity: showPhysicsPayload.physicsParityMode,
         ridge: showPhysicsPayload.ridgeMode,
         theta: showPhysicsPayload.thetaScale,
         gammaVdB: showPhysicsPayload.gammaVdB,
@@ -1295,7 +1300,7 @@ export default function WarpBubbleCompare({
       L?.gl?.viewport(0, 0, wL, hL);
       const { w: wR, h: hR } = sizeCanvas(rightRef.current);
       R?.gl?.viewport(0, 0, wR, hR);
-      
+
       // Use batched redraws instead of immediate forceRedraw
       pushLeft.current?.({}, 'dpr-change');
       pushRight.current?.({}, 'dpr-change');
@@ -1307,7 +1312,7 @@ export default function WarpBubbleCompare({
       // Cleanup low-FPS timers
       try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
       try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
-      
+
       mql.removeEventListener?.('change', onDpr);
       window.removeEventListener('resize', onDpr);
     };

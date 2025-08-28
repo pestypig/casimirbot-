@@ -69,13 +69,6 @@ function validateParameters(p: any, dutySource: DutySource) {
 export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
   debugLog(`Starting theta-scale calculation with dutySource: ${dutySource}`);
   
-  // Validate input parameters
-  const validationIssues = validateParameters(p, dutySource);
-  if (validationIssues.length > 0) {
-    debugLog('Parameter validation issues:', validationIssues);
-    console.warn('[warp-theta] Parameter validation issues:', validationIssues);
-  }
-  
   // Small helpers for robust numeric coercion
   const toNum = (v: any) => {
     if (v === undefined || v === null || v === '') return NaN;
@@ -98,6 +91,13 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
     debugLog(`Using fallback ${fallback}`);
     return fallback;
   };
+
+  // Validate input parameters
+  const validationIssues = validateParameters(p, dutySource);
+  if (validationIssues.length > 0) {
+    debugLog('Parameter validation issues:', validationIssues);
+    console.warn('[warp-theta] Parameter validation issues:', validationIssues);
+  }
 
   // Prefer direct scalar if upstream provided it (supports numeric strings too)
   const thetaScalar = toNum(p?.thetaScale);
