@@ -350,6 +350,26 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     // CRITICAL: Force parity mode immediately after bootstrap
     if (parity) {
       console.log('[WarpVisualizer] Enforcing parity mode after bootstrap');
+      
+      // DIRECT assignment bypasses gating for critical parity settings
+      if (engine.uniforms) {
+        engine.uniforms.physicsParityMode = true;
+        engine.uniforms.ridgeMode = 0;
+        engine.uniforms.exposure = 3.5;
+        engine.uniforms.zeroStop = 1e-5;
+        engine.uniforms.vizGain = 1;
+        engine.uniforms.curvatureGainDec = 0;
+        engine.uniforms.curvatureBoostMax = 1;
+        engine.uniforms.curvatureGainT = 0;
+        engine.requestRewarp?.();
+        
+        console.log('[DEBUG] Direct parity assignment completed:', {
+          physicsParityMode: engine.uniforms.physicsParityMode,
+          ridgeMode: engine.uniforms.ridgeMode
+        });
+      }
+      
+      // Also try gated update as backup
       gatedUpdateUniforms(engine, { 
         physicsParityMode: true, 
         ridgeMode: 0,
