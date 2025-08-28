@@ -99,7 +99,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         return {
           ...baseConstraints,
           P_avg_max: 120,   // 83.3 MW + headroom
-          zeta_max: 0.05    // ζ=0.032 + safety margin
+          zeta_max: 1.0     // Ford-Roman limit (ζ ≤ 1.0)
         };
       case 'cruise': 
         return {
@@ -111,7 +111,7 @@ export default function MetricsDashboard({ viabilityParams }: MetricsDashboardPr
         return {
           ...baseConstraints,
           P_avg_max: 400,   // 297.5 MW + headroom
-          zeta_max: 0.02    // ζ=0.009 + safety margin
+          zeta_max: 1.0     // Ford-Roman limit (ζ ≤ 1.0)
         };
       case 'standby':
         return {

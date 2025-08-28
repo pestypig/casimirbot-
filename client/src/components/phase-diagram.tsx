@@ -111,9 +111,9 @@ function InteractiveHeatMap({
   const getModeConstraintDefaults = (mode: string) => {
     const universalMinTimescale = 100; // TS_ratio ≥ 100
     switch (mode) {
-      case 'hover':     return { maxPower: 120, massTolerance: 5,  maxZeta: 0.05, minTimescale: universalMinTimescale };
-      case 'cruise':    return { maxPower: 20,  massTolerance: 10, maxZeta: 0.05, minTimescale: universalMinTimescale };
-      case 'emergency': return { maxPower: 400, massTolerance: 15, maxZeta: 0.02, minTimescale: universalMinTimescale };
+      case 'hover':     return { maxPower: 120, massTolerance: 5,  maxZeta: 1.0, minTimescale: universalMinTimescale };
+      case 'cruise':    return { maxPower: 20,  massTolerance: 10, maxZeta: 1.0, minTimescale: universalMinTimescale };
+      case 'emergency': return { maxPower: 400, massTolerance: 15, maxZeta: 1.0, minTimescale: universalMinTimescale };
       case 'standby':   return { maxPower: 10,  massTolerance: 50, maxZeta: 10.0, minTimescale: universalMinTimescale };
       default:          return { maxPower: 120, massTolerance: 5,  maxZeta: 1.0,  minTimescale: universalMinTimescale };
     }
