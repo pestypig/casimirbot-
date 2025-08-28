@@ -13,6 +13,82 @@ import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isWebGLAvailable, sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 
+// --- FAST PATH HELPERS (drop-in) --------------------------------------------
+
+const DEBUG = false;
+const IS_COARSE =
+  typeof window !== 'undefined' &&
+  (matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
+
+// Batches many uniform patches into ONE engine write + ONE forceRedraw per rAF
+function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
+  let pending: any = null;
+  let scheduled = false;
+  return (patch: any, tag = 'batched') => {
+    pending = { ...(pending || {}), ...(patch || {}) };
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      const e = engineRef.current;
+      if (!e || !pending) return;
+      const toSend = pending; pending = null;
+      try {
+        if (e.isLoaded && e.gridProgram) {
+          gatedUpdateUniforms(e, toSend, 'client');
+          e.forceRedraw?.();
+        } else if (typeof e.onceReady === 'function') {
+          e.onceReady(() => { gatedUpdateUniforms(e, toSend, 'client'); e.forceRedraw?.(); });
+        }
+      } catch (err) {
+        if (DEBUG) console.error('[batchPush] failed:', err);
+      }
+    });
+  };
+}
+
+// Wait until the engine is really ready, then compute camera once and draw once
+async function firstCorrectFrame({
+  engine, canvas, sharedAxesScene, pane
+}: {
+  engine: any; canvas: HTMLCanvasElement; sharedAxesScene: [number,number,number]; pane: 'REAL'|'SHOW';
+}) {
+  // wait for program + buffers
+  await new Promise<void>(res => {
+    const tick = () => (engine?.gridProgram && (engine?._vboBytes > 0)) ? res() : requestAnimationFrame(tick);
+    tick();
+  });
+
+  // single deterministic camera for the first frame
+  const cz = safeCamZ(calculateCameraZ(canvas, sharedAxesScene));
+  const packet = paneSanitize(pane, { cameraZ: cz, lockFraming: true, viewAvg: true });
+
+  gatedUpdateUniforms(engine, packet, 'client');
+  engine.forceRedraw?.();
+}
+
+// Helper functions needed by firstCorrectFrame
+function safeCamZ(z: number): number {
+  return Number.isFinite(z) ? Math.max(-10, Math.min(-0.5, z)) : -2.0;
+}
+
+function calculateCameraZ(canvas: HTMLCanvasElement, axes: [number,number,number]): number {
+  const w = canvas.clientWidth || canvas.width || 800;
+  const h = canvas.clientHeight || canvas.height || 320;
+  const aspect = w / h;
+  const maxRadius = Math.max(...axes);
+  return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
+}
+
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  return {
+    ...patch,
+    physicsParityMode: pane === 'REAL',
+    parityMode: pane === 'REAL',
+    ridgeMode: pane === 'REAL' ? 0 : 1
+  };
+}
+
 /**
  * WarpRenderInspector
  *
@@ -94,7 +170,7 @@ function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: bool
 
     const push = () => {
       try {
-        gatedUpdateUniforms(engine, patch, source);
+        gatedUpdateUniforms(engine, patch, 'client');
         console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(patch));
       } catch (error) {
         console.error(`[${source}] Failed to push uniforms:`, error);
@@ -759,7 +835,7 @@ export default function WarpRenderInspector(props: {
           zeroStop: 1e-7,
           physicsParityMode: true,
           ridgeMode: 0
-        }, 'real-init');
+        }, 'client');
 
         // Let engines render immediately; canonical uniforms will override later
         leftEngine.current?.setVisible?.(true);
@@ -790,7 +866,7 @@ export default function WarpRenderInspector(props: {
           zeroStop: 1e-7,
           physicsParityMode: false,
           ridgeMode: 1
-        }, 'show-init');
+        }, 'client');
 
         // Let engines render immediately; canonical uniforms will override later
         rightEngine.current?.setVisible?.(true);
@@ -822,10 +898,10 @@ export default function WarpRenderInspector(props: {
       if (!ax) {
         const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
         ax = deriveAxesClip(hull, 1);
-        gatedUpdateUniforms(leftEngine.current, { axesClip: ax }, 'inspector-left-axes');
+        gatedUpdateUniforms(leftEngine.current, { axesClip: ax }, 'client');
       }
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'inspector-left-init');
+      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'client');
       // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
       setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
     });
@@ -835,7 +911,7 @@ export default function WarpRenderInspector(props: {
       const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
       const ax = deriveAxesClip(hull, 1);
       const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true, ridgeMode: 1 }, 'inspector-right-init');
+      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true, ridgeMode: 1 }, 'client');
 
       // (Nice-to-have) instant grid buffers for the "0/0 floats" row
       rightEngine.current?.updateUniforms?.({
@@ -1293,8 +1369,8 @@ export default function WarpRenderInspector(props: {
     });
 
     // Apply to engines - the lock functions will enforce parity settings
-    gatedUpdateUniforms(leftEngine.current, realUniforms, 'inspector-real-physics');
-    gatedUpdateUniforms(rightEngine.current, showUniforms, 'inspector-show-physics');
+    gatedUpdateUniforms(leftEngine.current, realUniforms, 'client');
+    gatedUpdateUniforms(rightEngine.current, showUniforms, 'client');
 
     // Unmute engines after first normalized payloads are pushed
     leftEngine.current?.setVisible?.(true);
@@ -1303,8 +1379,8 @@ export default function WarpRenderInspector(props: {
     // Optional camera sweetener so both keep same framing
     const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
     const cz = compactCameraZ(ax);
-    gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
-    gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
+    gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'client');
+    gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'client');
 
     // Enhanced parity verification with detailed logging and correction
     setTimeout(() => {

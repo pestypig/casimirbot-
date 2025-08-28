@@ -3,7 +3,73 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
-import { sizeCanvasSafe } from '@/lib/gl/capabilities';
+
+// --- FAST PATH HELPERS (drop-in) --------------------------------------------
+
+const DEBUG = false;
+const IS_COARSE =
+  typeof window !== 'undefined' &&
+  (matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
+
+// Batches many uniform patches into ONE engine write + ONE forceRedraw per rAF
+function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
+  let pending: any = null;
+  let scheduled = false;
+  return (patch: any, tag = 'batched') => {
+    pending = { ...(pending || {}), ...(patch || {}) };
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      const e = engineRef.current;
+      if (!e || !pending) return;
+      const toSend = pending; pending = null;
+      try {
+        if (e.isLoaded && e.gridProgram) {
+          gatedUpdateUniforms(e, toSend, 'client');
+          e.forceRedraw?.();
+        } else if (typeof e.onceReady === 'function') {
+          e.onceReady(() => { gatedUpdateUniforms(e, toSend, 'client'); e.forceRedraw?.(); });
+        }
+      } catch (err) {
+        if (DEBUG) console.error('[batchPush] failed:', err);
+      }
+    });
+  };
+}
+
+// Wait until the engine is really ready, then compute camera once and draw once
+async function firstCorrectFrame({
+  engine, canvas, sharedAxesScene, pane
+}: {
+  engine: any; canvas: HTMLCanvasElement; sharedAxesScene: [number,number,number]; pane: 'REAL'|'SHOW';
+}) {
+  // wait for program + buffers
+  await new Promise<void>(res => {
+    const tick = () => (engine?.gridProgram && (engine?._vboBytes > 0)) ? res() : requestAnimationFrame(tick);
+    tick();
+  });
+
+  // single deterministic camera for the first frame
+  const cz = batcherSafeCamZ(batcherCalculateCameraZ(canvas, sharedAxesScene));
+  const packet = paneSanitize(pane, { cameraZ: cz, lockFraming: true, viewAvg: true });
+
+  gatedUpdateUniforms(engine, packet, 'client');
+  engine.forceRedraw?.();
+}
+
+// Helper functions needed by firstCorrectFrame
+function batcherSafeCamZ(z: number): number {
+  return Number.isFinite(z) ? Math.max(-10, Math.min(-0.5, z)) : -2.0;
+}
+
+function batcherCalculateCameraZ(canvas: HTMLCanvasElement, axes: [number,number,number]): number {
+  const w = canvas.clientWidth || canvas.width || 800;
+  const h = canvas.clientHeight || canvas.height || 320;
+  const aspect = w / h;
+  const maxRadius = Math.max(...axes);
+  return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
+}
 
 // Build token: read lazily so SSR never touches `window`
 const getAppBuild = () =>
@@ -747,7 +813,7 @@ export default function WarpBubbleCompare({
         console.log(`[${label}] WebGL pre-test passed`);
       } catch (webglError) {
         console.error(`[${label}] WebGL pre-test failed:`, webglError);
-        throw new Error(`WebGL not available for ${label}: ${webglError.message}`);
+        throw new Error(`WebGL not available for ${label}: ${String(webglError)}`);
       }
 
       console.log(`[${label}] Creating engine for canvas:`, canvas);
@@ -774,7 +840,7 @@ export default function WarpBubbleCompare({
       console.error(`[${label}] Engine creation failed:`, error);
 
       // Additional debugging for WebGL errors
-      if (error.message.includes('WebGL')) {
+      if (String(error).includes('WebGL')) {
         console.error(`[${label}] WebGL-specific debugging:`, {
           webglSupported: !!window.WebGLRenderingContext,
           webgl2Supported: !!window.WebGL2RenderingContext,
@@ -1210,9 +1276,9 @@ export default function WarpBubbleCompare({
     const onDpr = () => {
       if (!leftRef.current || !rightRef.current) return;
       const L = leftEngine.current, R = rightEngine.current;
-      const { w: wL, h: hL } = sizeCanvasSafe(leftRef.current);
+      const { w: wL, h: hL } = sizeCanvas(leftRef.current);
       L?.gl?.viewport(0, 0, wL, hL); L?.forceRedraw?.();
-      const { w: wR, h: hR } = sizeCanvasSafe(rightRef.current);
+      const { w: wR, h: hR } = sizeCanvas(rightRef.current);
       R?.gl?.viewport(0, 0, wR, hR); R?.forceRedraw?.();
     };
     const mql = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
