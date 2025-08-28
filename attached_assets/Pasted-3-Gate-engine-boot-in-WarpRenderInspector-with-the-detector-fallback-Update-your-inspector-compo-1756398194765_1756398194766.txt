@@ -1,0 +1,72 @@
+3) Gate engine boot in WarpRenderInspector with the detector + fallback
+
+Update your inspector component file (adjust the path to match your repo; this is a common one).
+
+apply_patch << 'PATCH'
+*** Begin Patch
+*** Update File: src/components/WarpRenderInspector.tsx
+@@
+-import { isWebGLAvailable, sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
++import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
++import { webglSupport } from '@/lib/gl/webgl-support';
++import CanvasFallback from '@/components/CanvasFallback';
+@@
+-  // Show error state if WebGL is not supported
+-  if (loadError) {
+-    return (
+-      <div className="w-full grid gap-4 p-4">
+-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+-          <h3 className="text-lg font-semibold text-red-800">WebGL Not Supported</h3>
+-          <p className="text-red-600 mt-2">{loadError}</p>
+-          <p className="text-sm text-red-500 mt-2">
+-            The Warp Render Inspector requires WebGL support. This may occur in:
+-          </p>
+-          <ul className="text-sm text-red-500 mt-1 ml-4 list-disc">
+-            <li>Headless environments or CI/CD systems</li>
+-            <li>Browsers with WebGL disabled</li>
+-            <li>Virtual machines without GPU acceleration</li>
+-          </ul>
+-        </div>
+-      </div>
+-    );
+-  }
++  // Show friendly fallback if WebGL is unavailable
++  if (loadError) {
++    return (
++      <div className="w-full p-4">
++        <CanvasFallback
++          title="WebGL could not start"
++          reason={String(loadError)}
++          onRetry={() => {
++            try { (window as any).__forceReloadWarpEngine?.(); } catch {}
++            window.location.reload();
++          }}
++        />
++      </div>
++    );
++  }
+@@
+-    const initEngines = async () => {
++    const initEngines = async () => {
+       let mounted = true;
+ 
+-      if (!isWebGLAvailable()) {
+-        setLoadError("WebGL not supported in this browser");
+-        return;
+-      }
++      // Strong detection up-front (esp. for Replit mobile preview/iframe)
++      const support = webglSupport();
++      if (!support.ok) {
++        setLoadError(support.reason || 'WebGL not available');
++        return;
++      }
+@@
+-      const W = (window as any).WarpEngine;
++      const W = (window as any).WarpEngine;
+       if (!W) {
+         console.error("WarpEngine not found on window. Load warp-engine.js first.");
+         setLoadError("WarpEngine not loaded");
+         return;
+       }
+*** End Patch
+PATCH
