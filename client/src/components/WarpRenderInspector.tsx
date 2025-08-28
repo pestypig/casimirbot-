@@ -843,19 +843,31 @@ export default function WarpRenderInspector(props: {
     const initEngines = async () => {
       if (!mounted) return;
 
-      // Strong detection up-front (esp. for Replit mobile preview/iframe)
-      const support = webglSupport();
+      // Strong detection (with DOM-mounted probe to avoid false negatives on mobile webviews)
+      const support = webglSupport(undefined);
       if (!support.ok) {
         setLoadError(support.reason || 'WebGL not available');
+        (window as any).__whyNoGL = support;
         return;
       }
 
       const W = (window as any).WarpEngine;
       if (!W) {
         console.error("WarpEngine not found on window. Load warp-engine.js first.");
-        setLoadError("WarpEngine not loaded");
+        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded");
         return;
       }
+
+      // Ensure canvases are visibly sized before any measurement
+      const ensureDisplaySize = (cv: HTMLCanvasElement | null) => {
+        if (!cv) return;
+        if ((cv.clientWidth|0) === 0 || (cv.clientHeight|0) === 0) {
+          cv.style.minHeight = '240px';
+          cv.style.display = 'block';
+        }
+      };
+      ensureDisplaySize(leftRef.current);
+      ensureDisplaySize(rightRef.current);
 
       // Prevent double initialization
       if (leftEngine.current || rightEngine.current) {
@@ -904,6 +916,10 @@ export default function WarpRenderInspector(props: {
       if (leftRef.current && !leftEngine.current && mounted) {
         try {
           sizeCanvasSafe(leftRef.current);
+          if ((leftRef.current.clientWidth|0) === 0 || (leftRef.current.clientHeight|0) === 0) {
+            // Final guard: set a default pixel size if layout still not ready
+            leftRef.current.width = 800; leftRef.current.height = 450;
+          }
 
           // Clear any existing engine on this canvas
           delete (leftRef.current as any)[ENGINE_KEY];
@@ -951,6 +967,9 @@ export default function WarpRenderInspector(props: {
       if (rightRef.current && !rightEngine.current && mounted) {
         try {
           sizeCanvasSafe(rightRef.current);
+          if ((rightRef.current.clientWidth|0) === 0 || (rightRef.current.clientHeight|0) === 0) {
+            rightRef.current.width = 800; rightRef.current.height = 450;
+          }
 
           // Clear any existing engine on this canvas
           delete (rightRef.current as any)[ENGINE_KEY];
@@ -1488,7 +1507,7 @@ export default function WarpRenderInspector(props: {
     return (
       <div className="w-full p-4">
         <CanvasFallback
-          title="WebGL could not start"
+          title="Renderer could not start"
           reason={String(loadError)}
           onRetry={() => {
             try { (window as any).__forceReloadWarpEngine?.(); } catch {}
@@ -1501,6 +1520,18 @@ export default function WarpRenderInspector(props: {
 
   return (
     <div className="w-full grid gap-4 p-2 sm:p-4">
+      {(() => {
+        try {
+          const qs = new URLSearchParams(location.search || '');
+          if (!qs.has('debug-gl')) return null;
+          const report = webglSupport(undefined);
+          return (
+            <pre className="text-xs p-2 rounded bg-black/70 text-green-200 overflow-auto">
+              GL Debug: {JSON.stringify(report, null, 2)}
+            </pre>
+          );
+        } catch { return null; }
+      })()}
       <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
         <div>
           <h2 className="text-lg sm:text-xl font-semibold">Operational Render Inspector</h2>
@@ -1524,7 +1555,7 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
+          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
             <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
@@ -1535,7 +1566,7 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">SHOW — Boosted (UI) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
+          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
             <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
