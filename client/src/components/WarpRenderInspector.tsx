@@ -10,7 +10,9 @@ import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { isWebGLAvailable, sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
+import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
+import { webglSupport } from '@/lib/gl/webgl-support';
+import CanvasFallback from '@/components/CanvasFallback';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -811,8 +813,10 @@ export default function WarpRenderInspector(props: {
     const initEngines = async () => {
       if (!mounted) return;
 
-      if (!isWebGLAvailable()) {
-        setLoadError("WebGL not supported in this browser");
+      // Strong detection up-front (esp. for Replit mobile preview/iframe)
+      const support = webglSupport();
+      if (!support.ok) {
+        setLoadError(support.reason || 'WebGL not available');
         return;
       }
 
@@ -1449,22 +1453,18 @@ export default function WarpRenderInspector(props: {
     });
   };
 
-  // Show error state if WebGL is not supported
+  // Show friendly fallback if WebGL is unavailable
   if (loadError) {
     return (
-      <div className="w-full grid gap-4 p-4">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-          <h3 className="text-lg font-semibold text-red-800">WebGL Not Supported</h3>
-          <p className="text-red-600 mt-2">{loadError}</p>
-          <p className="text-sm text-red-500 mt-2">
-            The Warp Render Inspector requires WebGL support. This may occur in:
-          </p>
-          <ul className="text-sm text-red-500 mt-1 ml-4 list-disc">
-            <li>Headless environments or CI/CD systems</li>
-            <li>Browsers with WebGL disabled</li>
-            <li>Virtual machines without GPU acceleration</li>
-          </ul>
-        </div>
+      <div className="w-full p-4">
+        <CanvasFallback
+          title="WebGL could not start"
+          reason={String(loadError)}
+          onRetry={() => {
+            try { (window as any).__forceReloadWarpEngine?.(); } catch {}
+            window.location.reload();
+          }}
+        />
       </div>
     );
   }
