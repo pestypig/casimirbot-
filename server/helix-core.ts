@@ -12,6 +12,7 @@ import {
   MODE_CONFIGS,
   type EnergyPipelineState 
 } from "./energy-pipeline.js";
+import { writePhaseCalibration } from "./utils/phase-calibration.js";
 
 // ── simple async mutex ───────────────────────────────────────────────────────
 class Mutex {
@@ -799,6 +800,15 @@ export async function updatePipelineParams(req: Request, res: Response) {
       setGlobalPipelineState(next);
       return next;
     });
+
+    // Write calibration for phase diagram integration
+    await writePhaseCalibration({
+      tile_area_cm2: newState.tileArea_cm2,
+      ship_radius_m: newState.shipRadius_m || 86.5,
+      P_target_W: (newState as any).P_avg_W || 100e6, 
+      M_target_kg: newState.exoticMassTarget_kg || 1400,
+      zeta_target: 0.5
+    }, 'pipeline_update');
 
     publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(parsed.data), ts: Date.now() });
 
