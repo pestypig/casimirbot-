@@ -540,15 +540,21 @@ void main() {
 
   vec3 col = (u_colorMode == 1) ? diverge(tVis) : seqTealLime(sVis);
 
-  // interior-tilt violet blend
-  vec3 pN_int = v_pos / axes;
-  float rs_int = length(pN_int) + 1e-6;
-  float wInt = max(1e-4, u_intWidth);
-  float s = clamp((1.0 - rs_int) / wInt, 0.0, 1.0);
-  float interior = s*s*(3.0 - 2.0*s);
-  float blendAmt = clamp(abs(u_epsTilt) * u_tiltViz * interior, 0.0, 1.0);
-  vec3 violet = vec3(0.70, 0.30, 1.00);
-  col = mix(col, violet, blendAmt);
+  // Interior tilt mode (3): purple visualization
+  if (u_colorMode == 3) {
+    float tilt = abs(u_epsTilt);
+    vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
+    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
+                        smoothstep(0.0, 1.0, tilt * u_thetaScale));
+    col = baseColor;
+  }
+
+  // Debug modes (4+)
+  if (u_colorMode >= 4) {
+    float debug = abs(thetaField) * u_thetaScale; // Use thetaField for debug based on context
+    vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
+    col = debugColor;
+  }
   SET_FRAG(vec4(col, 0.9));
 }`;
 
@@ -566,8 +572,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gl = this.gl;
         if (!gl) return;
         this._setLoaded(false);              // ← important: we're not ready *yet*
-
-        // Old hardcoded shaders removed - now using precision-aware factory
 
         // Use new precision-aware shader factory
         const src = this._makeShaderSources(this.gl);
@@ -911,7 +915,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           : !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
         const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
-        const CM = { solid:0, theta:1, shear:2 };
+        const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4 }; // Added interiorTilt to CM
         let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
         const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
                                                               : (colorModeRaw|0);
@@ -988,7 +992,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
           sectors: Math.max(1, Math.floor(sectorsIn)),
           split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsIn)) - 1, splitIn|0)),
-          viewAvg: parameters.viewAvg != null ? !!parameters.viewAvg : (prev.viewAvg ?? true),
+          viewAvg: parameters.viewAvg ?? prev.viewAvg ?? true,
           gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
           deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
           gammaVdB: gammaVdBIn,
@@ -1175,7 +1179,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             mode === 'hover'     ? 1.05 :
             mode === 'emergency' ? 1.08 : 1.00;
         // Enhanced amplitude compression for decades-scale gains: compress *after* boosting
-        const A_vis = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
+        const A_vis    = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
 
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
