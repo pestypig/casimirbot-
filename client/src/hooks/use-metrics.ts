@@ -8,6 +8,14 @@ export interface ShiftVectorMetrics {
   gEff_check: number;
 }
 
+interface MetricsData {
+  totalTiles: number;
+  activeTiles: number;
+  avgTiles: number;
+  // ... other existing fields
+  shift?: ShiftVectorMetrics;
+}
+
 export type HelixMetrics = {
   energyOutput: number;          // MW
   exoticMass: number;            // kg

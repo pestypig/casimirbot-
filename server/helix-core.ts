@@ -571,7 +571,18 @@ export function getSystemMetrics(req: Request, res: Response) {
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
   // Canonical geometry fields for visualizer
-  const a = hull.Lx_m/2, b = hull.Ly_m/2, c = hull.Lz_m/2;
+  const a, b, c: number;
+  if (hull) {
+    a = hull.Lx_m / 2;
+    b = hull.Ly_m / 2;
+    c = hull.Lz_m / 2;
+  } else {
+    // Default values if hull is undefined
+    a = 1007 / 2;
+    b = 264 / 2;
+    c = 173 / 2;
+  }
+
   const aEff_geo  = Math.cbrt(a*b*c);                 // geometric mean (legacy)
   const aEff_harm = 3 / (1/a + 1/b + 1/c);            // ✅ harmonic mean — matches viewer
   const w_m       = (s.sag_nm ?? 16) * 1e-9;
@@ -636,7 +647,8 @@ export function getSystemMetrics(req: Request, res: Response) {
   const mode = (s.currentMode ?? 'hover').toLowerCase();
   const gTarget = gTargets[mode] ?? 0;
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (C*C)));
-  const betaTiltVec: [number, number, number] = [0, -1, 0];
+  const betaTiltVec: [number, number, number] = [0, -1, 0]; // "down" direction
+  const gEff_check = (epsilonTilt * (C*C)) / R_geom;
 
   const C2 = 9e16;
   const massPerTile_kg = Math.abs(s.U_cycle) / C2;
@@ -688,7 +700,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     hull,
 
-    shiftVector: { epsilonTilt, betaTiltVec, gTarget, R_geom, gEff_check: epsilonTilt * (C*C) / R_geom },
+    shiftVector: { epsilonTilt, betaTiltVec, gTarget, R_geom, gEff_check },
 
     energyOutput_MW: s.P_avg,        // MW (canonical)
     energyOutput_W:  s.P_avg * 1e6,  // W (for fmtPowerUnitFromW callers)

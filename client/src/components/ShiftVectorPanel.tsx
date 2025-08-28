@@ -1,6 +1,7 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMetrics } from "@/hooks/use-metrics";
 
 type Props = {
   mode: string;
@@ -17,6 +18,12 @@ const fmt = (x: number, d = 3) => Number.isFinite(x) ? x.toExponential(d) : "—
 const fstd = (x: number, d = 3) => Number.isFinite(x) ? x.toFixed(d) : "—";
 
 export function ShiftVectorPanel({ mode, shift }: Props) {
+  const { data: metrics } = useMetrics();
+  
+  // Debug logging
+  console.debug("[ShiftVectorPanel] Props:", { mode, shift });
+  console.debug("[ShiftVectorPanel] Metrics shift data:", metrics?.shift);
+  
   // Compute fallback values based on mode and hull geometry (for when metrics aren't loaded yet)
   const G = 9.80665; // m/s²
   const c = 299792458; // m/s
@@ -34,17 +41,25 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
   const fallbackBetaTiltVec = [0, -1, 0];
   const fallbackGEffCheck = (fallbackEpsilonTilt * c * c) / fallbackRGeom;
 
-  // Use real data if available, otherwise fallback calculations (per-field merge)
-  const s = shift ?? {};
+  // Use live metrics data first, then props, then fallback calculations
+  const liveShift = metrics?.shift;
+  const propShift = shift;
+  
   const displayShift = {
-    gTarget: (s as any).gTarget ?? fallbackGTarget,
-    R_geom: (s as any).R_geom ?? fallbackRGeom,
-    epsilonTilt: (s as any).epsilonTilt ?? fallbackEpsilonTilt,
-    betaTiltVec: ((s as any).betaTiltVec ?? fallbackBetaTiltVec) as [number, number, number],
-    gEff_check: (s as any).gEff_check ?? fallbackGEffCheck,
+    gTarget: liveShift?.gTarget ?? propShift?.gTarget ?? fallbackGTarget,
+    R_geom: liveShift?.R_geom ?? propShift?.R_geom ?? fallbackRGeom,
+    epsilonTilt: liveShift?.epsilonTilt ?? propShift?.epsilonTilt ?? fallbackEpsilonTilt,
+    betaTiltVec: (liveShift?.betaTiltVec ?? propShift?.betaTiltVec ?? fallbackBetaTiltVec) as [number, number, number],
+    gEff_check: liveShift?.gEff_check ?? propShift?.gEff_check ?? fallbackGEffCheck,
   };
   
-  const ok = !!(shift || fallbackGTarget > 0); // Show panel if we have data or computed fallbacks
+  console.debug("[ShiftVectorPanel] Final display values:", displayShift);
+  
+  const hasLiveData = !!(liveShift && Object.keys(liveShift).length > 0);
+  const hasPropData = !!(propShift && Object.keys(propShift).length > 0);
+  const ok = hasLiveData || hasPropData || fallbackGTarget > 0; // Show panel if we have any data
+  
+  const dataSource = hasLiveData ? "live" : hasPropData ? "props" : "computed";
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -72,12 +87,12 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>target</sub></div>
                 <div className="text-violet-400">{fstd(displayShift.gTarget, 3)} m/s²</div>
-                {!shift && <div className="text-xs text-slate-500">computed</div>}
+                <div className="text-xs text-slate-500">{dataSource}</div>
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">R<sub>geom</sub></div>
                 <div className="text-cyan-300">{fstd(displayShift.R_geom, 1)} m</div>
-                {!shift && <div className="text-xs text-slate-500">computed</div>}
+                <div className="text-xs text-slate-500">{dataSource}</div>
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <TooltipProvider>
@@ -85,7 +100,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
                     <TooltipTrigger className="text-left">
                       <div className="text-slate-400">ε<sub>tilt</sub> (dimensionless)</div>
                       <div className="text-violet-400">{fmt(displayShift.epsilonTilt, 3)}</div>
-                      {!shift && <div className="text-xs text-slate-500">computed</div>}
+                      <div className="text-xs text-slate-500">{dataSource}</div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
                       Kept ≪ 1e-6 ("whisper" regime) to preserve QI headroom and keep tilt visual-only inside.
@@ -96,12 +111,12 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">β⃗<sub>tilt</sub></div>
                 <div className="text-violet-400">[{displayShift.betaTiltVec.join(", ")}]</div>
-                {!shift && <div className="text-xs text-slate-500">computed</div>}
+                <div className="text-xs text-slate-500">{dataSource}</div>
               </div>
               <div className="col-span-2 p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>eff</sub> (check)</div>
                 <div className="text-amber-300">{fstd(displayShift.gEff_check, 3)} m/s²</div>
-                {!shift && <div className="text-xs text-slate-500">computed</div>}
+                <div className="text-xs text-slate-500">{dataSource}</div>
               </div>
             </div>
 
