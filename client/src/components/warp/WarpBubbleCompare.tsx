@@ -95,7 +95,7 @@ function sanitizeUniforms(u: any = {}) {
   s.split             = Math.max(0, Math.min(s.sectors - 1, Math.floor(finite(s.split, 0))));
 
   // map strings → ints
-  if (typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode] ?? 1;
+  if (typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode as keyof typeof CM] ?? 1;
   s.ridgeMode = Math.max(0, Math.min(1, Math.floor(finite(s.ridgeMode, 0))));
 
   // hull normalization (drop invalid)
@@ -117,9 +117,9 @@ function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'RE
     clean = paneSanitize(pane, clean);
   }
   if (!e.isLoaded || !e.gridProgram) {
-    e.onceReady(() => { gatedUpdateUniforms(e, clean, 'bubble-compare-ready'); e.forceRedraw?.(); });
+    e.onceReady(() => { gatedUpdateUniforms(e, clean, 'client'); e.forceRedraw?.(); });
   } else {
-    gatedUpdateUniforms(e, clean, 'bubble-compare-direct');
+    gatedUpdateUniforms(e, clean, 'client');
     e.forceRedraw?.();
   }
 }
@@ -341,9 +341,9 @@ function applyShowSafe(e:any, payload:any) {
       applied = true;
       const clean = sanitizeUniforms({ cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
       if (e.isLoaded && e.gridProgram) {
-        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
+        gatedUpdateUniforms(e, clean, 'client');
       } else {
-        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'client'));
       }
       e.setDisplayGain?.(1);
       console.warn('[SHOW] cosmetics disabled as safety fallback');
@@ -351,9 +351,9 @@ function applyShowSafe(e:any, payload:any) {
       // re-apply SHOW once; use whatever you computed in applyShow
       const clean = sanitizeUniforms(payload);
       if (e.isLoaded && e.gridProgram) {
-        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
+        gatedUpdateUniforms(e, clean, 'client');
       } else {
-        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'client'));
       }
       console.log('[SHOW] re-applied boosted settings after grid ready');
     }
@@ -422,7 +422,7 @@ function scrubOverlays(e: any) {
   if ('hullAxes' in u && !patch.hullAxes) patch.hullAxes = u.hullAxes;
   if ('axesScene' in u && !patch.axesScene) patch.axesScene = u.axesScene;
 
-  gatedUpdateUniforms(e, patch, 'bubble-compare-scrub');
+  gatedUpdateUniforms(e, patch, 'client');
 }
 
 /* ---------------- Safe uniform push with compatibility shim ---------------- */
@@ -492,9 +492,9 @@ const primeOnce = (e: any, shared: ReturnType<typeof frameFromHull>, colorMode: 
     setTimeout(() => {
       const clean = sanitizeUniforms(payload);
       if (e.isLoaded && e.gridProgram) {
-        gatedUpdateUniforms(e, clean, 'bubble-compare-load');
+        gatedUpdateUniforms(e, clean, 'client');
       } else {
-        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'bubble-compare-once-ready'));
+        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'client'));
       }
     }, 0); // microtick delay
     return;
@@ -766,7 +766,7 @@ export default function WarpBubbleCompare({
         const tick = () => (eng.gridProgram && eng.gridVbo && eng._vboBytes > 0) ? res() : requestAnimationFrame(tick);
         tick();
       });
-      gatedUpdateUniforms(eng, uniforms, 'bubble-compare-engine-init');
+      gatedUpdateUniforms(eng, uniforms, 'client');
       eng.isLoaded = true;
       if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
       eng.start?.();
@@ -795,7 +795,7 @@ export default function WarpBubbleCompare({
       vShip: 0,
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
       deltaAOverA: real.qSpoilingFactor,
-      dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
+      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
       sectors: Math.max(1, parameters.sectors),
       ridgeMode: 0,
     };
@@ -913,7 +913,7 @@ export default function WarpBubbleCompare({
       wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
       gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
       deltaAOverA: real.qSpoilingFactor,
-      dutyEffectiveFR: real.dutyEffectiveFR ?? real.dutyEff ?? real.dutyFR,
+      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
       sectors: Math.max(1, parameters.sectors),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
