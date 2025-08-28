@@ -1,0 +1,217 @@
+love it—thanks for posting the page. keeping the earlier “one source of truth for sectors + FR duty” idea in mind, here are the **surgical fixes** I’d make to keep this UI perfectly in lockstep with your server pipeline (and to remove the last sector/duty foot-guns). I’m giving you drop-in patches you can paste as-is.
+
+---
+
+# 1) Make FR duty fallback match the server formula
+
+Your server uses
+`d_eff = BURST_DUTY_LOCAL × (S_live / S_total)` (0.01 × live/total).
+In the client, `sanitizeServerUniforms()` defaults `dFR` to `0.01 / sectorCount` (missing `S_live`). Fix it so the client’s “no-server” fallback matches the server.
+
+```ts
+// replace sanitizeServerUniforms() body up to the `return out;` with this improved defaulting
+
+function sanitizeServerUniforms(raw: any, version: number) {
+  const gammaVdB_vis_default = 1e11; // <-- match PAPER_VDB.GAMMA_VDB from the server
+  const gammaVdB_vis  = toNumber(raw.gammaVanDenBroeck_vis ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis_default);
+  const gammaVdB_mass = toNumber(raw.gammaVanDenBroeck_mass ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis);
+  const gammaGeo = Math.max(1, toNumber(raw.gammaGeo, 26));
+  const q = Math.max(1e-12, toNumber(raw.qSpoilingFactor ?? raw.deltaAOverA, 1));
+
+  // Pull both totals and live (concurrent) if available; otherwise fall back sensibly
+  const sectorCount = Math.max(1, toNumber(raw.sectorCount, 400));
+  const sectorsLive = Math.max(1, toNumber(raw.sectors ?? raw.sectorStrobing, 1));
+
+  // Use server dFR if provided; otherwise use proper FR fallback = 0.01 × (live / total)
+  const dFR_server = toNumber(raw.dutyEffectiveFR, NaN);
+  const dFR = Number.isFinite(dFR_server) ? dFR_server : Math.max(0, Math.min(1, 0.01 * (sectorsLive / sectorCount)));
+
+  const viewAvg = (raw.viewAvg ?? true) ? true : false;
+
+  // Renderer’s expected θ (renderer flavor: uses γ_VdB_vis and √dFR when viewAvg=true)
+  const thetaScaleExpected = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * (viewAvg ? Math.sqrt(dFR) : 1);
+
+  return {
+    // physics
+    gammaGeo,
+    qSpoilingFactor: q,
+    gammaVanDenBroeck_vis: gammaVdB_vis,
+    gammaVanDenBroeck_mass: gammaVdB_mass,
+    gammaVdB: gammaVdB_vis, // alias
+
+    // scheduling
+    sectorCount,
+    sectors: sectorsLive,
+    dutyCycle: Math.max(0, toNumber(raw.dutyCycle, 0.01)),
+    dutyEffectiveFR: dFR,
+    currentMode: String(raw.currentMode ?? "hover").toLowerCase() as "hover" | "cruise" | "emergency" | "standby",
+
+    // timing passthrough
+    lightCrossing:
+      raw.lightCrossing && {
+        burst_ms: toNumber(raw.lightCrossing.burst_ms, 0.01),
+        dwell_ms: toNumber(raw.lightCrossing.dwell_ms, 1.0),
+      },
+
+    // geometry passthrough
+    hull: raw.hull,
+
+    // averaging flag the renderer honors
+    viewAvg,
+
+    // helpful derived
+    thetaScaleExpected,
+
+    // bus meta
+    __src: "server" as const,
+    __version: version,
+  };
+}
+```
+
+Why this matters: your HUD/renderer audits (`θ_expected`, compliance badges, etc.) will now exactly match the server even if metrics arrive late or a field is omitted.
+
+---
+
+# 2) Use the same names everywhere for sectors (total vs live)
+
+* **Server**: we decided to make `concurrentSectors` the single truth (live), and keep `sectorStrobing` only as a legacy alias.
+* **Client (this page)**: you already compute `totalSectors` and `concurrentSectors` nicely, but a few UI strings still read `…sectorStrobing…`.
+
+**Patch the log line in the mode dropdown** (it currently prints the legacy field):
+
+```diff
+- `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].dutyCycle * 100).toFixed(1)}%, sectors=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorStrobing})...`,
++ `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].dutyCycle * 100).toFixed(1)}%, live=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorsConcurrent})...`,
+```
+
+If your `MODE_CONFIGS` on the client still exposes `sectorStrobing`, mirror the server by **adding** `sectorsConcurrent` and using it everywhere new; keep `sectorStrobing` only for old components.
+
+---
+
+# 3) One tiny helper to avoid drift (and re-use in two places)
+
+Add this to your small utils (near `npos`/`nnonneg`):
+
+```ts
+const computeFordRomanDuty = (burstLocal: number, live: number, total: number, isStandby: boolean) =>
+  isStandby ? 0 : Math.max(0, Math.min(1, burstLocal * (Math.max(1, live) / Math.max(1, total))));
+```
+
+Then use it in both places you compute FR duty:
+
+```diff
+-  return clamp01(burstLocal * (S_live / S_total));
++  return computeFordRomanDuty(burstLocal, S_live, S_total, isStandby);
+```
+
+and
+
+```diff
+-  const dutyFRSafe = (() => {
+-    if (isStandby) return 0;
+-    const fr = Number((pipelineState as any)?.dutyEffectiveFR) ?? Number((pipelineState as any)?.dutyEff) ?? NaN;
+-    if (Number.isFinite(fr)) return Math.max(0, Math.min(1, fr));
+-    return Math.max(0, Math.min(1, burstLocal * (concurrentSectorsSafe / totalSectorsSafe)));
+-  })();
++  const dutyFRSafe = (() => {
++    if (isStandby) return 0;
++    const fr = Number((pipelineState as any)?.dutyEffectiveFR) ?? Number((pipelineState as any)?.dutyEff) ?? NaN;
++    if (Number.isFinite(fr)) return clamp01(fr);
++    return computeFordRomanDuty(burstLocal, concurrentSectorsSafe, totalSectorsSafe, false);
++  })();
+```
+
+This guarantees the client’s computed FR duty never drifts from the server formula.
+
+---
+
+# 4) Kill the last naming confusion in the light-crossing loop
+
+Right now you call:
+
+```ts
+useLightCrossingLoop({
+  sectorStrobing: totalSectors, // comment says TOTAL sectors
+  ...
+});
+```
+
+If the hook’s prop really means **total sectors**, rename the prop in the hook to `sectorCount` and change this call to:
+
+```ts
+useLightCrossingLoop({
+  sectorCount: totalSectors,
+  ...
+});
+```
+
+If you can’t change the hook signature today, at least change the local **variable name** to avoid mental mismatch:
+
+```diff
+-  const lc = useLightCrossingLoop({
+-    sectorStrobing: totalSectors,
++  const lc = useLightCrossingLoop({
++    // NOTE: passes TOTAL sectors (averaging), not live/concurrent.
++    sectorStrobing: totalSectors,
+```
+
+(Just a doc fix, but it saves future you from a “why is my sweep wrong?” afternoon.)
+
+---
+
+# 5) Types: add the fields you actually use to avoid `any`
+
+Add these to your local `EnergyPipelineState` interface so TS helps you catch shape drift:
+
+```ts
+interface EnergyPipelineState {
+  // ...existing...
+  // scheduling truth
+  sectorCount?: number;
+  concurrentSectors?: number;
+  sectorsTotal?: number;
+  sectorsConcurrent?: number;
+
+  // FR duty direct
+  dutyEffectiveFR?: number;
+
+  // visual vs mass split (server emits both)
+  gammaVanDenBroeck_vis?: number;
+  gammaVanDenBroeck_mass?: number;
+
+  // optional: targets if you want to show them
+  P_target_W?: number;
+  M_exotic?: number; // you already use this, keep it
+}
+```
+
+---
+
+# 6) One cosmetic but important default
+
+In `sanitizeServerUniforms` you were defaulting `gammaVdB_vis` to `1.4e5`. The server’s `PAPER_VDB.GAMMA_VDB` is `1e11`. The new patch (above) sets the default to `1e11` so **renderer θ** and UI labels don’t silently under-scale when the first metrics frame doesn’t include `gammaVanDenBroeck_vis`.
+
+---
+
+# 7) (Optional) CONSISTENCY: show “live” instead of “sectors” in Active Tiles panel
+
+Small copy tweak to match the rest of the page:
+
+```diff
+- {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${localOnLabel} local ON`}
++ {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${localOnLabel} local ON`}
+```
+
+(You already do this—just calling out that “live” vs “sectors” is consistent with the rest.)
+
+---
+
+## Summary
+
+* **Client fallback FR duty** now exactly matches the server.
+* **Sector naming** is unambiguous: `sectorCount` (total) vs `concurrentSectors` (live).
+* **Renderer gamma default** matches the server constant.
+* A tiny **helper** dedupes FR duty math and removes drift.
+
+If you want, I can generate a single PR-style diff for the whole file (or split into a small `utils/fr-duty.ts` and a `types/pipeline.ts`) so it’s a clean commit.

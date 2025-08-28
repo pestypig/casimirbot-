@@ -552,7 +552,8 @@ export default function HelixCore() {
 
   // Shared light-crossing loop for synchronized strobing across all visual components
   const lc = useLightCrossingLoop({
-    sectorStrobing: totalSectors, // TOTAL sectors expected by the hook
+    // NOTE: passes TOTAL sectors (averaging), not live/concurrent.
+    sectorStrobing: totalSectors,
     currentSector: systemMetrics?.currentSector ?? 0,
     sectorPeriod_ms: systemMetrics?.sectorPeriod_ms ?? 1.0,
     duty: dutyUI,
@@ -1425,7 +1426,7 @@ export default function HelixCore() {
                         ...prev,
                         `[MODE] Switching to ${mode} (duty=${(MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].dutyCycle * 100).toFixed(
                           1
-                        )}%, sectors=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorStrobing})...`,
+                        )}%, live=${MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS].sectorsConcurrent})...`,
                       ]);
                     }}
                   >

@@ -20,12 +20,28 @@ export interface EnergyPipelineState {
   sectorStrobing: number;
   qSpoilingFactor: number;
   
+  // Scheduling truth
+  sectorCount?: number;
+  concurrentSectors?: number;
+  sectorsTotal?: number;
+  sectorsConcurrent?: number;
+  
+  // FR duty direct
+  dutyEffectiveFR?: number;
+  
   // Physics parameters
   gammaGeo: number;
   qMechanical: number;
   qCavity: number;
   gammaVanDenBroeck: number;
   exoticMassTarget_kg: number;
+  
+  // Visual vs mass split (server emits both)
+  gammaVanDenBroeck_vis?: number;
+  gammaVanDenBroeck_mass?: number;
+  
+  // Optional: targets if you want to show them
+  P_target_W?: number;
   
   // Calculated values
   U_static: number;

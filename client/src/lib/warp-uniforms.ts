@@ -62,15 +62,19 @@ const EPS = 1e-12;
 const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
 const clamp = (v:number, lo:number, hi:number) => Math.min(hi, Math.max(lo, v));
 
+// Helper to compute Ford-Roman duty consistently across client and server
+const computeFordRomanDuty = (burstLocal: number, live: number, total: number, isStandby: boolean) =>
+  isStandby ? 0 : Math.max(0, Math.min(1, burstLocal * (Math.max(1, live) / Math.max(1, total))));
+
 export function normalizeWU(raw:any): WarpUniforms {
   if (!raw) {
     // Conservative defaults consistent with backend fallbacks
     const sectorCount = 400;
     const sectors = 1;
     const dutyLocal = 0.01;
-    const dutyEffectiveFR = dutyLocal * sectors / sectorCount;
+    const dutyEffectiveFR = computeFordRomanDuty(dutyLocal, sectors, sectorCount, false);
     const gammaGeo = 26;
-    const gammaVdB = 1.4e5;
+    const gammaVdB = 1e11; // match PAPER_VDB.GAMMA_VDB from server
     const q = 1;
     const base: WarpUniforms = {
       sectorCount,
@@ -110,7 +114,7 @@ export function normalizeWU(raw:any): WarpUniforms {
   // Ford–Roman duty (authoritative if provided, else derive)
   const dutyEffectiveFR = clamp(N(
     raw.dutyEffectiveFR,
-    dutyLocal * (sectors / sectorCount)
+    computeFordRomanDuty(dutyLocal, sectors, sectorCount, false)
   ), EPS, 1);
 
   // --- γ_geo ----------------------------------------------------------------
@@ -129,7 +133,7 @@ export function normalizeWU(raw:any): WarpUniforms {
   // --- γ_VdB visual with symmetric aliases ---------------------------------
   const gammaV_vis_src = N(
     raw.gammaVanDenBroeck_vis ?? raw.gammaVdB ?? raw.gammaVanDenBroeck,
-    1.4e5
+    1e11 // match PAPER_VDB.GAMMA_VDB from server
   );
   const gammaVdB              = Math.max(1, gammaV_vis_src);
   const gammaVanDenBroeck     = gammaVdB; // keep legacy alias in sync
