@@ -7,10 +7,18 @@ const Eq = ({ children }: { children: React.ReactNode }) => (
   <code className="rounded bg-slate-900/50 px-2 py-1 text-[12px] font-mono">{children}</code>
 );
 
-const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
-const fmt = (x: unknown, digits = 3) => (typeof x === "number" && Number.isFinite(x) ? x.toFixed(digits) : "—");
-const fexp = (x: unknown, digits = 2) => (typeof x === "number" && Number.isFinite(x) ? x.toExponential(digits) : "—");
-const fint = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? Math.round(x).toLocaleString() : "—");
+// Accept numbers *and* numeric strings
+const num = (x: unknown) => {
+  const v =
+    typeof x === "number" ? x :
+    typeof x === "string" ? Number(x.trim()) :
+    NaN;
+  return Number.isFinite(v) ? v : undefined;
+};
+
+const fmt = (x: unknown, digits = 3) => (num(x) !== undefined ? num(x)!.toFixed(digits) : "—");
+const fexp = (x: unknown, digits = 2) => (num(x) !== undefined ? num(x)!.toExponential(digits) : "—");
+const fint = (x: unknown) => (num(x) !== undefined ? Math.round(num(x)!).toLocaleString() : "—");
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 /** Reusable formula block: Base → Substitute → Result (+provenance) */
@@ -60,28 +68,27 @@ export type UniformsExplain = {
   };
   // NEW: live values injected by backend for cards
   live?: {
-    S_total?: number;
-    S_live?: number;
-    dutyCycle?: number;
-    dutyEffectiveFR?: number;
+    S_total?: number | string;
+    S_live?: number | string;
+    dutyCycle?: number | string;
+    dutyEffectiveFR?: number | string;
 
-    gammaGeo?: number;
-    qSpoilingFactor?: number;
-    qCavity?: number;
-    gammaVanDenBroeck_vis?: number;
-    gammaVanDenBroeck_mass?: number;
+    gammaGeo?: number | string;
+    qSpoilingFactor?: number | string;
+    qCavity?: number | string;
+    gammaVanDenBroeck_vis?: number | string;
+    gammaVanDenBroeck_mass?: number | string;
 
-    N_tiles?: number;
-    tilesPerSector?: number;
-    activeTiles?: number;
+    N_tiles?: number | string;
+    tilesPerSector?: number | string;
+    activeTiles?: number | string;
 
-    P_avg_W?: number;
-    P_avg_MW?: number;
+    P_avg_W?: number | string;
+    P_avg_MW?: number | string;
 
-    zeta?: number;
-    TS_ratio?: number;
+    zeta?: number | string;
+    TS_ratio?: number | string;
   };
-  // NEW: equation strings for provenance
   equations?: {
     d_eff?: string;
     theta_expected?: string;
@@ -95,17 +102,34 @@ export type UniformsExplain = {
 };
 
 function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExplain; m?: HelixMetrics; className?: string }) {
-  if (!data) return null;
-  const entries = Object.entries(data.sources || {});
-  const fr = data.fordRomanDuty || ({} as UniformsExplain["fordRomanDuty"]);
-  const th = data.thetaAudit || ({} as UniformsExplain["thetaAudit"]);
-  const live = data.live || {};
-  const eqn = data.equations || {};
+  if (!data && !m) return null;
+  const entries = Object.entries(data?.sources || {});
+  const fr = data?.fordRomanDuty || ({} as NonNullable<UniformsExplain["fordRomanDuty"]>);
+  const th = data?.thetaAudit || ({} as NonNullable<UniformsExplain["thetaAudit"]>);
+  const live = data?.live || {};
+  const eqn = data?.equations || {};
 
-  // --- FR numbers ---
-  const dEff = num(fr.computed_d_eff) ?? num(live.dutyEffectiveFR);
-  const S_live = num(fr.S_live) ?? num(live.S_live);
-  const S_total = num(fr.S_total) ?? num(live.S_total);
+  // --- FR numbers (with robust fallbacks from metrics) ---
+  const S_total =
+    num(fr.S_total) ??
+    num(live.S_total) ??
+    num((m as any)?.totalSectors) ??
+    num((m as any)?.tiles?.sectorsTotal) ??
+    400;
+
+  const S_live =
+    num(fr.S_live) ??
+    num(live.S_live) ??
+    num((m as any)?.sectorStrobing) ??
+    num((m as any)?.activeSectors);
+
+  const dEff =
+    num(fr.computed_d_eff) ??
+    num(live.dutyEffectiveFR) ??
+    num((m as any)?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEff);
+
   const burstLocal = num(fr.burstLocal);
 
   const baseFR = eqn.d_eff || "d_eff = burstLocal × S_live / S_total";
@@ -115,10 +139,28 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
       : undefined;
   const resFR = dEff !== undefined ? `d_eff = ${fmt(dEff, 6)} (unitless)` : undefined;
 
-  // --- θ numbers ---
-  const gammaGeo = num(live.gammaGeo) ?? num(th.inputs?.gammaGeo);
-  const q = num(live.qSpoilingFactor) ?? num(th.inputs?.q);
-  const gammaVdB_vis = num(live.gammaVanDenBroeck_vis) ?? num(th.inputs?.gammaVdB_vis);
+  // --- θ numbers (broader fallbacks) ---
+  const gammaGeo =
+    num(live.gammaGeo) ??
+    num(th.inputs?.gammaGeo) ??
+    num((m as any)?.pipeline?.gammaGeo) ??
+    num((m as any)?.gammaGeo);
+
+  const q =
+    num(live.qSpoilingFactor) ??
+    num(th.inputs?.q) ??
+    num((m as any)?.pipeline?.qSpoilingFactor) ??
+    num((m as any)?.qSpoilingFactor) ??
+    num((m as any)?.q);
+
+  const gammaVdB_vis =
+    num(live.gammaVanDenBroeck_vis) ??
+    num(th.inputs?.gammaVdB_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVdB);
 
   const thetaExpected =
     gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
@@ -126,33 +168,65 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
       : undefined;
 
   // --- P_avg substitution pieces (best-effort) ---
-  const N_tiles = num(live.N_tiles) ?? num((m as any)?.tiles?.N_tiles) ?? num((m as any)?.N_tiles);
-  const Q_cav = num(live.qCavity) ?? num((m as any)?.pipeline?.qCavity ?? (m as any)?.qCavity);
+  const N_tiles =
+    num(live.N_tiles) ??
+    num((m as any)?.tiles?.N_tiles) ??
+    num((m as any)?.N_tiles);
+
+  const Q_cav =
+    num(live.qCavity) ??
+    num((m as any)?.pipeline?.qCavity) ??
+    num((m as any)?.qCavity);
+
   const f_m_Hz = num((m as any)?.timescales?.f_m_Hz);
   const omega = f_m_Hz !== undefined ? 2 * Math.PI * f_m_Hz : undefined;
-  const P_avg_W = num(live.P_avg_W) ?? (num((m as any)?.P_avg) !== undefined ? num((m as any)?.P_avg)! * 1e6 : undefined);
 
-  // We usually don't expose U_Q per-tile; show partial substitution if pieces are known
-  const subP = (N_tiles !== undefined || Q_cav !== undefined || omega !== undefined || dEff !== undefined)
-    ? `P_avg = |U_Q| · ${omega ? `(${fexp(omega, 2)} rad·s⁻¹)` : "ω"} / ${Q_cav ? fmt(Q_cav, 0) : "Q"} · ${N_tiles ? fint(N_tiles) : "N_tiles"} · ${dEff !== undefined ? fmt(dEff, 6) : "d_eff"}`
-    : undefined;
+  // Normalize P_avg to W whether it arrives as W or MW
+  const P_avg_W = (() => {
+    const fromLiveW = num(live.P_avg_W);
+    if (fromLiveW !== undefined) return fromLiveW;
+    const fromLiveMW = num(live.P_avg_MW);
+    if (fromLiveMW !== undefined) return fromLiveMW * 1e6;
+
+    const pMW = num((m as any)?.pipeline?.P_avg) ?? num((m as any)?.P_avg);
+    if (pMW !== undefined) return pMW * 1e6;
+
+    const pMaybeW = num((m as any)?.energyOutput);
+    if (pMaybeW !== undefined) {
+      // Heuristic: treat > 1e4 as W, else assume MW and convert
+      return pMaybeW > 1e4 ? pMaybeW : pMaybeW * 1e6;
+    }
+    return undefined;
+  })();
+
+  const subP =
+    (N_tiles !== undefined || Q_cav !== undefined || omega !== undefined || dEff !== undefined)
+      ? `P_avg = |U_Q| · ${omega ? `(${fexp(omega, 2)} rad·s⁻¹)` : "ω"} / ${Q_cav ? fmt(Q_cav, 0) : "Q"} · ${N_tiles ? fint(N_tiles) : "N_tiles"} · ${dEff !== undefined ? fmt(dEff, 6) : "d_eff"}`
+      : undefined;
 
   // --- Mass substitution pieces ---
   const A_tile_cm2 = num((m as any)?.tiles?.tileArea_cm2) ?? num((m as any)?.tileArea_cm2);
   const A_tile_m2 = A_tile_cm2 !== undefined ? A_tile_cm2 * 1e-4 : undefined;
   const gap_nm = num((m as any)?.pipeline?.gap_nm ?? (m as any)?.gap_nm);
-  const gammaVdB_mass = num(live.gammaVanDenBroeck_mass);
+  const gammaVdB_mass =
+    num(live.gammaVanDenBroeck_mass) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck_mass);
   const Q_burst = 1e9; // paper constant used in backend
-  const M_exotic_kg = num((m as any)?.pipeline?.M_exotic) ?? num((m as any)?.M_exotic) ?? num((m as any)?.exoticMass_kg) ?? num((m as any)?.exoticMass);
+  const M_exotic_kg =
+    num((m as any)?.pipeline?.M_exotic) ??
+    num((m as any)?.M_exotic) ??
+    num((m as any)?.exoticMass_kg) ??
+    num((m as any)?.exoticMass);
 
-  // --- Correct the classic Casimir exponent (1/a^3) and sanitize any server-provided string ---
+  // --- Correct/sanitize Casimir eqn ---
   const fixUStaticEqn = (s?: string) =>
     s ? s.replace(/a⁴|a\^4/g, "a³").replace(/a\^4/g, "a^3") : s;
 
   const baseUstatic = fixUStaticEqn(eqn.U_static) || "U_static = [-π²·ℏ·c/(720·a³)] · A_tile";
-  const subUstatic = (gap_nm !== undefined && A_tile_m2 !== undefined)
-    ? `U_static = [-π²·ℏ·c/(720·(${(gap_nm * 1e-9).toExponential(2)})³)] · ${fexp(A_tile_m2, 2)} m²`
-    : undefined;
+  const subUstatic =
+    gap_nm !== undefined && A_tile_m2 !== undefined
+      ? `U_static = [-π²·ℏ·c/(720·(${(gap_nm * 1e-9).toExponential(2)})³)] · ${fexp(A_tile_m2, 2)} m²`
+      : undefined;
 
   const baseTheta = eqn.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB(vis) · √d_eff";
   const subTheta =
@@ -161,9 +235,14 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
       : undefined;
 
   const baseMass = eqn.M_exotic || "M = [U_static · γ_geo^3 · Q_burst · γ_VdB · d_eff] · N_tiles / c²";
-  const subMass = (A_tile_m2 !== undefined && gammaGeo !== undefined && dEff !== undefined && N_tiles !== undefined && gammaVdB_mass !== undefined)
-    ? `M = [U_static · (${fmt(gammaGeo, 0)})^3 · 1e9 · ${fexp(gammaVdB_mass, 2)} · ${fmt(dEff, 6)}] · ${fint(N_tiles)} / c²`
-    : undefined;
+  const subMass =
+    A_tile_m2 !== undefined &&
+    gammaGeo !== undefined &&
+    dEff !== undefined &&
+    N_tiles !== undefined &&
+    gammaVdB_mass !== undefined
+      ? `M = [U_static · (${fmt(gammaGeo, 0)})^3 · ${Q_burst.toExponential(0)} · ${fexp(gammaVdB_mass, 2)} · ${fmt(dEff, 6)}] · ${fint(N_tiles)} / c²`
+      : undefined;
 
   const basePow = eqn.P_avg || "P_avg = |U_Q| · ω / Q · N_tiles · d_eff";
 
@@ -264,7 +343,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
 
 /** Hull Surface & Tile Count */
 function TilesCard({ m }: { m: HelixMetrics }) {
-  if (!m.hull || !(m as any).tiles) return null;
+  if (!m?.hull || !(m as any).tiles) return null;
 
   const Lx = num(m.hull.Lx_m);
   const Ly = num(m.hull.Ly_m);
@@ -275,7 +354,7 @@ function TilesCard({ m }: { m: HelixMetrics }) {
   const A_hull = num((m as any).tiles?.hullArea_m2);
   const N_tiles = num((m as any).tiles?.N_tiles);
 
-  // Include paper-authentic census factors when available (fallbacks are backend defaults)
+  // Include census factors when available (fallbacks are backend defaults)
   const PACKING =
     num((m as any).tiles?.packing ?? (m as any)?.pipeline?.__packing) ?? 0.88;
   const RADIAL_LAYERS =
@@ -371,20 +450,28 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
   const dEff =
     num(uexp?.fordRomanDuty?.computed_d_eff) ??
     num(uexp?.live?.dutyEffectiveFR) ??
-    num((m as any)?.dutyEffectiveFR);
+    num((m as any)?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEff);
 
   const gammaGeo =
     num(uexp?.live?.gammaGeo) ??
     num((m as any)?.pipeline?.gammaGeo) ??
-    num((m as any)?.gammaGeo) ??
-    26;
+    num((m as any)?.gammaGeo);
 
-  const q = num(uexp?.live?.qSpoilingFactor ?? (m as any)?.qSpoilingFactor ?? (m as any)?.q) ?? 1;
+  const q =
+    num(uexp?.live?.qSpoilingFactor) ??
+    num((m as any)?.pipeline?.qSpoilingFactor) ??
+    num((m as any)?.qSpoilingFactor) ??
+    num((m as any)?.q);
 
   const gammaVdB =
     num(uexp?.live?.gammaVanDenBroeck_vis) ??
-    num((m as any)?.pipeline?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck) ??
-    1;
+    num((m as any)?.pipeline?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVdB);
 
   const thetaExpected =
     gammaGeo !== undefined && q !== undefined && gammaVdB !== undefined && dEff !== undefined
@@ -428,11 +515,17 @@ function ThetaScaleCard({ m }: { m: HelixMetrics }) {
 /** Energy per cycle and mass bookkeeping */
 function EnergyAndMassCard({ m }: { m: HelixMetrics }) {
   const f_m = num((m as any)?.timescales?.f_m_Hz); // Hz
-  const P_MW = num((m as any)?.pipeline?.P_avg ?? (m as any)?.P_avg ?? (m as any)?.energyOutput); // MW
-  const P_W = P_MW !== undefined ? P_MW * 1e6 : undefined;
+  const P_MW = num((m as any)?.pipeline?.P_avg) ?? num((m as any)?.P_avg);
+  const P_W_fromMW = P_MW !== undefined ? P_MW * 1e6 : undefined;
+  const energyOutput = num((m as any)?.energyOutput);
+  const P_W = P_W_fromMW ?? (energyOutput !== undefined ? (energyOutput > 1e4 ? energyOutput : energyOutput * 1e6) : undefined);
   const E_cycle = f_m && P_W ? P_W / f_m : undefined; // J
 
-  const M_exotic = num((m as any)?.pipeline?.M_exotic) ?? num((m as any)?.M_exotic) ?? num((m as any)?.exoticMass_kg) ?? num((m as any)?.exoticMass);
+  const M_exotic =
+    num((m as any)?.pipeline?.M_exotic) ??
+    num((m as any)?.M_exotic) ??
+    num((m as any)?.exoticMass_kg) ??
+    num((m as any)?.exoticMass);
 
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
@@ -462,10 +555,15 @@ function ConstraintCard({ m }: { m: HelixMetrics }) {
   const zeta = num(ford?.value ?? (m as any)?.pipeline?.zeta);
   const zetaLim = num(ford?.limit) ?? 1.0;
 
-  const natVal = (nat?.value as number) ?? undefined;
-  const natStatus = String(nat?.status || "");
+  const natVal = num(nat?.value);
+  const natStatus = String(nat?.status || (m as any)?.pipeline?.natarioConstraint || "");
 
-  const R_est = num((m as any)?.curvatureMax);
+  const R_est =
+    num((m as any)?.curvatureMax) ??
+    num((m as any)?.pipeline?.curvatureMax) ??
+    num((m as any)?.R_max) ??
+    num((m as any)?.Rmax);
+
   const statusOverall = String((m as any)?.overallStatus || (m as any)?.pipeline?.overallStatus || "NOMINAL");
 
   return (
@@ -509,17 +607,43 @@ export default function BridgeDerivationCards() {
     (m as any)?.currentMode ??
     "hover";
 
-  const summary = {
-    mode: String(currentMode).toUpperCase(),
-    S_total: num(uexp?.live?.S_total) ?? num(uexp?.fordRomanDuty?.S_total),
-    S_live: num(uexp?.live?.S_live) ?? num(uexp?.fordRomanDuty?.S_live),
-    dEff:
-      num(uexp?.live?.dutyEffectiveFR) ??
-      num(uexp?.fordRomanDuty?.computed_d_eff ?? (m as any)?.dutyEffectiveFR),
-    gammaGeo: num(uexp?.live?.gammaGeo) ?? num((m as any)?.pipeline?.gammaGeo ?? (m as any)?.gammaGeo),
-    gammaVdB: num(uexp?.live?.gammaVanDenBroeck_vis) ?? num((m as any)?.pipeline?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck_vis),
-    q: num(uexp?.live?.qSpoilingFactor) ?? num((m as any)?.qSpoilingFactor ?? (m as any)?.q),
-  };
+  const S_total =
+    num(uexp?.live?.S_total) ??
+    num(uexp?.fordRomanDuty?.S_total) ??
+    num((m as any)?.totalSectors) ??
+    num((m as any)?.tiles?.sectorsTotal);
+
+  const S_live =
+    num(uexp?.live?.S_live) ??
+    num(uexp?.fordRomanDuty?.S_live) ??
+    num((m as any)?.sectorStrobing) ??
+    num((m as any)?.activeSectors);
+
+  const dEff =
+    num(uexp?.live?.dutyEffectiveFR) ??
+    num(uexp?.fordRomanDuty?.computed_d_eff) ??
+    num((m as any)?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEffectiveFR) ??
+    num((m as any)?.pipeline?.dutyEff);
+
+  const gammaGeo =
+    num(uexp?.live?.gammaGeo) ??
+    num((m as any)?.pipeline?.gammaGeo) ??
+    num((m as any)?.gammaGeo);
+
+  const gammaVdB =
+    num(uexp?.live?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVanDenBroeck) ??
+    num((m as any)?.gammaVdB);
+
+  const q =
+    num(uexp?.live?.qSpoilingFactor) ??
+    num((m as any)?.pipeline?.qSpoilingFactor) ??
+    num((m as any)?.qSpoilingFactor) ??
+    num((m as any)?.q);
 
   if (!m) {
     return (
@@ -540,6 +664,16 @@ export default function BridgeDerivationCards() {
     );
   }
 
+  const summary = {
+    mode: String(currentMode).toUpperCase(),
+    S_total,
+    S_live,
+    dEff,
+    gammaGeo,
+    gammaVdB,
+    q,
+  };
+
   return (
     <div className="space-y-4">
       <div className="bg-card border rounded-lg p-6">
@@ -549,7 +683,7 @@ export default function BridgeDerivationCards() {
         <div className="mb-4 p-3 rounded bg-slate-900/40 border border-slate-800 text-xs">
           <div className="flex flex-wrap gap-x-6 gap-y-1">
             <div>Mode: <Eq>{summary.mode}</Eq></div>
-            <div>Sectors: <Eq>{summary.S_live !== undefined && summary.S_total !== undefined ? `${summary.S_live}/${summary.S_total}` : "—"}</Eq></div>
+            <div>Sectors: <Eq>{summary.S_live !== undefined && summary.S_total !== undefined ? `${fint(summary.S_live)}/${fint(summary.S_total)}` : "—"}</Eq></div>
             <div>d_eff: <Eq>{summary.dEff !== undefined ? fmt(summary.dEff, 6) : "—"}</Eq></div>
             <div>γ_geo: <Eq>{summary.gammaGeo !== undefined ? fmt(summary.gammaGeo, 0) : "—"}</Eq></div>
             <div>γ_VdB: <Eq>{summary.gammaVdB !== undefined ? fexp(summary.gammaVdB, 2) : "—"}</Eq></div>
