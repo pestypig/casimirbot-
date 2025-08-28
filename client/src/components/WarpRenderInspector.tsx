@@ -668,10 +668,10 @@ export default function WarpRenderInspector(props: {
     const enforceParityWrapper = (patch: any, methodName: string) => {
       const safe = { ...(patch || {}) };
 
-      // Never accept direct θ writes; renderer derives θ from physics
-      if ('thetaScale' in safe) {
+      // Only block θ writes on REAL pane; SHOW may receive explicit θ
+      if (pane === 'REAL' && 'thetaScale' in safe) {
         console.warn(`[${pane}] Blocking direct thetaScale write via ${methodName}`);
-        delete safe.thetaScale;
+        delete safe.thetaScale;          // SHOW may receive explicit θ
       }
 
       // ABSOLUTE FORCE parity mode settings - these cannot be overridden
