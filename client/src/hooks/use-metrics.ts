@@ -69,17 +69,37 @@ export function useMetrics(pollMs = 2000) {
     let alive = true;
     const tick = async () => {
       try {
-        const r = await fetch("/api/helix/metrics");
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const r = await fetch("/api/helix/metrics", {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         const j = await r.json();
-        if (alive) setData(j);
-      } catch (e:any) {
-        if (alive) setErr(e.message ?? "network error");
+        if (alive) {
+          setData(j);
+          setErr(null); // Clear any previous errors
+        }
+      } catch (e: any) {
+        if (alive) {
+          console.error('[useMetrics] Fetch error:', e);
+          setErr(e.message ?? "network error");
+        }
       }
     };
+    
+    // Initial fetch
     tick();
+    
+    // Set up polling interval
     const id = setInterval(tick, pollMs);
-    return () => { alive = false; clearInterval(id); };
+    
+    return () => { 
+      alive = false; 
+      clearInterval(id); 
+    };
   }, [pollMs]);
 
   return { data, err };
