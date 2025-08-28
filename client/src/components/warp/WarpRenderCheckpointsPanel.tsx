@@ -316,10 +316,10 @@ function useCheckpointList(
 
     checkpoint({
       id: 'uniforms.ridge_mode', side, stage: 'uniforms',
-      pass: expectations?.ridge != null ? (u?.ridgeMode | 0) === (expectations.ridge | 0) : true,
+      pass: expectations?.ridge != null ? ((u?.ridgeMode || 0) === (expectations.ridge || 0)) : true,
       msg: `ridgeMode=${u?.ridgeMode}`,
       expect: expectations?.ridge, actual: u?.ridgeMode,
-      sev: expectations?.ridge != null && (u?.ridgeMode | 0) !== (expectations.ridge | 0) ? 'warn' : 'info'
+      sev: expectations?.ridge != null && (u?.ridgeMode || 0) !== (expectations.ridge || 0) ? 'warn' : 'info'
     });
 
     checkpoint({
@@ -636,8 +636,8 @@ function useCheckpointList(
         });
       }
       if (expRidge != null) {
-        const actualRidge = u?.ridgeMode | 0;
-        const expectedRidge = expRidge | 0;
+        const actualRidge = u?.ridgeMode || 0;
+        const expectedRidge = expRidge || 0;
         const ok = actualRidge === expectedRidge;
 
         if (!ok) {
