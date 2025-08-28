@@ -66,12 +66,18 @@ function sizeCanvas(cv: HTMLCanvasElement) {
 
 function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const p = { ...patch };
+  
+  // Force parity mode based on pane - this is critical for physics validation
   if (pane === 'REAL') { 
-    p.physicsParityMode = true;  
+    p.physicsParityMode = true;
+    p.parityMode = true;  // Also set the fallback field
     p.ridgeMode = 0; 
+    console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
-    p.physicsParityMode = false; 
+    p.physicsParityMode = false;
+    p.parityMode = false; // Also set the fallback field
     p.ridgeMode = 1; 
+    console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
 }
@@ -110,17 +116,36 @@ function sanitizeUniforms(u: any = {}) {
 
 function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'REAL'|'SHOW') {
   const e = engineRef?.current;
-  if (!e) return;
+  if (!e) {
+    console.warn(`[pushSafe] No engine found for pane: ${pane}`);
+    return;
+  }
+  
   let clean = sanitizeUniforms(patch);
+  
   // Apply pane-specific sanitization to prevent cross-contamination
   if (pane) {
     clean = paneSanitize(pane, clean);
   }
+  
+  // Debug what we're actually sending
+  console.log(`[pushSafe][${pane}] Applying uniforms:`, {
+    physicsParityMode: clean.physicsParityMode,
+    parityMode: clean.parityMode,
+    ridgeMode: clean.ridgeMode,
+    thetaScale: clean.thetaScale
+  });
+  
   if (!e.isLoaded || !e.gridProgram) {
-    e.onceReady(() => { gatedUpdateUniforms(e, clean, 'client'); e.forceRedraw?.(); });
+    e.onceReady(() => { 
+      gatedUpdateUniforms(e, clean, 'client'); 
+      e.forceRedraw?.(); 
+      console.log(`[${pane}] Deferred uniforms applied on ready`);
+    });
   } else {
     gatedUpdateUniforms(e, clean, 'client');
     e.forceRedraw?.();
+    console.log(`[${pane}] Immediate uniforms applied`);
   }
 }
 
@@ -824,6 +849,31 @@ export default function WarpBubbleCompare({
     pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true }, 'REAL');
     pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true }, 'SHOW');
 
+    // 6) Verify parity enforcement worked
+    setTimeout(() => {
+      console.log('=== PARITY VERIFICATION ===');
+      const realParity = leftEngine.current?.uniforms?.physicsParityMode ?? leftEngine.current?.uniforms?.parityMode;
+      const showParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
+      const realRidge = leftEngine.current?.uniforms?.ridgeMode;
+      const showRidge = rightEngine.current?.uniforms?.ridgeMode;
+      
+      console.log('REAL parity?', realParity, '(should be true)');
+      console.log('SHOW parity?', showParity, '(should be false)');
+      console.log('REAL ridge?', realRidge, '(should be 0)');
+      console.log('SHOW ridge?', showRidge, '(should be 1)');
+      
+      // Log theta scales for comparison
+      const realTheta = leftEngine.current?.uniforms?.thetaScale;
+      const showTheta = rightEngine.current?.uniforms?.thetaScale;
+      console.log('Theta scales - REAL:', realTheta?.toExponential?.(2) || realTheta, 'SHOW:', showTheta?.toExponential?.(2) || showTheta);
+      
+      if (realParity !== true || showParity !== false) {
+        console.error('❌ Parity enforcement failed! Check engine uniform application.');
+      } else {
+        console.log('✅ Parity enforcement successful');
+      }
+    }, 100);
+
     // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
     ensureStrobeMux();
     const lc = parameters.lightCrossing;
@@ -898,8 +948,8 @@ export default function WarpBubbleCompare({
     const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene as [number,number,number])) * 1.10);
     // -------------------------------------- //
 
-    // REAL (parity / Ford–Roman)
-    pushSafe(leftEngine, {
+    // Build physics payload for REAL engine
+    const realPhysicsPayload = {
       ...shared,
       gridSpan: gridSpanReal,            // tight framing around hull
       ...real,
@@ -917,14 +967,26 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, parameters.sectors),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-    }, 'REAL');
+      // Force parity mode
+      physicsParityMode: true,
+      parityMode: true,
+      ridgeMode: 0
+    };
+
+    console.log('Applying physics to engines:', {
+      real: { parity: true, ridge: 0 },
+      show: { parity: false, ridge: 1 }
+    });
+
+    // REAL (parity / Ford–Roman)
+    pushSafe(leftEngine, realPhysicsPayload, 'REAL');
 
     // SHOW (UI)
     const showTheta = parameters.currentMode === 'standby'
       ? 0
       : Math.max(1e-6, show.thetaScale || 0);
 
-    pushSafe(rightEngine, {
+    const showPhysicsPayload = {
       ...shared,
       ...show,
       currentMode: parameters.currentMode,
@@ -934,8 +996,14 @@ export default function WarpBubbleCompare({
       deltaAOverA: show.qSpoilingFactor,
       sectors: Math.max(1, parameters.sectors),
       // SHOW camera can share the same camZ for easy side-by-side comparison
-      cameraZ: camZ
-    }, 'SHOW');
+      cameraZ: camZ,
+      // Force non-parity mode for SHOW
+      physicsParityMode: false,
+      parityMode: false,
+      ridgeMode: 1
+    };
+
+    pushSafe(rightEngine, showPhysicsPayload, 'SHOW');
 
     // Force a draw so the user sees the change immediately
     leftEngine.current.forceRedraw?.();
