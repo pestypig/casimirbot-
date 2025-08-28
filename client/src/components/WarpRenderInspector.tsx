@@ -679,7 +679,7 @@ export default function WarpRenderInspector(props: {
         // Clear any existing engine on this canvas
         delete (rightRef.current as any).__warpEngine;
 
-        rightEngine.current = new W(rightRef.current);
+        rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
         rightOwnedRef.current = true;
         console.log("SHOW engine created successfully");
 
@@ -1064,7 +1064,7 @@ export default function WarpRenderInspector(props: {
         grid3dRef.current?.setPixelRatio?.(dpr);
         grid3dRef.current?.setSupersample?.(1.25);
 
-        // Nudge grid density once the canvas has real pixels
+        // Nudge grid density once the canvas has real dimensions
         const W = cv.width, H = cv.height;
         const pxAcross = estimatePxAcrossWall({
           canvasPxW: W, canvasPxH: H,
