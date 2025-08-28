@@ -723,6 +723,12 @@ export default function WarpBubbleCompare({
         return null;
       }
 
+      // Ensure canvas has proper dimensions before engine creation
+      if (!canvas.clientWidth || !canvas.clientHeight) {
+        console.warn(`[${label}] Canvas has no display size, waiting...`);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
       // Check canvas state before engine creation
       console.log(`[${label}] Canvas state:`, {
         id: canvas.id,
@@ -730,16 +736,26 @@ export default function WarpBubbleCompare({
         height: canvas.height,
         clientWidth: canvas.clientWidth,
         clientHeight: canvas.clientHeight,
-        style: canvas.style.cssText
+        style: canvas.style.cssText,
+        isConnected: canvas.isConnected,
+        parentElement: !!canvas.parentElement
       });
 
       // Test WebGL availability before creating engine
       try {
-        const testGl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        const testGl = canvas.getContext('webgl', { preserveDrawingBuffer: true }) || 
+                       canvas.getContext('experimental-webgl', { preserveDrawingBuffer: true });
         if (!testGl) {
           throw new Error('WebGL context test failed');
         }
-        console.log(`[${label}] WebGL pre-test passed`);
+        console.log(`[${label}] WebGL pre-test passed:`, {
+          version: testGl.getParameter(testGl.VERSION),
+          vendor: testGl.getParameter(testGl.VENDOR),
+          renderer: testGl.getParameter(testGl.RENDERER)
+        });
+        // Clean up test context
+        const loseContext = testGl.getExtension('WEBGL_lose_context');
+        loseContext?.loseContext();
       } catch (webglError) {
         console.error(`[${label}] WebGL pre-test failed:`, webglError);
         throw new Error(`WebGL not available for ${label}: ${String(webglError)}`);
@@ -747,35 +763,77 @@ export default function WarpBubbleCompare({
 
       console.log(`[${label}] Creating engine for canvas:`, canvas);
 
-      // Create engine instance with timeout
+      // Create engine instance with enhanced timeout and error handling
       const enginePromise = new Promise((resolve, reject) => {
         try {
           const engine = new window.WarpEngine(canvas);
+          
+          // Immediate validation
+          if (!engine) {
+            reject(new Error('Engine constructor returned null'));
+            return;
+          }
+          
+          if (!engine.gl) {
+            reject(new Error('Engine has no WebGL context'));
+            return;
+          }
+          
+          if (engine.gl.isContextLost()) {
+            reject(new Error('WebGL context was lost during engine creation'));
+            return;
+          }
+          
+          console.log(`[${label}] Engine instance created, validating...`);
           resolve(engine);
         } catch (error) {
+          console.error(`[${label}] Engine constructor threw:`, error);
           reject(error);
         }
       });
 
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Engine creation timeout')), 5000);
+        setTimeout(() => reject(new Error('Engine creation timeout after 5000ms')), 5000);
       });
 
       const engine = await Promise.race([enginePromise, timeoutPromise]);
 
-      console.log(`[${label}] Engine created successfully`);
+      // Additional post-creation validation
+      if (engine && engine.gl && engine.gl.isContextLost()) {
+        throw new Error('WebGL context lost immediately after engine creation');
+      }
+
+      console.log(`[${label}] Engine created and validated successfully`);
       return engine;
     } catch (error) {
       console.error(`[${label}] Engine creation failed:`, error);
 
-      // Additional debugging for WebGL errors
+      // Enhanced debugging for WebGL errors
       if (String(error).includes('WebGL')) {
+        const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
         console.error(`[${label}] WebGL-specific debugging:`, {
           webglSupported: !!window.WebGLRenderingContext,
           webgl2Supported: !!window.WebGL2RenderingContext,
           canvasSupported: !!window.HTMLCanvasElement,
-          documentReady: document.readyState
+          documentReady: document.readyState,
+          canvasInDOM: canvas?.isConnected,
+          canvasSize: canvas ? `${canvas.clientWidth}x${canvas.clientHeight}` : 'N/A'
         });
+        
+        // Try to get more WebGL debug info
+        try {
+          const debugCanvas = document.createElement('canvas');
+          const debugGl = debugCanvas.getContext('webgl');
+          if (debugGl) {
+            console.error(`[${label}] WebGL debug context info:`, {
+              maxTextureSize: debugGl.getParameter(debugGl.MAX_TEXTURE_SIZE),
+              maxViewportDims: debugGl.getParameter(debugGl.MAX_VIEWPORT_DIMS),
+              maxVertexAttribs: debugGl.getParameter(debugGl.MAX_VERTEX_ATTRIBS)
+            });
+          }
+        } catch (debugError) {
+          console.error(`[${label}] Could not create debug WebGL context:`, debugError);
+        }
       }
 
       return null;

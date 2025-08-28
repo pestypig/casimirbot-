@@ -649,6 +649,14 @@ export default function WarpRenderInspector(props: {
 
     console.log(`[${pane}] Locking pane with parity=${forcedParity}, ridge=${forcedRidge}`);
 
+    // IMMEDIATE enforcement - set uniforms directly first
+    if (engine.uniforms) {
+      engine.uniforms.physicsParityMode = forcedParity;
+      engine.uniforms.parityMode = forcedParity;
+      engine.uniforms.ridgeMode = forcedRidge;
+      console.log(`[${pane}] Direct uniform enforcement applied`);
+    }
+
     // Intercept ALL uniform update methods to enforce parity
     const originalUpdateUniforms = engine.updateUniforms?.bind(engine);
     const originalApplyUniforms = engine.applyUniforms?.bind(engine);
@@ -680,6 +688,13 @@ export default function WarpRenderInspector(props: {
         const enforced = enforceParityWrapper(patch, 'updateUniforms');
         const result = originalUpdateUniforms(enforced);
 
+        // IMMEDIATE post-enforcement
+        if (engine.uniforms) {
+          engine.uniforms.physicsParityMode = forcedParity;
+          engine.uniforms.parityMode = forcedParity;
+          engine.uniforms.ridgeMode = forcedRidge;
+        }
+
         // Double-check enforcement worked
         queueMicrotask(() => {
           if (engine.uniforms) {
@@ -701,18 +716,32 @@ export default function WarpRenderInspector(props: {
       };
     }
 
-    // Also override other potential uniform setters
+    // Also override other potential uniform setters with immediate enforcement
     if (originalApplyUniforms) {
       engine.applyUniforms = (patch: any) => {
         const enforced = enforceParityWrapper(patch, 'applyUniforms');
-        return originalApplyUniforms(enforced);
+        const result = originalApplyUniforms(enforced);
+        // IMMEDIATE enforcement
+        if (engine.uniforms) {
+          engine.uniforms.physicsParityMode = forcedParity;
+          engine.uniforms.parityMode = forcedParity;
+          engine.uniforms.ridgeMode = forcedRidge;
+        }
+        return result;
       };
     }
 
     if (originalSetUniforms) {
       engine.setUniforms = (patch: any) => {
         const enforced = enforceParityWrapper(patch, 'setUniforms');
-        return originalSetUniforms(enforced);
+        const result = originalSetUniforms(enforced);
+        // IMMEDIATE enforcement
+        if (engine.uniforms) {
+          engine.uniforms.physicsParityMode = forcedParity;
+          engine.uniforms.parityMode = forcedParity;
+          engine.uniforms.ridgeMode = forcedRidge;
+        }
+        return result;
       };
     }
 
@@ -721,7 +750,7 @@ export default function WarpRenderInspector(props: {
     engine.__forcedParity = forcedParity;
     engine.__forcedRidge = forcedRidge;
 
-    // Set up continuous enforcement via RAF
+    // Set up continuous enforcement via RAF with stronger intervention
     let rafId: number;
     const continuousEnforcement = () => {
       if (engine._destroyed || !engine.__locked) return;
@@ -735,6 +764,9 @@ export default function WarpRenderInspector(props: {
           engine.uniforms.physicsParityMode = forcedParity;
           engine.uniforms.parityMode = forcedParity;
           engine.uniforms.ridgeMode = forcedRidge;
+          
+          // Force a redraw to ensure changes are applied
+          engine.forceRedraw?.();
         }
       }
 
@@ -749,7 +781,7 @@ export default function WarpRenderInspector(props: {
       if (rafId) cancelAnimationFrame(rafId);
     };
 
-    // Immediately set the parity mode to ensure it's applied
+    // Immediately set the parity mode multiple ways to ensure it's applied
     const initialParity = {
       physicsParityMode: forcedParity,
       parityMode: forcedParity,
@@ -757,9 +789,17 @@ export default function WarpRenderInspector(props: {
     };
 
     console.log(`[${pane}] Setting initial parity:`, initialParity);
+    
+    // Apply via all available methods
     if (originalUpdateUniforms) {
       originalUpdateUniforms(initialParity);
     }
+    if (engine.uniforms) {
+      Object.assign(engine.uniforms, initialParity);
+    }
+    
+    // Force immediate redraw
+    engine.forceRedraw?.();
   }
 
   // Helper to create engine with conditional selection and 3D fallback
@@ -791,6 +831,8 @@ export default function WarpRenderInspector(props: {
     let mounted = true;
 
     const initEngines = async () => {
+      if (!mounted) return;
+      
       if (!isWebGLAvailable()) {
         setLoadError("WebGL not supported in this browser");
         return;
@@ -811,86 +853,112 @@ export default function WarpRenderInspector(props: {
 
       console.log("Initializing WarpRenderInspector engines...");
 
+      // Enhanced readiness check function
+      const waitForEngineReady = async (engine: any, label: string, timeoutMs = 5000) => {
+        return new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error(`${label} engine init timeout after ${timeoutMs}ms`)), timeoutMs);
+          
+          let attempts = 0;
+          const checkReady = () => {
+            attempts++;
+            console.log(`[${label}] Readiness check #${attempts}: isLoaded=${engine?.isLoaded}, hasProgram=${!!engine?.gridProgram}, hasGL=${!!engine?.gl}`);
+            
+            if (engine?._destroyed) {
+              clearTimeout(timeout);
+              reject(new Error(`${label} engine was destroyed during initialization`));
+              return;
+            }
+            
+            // More comprehensive readiness check
+            const isReady = engine?.isLoaded && 
+                           engine?.gridProgram && 
+                           engine?.gl && 
+                           !engine?.gl?.isContextLost?.();
+            
+            if (isReady) {
+              clearTimeout(timeout);
+              console.log(`[${label}] Engine ready after ${attempts} attempts`);
+              resolve();
+            } else {
+              setTimeout(checkReady, 50);
+            }
+          };
+          
+          checkReady();
+        });
+      };
+
       // REAL engine
-      if (leftRef.current && !leftEngine.current) {
+      if (leftRef.current && !leftEngine.current && mounted) {
         try {
           sizeCanvasSafe(leftRef.current);
 
           // Clear any existing engine on this canvas
           delete (leftRef.current as any).__warpEngine;
 
+          console.log("Creating REAL engine...");
           leftEngine.current = new W(leftRef.current);
           leftOwnedRef.current = true;
-          console.log("REAL engine created successfully");
+          console.log("REAL engine instance created");
 
-          // Wait for engine to be fully loaded before applying uniforms
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('REAL engine init timeout')), 3000);
-            const checkReady = () => {
-              if (leftEngine.current?.isLoaded && leftEngine.current?.gridProgram) {
-                clearTimeout(timeout);
-                resolve();
-              } else {
-                setTimeout(checkReady, 50);
-              }
-            };
-            checkReady();
-          });
+          // Wait for engine to be fully ready
+          await waitForEngineReady(leftEngine.current, 'REAL');
+          
+          if (!mounted) return;
 
           // Initialize with ENFORCED parity mode for REAL
           const realInitUniforms = {
             exposure: 5.0,
             zeroStop: 1e-7,
             physicsParityMode: true,
+            parityMode: true, // Explicit fallback
             ridgeMode: 0,
             colorMode: 2, // Force shear mode for truth view
             lockFraming: true
           };
 
+          console.log("Applying REAL initial uniforms:", realInitUniforms);
           gatedUpdateUniforms(leftEngine.current, realInitUniforms, 'client');
-          console.log("REAL engine initialized with parity mode:", leftEngine.current.uniforms?.physicsParityMode);
+          
+          // Verify parity was set
+          console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
 
           leftEngine.current?.setVisible?.(true);
           lockPane(leftEngine.current, 'REAL');
+          
+          console.log("REAL engine fully initialized");
 
         } catch (error) {
           console.error("Failed to create REAL engine:", error);
-          setLoadError("Failed to initialize REAL WebGL engine");
+          setLoadError(`Failed to initialize REAL WebGL engine: ${error}`);
           return; // Stop initialization if REAL engine fails
         }
       }
 
       // SHOW engine
-      if (rightRef.current && !rightEngine.current) {
+      if (rightRef.current && !rightEngine.current && mounted) {
         try {
           sizeCanvasSafe(rightRef.current);
 
           // Clear any existing engine on this canvas
           delete (rightRef.current as any).__warpEngine;
 
+          console.log("Creating SHOW engine...");
           rightEngine.current = new W(rightRef.current);
           rightOwnedRef.current = true;
-          console.log("SHOW engine created successfully");
+          console.log("SHOW engine instance created");
 
-          // Wait for engine to be fully loaded before applying uniforms
-          await new Promise<void>((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('SHOW engine init timeout')), 3000);
-            const checkReady = () => {
-              if (rightEngine.current?.isLoaded && rightEngine.current?.gridProgram) {
-                clearTimeout(timeout);
-                resolve();
-              } else {
-                setTimeout(checkReady, 50);
-              }
-            };
-            checkReady();
-          });
+          // Wait for engine to be fully ready
+          await waitForEngineReady(rightEngine.current, 'SHOW');
+          
+          if (!mounted) return;
 
           // Initialize with ENFORCED non-parity mode for SHOW
           const showInitUniforms = {
             exposure: 7.5,
             zeroStop: 1e-7,
             physicsParityMode: false,
+            parityMode: false, // Explicit fallback
             ridgeMode: 1,
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
@@ -899,15 +967,20 @@ export default function WarpRenderInspector(props: {
             lockFraming: true
           };
 
+          console.log("Applying SHOW initial uniforms:", showInitUniforms);
           gatedUpdateUniforms(rightEngine.current, showInitUniforms, 'client');
-          console.log("SHOW engine initialized with parity mode:", rightEngine.current.uniforms?.physicsParityMode);
+          
+          // Verify parity was set
+          console.log("SHOW engine parity after init:", rightEngine.current.uniforms?.physicsParityMode);
 
           rightEngine.current?.setVisible?.(true);
           lockPane(rightEngine.current, 'SHOW');
+          
+          console.log("SHOW engine fully initialized");
 
         } catch (error) {
           console.error("Failed to create SHOW engine:", error);
-          setLoadError("Failed to initialize SHOW WebGL engine");
+          setLoadError(`Failed to initialize SHOW WebGL engine: ${error}`);
           return; // Stop initialization if SHOW engine fails
         }
       }

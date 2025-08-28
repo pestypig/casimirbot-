@@ -211,12 +211,29 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
     }
   }
 
-  // Final result logging
+  // Final result logging with enhanced debugging
   const gammaVdBStr = Number(gammaVdB).toExponential(2);
   debugLog(
     `[${dutySource.toUpperCase()}] Final θ-scale=${Number(result).toExponential(2)} ` +
     `(γGeo=${gammaGeo}, qSpoil=${qSpoil}, γVdB=${gammaVdBStr}, duty=${duty}, sectors=${sectors})`
   );
+  
+  // Additional validation logging
+  if (result < 1e-12) {
+    console.warn(`[warp-theta] Suspiciously small theta scale: ${result.toExponential(2)}`);
+  }
+  if (result > 1e15) {
+    console.warn(`[warp-theta] Suspiciously large theta scale: ${result.toExponential(2)}`);
+  }
+  
+  // Log component contributions
+  debugLog('Theta scale components:', {
+    A_geo_contribution: A_geo,
+    qSpoil_contribution: qSpoil,
+    gammaVdB_contribution: gammaVdB,
+    duty_contribution: dutyTerm,
+    final_product: result
+  });
 
   return result;
 }
