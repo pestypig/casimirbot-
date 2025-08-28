@@ -143,7 +143,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
   const gap_nm = num((m as any)?.pipeline?.gap_nm ?? (m as any)?.gap_nm);
   const gammaVdB_mass = num(live.gammaVanDenBroeck_mass);
   const Q_burst = 1e9; // paper constant used in backend
-  const M_exotic_kg = num((m as any)?.pipeline?.M_exotic ?? (m as any)?.M_exotic);
+  const M_exotic_kg = num((m as any)?.pipeline?.M_exotic) ?? num((m as any)?.M_exotic) ?? num((m as any)?.exoticMass_kg) ?? num((m as any)?.exoticMass);
 
   // --- Correct the classic Casimir exponent (1/a^3) and sanitize any server-provided string ---
   const fixUStaticEqn = (s?: string) =>
@@ -432,7 +432,7 @@ function EnergyAndMassCard({ m }: { m: HelixMetrics }) {
   const P_W = P_MW !== undefined ? P_MW * 1e6 : undefined;
   const E_cycle = f_m && P_W ? P_W / f_m : undefined; // J
 
-  const M_exotic = num((m as any)?.pipeline?.M_exotic ?? (m as any)?.M_exotic);
+  const M_exotic = num((m as any)?.pipeline?.M_exotic) ?? num((m as any)?.M_exotic) ?? num((m as any)?.exoticMass_kg) ?? num((m as any)?.exoticMass);
 
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
@@ -443,7 +443,7 @@ function EnergyAndMassCard({ m }: { m: HelixMetrics }) {
         base="E_cycle = P_avg / f_m"
         sub={P_W !== undefined && f_m !== undefined ? `E = ${P_W.toLocaleString()} W / ${f_m.toLocaleString()} Hz` : undefined}
         result={E_cycle !== undefined ? `E_cycle = ${fexp(E_cycle, 2)} J` : undefined}
-        notes="Average electrical power divided by modulation frequency (one cycle’s energy)."
+        notes="Average electrical power divided by modulation frequency (one cycle's energy)."
       />
 
       <div className="text-xs">
