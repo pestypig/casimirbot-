@@ -832,6 +832,15 @@ export async function switchOperationalMode(req: Request, res: Response) {
       return next;
     });
 
+    // Write calibration for phase diagram integration  
+    await writePhaseCalibration({
+      tile_area_cm2: newState.tileArea_cm2,
+      ship_radius_m: newState.shipRadius_m || 86.5,
+      P_target_W: 100e6, // Use fixed target power for now
+      M_target_kg: newState.exoticMassTarget_kg || 1400,
+      zeta_target: 0.5
+    }, 'mode_change');
+
     publish("warp:reload", { reason: "mode-change", mode, ts: Date.now() });
 
     res.json({ success: true, mode, state: newState, config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS] });
