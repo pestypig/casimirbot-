@@ -536,7 +536,7 @@ export default function HelixCasimirAmplifier({
 
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
-    const gammaGeo = hud.gammaGeo;
+    const gammaGeo = hud.gammaGeo || state.gammaGeo || 26; // fallback to pipeline or default
     // HUD → state → safe fallback (avoid silent zeros)
     const qMech = (
       Number.isFinite((hud as any)?.qMech) && (hud as any).qMech! > 0 ? (hud as any).qMech :
