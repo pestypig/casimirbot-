@@ -89,6 +89,32 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   };
 }
 
+// Sanitize uniform values for safe WebGL consumption
+function sanitizeUniforms(u: any = {}) {
+  const s = { ...u };
+  
+  // Numeric coercions + clamps
+  if ('cameraZ' in s) s.cameraZ = Number.isFinite(s.cameraZ) ? Math.max(-10, Math.min(-0.1, s.cameraZ)) : -2.0;
+  if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
+  if ('gammaGeo' in s) s.gammaGeo = Number.isFinite(s.gammaGeo) ? Math.max(1, s.gammaGeo) : 26;
+  if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
+  if ('gammaVanDenBroeck' in s) s.gammaVanDenBroeck = Number.isFinite(s.gammaVanDenBroeck) ? Math.max(1, s.gammaVanDenBroeck) : 1.4e5;
+  if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
+  
+  // Boolean sanitization
+  if ('physicsParityMode' in s) s.physicsParityMode = !!s.physicsParityMode;
+  if ('parityMode' in s) s.parityMode = !!s.parityMode;
+  if ('lockFraming' in s) s.lockFraming = !!s.lockFraming;
+  if ('viewAvg' in s) s.viewAvg = !!s.viewAvg;
+  
+  // Integer sanitization
+  if ('ridgeMode' in s) s.ridgeMode = Math.max(0, Math.min(1, Math.floor(s.ridgeMode || 0)));
+  if ('sectorCount' in s) s.sectorCount = Math.max(1, Math.floor(s.sectorCount || 400));
+  if ('split' in s) s.split = Math.max(0, Math.floor(s.split || 0));
+  
+  return s;
+}
+
 /**
  * WarpRenderInspector
  *
@@ -541,6 +567,10 @@ export default function WarpRenderInspector(props: {
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const grid3dRef = useRef<Grid3DHandle>(null);
+  
+  // Batched push system for performance optimization
+  const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
+  const pushRight = useRef<(p:any, tag?:string)=>void>(() => {});
   const leftOwnedRef = useRef(false);
   const rightOwnedRef = useRef(false);
 
@@ -1252,7 +1282,8 @@ export default function WarpRenderInspector(props: {
         const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
         const ax = deriveAxesClip(hull, 1);
         const cz = compactCameraZ(ax);
-        pushUniformsWhenReady(g, { axesClip: ax, cameraZ: cz, lockFraming: true }, 'grid3d-bridge');
+        // Grid3D bridge - use direct gated update since it's not left/right engine
+        gatedUpdateUniforms(g, sanitizeUniforms({ axesClip: ax, cameraZ: cz, lockFraming: true }), 'client');
 
         // Sensible render quality
         const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1508,18 +1539,27 @@ export default function WarpRenderInspector(props: {
       const dutyFR_REAL = dutyLocal * (sConcL / s);
       const dutyUI_SHOW = dutyLocal * (1 / s);
 
-      pushUniformsWhenReady(leftEngine.current,  {
-        ...payload,
-        physicsParityMode: true,
-        dutyEffectiveFR: dutyFR_REAL,
-      });
-      pushUniformsWhenReady(rightEngine.current, {
-        ...payload,
-        physicsParityMode: false,
-        dutyEffectiveFR: dutyUI_SHOW,
-      });
+      // Temporarily use direct updates to debug syntax error
+      if (leftEngine.current) {
+        gatedUpdateUniforms(leftEngine.current, sanitizeUniforms({
+          ...payload,
+          dutyEffectiveFR: dutyFR_REAL,
+        }), 'client');
+      }
+      if (rightEngine.current) {
+        gatedUpdateUniforms(rightEngine.current, sanitizeUniforms({
+          ...payload,
+          dutyEffectiveFR: dutyUI_SHOW,
+        }), 'client');
+      }
     });
     return () => { try { off?.(); } catch {} };
+  }, []);
+
+  // Initialize batched push functions for performance optimization
+  useEffect(() => {
+    pushLeft.current = makeUniformBatcher(leftEngine);
+    pushRight.current = makeUniformBatcher(rightEngine);
   }, []);
 
   // UI events - use global mode switching instead of local state
@@ -1642,8 +1682,8 @@ export default function WarpRenderInspector(props: {
             onChange={e => {
               const v = Number(e.target.value);
               setCurvT(v);
-              pushUniformsWhenReady(leftEngine.current,  { curvT: v }, 'ui-curvature');
-              pushUniformsWhenReady(rightEngine.current, { curvT: v }, 'ui-curvature');
+              pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ curvT: v })), 'REAL');
+              pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ curvT: v })), 'SHOW');
             }}
           >
             <option value={0.00}>Flat</option>
@@ -1657,7 +1697,7 @@ export default function WarpRenderInspector(props: {
           <h4 className="font-medium mb-3">Live Engine Snapshot</h4>
           {/* θ-scale verification display */}
           <div className="text-xs text-neutral-600 mb-3 space-y-1">
-            <div>θ-scale expected: {((live as any)?.thetaScaleExpected ?? 0).toExponential(2)}</div>
+            <div>θ-scale expected: {(live?.thetaScaleExpected ?? 0).toExponential(2)}</div>
             <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
@@ -1671,7 +1711,7 @@ export default function WarpRenderInspector(props: {
               console.table({
                 REAL_thetaScale: L?.thetaScale, SHOW_thetaScale: R?.thetaScale,
                 REAL_gammaVdB: L?.gammaVdB, SHOW_gammaVdB: R?.gammaVdB,
-                REAL_dutyFR: (leftEngine.current?.uniforms as any)?.dutyEffectiveFR,
+                REAL_dutyFR: leftEngine.current?.uniforms?.dutyEffectiveFR,
                 REAL_dutyCycle: L?.dutyCycle, SHOW_dutyCycle: R?.dutyCycle,
                 sectors: L?.sectors, split: L?.split,
                 REAL_parity: L?.physicsParityMode, SHOW_parity: R?.physicsParityMode,
@@ -1709,7 +1749,7 @@ export default function WarpRenderInspector(props: {
         leftCanvasRef={leftRef}
         rightCanvasRef={rightRef}      // ⬅️ same canvas the engine draws into
         live={live}
-        lightCrossing={{ burst_ms: (live as any)?.burst_ms, dwell_ms: (live as any)?.dwell_ms }}
+        lightCrossing={{ burst_ms: live?.burst_ms, dwell_ms: live?.dwell_ms }}
       />
 
       {/* Visual controls removed - using hardcoded defaults */}

@@ -181,40 +181,6 @@ function sanitizeUniforms(u: any = {}) {
   return s;
 }
 
-function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'REAL'|'SHOW') {
-  const e = engineRef?.current;
-  if (!e) {
-    console.warn(`[pushSafe] No engine found for pane: ${pane}`);
-    return;
-  }
-
-  let clean = sanitizeUniforms(patch);
-
-  // Apply pane-specific sanitization to prevent cross-contamination
-  if (pane) {
-    clean = paneSanitize(pane, clean);
-  }
-
-  // Debug what we're actually sending
-  console.log(`[pushSafe][${pane}] Applying uniforms:`, {
-    physicsParityMode: clean.physicsParityMode,
-    parityMode: clean.parityMode,
-    ridgeMode: clean.ridgeMode,
-    thetaScale: clean.thetaScale
-  });
-
-  if (!e.isLoaded || !e.gridProgram) {
-    e.onceReady(() => {
-      gatedUpdateUniforms(e, clean, 'client');
-      e.forceRedraw?.();
-      console.log(`[${pane}] Deferred uniforms applied on ready`);
-    });
-  } else {
-    gatedUpdateUniforms(e, clean, 'client');
-    e.forceRedraw?.();
-    console.log(`[${pane}] Immediate uniforms applied`);
-  }
-}
 
 // Modes we expose in UI
 type ModeKey = "hover" | "cruise" | "emergency" | "standby";
@@ -750,6 +716,10 @@ export default function WarpBubbleCompare({
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const reinitInFlight = useRef<Promise<void> | null>(null);
+  
+  // Batched push system for performance optimization
+  const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
+  const pushRight = useRef<(p:any, tag?:string)=>void>(() => {});
 
   // current UI mode key from parameters only
   const currentModeKey = ((parameters?.currentMode as ModeKey) ?? "hover") as ModeKey;
@@ -1001,8 +971,8 @@ export default function WarpBubbleCompare({
 
     // 5) Deterministic camera for both panes
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
-    pushSafe(leftEngine,  { cameraZ: camZ, lockFraming: true }, 'REAL');
-    pushSafe(rightEngine, { cameraZ: camZ, lockFraming: true }, 'SHOW');
+    pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ cameraZ: camZ, lockFraming: true })), 'REAL');
+    pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: camZ, lockFraming: true })), 'SHOW');
 
     // 6) Verify parity enforcement worked
     setTimeout(() => {
@@ -1130,7 +1100,7 @@ export default function WarpBubbleCompare({
     });
 
     // REAL (parity / Ford–Roman)
-    pushSafe(leftEngine, realPhysicsPayload, 'REAL');
+    pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
 
     // SHOW (UI) with heroExaggeration applied
     const showTheta = parameters.currentMode === 'standby'
@@ -1155,7 +1125,7 @@ export default function WarpBubbleCompare({
       displayGain: 1,
     });
 
-    pushSafe(rightEngine, showPhysicsPayload, 'SHOW');
+    pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
     const displayGain = Math.max(1, 1 + 0.5 * Math.log10(Math.max(1, heroBoost)));
@@ -1177,13 +1147,13 @@ export default function WarpBubbleCompare({
       // Force correction if parity is wrong
       if (realParity !== true) {
         console.log('[REAL] Forced correction applied');
-        pushSafe(leftEngine, { physicsParityMode: true, parityMode: true, ridgeMode: 0 }, 'REAL');
+        pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ physicsParityMode: true, parityMode: true, ridgeMode: 0 })), 'REAL');
         leftEngine.current?.forceRedraw?.();
       }
 
       if (showParity !== false) {
         console.log('[SHOW] Forced correction applied');
-        pushSafe(rightEngine, { physicsParityMode: false, parityMode: false, ridgeMode: 1 }, 'SHOW');
+        pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ physicsParityMode: false, parityMode: false, ridgeMode: 1 })), 'SHOW');
         rightEngine.current?.forceRedraw?.();
       }
 
@@ -1234,22 +1204,22 @@ export default function WarpBubbleCompare({
         burst_ms: lc.burst_ms,
         sectors: s
       };
-      pushSafe(leftEngine,  lcPayload, 'REAL');
-      pushSafe(rightEngine, lcPayload, 'SHOW');
+      pushLeft.current(paneSanitize('REAL', sanitizeUniforms(lcPayload)), 'REAL');
+      pushRight.current(paneSanitize('SHOW', sanitizeUniforms(lcPayload)), 'SHOW');
     }
 
     // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
-    pushSafe(leftEngine, {
+    pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
       exposure: real.exposure,
       zeroStop: real.zeroStop,
       colorMode: 2,             // pin shear proxy permanently for REAL
       ridgeMode: 0              // pin double-lobe physics mode
-    }, 'REAL');
+    })), 'REAL');
 
     // SHOW: can have live camera and display adjustments
     if (leftRef.current && rightRef.current) {
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
-      pushSafe(rightEngine, { cameraZ: fixedCamZ, lockFraming: true }, 'SHOW');
+      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: fixedCamZ, lockFraming: true })), 'SHOW');
     }
   }, [parameters, colorMode, lockFraming, heroBoost]);
 
@@ -1288,6 +1258,12 @@ export default function WarpBubbleCompare({
       mql.removeEventListener?.('change', onDpr);
       window.removeEventListener('resize', onDpr);
     };
+  }, []);
+
+  // Initialize batched push functions for performance optimization
+  useEffect(() => {
+    pushLeft.current = makeUniformBatcher(leftEngine);
+    pushRight.current = makeUniformBatcher(rightEngine);
   }, []);
 
   // Debug probe to verify physics parameters are changing with mode switches
