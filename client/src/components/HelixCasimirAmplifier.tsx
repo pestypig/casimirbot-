@@ -586,7 +586,16 @@ export default function HelixCasimirAmplifier({
       });
     }
 
-    // Debug: log all derived calculations
+    // mass chain (no Q in energy; Q is for power)
+    const geo3        = Math.pow(gammaGeo, 3);
+    const E_tile_geo3 = Math.abs(U_static) * geo3;             // step: ×γ_geo^3
+    const E_tile_VdB  = E_tile_geo3 * gammaVdB;                // step: ×γ_VdB
+    const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
+    const M_tile      = E_tile_mass / (C * C);                 // kg per tile
+    const M_total_calc   = M_tile * N_tiles;
+    const M_total_report = hud.exoticMassKg;
+
+    // Debug: log all derived calculations (after all variables are calculated)
     console.debug("[HelixCasimirAmplifier] Derived calculations:", {
       U_geo: U_geo,
       U_Q: U_Q,
@@ -596,15 +605,6 @@ export default function HelixCasimirAmplifier({
       d_eff: d_eff,
       N_tiles: N_tiles
     });
-
-    // mass chain (no Q in energy; Q is for power)
-    const geo3        = Math.pow(gammaGeo, 3);
-    const E_tile_geo3 = Math.abs(U_static) * geo3;             // step: ×γ_geo^3
-    const E_tile_VdB  = E_tile_geo3 * gammaVdB;                // step: ×γ_VdB
-    const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
-    const M_tile      = E_tile_mass / (C * C);                 // kg per tile
-    const M_total_calc   = M_tile * N_tiles;
-    const M_total_report = hud.exoticMassKg;
 
     // casimir foundation (unchanged)
     const gap_m       = Math.max(1e-12, (state.gap_nm ?? 16) * 1e-9);
