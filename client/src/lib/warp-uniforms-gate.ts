@@ -4,54 +4,117 @@
  */
 
 export type WarpUniforms = {
+  // geometry
+  hull?: { a:number; b:number; c:number };
+  axesScene?: [number,number,number];
+  axesClip?: [number,number,number];
+  cameraZ?: number;
+  lockFraming?: boolean;
+
+  // duty / sectoring
+  sectorCount: number;      // total sectors
+  sectors: number;          // concurrent live sectors
+  dutyCycle?: number;       // UI duty (0..1)
+  dutyLocal?: number;       // local on-window duty (defaults to 0.01 if missing)
+  dutyEffectiveFR: number;  // Ford–Roman ship-wide duty (0..1)
+
+  // physics amps
   gammaGeo: number;
-  qSpoilingFactor: number;
-  gammaVanDenBroeck: number;    // visual-only version for rendering
+
+  // q (ΔA/A) aliases
+  deltaAOverA?: number;
+  qSpoilingFactor?: number;
+  qSpoil?: number;
+
+  // γ_VdB aliases
+  gammaVanDenBroeck?: number;      // legacy/visual
+  gammaVdB?: number;               // short alias
   gammaVanDenBroeck_vis?: number;  // explicit visual version
-  gammaVanDenBroeck_mass?: number; // mass-calibrated version
-  dutyEffectiveFR: number;
-  sectorCount: number;
-  sectors: number;
-  thetaScale?: number;         // optional precomputed (server)
-  thetaScaleExpected?: number; // server verification value
+  gammaVanDenBroeck_mass?: number; // mass-calibrated (pass-through)
+
+  // mech/cavity Q aliases (pass-through for consumers that need them)
+  qMechanical?: number;
+  qMech?: number;
+  qCavity?: number;
+  qCav?: number;
+
+  // θ scaling
+  thetaScale?: number;             // server-precomputed θ (authoritative if present)
+  thetaScaleExpected?: number;     // server verification value (for audit)
+  thetaDutyExponent?: number;      // optional duty exponent (default 1.0). Viz may set 0.5
+  __vizDutySqrt?: boolean;         // legacy viz toggle → exponent 0.5
+
+  // view
   colorMode?: 'theta'|'rho';
+  viewAvg?: boolean;
+  viewMassFraction?: number;       // 0..1
   physicsParityMode?: boolean;
   ridgeMode?: number;
+  exposure?: number;
+  zeroStop?: number;
+
+  // provenance
   __src?: 'server'|'client'|'legacy';
-  __version?: number;          // monotone
-  [key: string]: any;          // Allow other engine-specific uniforms
+  __version?: number;              // monotone
+
+  // timing hints (pass-through)
+  onWindowDisplay?: boolean;
+  cyclesPerBurst?: number;
+  dwell_ms?: number;
+  tauLC_ms?: number;
+
+  [key: string]: any;              // allow other engine-specific uniforms
 };
 
 let lastVersion = 0;
 let lastSrc: string | undefined;
 
+const EPS = 1e-12;
+const N = (x:any, d:number) => (Number.isFinite(+x) ? +x : d);
+const POS = (x:any, d:number) => Math.max(d, N(x, d));
+
 export function applyToEngine(
   engine: { updateUniforms: (u: any) => void },
   uniforms: WarpUniforms
 ) {
-  // Normalize uniform names to ensure both spellings exist
-  const normalizedUniforms = { ...uniforms };
-  
-  // Ensure both spellings exist for gamma VdB
-  if (typeof normalizedUniforms.gammaVanDenBroeck === 'number' && typeof normalizedUniforms.gammaVdB !== 'number') {
-    normalizedUniforms.gammaVdB = normalizedUniforms.gammaVanDenBroeck;
+  // --- 1) Normalize aliases --------------------------------------------------
+  const u: any = { ...uniforms };
+
+  // γ_VdB aliases ↔ mirror both ways
+  if (typeof u.gammaVanDenBroeck === 'number' && typeof u.gammaVdB !== 'number') {
+    u.gammaVdB = u.gammaVanDenBroeck;
   }
-  if (typeof normalizedUniforms.gammaVdB === 'number' && typeof normalizedUniforms.gammaVanDenBroeck !== 'number') {
-    normalizedUniforms.gammaVanDenBroeck = normalizedUniforms.gammaVdB;
+  if (typeof u.gammaVdB === 'number' && typeof u.gammaVanDenBroeck !== 'number') {
+    u.gammaVanDenBroeck = u.gammaVdB;
+  }
+  if (typeof u.gammaVanDenBroeck_vis !== 'number') {
+    u.gammaVanDenBroeck_vis = (typeof u.gammaVdB === 'number' ? u.gammaVdB : u.gammaVanDenBroeck);
   }
 
-  // Ensure both spellings exist for q spoiling
-  if (typeof normalizedUniforms.qSpoilingFactor === 'number' && typeof normalizedUniforms.qSpoil !== 'number') {
-    normalizedUniforms.qSpoil = normalizedUniforms.qSpoilingFactor;
+  // q (ΔA/A) aliases ↔ mirror
+  const qCanon = POS(u.deltaAOverA ?? u.qSpoilingFactor ?? u.qSpoil, 1);
+  u.deltaAOverA     = qCanon;
+  u.qSpoilingFactor = qCanon;
+  u.qSpoil          = qCanon;
+
+  // qMechanical / qMech aliases ↔ mirror (pass-through; not used here but useful to consumers)
+  const qMechCanon = N(u.qMechanical ?? u.qMech, NaN);
+  if (Number.isFinite(qMechCanon)) {
+    u.qMechanical = qMechCanon;
+    u.qMech = qMechCanon;
   }
-  if (typeof normalizedUniforms.qSpoil === 'number' && typeof normalizedUniforms.qSpoilingFactor !== 'number') {
-    normalizedUniforms.qSpoilingFactor = normalizedUniforms.qSpoil;
+
+  // qCavity / qCav aliases ↔ mirror (pass-through)
+  const qCavCanon = N(u.qCavity ?? u.qCav, NaN);
+  if (Number.isFinite(qCavCanon)) {
+    u.qCavity = qCavCanon;
+    u.qCav = qCavCanon;
   }
-  
-  const v = normalizedUniforms.__version ?? Date.now();
-  const src = normalizedUniforms.__src || 'legacy';
-  
-  // Server canonical source always wins if it has newer or equal version
+
+  // --- 2) Version / source gate --------------------------------------------
+  const v = N(u.__version, Date.now());
+  const src = u.__src || 'legacy';
+
   if (src === 'server') {
     if (v >= lastVersion) {
       lastVersion = v;
@@ -60,14 +123,10 @@ export function applyToEngine(
       console.warn('[warp:gating] drop older server uniforms v=', v, 'last=', lastVersion);
       return;
     }
-  }
-  // Legacy sources blocked if server has written
-  else if (lastSrc === 'server' && src === 'legacy') {
+  } else if (lastSrc === 'server' && src === 'legacy') {
     console.warn('[warp:gating] blocked legacy uniforms (server canonical active)');
     return;
-  }
-  // Standard version check for non-server sources
-  else if (v < lastVersion) {
+  } else if (v < lastVersion) {
     console.warn('[warp:gating] drop older uniforms from', src, 'v=', v, 'last=', lastVersion);
     return;
   } else {
@@ -75,97 +134,127 @@ export function applyToEngine(
     lastSrc = src;
   }
 
-  // ---- Canonical θ (renderer law √d_FR) with safe defaults -----------------
-  // visual-only γ_VdB to keep mass calibration away from renderer
-  const gammaVdB_vis =
-    (typeof normalizedUniforms.gammaVanDenBroeck_vis === 'number' && normalizedUniforms.gammaVanDenBroeck_vis) ??
-    (typeof normalizedUniforms.gammaVanDenBroeck === 'number' && normalizedUniforms.gammaVanDenBroeck) ??
-    (typeof normalizedUniforms.gammaVdB === 'number' && normalizedUniforms.gammaVdB) ?? 1;
+  // --- 3) Compute canonical θ ----------------------------------------------
+  const gammaGeo = POS(u.gammaGeo, 26);
+  const q = POS(u.qSpoilingFactor, 1);
 
-  const gammaGeo = Math.max(1, Number(normalizedUniforms.gammaGeo ?? 26));
-  const q = Math.max(1e-12, Number(
-    normalizedUniforms.qSpoilingFactor ?? normalizedUniforms.deltaAOverA ?? 1
-  ));
-
-  // FR duty guard: use provided value or compute 0.01 × (S_live / S_total)
-  const sectorsTotal = Math.max(1, Number(normalizedUniforms.sectorCount ?? 400));
-  const sectorsLive  = Math.max(1, Number(normalizedUniforms.sectors ?? 1));
-  const dutyLocal    = Number.isFinite(+normalizedUniforms.dutyLocal)
-    ? Math.max(1e-12, Number(normalizedUniforms.dutyLocal))
-    : 0.01;
-  const dutyFR = Math.max(
-    1e-12,
-    Number(normalizedUniforms.dutyEffectiveFR ??
-      (dutyLocal * (sectorsLive / sectorsTotal)))
+  // Prefer *visual* γ_VdB for renderer; fall back to legacy/short alias
+  const gammaVdB_vis = POS(
+    u.gammaVanDenBroeck_vis ?? u.gammaVanDenBroeck ?? u.gammaVdB,
+    1
   );
 
-  const thetaFromChain =
-    Math.pow(gammaGeo, 3) * q * Math.max(1, Number(gammaVdB_vis)) * Math.sqrt(dutyFR);
-  const θ = (normalizedUniforms.thetaScale != null && Number.isFinite(+normalizedUniforms.thetaScale))
-    ? Number(normalizedUniforms.thetaScale)
-    : thetaFromChain;
+  // Sectors / Duties
+  const sectorsTotal = Math.max(1, N(u.sectorCount, 400));
+  const sectorsLive  = Math.max(1, Math.min(sectorsTotal, N(u.sectors, 1)));
 
-  // ---- Display locks (non-physics) ----------------------------------------
-  const viewAvg = (normalizedUniforms.viewAvg ?? true) ? true : false;
-  const exposure = Number.isFinite(+normalizedUniforms.exposure) ? +normalizedUniforms.exposure : 5.0;
-  const zeroStop = Number.isFinite(+normalizedUniforms.zeroStop) ? +normalizedUniforms.zeroStop : 1e-7;
-  const colorMode = normalizedUniforms.colorMode ?? 'theta';
+  // Local duty for provenance (UI/local)
+  const dutyLocal = POS(u.dutyLocal ?? u.dutyCycle, 0.01);
 
-  // Respect caller's ridgeMode; if absent, infer from parity (REAL→0, SHOW→1)
-  let ridgeMode = normalizedUniforms.ridgeMode;
-  if (ridgeMode == null && typeof normalizedUniforms.physicsParityMode === 'boolean') {
-    ridgeMode = normalizedUniforms.physicsParityMode ? 0 : 1;
-  }
+  // Ford–Roman ship-wide duty: authoritative if provided, else derive
+  const dutyFR = POS(
+    u.dutyEffectiveFR ?? (dutyLocal * (sectorsLive / sectorsTotal)),
+    1e-12
+  );
 
-  // Ensure viewMassFraction always present
-  const viewMassFraction = Number.isFinite(+normalizedUniforms.viewMassFraction)
-    ? Number(normalizedUniforms.viewMassFraction)
-    : 1.0;
+  // Duty exponent (physics default = 1.0). Viz can request sqrt(·) via thetaDutyExponent or __vizDutySqrt
+  const dutyExp = Number.isFinite(+u.thetaDutyExponent)
+    ? +u.thetaDutyExponent
+    : (u.__vizDutySqrt ? 0.5 : 1.0);
 
-  // CameraZ helper (prevents "CameraZ unset" warnings)
-  let cameraZ = normalizedUniforms.cameraZ as any;
-  let lockFraming = normalizedUniforms.lockFraming as any;
-  if (!Number.isFinite(cameraZ)) {
-    const ax = (normalizedUniforms as any).axesClip;
-    if (Array.isArray(ax) && ax.length === 3) {
-      const R = Math.max(1e-6, Math.max(ax[0]||0, ax[1]||0, ax[2]||0));
-      const fov = Math.PI / 3.2; // ~56°
-      cameraZ = (1.8 * R) / Math.tan(fov * 0.5);
-      lockFraming = true;
+  // Fallback chain matches backend physics by default (exp=1). Viz may compress range with exp=0.5.
+  const thetaFromChain = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.pow(dutyFR, dutyExp);
+
+  // If server provided a θ, it wins; otherwise use chain
+  const thetaUsed =
+    (u.thetaScale != null && Number.isFinite(+u.thetaScale))
+      ? +u.thetaScale
+      : thetaFromChain;
+
+  // Optional audit vs expected
+  if (Number.isFinite(+u.thetaScaleExpected) && Number.isFinite(+thetaUsed)) {
+    const exp = +u.thetaScaleExpected;
+    const rel = Math.abs(thetaUsed - exp) / Math.max(EPS, Math.abs(exp));
+    if (rel > 0.10) {
+      console.warn('[warp:gating] θ mismatch vs expected (>|10%|): used=', thetaUsed, 'expected=', exp, 'rel=', (rel*100).toFixed(1)+'%');
     }
   }
 
-  const lockedUniforms: any = {
-    ...normalizedUniforms,
-    thetaScale: θ,
-    dutyEffectiveFR: dutyFR,   // echo back the authoritative duty
-    exposure,
-    zeroStop,
+  // --- 4) Display/fit helpers ----------------------------------------------
+  const colorMode = (u.colorMode === 'rho' ? 'rho' : 'theta');
+  const viewAvg = (u.viewAvg ?? true) ? true : false;
+
+  // Ensure viewMassFraction present
+  const viewMassFraction = Math.max(0, Math.min(1, N(u.viewMassFraction, sectorsLive / sectorsTotal)));
+
+  // Exposure / zeroStop defaults (non-physics)
+  const exposure = Number.isFinite(+u.exposure) ? +u.exposure : 5.0;
+  const zeroStop = Number.isFinite(+u.zeroStop) ? +u.zeroStop : 1e-7;
+
+  // Ridge mode: respect caller; else infer from parity (REAL→0, SHOW→1)
+  let ridgeMode = u.ridgeMode;
+  if (ridgeMode == null && typeof u.physicsParityMode === 'boolean') {
+    ridgeMode = u.physicsParityMode ? 0 : 1;
+  }
+
+  // axesClip → derive from axesClip | axesScene | hull
+  let axesClip: [number,number,number] | undefined = u.axesClip;
+  if (!axesClip) {
+    if (Array.isArray(u.axesScene) && u.axesScene.length === 3) {
+      axesClip = [ Math.abs(u.axesScene[0]||0), Math.abs(u.axesScene[1]||0), Math.abs(u.axesScene[2]||0) ];
+    } else if (u.hull && Number.isFinite(u.hull.a) && Number.isFinite(u.hull.b) && Number.isFinite(u.hull.c)) {
+      axesClip = [ Math.abs(u.hull.a), Math.abs(u.hull.b), Math.abs(u.hull.c) ];
+    }
+  }
+
+  // CameraZ helper (prevents "CameraZ unset" warnings) — only fill if missing
+  let cameraZ = u.cameraZ as any;
+  let lockFraming = u.lockFraming as any;
+  if (!Number.isFinite(cameraZ) && axesClip) {
+    const R = Math.max(1e-6, Math.max(axesClip[0], axesClip[1], axesClip[2]));
+    const fov = Math.PI / 3.2; // ~56°
+    cameraZ = (1.8 * R) / Math.tan(fov * 0.5);
+    lockFraming = true;
+  }
+
+  // --- 5) Final locked uniforms pushed to engine ----------------------------
+  const locked: any = {
+    ...u,
+    // canonical outputs
+    thetaScale: thetaUsed,
+    dutyEffectiveFR: dutyFR,
+    // mirrored aliases (so downstream can use any)
+    gammaVdB: gammaVdB_vis,
+    gammaVanDenBroeck: gammaVdB_vis,
+    deltaAOverA: q,
+    qSpoilingFactor: q,
+    qSpoil: q,
+    // view locks
     colorMode,
     viewAvg,
     viewMassFraction,
+    exposure,
+    zeroStop,
+    ridgeMode,
+    // geometry / framing
+    axesClip: axesClip ?? u.axesClip,
+    cameraZ: Number.isFinite(cameraZ) ? cameraZ : u.cameraZ,
+    lockFraming: (lockFraming ?? u.lockFraming ?? false),
   };
-  if (ridgeMode != null) lockedUniforms.ridgeMode = ridgeMode;
-  if (Number.isFinite(cameraZ)) {
-    lockedUniforms.cameraZ = cameraZ;
-    lockedUniforms.lockFraming = (lockFraming ?? true);
-  }
 
   // Debug echo (what we actually bind)
   (window as any).__warpEcho = {
-    v, src: normalizedUniforms.__src, θ_used: θ,
+    v, src,
+    theta_used: thetaUsed,
+    theta_dutyExp: dutyExp,
     terms: {
-      γ_geo: gammaGeo,
-      q,
-      γ_VdB: gammaVdB_vis,
-      γ_VdB_mass: normalizedUniforms.gammaVanDenBroeck_mass,
-      d_FR: dutyFR,
-      viewAvg,
-      viewMassFraction,
-      sectors: { total: sectorsTotal, live: sectorsLive }
+      gammaGeo, q, gammaVdB_vis, dutyFR,
+      sectors: { total: sectorsTotal, live: sectorsLive },
+      viewAvg, viewMassFraction
     }
   };
-  engine.updateUniforms(lockedUniforms);
+
+  engine.updateUniforms(locked);
 }
 
 /**
@@ -175,14 +264,13 @@ export function applyToEngine(
 export function gatedUpdateUniforms(
   engine: { updateUniforms: (u: any) => void },
   uniforms: any,
-  source: string = 'legacy'
+  source: 'server'|'client'|'legacy' = 'legacy'
 ) {
   const gatedUniforms: WarpUniforms = {
     ...uniforms,
     __src: source,
     __version: Date.now()
   };
-  
   applyToEngine(engine, gatedUniforms);
 }
 

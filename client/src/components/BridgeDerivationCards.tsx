@@ -2,85 +2,579 @@ import React from "react";
 import { useMetrics } from "@/hooks/use-metrics";
 import type { HelixMetrics } from "@/hooks/use-metrics";
 
-// Helper components for clean display
+/* ---------- tiny helpers ---------- */
 const Eq = ({ children }: { children: React.ReactNode }) => (
-  <code className="rounded bg-slate-900/50 px-2 py-1 text-sm font-mono">{children}</code>
+  <code className="rounded bg-slate-900/50 px-2 py-1 text-[12px] font-mono">{children}</code>
 );
 
-// Hull Surface & Tile Count Card
+const num = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+const fmt = (x: unknown, digits = 3) => (typeof x === "number" && Number.isFinite(x) ? x.toFixed(digits) : "—");
+const fexp = (x: unknown, digits = 2) => (typeof x === "number" && Number.isFinite(x) ? x.toExponential(digits) : "—");
+const fint = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? Math.round(x).toLocaleString() : "—");
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+/** Reusable formula block: Base → Substitute → Result (+provenance) */
+function FormulaBlock({
+  title,
+  base,
+  sub,
+  result,
+  notes,
+}: {
+  title: string;
+  base: string;
+  sub?: string;
+  result?: string;
+  notes?: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1 text-xs">
+      <div className="font-medium">{title}</div>
+      <div>Base: <Eq>{base}</Eq></div>
+      {sub && <div>Substitute: <Eq>{sub}</Eq></div>}
+      {result && <div>Result: <Eq>{result}</Eq></div>}
+      {notes && <div className="text-[11px] text-slate-400">{notes}</div>}
+    </div>
+  );
+}
+
+/** Server→Client mapping + FR duty + θ note */
+export type UniformsExplain = {
+  sources: Record<string, string>;
+  fordRomanDuty: {
+    formula: string;
+    burstLocal: number;
+    S_total: number;
+    S_live: number;
+    computed_d_eff: number;
+  };
+  thetaAudit: {
+    note: string;
+    thetaScaleExpected: number;
+    inputs?: {
+      gammaGeo?: number;
+      q?: number;
+      gammaVdB_vis?: number;
+      d_eff?: number;
+    };
+  };
+  // NEW: live values injected by backend for cards
+  live?: {
+    S_total?: number;
+    S_live?: number;
+    dutyCycle?: number;
+    dutyEffectiveFR?: number;
+
+    gammaGeo?: number;
+    qSpoilingFactor?: number;
+    qCavity?: number;
+    gammaVanDenBroeck_vis?: number;
+    gammaVanDenBroeck_mass?: number;
+
+    N_tiles?: number;
+    tilesPerSector?: number;
+    activeTiles?: number;
+
+    P_avg_W?: number;
+    P_avg_MW?: number;
+
+    zeta?: number;
+    TS_ratio?: number;
+  };
+  // NEW: equation strings for provenance
+  equations?: {
+    d_eff?: string;
+    theta_expected?: string;
+    U_static?: string;
+    U_geo?: string;
+    U_Q?: string;
+    P_avg?: string;
+    M_exotic?: string;
+    TS_long?: string;
+  };
+};
+
+function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExplain; m?: HelixMetrics; className?: string }) {
+  if (!data) return null;
+  const entries = Object.entries(data.sources || {});
+  const fr = data.fordRomanDuty || ({} as UniformsExplain["fordRomanDuty"]);
+  const th = data.thetaAudit || ({} as UniformsExplain["thetaAudit"]);
+  const live = data.live || {};
+  const eqn = data.equations || {};
+
+  // --- FR numbers ---
+  const dEff = num(fr.computed_d_eff) ?? num(live.dutyEffectiveFR);
+  const S_live = num(fr.S_live) ?? num(live.S_live);
+  const S_total = num(fr.S_total) ?? num(live.S_total);
+  const burstLocal = num(fr.burstLocal);
+
+  const baseFR = eqn.d_eff || "d_eff = burstLocal × S_live / S_total";
+  const subFR =
+    burstLocal !== undefined && S_live !== undefined && S_total !== undefined
+      ? `d_eff = ${fmt(burstLocal)} × ${fmt(S_live, 0)} / ${fmt(S_total, 0)}`
+      : undefined;
+  const resFR = dEff !== undefined ? `d_eff = ${fmt(dEff, 6)} (unitless)` : undefined;
+
+  // --- θ numbers ---
+  const gammaGeo = num(live.gammaGeo) ?? num(th.inputs?.gammaGeo);
+  const q = num(live.qSpoilingFactor) ?? num(th.inputs?.q);
+  const gammaVdB_vis = num(live.gammaVanDenBroeck_vis) ?? num(th.inputs?.gammaVdB_vis);
+
+  const thetaExpected =
+    gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
+      ? Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.sqrt(clamp01(dEff))
+      : undefined;
+
+  // --- P_avg substitution pieces (best-effort) ---
+  const N_tiles = num(live.N_tiles) ?? num((m as any)?.tiles?.N_tiles) ?? num((m as any)?.N_tiles);
+  const Q_cav = num(live.qCavity) ?? num((m as any)?.pipeline?.qCavity ?? (m as any)?.qCavity);
+  const f_m_Hz = num((m as any)?.timescales?.f_m_Hz);
+  const omega = f_m_Hz !== undefined ? 2 * Math.PI * f_m_Hz : undefined;
+  const P_avg_W = num(live.P_avg_W) ?? (num((m as any)?.P_avg) !== undefined ? num((m as any)?.P_avg)! * 1e6 : undefined);
+
+  // We usually don't expose U_Q per-tile; show partial substitution if pieces are known
+  const subP = (N_tiles !== undefined || Q_cav !== undefined || omega !== undefined || dEff !== undefined)
+    ? `P_avg = |U_Q| · ${omega ? `(${fexp(omega, 2)} rad·s⁻¹)` : "ω"} / ${Q_cav ? fmt(Q_cav, 0) : "Q"} · ${N_tiles ? fint(N_tiles) : "N_tiles"} · ${dEff !== undefined ? fmt(dEff, 6) : "d_eff"}`
+    : undefined;
+
+  // --- Mass substitution pieces ---
+  const A_tile_cm2 = num((m as any)?.tiles?.tileArea_cm2) ?? num((m as any)?.tileArea_cm2);
+  const A_tile_m2 = A_tile_cm2 !== undefined ? A_tile_cm2 * 1e-4 : undefined;
+  const gap_nm = num((m as any)?.pipeline?.gap_nm ?? (m as any)?.gap_nm);
+  const gammaVdB_mass = num(live.gammaVanDenBroeck_mass);
+  const Q_burst = 1e9; // paper constant used in backend
+  const M_exotic_kg = num((m as any)?.pipeline?.M_exotic ?? (m as any)?.M_exotic);
+
+  // --- Correct the classic Casimir exponent (1/a^3) and sanitize any server-provided string ---
+  const fixUStaticEqn = (s?: string) =>
+    s ? s.replace(/a⁴|a\^4/g, "a³").replace(/a\^4/g, "a^3") : s;
+
+  const baseUstatic = fixUStaticEqn(eqn.U_static) || "U_static = [-π²·ℏ·c/(720·a³)] · A_tile";
+  const subUstatic = (gap_nm !== undefined && A_tile_m2 !== undefined)
+    ? `U_static = [-π²·ℏ·c/(720·(${(gap_nm * 1e-9).toExponential(2)})³)] · ${fexp(A_tile_m2, 2)} m²`
+    : undefined;
+
+  const baseTheta = eqn.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB(vis) · √d_eff";
+  const subTheta =
+    gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
+      ? `θ = (${fmt(gammaGeo, 0)})^3 · ${fmt(q, 3)} · ${fexp(gammaVdB_vis, 2)} · √${fmt(dEff, 6)}`
+      : undefined;
+
+  const baseMass = eqn.M_exotic || "M = [U_static · γ_geo^3 · Q_burst · γ_VdB · d_eff] · N_tiles / c²";
+  const subMass = (A_tile_m2 !== undefined && gammaGeo !== undefined && dEff !== undefined && N_tiles !== undefined && gammaVdB_mass !== undefined)
+    ? `M = [U_static · (${fmt(gammaGeo, 0)})^3 · 1e9 · ${fexp(gammaVdB_mass, 2)} · ${fmt(dEff, 6)}] · ${fint(N_tiles)} / c²`
+    : undefined;
+
+  const basePow = eqn.P_avg || "P_avg = |U_Q| · ω / Q · N_tiles · d_eff";
+
+  return (
+    <section className={`bg-card/60 border rounded-lg p-4 space-y-3 ${className}`}>
+      <h3 className="font-semibold text-sm">Uniforms Explain (server → client)</h3>
+
+      {!!entries.length && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+          {entries.map(([k, v]) => (
+            <div key={k} className="flex items-start gap-2">
+              <span className="text-muted-foreground w-40 shrink-0">{k}</span>
+              <span className="text-foreground/90">{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Live parameters row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div>
+          <div className="text-muted-foreground">Sectors</div>
+          <div><Eq>{S_live !== undefined && S_total !== undefined ? `${fint(S_live)}/${fint(S_total)}` : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">d_eff</div>
+          <div><Eq>{dEff !== undefined ? fmt(dEff, 6) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">γ_VdB (vis)</div>
+          <div><Eq>{gammaVdB_vis !== undefined ? fexp(gammaVdB_vis, 2) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">γ_VdB (mass)</div>
+          <div><Eq>{gammaVdB_mass !== undefined ? fexp(gammaVdB_mass, 2) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">q (spoiling)</div>
+          <div><Eq>{q !== undefined ? fmt(q, 3) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Q (cavity)</div>
+          <div><Eq>{Q_cav !== undefined ? fint(Q_cav) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">Tiles</div>
+          <div><Eq>{N_tiles !== undefined ? fint(N_tiles) : "—"}</Eq></div>
+        </div>
+        <div>
+          <div className="text-muted-foreground">P_avg</div>
+          <div><Eq>{P_avg_W !== undefined ? ${(P_avg_W / 1e6).toFixed(1)} MW : "—"}</Eq></div>
+        </div>
+      </div>
+
+      <FormulaBlock
+        title="Ford–Roman duty aggregation"
+        base={baseFR}
+        sub={subFR}
+        result={resFR}
+        notes="S_live is concurrently strobed sectors; S_total is total tiling. burstLocal is the local ON fraction."
+      />
+
+      <FormulaBlock
+        title="Expected θ (mode-aware)"
+        base={baseTheta}
+        sub={subTheta}
+        result={thetaExpected !== undefined ? `θ_expected = ${fexp(thetaExpected, 2)}` : undefined}
+        notes={<>
+          <div>Server audit θ: <Eq>{fexp(th?.thetaScaleExpected, 2)}</Eq></div>
+        </>}
+      />
+
+      <FormulaBlock
+        title="Static Casimir energy (per tile)"
+        base={baseUstatic}
+        sub={subUstatic}
+        notes="a = gap; E/A ∝ 1/a³; A_tile from tile census"
+      />
+
+      <FormulaBlock
+        title="Average power (ship)"
+        base={basePow}
+        sub={subP}
+        result={P_avg_W !== undefined ? `P_avg = ${(P_avg_W/1e6).toFixed(2)} MW` : undefined}
+        notes="U_Q includes geometry + mechanical Q calibration; ω = 2π f_m; Q is dynamic cavity Q"
+      />
+
+      <FormulaBlock
+        title="Exotic mass budget (ship)"
+        base={baseMass}
+        sub={subMass}
+        result={M_exotic_kg !== undefined ? `M = ${fint(M_exotic_kg)} kg` : undefined}
+        notes="γ_VdB(mass) is the calibrated pocket factor used solely for mass matching"
+      />
+    </section>
+  );
+}
+
+/** Hull Surface & Tile Count */
 function TilesCard({ m }: { m: HelixMetrics }) {
-  if (!m.hull || !m.tiles) return null;
-  
-  const A_tile_m2 = m.tiles.tileArea_cm2 * 1e-4;
-  
+  if (!m.hull || !(m as any).tiles) return null;
+
+  const Lx = num(m.hull.Lx_m);
+  const Ly = num(m.hull.Ly_m);
+  const Lz = num(m.hull.Lz_m);
+  const A_tile_cm2 = num((m as any).tiles?.tileArea_cm2);
+  const A_tile_m2 = A_tile_cm2 !== undefined ? A_tile_cm2 * 1e-4 : undefined;
+
+  const A_hull = num((m as any).tiles?.hullArea_m2);
+  const N_tiles = num((m as any).tiles?.N_tiles);
+
+  // Include paper-authentic census factors when available (fallbacks are backend defaults)
+  const PACKING =
+    num((m as any).tiles?.packing ?? (m as any)?.pipeline?.__packing) ?? 0.88;
+  const RADIAL_LAYERS =
+    num((m as any).tiles?.radialLayers ?? (m as any)?.tiles?.RADIAL_LAYERS ?? (m as any)?.RADIAL_LAYERS) ?? 10;
+
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
       <h3 className="font-semibold text-sm">Hull Surface & Tile Count</h3>
-      <div className="space-y-2 text-xs">
-        <p>
-          Hull (needle) dimensions: <Eq>{m.hull.Lx_m} × {m.hull.Ly_m} × {m.hull.Lz_m} m</Eq><br/>
-          Tile area: <Eq>{m.tiles.tileArea_cm2} cm²</Eq> = <Eq>{A_tile_m2.toExponential(2)} m²</Eq>
-        </p>
-        <p>
-          Surface area (ellipsoid approx.): <Eq>A_hull ≈ {m.tiles.hullArea_m2 ? m.tiles.hullArea_m2.toLocaleString() : '—'} m²</Eq><br/>
-          <strong><Eq>N_tiles = ⌊A_hull / A_tile⌋ = {m.tiles.N_tiles.toLocaleString()}</Eq></strong>
-        </p>
-        <p className="text-muted-foreground text-xs">
-          Area via Knud–Thomsen; good accuracy for prolate (needle-like) shapes.
-        </p>
+
+      <div className="space-y-3">
+        <FormulaBlock
+          title="Tile area conversion"
+          base="A_tile[m²] = A_tile[cm²] × 1e-4"
+          sub={A_tile_cm2 !== undefined ? `A_tile = ${fmt(A_tile_cm2, 2)} × 1e-4` : undefined}
+          result={A_tile_m2 !== undefined ? `A_tile = ${fexp(A_tile_m2, 2)} m²` : undefined}
+          notes="1 cm² = 1e-4 m²"
+        />
+
+        <FormulaBlock
+          title="Ellipsoidal hull area (Knud–Thomsen)"
+          base="A_hull ≈ 4π · ((a^p b^p + a^p c^p + b^p c^p)/3)^(1/p)  (p≈1.6075)"
+          sub={
+            Lx !== undefined && Ly !== undefined && Lz !== undefined
+              ? `a=${fmt(Lx / 2, 3)} m, b=${fmt(Ly / 2, 3)} m, c=${fmt(Lz / 2, 3)} m`
+              : undefined
+          }
+          result={A_hull !== undefined ? `A_hull ≈ ${A_hull.toLocaleString()} m²` : undefined}
+          notes="Good accuracy for prolate (needle-like) shapes."
+        />
+
+        <FormulaBlock
+          title="Tile count (paper-authentic)"
+          base="N_tiles = ⌊ (A_hull / A_tile) × PACKING × RADIAL_LAYERS ⌋"
+          sub={
+            A_hull !== undefined && A_tile_m2 !== undefined
+              ? `N_tiles = ⌊ ${A_hull.toLocaleString()} / ${fexp(A_tile_m2, 2)} × ${fmt(PACKING, 2)} × ${fmt(RADIAL_LAYERS, 0)} ⌋`
+              : undefined
+          }
+          result={N_tiles !== undefined ? `N_tiles = ${fint(N_tiles)}` : undefined}
+          notes="PACKING ≈ 0.88 (surface efficiency), RADIAL_LAYERS ≈ 10 (surface × radial lattice)."
+        />
       </div>
     </section>
   );
 }
 
-// Time-Scale Separation Card
+/** Time-Scale Separation */
 function TimeScaleCard({ m }: { m: HelixMetrics }) {
-  if (!m.timescales) return null;
-  
-  const fGHz = m.timescales.f_m_Hz / 1e9;
-  
+  const ts = (m as any).timescales;
+  if (!ts) return null;
+
+  const L_long = num(ts.L_long_m);
+  const c = 299_792_458; // m/s
+  const T_long = L_long !== undefined ? L_long / c : undefined;
+
+  const f_m = num(ts.f_m_Hz); // Hz
+  const T_m = f_m !== undefined && f_m > 0 ? 1 / f_m : undefined;
+
+  const TS_long = T_long !== undefined && T_m !== undefined && T_m > 0 ? T_long / T_m : undefined;
+
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
       <h3 className="font-semibold text-sm">Time-Scale Separation</h3>
-      <div className="space-y-2 text-xs">
-        <p>
-          Longest hull dimension: <Eq>L_long = {m.timescales.L_long_m.toLocaleString()} m</Eq><br/>
-          Modulation period: <Eq>T_m = {m.timescales.T_m_s.toExponential(2)} s</Eq><br/>
-          Light-crossing time: <Eq>T_LC = L_long / c = {m.timescales.T_long_s.toExponential(2)} s</Eq>
-        </p>
-        <p>
-          <strong><Eq>TS_ratio = T_LC / T_m = {m.timescales.TS_long.toLocaleString(undefined, {maximumFractionDigits: 1})}</Eq></strong>
-        </p>
-        <p className="text-muted-foreground text-xs">
-          Using f_m = {fGHz.toFixed(2)} GHz · conservative (longest-edge) TS shown; geometric TS also available.
-        </p>
+
+      <FormulaBlock
+        title="Light-crossing time"
+        base="T_LC = L_long / c"
+        sub={L_long !== undefined ? `T_LC = ${fmt(L_long, 3)} m / ${c.toLocaleString()} m·s⁻¹` : undefined}
+        result={T_long !== undefined ? `T_LC = ${fexp(T_long, 2)} s` : undefined}
+      />
+
+      <FormulaBlock
+        title="Modulation period"
+        base="T_m = 1 / f_m"
+        sub={f_m !== undefined ? `T_m = 1 / ${f_m.toLocaleString()} Hz` : undefined}
+        result={T_m !== undefined ? `T_m = ${fexp(T_m, 2)} s` : undefined}
+      />
+
+      <FormulaBlock
+        title="Time-scale separation ratio"
+        base="TS_ratio = T_LC / T_m"
+        sub={T_long !== undefined && T_m !== undefined ? `TS = ${fexp(T_long, 2)} / ${fexp(T_m, 2)}` : undefined}
+        result={TS_long !== undefined ? `TS_ratio = ${fmt(TS_long, 1)}` : undefined}
+        notes="We require TS_ratio ≫ 1 so the field evolves slowly relative to light-crossing time."
+      />
+    </section>
+  );
+}
+
+/** θ-scale derivation */
+function ThetaScaleCard({ m }: { m: HelixMetrics }) {
+  const uexp: UniformsExplain | undefined = (m as any)?.uniformsExplain;
+  const dEff =
+    num(uexp?.fordRomanDuty?.computed_d_eff) ??
+    num(uexp?.live?.dutyEffectiveFR) ??
+    num((m as any)?.dutyEffectiveFR);
+
+  const gammaGeo =
+    num(uexp?.live?.gammaGeo) ??
+    num((m as any)?.pipeline?.gammaGeo) ??
+    num((m as any)?.gammaGeo) ??
+    26;
+
+  const q = num(uexp?.live?.qSpoilingFactor ?? (m as any)?.qSpoilingFactor ?? (m as any)?.q) ?? 1;
+
+  const gammaVdB =
+    num(uexp?.live?.gammaVanDenBroeck_vis) ??
+    num((m as any)?.pipeline?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck) ??
+    1;
+
+  const thetaExpected =
+    gammaGeo !== undefined && q !== undefined && gammaVdB !== undefined && dEff !== undefined
+      ? Math.pow(gammaGeo, 3) * q * gammaVdB * Math.sqrt(clamp01(dEff))
+      : undefined;
+
+  const baseEq = uexp?.equations?.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB · √d_eff";
+
+  return (
+    <section className="bg-card/60 border rounded-lg p-4 space-y-3">
+      <h3 className="font-semibold text-sm">θ-Scale Derivation</h3>
+
+      <FormulaBlock
+        title="Expected θ (mode-aware)"
+        base={baseEq}
+        sub={
+          gammaGeo !== undefined && q !== undefined && gammaVdB !== undefined && dEff !== undefined
+            ? `θ = (${fmt(gammaGeo, 0)})^3 · ${fmt(q, 3)} · ${fexp(gammaVdB, 2)} · √${fmt(dEff, 6)}`
+            : undefined
+        }
+        result={thetaExpected !== undefined ? `θ_expected = ${fexp(thetaExpected, 2)}` : undefined}
+        notes={
+          <>
+            <div>Inputs from live pipeline snapshot:</div>
+            <ul className="list-disc ml-5">
+              <li>γ_geo — geometric amplification</li>
+              <li>q — net Q-spoiling factor</li>
+              <li>γ_VdB — Van den Broeck pocket amplification (visual)</li>
+              <li>d_eff — Ford–Roman averaged duty</li>
+            </ul>
+            {uexp?.thetaAudit?.thetaScaleExpected !== undefined && (
+              <div className="mt-1">Server θ (audit): <Eq>{fexp(uexp.thetaAudit.thetaScaleExpected, 2)}</Eq></div>
+            )}
+          </>
+        }
+      />
+    </section>
+  );
+}
+
+/** Energy per cycle and mass bookkeeping */
+function EnergyAndMassCard({ m }: { m: HelixMetrics }) {
+  const f_m = num((m as any)?.timescales?.f_m_Hz); // Hz
+  const P_MW = num((m as any)?.pipeline?.P_avg ?? (m as any)?.P_avg ?? (m as any)?.energyOutput); // MW
+  const P_W = P_MW !== undefined ? P_MW * 1e6 : undefined;
+  const E_cycle = f_m && P_W ? P_W / f_m : undefined; // J
+
+  const M_exotic = num((m as any)?.pipeline?.M_exotic ?? (m as any)?.M_exotic);
+
+  return (
+    <section className="bg-card/60 border rounded-lg p-4 space-y-3">
+      <h3 className="font-semibold text-sm">Energy & Mass Ledger</h3>
+
+      <FormulaBlock
+        title="Energy per modulation cycle"
+        base="E_cycle = P_avg / f_m"
+        sub={P_W !== undefined && f_m !== undefined ? `E = ${P_W.toLocaleString()} W / ${f_m.toLocaleString()} Hz` : undefined}
+        result={E_cycle !== undefined ? `E_cycle = ${fexp(E_cycle, 2)} J` : undefined}
+        notes="Average electrical power divided by modulation frequency (one cycle’s energy)."
+      />
+
+      <div className="text-xs">
+        <div className="font-medium">Exotic mass target</div>
+        <div>M_exotic (live): <Eq>{M_exotic !== undefined ? `${fmt(M_exotic, 0)} kg` : "—"}</Eq></div>
       </div>
     </section>
   );
 }
 
-// Main Bridge Derivation Cards Component
+/** Constraint summary */
+function ConstraintCard({ m }: { m: HelixMetrics }) {
+  const ford = (m as any)?.fordRoman;
+  const nat = (m as any)?.natario;
+
+  const zeta = num(ford?.value ?? (m as any)?.pipeline?.zeta);
+  const zetaLim = num(ford?.limit) ?? 1.0;
+
+  const natVal = (nat?.value as number) ?? undefined;
+  const natStatus = String(nat?.status || "");
+
+  const R_est = num((m as any)?.curvatureMax);
+  const statusOverall = String((m as any)?.overallStatus || (m as any)?.pipeline?.overallStatus || "NOMINAL");
+
+  return (
+    <section className="bg-card/60 border rounded-lg p-4 space-y-3">
+      <h3 className="font-semibold text-sm">Constraint Compliance</h3>
+
+      <FormulaBlock
+        title="Ford–Roman window (summary)"
+        base="ζ ≤ 1 (ship-averaged)"
+        sub={zeta !== undefined ? `ζ = ${fmt(zeta, 3)}, limit = ${fmt(zetaLim, 3)}` : undefined}
+        result={zeta !== undefined ? (zeta <= zetaLim ? "PASS" : "FAIL") : undefined}
+        notes="ζ is reported by the server’s averaging window; integral omitted here."
+      />
+
+      <FormulaBlock
+        title="Natário zero-expansion"
+        base="∇·ξ = 0"
+        sub={natVal !== undefined ? `∇·ξ ≈ ${fmt(natVal, 3)}` : undefined}
+        result={natStatus ? `Status: ${natStatus}` : undefined}
+      />
+
+      <div className="text-xs">
+        <div className="font-medium">Curvature threshold (informal)</div>
+        <div>R_max (live): <Eq>{R_est !== undefined ? fexp(R_est, 1) : "—"}</Eq></div>
+        <div>System status: <Eq>{statusOverall}</Eq></div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================== Main Component ===================== */
+
 export default function BridgeDerivationCards() {
   const metricsResult = useMetrics();
   const m = metricsResult?.data;
-  
+
+  const uexp: UniformsExplain | undefined = (m as any)?.uniformsExplain;
+
+  const currentMode =
+    (m as any)?.pipeline?.currentMode ??
+    (m as any)?.currentMode ??
+    "hover";
+
+  const summary = {
+    mode: String(currentMode).toUpperCase(),
+    S_total: num(uexp?.live?.S_total) ?? num(uexp?.fordRomanDuty?.S_total),
+    S_live: num(uexp?.live?.S_live) ?? num(uexp?.fordRomanDuty?.S_live),
+    dEff:
+      num(uexp?.live?.dutyEffectiveFR) ??
+      num(uexp?.fordRomanDuty?.computed_d_eff ?? (m as any)?.dutyEffectiveFR),
+    gammaGeo: num(uexp?.live?.gammaGeo) ?? num((m as any)?.pipeline?.gammaGeo ?? (m as any)?.gammaGeo),
+    gammaVdB: num(uexp?.live?.gammaVanDenBroeck_vis) ?? num((m as any)?.pipeline?.gammaVanDenBroeck_vis ?? (m as any)?.gammaVanDenBroeck_vis),
+    q: num(uexp?.live?.qSpoilingFactor) ?? num((m as any)?.qSpoilingFactor ?? (m as any)?.q),
+  };
+
   if (!m) {
     return (
       <div className="bg-card/60 border rounded-lg p-4">
-        <p className="text-sm text-muted-foreground">Loading physics derivation...</p>
+        <h2 className="text-lg font-semibold mb-2">Physics Derivation Cards</h2>
+        <div className="mb-3 p-3 rounded bg-slate-900/40 border border-slate-800 text-xs">
+          <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <div>Mode: <Eq>—</Eq></div>
+            <div>Sectors: <Eq>—</Eq></div>
+            <div>d_eff: <Eq>—</Eq></div>
+            <div>γ_geo: <Eq>—</Eq></div>
+            <div>γ_VdB: <Eq>—</Eq></div>
+            <div>q: <Eq>—</Eq></div>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground">Loading physics derivation…</p>
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4">
       <div className="bg-card border rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          Physics Derivation Cards
-        </h2>
-        <div className="grid gap-4">
-          <TilesCard m={m} />
+        <h2 className="text-lg font-semibold mb-4">Physics Derivation Cards</h2>
+
+        {/* Mode snapshot */}
+        <div className="mb-4 p-3 rounded bg-slate-900/40 border border-slate-800 text-xs">
+          <div className="flex flex-wrap gap-x-6 gap-y-1">
+            <div>Mode: <Eq>{summary.mode}</Eq></div>
+            <div>Sectors: <Eq>{summary.S_live !== undefined && summary.S_total !== undefined ? `${summary.S_live}/${summary.S_total}` : "—"}</Eq></div>
+            <div>d_eff: <Eq>{summary.dEff !== undefined ? fmt(summary.dEff, 6) : "—"}</Eq></div>
+            <div>γ_geo: <Eq>{summary.gammaGeo !== undefined ? fmt(summary.gammaGeo, 0) : "—"}</Eq></div>
+            <div>γ_VdB: <Eq>{summary.gammaVdB !== undefined ? fexp(summary.gammaVdB, 2) : "—"}</Eq></div>
+            <div>q: <Eq>{summary.q !== undefined ? fmt(summary.q, 3) : "—"}</Eq></div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <UniformsExplainCard data={uexp} m={m} />
+          <ThetaScaleCard m={m} />
+          <EnergyAndMassCard m={m} />
           <TimeScaleCard m={m} />
+          <TilesCard m={m} />
+          <ConstraintCard m={m} />
+        </div>
+
+        <div className="mt-6 text-xs text-slate-400 space-y-1">
+          <div className="font-medium text-slate-300">Review Checklist (for researchers)</div>
+          <ul className="list-disc ml-5 space-y-1">
+            <li><strong>Unit audit:</strong> ensure all inputs are SI before substitution (m, s, Hz, J, W, kg).</li>
+            <li><strong>Snapshot export:</strong> log the full live substitution tuple alongside results for reproducibility.</li>
+            <li><strong>Uncertainty:</strong> attach ± bounds where applicable (hull dims, Q factors, scheduling jitter).</li>
+            <li><strong>Mode parity:</strong> repeat the same ledger for each mode (Standby / Hover / Cruise / Emergency).</li>
+            <li><strong>Assumptions page:</strong> separate doc stating geometry model, boundary conditions, and visual vs. enforced physics.</li>
+          </ul>
         </div>
       </div>
     </div>

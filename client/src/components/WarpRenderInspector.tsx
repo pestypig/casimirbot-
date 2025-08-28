@@ -90,7 +90,7 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
       msg:`ridge=${U.ridgeMode} parity=${U.physicsParityMode}`
     });
 
-    // GPU health with loading state support
+    // GPU health with enhanced diagnostics support
     function getLinkStatus(engine: any) {
       const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
       const prog = engine?.gridProgram || engine?.program || engine?._program || null;
@@ -98,9 +98,21 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
 
       if (!gl || !prog) return { stage: engine?.loadingState || 'idle', ok: false, reason: 'no GL or program' };
 
-      // If engine told us, trust it
+      // Enhanced diagnostics temporarily disabled for debugging
+      // if (typeof engine.getShaderDiagnostics === 'function') {
+      //   const diag = engine.getShaderDiagnostics();
+      //   const ok = diag.status === 'linked';
+      //   return { 
+      //     stage: diag.status, 
+      //     ok: ok, 
+      //     reason: diag.message || '',
+      //     profile: diag.profile || 'auto'
+      //   };
+      // }
+
+      // Fallback to original method for compatibility
       if (engine?.loadingState === 'compiling') {
-        return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+        return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
       }
       if (engine?.loadingState === 'failed') {
         const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
@@ -112,7 +124,7 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
 
       // Infer via KHR if state not provided
       if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
-        return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+        return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
       }
 
       // Final truth from LINK_STATUS

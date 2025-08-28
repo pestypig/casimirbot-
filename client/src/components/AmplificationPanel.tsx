@@ -1,5 +1,7 @@
+'use client';
+
 import * as React from "react";
-import { Tooltip } from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 const fmtSci = (v: number) =>
@@ -25,7 +27,7 @@ function Bar({
   if (mode === "log") {
     const v = Math.log10(Math.max(value, 1e-12));
     const lo = Math.log10(Math.max(min, 1e-12));
-    const hi = Math.log10(Math.max(max, min * 10));
+    const hi = Math.log10(Math.max(max, Math.max(min, 1e-12) * 10));
     pct = Math.min(1, Math.max(0, (v - lo) / (hi - lo)));
   } else {
     const v = Math.max(min, Math.min(max, value));
@@ -86,110 +88,109 @@ export default function AmplificationPanel({ readOnly = false }: { readOnly?: bo
   const A_geo = Math.pow(Math.max(1, Number(gammaGeo) || 1), 3);
   const A_total = A_geo * Math.max(1e-12, Number(qSpoil) || 1e-12) * Math.max(1, Number(gammaVdB) || 1);
 
-  // effective duty factor used in the renderer (averaged if viewAvg=true)
-  const effDuty = viewAvg ? Math.max(1e-12, (Number(duty) || 0) / sectors) : 1.0;
-  const dutyTerm = effDuty;
+  // Use √(duty/sectors) when averaging is enabled (matches label & viewer semantics)
+  const avgTerm = viewAvg ? Math.sqrt(Math.max(1e-12, (Number(duty) || 0) / sectors)) : 1.0;
 
   // final θ-scale used by the grid shader / CPU geometry
-  const thetaScale = A_total * dutyTerm;
+  const thetaScale = A_total * avgTerm;
 
   return (
-    <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4 text-slate-100">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Amplification Chain</h3>
-        <span className="text-xs opacity-70">live</span>
-      </div>
+    <TooltipProvider>
+      <div className="rounded-lg border border-white/10 bg-slate-900/60 p-4 text-slate-100">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold">Amplification Chain</h3>
+          <span className="text-xs opacity-70">{readOnly ? "read-only" : "live"}</span>
+        </div>
 
-      {/* Equation line */}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Tooltip
-          label={
-            <div className="space-y-1">
-              <div className="font-semibold">
-                γ<sub>geo</sub> (geometric amplification)
+        {/* Equation line */}
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="px-2 py-0.5 rounded bg-sky-500/15 ring-1 ring-sky-400/30 cursor-help">
+                γ<sub>geo</sub> = {fmtSci(gammaGeo)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <div className="space-y-1">
+                <div className="font-semibold">
+                  γ<sub>geo</sub> (geometric amplification)
+                </div>
+                <p>From needle-hull/Natário geometry. Energy scaling is cubic in γ<sub>geo</sub>.</p>
               </div>
-              <p>
-                From needle-hull/Natário geometry. Energy scaling is cubic in γ<sub>geo</sub>.
-              </p>
-            </div>
-          }
-        >
-          <span className="px-2 py-0.5 rounded bg-sky-500/15 ring-1 ring-sky-400/30 cursor-help">
-            γ<sub>geo</sub> = {fmtSci(gammaGeo)}
-          </span>
-        </Tooltip>
+            </TooltipContent>
+          </Tooltip>
 
-        <span className="opacity-60">^3 ×</span>
+          <span className="opacity-60">^3 ×</span>
 
-        <Tooltip
-          label={
-            <div className="space-y-1">
-              <div className="font-semibold">q<sub>spoil</sub> (Q-spoiling / ΔA/A)</div>
-              <p>Operational quality adjustment; accounts for realistic losses.</p>
-            </div>
-          }
-        >
-          <span className="px-2 py-0.5 rounded bg-amber-500/15 ring-1 ring-amber-400/30 cursor-help">
-            q<sub>spoil</sub> = {fmtSci(qSpoil)}
-          </span>
-        </Tooltip>
-
-        <span className="opacity-60">×</span>
-
-        <Tooltip
-          label={
-            <div className="space-y-1">
-              <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket)</div>
-              <p>Geometry pocket factor; design choice, mode-independent.</p>
-            </div>
-          }
-        >
-          <span className="px-2 py-0.5 rounded bg-fuchsia-500/15 ring-1 ring-fuchsia-400/30 cursor-help">
-            γ<sub>VdB</sub> = {fmtSci(gammaVdB)}
-          </span>
-        </Tooltip>
-
-        <span className="opacity-60">×</span>
-
-        <Tooltip
-          label={
-            <div className="space-y-1">
-              <div className="font-semibold">
-                √(duty/sectors) (strobing average)
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="px-2 py-0.5 rounded bg-amber-500/15 ring-1 ring-amber-400/30 cursor-help">
+                q<sub>spoil</sub> = {fmtSci(qSpoil)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <div className="space-y-1">
+                <div className="font-semibold">q<sub>spoil</sub> (Q-spoiling / ΔA/A)</div>
+                <p>Operational quality adjustment; accounts for realistic losses.</p>
               </div>
-              <p>
-                Averaging factor when view-averaging is enabled. With {sectors} sector
-                {sectors > 1 ? "s" : ""} at duty {fmtSci(duty)}, effective term is{" "}
-                {fmtSci(dutyTerm)}.
-              </p>
-            </div>
-          }
-        >
-          <span className="px-2 py-0.5 rounded bg-emerald-500/15 ring-1 ring-emerald-400/30 cursor-help">
-            √(duty/sectors) = {fmtSci(dutyTerm)}
+            </TooltipContent>
+          </Tooltip>
+
+          <span className="opacity-60">×</span>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="px-2 py-0.5 rounded bg-fuchsia-500/15 ring-1 ring-fuchsia-400/30 cursor-help">
+                γ<sub>VdB</sub> = {fmtSci(gammaVdB)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <div className="space-y-1">
+                <div className="font-semibold">γ<sub>VdB</sub> (Van den Broeck pocket)</div>
+                <p>Geometry pocket factor; design choice, mode-independent.</p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+
+          <span className="opacity-60">×</span>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/15 ring-1 ring-emerald-400/30 cursor-help">
+                √(duty/sectors) = {fmtSci(avgTerm)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              <div className="space-y-1">
+                <div className="font-semibold">√(duty/sectors) (strobing average)</div>
+                <p>
+                  Averaging factor when view-averaging is enabled. With {sectors} sector{sectors > 1 ? "s" : ""} at duty{" "}
+                  {fmtSci(duty)}, effective term is {fmtSci(avgTerm)}.
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+
+          <span className="opacity-60">=</span>
+
+          <span className="px-2 py-0.5 rounded bg-emerald-500/20 ring-1 ring-emerald-400/30">
+            θ-scale = {fmtSci(thetaScale)}
           </span>
-        </Tooltip>
+        </div>
 
-        <span className="opacity-60">=</span>
+        {/* Tiny bars */}
+        <div className="mt-4 grid grid-cols-4 gap-3">
+          <Bar label="γ_geo^3" value={A_geo} mode="log" min={1e-6} max={1e9} />
+          <Bar label="q_spoil" value={qSpoil} mode="log" min={1e-6} max={1e3} />
+          <Bar label="γ_VdB" value={gammaVdB} mode="log" min={1} max={1e7} />
+          <Bar label="√(duty/sectors)" value={avgTerm} mode="linear" min={0} max={1} />
+        </div>
 
-        <span className="px-2 py-0.5 rounded bg-emerald-500/20 ring-1 ring-emerald-400/30">
-          θ-scale = {fmtSci(thetaScale)}
-        </span>
+        <div className="mt-3 text-[11px] opacity-70">
+          Display model only. θ-scale is the multiplier forwarded by the pipeline to the
+          renderers (<code>u_thetaScale</code> / <code>thetaScale</code>). Q<sub>cavity</sub> appears separately in ζ (Ford–Roman) and loss terms.
+        </div>
       </div>
-
-      {/* Tiny bars */}
-      <div className="mt-4 grid grid-cols-4 gap-3">
-        <Bar label="γ_geo^3" value={A_geo} mode="log" min={1e-6} max={1e9} />
-        <Bar label="q_spoil" value={qSpoil} mode="log" min={1e-6} max={1e3} />
-        <Bar label="γ_VdB" value={gammaVdB} mode="log" min={1} max={1e7} />
-        <Bar label="√(duty/sectors)" value={dutyTerm} mode="linear" min={0} max={1} />
-      </div>
-
-      <div className="mt-3 text-[11px] opacity-70">
-        Display model only. θ-scale is the multiplier forwarded by the pipeline to the
-        renderers (<code>u_thetaScale</code> / <code>thetaScale</code>).{" "}
-        Q<sub>cavity</sub> appears separately in ζ (Ford-Roman) and loss terms.
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

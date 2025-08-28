@@ -3,7 +3,7 @@
  * Shares pipeline mode + FR duty with the rest of the app
  */
 
-import { useMemo, startTransition } from "react";
+import { useEffect, useMemo, startTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp } from "lucide-react";
@@ -70,7 +70,10 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const γ_geo = isFiniteNum(live?.gammaGeo) ? live.gammaGeo : 26;
   const Q = isFiniteNum(live?.qCavity) ? live.qCavity : 1e9;
   const N = Math.max(1, Number(live?.N_tiles ?? 1));
-  const U_static = Number(live?.U_static ?? 0); // J per tile
+  const U_static =
+    isFiniteNum(live?.U_static) ? live.U_static :
+    isFiniteNum((systemMetrics as any)?.U_static) ? (systemMetrics as any).U_static :
+    0; // J per tile
 
   // Pipeline ordering: geometry → Q → FR duty
   const γ3 = Math.pow(γ_geo, 3);
@@ -78,9 +81,26 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const U_Q = U_geo_raw * Q;             // J per tile (ON-window)
   const U_cycle = U_Q * dutyEffectiveFR; // J per tile, Ford–Roman ship-averaged
 
-  // Per-tile ON-window dissipation:
-  // P_tile_on = (U_Q) * ω / Q = U_geo_raw * ω  (Q cancels)
-  const P_tile_on = Math.abs(U_geo_raw) * ω;
+  // Per-tile ON-window dissipation (with robust fallbacks)
+  const P_tile_on = useMemo(() => {
+    // 1) server-calibrated value wins if present
+    const fromPipeline = (live as any)?.P_tile_on_W;
+    if (isFiniteNum(fromPipeline)) return fromPipeline;
+
+    // 2) physics chain (preferred when U_static is available)
+    const base = Math.abs(U_geo_raw) * ω; // P_tile_on = U_geo_raw · ω
+    if (base > 0) return base;
+
+    // 3) backsolve from ship-avg: P_tile_on ≈ (P_avg / N_tiles) / d_FR
+    // (use P_avg if server provided it)
+    const P_avg_fromSrv_MW = (live as any)?.P_avg;
+    const P_avg_fromSrv_W = isFiniteNum(P_avg_fromSrv_MW) ? P_avg_fromSrv_MW * 1e6 : undefined;
+
+    if (isFiniteNum(P_avg_fromSrv_W) && N > 0 && dutyEffectiveFR > 0) {
+      return (P_avg_fromSrv_W / N) / Math.max(1e-12, dutyEffectiveFR);
+    }
+    return 0;
+  }, [live, U_geo_raw, ω, N, dutyEffectiveFR]);
 
   // Average total electrical power (ship-avg):
   const P_total_W = P_tile_on * N * dutyEffectiveFR;
@@ -92,6 +112,9 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   // Time-scale separation — keep semantics consistent with Helix-Core HUD:
   // "SAFE" when TS_ratio >> 1 (long > light-crossing, i.e., homogenized)
   const TS_ratio = isFiniteNum(live?.TS_ratio) ? live.TS_ratio : isFiniteNum(live?.TS_long) ? live.TS_long : undefined;
+
+  // Derive τ_Q from Q and ω
+  const τ_Q_ms = isFiniteNum(Q) && Q > 0 ? (Q / ω) * 1e3 : undefined;
 
   // ---------- UI helpers ----------
   const sci = (v?: number) => (isFiniteNum(v) ? formatScientific(v) : "—");
@@ -119,6 +142,32 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     P_total: true,
     TS_ratio: isFiniteNum(TS_ratio) ? TS_ratio > 1 : false // consistent with HUD ("SAFE" when > 1)
   };
+
+  // --- Publish a shared derived object so all panels can subscribe consistently ---
+  useEffect(() => {
+    const tau_LC_ms = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+    queryClient.setQueryData(["helix:pipeline:derived"], {
+      mode,
+      dutyUI,
+      dutyEffectiveFR,
+      P_tile_on_W: P_tile_on,
+      P_total_W: P_avg_W,
+      // expose both ASCII and Unicode keys for convenience
+      tau_Q_ms: τ_Q_ms,
+      τ_Q_ms,
+      tau_LC_ms,
+      τ_LC_ms: tau_LC_ms,
+      N_tiles: N,
+      f_GHz: fGHz,
+      gammaGeo: γ_geo,
+      Q,
+      sectorsTotal: (systemMetrics as any)?.totalSectors ?? (live as any)?.sectorCount,
+      sectorsConcurrent: (live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors,
+    });
+  }, [
+    mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms,
+    live, N, fGHz, γ_geo, Q, systemMetrics, queryClient
+  ]);
 
   return (
     <div className="space-y-6">
@@ -209,7 +258,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 <div className="text-sm text-muted-foreground">U_cycle = U_Q × d_FR</div>
                 <div className="font-mono text-lg">{sci(U_cycle)} J</div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                  UI duty: {(dutyUI*100).toFixed(2)}% · FR duty: {(dutyEffectiveFR*100).toExponential(2)}%
+                  UI duty: {(dutyUI*100).toFixed(2)}% · FR duty: {(dutyEffectiveFR*100).toFixed(3)}%
                   <StatusIcon ok={validation.U_cycle} />
                 </div>
               </div>
@@ -298,7 +347,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
               </div>
               <div>
                 <div className="text-muted-foreground">FR duty</div>
-                <div className="font-mono">{(dutyEffectiveFR*100).toExponential(2)}%</div>
+                <div className="font-mono">{(dutyEffectiveFR*100).toFixed(3)}%</div>
               </div>
             </div>
           </div>

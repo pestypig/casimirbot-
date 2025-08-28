@@ -2,6 +2,14 @@
 import * as React from "react";
 import { computeSolarXY, SolarPoint } from "@/lib/solar-adapter";
 
+type PolylinePointAU = { x_au: number; y_au: number; alpha?: number };
+type PolylineStyle = {
+  stroke?: string;
+  width?: number;
+  dash?: number[];
+  composite?: GlobalCompositeOperation;
+};
+
 type Props = {
   width?: number;              // optional; panel can drive size
   height?: number;
@@ -13,6 +21,12 @@ type Props = {
   fitToIds?: string[];
   /** Optional padding (px) when fitting */
   fitMarginPx?: number;
+  /** OPTIONAL: background polyline to draw in AU coords (e.g., barycentric trail) */
+  backgroundPolylineAU?: PolylinePointAU[];
+  /** OPTIONAL: style for the background polyline */
+  backgroundPolylineStyle?: PolylineStyle;
+  /** OPTIONAL: visual magnification of AU background polyline (AU → AU*gain). Default 1. */
+  backgroundPolylineGain?: number;
 };
 
 /* ----------------- helpers ----------------- */
@@ -48,7 +62,10 @@ export function SolarMap({
   centerOnId,
   centerBetweenIds,
   fitToIds = [],
-  fitMarginPx = 24
+  fitMarginPx = 24,
+  backgroundPolylineAU,
+  backgroundPolylineStyle,
+  backgroundPolylineGain = 1,
 }: Props) {
   /** Responsive size (fits the card) */
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -226,7 +243,7 @@ export function SolarMap({
     if (pointers.current.size === 0) dragStart.current = null;
   };
 
-  // ---- draw (use your existing draw; just honor size, zoom, offset) ----
+  // ---- draw (honor size, zoom, offset) ----
   React.useEffect(() => {
     const cvs = canvasRef.current;
     if (!cvs) return;
@@ -235,12 +252,49 @@ export function SolarMap({
     cvs.height = Math.floor(size.h * dpr);
     const ctx = cvs.getContext("2d");
     if (!ctx || typeof ctx.clearRect !== 'function') return;
+    // ✅ correct DPR transform (scaleX=dpr, scaleY=dpr)
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.w, size.h);
 
     // Dark space background
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, size.w, size.h);
+
+    // --- draw background polyline (if provided) BEFORE planets/routes ---
+    if (backgroundPolylineAU && backgroundPolylineAU.length >= 2) {
+      ctx.save();
+      ctx.strokeStyle = backgroundPolylineStyle?.stroke ?? "#60a5fa";
+      ctx.lineWidth = backgroundPolylineStyle?.width ?? 1;
+      if (backgroundPolylineStyle?.dash?.length) ctx.setLineDash(backgroundPolylineStyle.dash);
+      if (backgroundPolylineStyle?.composite) ctx.globalCompositeOperation = backgroundPolylineStyle.composite;
+
+      const gain =
+        Number.isFinite(backgroundPolylineGain as number) && (backgroundPolylineGain as number) > 0
+          ? (backgroundPolylineGain as number)
+          : 1;
+
+      // per-segment alpha (uses average of endpoints' alpha)
+      for (let i = 1; i < backgroundPolylineAU.length; i++) {
+        const a = clamp(backgroundPolylineAU[i - 1].alpha ?? 1, 0, 1);
+        const b = clamp(backgroundPolylineAU[i].alpha ?? 1, 0, 1);
+        const segAlpha = (a + b) * 0.5;
+
+        const x1 = offset.x + (backgroundPolylineAU[i - 1].x_au * gain) * zoom;
+        const y1 = offset.y - (backgroundPolylineAU[i - 1].y_au * gain) * zoom;
+        const x2 = offset.x + (backgroundPolylineAU[i].x_au * gain) * zoom;
+        const y2 = offset.y - (backgroundPolylineAU[i].y_au * gain) * zoom;
+
+        ctx.globalAlpha = segAlpha;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+      }
+
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
 
     // Draw orbits and bodies
     for (const p of points) {
@@ -252,7 +306,7 @@ export function SolarMap({
         const orbitRadius = Math.hypot(p.x_au, p.y_au) * zoom;
         const sunX = offset.x;
         const sunY = offset.y;
-        
+
         ctx.strokeStyle = "rgba(100, 100, 100, 0.3)";
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -263,7 +317,7 @@ export function SolarMap({
       // Draw body
       const isHighlighted = routeIds.includes(p.id);
       const bodySize = p.id === "SUN" ? 8 : p.id === "JUPITER" ? 4 : 3;
-      
+
       ctx.fillStyle = isHighlighted ? "#ff6b35" : (p as any).color || "#ffffff";
       ctx.beginPath();
       ctx.arc(x, y, bodySize, 0, Math.PI * 2);
@@ -283,39 +337,46 @@ export function SolarMap({
       ctx.strokeStyle = "#ff6b35";
       ctx.lineWidth = 2;
       ctx.beginPath();
-      
+
       for (let i = 1; i < routeIds.length; i++) {
         const fromBody = points.find(p => p.id === routeIds[i - 1]);
         const toBody = points.find(p => p.id === routeIds[i]);
-        
+
         if (fromBody && toBody) {
           const x1 = offset.x + fromBody.x_au * zoom;
           const y1 = offset.y - fromBody.y_au * zoom;
           const x2 = offset.x + toBody.x_au * zoom;
           const y2 = offset.y - toBody.y_au * zoom;
-          
+
           if (i === 1) ctx.moveTo(x1, y1);
           ctx.lineTo(x2, y2);
         }
       }
       ctx.stroke();
     }
-  }, [size.w, size.h, zoom, offset, points, routeIds]);
+  }, [
+    size.w, size.h,
+    zoom, offset,
+    points, routeIds,
+    backgroundPolylineAU,
+    backgroundPolylineStyle,
+    backgroundPolylineGain, // ✅ ensure redraw when gain changes
+  ]);
 
   // Click handling for body selection
   const handleClick = (e: React.MouseEvent) => {
     if (!onPickBody) return;
-    
+
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
-    
+
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
-    
+
     // Find closest body
     let minDist = Infinity;
     let closestBody: SolarPoint | null = null;
-    
+
     for (const p of points) {
       const x = offset.x + p.x_au * zoom;
       const y = offset.y - p.y_au * zoom;
@@ -325,14 +386,14 @@ export function SolarMap({
         closestBody = p;
       }
     }
-    
+
     if (closestBody) {
       onPickBody(closestBody.id);
     }
   };
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative rounded-lg overflow-hidden border border-white/10"
       style={{ width: width ? undefined : '100%', height: height ? undefined : 360 }}
@@ -354,22 +415,22 @@ export function SolarMap({
 
       {/* zoom controls */}
       <div className="absolute top-2 right-2 z-50 pointer-events-auto flex gap-1">
-        <button 
+        <button
           className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
-          onClick={() => zoomAtPoint(size.w * 0.5, size.h * 0.5, 1/1.2)} 
+          onClick={() => zoomAtPoint(size.w * 0.5, size.h * 0.5, 1/1.2)}
           title="Zoom out"
         >−</button>
-        <button 
+        <button
           className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
-          onClick={() => zoomAtPoint(size.w * 0.5, size.h * 0.5, 1.2)} 
+          onClick={() => zoomAtPoint(size.w * 0.5, size.h * 0.5, 1.2)}
           title="Zoom in"
         >+</button>
-        <button 
+        <button
           className="px-2 py-1 bg-white/20 backdrop-blur rounded text-white hover:bg-white/30"
-          onClick={() => { 
-            if (baseFitRef.current) { 
-              setZoom(baseFitRef.current.zoom); 
-              setOffset(baseFitRef.current.offset); 
+          onClick={() => {
+            if (baseFitRef.current) {
+              setZoom(baseFitRef.current.zoom);
+              setOffset(baseFitRef.current.offset);
             }
           }}
           title="Reset view"

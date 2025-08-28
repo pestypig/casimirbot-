@@ -33,7 +33,7 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// GPU link status helper
+// GPU link status helper with enhanced diagnostics
 function getLinkStatus(engine: any) {
   const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
   const prog = engine?.gridProgram || engine?.program || engine?._program || null;
@@ -41,9 +41,22 @@ function getLinkStatus(engine: any) {
 
   if (!gl || !prog) return { stage: engine?.loadingState || 'idle', ok: false, reason: 'no GL or program' };
 
-  // If engine told us, trust it
+  // Enhanced diagnostics temporarily disabled for debugging
+  // if (typeof engine.getShaderDiagnostics === 'function') {
+  //   const diag = engine.getShaderDiagnostics();
+  //   const ok = diag.status === 'linked';
+  //   return { 
+  //     stage: diag.status, 
+  //     ok: ok, 
+  //     reason: diag.message || '',
+  //     profile: diag.profile || 'auto',
+  //     vertexCount: diag.vertexCount || 0
+  //   };
+  // }
+
+  // Fallback to original method for compatibility
   if (engine?.loadingState === 'compiling') {
-    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+    return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
   }
   if (engine?.loadingState === 'failed') {
     const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
@@ -55,7 +68,7 @@ function getLinkStatus(engine: any) {
 
   // Infer via KHR if state not provided
   if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
-    return { stage: 'compiling', ok: false, reason: 'KHR async compile' };
+    return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
   }
 
   // Final truth from LINK_STATUS
@@ -171,6 +184,37 @@ function FixButton({ onClick, children }: React.PropsWithChildren<{ onClick: () 
   );
 }
 
+// 🔊 Publish a pane-local echo of the physics chain so other panels can read the same authority.
+function publishWarpEcho(engine: any, side: Side, liveSnap?: any) {
+  try {
+    const u = engine?.uniforms || {};
+    const gammaGeo = Math.max(1, N(u.gammaGeo ?? liveSnap?.gammaGeo ?? liveSnap?.g_y, 26));
+    const q       = Math.max(1e-12, N(u.qSpoilingFactor ?? u.deltaAOverA ?? liveSnap?.deltaAOverA ?? liveSnap?.qSpoilingFactor, 1));
+    const gammaVdB= Math.max(1, N(u.gammaVdB ?? u.gammaVanDenBroeck ?? liveSnap?.gammaVanDenBroeck ?? liveSnap?.gammaVdB, 1.4e5));
+
+    const sectorsTotal = Math.max(1, N(u.sectorCount ?? liveSnap?.sectorCount, 400));
+    const sectorsLive  = Math.max(1, N(u.sectors ?? 1, 1));
+
+    const dutyLocal = 0.01; // Ford–Roman window (local)
+    const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
+    const dFR = Number.isFinite(+u.dutyEffectiveFR) ? Math.max(1e-12, +u.dutyEffectiveFR) : dFR_fallback;
+
+    const w = (window as any);
+    if (!w.__warpEcho) w.__warpEcho = {};
+    w.__warpEcho.src = `${String(side).toLowerCase()}-locked`;
+    w.__warpEcho.v = Date.now();
+    w.__warpEcho.terms = { 
+      // expose canonical names used by the checker rows
+      ['γ_geo']: gammaGeo,
+      ['q']: q,
+      ['γ_VdB']: gammaVdB,
+      ['d_FR']: dFR,
+    };
+  } catch {
+    // no-op
+  }
+}
+
 function useCheckpointList(
   label: string,
   engineRef: React.MutableRefObject<any | null>,
@@ -188,6 +232,9 @@ function useCheckpointList(
     const rows: { label: string; detail?: string; state: "ok" | "warn" | "fail" }[] = [];
     const side: Side = label === "REAL" ? "REAL" : "SHOW";
 
+    // 👂 Publish the engine's current physics authority for other UI bits
+    publishWarpEcho(e, side, liveSnap);
+
     // === DAG Stage 1: INPUT CHECKPOINTS ===
     // Pipeline inputs validation
     const gammaGeo = N(liveSnap?.gammaGeo ?? liveSnap?.g_y, 26);
@@ -195,7 +242,7 @@ function useCheckpointList(
     const gammaVdB = N(liveSnap?.gammaVdB ?? liveSnap?.gammaVanDenBroeck, 1.4e5);
     const sectors = Math.max(1, Math.floor(N(liveSnap?.sectorCount ?? liveSnap?.sectors, 1)));
     const duty = N(liveSnap?.dutyCycle, 0);
-    
+
     checkpoint({
       id: 'input.gamma_geo', side, stage: 'input',
       pass: gammaGeo >= 1 && gammaGeo <= 1000,
@@ -221,7 +268,7 @@ function useCheckpointList(
     });
 
     // === DAG Stage 2: EXPECTATIONS (Single Source of Truth) ===
-    // Calculate the expected θ-scale using canonical formula
+    // Calculate the expected θ-scale using canonical formula (RAW, no tone-mapping)
     const dutyFR = Math.max(1e-12, duty / sectors);
     const thetaExpected = thetaScaleExpected({
       gammaGeo: Math.max(1, gammaGeo),
@@ -242,8 +289,8 @@ function useCheckpointList(
     // === DAG Stage 3: UNIFORMS ===
     const u = e?.uniforms || {};
     const ts = N(u?.thetaScale, NaN);
-    
-    // Expected uniforms θ from the same chain the engine uses
+
+    // Expected uniforms θ from the same chain the engine uses (RAW)
     const thetaUniformExpected = expectedThetaForPane(liveSnap, e);
 
     checkpoint({
@@ -253,6 +300,18 @@ function useCheckpointList(
       expect: thetaUniformExpected, actual: ts,
       sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUniformExpected, 0.10) ? 'info' : 'warn'),
       meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
+    });
+
+    // NEW: CameraZ presence checkpoint (warn-only so it won’t halt render)
+    const camZOk = Number.isFinite(u?.cameraZ);
+    checkpoint({
+      id: 'uniforms.cameraZ',
+      side,
+      stage: 'uniforms',
+      pass: camZOk,
+      msg: camZOk ? `cameraZ=${(+u.cameraZ).toFixed(2)}` : 'CameraZ unset',
+      expect: 'number', actual: camZOk ? u.cameraZ : 'unset',
+      sev: camZOk ? 'info' : 'warn'
     });
 
     checkpoint({
@@ -270,6 +329,35 @@ function useCheckpointList(
       expect: expectations?.parity, actual: !!(u.physicsParityMode ?? u.parityMode),
       sev: expectations?.parity != null && !!(u.physicsParityMode ?? u.parityMode) !== !!expectations.parity ? 'warn' : 'info'
     });
+
+    // NEW: Informational display-space θ (tone-mapped) — for context only
+    {
+      const exposure   = Math.max(1.0, N(u?.exposure, 6.0));
+      const zeroStop   = Math.max(1e-18, N(u?.zeroStop, 1e-7));
+      const userGain   = Math.max(1.0, N(u?.userGain, 1.0));
+      const boostT     = clamp01(N(u?.curvatureGainT, 0));
+      const boostMax   = Math.max(1, N(u?.curvatureBoostMax, 40));
+      const boostNow   = 1 + boostT * (boostMax - 1);
+
+      // We use a unit baseMag for comparability; this row is *informational*, not a pass/fail gate.
+      const baseMag = 1;
+
+      const magUniform = Math.log(1 + (baseMag * ts * userGain * boostNow) / zeroStop);
+      const magExpect  = Math.log(1 + (baseMag * thetaUniformExpected * userGain * boostNow) / zeroStop);
+      const thetaDisplayUniform = magUniform / Math.log(1 + exposure);
+      const thetaDisplayExpect  = magExpect  / Math.log(1 + exposure);
+
+      checkpoint({
+        id: 'uniforms.theta_display_info',
+        side,
+        stage: 'uniforms',
+        pass: true,
+        msg: `θ_display uniform=${Number.isFinite(thetaDisplayUniform) ? thetaDisplayUniform.toFixed(3) : '—'} vs exp=${Number.isFinite(thetaDisplayExpect) ? thetaDisplayExpect.toFixed(3) : '—'}`,
+        expect: 'info-only',
+        actual: { thetaDisplayUniform, thetaDisplayExpect, exposure, zeroStop, userGain, boostNow },
+        sev: 'info'
+      });
+    }
 
     // === DAG Stage 4: GPU STATE ===
     const cw = N(cv?.clientWidth || cv?.width, 0);
@@ -289,7 +377,7 @@ function useCheckpointList(
     // GL context
     const gl = e?.gl;
     const ctxOk = !!gl && !(gl?.isContextLost && gl.isContextLost());
-    
+
     checkpoint({
       id: 'gpu.webgl_context', side, stage: 'gpu',
       pass: ctxOk,
@@ -364,7 +452,7 @@ function useCheckpointList(
     const verts = (e?.gridVertices?.length || 0);
     const orig = (e?.originalGridVertices?.length || 0);
     const gridOk = verts > 0 && orig > 0;
-    
+
     checkpoint({
       id: 'gpu.grid_buffers', side, stage: 'gpu',
       pass: gridOk,
@@ -376,7 +464,7 @@ function useCheckpointList(
     // === DAG Stage 5: FRAME PROVENANCE ===
     // Frame analysis would need readPixels - simplified for now
     const frameAlive = !!e?._raf;
-    
+
     checkpoint({
       id: 'frame.render_loop', side, stage: 'frame',
       pass: frameAlive,
@@ -424,14 +512,14 @@ function useCheckpointList(
           Math.max(1, N(echo.terms.γ_VdB, 1.4e5)) *
           (viewAvg ? Math.sqrt(Math.max(1e-12, N(echo.terms.d_FR, 0))) : 1)
         : undefined;
-    
+
     const mismatch = echo && thetaExpectedFromBound && tsOk
       ? (ts / thetaExpectedFromBound) : 1;
-    
+
     if (echo && thetaExpectedFromBound !== undefined) {
       // Use bound uniforms for perfect self-consistency
       const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
-      
+
       // Smart θ mismatch detection
       const parity = !!(u.physicsParityMode ?? u.parityMode);
       const boostLeak = parity && N(u.curvatureBoostMax, 1) > 1;
@@ -439,12 +527,12 @@ function useCheckpointList(
         tsDetail += ' • (check: REAL boost should be 1)';
         tsState = 'warn';
       }
-      
+
       // Check for mode disagreement during transitions
       const engineMode = String(e?.uniforms?.currentMode || '').toLowerCase();
       const liveMode = String(liveSnap?.currentMode || '').toLowerCase();
       const inTransition = engineMode && liveMode && engineMode !== liveMode;
-      
+
       if (tsOk && Number.isFinite(rel)) {
         if (inTransition) {
           tsDetail += ` • (transition)`;
@@ -458,7 +546,7 @@ function useCheckpointList(
       // Fallback to old method when echo unavailable
       const tsExp = thetaExpectedFn(u, dutyFR);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
-      
+
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
         tsState = "warn";
         const pct = (ts / tsExp - 1) * 100;
@@ -468,13 +556,13 @@ function useCheckpointList(
       // Final fallback to old method
       const tsExp = expectedThetaForPane(liveSnap, e);
       const rel = tsOk ? Math.abs(ts - tsExp) / Math.max(1e-12, tsExp) : Infinity;
-      
+
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
         tsState = "warn";
         tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
       }
     }
-    
+
     // Bonus: inferred θ-duty hint (prefer dutyUsed if available)
     let inferredDutyPct: string | null = null;
     if (typeof u?.dutyUsed === 'number') {
@@ -493,7 +581,7 @@ function useCheckpointList(
         inferredDutyPct = `${(d*100).toFixed(3)}%`;
       }
     }
-    
+
     // Add inferred duty to detail if available
     if (inferredDutyPct && tsOk && liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
       const tsExp = thetaExpectedFn(u, dutyFR);
@@ -502,9 +590,9 @@ function useCheckpointList(
         tsDetail += ` • used≈${inferredDutyPct}`;
       }
     }
-    
+
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
-    
+
     // Show detailed breakdown from bound uniforms if available
     if (echo && echo.terms) {
       const terms = echo.terms;
@@ -546,7 +634,7 @@ function useCheckpointList(
     const exp = N(u?.exposure, 0);
     const zs = N(u?.zeroStop, 0);
     const toneOk = exp > 0 && exp <= 12 && zs > 0 && zs < 1e-3;
-    
+
     // Update the frame tone mapping checkpoint with actual values
     checkpoint({
       id: 'frame.tone_mapping_actual', side, stage: 'frame',
@@ -555,7 +643,7 @@ function useCheckpointList(
       expect: { exp: [0, 12], zs: [0, 1e-3] }, actual: { exp, zs },
       sev: !toneOk ? 'warn' : 'info'
     });
-    
+
     rows.push({ label: "Tone mapping", detail: `exp=${exp} • zero=${zs}` , state: toneOk ? "ok" : "warn" });
 
     // Render loop alive (RAF attached)
@@ -590,14 +678,14 @@ function CompactCheckpointTable() {
           (window as any).__leftEngine, 
           (window as any).__rightEngine
         ].filter(Boolean);
-        
+
         engines.forEach(engine => {
           if (engine._raf) {
             cancelAnimationFrame(engine._raf);
             engine._raf = null;
           }
         });
-        
+
         console.warn('🛑 Render loop halted due to checkpoint error:', check);
       }
     };
@@ -615,7 +703,7 @@ function CompactCheckpointTable() {
       (window as any).__leftEngine, 
       (window as any).__rightEngine
     ].filter(Boolean);
-    
+
     engines.forEach(engine => {
       if (!engine._raf && engine._render) {
         const renderLoop = () => {
@@ -674,7 +762,7 @@ function CompactCheckpointTable() {
           )}
         </div>
       </div>
-      
+
       {renderPaused && (
         <div className="bg-red-900/30 border border-red-700 rounded p-2 mb-3 text-xs text-red-300">
           🛑 Render loop paused due to checkpoint error. Click Resume to continue.
@@ -705,7 +793,7 @@ function CompactCheckpointTable() {
           </div>
         ))}
       </div>
-      
+
       {checks.length === 0 && (
         <div className="text-slate-500 text-xs text-center py-4">
           No checkpoints recorded yet...
@@ -807,7 +895,6 @@ export default function WarpRenderCheckpointsPanel({
           <span className="text-white/70">θ-scale expected:</span>
           <span className="font-mono">{
             (() => {
-              const u = (leftEngineRef.current?.uniforms ?? {}); // pick REAL as reference
               const exp = expectedThetaForPane(snap, leftEngineRef.current);
               return Number.isFinite(exp) ? exp.toExponential(2) : '—';
             })()
@@ -817,7 +904,7 @@ export default function WarpRenderCheckpointsPanel({
           <span className="text-white/70">γ_geo × q × γ_VdB:</span>
           <span className="font-mono">{
             parameters
-              ? `${N(parameters.gammaGeo, 26)}³ × ${N(parameters.qSpoilingFactor, 1).toFixed(2)} × ${N(parameters.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
+              ? `${N(parameters.g_y, 26)}³ × ${N(parameters.qSpoilingFactor, 1).toFixed(2)} × ${N(parameters.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
               : `${N(snap?.gammaGeo ?? snap?.g_y, 26)}³ × ${N(snap?.deltaAOverA ?? snap?.qSpoilingFactor, 1).toFixed(2)} × ${N(snap?.gammaVdB ?? snap?.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
           }</span>
         </div>
@@ -845,10 +932,10 @@ export default function WarpRenderCheckpointsPanel({
     <div className="mt-3 space-y-3">
       {/* D) Compact checkpoint table with stop-on-error toggle */}
       <CompactCheckpointTable />
-      
+
       {/* DAG Checkpoint System */}
       <CheckpointViewer title="DAG: Props → Calc → Uniforms → GPU → Frame" />
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
           <div className="flex items-center justify-between mb-2">

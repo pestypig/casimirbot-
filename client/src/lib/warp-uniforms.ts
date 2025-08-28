@@ -1,47 +1,211 @@
+// warp-uniforms.ts
+// Canonical normalization for warp renderer uniforms, with robust aliasing
+// and physics-aware fallbacks so UI code can depend on consistent fields.
+
 export type WarpUniforms = {
+  // --- geometry (semi-axes in meters) -------------------------------------
   hull?: { a:number; b:number; c:number };
   axesScene?: [number,number,number];
   gridSpan?: number;
   wallWidth_m?: number;
   wallWidth_rho?: number;
 
-  sectorCount: number;     // total
-  sectors: number;         // concurrent
+  // --- sectoring & duties --------------------------------------------------
+  sectorCount: number;     // total sectors
+  sectors: number;         // concurrent sectors
   dutyCycle: number;       // UI duty (0..1)
-  dutyEffectiveFR: number; // FR ship-wide duty (0..1)
+  dutyLocal?: number;      // per-sector ON fraction (0..1)
+  dutyEffectiveFR: number; // Ford–Roman ship-wide duty (0..1)
 
-  gammaGeo: number;
+  // --- amplification chain -------------------------------------------------
+  gammaGeo: number;        // γ_geo
+
+  // γ_VdB aliases (visual amplitude version)
   gammaVdB?: number;
-  gammaVanDenBroeck?: number; // legacy alias
-  deltaAOverA?: number;
-  qSpoilingFactor?: number;   // legacy alias
+  gammaVanDenBroeck?: number;      // legacy alias
+  gammaVanDenBroeck_vis?: number;  // explicit visual version
+  gammaVanDenBroeck_mass?: number; // mass-calibrated version (pass-through if present)
+
+  // q (ΔA/A) aliases
+  deltaAOverA?: number;     // canonical symbol for q-spoiling factor
+  qSpoilingFactor?: number; // legacy alias
+  qSpoil?: number;          // short alias
+
+  // mechanical/cavity Q or gains (optional but helpful to UI)
+  qMech?: number;           // mechanical energy gain proxy used by UI
+  qMechanical?: number;     // alias (server/state name)
+  qCav?: number;            // cavity Q (short)
+  qCavity?: number;         // alias (server/state name)
+
+  // expected θ scale (renderer convenience). If server omits it, we derive.
+  thetaScale?: number;
+
+  // --- renderer/display helpers -------------------------------------------
+  viewAvg?: boolean;
+  viewMassFraction?: number;             // defaults to sectors/sectorCount
+  colorMode?: 'theta'|'rho';
+
   currentMode?: 'hover'|'cruise'|'emergency'|'standby';
+
+  // Optional pass-through for UI gating (not used by shader math, but handy)
+  onWindowDisplay?: boolean;
+  cyclesPerBurst?: number;
+  dwell_ms?: number;
+  tauLC_ms?: number;
+
+  // optional provenance
+  __src?: 'server'|'client'|'legacy';
+  __version?: number;
 };
 
+const EPS = 1e-12;
 const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
+const clamp = (v:number, lo:number, hi:number) => Math.min(hi, Math.max(lo, v));
 
 export function normalizeWU(raw:any): WarpUniforms {
-  if (!raw) return {
-    sectorCount: 400, sectors: 1, dutyCycle: 0.01, dutyEffectiveFR: 0.01 * 1 / 400,
-    gammaGeo: 26, gammaVdB: 1.4e5, deltaAOverA: 1
-  };
-  return {
+  if (!raw) {
+    // Conservative defaults consistent with backend fallbacks
+    const sectorCount = 400;
+    const sectors = 1;
+    const dutyLocal = 0.01;
+    const dutyEffectiveFR = dutyLocal * sectors / sectorCount;
+    const gammaGeo = 26;
+    const gammaVdB = 1.4e5;
+    const q = 1;
+    const base: WarpUniforms = {
+      sectorCount,
+      sectors,
+      dutyCycle: dutyLocal,
+      dutyLocal,
+      dutyEffectiveFR,
+      gammaGeo,
+      gammaVdB,
+      gammaVanDenBroeck: gammaVdB,
+      gammaVanDenBroeck_vis: gammaVdB,
+      deltaAOverA: q,
+      qSpoilingFactor: q,
+      qSpoil: q,
+      qMech: 1,
+      qCav: 1e9,
+      viewAvg: true,
+      viewMassFraction: sectors / sectorCount,
+      colorMode: 'theta',
+      thetaScale: dutyEffectiveFR * Math.pow(gammaGeo,3) * q * gammaVdB,
+      __src: 'legacy',
+      __version: 1
+    };
+    return base;
+  }
+
+  // --- sectors & duties -----------------------------------------------------
+  const sectorCount = Math.max(1, N(raw.sectorCount, 400));
+  const sectors     = Math.max(1, Math.min(sectorCount, N(raw.sectors, 1)));
+
+  // UI duty (what users see/adjust)
+  const dutyCycle   = clamp(N(raw.dutyCycle, 0.01), EPS, 1);
+
+  // Local burst fraction (used in FR derivation)
+  const dutyLocal   = clamp(N(raw.dutyLocal, dutyCycle), EPS, 1);
+
+  // Ford–Roman duty (authoritative if provided, else derive)
+  const dutyEffectiveFR = clamp(N(
+    raw.dutyEffectiveFR,
+    dutyLocal * (sectors / sectorCount)
+  ), EPS, 1);
+
+  // --- γ_geo ----------------------------------------------------------------
+  const gammaGeo = Math.max(1, N(raw.gammaGeo, 26));
+
+  // --- q (ΔA/A) with symmetric aliases -------------------------------------
+  const q_canonical = clamp(
+    N(raw.deltaAOverA ?? raw.qSpoilingFactor ?? raw.qSpoil, 1),
+    EPS, 1e6
+  );
+  // reflect back to all aliases so downstream code can rely on any name
+  const deltaAOverA     = q_canonical;
+  const qSpoilingFactor = q_canonical;
+  const qSpoil          = q_canonical;
+
+  // --- γ_VdB visual with symmetric aliases ---------------------------------
+  const gammaV_vis_src = N(
+    raw.gammaVanDenBroeck_vis ?? raw.gammaVdB ?? raw.gammaVanDenBroeck,
+    1.4e5
+  );
+  const gammaVdB              = Math.max(1, gammaV_vis_src);
+  const gammaVanDenBroeck     = gammaVdB; // keep legacy alias in sync
+  const gammaVanDenBroeck_vis = gammaVdB;
+
+  // Mass-calibrated (pass-through if present; do not invent)
+  const gammaVanDenBroeck_mass =
+    Number.isFinite(+raw.gammaVanDenBroeck_mass) ? +raw.gammaVanDenBroeck_mass : undefined;
+
+  // --- mechanical & cavity Q/gains -----------------------------------------
+  const qMech        = clamp(N(raw.qMech ?? raw.qMechanical, 1), EPS, 1e12);
+  const qCav         = clamp(N(raw.qCav ?? raw.qCavity, 1e9), 1, 1e12);
+
+  // --- renderer helpers -----------------------------------------------------
+  const viewAvg = (raw.viewAvg ?? true) ? true : false;
+  const viewMassFraction = clamp(N(raw.viewMassFraction, sectors / sectorCount), 0, 1);
+  const colorMode: 'theta'|'rho' = (raw.colorMode === 'rho' ? 'rho' : 'theta');
+
+  // --- expected θ scale (derive if missing) ---------------------------------
+  const thetaScale = Number.isFinite(+raw.thetaScale)
+    ? +raw.thetaScale
+    : (dutyEffectiveFR * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
+
+  // --- optional time-window gating passthrough ------------------------------
+  const onWindowDisplay = !!raw.onWindowDisplay;
+  const cyclesPerBurst  = Number.isFinite(+raw.cyclesPerBurst) ? +raw.cyclesPerBurst : undefined;
+  const dwell_ms        = Number.isFinite(+raw.dwell_ms) ? +raw.dwell_ms : undefined;
+  const tauLC_ms        = Number.isFinite(+raw.tauLC_ms) ? +raw.tauLC_ms : undefined;
+
+  const wu: WarpUniforms = {
     ...raw,
-    gammaVdB: N(raw.gammaVdB ?? raw.gammaVanDenBroeck, 1.4e5),
-    deltaAOverA: Math.max(1e-12, N(raw.deltaAOverA ?? raw.qSpoilingFactor, 1)),
-    sectorCount: Math.max(1, N(raw.sectorCount, 400)),
-    sectors: Math.max(1, N(raw.sectors, 1)),
-    dutyCycle: Math.max(1e-12, N(raw.dutyCycle, 0.01)),
-    // Ford–Roman duty = dutyLocal × (S_live / S_total)
-    dutyEffectiveFR: Math.max(
-      1e-12,
-      N(
-        raw.dutyEffectiveFR,
-        0.01 * Math.max(1, N(raw.sectors, 1)) / Math.max(1, N(raw.sectorCount, 400))
-      )
-    ),
-    gammaGeo: N(raw.gammaGeo, 26),
+
+    // normalized numerics
+    sectorCount,
+    sectors,
+    dutyCycle,
+    dutyLocal,
+    dutyEffectiveFR,
+    gammaGeo,
+
+    // q aliases normalized & mirrored
+    deltaAOverA,
+    qSpoilingFactor,
+    qSpoil,
+
+    // γ_VdB aliases normalized & mirrored
+    gammaVdB,
+    gammaVanDenBroeck,
+    gammaVanDenBroeck_vis,
+    gammaVanDenBroeck_mass,
+
+    // Q/gain helpers
+    qMech,
+    qMechanical: qMech,
+    qCav,
+    qCavity: qCav,
+
+    // derived θ
+    thetaScale,
+
+    // renderer helpers
+    viewAvg,
+    viewMassFraction,
+    colorMode,
+
+    // gating passthrough
+    onWindowDisplay,
+    cyclesPerBurst,
+    dwell_ms,
+    tauLC_ms,
+
+    __src: raw.__src ?? 'server',
+    __version: Number.isFinite(+raw.__version) ? +raw.__version : 1,
   };
+
+  return wu;
 }
 
 // Pane builders (only pane-specific spice added here)
@@ -51,25 +215,27 @@ export function buildREAL(wu: WarpUniforms) {
     physicsParityMode: true,
     ridgeMode: 0,
     viewAvg: true,
+    colorMode: wu.colorMode ?? 'theta',
     exposure: 3.5,
     zeroStop: 1e-6,
     userGain: 1,
     displayGain: 1,
-  };
+  } as const;
 }
 
 export function buildSHOW(wu: WarpUniforms, opts?: { T?:number; boost?:number; userGain?:number }) {
-  const T = Math.max(0, Math.min(1, opts?.T ?? 0.70));
-  const boost = Math.max(1, opts?.boost ?? 40);
+  const T = clamp(N(opts?.T, 0.70), 0, 1);
+  const boost = Math.max(1, N(opts?.boost, 40));
   return {
     ...wu,
     physicsParityMode: false,
     ridgeMode: 1,
     viewAvg: true,
+    colorMode: wu.colorMode ?? 'theta',
     exposure: 6,
     zeroStop: 1e-7,
     curvatureGainT: T,
     curvatureBoostMax: boost,
-    userGain: Math.max(1, opts?.userGain ?? 2),
-  };
+    userGain: Math.max(1, N(opts?.userGain, 2)),
+  } as const;
 }

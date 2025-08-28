@@ -19,29 +19,61 @@ interface InteractiveHeatMapProps {
   onModeChange?: (mode: string) => void;
 }
 
-const DEFAULT_GAMMA_VDB = 1.4e5;
+// Match server visual seed unless pipeline provides one
+const DEFAULT_GAMMA_VDB = 1e11;
 
-const pick = <T,>(v: T | undefined, d: T) => (typeof v === "number" ? (isFinite(v as any) ? v! : d) : (v ?? d));
+const pick = <T,>(v: T | undefined, d: T) =>
+  (typeof v === "number" ? (isFinite(v as any) ? (v as any) : d) : (v ?? d));
 
 function resolveModeNumbers(mode: string, pipeline?: any) {
   const m = (mode || "hover").toLowerCase() as keyof typeof MODE_CONFIGS;
 
-  // Prefer live pipeline when present; else MODE_CONFIGS; else sane fallbacks
+  // Prefer live pipeline; otherwise MODE_CONFIGS; otherwise sane fallbacks
   const dutyCycle       = pick(pipeline?.dutyCycle,       MODE_CONFIGS[m]?.dutyCycle ?? 0.14);
   const sectorStrobing  = pick(pipeline?.sectorStrobing,  MODE_CONFIGS[m]?.sectorStrobing ?? 1);
   const qSpoilingFactor = pick(pipeline?.qSpoilingFactor, MODE_CONFIGS[m]?.qSpoilingFactor ?? 1);
   const qCavity         = pick(pipeline?.qCavity,         1e9);
-  const P_avg           = pick(pipeline?.P_avg_MW,        MODE_CONFIGS[m]?.powerTarget ?? 83.3);
-  const gammaVanDenBroeck = pick(pipeline?.gammaVanDenBroeck, DEFAULT_GAMMA_VDB);
+  const P_avg           = Number.isFinite(pipeline?.P_avg)
+    ? pipeline.P_avg
+    : (MODE_CONFIGS[m]?.powerTarget_W != null
+        ? MODE_CONFIGS[m].powerTarget_W / 1e6
+        : 83.3); // MW fallback
+
+  // Prefer visual gamma from server if available
+  const gammaVanDenBroeck = pick(
+    (pipeline as any)?.gammaVanDenBroeck_vis ?? (pipeline as any)?.gammaVanDenBroeck,
+    DEFAULT_GAMMA_VDB
+  );
 
   return { dutyCycle, sectorStrobing, qSpoilingFactor, qCavity, P_avg, gammaVanDenBroeck };
 }
 
-function InteractiveHeatMap({ 
-  currentTileArea, 
-  currentShipRadius, 
-  viabilityParams, 
-  constraintConfig, 
+// Build a lightweight preset for a mode using live values / MODE_CONFIGS
+function buildModePreset(modeKey: string, pipeline?: any) {
+  const resolved = resolveModeNumbers(modeKey, pipeline);
+  const name = modeKey.charAt(0).toUpperCase() + modeKey.slice(1);
+  return {
+    key: modeKey,
+    name,
+    qCavity: resolved.qCavity,
+    mechQ: 5e4, // fixed diagram knob
+    dutyCycle: resolved.dutyCycle,
+    sectorStrobing: resolved.sectorStrobing,
+    qSpoilingFactor: resolved.qSpoilingFactor,
+    gammaVanDenBroeck: resolved.gammaVanDenBroeck,
+    powerMW: resolved.P_avg,
+    description:
+      Number.isFinite(resolved.P_avg)
+        ? `${resolved.P_avg.toFixed(1)} MW target`
+        : ''
+  };
+}
+
+function InteractiveHeatMap({
+  currentTileArea,
+  currentShipRadius,
+  viabilityParams,
+  constraintConfig,
   currentSimulation,
   onParameterChange,
   selectedMode = "hover",
@@ -49,113 +81,25 @@ function InteractiveHeatMap({
 }: InteractiveHeatMapProps) {
   const [gridData, setGridData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Get live pipeline data for authentic values
+
+  // Live values from the energy pipeline (authoritative)
   const { data: pipeline } = useEnergyPipeline();
   const resolved = resolveModeNumbers(selectedMode, pipeline);
 
+  // Derived preset for the currently selected mode
+  const currentModePreset = buildModePreset(selectedMode, pipeline);
+
+  // For convenience when passing to computeViabilityGrid & toasts
   const modePreset = {
-    name: selectedMode[0].toUpperCase() + selectedMode.slice(1),
-    qCavity: resolved.qCavity,
-    mechQ: 5e4, // mechanical Q for the diagram
-    dutyCycle: resolved.dutyCycle,
-    sectorStrobing: resolved.sectorStrobing,
-    qSpoilingFactor: resolved.qSpoilingFactor,
-    gammaVanDenBroeck: resolved.gammaVanDenBroeck,
-    powerMW: resolved.P_avg
+    name: currentModePreset.name,
+    qCavity: currentModePreset.qCavity,
+    mechQ: currentModePreset.mechQ,
+    dutyCycle: currentModePreset.dutyCycle,
+    sectorStrobing: currentModePreset.sectorStrobing,
+    qSpoilingFactor: currentModePreset.qSpoilingFactor,
+    gammaVanDenBroeck: currentModePreset.gammaVanDenBroeck,
+    powerMW: currentModePreset.powerMW
   };
-  
-  // Legacy mode presets structure for compatibility (deprecated)
-  const legacyModePresets = {
-    hover: {
-      name: "Hover",
-      qCavity: 1e9,        // 1.0×10⁹ (Cavity Q for power loss)
-      mechQ: 5e4,          // 5.0×10⁴ (Mechanical Q for energy boost - fixed)
-      dutyCycle: 0.14,     // 14% duty (station-hold)
-      sectorStrobing: 1,   // No strobing
-      qSpoilingFactor: 1,  // No Q-spoiling (Q_idle/Q_on = 1)
-      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
-      description: "83.3 MW • 1,405 kg • ζ=0.032"
-    },
-    cruise: {
-      name: "Cruise", 
-      qCavity: 1.6e6,      // 1.6×10⁶ (Lower for stability)
-      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      dutyCycle: 0.005,    // 0.5% duty (Ford-Roman compliant)
-      sectorStrobing: 1, // 1-sector strobing (proper sweep mode)
-      qSpoilingFactor: 0.001, // Q-spoiling (Q_idle/Q_cavity = 1 × 10⁻³)
-      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
-      description: "7.4 MW • 1,405 kg • ζ=0.89"
-    },
-    emergency: {
-      name: "Emergency",
-      qCavity: 1e9,        // 1.0×10⁹
-      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      dutyCycle: 0.50,     // 50% duty (fast-burn)
-      sectorStrobing: 1,   // No strobing
-      qSpoilingFactor: 1,  // No Q-spoiling
-      gammaVanDenBroeck: DEFAULT_GAMMA_VDB, // Van-den-Broeck pocket amplification
-      description: "297 MW • 1,405 kg • ζ=0.009"
-    },
-    standby: {
-      name: "Standby",
-      qCavity: 1e9,        // 1.0×10⁹ (Irrelevant when duty=0)
-      mechQ: 5e4,          // 5.0×10⁴ (Fixed)
-      dutyCycle: 0.0,      // 0% duty (bubble collapsed)
-      sectorStrobing: 1,   // Irrelevant
-      qSpoilingFactor: 1,  // Irrelevant
-      gammaVanDenBroeck: 0, // No pocket amplification (exotic mass = 0)
-      description: "0 MW • 0 kg • System Off"
-    }
-  };
-
-  // Get initial mode preset
-  const initialMode = selectedMode || "hover";
-  const initialPreset = legacyModePresets[initialMode as keyof typeof legacyModePresets] || legacyModePresets.hover;
-  
-  // Helper to get mode-specific constraint defaults using authentic calculated values
-  const getModeConstraintDefaults = (mode: string) => {
-    // NOTE: minTimescale is UNIVERSAL homogenization threshold (TS_ratio ≥ 100)
-    // NOT mode-specific - all modes must clear same τ_pulse ≪ τ_LC bar
-    const universalMinTimescale = 100; // TS_ratio = 100 for universal homogenization threshold
-    
-    switch (mode) {
-      case 'hover':
-        // Authentic values: 83.3 MW, 1,405 kg, ζ=0.032
-        return { maxPower: 120, massTolerance: 5, maxZeta: 0.05, minTimescale: universalMinTimescale };
-      case 'cruise':
-        // Authentic values: 7.4 MW, 1,405 kg, ζ=0.89
-        return { maxPower: 20, massTolerance: 10, maxZeta: 0.05, minTimescale: universalMinTimescale };
-      case 'emergency':
-        // Authentic values: 297 MW, 1,405 kg, ζ=0.009
-        return { maxPower: 400, massTolerance: 15, maxZeta: 0.02, minTimescale: universalMinTimescale };
-      case 'standby':
-        // Authentic values: 0 MW, 0 kg, System Off
-        return { maxPower: 10, massTolerance: 50, maxZeta: 10.0, minTimescale: universalMinTimescale };
-      default:
-        return { maxPower: 120, massTolerance: 5, maxZeta: 1.0, minTimescale: universalMinTimescale };
-    }
-  };
-
-  const initialConstraints = getModeConstraintDefaults(initialMode);
-
-  // Local parameter state for sliders - initialized with safe numeric fallbacks
-  const [localParams, setLocalParams] = useState({
-    selectedMode: initialMode,
-    gammaGeo: Number.isFinite(viabilityParams?.gammaGeo) ? viabilityParams.gammaGeo : 26,
-    qCavity: Number.isFinite(viabilityParams?.qCavity) && viabilityParams.qCavity > 0
-      ? viabilityParams.qCavity
-      : (initialPreset?.qCavity ?? 1e9),
-    dutyCycle: Number.isFinite(viabilityParams?.dutyCycle) ? viabilityParams.dutyCycle : (initialPreset?.dutyCycle ?? 0.14),
-    sagDepth: Number.isFinite(viabilityParams?.sagDepth) ? viabilityParams.sagDepth : 16,
-    maxPower: Number.isFinite(viabilityParams?.maxPower) ? viabilityParams.maxPower : initialConstraints.maxPower,
-    massTolerance: Number.isFinite(viabilityParams?.massTolerance) ? viabilityParams.massTolerance : initialConstraints.massTolerance,
-    maxZeta: Number.isFinite(viabilityParams?.maxZeta) ? viabilityParams.maxZeta : initialConstraints.maxZeta,
-    minTimescale: Number.isFinite(viabilityParams?.minTimescale) ? viabilityParams.minTimescale : initialConstraints.minTimescale
-  });
-  
-  // Get current mode configuration (use passed selectedMode instead of local state)
-  const currentMode = legacyModePresets[selectedMode as keyof typeof legacyModePresets] || legacyModePresets.hover;
 
   // Safe parser for numeric values with fallbacks
   const safeParse = <T extends number>(v: any, d: T): T => {
@@ -163,7 +107,36 @@ function InteractiveHeatMap({
     return (Number.isFinite(n) ? (n as T) : d);
   };
 
-  // Format Q-Factor for better readability (hardened against undefined/NaN)
+  // Mode constraint defaults (Ford–Roman & homogenization)
+  const getModeConstraintDefaults = (mode: string) => {
+    const universalMinTimescale = 100; // TS_ratio ≥ 100
+    switch (mode) {
+      case 'hover':     return { maxPower: 120, massTolerance: 5,  maxZeta: 0.05, minTimescale: universalMinTimescale };
+      case 'cruise':    return { maxPower: 20,  massTolerance: 10, maxZeta: 0.05, minTimescale: universalMinTimescale };
+      case 'emergency': return { maxPower: 400, massTolerance: 15, maxZeta: 0.02, minTimescale: universalMinTimescale };
+      case 'standby':   return { maxPower: 10,  massTolerance: 50, maxZeta: 10.0, minTimescale: universalMinTimescale };
+      default:          return { maxPower: 120, massTolerance: 5,  maxZeta: 1.0,  minTimescale: universalMinTimescale };
+    }
+  };
+
+  const initialConstraints = getModeConstraintDefaults(selectedMode);
+
+  // Local parameter state for sliders - initialized with safe numeric fallbacks
+  const [localParams, setLocalParams] = useState({
+    selectedMode,
+    gammaGeo: Number.isFinite(viabilityParams?.gammaGeo) ? viabilityParams.gammaGeo : 26,
+    qCavity: Number.isFinite(viabilityParams?.qCavity) && viabilityParams.qCavity > 0
+      ? viabilityParams.qCavity
+      : currentModePreset.qCavity,
+    dutyCycle: Number.isFinite(viabilityParams?.dutyCycle) ? viabilityParams.dutyCycle : currentModePreset.dutyCycle,
+    sagDepth: Number.isFinite(viabilityParams?.sagDepth) ? viabilityParams.sagDepth : 16,
+    maxPower: Number.isFinite(viabilityParams?.maxPower) ? viabilityParams.maxPower : initialConstraints.maxPower,
+    massTolerance: Number.isFinite(viabilityParams?.massTolerance) ? viabilityParams.massTolerance : initialConstraints.massTolerance,
+    maxZeta: Number.isFinite(viabilityParams?.maxZeta) ? viabilityParams.maxZeta : initialConstraints.maxZeta,
+    minTimescale: Number.isFinite(viabilityParams?.minTimescale) ? viabilityParams.minTimescale : initialConstraints.minTimescale
+  });
+
+  // Format Q-Factor for better readability
   const formatQFactor = (q: unknown) => {
     const n = Number(q);
     if (!Number.isFinite(n) || n <= 0) return '—';
@@ -171,29 +144,27 @@ function InteractiveHeatMap({
     if (n >= 1e6) return `${(n / 1e6).toFixed(1)}×10⁶`;
     return n.toExponential(1);
   };
-  
-  // Helper to apply a mode preset to all parameters
+
+  // Apply a mode preset
   const applyModePreset = (mode: string) => {
-    // Use live pipeline data for authentic values
-    const resolved = resolveModeNumbers(mode, pipeline);
+    const preset = buildModePreset(mode, pipeline);
     const constraints = getModeConstraintDefaults(mode);
-    
+
     const newParams = {
       ...localParams,
       selectedMode: mode,
-      qCavity: resolved.qCavity,
-      dutyCycle: resolved.dutyCycle,
+      qCavity: preset.qCavity,
+      dutyCycle: preset.dutyCycle,
       ...constraints
     };
-    
+
     setLocalParams(newParams);
-    
-    // Update parent component with new parameters
+
     if (onParameterChange) {
       onParameterChange(newParams);
     }
-    
-    console.log(`🎯 Applied ${mode} mode preset: Q=${resolved.qCavity}, duty=${resolved.dutyCycle}`);
+
+    console.log(`🎯 Applied ${mode} mode preset: Q=${preset.qCavity}, duty=${preset.dutyCycle}`);
   };
 
   // React to mode changes from parent component
@@ -203,142 +174,77 @@ function InteractiveHeatMap({
     }
   }, [selectedMode]);
 
-  // Get mode-specific parameter values for double-click functionality
+  // Mode-specific defaults for double-click reset
   const getModeSpecificValue = (parameter: string, mode: string) => {
-    const resolved = resolveModeNumbers(mode, pipeline);
-    
+    const r = resolveModeNumbers(mode, pipeline);
     switch (parameter) {
-      case 'gammaGeo':
-        return 26; // Standard research value for all modes
-      case 'qCavity':
-        return resolved.qCavity;
-      case 'dutyCycle':
-        return resolved.dutyCycle;
-      case 'sagDepth':
-        return 16; // Standard Needle Hull research value
-      case 'maxPower':
-        // Mode-specific power constraints
-        switch (mode) {
-          case 'hover': return 120;
-          case 'cruise': return 20;
-          case 'emergency': return 400;
-          case 'standby': return 10;
-          default: return 120;
-        }
-      case 'massTolerance':
-        // Mode-specific mass tolerance
-        switch (mode) {
-          case 'hover': return 5; // Tight control for station-keeping
-          case 'cruise': return 10; // Moderate tolerance for efficiency
-          case 'emergency': return 15; // Relaxed for high power
-          case 'standby': return 50; // Very relaxed (system off)
-          default: return 5;
-        }
-      case 'maxZeta':
-        // Mode-specific quantum safety limits (Ford-Roman compliant)
-        switch (mode) {
-          case 'hover': return 0.05; // Ford-Roman compliant for station-keeping
-          case 'cruise': return 0.05; // Ford-Roman compliant for sustained travel
-          case 'emergency': return 0.05; // Ford-Roman compliant even for high power  
-          case 'standby': return 10.0; // Very relaxed (system off)
-          default: return 0.05;
-        }
-      case 'minTimescale':
-        // UNIVERSAL homogenization threshold: TS_ratio = τ_LC/τ_pulse ≥ 100
-        // Same for ALL modes - ensures τ_pulse ≪ τ_LC across all operational envelopes
-        return 100; // TS_ratio = 100 safety margin
-      default:
-        return null;
+      case 'gammaGeo':     return 26;
+      case 'qCavity':      return r.qCavity;
+      case 'dutyCycle':    return r.dutyCycle;
+      case 'sagDepth':     return 16;
+      case 'maxPower':     return getModeConstraintDefaults(mode).maxPower;
+      case 'massTolerance':return getModeConstraintDefaults(mode).massTolerance;
+      case 'maxZeta':      return getModeConstraintDefaults(mode).maxZeta;
+      case 'minTimescale': return 100;
+      default:             return null;
     }
   };
-  
-  // Handle double-click to apply mode-specific values
+
   const handleSliderDoubleClick = (parameter: string) => {
     const modeValue = getModeSpecificValue(parameter, selectedMode);
     if (modeValue !== null) {
-      console.log(`🎯 Double-click detected for ${parameter}, applying ${selectedMode} mode value: ${modeValue}`);
-      
-      // Force immediate local state update
-      setLocalParams(prev => {
-        const updated = { ...prev, [parameter]: modeValue };
-        console.log(`🔄 Local state updated: ${parameter} = ${modeValue}`);
-        return updated;
-      });
-      
-      // Trigger parent update after a brief delay to ensure state is synchronized
-      setTimeout(() => {
-        updateParameter(parameter, modeValue);
-        console.log(`📤 Parent update triggered for ${parameter}: ${modeValue}`);
-      }, 10);
-    } else {
-      console.log(`❌ No mode value found for parameter: ${parameter} in mode: ${selectedMode}`);
+      setLocalParams(prev => ({ ...prev, [parameter]: modeValue }));
+      setTimeout(() => updateParameter(parameter, modeValue), 10);
     }
   };
-  
+
   // Update parent when local parameters change
   const updateParameter = (key: string, value: number | string) => {
     const newParams = { ...localParams, [key]: value };
     setLocalParams(newParams);
-    
-    // If mode changed, update dutyCycle and other mode-specific parameters
+
     if (key === 'selectedMode' && typeof value === 'string') {
-      if (onModeChange) {
-        onModeChange(value); // Notify parent component
-      }
-      const resolved = resolveModeNumbers(value, pipeline);
+      if (onModeChange) onModeChange(value);
+      const preset = buildModePreset(value, pipeline);
       const constraints = getModeConstraintDefaults(value);
-      
-      newParams.dutyCycle = resolved.dutyCycle;
-      newParams.qCavity = resolved.qCavity;
+      newParams.dutyCycle = preset.dutyCycle;
+      newParams.qCavity = preset.qCavity;
       Object.assign(newParams, constraints);
       setLocalParams(newParams);
     }
-    
+
     if (onParameterChange) {
-      onParameterChange({
-        ...viabilityParams,
-        [key]: value
-      });
+      onParameterChange({ ...viabilityParams, [key]: value });
     }
   };
-  
+
   React.useEffect(() => {
     const loadGrid = async () => {
       setIsLoading(true);
-      console.log(`🔄 Building realistic viability grid using 8-step recipe...`);
-      console.log(`🔧 Mode: ${viabilityParams?.duty === 0.14 ? 'Hover' : viabilityParams?.duty === 0.005 ? 'Cruise' : 'Custom'}`);
-      
       try {
-        // Use the recipe-based viability grid computation with mode-aware parameters
         const { computeViabilityGrid } = await import('./viability-grid');
         const enhancedParams = {
           ...viabilityParams,
-          ...localParams, // Include local constraint parameters
-          // Include current mode configuration for exact Live Energy Pipeline matching
-          currentMode: currentMode,
+          ...localParams, // include local constraint parameters
+          currentMode: currentModePreset,
           modeConfig: {
-            dutyCycle: (resolved as any)?.dutyCycle || currentMode.dutyCycle,
-            sectorStrobing: (resolved as any)?.sectorStrobing || currentMode.sectorStrobing,
-            qSpoilingFactor: (resolved as any)?.qSpoilingFactor || currentMode.qSpoilingFactor,
-            gammaVanDenBroeck: (resolved as any)?.gammaVanDenBroeck || currentMode.gammaVanDenBroeck
+            dutyCycle: resolved.dutyCycle,
+            sectorStrobing: resolved.sectorStrobing,
+            qSpoilingFactor: resolved.qSpoilingFactor,
+            gammaVanDenBroeck: resolved.gammaVanDenBroeck
           }
         };
         const gridResult = computeViabilityGrid(enhancedParams, 25);
         const { A_vals, R_vals, Z } = gridResult;
-        
-        console.log(`🎯 Recipe Results: ${gridResult.viableCount}/${gridResult.totalCount} viable points (${(gridResult.viableCount/gridResult.totalCount*100).toFixed(1)}%)`);
-        console.log(`✅ Realistic constraints applied - no more 100% viable zones!`);
-        
-        // Create hover text
-        const hoverText = R_vals.map((R: number) => 
-          A_vals.map((A: number) => {
-            const viable = Z[R_vals.indexOf(R)][A_vals.indexOf(A)] === 1;
+
+        const hoverText = R_vals.map((R: number, rIdx: number) =>
+          A_vals.map((A: number, aIdx: number) => {
+            const viable = Z[rIdx][aIdx] === 1;
             return `Tile: ${A.toFixed(1)} cm²\nRadius: ${R.toFixed(1)} m\n${viable ? '✅ Viable' : '❌ Failed'}`;
           })
         );
-        
+
         setGridData({ A_vals, R_vals, Z, hoverText });
-        
       } catch (error) {
         console.error('Recipe grid computation failed:', error);
         setGridData(null);
@@ -346,10 +252,10 @@ function InteractiveHeatMap({
         setIsLoading(false);
       }
     };
-    
+
     loadGrid();
   }, [currentTileArea, currentShipRadius, viabilityParams, constraintConfig, currentSimulation?.status, localParams]);
-  
+
   if (!gridData || isLoading) {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 h-96 flex items-center justify-center">
@@ -363,11 +269,16 @@ function InteractiveHeatMap({
   }
 
   const { A_vals, R_vals, Z } = gridData;
-  
+
   // Calculate grid dimensions
   const cellWidth = 400 / A_vals.length;
   const cellHeight = 300 / R_vals.length;
-  
+
+  // Build options list from MODE_CONFIGS (fallback to canonical list)
+  const MODE_KEYS = (MODE_CONFIGS && Object.keys(MODE_CONFIGS).length
+    ? Object.keys(MODE_CONFIGS)
+    : ['hover', 'cruise', 'emergency', 'standby']) as string[];
+
   return (
     <div className="space-y-4">
       {/* Physics Parameter Controls */}
@@ -379,38 +290,40 @@ function InteractiveHeatMap({
           {/* Operational Mode Selector */}
           <div className="space-y-2">
             <Label>Operational Mode</Label>
-            <Select 
-              value={selectedMode} 
+            <Select
+              value={selectedMode}
               onValueChange={(value) => {
                 updateParameter('selectedMode', value);
-                // Trigger zen toast with current metrics
-                const resolved = resolveModeNumbers(value, pipeline);
+                const r = resolveModeNumbers(value, pipeline);
                 zenLongToast("mode:switch", {
-                  mode: resolved.dutyCycle === 0.14 ? 'Hover' : resolved.dutyCycle === 0.005 ? 'Cruise' : resolved.dutyCycle === 0.5 ? 'Emergency' : 'Standby',
-                  duty: resolved.dutyCycle,
-                  powerMW: resolved.P_avg,
+                  mode: value.charAt(0).toUpperCase() + value.slice(1),
+                  duty: r.dutyCycle,
+                  powerMW: r.P_avg,
                   exoticKg: (pipeline as any)?.M_exotic ?? 1405,
                   zeta: (pipeline as any)?.zeta ?? 0.032
                 });
               }}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select mode" />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(legacyModePresets).map(([key, mode]) => (
-                  <SelectItem key={key} value={key}>
-                    {mode.name} - {mode.description}
-                  </SelectItem>
-                ))}
+                {MODE_KEYS.map((key) => {
+                  const p = buildModePreset(key, pipeline);
+                  return (
+                    <SelectItem key={key} value={key}>
+                      {p.name} {p.description ? `- ${p.description}` : ''}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Current: {currentMode.dutyCycle * 100}% duty, {currentMode.sectorStrobing === 1 ? 'no' : `${currentMode.sectorStrobing}-sector`} strobing, 
-              {currentMode.qSpoilingFactor === 1 ? 'no' : `${(currentMode.qSpoilingFactor * 1000).toFixed(0)}×10⁻³`} Q-spoiling
+              Current: {(currentModePreset.dutyCycle * 100).toFixed(1)}% duty, {currentModePreset.sectorStrobing === 1 ? 'no' : `${currentModePreset.sectorStrobing}-sector`} strobing,
+              Q-spoiling ×{currentModePreset.qSpoilingFactor}
             </p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Geometric Amplification */}
             <div className="space-y-2">
@@ -423,7 +336,7 @@ function InteractiveHeatMap({
                     zenLongToast("geom:gamma", {
                       gammaGeo: value,
                       shipRadiusM: currentShipRadius,
-                      gapNm: 1.0 // Typical gap
+                      gapNm: 1.0
                     });
                   }}
                   min={1}
@@ -436,19 +349,20 @@ function InteractiveHeatMap({
                 Geometric amplification factor • Double-click to apply {selectedMode} mode value (26)
               </p>
             </div>
-            
+
             {/* Q-Factors (Two Types) */}
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label>Cavity Q-Factor: {formatQFactor(localParams.qCavity)} <span className="text-xs text-blue-600">(User Control)</span></Label>
+                <Label>
+                  Cavity Q-Factor: {formatQFactor(localParams.qCavity)} <span className="text-xs text-blue-600">(User Control)</span>
+                </Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('qCavity')}>
                   <Slider
                     value={[(() => {
                       const n = Number(localParams.qCavity);
-                      return Number.isFinite(n) && n > 0 ? Math.log10(n) : 6; // default to 1e6
+                      return Number.isFinite(n) && n > 0 ? Math.log10(n) : 6;
                     })()]}
                     onValueChange={([value]) => {
-                      // clamp to [1e6, 1e10] like your min/max
                       const qFactor = Math.min(1e10, Math.max(1e6, Math.pow(10, value)));
                       updateParameter('qCavity', qFactor);
                       zenLongToast("geom:qfactor", {
@@ -464,21 +378,23 @@ function InteractiveHeatMap({
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentMode?.qCavity)})
+                  Electromagnetic cavity Q for power loss P = U_geo×ω/Q_cavity • Double-click to apply {selectedMode} mode value ({formatQFactor(currentModePreset.qCavity)})
                 </p>
               </div>
-              
+
               <div className="bg-muted/30 rounded p-2">
-                <Label className="text-sm">Mechanical Q-Factor: {formatQFactor(currentMode?.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span></Label>
+                <Label className="text-sm">
+                  Mechanical Q-Factor: {formatQFactor(currentModePreset.mechQ)} <span className="text-xs text-gray-600">(Fixed)</span>
+                </Label>
                 <p className="text-xs text-muted-foreground mt-1">
                   Parametric resonator Q for energy boost U_Q = Q_mech × U_geo (mode-invariant)
                 </p>
               </div>
             </div>
-            
-            {/* Duty Cycle - Mode-controlled but still adjustable */}
+
+            {/* Duty Cycle */}
             <div className="space-y-2">
-              <Label>Duty Cycle: {(localParams.dutyCycle * 100).toFixed(1)}% (Mode: {currentMode.name})</Label>
+              <Label>Duty Cycle: {(localParams.dutyCycle * 100).toFixed(1)}% (Mode: {currentModePreset.name})</Label>
               <div onDoubleClick={() => handleSliderDoubleClick('dutyCycle')}>
                 <Slider
                   value={[localParams.dutyCycle * 100]}
@@ -487,14 +403,13 @@ function InteractiveHeatMap({
                   max={50}
                   step={0.1}
                   className="w-full cursor-pointer"
-                  disabled={false} // Enable for double-click functionality
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Set by operational mode ({currentMode.name}) • Double-click to reset to mode default ({(currentMode.dutyCycle * 100).toFixed(1)}%)
+                Set by operational mode ({currentModePreset.name}) • Double-click to reset to mode default ({(currentModePreset.dutyCycle * 100).toFixed(1)}%)
               </p>
             </div>
-            
+
             {/* Sag Depth */}
             <div className="space-y-2">
               <Label>Sag Depth: {localParams.sagDepth} nm</Label>
@@ -513,9 +428,9 @@ function InteractiveHeatMap({
               </p>
             </div>
           </div>
-          
+
           <Separator />
-          
+
           {/* Constraint Controls */}
           <div>
             <h4 className="font-medium mb-4">Viability Constraints</h4>
@@ -537,7 +452,7 @@ function InteractiveHeatMap({
                   Maximum allowable power • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxPower', selectedMode)} MW)
                 </p>
               </div>
-              
+
               {/* Mass Tolerance */}
               <div className="space-y-2">
                 <Label>Mass Tolerance: ±{localParams.massTolerance}%</Label>
@@ -555,10 +470,10 @@ function InteractiveHeatMap({
                   Exotic mass target tolerance • Double-click to apply {selectedMode} mode value (±{getModeSpecificValue('massTolerance', selectedMode)}%)
                 </p>
               </div>
-              
+
               {/* Quantum Safety */}
               <div className="space-y-2">
-                <Label>Max ζ: {localParams.maxZeta.toFixed(1)}</Label>
+                <Label>Max ζ: {localParams.maxZeta.toFixed(2)}</Label>
                 <div onDoubleClick={() => handleSliderDoubleClick('maxZeta')}>
                   <Slider
                     value={[localParams.maxZeta]}
@@ -573,7 +488,7 @@ function InteractiveHeatMap({
                   Quantum inequality limit • Double-click to apply {selectedMode} mode value ({getModeSpecificValue('maxZeta', selectedMode)?.toFixed(2)})
                 </p>
               </div>
-              
+
               {/* Time-scale Separation */}
               <div className="space-y-2">
                 <Label>Min TS Ratio: {localParams.minTimescale.toFixed(0)}</Label>
@@ -595,7 +510,7 @@ function InteractiveHeatMap({
           </div>
         </CardContent>
       </Card>
-      
+
       {/* Metrics Dashboard */}
       <Card className="bg-white dark:bg-gray-900">
         <CardHeader>
@@ -605,11 +520,13 @@ function InteractiveHeatMap({
           </p>
         </CardHeader>
         <CardContent>
-          <MetricsDashboard viabilityParams={{
-            ...viabilityParams,
-            selectedMode: selectedMode,
-            dutyCycle: localParams.dutyCycle
-          }} />
+          <MetricsDashboard
+            viabilityParams={{
+              ...viabilityParams,
+              selectedMode: selectedMode,
+              dutyCycle: localParams.dutyCycle
+            }}
+          />
         </CardContent>
       </Card>
     </div>
@@ -620,8 +537,6 @@ export default function PhaseDiagram(props: any) {
   return (
     <div className="space-y-4">
       <InteractiveHeatMap {...props} />
-      
-
     </div>
   );
 }

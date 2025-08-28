@@ -102,39 +102,6 @@ export default function ParameterPanel({
     onGenerateOnly(data);
   };
 
-  const handleNeedleHullPreset = () => {
-    // Based on research papers: scaled for numerical stability while preserving physics ratios
-    // Geometry-Amplified Dynamic Casimir Effect parameters for warp bubble configuration
-    form.setValue("geometry", "bowl");
-    form.setValue("gap", 1.0); // 1 nm vacuum gap (design parameter)
-    form.setValue("radius", 25000); // 25 mm radius (50 mm diameter) as per paper spec
-    form.setValue("sagDepth", 16); // 16 nm sag depth as specified in paper
-    form.setValue("material", "PEC"); // Nb₃Sn superconducting mirrors
-    form.setValue("temperature", 20); // 20 K operating temperature
-    form.setValue("moduleType", "dynamic");
-    form.setValue("dynamicConfig", {
-      modulationFreqGHz: 15, // 15 GHz AlN piezo modulation
-      strokeAmplitudePm: 50, // ±50 pm piston stroke amplitude
-      burstLengthUs: 10, // 10 μs burst duration
-      cycleLengthUs: 1000, // 1 ms cycle (1 kHz strobe frequency, S=400 sectors)
-      cavityQ: 1e9, // Q ≈ 10⁹ superconducting RF quality factor
-      sectorCount: 400,
-      sectorDuty: 2.5e-5,
-      pulseFrequencyGHz: 15,
-      lightCrossingTimeNs: 100,
-      shiftAmplitude: 1e-6,
-      expansionTolerance: 1e-12,
-      warpFieldType: "natario" as const
-    });
-    form.setValue("advanced", {
-      xiMin: 0.001,
-      maxXiPoints: 25000, // Enhanced for Van-den-Broeck amplification
-      intervals: 100, // Higher precision for exotic mass calculations
-      absTol: 0,
-      relTol: 0.001 // Tighter tolerance for warp bubble requirements
-    });
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -146,7 +113,7 @@ export default function ParameterPanel({
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            
+
             {/* Geometry Selection */}
             <FormField
               control={form.control}
@@ -164,7 +131,7 @@ export default function ParameterPanel({
                         </div>
                         <div className="w-4 h-4 rounded-full bg-slate-300"></div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                         <RadioGroupItem value="parallel_plate" id="parallel_plate" />
                         <div className="flex-1">
@@ -176,7 +143,7 @@ export default function ParameterPanel({
                           <div className="w-4 h-1 bg-slate-300"></div>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                         <RadioGroupItem value="bowl" id="bowl" />
                         <div className="flex-1">
@@ -211,7 +178,7 @@ export default function ParameterPanel({
                           <p className="text-sm text-muted-foreground">Standard SCUFF-EM calculations</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                         <RadioGroupItem value="dynamic" id="dynamic" />
                         <div className="flex-1">
@@ -222,7 +189,7 @@ export default function ParameterPanel({
                           <p className="text-sm text-muted-foreground">Moving boundaries with quantum inequality constraints</p>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center space-x-3 p-3 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors">
                         <RadioGroupItem value="warp" id="warp" />
                         <div className="flex-1">
@@ -240,7 +207,7 @@ export default function ParameterPanel({
               )}
             />
 
-            {/* Needle Hull Preset Button */}
+            {/* Needle Hull Preset Button (single source of truth) */}
             <NeedleHullPreset 
               form={form} 
               onTileAreaChange={onTileAreaChange}
@@ -417,7 +384,7 @@ export default function ParameterPanel({
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="advanced.maxXiPoints"
@@ -437,7 +404,7 @@ export default function ParameterPanel({
                       )}
                     />
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={form.control}
@@ -457,7 +424,7 @@ export default function ParameterPanel({
                         </FormItem>
                       )}
                     />
-                    
+
                     <FormField
                       control={form.control}
                       name="advanced.relTol"
@@ -482,28 +449,6 @@ export default function ParameterPanel({
               </Collapsible>
             </div>
 
-            {/* Preset Configuration */}
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                <Rocket className="h-4 w-4" />
-                Warp Bubble Research Configuration
-              </h4>
-              <p className="text-xs text-purple-700 dark:text-purple-300 mb-3">
-                Configure parameters based on "Needle Hull" and "Geometry-Amplified Dynamic Casimir Effect" research papers
-                for theoretical warp bubble conditions. Implements Van-den-Broeck amplification (γ ≈ 10¹¹) targeting ≈1.5 kg exotic mass per tile.
-              </p>
-              <Button 
-                type="button" 
-                variant="outline" 
-                className="w-full border-purple-300 hover:bg-purple-100 dark:border-purple-600 dark:hover:bg-purple-900/30"
-                onClick={handleNeedleHullPreset}
-                disabled={isLoading}
-              >
-                <Rocket className="w-4 h-4 mr-2" />
-                Apply Needle Hull Preset
-              </Button>
-            </div>
-
             {/* Action Buttons */}
             <div className="space-y-3">
               <Button 
@@ -514,7 +459,7 @@ export default function ParameterPanel({
                 <Play className="w-4 h-4 mr-2" />
                 Generate & Run Simulation
               </Button>
-              
+
               <Button 
                 type="button" 
                 variant="secondary" 

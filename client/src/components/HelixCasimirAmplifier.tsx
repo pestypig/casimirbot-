@@ -208,7 +208,7 @@ function DisplacementHeatmap({ endpoint, metrics, state }: {
                  ?? state?.sectorStrobing
                  ?? 400;
     const split = Math.round(sectors * 0.5);
-    
+
     setParams(prevParams => ({
       ...prevParams,
       sectors,
@@ -402,6 +402,53 @@ function EquationChip({ eq }: { eq: string }) {
   return <code className="px-2 py-1 rounded-md bg-slate-800/70 text-slate-200 text-xs font-mono border border-slate-700">{eq}</code>;
 }
 
+// ------------------------------- Checkpoint UI -----------------------------
+
+type CheckRow = {
+  label: string;
+  state: "ok" | "warn" | "fail";
+  detail?: string;
+};
+
+function rowStyle(state: CheckRow["state"]) {
+  if (state === "ok") return "text-emerald-300 bg-emerald-500/10 border-emerald-500/30";
+  if (state === "warn") return "text-amber-300 bg-amber-500/10 border-amber-500/30";
+  return "text-rose-300 bg-rose-500/10 border-rose-500/30";
+}
+
+function CheckpointCard({ title, rows, equations }: {
+  title: string;
+  rows: CheckRow[];
+  equations?: React.ReactNode;
+}) {
+  return (
+    <Card className="bg-slate-900/60 border-slate-700">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-slate-100">
+          <ShieldCheck className="w-5 h-5"/>
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="grid md:grid-cols-2 gap-2">
+          {rows.map((r, i) => (
+            <div key={i} className={`px-3 py-2 rounded-lg border ${rowStyle(r.state)} flex items-center justify-between`}>
+              <span className="text-xs md:text-sm">{r.label}</span>
+              <span className="text-[11px] opacity-90">{r.detail || (r.state === "ok" ? "OK" : r.state === "warn" ? "Check" : "Fail")}</span>
+            </div>
+          ))}
+        </div>
+        {equations && (
+          <details className="mt-2">
+            <summary className="text-xs text-slate-400 hover:text-slate-200 cursor-pointer">equations & filled values</summary>
+            <div className="mt-2 text-[11px] leading-5 text-slate-300 space-y-2">{equations}</div>
+          </details>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ------------------------------- Main UI ----------------------------------
 
 export default function HelixCasimirAmplifier({
@@ -436,30 +483,40 @@ export default function HelixCasimirAmplifier({
     // keep any *explicit* HUD inputs you need; do NOT spread raw metrics
   });
 
+  // ✅ Unified light-crossing packet for gating/labels
+  const lc = useMemo(
+    () => metrics?.lightCrossing ?? lightCrossing,
+    [metrics?.lightCrossing, lightCrossing]
+  );
+
   // Time-evolving cavity energy system using shared light-crossing loop
   const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-  
-  const qCav = isFiniteNumber(state?.qCavity) ? state.qCavity : 1e9;
-  
+
+  // Prefer state → metrics → default
+  const qCav =
+    Number.isFinite(state?.qCavity) ? Number(state!.qCavity) :
+    Number.isFinite(metrics?.qCavity) ? Number(metrics!.qCavity) :
+    1e9;
+
   // SAFE frequency selection - positive-only guard
   const fGHz_state = Number(state?.modulationFreq_GHz);
   const fGHz =
     Number.isFinite(fGHz_state) && fGHz_state > 0
       ? fGHz_state
-      : (Number.isFinite(lightCrossing?.freqGHz) && (lightCrossing!.freqGHz as number) > 0
-          ? (lightCrossing!.freqGHz as number)
+      : (Number.isFinite(lc?.freqGHz) && (lc!.freqGHz as number) > 0
+          ? (lc!.freqGHz as number)
           : 15);
-  
+
   const f = fGHz * 1e9;
   const omega = 2 * Math.PI * f;
   const tauQ_s = qCav / (2 * Math.PI * f); // cavity time constant: τ = Q/(2πf)
 
   // ---- DISPLAY gating consistency fix ----
   const MIN_CYCLES_PER_BURST = 10;
-  const isBurstMeaningful = (lightCrossing?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
-  
+  const isBurstMeaningful = (lc?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
+
   // Use display gating consistently
-  const onDisplay = !!lightCrossing?.onWindowDisplay;
+  const onDisplay = !!lc?.onWindowDisplay;
   const gateOn = onDisplay && isBurstMeaningful;
 
   // effective duty for ship-averaged quantities:
@@ -467,8 +524,8 @@ export default function HelixCasimirAmplifier({
   const d_eff = (() => {
     const fromMetrics = metrics?.dutyEffectiveFR;
     if (Number.isFinite(fromMetrics)) return Math.max(0, Math.min(1, Number(fromMetrics)));
-    if (lightCrossing && lightCrossing.dwell_ms > 0) {
-      const val = lightCrossing.burst_ms / lightCrossing.dwell_ms;
+    if (lc && lc.dwell_ms > 0) {
+      const val = lc.burst_ms / lc.dwell_ms;
       return Math.max(0, Math.min(1, val));
     }
     return state?.dutyCycle ?? metrics?.dutyGlobal ?? 0; // last resort
@@ -480,17 +537,30 @@ export default function HelixCasimirAmplifier({
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
     const gammaGeo = hud.gammaGeo;
-    const qMech    = hud.qMech;                      // mech gain
+    // HUD → state → safe fallback (avoid silent zeros)
+    const qMech = (
+      Number.isFinite((hud as any)?.qMech) && (hud as any).qMech! > 0 ? (hud as any).qMech :
+      Number.isFinite(state?.qMechanical)   && state!.qMechanical!   > 0 ? state!.qMechanical :
+      1
+    ) as number;
     const N_tiles  = hud.tilesTotal;
     const gammaVdB = hud.gammaVdB;
 
     // power chain (per tile → ship)
-    const U_geo     = U_static * gammaGeo;           // backend uses γ^1 for power
-    const U_Q       = U_geo * qMech;                 // per-tile stored energy proxy during ON
-    const P_tile_on = (omega * Math.abs(U_Q)) / qCav; // physics
-    const P_tile_instant_W = gateOn ? P_tile_on : 0;  // display-gated
+    const U_geo     = U_static * gammaGeo;             // backend uses γ^1 for power
+    const U_Q       = U_geo * qMech;                   // per-tile stored energy proxy during ON
+    const P_tile_on = (omega * Math.abs(U_Q)) / qCav;  // physics
+    const P_tile_instant_W = gateOn ? P_tile_on : 0;   // display-gated
     const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
-    const P_ship_avg_report_MW = hud.powerMW;        // authoritative calibration (if provided)
+    const P_ship_avg_report_MW = hud.powerMW;          // authoritative calibration (if provided)
+
+    // Debug: badge ON but 0 W
+    if (gateOn && (!Number.isFinite(P_tile_on) || P_tile_on === 0)) {
+      // eslint-disable-next-line no-console
+      console.debug("Zero-W instant power debug", {
+        U_static, gammaGeo, qMech, omega, qCav, gateOn, onDisplay: gateOn
+      });
+    }
 
     // mass chain (no Q in energy; Q is for power)
     const geo3        = Math.pow(gammaGeo, 3);
@@ -529,13 +599,13 @@ export default function HelixCasimirAmplifier({
 
   // Compute mechanical stroke from pipeline values
   const gap_nm = (state?.gap_nm ?? 16);
-  const qMech = state?.qMechanical ?? 1;
+  const qMechStroke = state?.qMechanical ?? 1;
 
   // Reference small actuation nm per unit q_mech (pipeline may send a better number later)
   const ref_nm_per_q = 0.25; // small; purely visual, bounded below
   const stroke_nm_peak = Math.min(
     gap_nm * 0.25,                 // never exceed 25% of gap visually
-    Math.max(0, qMech * ref_nm_per_q)
+    Math.max(0, qMechStroke * ref_nm_per_q)
   );
 
   // Visual instantaneous stroke (modulated by envelope)
@@ -545,7 +615,7 @@ export default function HelixCasimirAmplifier({
   useEffect(() => {
     // Early return if readOnly - prevent engine interference
     if (readOnly) return;
-    
+
     const sectorCount =
       metrics?.totalSectors ??
       state?.sectorStrobing ??
@@ -583,7 +653,7 @@ export default function HelixCasimirAmplifier({
   useEffect(() => {
     let raf: number;
     const step = (t: number) => {
-      if (!lightCrossing) { raf = requestAnimationFrame(step); return; }
+      if (!lc) { raf = requestAnimationFrame(step); return; }
       const on = gateOn; // one source of truth
       const now = t / 1000;
       const prev = lastT.current ?? now;
@@ -602,10 +672,10 @@ export default function HelixCasimirAmplifier({
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [gateOn, tauQ_s, U_inf, lightCrossing]);
+  }, [gateOn, tauQ_s, U_inf, lc]);
 
   // Use U to drive visuals / numbers
-  const pInstant = U / Math.max(1e-9, lightCrossing?.dwell_ms ?? 1); // arbitrary proportional readout
+  const pInstant = U / Math.max(1e-9, lc?.dwell_ms ?? 1); // arbitrary proportional readout
 
   // Mode switch
   const [switchingMode, setSwitchingMode] = useState(false);
@@ -659,10 +729,98 @@ export default function HelixCasimirAmplifier({
     { stage: "×d_eff",     value: derived.E_tile_mass } // duty applied here (no Q_cav in mass)
   ];
 
+  // ---------- Checkpoint logic ----------
+  const within = (a: number, b: number, rel = 0.05, abs = 1e-9) => {
+    if (!isFinite(a) || !isFinite(b)) return false;
+    const d = Math.abs(a - b);
+    const m = Math.max(Math.abs(a), Math.abs(b));
+    return d <= Math.max(abs, rel * m);
+  };
+
+  // Theoretical Casimir per tile (already in derived)
+  const casimirMatches = within(derived.U_static, derived.casimir_per_tile, 0.05, 1e-12);
+
+  // Amplification steps vs backend-provided fields (if present)
+  const geoStepOK  = within(state.U_geo ?? derived.U_geo, derived.U_geo, 0.01, 1e-12);
+  const qStepOK    = within(state.U_Q   ?? derived.U_Q,   derived.U_Q,   0.01, 1e-12);
+
+  // Duty presence & consistency (prefer authoritative metrics)
+  const dutyPipeline = Number.isFinite(state.dutyEffective_FR ?? NaN) ? Number(state.dutyEffective_FR) : undefined;
+  const dutyMetric   = Number.isFinite(metrics.dutyEffectiveFR ?? NaN) ? Number(metrics.dutyEffectiveFR) : undefined;
+  const dRef = Number.isFinite(d_eff) ? d_eff : dutyMetric ?? dutyPipeline ?? 0;
+  const dutyOK = within(dRef, (dutyMetric ?? dRef), 0.001, 0) && within(dRef, (dutyPipeline ?? dRef), 0.001, 0);
+
+  // Power & mass cross-checks against reported values
+  const powerOK = (derived.P_ship_avg_report_MW > 0)
+    ? within(derived.P_ship_avg_calc_MW, derived.P_ship_avg_report_MW, 0.10, 1e-6)
+    : true; // if no report, don't fail
+
+  const massOK = (derived.M_total_report > 0)
+    ? within(derived.M_total_calc, derived.M_total_report, 0.10, 1e-9)
+    : true;
+
+  // Sectoring sanity
+  const sectorTotal = metrics.totalSectors || state.sectorStrobing || 0;
+  const sectorOK = sectorTotal > 0 && Number.isFinite(sectorTotal);
+
+  const checkpointRows: CheckRow[] = [
+    { label: "Casimir per tile (theory vs backend)", state: casimirMatches ? "ok" : "fail",
+      detail: casimirMatches ? "match ≤5%" : "mismatch >5%" },
+    { label: "Amplification step ×γ_geo (power)", state: geoStepOK ? "ok" : "warn",
+      detail: geoStepOK ? "backend matches" : "drift vs computed" },
+    { label: "Amplification step ×q_mech (stored U)", state: qStepOK ? "ok" : "warn",
+      detail: qStepOK ? "backend matches" : "drift vs computed" },
+    { label: "Effective duty d_eff (Ford–Roman)", state: dutyOK ? "ok" : "fail",
+      detail: dutyOK ? fmtNum(dRef, "", 5) : "mismatch/missing" },
+    { label: "Ship power (calc vs report)", state: powerOK ? "ok" : "warn",
+      detail: powerOK ? "≤10% drift" : "check calibration" },
+    { label: "Exotic mass (calc vs report)", state: massOK ? "ok" : "warn",
+      detail: massOK ? "≤10% drift" : "check γ_VdB calibration" },
+    { label: "Sectoring in sync", state: sectorOK ? "ok" : "warn",
+      detail: sectorOK ? `${sectorTotal} sectors` : "sector count unknown" },
+  ];
+
+  const equationsBlock = (
+    <>
+      <div>
+        <div className="opacity-80">Casimir foundation</div>
+        <div><EquationChip eq="u = -π² ħc / (720 a⁴)" /></div>
+        <div className="mt-1">
+          a = {fmtNum(derived.gap_m * 1e9, "nm", 2)}, ħc = {fmtNum(HBAR_C, "J·m", 2)} <br/>
+          u = {fmtNum(derived.casimir_theory, "J/m³", 2)}, A = {fmtNum((state.tileArea_cm2 ?? 25) * 1e-4, "m²", 3)} <br/>
+          U<sub>tile</sub> (theory) = u · A · a = {fmtNum(derived.casimir_per_tile, "J", 3)}
+        </div>
+      </div>
+      <div>
+        <div className="opacity-80">Power chain (per tile → ship)</div>
+        <div><EquationChip eq="U_geo = U_static × γ_geo" /> <EquationChip eq="U_Q = U_geo × q_mech" /></div>
+        <div><EquationChip eq="P_tile,on = ω · |U_Q| / Q_cav" /> <EquationChip eq="P_ship,avg = P_tile,on · N_tiles · d_eff" /></div>
+        <div className="mt-1">
+          ω = {fmtNum(omega, "rad/s", 2)}, Q<sub>cav</sub> = {fmtNum(qCav, "", 0)}, N = {fmtNum(derived.N_tiles, "", 0)}, d<sub>eff</sub> = {fmtNum(dRef, "", 5)}
+        </div>
+      </div>
+      <div>
+        <div className="opacity-80">Mass chain (per tile → ship)</div>
+        <div><EquationChip eq="E_tile = |U_static| × γ_geo³ × γ_VdB × d_eff" /></div>
+        <div><EquationChip eq="M_total = (E_tile / c²) × N_tiles" /></div>
+        <div className="mt-1">
+          γ<sub>geo</sub> = {fmtNum(derived.gammaGeo, "", 2)}, γ<sub>VdB</sub> = {fmtNum(derived.gammaVdB, "", 2)}, c = {fmtNum(C, "m/s", 0)}
+        </div>
+      </div>
+    </>
+  );
+
+  // --- Presentation-fit cavity specs synced with warp-bubble/pipeline (no hooks here) ---
+  const tileArea_cm2 = Number.isFinite(state?.tileArea_cm2) ? Number(state!.tileArea_cm2) : 25;
+  const gap_nm_display = Number.isFinite(state?.gap_nm) ? Number(state!.gap_nm) : 1;
+  const sag_nm_display = Number.isFinite(state?.sag_nm) ? Number(state!.sag_nm) : 16;
+  // Square tile: width(mm) = sqrt(cm²) * 10
+  const tileWidthMM = Math.max(1, Math.sqrt(Math.max(0, tileArea_cm2)) * 10);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        
+
         {/* Header & Mode Controls */}
         <Card className="bg-slate-900/60 border-slate-700">
           <CardHeader>
@@ -677,9 +835,9 @@ export default function HelixCasimirAmplifier({
                   <Button
                     key={mode}
                     size="sm"
-                    variant={switchingMode ? "outline" : "default"}
+                    variant={switchingMode || readOnly ? "outline" : "default"}
                     onClick={() => switchMode(mode)}
-                    disabled={switchingMode}
+                    disabled={switchingMode || readOnly}
                     className="capitalize"
                   >
                     {mode}
@@ -702,13 +860,13 @@ export default function HelixCasimirAmplifier({
             </div>
 
             {/* Time-Evolving Cavity Physics Display */}
-            {lightCrossing && (
+            {lc && (
               <div className="mt-4 pt-4 border-t border-slate-700">
                 <div className="mb-2 text-xs text-slate-400 font-mono uppercase tracking-wide">Cavity Dynamics (Phase-Locked)</div>
                 <div className="grid grid-cols-3 gap-3 text-[10px] font-mono">
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">τ_LC</div>
-                    <div className="text-slate-200">{(lightCrossing.tauLC_ms).toFixed(3)} ms</div>
+                    <div className="text-slate-200">{(lc.tauLC_ms).toFixed(3)} ms</div>
                   </div>
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">τ_Q</div>
@@ -719,7 +877,7 @@ export default function HelixCasimirAmplifier({
                     <div className="text-slate-200">{(U / Math.max(1e-12, U_inf || 1e-6)).toFixed(3)}</div>
                   </div>
                 </div>
-                
+
                 {/* Energy bar driven by U(t)/U∞ so it matches the number */}
                 <div className="mt-3 flex items-center gap-2">
                   <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
@@ -731,23 +889,23 @@ export default function HelixCasimirAmplifier({
                     />
                   </div>
                   <Badge 
-                    variant={lightCrossing.onWindowDisplay ? "default" : "secondary"} 
+                    variant={lc.onWindowDisplay ? "default" : "secondary"} 
                     className={`text-xs ${
-                      lightCrossing.onWindowDisplay ? 'bg-cyan-500 text-white' : 'bg-slate-600 text-slate-200'
+                      lc.onWindowDisplay ? 'bg-cyan-500 text-white' : 'bg-slate-600 text-slate-200'
                     }`}
                   >
-                    {lightCrossing.onWindowDisplay ? 'ON' : 'OFF'}
+                    {lc.onWindowDisplay ? 'ON' : 'OFF'}
                   </Badge>
                 </div>
-                
+
                 {/* Instantaneous per-tile power display */}
                 <div className="mt-3 pt-3 border-t border-slate-700/50">
                   <div className="mb-2 text-xs text-slate-400 font-mono uppercase tracking-wide">Per-Tile Instantaneous Power</div>
                   <div className="flex items-center gap-2">
                     <span className={`px-2 py-0.5 rounded text-xs ${
-                      lightCrossing.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
+                      lc?.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
                     }`}>
-                      {lightCrossing.onWindowDisplay ? "ON" : "OFF"}
+                      {lc?.onWindowDisplay ? "ON" : "OFF"}
                     </span>
                     <span className="text-slate-400 text-xs">
                       {derived?.isBurstMeaningful ? `${fmtNum(derived.P_tile_instant_W, "W")}` : "insufficient cycles"}
@@ -756,9 +914,16 @@ export default function HelixCasimirAmplifier({
                 </div>
               </div>
             )}
-            
+
           </CardContent>
         </Card>
+
+        {/* NEW: Casimir → Amplifier Checkpoints */}
+        <CheckpointCard
+          title="Casimir → Amplifier Checkpoints"
+          rows={checkpointRows}
+          equations={equationsBlock}
+        />
 
         {/* Casimir Foundation */}
         <Card className="bg-slate-900/40 border-slate-800">
@@ -786,7 +951,7 @@ export default function HelixCasimirAmplifier({
                 </div>
               </div>
             </div>
-            
+
             {/* To-Scale Cavity Cross-Section */}
             <div className="mt-6 pt-4 border-t border-slate-700">
               <h4 className="font-semibold mb-3 text-slate-200 flex items-center gap-2">
@@ -794,22 +959,23 @@ export default function HelixCasimirAmplifier({
                 Pipeline-Driven Cavity Cross-Section (To Scale)
               </h4>
               <CavitySideView
+                key={`${tileWidthMM}|${gap_nm_display}|${sag_nm_display}|${lc?.onWindow ? 1 : 0}`}
                 pocketDiameter_um={40}
-                sag_nm={state.sag_nm ?? 16}
-                gap_nm={state.gap_nm ?? 1}
+                sag_nm={sag_nm_display}
+                gap_nm={gap_nm_display}
                 topMirror_thick_um={1.5}
                 botMirror_thick_um={1.5}
                 alnRim_width_um={20}
-                tileWidth_mm={50}
+                tileWidth_mm={tileWidthMM}
                 physicsParity={false}
-                onWindow={lightCrossing?.onWindow ?? false}
+                onWindow={!!lc?.onWindow}
 
                 // Bigger canvas
                 width={1000}
                 height={360}
 
                 // READABILITY: keep X to-scale, exaggerate Y only, plus a gap zoom inset
-                pxPerUmX={undefined}           // auto-fit the 50 mm tile horizontally
+                pxPerUmX={undefined}           // auto-fit the tile horizontally
                 verticalExaggeration={5000}    // make nm-scale clearly visible
                 gapInsetMagnification={12000}  // inset zoom of the stack
                 fontScale={1.15}
@@ -840,9 +1006,9 @@ export default function HelixCasimirAmplifier({
                   <div className="flex items-center gap-2">
                     <span>P_tile (instantaneous):</span>
                     <span className={`px-2 py-0.5 rounded text-xs ${
-                      lightCrossing?.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
+                      lc?.onWindowDisplay ? "bg-emerald-500/20 text-emerald-300" : "bg-slate-700/40 text-slate-300"
                     }`}>
-                      {lightCrossing?.onWindowDisplay ? "ON" : "OFF"}
+                      {lc?.onWindowDisplay ? "ON" : "OFF"}
                     </span>
                     <span className="text-slate-400 text-xs">
                       {derived?.isBurstMeaningful
@@ -874,7 +1040,7 @@ export default function HelixCasimirAmplifier({
 
         {/* Displacement Field Heatmap */}
         <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
-        
+
       </div>
     </div>
   );

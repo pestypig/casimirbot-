@@ -16,22 +16,32 @@ export function casimirEnergyDensity(a_m: number): number {
 }
 
 // ---------- Pipeline amplification chain ----------
-/** A_inst = (γ_geo)^3 · √(Q/1e9) · γ_VdB · q_spoil  (dimensionless) */
+/**
+ * A_inst = (γ_geo)^3 · √(Q/1e9) · γ_VdB · q_spoil  (dimensionless)
+ * Notes:
+ *  - Accepts aliases { gammaVdB, gammaVanDenBroeck }
+ *  - Accepts aliases { deltaAOverA, qSpoilingFactor }
+ *  - Defaults match live pipeline: γ_VdB≈1.4e5
+ */
 export function amplificationFromPipeline({
   gammaGeo = 26,
   cavityQ = 1e9,
-  gammaVanDenBroeck = 3.83e1,
-  qSpoilingFactor = 1
+  gammaVdB,
+  gammaVanDenBroeck = 1.4e5,
+  qSpoilingFactor,
+  deltaAOverA = 1
 }: {
   gammaGeo?: number;
   cavityQ?: number;
+  gammaVdB?: number;
   gammaVanDenBroeck?: number;
   qSpoilingFactor?: number;
+  deltaAOverA?: number;
 }): number {
   const A_geo = Math.max(1, gammaGeo) ** 3;
   const qGain = Math.sqrt(Math.max(1, cavityQ) / 1e9);
-  const vdb  = Math.max(1, gammaVanDenBroeck);
-  const qsp  = Math.max(1e-6, qSpoilingFactor);
+  const vdb  = Math.max(1, (gammaVdB ?? gammaVanDenBroeck));
+  const qsp  = Math.max(1e-6, (qSpoilingFactor ?? deltaAOverA));
   return A_geo * qGain * vdb * qsp;
 }
 
@@ -53,6 +63,7 @@ export function resolveDutyEff({
     return clamp01(dutyEffectiveFR as number);
   }
   if (Number.isFinite(burst_ms) && Number.isFinite(dwell_ms) && (dwell_ms as number) > 0) {
+    // Treat provided burst/dwell as already ship-wide FR window.
     return clamp01((burst_ms as number) / (dwell_ms as number));
   }
   const d = clamp01(Number(dutyCycle) || 0);
@@ -71,20 +82,26 @@ export function enhancedAvgEnergyDensity({
   gap_m,
   gammaGeo,
   cavityQ,
+  gammaVdB,
   gammaVanDenBroeck,
   qSpoilingFactor,
+  deltaAOverA,
   dutyEff
 }: {
   gap_m: number;
   gammaGeo: number;
   cavityQ: number;
-  gammaVanDenBroeck: number;
-  qSpoilingFactor: number;
+  gammaVdB?: number;
+  gammaVanDenBroeck?: number;
+  qSpoilingFactor?: number;
+  deltaAOverA?: number;
   dutyEff: number;
-}): number {
-  const rho0 = casimirEnergyDensity(gap_m);          // negative
-  const A    = amplificationFromPipeline({ gammaGeo, cavityQ, gammaVanDenBroeck, qSpoilingFactor });
-  return rho0 * A * clamp01(dutyEff);                // stays negative
+}): { rho_avg: number; rho_inst: number } {
+  const rho0 = casimirEnergyDensity(gap_m); // negative
+  const A    = amplificationFromPipeline({ gammaGeo, cavityQ, gammaVdB, gammaVanDenBroeck, qSpoilingFactor, deltaAOverA });
+  const rho_inst = rho0 * A;                 // instantaneous (no duty)
+  const rho_avg  = rho_inst * clamp01(dutyEff);
+  return { rho_avg, rho_inst };
 }
 
 // ---------- Stress–energy tensor (perfect-fluid proxy, w = −1) ----------
@@ -98,28 +115,31 @@ export function stressEnergyFromDensity(rho_J_per_m3: number) {
   };
 }
 
-// ---------- Natário shift amplitude β_avg ----------
+// ---------- Natário shift amplitude β ----------
 /**
- * β_avg ≈ √(8πG |ρ_avg| / c²) · R_geom
- * (We already used d_eff in ρ_avg, so do NOT apply √duty again here.)
+ * β(ρ, R) ≈ √(8πG |ρ| / c²) · R
+ * Pass ρ_avg for cycle-averaged β, or ρ_inst for per-burst β.
+ * (Do NOT apply √duty inside this; the choice of ρ already encodes it.)
  */
-export function natarioShiftFromDensity(rho_avg: number, R_geom_m: number): number {
+export function natarioShiftFromDensity(rho: number, R_geom_m: number): number {
   const c2 = PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C;
-  const pref = Math.sqrt((8 * Math.PI * G * Math.abs(rho_avg)) / c2);
+  const pref = Math.sqrt((8 * Math.PI * G * Math.abs(rho)) / c2);
   return pref * Math.max(1e-9, R_geom_m);
 }
 
 // ---------- One-shot adapter the pipeline can call ----------
 /**
  * Produce time-averaged Tμν and β from the pipeline snapshot.
- * This is the entry you wire into energy-pipeline.ts.
+ * Also returns instantaneous density for diagnostics.
  */
 export function toPipelineStressEnergy(p: {
   gap_nm: number;
   gammaGeo: number;
   cavityQ: number;
-  gammaVanDenBroeck: number;
-  qSpoilingFactor: number;
+  gammaVdB?: number;
+  gammaVanDenBroeck?: number;
+  qSpoilingFactor?: number;
+  deltaAOverA?: number;
   dutyCycle?: number;
   sectorStrobing?: number;
   dutyEffectiveFR?: number;
@@ -135,18 +155,20 @@ export function toPipelineStressEnergy(p: {
     dwell_ms: p.lightCrossing?.dwell_ms
   });
 
-  const rho_avg = enhancedAvgEnergyDensity({
+  const { rho_avg, rho_inst } = enhancedAvgEnergyDensity({
     gap_m,
     gammaGeo: p.gammaGeo ?? 26,
     cavityQ: p.cavityQ ?? 1e9,
-    gammaVanDenBroeck: p.gammaVanDenBroeck ?? 3.83e1,
-    qSpoilingFactor: p.qSpoilingFactor ?? 1,
+    gammaVdB: p.gammaVdB,
+    gammaVanDenBroeck: p.gammaVanDenBroeck ?? 1.4e5,
+    qSpoilingFactor: p.qSpoilingFactor,
+    deltaAOverA: p.deltaAOverA,
     dutyEff: d_eff
   });
 
   const T = stressEnergyFromDensity(rho_avg);
-  const Rg = Math.max(1e-3, p.R_geom_m ?? 1); // be defensive
+  const Rg = Math.max(1e-6, p.R_geom_m ?? 1); // defensive floor at 1 µm
   const beta_avg = natarioShiftFromDensity(rho_avg, Rg);
 
-  return { ...T, beta_avg, rho_avg, dutyEff: d_eff };
+  return { ...T, beta_avg, rho_avg, rho_inst, dutyEff: d_eff };
 }

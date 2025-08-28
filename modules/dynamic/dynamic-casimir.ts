@@ -1,6 +1,6 @@
 /**
  * Dynamic Casimir Effects Module
- * Based on math-gpt.org formulation reference and theoretical foundations
+ * Pipeline-true implementation with Natário metric support
  */
 
 import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.js';
@@ -46,7 +46,7 @@ function resolveFromPipeline(sim: SimulationParameters): Required<PipeLike> {
     dutyEffectiveFR:    Number.isFinite(dutyFR) ? dutyFR : (dutyLocal / sectors),
     modulationFreq_GHz: Number(p.modulationFreq_GHz ?? dc.modulationFreqGHz ?? 15),
     tauLC_ms:           Number(p.tauLC_ms ?? p.lightCrossing?.tauLC_ms ?? (dc.lightCrossingTimeNs ? dc.lightCrossingTimeNs * 1e-6 : 0.1)),
-    N_tiles:            Math.max(1, Number(p.N_tiles ?? sim.arrayConfig?.size ? Math.pow(sim.arrayConfig!.size!, 2) : 1)),
+    N_tiles:            Math.max(1, Number(p.N_tiles ?? (sim.arrayConfig?.size ? Math.pow(sim.arrayConfig.size, 2) : 1))),
     tileArea_m2:        Number(p.tileArea_m2 ?? 0.05 * 0.05),
     gap_nm:             Number(p.gap_nm ?? sim.gap ?? 1.0),
   } as Required<PipeLike>;
@@ -63,7 +63,7 @@ function computeAmplificationChain(pipe: Required<PipeLike>) {
 export interface DynamicCasimirParams {
   // Static Casimir baseline
   staticEnergy: number;
-  
+
   // Dynamic modulation parameters (from roadmap spec)
   modulationFreqGHz: number;     // fₘ (15 GHz default)
   strokeAmplitudePm: number;     // δa (±50 pm default)
@@ -77,38 +77,38 @@ export interface DynamicCasimirResult {
   // Time-domain parameters
   strokePeriodPs: number;        // Tₘ = 1/fₘ (66.7 ps for 15 GHz)
   dutyFactor: number;            // d = t_burst/t_cycle
-  
+
   // Enhanced energy calculations
-  boostedEnergy: number;         // ΔE enhanced by Q factor during burst
-  cycleAverageEnergy: number;    // ⟨ΔE⟩ = ΔE_static × Q × d
-  
+  boostedEnergy: number;         // ΔE enhanced (instantaneous)
+  cycleAverageEnergy: number;    // ⟨ΔE⟩ cycle-averaged
+
   // Lattice and density calculations
-  totalExoticMass: number;       // Total exotic mass (target ≈ 1.4×10³ kg)
+  totalExoticMass: number;       // Total exotic mass
   exoticEnergyDensity: number;   // ρ_eff = ⟨ΔE⟩ / tile_volume
-  
+
   // Quantum inequality and safety
-  quantumInequalityMargin: number; // ζ = ρ_eff × τ_pulse / QI_bound
+  quantumInequalityMargin: number; // placeholder (server owns QI)
   quantumSafetyStatus: 'safe' | 'warning' | 'violation';
-  
+
   // Power calculations
-  instantaneousPower: number;    // Raw power during burst
+  instantaneousPower: number;    // Power during burst
   averagePower: number;          // Duty-mitigated power
-  
+
   // GR validity checks
   isaacsonLimit: boolean;        // High-frequency limit compliance
   greenWaldCompliance: boolean;  // Averaged null energy condition
-  
+
   // Additional readouts for research verification
-  averagePowerPerTile: number;     // Power per tile for scaling
-  averagePowerTotalLattice: number; // Full lattice power
-  exoticMassPerTile: number;       // Mass per tile
-  exoticMassTotalLattice: number;  // Total exotic mass
-  
-  // Complete Energy Pipeline (T_μν → metric calculations)
+  averagePowerPerTile: number;       // Power per tile
+  averagePowerTotalLattice: number;  // Full lattice power
+  exoticMassPerTile: number;         // Mass per tile
+  exoticMassTotalLattice: number;    // Total exotic mass
+
+  // Complete Energy Pipeline (optional summary)
   energyPipeline?: {
-    U_static: number;             // Static Casimir energy per cavity [J]
+    U_static: number;             // Static energy per cavity [J]
     U_Q: number;                  // Q-amplified energy [J]
-    U_geo: number;                // Geometrically amplified energy [J]
+    U_geo: number;                // Effective amplified energy [J]
     U_cycle: number;              // Stored energy per cycle [J]
     P_loss: number;               // Power loss per cavity [W]
     TS_ratio: number;             // Time-scale separation ratio
@@ -117,190 +117,102 @@ export interface DynamicCasimirResult {
     m_exotic: number;             // Exotic mass via E=mc² [kg]
     γ_geo: number;                // Geometric blueshift factor
     ω: number;                    // Angular frequency [rad/s]
-    d: number;                    // Duty cycle [dimensionless]
-    N_tiles: number;              // Number of tiles in full lattice
+    d: number;                    // Duty cycle
+    N_tiles: number;              // Tile count
     τ_pulse: number;              // Mechanical period [s]
     T_LC: number;                 // Light crossing time [s]
     powerPerTileComputed: number; // P_loss per tile [W]
     powerTotalComputed: number;   // Total lattice power [W]
-    massPerTileComputed: number;  // Mass per tile from E=mc² [kg]
+    massPerTileComputed: number;  // Mass per tile [kg]
   };
 }
 
 /**
- * Calculate dynamic Casimir effects with quantum inequality constraints
+ * Minimal dynamic Casimir calculator (kept for API compatibility).
+ * Uses only the provided params (no hidden constants).
+ * For full pipeline + GR, use calculateDynamicCasimirWithNatario().
  */
 export function calculateDynamicCasimir(params: DynamicCasimirParams): DynamicCasimirResult {
   const {
     staticEnergy,
     modulationFreqGHz,
-    strokeAmplitudePm,
     burstLengthUs,
     cycleLengthUs,
     cavityQ,
     tileCount
   } = params;
-  
-  // Time-domain calculations
-  const strokePeriodPs = 1000 / modulationFreqGHz; // Convert GHz to ps
-  const dutyFactor = burstLengthUs / cycleLengthUs;
-  
-  // Exact amplification chain from the research paper's logical flow:
-  // Step 1: Geometric blue-shift γ_geo ≈ 25 (from concave bowl geometry)
-  // Step 2: Dynamic enhancement from cavity Q factor
-  // Step 3: Van den Broeck amplification γ_VdB ≈ 10¹¹
-  // Combined as: E' ∝ E₀ × γ_geo³ × √Q × γ_VdB × d_eff
-  
-  const gammaGeo = 25; // Geometric blue-shift factor
-  const gammaVdB = 1e11; // Van den Broeck seed pocket amplification
-  const qEnhancement = Math.sqrt(cavityQ / 1e9); // Q-factor enhancement (normalized)
-  
-  // Paper shows energy scales as γ_geo³ not just γ_geo
-  const geometricAmplification = Math.pow(gammaGeo, 3); // E ∝ γ³ for 3D cavity
-  
-  // Total amplification following paper's exact formula
-  const totalAmplification = geometricAmplification * qEnhancement * gammaVdB;
-  
-  // Dynamic energy enhancement targeting ≈1.5 kg per tile
-  // The paper states this amplification produces the required exotic mass
-  const boostedEnergy = Math.abs(staticEnergy) * totalAmplification;
-  
-  // Cycle-averaged energy (duty-cycle reduced for sector strobing)
-  const cycleAverageEnergy = boostedEnergy * dutyFactor;
-  
-  // Exotic mass calculation following paper's target
-  // 5cm × 5cm × 1cm tile volume as specified in paper
-  const tileVolume = 0.05 * 0.05 * 0.01; // m³ (2.5×10⁻⁵ m³)
-  const exoticEnergyDensity = cycleAverageEnergy / tileVolume;
-  
-  // Calculate mass from amplified energy
-  const exoticMassPerTile = Math.abs(cycleAverageEnergy) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  
-  // Calculate exotic mass from energy
-  const c2 = PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C;
-  const massPerTile = Math.abs(cycleAverageEnergy) / c2;
-  const totalExoticMass = massPerTile * tileCount;
-  
-  // Quantum inequality check (Ford-Roman constraints)
-  // ζ = ρ_eff × τ_pulse / QI_bound
-  const pulseDuration = burstLengthUs * 1e-6; // Convert to seconds
-  const qiBound = PHYSICS_CONSTANTS.HBAR_C / (Math.pow(strokeAmplitudePm * 1e-12, 4)); // Simplified QI bound
-  const quantumInequalityMargin = Math.abs(exoticEnergyDensity) * pulseDuration / qiBound;
-  
-  let quantumSafetyStatus: 'safe' | 'warning' | 'violation';
-  if (quantumInequalityMargin < 0.9) {
-    quantumSafetyStatus = 'safe';
-  } else if (quantumInequalityMargin < 1.0) {
-    quantumSafetyStatus = 'warning';
-  } else {
-    quantumSafetyStatus = 'violation';
-  }
-  
-  // Power calculations following paper's methodology
-  // Power calculations (pipeline-based)
-  const instantaneousPower = boostedEnergy / pulseDuration; // Power during burst
-  const averagePower = cycleAverageEnergy * f_m; // ⟨E⟩ per cycle times cycles/s
-  
-  // GR validity checks
-  const isaacsonLimit = dutyFactor < 0.1; // High-frequency limit for spacetime stability
-  const greenWaldCompliance = quantumInequalityMargin < 1.0; // Averaged null energy condition
-  
-  // Calculate power and mass readouts
-  const powerPerTileReadout = averagePower / tileCount;
-  const powerTotalLatticeReadout = averagePower;
-  const massPerTileReadout = Math.abs(cycleAverageEnergy) / (PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  const massTotalLatticeReadout = massPerTileReadout * tileCount;
 
-  // Complete Energy Pipeline Implementation (following theory checklist)
-  const c = 299_792_458; // m/s - speed of light
-  const f_m = 15e9; // Hz - 15 GHz modulation frequency
-  const ω = 2 * Math.PI * f_m; // angular frequency [rad/s]
-  
-  // Hull geometry parameters for scaling calculations
-  const R_hull = 20e-6; // m - 20 μm hull radius from needle hull paper
-  const tileRadius = 20e-6; // m - assume 20 μm tile radius for calculations
-  const A_tile = Math.PI * Math.pow(tileRadius, 2); // m² - single tile area
-  const A_hull = Math.PI * Math.pow(25e-3, 2); // m² - full 25mm disk area from paper
-  const N_tiles = A_hull / A_tile; // Number of tiles in full lattice
-  
-  // 1) Q-factor amplification
-  // Use proper SCUFF-EM interaction energy (divide by 2 for identical plates)
-  const U_static = staticEnergy / 2; // per-cavity interaction energy [J] (should be ~-2.55e-3)
-  const U_Q = cavityQ * U_static; // U_Q = Q·U_static [J]
-  
-  // 2) Geometric amplification (Van den Broeck)
-  const γ_geo = 25; // Geometric blueshift factor (full amplification, not cube root)
-  const U_geo = γ_geo * U_Q; // U_geo = γ·U_Q [J]
-  
-  // 3) Fractional stroke / duty cycle
-  const t_burst = params.burstLengthUs * 1e-6; // s - convert μs to s
-  const t_cycle = params.cycleLengthUs * 1e-6; // s - convert μs to s
-  const d = t_burst / t_cycle; // d = t_burst / t_cycle [dimensionless]
-  
-  // 4) Stored energy per cycle
-  const U_cycle = U_geo * d; // ⟨E⟩_cycle = U_geo·d [J]
-  
-  // 5) Power loss per cavity
-  // P_loss = |U_geo·ω / Q| [W] (take absolute value for power)
-  const P_loss = Math.abs(U_geo * ω / cavityQ);
-  
-  // 6) Time-scale separation check
-  // Use mechanical period T_m = 1/f_m, not burst time
-  const T_m = 1 / f_m; // mechanical period [s] = 6.67×10⁻¹¹ s for 15 GHz
-  const T_LC = 2 * R_hull / c; // light crossing time [s] ≃ 1.33×10⁻¹³ s (corrected)
-  const TS_ratio = T_m / T_LC; // dimensionless - should be ≪1 (≃ 0.4)
-  
-  // 7) Per-tile negative energy
-  const E_tile = U_cycle; // E_tile = U_geo·d [J]
-  
-  // 8) Total exotic energy & mass
-  const E_total = E_tile * N_tiles; // J - total exotic energy
-  const m_exotic = Math.abs(E_total) / (c * c); // kg - via E=mc²
-  
-  // Additional calculations for verification
-  const powerPerTileComputed = P_loss; // W per tile
-  const powerTotalComputed = P_loss * N_tiles; // W total lattice
-  const massPerTileComputed = Math.abs(E_tile) / (c * c); // kg per tile
-  
+  // Time-domain
+  const f_m = Math.max(1, modulationFreqGHz * 1e9); // Hz
+  const strokePeriodPs = 1e12 / f_m;                // ps
+  const dutyFactor = Math.max(0, Math.min(1, burstLengthUs / Math.max(1e-12, cycleLengthUs)));
+
+  // Amplification (neutral baseline: √Q only; geometry handled elsewhere)
+  const qEnhancement = Math.sqrt(Math.max(1, cavityQ) / 1e9);
+  const boostedEnergy = Math.abs(staticEnergy) * qEnhancement;     // instantaneous
+  const cycleAverageEnergy = boostedEnergy * dutyFactor;           // averaged per cycle
+
+  // Per-tile / lattice
+  const E_tile = cycleAverageEnergy;
+  const E_total = E_tile * Math.max(1, tileCount);
+  const c2 = PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C;
+  const exoticMassPerTile = Math.abs(E_tile) / c2;
+  const exoticMassTotalLattice = Math.abs(E_total) / c2;
+
+  // Densities need a volume; use a conservative nominal 5cm×5cm×1nm
+  const tileVolume = 0.05 * 0.05 * 1e-9; // m³
+  const exoticEnergyDensity = E_tile / tileVolume;
+
+  // Power
+  const burst_s = Math.max(1e-12, burstLengthUs * 1e-6);
+  const instantaneousPower = boostedEnergy / burst_s;
+  const averagePower = cycleAverageEnergy * f_m;
+
+  // Simple cavity loss estimate (per tile)
+  const ω = 2 * Math.PI * f_m;
+  const P_loss = Math.abs(boostedEnergy * ω / Math.max(1, cavityQ));
+
+  // Time-scale separation (no LC number here → set T_LC conservative to 1e-9s)
+  const T_m = 1 / f_m;
+  const T_LC = 1e-9;
+  const TS_ratio = T_m / T_LC;
+
   return {
     strokePeriodPs,
     dutyFactor,
     boostedEnergy,
     cycleAverageEnergy,
-    totalExoticMass,
+    totalExoticMass: exoticMassTotalLattice,
     exoticEnergyDensity,
-    quantumInequalityMargin,
-    quantumSafetyStatus,
+    quantumInequalityMargin: 0,   // server-side QI owns this
+    quantumSafetyStatus: 'safe',  // placeholder
     instantaneousPower,
-    averagePower: correctedAveragePower,
-    // Additional readouts
-    averagePowerPerTile: powerPerTileReadout,
-    averagePowerTotalLattice: powerTotalLatticeReadout,
-    exoticMassPerTile: massPerTileReadout,
-    exoticMassTotalLattice: massTotalLatticeReadout,
-    isaacsonLimit,
-    greenWaldCompliance,
-    
-    // Complete Energy Pipeline Values (theory checklist)
+    averagePower,
+    isaacsonLimit: dutyFactor < 0.1,
+    greenWaldCompliance: true,
+    averagePowerPerTile: averagePower / Math.max(1, tileCount),
+    averagePowerTotalLattice: averagePower,
+    exoticMassPerTile,
+    exoticMassTotalLattice,
     energyPipeline: {
-      U_static, // Static Casimir energy per cavity [J]
-      U_Q,      // Q-amplified energy [J]
-      U_geo,    // Geometrically amplified energy [J]
-      U_cycle,  // Stored energy per cycle [J]
-      P_loss,   // Power loss per cavity [W]
-      TS_ratio, // Time-scale separation ratio [dimensionless]
-      E_tile,   // Per-tile negative energy [J]
-      E_total,  // Total exotic energy [J]
-      m_exotic, // Exotic mass via E=mc² [kg]
-      γ_geo,    // Geometric blueshift factor
-      ω,        // Angular frequency [rad/s]
-      d,        // Duty cycle [dimensionless]
-      N_tiles,  // Number of tiles in full lattice
-      τ_pulse: T_m,  // Mechanical period [s] (corrected)
-      T_LC,     // Light crossing time [s]
-      powerPerTileComputed,  // P_loss per tile [W]
-      powerTotalComputed,    // Total lattice power [W]
-      massPerTileComputed    // Mass per tile from E=mc² [kg]
+      U_static: staticEnergy,
+      U_Q: cavityQ * staticEnergy,
+      U_geo: boostedEnergy,
+      U_cycle: cycleAverageEnergy,
+      P_loss,
+      TS_ratio,
+      E_tile,
+      E_total,
+      m_exotic: exoticMassTotalLattice,
+      γ_geo: 1,               // geometry not applied in this minimal path
+      ω,
+      d: dutyFactor,
+      N_tiles: Math.max(1, tileCount),
+      τ_pulse: T_m,
+      T_LC,
+      powerPerTileComputed: P_loss,
+      powerTotalComputed: P_loss * Math.max(1, tileCount),
+      massPerTileComputed: exoticMassPerTile
     }
   };
 }
@@ -313,17 +225,17 @@ export const dynamicCasimirModule: CasimirModule = {
   version: '1.0.0',
   description: 'Dynamic Casimir effects with moving boundaries and quantum inequality constraints',
   dependencies: ['static'], // Requires static calculations as baseline
-  
+
   async initialize(): Promise<boolean> {
     // Validate physics constants and dependencies
     return true;
   },
-  
+
   async calculate(params: SimulationParameters): Promise<DynamicCasimirResult> {
     // First get static baseline from static module
     const { calculateCasimirEnergy } = await import('../sim_core/static-casimir.js');
     const staticResult = calculateCasimirEnergy(params);
-    
+
     // Extract dynamic parameters with defaults
     const dynamicParams: DynamicCasimirParams = {
       staticEnergy: staticResult.totalEnergy,
@@ -334,7 +246,7 @@ export const dynamicCasimirModule: CasimirModule = {
       cavityQ: params.dynamicConfig?.cavityQ || 1e9,
       tileCount: params.arrayConfig?.size ? Math.pow(params.arrayConfig.size, 2) : 1
     };
-    
+
     return calculateDynamicCasimirWithNatario(dynamicParams, params);
   }
 };
@@ -371,7 +283,7 @@ export function calculateDynamicCasimirWithNatario(
   const tileVolume = Math.max(1e-18, pipe.tileArea_m2 * gap_m);
   const exoticEnergyDensity = cycleAverageEnergy / tileVolume;
 
-  // Power (do not use "2 PW/83 MW" targets)
+  // Power (do not use targets)
   const f_m = pipe.modulationFreq_GHz * 1e9;
   const T_m = 1 / f_m;
   const instantaneousPower = boostedEnergy / Math.max(1e-12, params.burstLengthUs * 1e-6); // during local burst
@@ -401,8 +313,8 @@ export function calculateDynamicCasimirWithNatario(
     cycleAverageEnergy,
     totalExoticMass: massTotalLatticeReadout,
     exoticEnergyDensity,
-    quantumInequalityMargin: 0,     // leave 0 or compute with your proper QI bound; remove the HBAR_C/δ^4 toy
-    quantumSafetyStatus: 'safe',    // let server/services/target-validation.ts own this
+    quantumInequalityMargin: 0,     // leave 0 or compute with your proper QI bound; server owns this
+    quantumSafetyStatus: 'safe',    // let validation service own strict status
     instantaneousPower,
     averagePower,
     isaacsonLimit: d_eff < 0.1,     // rough check; refine if needed
@@ -414,7 +326,7 @@ export function calculateDynamicCasimirWithNatario(
     energyPipeline: {
       U_static: params.staticEnergy,     // sign-preserving if your static returns signed
       U_Q: params.cavityQ * params.staticEnergy,
-      U_geo: boostedEnergy,              // using total amp chain is fine as "effective geometric"
+      U_geo: boostedEnergy,              // effective amplified energy
       U_cycle: cycleAverageEnergy,
       P_loss,
       TS_ratio,

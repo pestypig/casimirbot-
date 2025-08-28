@@ -170,7 +170,7 @@
       mechGain = clamp01(mechGain);
     }
     const mechMod  = 1 + 2.5 * mechGain;
-    
+
     if (p.debug) {
       console.log(`🔧 OUTLINE: mechGain=${mechGain.toFixed(3)}, mechMod=${mechMod.toFixed(2)}x, f_mod=${((p.fMod_Hz??15e9)/1e9).toFixed(1)}GHz, ζ=${(p.mechZeta??0.005).toFixed(3)}`);
     }
@@ -192,10 +192,10 @@
     // Apply mechGain modulation: thickness *= (1.0 + 0.5 * mechGain), alpha *= mix(0.6, 1.0, mechGain)
     const alphaMod = 0.6 + 0.4 * mechGain; // 0.6 to 1.0 alpha multiplier
     const thicknessMod = 1.0 + 0.5 * mechGain; // 1.0 to 1.5x thickness multiplier
-    
+
     // Mechanical response alpha modulation
     const shellAlpha = finalAlpha * alphaMod;
-    
+
     // Base shell colors with optional cyan tint when "in band"
     const baseColors = {
       // shift palette slightly if FR breach
@@ -205,18 +205,18 @@
     };
     const mechTint = [77, 230, 255]; // cyan tint (0.3, 0.9, 1.0 * 255)
     const tintStrength = 0.35 * mechGain;
-    
+
     // Mix base colors with cyan tint when mechanical response is active
     const mixColor = (base, tint, strength) => [
       Math.round(base[0] * (1 - strength) + tint[0] * strength),
       Math.round(base[1] * (1 - strength) + tint[1] * strength),
       Math.round(base[2] * (1 - strength) + tint[2] * strength)
     ];
-    
+
     const innerColor = mixColor(baseColors.inner, mechTint, tintStrength);
     const centerColor = mixColor(baseColors.center, mechTint, tintStrength);
     const outerColor = mixColor(baseColors.outer, mechTint, tintStrength);
-    
+
     const baseInner = `rgba(${innerColor[0]},${innerColor[1]},${innerColor[2]},${0.60 * shellAlpha})`;
     const baseCenter= `rgba(${centerColor[0]},${centerColor[1]},${centerColor[2]},${0.45 * shellAlpha})`;
     const baseOuter = `rgba(${outerColor[0]},${outerColor[1]},${outerColor[2]},${0.60 * shellAlpha})`;

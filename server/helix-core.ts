@@ -414,11 +414,11 @@ export async function handleHelixCommand(req: Request, res: Response) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
+
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
     }
-    
+
     // Rate limiting
     const clientId = clientKey(req);
     if (!checkRateLimit(clientId)) {
@@ -430,10 +430,10 @@ export async function handleHelixCommand(req: Request, res: Response) {
       });
     }
     const { message: userMessage, messages, function_call } = req.body;
-    
+
     // Handle both single message and messages array formats
     const chatMessages = messages || (userMessage ? [{ role: "user", content: userMessage }] : []);
-    
+
     if (!process.env.OPENAI_API_KEY) {
       return res.status(500).json({ 
         error: "OPENAI_API_KEY not configured. Please set the API key in environment variables." 
@@ -525,7 +525,7 @@ export function getTileStatus(req: Request, res: Response) {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const { sectorId } = req.params;
-  
+
   // Mock tile data for demo
   const tileData = {
     id: sectorId,
@@ -537,7 +537,7 @@ export function getTileStatus(req: Request, res: Response) {
     curvatureContribution: Math.random() * 1e-15,
     lastPulse: new Date().toISOString()
   };
-  
+
   res.json(tileData);
 }
 
@@ -568,7 +568,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const activeTiles = tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
-  
+
   // Canonical geometry fields for visualizer
   const a = hull.Lx_m/2, b = hull.Ly_m/2, c = hull.Lz_m/2;
   const aEff_geo  = Math.cbrt(a*b*c);                 // geometric mean (legacy)
@@ -576,17 +576,14 @@ export function getSystemMetrics(req: Request, res: Response) {
   const w_m       = (s.sag_nm ?? 16) * 1e-9;
   const w_rho_harm = w_m / aEff_harm;
   const w_rho_geo  = w_m / aEff_geo;
-  
+
   // Optional scene scale helper (if your viewer wants precomputed clip axes):
   const sceneScale = 1 / Math.max(a, 1e-9);           // long semi-axis → 1.0
   const axesScene = [a*sceneScale, b*sceneScale, c*sceneScale];
-  
+
   const R_geom = Math.cbrt((hull.Lx_m/2) * (hull.Ly_m/2) * (hull.Lz_m/2));
 
   // --- Duty & θ chain (canonical) ---
-  // Reuse existing variables to avoid redeclaration
-  // const totalSectors = Math.max(1, s.sectorCount);
-  // const concurrent   = Math.max(1, s.concurrentSectors || 1);
   const dutyLocal    = Number.isFinite((s as any).localBurstFrac)
     ? Math.max(1e-12, (s as any).localBurstFrac as number)
     : Math.max(1e-12, s.dutyCycle ?? 0.01); // ✅ default 1%
@@ -603,7 +600,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const qsp  = s.qSpoilingFactor ?? 1;
   const γvdb = s.gammaVanDenBroeck ?? 0;             // ← use calibrated value from pipeline
   const γ3 = Math.pow(γg, 3);
-  
+
   // ✅ physics-true, FR-averaged — NO sqrt
   const theta_FR = γ3 * qsp * γvdb * dutyFR;
   // keep a UI-only label if you want, but don't use it in engines
@@ -667,6 +664,10 @@ export function getSystemMetrics(req: Request, res: Response) {
     used: thetaUsedByServer,
     ratio: thetaExpected > 0 ? (thetaUsedByServer / thetaExpected) : 1
   };
+
+  // 🔁 add time-loop info needed by the viewer & charts
+  const burst_ms = dutyLocal * sectorPeriod_ms;
+  const cyclesPerBurst = (burst_ms / 1000) * f_m_Hz; // ✅ tell client exactly how many carrier cycles fit
 
   res.json({
     totalTiles: Math.floor(s.N_tiles),
@@ -746,9 +747,14 @@ export function getSystemMetrics(req: Request, res: Response) {
     lightCrossing: {
       tauLC_ms: tauLC * 1000,
       dwell_ms: sectorPeriod_ms,
-      burst_ms: dutyLocal * sectorPeriod_ms,
+      burst_ms,
       sectorIdx: sweepIdx,
-      onWindowDisplay: true
+      sectorCount: totalSectors,
+      onWindowDisplay: true,
+      // 👇 additions for the viewer/plots
+      onWindow: true,
+      freqGHz: f_m_Hz / 1e9,
+      cyclesPerBurst
     },
 
     modelMode: "calibrated-single-pass"
@@ -761,11 +767,11 @@ export function getPipelineState(req: Request, res: Response) {
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
   const s = getGlobalPipelineState();
-  
+
   // Include mode-specific configuration fields for client consumption
   const currentMode = s.currentMode || 'hover';
   const modeConfig = MODE_CONFIGS[currentMode as keyof typeof MODE_CONFIGS];
-  
+
   res.json({
     ...s,
     dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
@@ -793,9 +799,9 @@ export async function updatePipelineParams(req: Request, res: Response) {
       setGlobalPipelineState(next);
       return next;
     });
-    
+
     publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(parsed.data), ts: Date.now() });
-    
+
     res.json(newState);
   } catch (error) {
     res.status(400).json({ error: "Failed to update parameters", details: error instanceof Error ? error.message : "Unknown error" });
@@ -815,9 +821,9 @@ export async function switchOperationalMode(req: Request, res: Response) {
       setGlobalPipelineState(next);
       return next;
     });
-    
+
     publish("warp:reload", { reason: "mode-change", mode, ts: Date.now() });
-    
+
     res.json({ success: true, mode, state: newState, config: MODE_CONFIGS[mode as keyof typeof MODE_CONFIGS] });
   } catch (error) {
     res.status(400).json({ error: "Failed to switch mode", details: error instanceof Error ? error.message : "Unknown error" });
@@ -854,6 +860,9 @@ export function getDisplacementField(req: Request, res: Response) {
       physics: {
         gammaGeo: s.gammaGeo,
         qSpoiling: s.qSpoilingFactor,
+        // ✅ provide the exact field name the client type expects
+        sectorStrobing: sectors,
+        // (keep extra fields for debugging/compat)
         sectorCount: s.sectorCount,
         concurrentSectors: s.concurrentSectors
       },

@@ -4,17 +4,19 @@ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { toHUDModel } from "@/lib/hud-adapter";
 
 type ScaleProps = {
-  dwellMs?: number;
-  tauLcMs?: number;
-  burstMs?: number;
-  sectorIdx?: number;
-  sectorCount?: number;
-  phase?: number;
+  dwellMs?: number;      // sector dwell (ms) override
+  tauLcMs?: number;      // light-crossing (ms) override
+  burstMs?: number;      // local on-window (ms) override
+  sectorIdx?: number;    // optional current sector index (0..sectorCount-1)
+  sectorCount?: number;  // optional total sectors (display only)
+  phase?: number;        // optional burst phase: if <=1 treated as fraction of Tsec; if >1 treated as seconds
 };
 
 export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const { data: metrics } = useMetrics();
   const { data: pipeline } = useEnergyPipeline();
+
+  // HUD model (source of truth with sensible fallbacks)
   const wu  = metrics?.warpUniforms ?? pipeline?.warpUniforms ?? null;
   const hud = toHUDModel({
     warpUniforms: wu || {},
@@ -22,24 +24,75 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
     lightCrossing: metrics?.lightCrossing || {},
   });
 
-  // Prefer props; fall back to HUD
-  const fGHz  = (pipeline as any)?.modulationFreq_GHz ?? 15.0;
-  const Tm    = 1 / (fGHz * 1e9);
+  // Modulation period
+  const fGHz = (pipeline as any)?.modulationFreq_GHz;
+  const fHz  = Number.isFinite(fGHz) && fGHz! > 0 ? fGHz! * 1e9 : 15 * 1e9;
+  const Tm   = 1 / fHz; // seconds
 
-  const tauLC = Number.isFinite(props.tauLcMs) ? props.tauLcMs! / 1000 : (hud.TS_long * Tm);
-  const Tsec  = Number.isFinite(props.dwellMs) ? props.dwellMs! / 1000 : (hud.sectorPeriod_ms / 1000);
-  const burst = Number.isFinite(props.burstMs) ? props.burstMs! / 1000 : (hud.dutyShip * Tsec);
+  // Light-crossing τ_LC (seconds): prefer explicit tau fields, then HUD/metrics, last resort fallback
+  const tauLC: number = React.useMemo(() => {
+    // 1) explicit prop (ms)
+    if (Number.isFinite(props.tauLcMs)) return (props.tauLcMs as number) / 1000;
 
-  const sectors   = hud.sectorsConcurrent;
-  const dutyFR    = hud.dutyShip;
+    // 2) HUD/metrics common shapes
+    const lc = (metrics as any)?.lightCrossing ?? {};
+    const fromHUDs =
+      (hud as any)?.tauLC_s ??
+      (hud as any)?.tau_lc_s ??
+      (Number.isFinite((hud as any)?.tauLC_ms) ? (hud as any).tauLC_ms / 1000 : undefined) ??
+      (Number.isFinite(lc.tauLC_ms) ? lc.tauLC_ms / 1000 : undefined) ??
+      (Number.isFinite(lc.tau_ms) ? lc.tau_ms / 1000 : undefined);
 
+    if (Number.isFinite(fromHUDs)) return fromHUDs as number;
+
+    // 3) conservative fallback (ensure visible marker even if LC missing)
+    return Tm; // fall back to one modulation period as a placeholder
+  }, [props.tauLcMs, hud, metrics, Tm]);
+
+  // Sector dwell (seconds)
+  const Tsec: number = React.useMemo(() => {
+    if (Number.isFinite(props.dwellMs)) return (props.dwellMs as number) / 1000;
+    const dwellMs =
+      (hud as any)?.sectorPeriod_ms ??
+      (metrics as any)?.lightCrossing?.sectorPeriod_ms ??
+      undefined;
+    return Number.isFinite(dwellMs) ? (dwellMs as number) / 1000 : Tm * 100; // benign fallback
+  }, [props.dwellMs, hud, metrics, Tm]);
+
+  // Duty (Ford–Roman, ship-avg) and burst window
+  const dutyFR = Number.isFinite((hud as any)?.dutyShip) ? (hud as any).dutyShip : 0;
+  const burst: number = React.useMemo(() => {
+    if (Number.isFinite(props.burstMs)) return (props.burstMs as number) / 1000;
+    // default: dutyShip × Tsec
+    return Math.max(0, dutyFR) * Math.max(0, Tsec);
+  }, [props.burstMs, dutyFR, Tsec]);
+
+  // Optional phase offset within the sector
+  const burstOffset: number = React.useMemo(() => {
+    const p = props.phase;
+    if (!Number.isFinite(p)) return 0;
+    // If phase ≤ 1, treat as fraction of Tsec; if >1, treat as seconds (clamped to Tsec)
+    return p! <= 1 ? Math.max(0, Math.min(1, p!)) * Tsec : Math.max(0, Math.min(Tsec, p!));
+  }, [props.phase, Tsec]);
+
+  // Multi-sector readout (display only)
+  const sectors =
+    Number.isFinite(props.sectorCount) ? (props.sectorCount as number)
+    : Number.isFinite((hud as any)?.sectorsConcurrent) ? (hud as any).sectorsConcurrent
+    : undefined;
+  const sectorIdx =
+    Number.isFinite(props.sectorIdx) ? (props.sectorIdx as number)
+    : undefined;
+
+  // Timeline sizing
   const tMax = Math.max(tauLC || 0, Tm || 0, Tsec || 0) || 1;
-  const tPad = tMax * 1.08; // 8% headroom so labels don't clip
+  const tPad = tMax * 1.08; // headroom so labels don’t clip
 
+  // Compliance checks
   const passBurstVsTau = Number.isFinite(burst) && Number.isFinite(tauLC) ? (burst < tauLC) : false;
   const passDwellVsTau = Number.isFinite(Tsec)  && Number.isFinite(tauLC) ? (Tsec  >= tauLC) : false;
 
-  // small animation
+  // Tiny tracer animation
   const [tick, setTick] = React.useState(0);
   React.useEffect(() => {
     let raf = 0, t0 = performance.now();
@@ -67,6 +120,11 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
     if (t >= 1e-9) return `${(t*1e9).toFixed(2)} ns`;
     return `${(t*1e12).toFixed(2)} ps`;
   };
+
+  // Burst span with phase (wrap-aware: if it overflows the sector, draw two segments)
+  const burstStart = Math.max(0, Math.min(Tsec, burstOffset));
+  const burstEnd   = Math.max(0, Math.min(Tsec, burstOffset + burst));
+  const burstWraps = burstEnd > Tsec;
 
   return (
     <div className={`rounded-lg border bg-gradient-to-br ${modeTint} p-4`}>
@@ -104,12 +162,23 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
           </div>
         </div>
 
-        {/* Burst window (drawn as a faint span starting at sector start) */}
+        {/* Burst window with phase offset; draw 1–2 spans depending on wrap */}
+        {/* Primary segment */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 h-[6px] bg-white/10 rounded-sm"
-          style={{ left: pct(0, tPad), width: pct(burst, tPad) }}
-          title="Local FR window (burst)"
+          className="absolute top-1/2 -translate-y-1/2 h-[6px] bg-white/12 rounded-sm"
+          style={{
+            left: pct(burstStart, tPad),
+            width: pct(burstWraps ? (Tsec - burstStart) : (burstEnd - burstStart), tPad),
+          }}
+          title={`Local FR window (burst): ${fmtSI(burst)}${burstOffset ? `, phase ${fmtSI(burstOffset)}` : ""}`}
         />
+        {/* Wrapped tail (if burst spans beyond sector) */}
+        {burstWraps && (
+          <div
+            className="absolute top-1/2 -translate-y-1/2 h-[6px] bg-white/12 rounded-sm"
+            style={{ left: pct(0, tPad), width: pct(burstEnd - Tsec, tPad) }}
+          />
+        )}
 
         {/* tracer */}
         <div className="absolute top-1/2 -translate-y-1/2" style={{ left: `${tick * 100}%` }}>
@@ -122,7 +191,11 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-yellow-400" />τₗc: light-crossing</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-cyan-400" />Tₘ: modulation</div>
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" />Tₛₑc: dwell per sector</div>
-        <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-white/70" />Duty (FR): {(dutyFR*100).toFixed(3)}% • burst {fmtSI(burst)}</div>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-white/70" />
+          Duty (FR): {(Math.max(0, dutyFR) * 100).toFixed(3)}% • burst {fmtSI(burst)}
+          {Number.isFinite(burstOffset) && burstOffset > 0 ? ` • phase ${fmtSI(burstOffset)}` : ""}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
@@ -132,9 +205,11 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <span className={`px-2 py-0.5 rounded border ${passDwellVsTau ? 'bg-green-500/15 border-green-500/30 text-green-300' : 'bg-yellow-500/15 border-yellow-500/30 text-yellow-300'}`}>
           Tₛₑc ≥ τₗc: {passDwellVsTau ? 'PASS' : 'CHECK'}
         </span>
-        <span className="px-2 py-0.5 rounded border border-white/10 text-slate-300">
-          sectors: {sectors}
-        </span>
+        {Number.isFinite(sectors) && (
+          <span className="px-2 py-0.5 rounded border border-white/10 text-slate-300">
+            sectors: {sectors}{Number.isFinite(sectorIdx) ? ` (sector ${sectorIdx! + 1})` : ""}
+          </span>
+        )}
       </div>
     </div>
   );

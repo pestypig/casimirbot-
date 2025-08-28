@@ -40,6 +40,15 @@ export function usePollingSmart<T = any>(
   const [data, setData] = useState<T | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const delayRef = useRef(minMs);
+  const abortWith = (ac?: AbortController, reason = "cleanup") => {
+    if (!ac) return;
+    // Prefer a proper AbortError if available; any value works as reason.
+    const r =
+      typeof DOMException !== "undefined"
+        ? new DOMException(`polling ${reason}`, "AbortError")
+        : new Error(`polling ${reason}`);
+    ac.abort(r as any);
+  };
 
   useEffect(() => {
     if (!enabled) return;
@@ -65,20 +74,37 @@ export function usePollingSmart<T = any>(
         return;
       }
       try {
-        ch.controller?.abort();
+        // cancel any in-flight request from the previous cycle
+        abortWith(ch.controller, "restart");
         ch.controller = new AbortController();
         const res = await fetch(url, { signal: ch.controller.signal });
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         const json = await parser(res);
         ch.last = json;
         ch.subscribers.forEach(fn => fn(json));
-        setErr(null);
+        if (!disposed) setErr(null);
         delayRef.current = minMs; // reset backoff on success
       } catch (e: any) {
-        setErr(e?.message ?? "fetch failed");
-        delayRef.current = Math.min(maxMs, Math.max(minMs, Math.round(delayRef.current * backoffFactor)));
+        // Treat our own aborts as benign: no error/backoff
+        const isAbort =
+          e?.name === "AbortError" ||
+          e?.message?.toLowerCase?.().includes("abort") ||
+          e === "restart" ||
+          e === "cleanup";
+        if (!disposed && !isAbort) {
+          setErr(e?.message ?? "fetch failed");
+          delayRef.current = Math.min(
+            maxMs,
+            Math.max(minMs, Math.round(delayRef.current * backoffFactor))
+          );
+        }
       } finally {
-        ch.timer = window.setTimeout(tick, delayRef.current);
+        // Only keep polling while someone is listening and we’re not disposed
+        if (!disposed && ch.subscribers.size > 0) {
+          ch.timer = window.setTimeout(tick, delayRef.current);
+        } else {
+          ch.timer = undefined as any;
+        }
       }
     };
 
@@ -103,8 +129,13 @@ export function usePollingSmart<T = any>(
       ch.subscribers.delete(sub);
       // stop loop if nobody is listening
       if (ch.subscribers.size === 0) {
-        if (ch.timer) clearTimeout(ch.timer);
-        ch.controller?.abort();
+        if (ch.timer != null) {
+          clearTimeout(ch.timer);
+          ch.timer = undefined as any;
+        }
+        abortWith(ch.controller, "cleanup");
+        ch.controller = undefined;
+        ch.running = false;
         bus.delete(key);
       }
     };

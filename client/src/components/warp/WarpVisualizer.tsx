@@ -86,6 +86,21 @@ const getUnifiedPhysicsTilt = (parameters: any, mode: string) =>
 // Helper for clamping values to 0-1 range
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// 🔧 Compute cameraZ from axes + canvas for deterministic framing
+function computeCameraZ(
+  axesClip: [number, number, number],
+  canvas: HTMLCanvasElement,
+) {
+  const w = canvas.clientWidth || canvas.width || 800;
+  const h = canvas.clientHeight || canvas.height || 320;
+  const aspect = w / Math.max(1, h);
+  const t = Math.min(1, Math.max(0, (VIS_LOCAL.portraitAspectKnee - aspect) / VIS_LOCAL.portraitBlendWidth));
+  const fov = VIS_LOCAL.fovDesktopRad * (1 - t) + VIS_LOCAL.fovPortraitRad * t;
+  const R = Math.max(...axesClip);
+  const margin = VIS_LOCAL.baseMargin * (aspect < VIS_LOCAL.portraitAspectKnee ? VIS_LOCAL.portraitMarginMul : 1);
+  return (margin * R) / Math.tan(0.5 * fov);
+}
+
 // Light-crossing timing loop for synchronized strobing
 type LightCrossing = {
   sectorIdx: number;
@@ -185,8 +200,6 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const [initNonce, setInitNonce] = useState(0); // bump to retry
 
   // --- Simple per-mode defaults for interior tilt (demo-friendly) ---
-  // You can later replace this with the exact value from the Shift Vector panel
-  // (epsilonTilt = g_target * R_geom / c^2) and pass it via props.parameters.epsilonTilt.
   const modeEpsilonTilt = (mode: string | undefined) => {
     switch ((mode || 'hover').toLowerCase()) {
       case 'standby':   return 0.000; // perfectly flat
@@ -232,7 +245,7 @@ useEffect(() => {
   const makeEngine = (EngineCtor: any) => {
     if (!canvasRef.current) throw new Error("canvas missing");
     const engine = new EngineCtor(canvasRef.current);
-    
+
     // Setup loading state callback for non-blocking shader compilation
     engine.onLoadingStateChange = (state: LoadingState) => {
       setLoadingState(state);
@@ -243,10 +256,10 @@ useEffect(() => {
 
     // Build sanitized uniforms once
     const mode = (parameters.currentMode || 'hover').toLowerCase();
-    
+
     // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
     const lc = parameters.lightCrossing;
-    
+
     const dutyResolved =
       isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
       (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
@@ -257,7 +270,6 @@ useEffect(() => {
       1,
       Math.floor(
         num(
-          // total sectors across the ring (pipeline-provided if available)
           (parameters as any).sectorCount,
           lc?.sectorCount ?? 1
         )
@@ -265,37 +277,33 @@ useEffect(() => {
     );
     const sectorsResolved = Math.max(
       1,
-      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1)) // concurrent strobe for viz
+      Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
     );
-    const splitResolved = Math.max(0, Math.min(sectorsResolved - 1, Math.floor(sectorsResolved / 2)));
-    
+    // 🔑 Ford–Roman ship-effective duty used for √d_FR
+    const dFRShip = clamp01(dutyResolved * (sectorsResolved / Math.max(1, sectorCountResolved)));
+
     const hull = parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
-    
-    // Harden unit/finite guards for Q, γ, wall width (no hidden magic)
+
+    // Harden unit/finite guards for Q, γ, wall width
     const gammaGeo = Math.max(1, num(parameters.g_y, 26));
-    const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));    // never ≤0
+    const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));
     const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
     const wallNorm = Math.max(1e-5, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho));
 
-    // replace the mode-based tiltGain with a scaling of epsilonTilt magnitude
     const epsilonTiltResolved = num(
       parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
       mode === 'standby' ? 0.0 : 5e-7
     );
     const betaTiltResolved = vec3(parameters.shift?.betaTiltVec ?? parameters.betaTiltVec, [0, -1, 0]);
-    
-    // roughly normalize: 5e-7 → ~0.35, clamp at 0.65
     const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
+    const parity = !!parameters.physicsParityMode;
 
-    const parity = !!parameters.physicsParityMode; // hoist this near the top
-
-    // Derive seeded axes/clip/span from hull (prevents first-frame NaNs/black)
+    // Derive seeded axes/clip/span from hull
     const a = num(hull.a, 503.5), b = num(hull.b, 132), c = num(hull.c, 86.5);
     const s = 1 / Math.max(a, b, c, 1e-9);
     const axesSceneSeed: [number,number,number] = [a*s, b*s, c*s];
     const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
 
-    // Harden gammaVdB default (match AmplificationPanel & pipeline)
     const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 1.4e5);
 
     const uniforms = {
@@ -310,7 +318,7 @@ useEffect(() => {
       gammaGeo,
       Qburst: qCavity,
       deltaAOverA: qSpoil,
-      gammaVdB: gammaVdBDefault,           // << was 3.83e1; now 1.4e5 default
+      gammaVdB: gammaVdBDefault,           // unified default
 
       // Seed framing so engine has non-null axes in first frame
       axesScene: axesSceneSeed,
@@ -329,23 +337,38 @@ useEffect(() => {
 
     // single bootstrap: fit + all uniforms in one shot
     engine.bootstrap(uniforms);
-    
+
+    // 🎯 seed cameraZ so “CameraZ unset” never trips (via gate)
+    try {
+      const camZ0 = computeCameraZ(axesSceneSeed, canvasRef.current!);
+      gatedUpdateUniforms(engine, { cameraZ: camZ0, lockFraming: true }, 'client');
+    } catch {}
+
     // Prime θ-scale for the first frame (single source of truth)
     gatedUpdateUniforms(engine, {
       thetaScale: resolveThetaScale({
         dutyCycle: dutyResolved,
-        sectorCount: sectorCountResolved,   // ← total for averaging
-        sectors: sectorsResolved,           // viz strobing (kept for compatibility)
+        sectorCount: sectorCountResolved,   // total for averaging
+        sectors: sectorsResolved,           // viz strobing
         gammaGeo,
         qSpoilingFactor: qSpoil,
-        gammaVdB: gammaVdBDefault
+        gammaVdB: gammaVdBDefault,
+        dutyEffectiveFR: dFRShip,           // 🔑 √d_FR source
       }),
-      sectorCount: sectorCountResolved,     // make it explicit on the engine too
+      sectorCount: sectorCountResolved,
       sectors: sectorsResolved,
-    }, 'visualizer-prime');
-    
+      dutyEffectiveFR: dFRShip,             // expose for diagnostics
+      viewAvg: true,                        // ensure √d_FR is applied
+    }, 'client');
+
+    // Echo terms for checkpoint “θ breakdown”
+    (window as any).__warpEcho = {
+      src: 'visualizer',
+      v: Date.now(),
+      terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: gammaVdBDefault, d_FR: dFRShip }
+    };
+
     // Apply viz overrides if provided
-    // Normalize colorMode to numeric (engine: 0=solid,1=theta,2=shear) and send synonyms
     const cmRaw = parameters.viz?.colorMode ?? 'theta';
     const cmMap: any = { solid:0, theta:1, shear:2 };
     const cmIndex = typeof cmRaw === 'string' ? (cmMap[cmRaw] ?? 1) : Number(cmRaw);
@@ -358,18 +381,18 @@ useEffect(() => {
       exposure: parameters.viz?.exposure ?? undefined,
       zeroStop: parameters.viz?.zeroStop ?? undefined,
       cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
-    }, 'visualizer-color');
+    }, 'client');
 
     // Pipeline-timed gating
     if (lc) {
       gatedUpdateUniforms(engine, {
-        phase: lc.phase,                  // 0..1 sweep position
-        onWindow: !!lc.onWindowDisplay,   // gate visuals to FR-compliant window
+        phase: lc.phase,
+        onWindow: !!lc.onWindowDisplay,
         sectorIdx: Math.max(0, lc.sectorIdx % sectorsResolved),
         tauLC_ms: lc.tauLC_ms,
         dwell_ms: lc.dwell_ms,
         burst_ms: lc.burst_ms,
-      }, 'visualizer-pipeline');
+      }, 'client');
     }
 
     // visual knobs that aren't strictly physics
@@ -387,7 +410,7 @@ useEffect(() => {
       powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
       exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
       tsRatio: parameters.tsRatio || VIS.tsRatioDefault
-    }, 'visualizer-knobs');
+    }, 'client');
 
     // start render explicitly so we get a first frame
     engine._startRenderLoop?.();
@@ -401,8 +424,10 @@ useEffect(() => {
   // --- global strobing multiplexer (supports many viewers) ---
   const ensureStrobeMux = () => {
     const w = window as any;
-    const prev = w.setStrobingState;                    // capture whatever is installed (engine or placeholder)
-    if (!w.__strobeListeners) w.__strobeListeners = new Set();
+    const prev = w.setStrobingState;
+    // keep both names in sync for legacy compat
+    if (!w.__strobingListeners) w.__strobingListeners = new Set();
+    if (!w.__strobeListeners) w.__strobeListeners = w.__strobingListeners;
     w.setStrobingState = (payload: { sectorCount:number; currentSector:number; split?:number }) => {
       try { typeof prev === 'function' && prev(payload); } catch {}
       for (const fn of w.__strobeListeners) {
@@ -413,10 +438,9 @@ useEffect(() => {
   };
 
   const init = async () => {
-    // derive an initial scale (fallback to your parameters.gridScale or 1.0)
     const initialScale = Number(parameters.gridScale ?? 1.0);
     installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
-    
+
 
     setLoadError(null);
     setIsLoaded(false);
@@ -430,48 +454,49 @@ useEffect(() => {
       if ((window as any).WarpEngine) {
         engineRef.current = makeEngine((window as any).WarpEngine);
         ensureStrobeMux(); // wrap the engine's handler into the mux
-        
+
         // Add ResizeObserver to react to container changes
         const resizeObserver = new ResizeObserver(() => {
           if (engineRef.current?._resizeCanvasToDisplaySize) {
             engineRef.current._resizeCanvasToDisplaySize();
           }
+          // keep cameraZ fresh on container resizes
+          try {
+            const u = engineRef.current?.uniforms;
+            if (u && Array.isArray(u.axesClip) && canvasRef.current) {
+              const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
+              gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
+            }
+          } catch {}
         });
         if (canvasRef.current?.parentElement) {
           resizeObserver.observe(canvasRef.current.parentElement);
         }
-        // Store cleanup function for later
         (engineRef.current as any).__resizeObserver = resizeObserver;
-        
+
         // Register with strobing multiplexer
         const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
           if (!engineRef.current) return;
           const s = Math.max(1, Math.floor(sectorCount||1));
-          engineRef.current.updateUniforms({
+          gatedUpdateUniforms(engineRef.current, {
             sectors: s,
             split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
             sectorIdx: Math.max(0, currentSector % s)
-          });
+          }, 'client');
           engineRef.current.requestRewarp?.();
         });
-        // Store cleanup function for later
         (engineRef.current as any).__strobingCleanup = off;
-        
+
         return;
       }
 
-      // --- Robust asset base resolution (handles sub-path deploys, Next/Vite/CRA) ---
+      // --- Robust asset base resolution ---
       const resolveAssetBase = () => {
         const w: any = window;
-        // explicit override wins
         if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
-        // Vite
         if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
-        // Webpack public path
         if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
-        // Next.js base path
         if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
-        // <base href="..."> tag
         const baseEl = document.querySelector('base[href]');
         if (baseEl) return (baseEl as HTMLBaseElement).href;
         return '/';
@@ -483,7 +508,6 @@ useEffect(() => {
         try { return new URL(p, assetBase).toString(); } catch { return p; }
       };
 
-      // Try explicit override → base-aware → relative → root
       const trySrcs = [
         (window as any).__WARP_ENGINE_SRC__,
         mk(`warp-engine.js?v=${encodeURIComponent(stamp)}`),
@@ -504,21 +528,19 @@ useEffect(() => {
         if ((window as any).WarpEngine) {
           engineRef.current = makeEngine((window as any).WarpEngine);
           ensureStrobeMux(); // wrap the engine's handler into the mux
-          
-          // Register with strobing multiplexer
+
           const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
             if (!engineRef.current) return;
             const s = Math.max(1, Math.floor(sectorCount||1));
-            engineRef.current.updateUniforms({
+            gatedUpdateUniforms(engineRef.current, {
               sectors: s,
               split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
               sectorIdx: Math.max(0, currentSector % s)
-            });
+            }, 'client');
             engineRef.current.requestRewarp?.();
           });
-          // Store cleanup function for later
           (engineRef.current as any).__strobingCleanup = off;
-          
+
           return;
         }
       }
@@ -550,17 +572,15 @@ useEffect(() => {
   return () => {
     cancelled = true;
     if (watchdog) clearTimeout(watchdog);
-    
-    // cleanup resize observer
+
     try {
       (engineRef.current as any)?.__resizeObserver?.disconnect?.();
     } catch {}
-    
-    // cleanup strobing listener
+
     try {
       (engineRef.current as any)?.__strobingCleanup?.();
     } catch {}
-    
+
     try { engineRef.current?.destroy?.(); } catch {}
     engineRef.current = null;
   };
@@ -570,7 +590,7 @@ useEffect(() => {
   useEffect(() => {
     if (!isLoaded || !engineRef.current) return;
     const lc = parameters.lightCrossing;
-    
+
     try {
       console.log('🔄 Live operational mode update:', {
         mode: parameters.currentMode || 'hover',
@@ -586,18 +606,15 @@ useEffect(() => {
       });
 
       // === NEW: Use pipeline adapter for single source of truth ===
-      // Resolve duty and sectors from pipeline (prefer dutyEffectiveFR > lightCrossing > dutyCycle)
       const dutyResolved =
         isFiniteNum(parameters.dutyEffectiveFR) ? clamp01(parameters.dutyEffectiveFR!) :
         (lc && lc.dwell_ms > 0 ? clamp01(lc.burst_ms / lc.dwell_ms) :
          clamp01(num(parameters.dutyCycle, 0.14)));
 
-      // Separate strobing vs averaging:
       const sectorCountResolved = Math.max(
         1,
         Math.floor(
           num(
-            // total sectors across the ring (pipeline-provided if available)
             (parameters as any).sectorCount,
             lc?.sectorCount ?? 1
           )
@@ -605,29 +622,31 @@ useEffect(() => {
       );
       const sectorsResolved = Math.max(
         1,
-        Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1)) // concurrent strobe for viz
+        Math.floor(num(parameters.sectorStrobing, lc?.sectorCount ?? 1))
       );
 
-      // Harden unit/finite guards for Q, γ, wall width (no hidden magic)
       const gammaGeo = Math.max(1, num(parameters.g_y, 26));
-      const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));    // never ≤0
+      const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));
       const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
       const parity = !!parameters.physicsParityMode;
 
-      // ----- Seed framing every update (keeps axesClip non-null, matches engine) -----
+      // ----- Seed framing every update -----
       const ah = num(parameters.hull?.a, 503.5), bh = num(parameters.hull?.b, 132), ch = num(parameters.hull?.c, 86.5);
       const sh = 1 / Math.max(ah, bh, ch, 1e-9);
       const axesSceneNow: [number,number,number] = [ah*sh, bh*sh, ch*sh];
       const spanNow = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneNow) * VIS_LOCAL.spanPaddingDesktop);
+      const camZnow = canvasRef.current ? computeCameraZ(axesSceneNow, canvasRef.current) : undefined;
 
-      // ===== CONSOLIDATED UNIFORM UPDATE (prevents mode override conflicts) =====
+      // Ford–Roman ship-effective duty (pane)
+      const dFRShip = clamp01(dutyResolved * (sectorsResolved / Math.max(1, sectorCountResolved)));
+
       const pipelineState = {
         currentMode: parameters.currentMode || 'hover',
         dutyCycle: parameters.dutyCycle,
         dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
         sectorCount: sectorCountResolved,
         gammaGeo: gammaGeo,
-        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 1.4e5), // unify default
+        gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 1.4e5),
         qCavity: qCavity,
         qSpoilingFactor: qSpoil,
         sag_nm: num(parameters.sagDepth_nm, 16),
@@ -635,26 +654,26 @@ useEffect(() => {
         shipRadius_m: parameters.hull?.c ?? 86.5,
         modelMode: parity ? 'raw' as const : 'calibrated' as const,
       };
-      
+
       // First set core physics via pipeline adapter
       driveWarpFromPipeline(engineRef.current, pipelineState);
 
       // Now build the consolidated uniform update that preserves currentMode
       const consolidatedUniforms = {
-        // Framing (preserve these)
+        // Framing
         axesScene: axesSceneNow,
         axesClip:  axesSceneNow,
         hullAxes:  [ah,bh,ch] as [number,number,number],
         gridSpan:  parameters.gridSpan ?? spanNow,
-        
-        // Critical: preserve currentMode from pipeline
+        ...(isFiniteNum(camZnow) ? { cameraZ: camZnow, lockFraming: true } : {}),
+
         currentMode: parameters.currentMode || 'hover',
-        
-        // 🔑 ensure truth/cosmetic actually toggles at runtime
+
+        // 🔑 runtime truth/cosmetic
         physicsParityMode: parity,
         ridgeMode: parity ? 0 : 1,
-        
-        // Theta scale
+
+        // Theta scale (single source)
         thetaScale: resolveThetaScale({
           dutyCycle: dutyResolved,
           sectorCount: sectorCountResolved,
@@ -662,9 +681,10 @@ useEffect(() => {
           gammaGeo,
           qSpoilingFactor: qSpoil,
           gammaVdB: num(parameters.gammaVanDenBroeck, 1.4e5),
-          lightCrossing: lc,
-          dutyEffectiveFR: parameters.dutyEffectiveFR
+          dutyEffectiveFR: dFRShip,
         }),
+        dutyEffectiveFR: dFRShip,
+        viewAvg: true,
 
         // Pipeline-timed gating (if available)
         ...(lc && {
@@ -676,9 +696,8 @@ useEffect(() => {
           burst_ms: lc.burst_ms,
         }),
 
-        // Parity-specific visual settings to make the difference unmistakable
+        // Parity-specific visual settings
         ...(parity ? {
-          // Truth mode: subdued, physics-accurate
           exposure: 3.5,
           zeroStop: 1e-5,
           vizGain: 1,
@@ -687,7 +706,6 @@ useEffect(() => {
           curvatureGainT: 0,
           displayGain: 1,
         } : {
-          // Cosmetic mode: enhanced, visually dramatic
           exposure: 6,
           zeroStop: 1e-7,
           curvatureGainT: 0.6,
@@ -695,48 +713,46 @@ useEffect(() => {
         }),
       };
 
-      // Single atomic update to prevent mode conflicts
-      engineRef.current.updateUniforms(consolidatedUniforms);
-      
+      // Single atomic update to prevent mode conflicts (via gate)
+      gatedUpdateUniforms(engineRef.current, consolidatedUniforms, 'client');
+
+      // Update echo terms for diagnostics
+      (window as any).__warpEcho = {
+        src: 'visualizer',
+        v: Date.now(),
+        terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: num(parameters.gammaVanDenBroeck, 1.4e5), d_FR: dFRShip }
+      };
+
       // Apply display gain based on mode
       if (parity) {
-        engineRef.current.setDisplayGain?.(1);      // Truth: natural gain
+        engineRef.current.setDisplayGain?.(1);
       } else {
-        engineRef.current.setDisplayGain?.(2.5);    // Cosmetic: enhanced gain
+        engineRef.current.setDisplayGain?.(2.5);
       }
 
-      // Add visual enhancements that aren't physics-driven
+      // Visual-only enhancements (via gate)
       const mode = parameters.currentMode || 'hover';
-      
-      // replace the mode-based tiltGain with a scaling of epsilonTilt magnitude
       const epsilonTiltResolved = num(
         parameters.shift?.epsilonTilt ?? parameters.epsilonTilt,
         mode === 'standby' ? 0.0 : 5e-7
       );
       const betaTiltVec = parameters.shift?.betaTiltVec ?? parameters.betaTiltVec ?? [0, -1, 0];
-      
-      // roughly normalize: 5e-7 → ~0.35, clamp at 0.65
       const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
-      // Apply visual-only enhancements
-      engineRef.current.updateUniforms({
-        // Interior gravity visuals
+      gatedUpdateUniforms(engineRef.current, {
         epsilonTilt: Number(epsilonTiltResolved || 0),
         betaTiltVec: betaTiltVec as [number, number, number],
         tiltGain: tiltGainResolved,
-        
-        // Visual scaling
+
         vizGain: parity ? 1 : (
           mode === 'emergency' ? VIS_LOCAL.vizGainEmergency : 
           mode === 'cruise' ? VIS_LOCAL.vizGainCruise : VIS_LOCAL.vizGainDefault
         ),
-        
-        // Curvature controls (with viz overrides)
+
         curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
         curvatureBoostMax: parity ? 1 : Math.max(1, parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
         curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
-        
-        // Viz overrides (normalize colorMode locally)
+
         colorMode: (() => {
           const cmRaw2 = parameters.viz?.colorMode ?? 'theta';
           const cmMap2: any = { solid:0, theta:1, shear:2 };
@@ -745,17 +761,15 @@ useEffect(() => {
         exposure: parameters.viz?.exposure ?? undefined,
         zeroStop: parameters.viz?.zeroStop ?? undefined,
         cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined,
-        
-        // Optional view settings
+
         viewAvg: true,
         _debugHUD: true,
-        
-        // Legacy compatibility
+
         sagDepth_nm: parameters.sagDepth_nm || 16,
         powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
         exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
         tsRatio: parameters.tsRatio || VIS.tsRatioDefault
-      });
+      }, 'client');
 
       engineRef.current.requestRewarp?.();
     } catch (e) {
@@ -766,15 +780,21 @@ useEffect(() => {
   useEffect(() => {
     const handleResize = () => {
       if (engineRef.current && canvasRef.current) {
-        // The optimized engine handles its own resizing automatically
-        // through the _resize() method bound to window resize events
+        // recompute cameraZ based on current axes
+        try {
+          const u = engineRef.current.uniforms || {};
+          if (Array.isArray(u.axesClip) && u.axesClip.length === 3) {
+            const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
+            gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
+          }
+        } catch {}
         if (engineRef.current._resize) {
           engineRef.current._resize();
         }
+        engineRef.current.requestRewarp?.();
       }
     };
 
-    // Manual resize trigger for component changes
     if (isLoaded && engineRef.current) {
       handleResize();
     }
@@ -818,7 +838,7 @@ useEffect(() => {
 
     if (parameters.physicsParityMode) {
       engineRef.current.setDisplayGain?.(1);              // userGain = 1
-      engineRef.current.updateUniforms?.({ displayGain: 1 });
+      gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client');
       return;
     }
 
@@ -827,7 +847,7 @@ useEffect(() => {
       parameters.curvatureBoostMax ?? 40
     );
     engineRef.current.setDisplayGain?.(boost);            // userGain = boost (geometry + shader)
-    engineRef.current.updateUniforms?.({ displayGain: 1 }); // keep shader's u_displayGain neutral
+    gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client'); // keep shader's u_displayGain neutral
     console.log(`🎛️ EXAGGERATION (userGain): ×${boost.toFixed(2)}`);
   }, [
     parameters.physicsParityMode,
@@ -838,17 +858,13 @@ useEffect(() => {
 
   useEffect(() => {
     const s = Number(parameters.gridScale ?? 1.0);
-    // Update both the property and (for engines that re-read) the var
     (window as any).sceneScale = Number.isFinite(s) ? s : 1.0;
 
-    // Optional: also poke the engine if it exposes a setter
     if (engineRef.current?.setSceneScale) {
       engineRef.current.setSceneScale((window as any).sceneScale);
       engineRef.current.requestRewarp?.();
     }
   }, [parameters.gridScale, isLoaded]);
-
-  // REMOVED: Global bridge - now using unified visual boost system passed via uniforms
 
   const toggleAnimation = () => {
     setIsRunning(prev => {
@@ -867,9 +883,8 @@ useEffect(() => {
 
   const resetView = () => {
     if (!engineRef.current) return;
-    // Reapply the exact uniforms we computed in the last update, not the bare props.
     const u = engineRef.current.uniforms || {};
-    engineRef.current.updateUniforms({ ...u });
+    gatedUpdateUniforms(engineRef.current, { ...u }, 'client');
     if (engineRef.current.requestRewarp) engineRef.current.requestRewarp();
   };
 
@@ -983,7 +998,7 @@ useEffect(() => {
               </div>
             </div>
           )}
-          
+
           {/* Enhanced exaggeration HUD */}
           {isLoaded && (
             <div className="absolute top-2 left-2 bg-black/80 rounded px-2 py-1 text-xs font-mono space-y-0.5">
@@ -998,12 +1013,11 @@ useEffect(() => {
               </div>
               <div className="text-amber-300">
                 {(() => {
-                  // reflect actual uniforms (after parity gating) when available
                   const u = engineRef.current?.uniforms ?? {};
                   const parity = !!u.physicsParityMode;
                   const curvT  = parity ? 0 : (u.curvatureGainT ?? 0);
                   const boostM = parity ? 1 : Math.max(1, u.curvatureBoostMax ?? 1);
-                  const userG  = parity ? 1 : Math.max(1, u.userGain ?? 1);  // ← geometry + shader
+                  const userG  = parity ? 1 : Math.max(1, u.userGain ?? 1);
                   const vizG   = parity ? 1 : (u.vizGain ?? 1);
                   const gain   = userG * vizG * (1 + curvT * (boostM - 1));
                   return (
@@ -1018,7 +1032,7 @@ useEffect(() => {
             </div>
           )}
         </div>
-        
+
         <div className="mt-4 space-y-3">
           <div className="grid grid-cols-2 gap-4 text-xs">
             <div className="space-y-1">
@@ -1050,7 +1064,7 @@ useEffect(() => {
               </div>
             </div>
           </div>
-          
+
           <div className="text-xs text-slate-400 space-y-1">
             <div className="font-semibold text-slate-300">Operational Mode Physics:</div>
             <div className="mb-2 text-cyan-300">
@@ -1068,11 +1082,11 @@ useEffect(() => {
             </div>
           </div>
         </div>
-        
+
         {/* Real-time β Calculations Panel - Moved outside visualization canvas */}
         <div className="mt-4 bg-slate-800/50 border border-cyan-500/20 rounded-lg p-4">
           <h3 className="text-cyan-400 font-mono text-sm mb-3">Real-Time Natário β Field Calculations</h3>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
             {/* Physics Equations */}
             <div className="space-y-2">
@@ -1081,12 +1095,12 @@ useEffect(() => {
                 <div className="text-cyan-500 text-xs">with ρ = ‖(x/a, y/b, z/c)‖</div>
                 <div className="text-cyan-500 text-xs">(ellipsoidal ring at ρ≈1, width w = w_ρ ; visual scale uses γ_geo³ · ΔA/A · γ_VdB · √(duty/sectors))</div>
               </div>
-              
+
               <div className="text-green-300">
                 <div>β_chain (inst) = γ_geo³ · (ΔA/A) · γ_VdB</div>
                 <div>β_chain (avg)  = β_chain(inst) · √(duty / sectors)</div>
               </div>
-              
+
               <div className="text-blue-300">
                 <div>View = {(num(parameters.sagDepth_nm, 16) * 4)}nm (4× zoom)</div>
                 <div>s_max = {(2.0).toFixed(2)} | γᵢⱼ = δᵢⱼ (flat spatial metric)</div>
@@ -1099,18 +1113,17 @@ useEffect(() => {
                   );
                 })()}
               </div>
-              
+
               <div className="text-yellow-300">
                 <div>ρ = (|∇×β|² - |∇β|²)/(16π)</div>
                 <div className="text-yellow-500 text-xs">[Authentic Natário Energy Density]</div>
               </div>
             </div>
-            
+
             {/* Live β Sampling */}
             <div className="space-y-2">
               <div className="text-cyan-300 font-semibold">Live β Field Samples:</div>
               {(() => {
-                // === resolve tilt exactly once (reuse the same numbers we push to the engine) ===
                 const mode = parameters.currentMode ?? "hover";
                 const epsFromPanel = Number(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 0);
                 const hasGoodPanelEps = Number.isFinite(epsFromPanel) && epsFromPanel > 1e-9;
@@ -1118,7 +1131,7 @@ useEffect(() => {
                 const epsilonTilt = hasGoodPanelEps ? epsFromPanel : (modeTiltDefaults[mode] ?? 0.0);
                 const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
                   ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
-                  : [0, -1, 0];  // default "down"
+                  : [0, -1, 0];
 
                 return [
                   { name: 'Center', s: 0.00 },
@@ -1126,19 +1139,13 @@ useEffect(() => {
                   { name: 'R',      s: 1.00 },
                   { name: 'Edge',   s: 2.00 }
                 ].map(point => {
-                  // Canonical Natário bell
-                  const beta0 = num(parameters.dutyCycle, 0.14) * num(parameters.g_y, 26);       // β0 = duty·γ_geo
+                  const beta0 = num(parameters.dutyCycle, 0.14) * num(parameters.g_y, 26);
                   const betaBell = beta0 * point.s * Math.exp(-(point.s ** 2));
-
-                  // Interior tilt (small, interior-weighted)
-                  const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2)); // 1 at center → 0 near wall
-                  const tiltMagnitude = epsilonTilt;                         // resolved above in your code
-                  const tiltProj = Math.abs(betaTiltVec?.[1] ?? 1);          // project roughly on "down"
+                  const interiorEnv = Math.exp(-Math.pow(point.s / 1.0, 2));
+                  const tiltMagnitude = epsilonTilt;
+                  const tiltProj = Math.abs(betaTiltVec?.[1] ?? 1);
                   const betaTilt = tiltMagnitude * tiltProj * interiorEnv;
-
                   const betaTotal = betaBell + betaTilt;
-
-                  // Color by sign for total: −β=blue, +β=orange
                   const totalClass = betaTotal >= 0 ? "text-orange-400" : "text-sky-400";
 
                   return (
@@ -1163,7 +1170,7 @@ useEffect(() => {
                   );
                 });
               })()}
-              
+
               {/* Live Parameters */}
               <div className="mt-4 pt-3 border-t border-cyan-500/20">
                 <div className="text-cyan-300 font-semibold mb-2">Current Parameters:</div>
@@ -1179,7 +1186,7 @@ useEffect(() => {
                 <div className="text-green-300">Q-Factor: {safeExp(parameters.cavityQ, 0, '1e+9')}</div>
                 <div className="text-green-300">Exotic Mass: {safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)}kg</div>
               </div>
-              
+
               {/* Debug Controls */}
               <div className="mt-3 pt-3 border-t border-cyan-500/20">
                 <div className="text-purple-300 text-xs">
@@ -1189,7 +1196,7 @@ useEffect(() => {
             </div>
           </div>
         </div>
-        
+
         {/* WarpFactory-inspired diagnostics panel */}
         <div className="mt-4">
           <WarpDiagnostics 
@@ -1205,7 +1212,7 @@ useEffect(() => {
             zeta={VIS.zetaDefault}
           />
         </div>
-        
+
         {/* Natário Proof Panel */}
         {diag && (
           <div className="mt-4 bg-slate-900/60 border border-cyan-500/20 rounded-lg p-4 font-mono text-xs">

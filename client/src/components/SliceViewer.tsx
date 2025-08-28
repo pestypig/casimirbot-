@@ -32,12 +32,12 @@ export interface SliceViewerProps {
   gammaVdB?: number; // γ_VdB
   dutyCycle?: number; // 0..1
   sectors?: number; // ≥1
-  viewAvg?: boolean; // true→√(duty/sectors), false→instant
+  viewAvg?: boolean; // true→(duty/sectors), false→instant
 
   // Engine sync
   dutyEffectiveFR?: number; // ship-wide FR duty (0..1)
   physicsParityMode?: boolean; // true => no boost, unity viz chain
-  
+
   // Live strobing (REAL instant view)
   instantStrobe?: boolean; // false => avg; true => show sector polarity
   split?: number; // current (+/−) split boundary from engine
@@ -60,7 +60,7 @@ export interface SliceViewerProps {
   exposure?: number; // dynamic range control for symmetric log (default 6)
   zeroStop?: number; // avoids singularity at zero before log (default 1e-9)
   showContours?: boolean; // overlay iso-contours
-  
+
   // Curvature gain controls (matches WarpVisualizer)
   curvatureGain?: number; // 0-8 slider range for blend control
   curvatureBoostMax?: number; // maximum boost multiplier (default 40)
@@ -161,9 +161,13 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
           ? Math.max(1e-12, dutyEffectiveFR as number)
           : Math.max(1e-12, dutyCycle) / Math.max(1, sectors))
       : 1.0;
-    
-    const thetaScaleCanonical = Math.pow(gammaGeo, 3) * Math.max(1e-12, qSpoilingFactor) * Math.max(1.0, gammaVdB) * avg;
-    
+
+    const thetaScaleCanonical =
+      Math.pow(gammaGeo, 3) *
+      Math.max(1e-12, qSpoilingFactor) *
+      Math.max(1.0, gammaVdB) *
+      avg;
+
     // Apply view mass fraction after canonical chain
     const thetaScaleUsed = thetaScaleCanonical * viewMassFraction;
 
@@ -189,7 +193,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       ? (Number.isFinite(dutyEffectiveFR)
           ? Math.max(1e-12, dutyEffectiveFR as number)
           : Math.max(1e-12, (refParams?.dutyCycle ?? dutyCycle)) /
-                      Math.max(1, (refParams?.sectors ?? sectors)))
+              Math.max(1, (refParams?.sectors ?? sectors)))
       : 1.0;
 
     return Math.pow(g, 3) * Math.max(1e-12, q) * Math.max(1.0, v) * avgRef;
@@ -205,7 +209,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
     if (width <= 0 || height <= 0) return;
 
     // Handle high-DPR displays for crisp result
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
     const W = Math.floor(width * dpr);
     const H = Math.floor(height * dpr);
     canvas.width = W;
@@ -237,7 +241,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       let strobeSign = 1;
       if (instantStrobe && sectors >= 1) {
         const S = Math.max(1, sectors);
-        const splitIdx = Math.max(0, Math.min(S - 1, Math.floor(split ?? S / 2)));
+        const splitIdx = Math.max(0, Math.min(S - 1, Math.floor(split)));
         const u = (phi % (2 * Math.PI)) / (2 * Math.PI);        // [0,1)
         const k = Math.floor(u * S);                             // sector index at this φ
         const distToSplit = (k - splitIdx + 0.5);                // sector units
@@ -353,7 +357,7 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
           {instantStrobe && <span className="ml-1 text-orange-400">[LIVE]</span>}
         </div>
         <div className="text-[10px] font-mono text-slate-400">
-          γ³×(ΔA/A)×γ_VdB×{viewAvg ? (dutyEffectiveFR !== undefined ? "√(FR-duty/sectors)" : "√(duty/sectors)") : "instant"}
+          γ³×(ΔA/A)×γ_VdB×{viewAvg ? (dutyEffectiveFR !== undefined ? "(FR-duty/sectors)" : "(duty/sectors)") : "instant"}
         </div>
       </div>
       <canvas ref={canvasRef} className="w-full h-auto block rounded-lg overflow-hidden" />

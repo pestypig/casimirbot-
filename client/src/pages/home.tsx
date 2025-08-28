@@ -1,70 +1,65 @@
+// client/src/pages/home.tsx (or wherever this component lives)
 import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Atom, Settings, Book, History, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PhaseDiagram from "@/components/phase-diagram";
 import { LiveEnergyPipeline } from "@/components/live-energy-pipeline";
-import { useUpdatePipeline } from "@/hooks/use-energy-pipeline";
+import { useUpdatePipeline, MODE_CONFIGS, ModeKey } from "@/hooks/use-energy-pipeline";
 import BridgeDerivationCards from "@/components/BridgeDerivationCards";
 
 export default function Home() {
   // Hook for updating backend pipeline
   const updatePipeline = useUpdatePipeline();
-  
+
   // Shared phase diagram state - Needle Hull Mk 1 defaults
   const [tileArea, setTileArea] = useState(5); // cm² (Needle Hull: 5 cm²)
   const [shipRadius, setShipRadius] = useState(82.0); // m (Needle Hull: 82.0 m ellipsoid scale)
-  
-  // Constraint configuration state (exact Needle Hull defaults)
-  const [massTolPct, setMassTolPct] = useState(5);      // ±5% mass tolerance (1340-1470 kg range)
-  const [maxPower, setMaxPower] = useState(100);       // 100 MW max power (headroom above 83 MW target)
-  const [maxZeta, setMaxZeta] = useState(1.0);         // ζ ≤ 1.0 Ford-Roman bound
-  const [minGamma, setMinGamma] = useState(25);        // γ ≥ 25 geometric amplification
-  
-  // Dynamic simulation parameters - Needle Hull Mk 1 defaults
-  const [gammaGeo, setGammaGeo] = useState(26);        // γ_geo = 26 (Needle Hull research value)
-  const [qFactor, setQFactor] = useState(1.6e6);       // Q = 1.6 × 10⁶ (Needle Hull research value)
-  const [duty, setDuty] = useState(0.14);              // 14% burst duty cycle (HOVER MODE default)
-  const [sagDepth, setSagDepth] = useState(16);        // 16 nm sag depth for Ω profiling
-  const [temperature, setTemperature] = useState(20);
-  const [exoticMassTarget, setExoticMassTarget] = useState(1405);  // Default to research paper target
-  
-  // Operational mode state - default to hover mode
-  const [selectedMode, setSelectedMode] = useState("hover");
-  
-  // Function to determine best matching mode based on current parameters
-  const findBestMatchingMode = (currentDuty: number): string => {
-    const modes = {
-      hover: { duty: 0.14, threshold: 0.02 },
-      cruise: { duty: 0.005, threshold: 0.002 },
-      emergency: { duty: 0.50, threshold: 0.1 },
-      standby: { duty: 0.0, threshold: 0.001 }
-    };
-    
-    let bestMatch = "hover";
-    let minDifference = Infinity;
-    
-    for (const [mode, config] of Object.entries(modes)) {
-      const difference = Math.abs(currentDuty - config.duty);
-      if (difference < minDifference && difference <= config.threshold) {
-        minDifference = difference;
-        bestMatch = mode;
-      }
-    }
-    
-    return bestMatch;
-  };
 
-  // Mode-aware constraint calculation
-  const getModeAwareConstraints = (mode: string) => {
-    switch(mode) {
-      case "hover":     // 14% duty → ~83 MW
+  // Constraint configuration state (exact Needle Hull defaults)
+  const [massTolPct, setMassTolPct] = useState(5); // ±5% mass tolerance (1340-1470 kg range)
+  const [maxPower, setMaxPower] = useState(100); // 100 MW max power (headroom above 83 MW target)
+  const [maxZeta, setMaxZeta] = useState(1.0); // ζ ≤ 1.0 Ford-Roman bound
+  const [minGamma, setMinGamma] = useState(25); // γ ≥ 25 geometric amplification
+
+  // Dynamic simulation parameters - Needle Hull Mk 1 defaults
+  const [gammaGeo, setGammaGeo] = useState(26); // γ_geo = 26 (Needle Hull research value)
+  const [qFactor, setQFactor] = useState(1.6e6); // Q_cavity default for research sketch
+  const [duty, setDuty] = useState(0.14); // 14% burst duty cycle (HOVER MODE default)
+  const [sagDepth, setSagDepth] = useState(16); // 16 nm sag depth for Ω profiling
+  const [temperature, setTemperature] = useState(20);
+  const [exoticMassTarget, setExoticMassTarget] = useState(1405); // Default to research paper target
+
+  // Operational mode state - default to hover mode
+  const [selectedMode, setSelectedMode] = useState<ModeKey>("hover");
+
+  // Function to determine best matching mode based on current duty, using MODE_CONFIGS
+  const findBestMatchingMode = (currentDuty: number): ModeKey => {
+    let best: ModeKey = "hover";
+    let bestErr = Number.POSITIVE_INFINITY;
+    (Object.keys(MODE_CONFIGS) as ModeKey[]).forEach((k) => {
+      const target = MODE_CONFIGS[k].dutyCycle ?? 0;
+      const err = Math.abs(currentDuty - target);
+      // tolerance: 15% of target or an absolute floor
+      const tol = Math.max(0.001, 0.15 * Math.max(target, 0.001));
+      if (err < bestErr && err <= tol) {
+        bestErr = err;
+        best = k;
+      }
+    });
+    return best;
+    };
+
+  // Mode-aware constraint calculation (kept explicit; can diverge from MODE_CONFIGS if needed)
+  const getModeAwareConstraints = (mode: ModeKey) => {
+    switch (mode) {
+      case "hover": // 14% duty → ~83 MW
         return { maxPower: 120, maxZeta: 0.1, massTolPct: 5 };
-      case "cruise":    // 0.5% duty → ~0.007 MW  
+      case "cruise": // 0.5% duty → ~0.007 MW
         return { maxPower: 20, maxZeta: 1.5, massTolPct: 5 };
       case "emergency": // 50% duty → ~297 MW
         return { maxPower: 400, maxZeta: 0.05, massTolPct: 5 };
-      case "standby":   // 0% duty → 0 MW
+      case "standby": // 0% duty → 0 MW
         return { maxPower: 10, maxZeta: 10, massTolPct: 5 };
       default:
         return { maxPower: 100, maxZeta: 1.0, massTolPct: 5 };
@@ -73,13 +68,28 @@ export default function Home() {
 
   // Get current mode constraints
   const currentConstraints = getModeAwareConstraints(selectedMode);
-  
-  // Auto-update constraints when mode changes
+
+  // Auto-update constraints when mode changes (UI-only knobs)
   useEffect(() => {
-    const newConstraints = getModeAwareConstraints(selectedMode);
-    setMaxPower(newConstraints.maxPower);
-    setMaxZeta(newConstraints.maxZeta);
-    setMassTolPct(newConstraints.massTolPct);
+    const c = getModeAwareConstraints(selectedMode);
+    setMaxPower(c.maxPower);
+    setMaxZeta(c.maxZeta);
+    setMassTolPct(c.massTolPct);
+  }, [selectedMode]);
+
+  // Keep server pipeline mode & duty in sync with local selection (and align duty to mode default)
+  useEffect(() => {
+    const cfg = MODE_CONFIGS[selectedMode];
+    if (!cfg) return;
+    const dutyForMode = cfg.dutyCycle ?? duty;
+    // Align local duty to selected mode's nominal duty
+    setDuty(dutyForMode);
+    // Notify backend (currentMode + dutyCycle)
+    updatePipeline.mutate({
+      currentMode: selectedMode,
+      dutyCycle: dutyForMode,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMode]);
 
   return (
@@ -116,7 +126,7 @@ export default function Home() {
             </Button>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Live Energy Pipeline */}
           <div className="space-y-4">
@@ -138,24 +148,42 @@ export default function Home() {
                 exoticMassTarget={exoticMassTarget}
                 isRunning={false}
                 selectedMode={selectedMode}
-                onModeChange={setSelectedMode}
-                onParameterUpdate={({ duty: newDuty, qFactor: newQFactor, gammaGeo: newGammaGeo, exoticMassTarget: newExoticMassTarget }) => {
+                onModeChange={(mode: ModeKey) => {
+                  setSelectedMode(mode);
+                  const cfg = MODE_CONFIGS[mode];
+                  if (cfg?.dutyCycle != null) {
+                    setDuty(cfg.dutyCycle);
+                  }
+                  // Update backend with mode & aligned duty
+                  updatePipeline.mutate({
+                    currentMode: mode,
+                    dutyCycle: cfg?.dutyCycle ?? duty,
+                  });
+                }}
+                onParameterUpdate={({
+                  duty: newDuty,
+                  qFactor: newQ,
+                  gammaGeo: newGamma,
+                  exoticMassTarget: newM,
+                }) => {
                   if (newDuty !== undefined) setDuty(newDuty);
-                  if (newQFactor !== undefined) setQFactor(newQFactor);  
-                  if (newGammaGeo !== undefined) setGammaGeo(newGammaGeo);
-                  if (newExoticMassTarget !== undefined) setExoticMassTarget(newExoticMassTarget);
-                  
+                  if (newQ !== undefined) setQFactor(newQ);
+                  if (newGamma !== undefined) setGammaGeo(newGamma);
+                  if (newM !== undefined) setExoticMassTarget(newM);
+
                   // Update backend pipeline with new parameters
                   updatePipeline.mutate({
-                    dutyCycle: newDuty || duty,
-                    qMechanical: newQFactor || qFactor,
-                    gammaGeo: newGammaGeo || gammaGeo,
-                    exoticMassTarget_kg: newExoticMassTarget || exoticMassTarget
+                    dutyCycle: newDuty ?? duty,
+                    // ⬇️ map UI qFactor → pipeline qCavity (not qMechanical)
+                    qCavity: newQ ?? qFactor,
+                    gammaGeo: newGamma ?? gammaGeo,
+                    exoticMassTarget_kg: newM ?? exoticMassTarget,
+                    currentMode: selectedMode,
                   });
                 }}
               />
             </div>
-            
+
             {/* Bridge Physics Derivation Cards */}
             <BridgeDerivationCards />
           </div>
@@ -181,16 +209,32 @@ export default function Home() {
                 minGamma={minGamma}
                 onMinGammaChange={setMinGamma}
                 gammaGeo={gammaGeo}
-                onGammaGeoChange={setGammaGeo}
+                onGammaGeoChange={(g: number) => {
+                  setGammaGeo(g);
+                  updatePipeline.mutate({ gammaGeo: g });
+                }}
                 qFactor={qFactor}
-                onQFactorChange={setQFactor}
+                onQFactorChange={(q: number) => {
+                  setQFactor(q);
+                  // map to qCavity in backend
+                  updatePipeline.mutate({ qCavity: q });
+                }}
                 duty={duty}
                 onDutyChange={(newDuty: number) => {
                   setDuty(newDuty);
+                  // Backend: keep duty in sync
+                  updatePipeline.mutate({ dutyCycle: newDuty });
+
                   // Auto-update operational mode when duty cycle changes from phase diagram
                   const matchingMode = findBestMatchingMode(newDuty);
                   if (matchingMode !== selectedMode) {
                     setSelectedMode(matchingMode);
+                    const cfg = MODE_CONFIGS[matchingMode];
+                    // ensure backend also sees mode change
+                    updatePipeline.mutate({
+                      currentMode: matchingMode,
+                      dutyCycle: cfg?.dutyCycle ?? newDuty,
+                    });
                   }
                 }}
                 sagDepth={sagDepth}
@@ -199,25 +243,20 @@ export default function Home() {
                 currentSimulation={null}
                 // Add mode synchronization
                 selectedMode={selectedMode}
-                onModeChange={(newMode: string) => {
+                onModeChange={(newMode: ModeKey) => {
                   setSelectedMode(newMode);
-                  // Update other parameters when mode changes from phase diagram
-                  const modes = {
-                    hover: { duty: 0.14 },
-                    cruise: { duty: 0.005 },
-                    emergency: { duty: 0.50 },
-                    standby: { duty: 0.0 }
-                  };
-                  const modeConfig = modes[newMode as keyof typeof modes];
-                  if (modeConfig) {
-                    setDuty(modeConfig.duty);
-                  }
+                  const cfg = MODE_CONFIGS[newMode];
+                  if (cfg?.dutyCycle != null) setDuty(cfg.dutyCycle);
+                  updatePipeline.mutate({
+                    currentMode: newMode,
+                    dutyCycle: cfg?.dutyCycle ?? duty,
+                  });
                 }}
               />
             </div>
           </div>
         </div>
-        
+
         {/* Footer Information */}
         <div className="mt-8 text-center text-sm text-muted-foreground">
           <p>Natário Zero-Expansion Warp Bubble Research Platform • Needle Hull Mk 1 Configuration</p>

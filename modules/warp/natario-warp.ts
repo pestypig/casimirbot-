@@ -20,34 +20,34 @@ const DEFAULTS = {
 
 export interface NatarioWarpParams {
   // Geometry parameters
-  bowlRadius: number;           // μm - concave bowl radius (20 μm for needle hull)
-  sagDepth: number;            // nm - sag depth t
-  gap: number;                 // nm - vacuum gap a
-  
+  bowlRadius: number;           // μm - concave bowl radius (e.g. 25,000 μm)
+  sagDepth: number;             // nm - sag depth t
+  gap: number;                  // nm - vacuum gap a
+
   // Dynamic Casimir parameters
-  cavityQ: number;             // Quality factor (~10^9)
-  burstDuration: number;       // μs - burst length (10 μs)
-  cycleDuration: number;       // μs - cycle length (1000 μs)
-  
+  cavityQ: number;              // Quality factor (~10^9)
+  burstDuration: number;        // μs - burst length (10 μs)
+  cycleDuration: number;        // μs - cycle length (1000 μs)
+
   // Sector strobing parameters
-  sectorCount: number;         // S = 400 sectors
-  dutyFactor: number;          // d = 0.01 local duty
-  effectiveDuty: number;       // d_eff = 2.5×10^-5 ship-wide duty
-  
+  sectorCount: number;          // S = 400 sectors
+  dutyFactor: number;           // d_local (burst/cycle), e.g. 0.01
+  effectiveDuty: number;        // d_eff = d_local × (S_live / S_total)
+
   // Warp field parameters
-  shiftAmplitude: number;      // β amplitude for shift vector
-  expansionTolerance: number;  // Zero-expansion tolerance
+  shiftAmplitude: number;       // β amplitude for shift vector
+  expansionTolerance: number;   // Zero-expansion tolerance
 
   // NEW: pipeline-driven knobs
-  gammaGeo?: number;           // From pipeline geometric amplification
-  gammaVanDenBroeck?: number;  // γ_VdB from pipeline
-  qSpoilingFactor?: number;    // ΔA/A (if modeling spoiling)
-  tileCount?: number;          // From pipeline tile census
-  tileArea_m2?: number;        // Override tile area if needed
-  fordRomanLimit_kg?: number;  // Ford-Roman limit (default 1e6 kg)
-  referenceQ?: number;         // Q0 for normalization
-  P_avg_W?: number;            // Live average power (preferred over targets)
-  
+  gammaGeo?: number;            // From pipeline geometric amplification
+  gammaVanDenBroeck?: number;   // γ_VdB from pipeline
+  qSpoilingFactor?: number;     // ΔA/A (if modeling spoiling)
+  tileCount?: number;           // From pipeline tile census
+  tileArea_m2?: number;         // Override tile area if needed
+  fordRomanLimit_kg?: number;   // Ford-Roman limit (default 1e6 kg)
+  referenceQ?: number;          // Q0 for normalization
+  P_avg_W?: number;             // Live average power (preferred over targets)
+
   // Advanced parameterization (eliminates remaining magic constants)
   shellThickness_m?: number;                // for momentum flux
   stressTangentialFactor?: number;          // replaces hard-coded 0.5
@@ -59,51 +59,51 @@ export interface NatarioWarpParams {
 export interface NatarioWarpResult {
   // Geometric amplification
   geometricBlueshiftFactor: number;     // γ_geo ≈ 25
-  effectivePathLength: number;          // a_eff = a - t
-  geometricAmplification: number;       // γ_geo³ × γ_VdB (Casimir a⁻⁴ already in baseline)
-  
+  effectivePathLength: number;          // a_eff (meters)
+  geometricAmplification: number;       // γ_geo³ × γ_VdB (Casimir a⁻⁴ is in baseline)
+
   // Dynamic amplification
-  qEnhancementFactor: number;           // Q-factor enhancement
-  totalAmplificationFactor: number;    // Combined γ_geo³ × √Q
-  
-  // Energy and mass calculations
-  baselineEnergyDensity: number;       // J/m³ - baseline Casimir
-  amplifiedEnergyDensity: number;      // J/m³ - amplified negative energy
-  exoticMassPerTile: number;           // kg - per tile (~1.5 kg target)
-  totalExoticMass: number;             // kg - total system (~1.4×10³ kg)
-  
+  qEnhancementFactor: number;           // √(Q / Q0)
+  totalAmplificationFactor: number;     // per-pulse: γ_geo³ × γ_VdB × √Q × (qSpoil)
+
+  // Energy and mass (time-averaged) 
+  baselineEnergyDensity: number;        // J/m³ (from gap)
+  amplifiedEnergyDensity: number;       // J/m³ (includes d_eff)
+  exoticMassPerTile: number;            // kg (time-averaged)
+  totalExoticMass: number;              // kg (time-averaged)
+
   // Sector strobing validation
-  timeAveragedMass: number;            // kg - duty-cycle averaged
-  powerDraw: number;                   // W - average power (~83 MW)
-  quantumInequalityMargin: number;     // vs Ford-Roman limit
+  timeAveragedMass: number;             // kg (same as totalExoticMass; no double-duty)
+  powerDraw: number;                    // W - average power (prefer pipeline)
+  quantumInequalityMargin: number;      // vs Ford-Roman limit
   quantumSafetyStatus: 'safe' | 'warning' | 'violation';
-  
+
   // Natário shift vector
   shiftVectorField: NatarioShiftField;
-  expansionScalar: number;             // ∇·β (should be ≈ 0)
-  curlMagnitude: number;               // |∇×β| (should be = 0)
-  
+  expansionScalar: number;              // ∇·β (≈ 0)
+  curlMagnitude: number;                // |∇×β| (= 0)
+
   // Momentum flux balance
-  momentumFlux: number;                // kg⋅m/s² - booster shell
+  momentumFlux: number;                 // kg⋅m/s² - booster shell
   stressEnergyTensor: StressEnergyComponents;
-  
+
   // Validation flags
-  isZeroExpansion: boolean;            // |∇·β| < tolerance
-  isCurlFree: boolean;                 // |∇×β| = 0
-  isQuantumSafe: boolean;              // Mass < Ford-Roman limit
-  isPowerCompliant: boolean;           // Power ≈ 83 MW target
+  isZeroExpansion: boolean;             // |∇·β| < tolerance
+  isCurlFree: boolean;                  // |∇×β| ≈ 0
+  isQuantumSafe: boolean;               // Mass < Ford-Roman limit
+  isPowerCompliant: boolean;            // Within tolerance if target provided
 }
 
 export interface NatarioShiftField {
-  amplitude: number;                   // β amplitude
+  amplitude: number;                    // β amplitude
   radialProfile: (r: number) => number; // β(r) radial function
-  tangentialComponent: number;         // β_θ component
-  axialComponent: number;              // β_z component
-  
+  tangentialComponent: number;          // β_θ component
+  axialComponent: number;               // β_z component
+
   // Sector strobing phases
-  positivePhaseAmplitude: number;      // N_+ amplitude
-  negativePhaseAmplitude: number;      // N_- amplitude
-  netShiftAmplitude: number;           // Net effective shift
+  positivePhaseAmplitude: number;       // N_+ amplitude
+  negativePhaseAmplitude: number;       // N_- amplitude
+  netShiftAmplitude: number;            // Net effective shift
 }
 
 export interface StressEnergyComponents {
@@ -116,23 +116,22 @@ export interface StressEnergyComponents {
 
 /**
  * Calculate geometric blue-shift factor γ_geo from pipeline (no magic numbers)
+ * a_eff is the *physical gap*; curvature amplification is represented by γ_geo.
  */
 export function calculateGeometricBlueshift(
-  bowlRadius: number, sagDepth: number, gap: number,
+  _bowlRadius: number, sagDepth: number, gap: number,
   opts?: { gammaGeo?: number; gammaVanDenBroeck?: number }
 ): { gammaGeo: number; effectivePathLength_m: number; amplification: number } {
-  // If pipeline provides γ_geo, trust it; otherwise fall back to 1
+  // Trust pipeline γ_geo if provided; otherwise 1
   const gammaGeo = Math.max(1, opts?.gammaGeo ?? 1);
 
-  // Path length a_eff = a - t (meters)
-  const effectivePathLength_m = Math.max(1e-12,
-    (bowlRadius * 1e-6) - (sagDepth * 1e-9)
-  );
+  // Use physical gap for a_eff; do NOT subtract sagDepth here (that’s what γ_geo captures)
+  const effectivePathLength_m = Math.max(1e-12, gap * 1e-9);
 
   // Van den Broeck factor from pipeline; default 1 if not modeling it
   const gammaVdB = Math.max(1, opts?.gammaVanDenBroeck ?? 1);
 
-  // Total amplification (geometry only, no Q or duty here)
+  // Total *geometric/pocket* amplification (no Q or duty here)
   const amplification = Math.pow(gammaGeo, 3) * gammaVdB;
 
   return { gammaGeo, effectivePathLength_m, amplification };
@@ -140,6 +139,7 @@ export function calculateGeometricBlueshift(
 
 /**
  * Calculate dynamic Casimir amplification with configurable Q baseline
+ * Returns per-pulse amplification (no d_eff applied here).
  */
 export function calculateDynamicAmplification(
   geometricAmplification: number,
@@ -149,11 +149,11 @@ export function calculateDynamicAmplification(
   opts?: { referenceQ?: number; qSpoilingFactor?: number }
 ) {
   const Q0 = Math.max(1, opts?.referenceQ ?? DEFAULTS.Q0);
-  const qEnhancement = Math.sqrt(cavityQ / Q0);
-  const dutyFactor = Math.max(1e-12, burstDuration_us / cycleDuration_us);
-  const qSpoil = Math.max(0, opts?.qSpoilingFactor ?? 1);
+  const qEnhancement = Math.sqrt(Math.max(1, cavityQ) / Q0);
+  const dutyFactor = Math.max(1e-12, burstDuration_us / Math.max(1e-12, cycleDuration_us));
+  const qSpoil = Math.max(1e-12, opts?.qSpoilingFactor ?? 1);
 
-  // Do not apply effective duty here; keep this purely "per-pulse"
+  // Per-pulse (ON-window) amplification
   const totalAmplification = geometricAmplification * qEnhancement * qSpoil;
 
   return { qEnhancement, totalAmplification, dutyFactor };
@@ -168,9 +168,11 @@ export function calculateSectorStrobing(
   dutyLocal: number,
   dutyEffective: number
 ) {
-  const timeAveragedAmplification = perPulseAmplification * Math.max(0, dutyEffective);
-  const powerReduction = Math.max(1e-12, dutyEffective) / Math.max(1e-12, dutyLocal);
-  const effectivenessFactor = Math.max(0, dutyEffective) * Math.max(1, sectorCount);
+  const d_eff = Math.max(0, dutyEffective);
+  const d_local = Math.max(1e-12, dutyLocal);
+  const timeAveragedAmplification = perPulseAmplification * d_eff;
+  const powerReduction = Math.max(1e-12, d_eff) / d_local;
+  const effectivenessFactor = d_eff * Math.max(1, sectorCount);
   return { timeAveragedAmplification, powerReduction, effectivenessFactor };
 }
 
@@ -179,35 +181,32 @@ export function calculateSectorStrobing(
  */
 export function calculateNatarioShiftField(
   params: NatarioWarpParams,
-  totalExoticMass: number
+  _totalExoticMass: number
 ): NatarioShiftField {
   const { shiftAmplitude, bowlRadius } = params;
-  
+
   // Radial profile for zero-expansion condition
-  // β(r) = A × f(r/R) where f ensures ∇·β = 0
+  // β(r) = A × f(r/R) where f ensures smooth center & finite support
   const radialProfile = (r: number): number => {
-    const bowlRadiusM = Math.max(1e-12, bowlRadius * 1e-6); // Convert μm to meters with safety clamp
-    const rho = r / bowlRadiusM; // Both in meters now
-    
-    // Zero-expansion profile: f(ρ) = ρ² × (3 - 2ρ) for ρ ∈ [0,1]
-    // This ensures ∇·β = 0 at all points (C¹ smooth)
-    if (rho <= 1) {
-      return shiftAmplitude * (rho * rho) * (3 - 2 * rho);
-    } else {
-      // Outside the active region: 1/r² falloff
-      return shiftAmplitude / (rho * rho);
+    const R = Math.max(1e-12, bowlRadius * 1e-6); // μm → m
+    const ρ = r / R;
+    if (ρ <= 1) {
+      // C¹ smooth “ease-in-out” profile
+      return shiftAmplitude * (ρ * ρ) * (3 - 2 * ρ);
     }
+    // Outside the active region: 1/r² falloff
+    return shiftAmplitude / (ρ * ρ);
   };
-  
+
   // Sector strobing phases (N_+ and N_- amplitudes)
-  const positivePhaseAmplitude = shiftAmplitude * (1 + params.effectiveDuty);
-  const negativePhaseAmplitude = shiftAmplitude * (1 - params.effectiveDuty);
+  const positivePhaseAmplitude = shiftAmplitude * (1 + Math.max(0, params.effectiveDuty));
+  const negativePhaseAmplitude = shiftAmplitude * (1 - Math.max(0, params.effectiveDuty));
   const netShiftAmplitude = positivePhaseAmplitude - negativePhaseAmplitude;
-  
-  // Tangential and axial components (for curl-free condition)
-  const tangentialComponent = 0; // β_θ = 0 for cylindrical symmetry
+
+  // Tangential and axial components (curl-free construction)
+  const tangentialComponent = 0; // β_θ = 0 for axial symmetry
   const axialComponent = Array.isArray(params.betaTiltVec) ? shiftAmplitude * (params.betaTiltVec[2] ?? 0) : 0;
-  
+
   return {
     amplitude: shiftAmplitude,
     radialProfile,
@@ -223,33 +222,29 @@ export function calculateNatarioShiftField(
  * Validate quantum inequality and Ford-Roman bounds
  */
 export function validateQuantumInequality(
-  exoticMass: number,        // kg
-  energyDensity: number,     // J/m³
+  exoticMass: number,        // kg (time-averaged)
+  energyDensity: number,     // J/m³ (time-averaged)
   pulseDuration: number,     // s
-  spatialScale: number,      // m (gap scale, NOT converted)
+  spatialScale: number,      // m (gap scale)
   fordRomanLimit: number = DEFAULTS.fordRomanLimit_kg
 ): { margin: number; status: 'safe' | 'warning' | 'violation'; bound: number } {
-  // Ford-Roman quantum inequality bound (configurable)
-  const fordRomanBound = fordRomanLimit;
-  
-  // Energy density × time constraint
-  const quantumBound = PHYSICS_CONSTANTS.HBAR_C / Math.pow(spatialScale, 4);
-  const energyTimeBound = Math.abs(energyDensity) * pulseDuration;
-  
-  // Combined margin calculation
+  // Ford-Roman bound (configurable)
+  const fordRomanBound = Math.max(1e-12, fordRomanLimit);
+
+  // Energy density × time constraint (very heuristic proxy)
+  const quantumBound = PHYSICS_CONSTANTS.HBAR_C / Math.max(1e-48, Math.pow(spatialScale, 4));
+  const energyTimeBound = Math.abs(energyDensity) * Math.max(1e-12, pulseDuration);
+
+  // Combined margin
   const massMargin = exoticMass / fordRomanBound;
   const energyMargin = energyTimeBound / quantumBound;
   const totalMargin = Math.max(massMargin, energyMargin);
-  
+
   let status: 'safe' | 'warning' | 'violation';
-  if (totalMargin < 0.9) {
-    status = 'safe';
-  } else if (totalMargin < 1.0) {
-    status = 'warning';
-  } else {
-    status = 'violation';
-  }
-  
+  if (totalMargin < 0.9)      status = 'safe';
+  else if (totalMargin < 1.0) status = 'warning';
+  else                        status = 'violation';
+
   return {
     margin: totalMargin,
     status,
@@ -261,32 +256,26 @@ export function validateQuantumInequality(
  * Calculate stress-energy tensor components for warp field
  */
 export function calculateStressEnergyTensor(
-  energyDensity: number,     // J/m³
+  energyDensity: number,     // J/m³ (time-averaged)
   shiftField: NatarioShiftField,
   spatialGradients: { dvdr: number; dvdt: number },
   tangentialFactor: number = DEFAULTS.stressTangentialFactor
 ): StressEnergyComponents {
-  const { amplitude, radialProfile } = shiftField;
+  const { amplitude } = shiftField;
   const { dvdr, dvdt } = spatialGradients;
-  
+
   // Energy density component T^00
-  const T00 = energyDensity; // Casimir energy density
-  
-  // Pressure components from shift vector derivatives
-  // T^11 = -(energy_density + pressure_r)
+  const T00 = energyDensity; // Casimir energy density (negative)
+
+  // Pressure components (simple anisotropic proxy)
   const T11 = -(energyDensity + dvdr * amplitude * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  
-  // Tangential pressure T^22 (parameterized anisotropy factor)
-  const T22 = -energyDensity * tangentialFactor;
-  
-  // Axial pressure T^33
+  const T22 = -energyDensity * Math.max(0, Math.min(1, tangentialFactor));
   const T33 = -(energyDensity + dvdt * amplitude * PHYSICS_CONSTANTS.C * PHYSICS_CONSTANTS.C);
-  
-  // Null Energy Condition: T_μν k^μ k^ν ≥ 0 for null vectors k^μ
-  // For timelike observers: T^00 + T^11 + T^22 + T^33 ≥ 0
+
+  // NEC proxy (very heuristic)
   const necSum = T00 + T11 + T22 + T33;
   const isNullEnergyConditionSatisfied = necSum >= 0;
-  
+
   return {
     T00,
     T11,
@@ -304,23 +293,23 @@ export function calculateMomentumFlux(
   shellRadius: number,      // m
   shellThickness: number    // m
 ): { momentumFlux: number; pressureBalance: number; isStable: boolean } {
-  const { T00, T11, T22, T33 } = stressEnergyTensor;
-  
+  const { T11, T22, T33 } = stressEnergyTensor;
+
   // Surface area of booster shell
-  const shellArea = 4 * Math.PI * shellRadius * shellRadius;
-  
-  // Momentum flux through shell surface
-  // Φ = ∫ T^i0 dA for momentum component i
-  const momentumFlux = T11 * shellArea; // Radial momentum flux
-  
+  const R = Math.max(DEFAULTS.minPos, shellRadius);
+  const shellArea = 4 * Math.PI * R * R;
+
+  // Momentum flux through shell surface (radial)
+  const momentumFlux = T11 * shellArea;
+
   // Pressure balance: internal stress vs external reaction
   const internalPressure = -(T11 + T22 + T33) / 3; // Average internal pressure
-  const externalPressure = momentumFlux / shellArea; // External reaction pressure
+  const externalPressure = momentumFlux / shellArea;
   const pressureBalance = internalPressure + externalPressure;
-  
-  // Stability criterion: balanced forces
-  const isStable = Math.abs(pressureBalance) < Math.abs(internalPressure) * 0.1; // 10% tolerance
-  
+
+  // Stability criterion: balanced forces (10% tolerance)
+  const isStable = Math.abs(pressureBalance) < Math.abs(internalPressure) * 0.1;
+
   return {
     momentumFlux,
     pressureBalance,
@@ -329,10 +318,10 @@ export function calculateMomentumFlux(
 }
 
 /**
- * Main calculation function for complete Natário warp bubble system (pipeline-driven)
+ * Main calculation for complete Natário warp bubble (pipeline-driven)
  */
 export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWarpResult {
-  // 1. Geometric amplification (using pipeline values if available)
+  // 1) Geometric amplification (pipeline-trusted γ_geo / γ_VdB)
   const { gammaGeo, effectivePathLength_m, amplification } = calculateGeometricBlueshift(
     params.bowlRadius,
     params.sagDepth,
@@ -342,8 +331,8 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
       gammaVanDenBroeck: params.gammaVanDenBroeck
     }
   );
-  
-  // 2. Dynamic Casimir amplification 
+
+  // 2) Dynamic (per-pulse) amplification
   const { qEnhancement, totalAmplification } = calculateDynamicAmplification(
     amplification,
     params.cavityQ,
@@ -354,55 +343,54 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
       qSpoilingFactor: params.qSpoilingFactor
     }
   );
-  
-  // 3. Sector strobing effects
-  const { timeAveragedAmplification, powerReduction } = calculateSectorStrobing(
+
+  // 3) Sector strobing → time-averaged amplification (includes d_eff)
+  const { timeAveragedAmplification } = calculateSectorStrobing(
     totalAmplification,
     params.sectorCount,
     params.dutyFactor,
     params.effectiveDuty
   );
 
-  // 4. Baseline Casimir energy density from gap (no constant)
-  // Casimir energy density between ideal plates: u = -π² ħ c / (720 a⁴)
+  // 4) Baseline Casimir energy density from gap (no constants hidden)
+  // u0 = -π² ħc / (720 a⁴)
   const a_m = Math.max(1e-12, params.gap * 1e-9);
   const u0 = -(Math.PI**2 / 720) * PHYSICS_CONSTANTS.HBAR_C / (a_m**4);
 
-  const baselineEnergyDensity = u0;                               // J/m³
-  const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;
+  const baselineEnergyDensity = u0;                                                   // J/m³
+  const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;   // J/m³ (time-averaged)
 
-  // 5. Mass calculations (pipeline-driven, no TARGET constants)
-  const tileArea = params.tileArea_m2 ?? DEFAULTS.tileArea_m2;
+  // 5) Mass (time-averaged — NO extra duty multiplication here)
+  const tileArea = Math.max(1e-12, params.tileArea_m2 ?? DEFAULTS.tileArea_m2);
   const tileVolume = tileArea * a_m;
+  const tileCount = Math.max(1, params.tileCount ?? 1);
+  const exoticMassPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
+  const totalExoticMass = exoticMassPerTile * tileCount;
 
-  const tileCount = Math.max(1, params.tileCount ?? 1);           // ← pipeline preferred
-  const massPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
-  const totalExoticMass = massPerTile * tileCount;
+  // 6) Power (prefer pipeline average if provided)
+  const powerDraw = Number.isFinite(params.P_avg_W) ? (params.P_avg_W as number) : NaN;
 
-  // 6. Power calculations (pipeline-driven average power preferred)
-  const powerDraw = Number.isFinite(params.P_avg_W) ? params.P_avg_W! : NaN;
-
-  // 7. Quantum inequality validation  
+  // 7) Quantum inequality validation (time-averaged inputs)
   const fordRomanLimit = params.fordRomanLimit_kg ?? DEFAULTS.fordRomanLimit_kg;
   const quantumValidation = validateQuantumInequality(
     totalExoticMass,
     amplifiedEnergyDensity,
-    params.burstDuration * 1e-6,               // s
-    a_m,                                        // m (gap scale)
+    Math.max(1e-12, params.burstDuration * 1e-6), // s
+    a_m,                                          // m
     fordRomanLimit
   );
 
-  // 8. Natário shift vector field
+  // 8) Natário shift vector field
   const shiftVectorField = calculateNatarioShiftField(params, totalExoticMass);
 
-  // 9. Expansion and curl (zero by construction for Natário metric)
+  // 9) Expansion and curl (zero by construction for Natário metric)
   const expansionScalar = 0.0;
   const curlMagnitude = 0.0;
 
-  // 10. Stress-energy tensor
+  // 10) Stress-energy tensor (time-averaged)
   const spatialGradients = {
     dvdr: shiftVectorField.amplitude / Math.max(1e-12, params.bowlRadius * 1e-6),
-    dvdt: 0.0 // Steady state
+    dvdt: 0.0 // quasi-steady on the averaging window
   };
   const stressEnergyTensor = calculateStressEnergyTensor(
     amplifiedEnergyDensity,
@@ -411,7 +399,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     params.stressTangentialFactor ?? DEFAULTS.stressTangentialFactor
   );
 
-  // 11. Momentum flux balance
+  // 11) Momentum flux balance
   const shellThickness = params.shellThickness_m ?? DEFAULTS.shellThickness_m;
   const { momentumFlux } = calculateMomentumFlux(
     stressEnergyTensor,
@@ -419,18 +407,18 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     shellThickness
   );
 
-  // 12. Validation flags (no hard-coded targets)
+  // 12) Validation flags (no hard-coded targets)
   const isZeroExpansion = Math.abs(expansionScalar) < params.expansionTolerance;
   const isCurlFree = Math.abs(curlMagnitude) < 1e-10;
   const isQuantumSafe = quantumValidation.status !== 'violation';
-  
-  // Power compliance against optional target with tolerance
+
+  // Optional power-compliance check (only if a target was supplied)
   const powerTarget = params.powerTarget_W;
   const tol = params.powerTolerance ?? DEFAULTS.powerTolerance;
   const isPowerCompliant =
     Number.isFinite(powerDraw) && Number.isFinite(powerTarget)
-      ? Math.abs(powerDraw - (powerTarget as number)) <= (powerTarget as number) * tol
-      : Number.isFinite(powerDraw); // fallback: "has data" ⇒ ok
+      ? Math.abs(powerDraw - (powerTarget as number)) <= Math.abs(powerTarget as number) * tol
+      : Number.isFinite(powerDraw); // fallback: “has data” ⇒ ok
 
   return {
     geometricBlueshiftFactor: gammaGeo,
@@ -440,9 +428,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     totalAmplificationFactor: totalAmplification,
     baselineEnergyDensity,
     amplifiedEnergyDensity,
-    exoticMassPerTile: massPerTile,
+    exoticMassPerTile,
     totalExoticMass,
-    timeAveragedMass: totalExoticMass * Math.max(0, params.effectiveDuty),
+    timeAveragedMass: totalExoticMass, // already averaged; no extra duty
     powerDraw,
     quantumInequalityMargin: quantumValidation.margin,
     quantumSafetyStatus: quantumValidation.status,

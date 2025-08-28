@@ -1,24 +1,99 @@
 // expectations.ts
-export function thetaScaleExpected({ gammaGeo=26, q=1, gammaVdB=1.4e5, dFR=0.000025 }) {
-  // matches your "engine θ-scale (γ_geo^3 · q · γ_VdB · √d_FR)"
-  return Math.pow(gammaGeo,3) * q * gammaVdB * Math.sqrt(dFR);
+
+// ───────────────── Types ─────────────────
+export type ThetaExpectedArgs = {
+  gammaGeo?: number;
+  // q aliases (renderer uses ΔA/A as qSpoilingFactor)
+  q?: number;
+  deltaAOverA?: number;
+  qSpoilingFactor?: number;
+
+  // γ_VdB (visual) aliases
+  gammaVdB?: number;
+  gammaVanDenBroeck?: number;
+  gammaVanDenBroeck_vis?: number;
+
+  // duty inputs
+  dFR?: number;                 // ship-wide Ford–Roman duty (authoritative if present)
+  dutyEffectiveFR?: number;     // alias
+  dutyLocal?: number;           // local burst fraction (e.g., 0.01)
+  concurrent?: number;          // S_live
+  total?: number;               // S_total
+};
+
+export type ThetaUsedArgs = {
+  // same duty inputs as above (any combination allowed)
+  dFR?: number;
+  dutyEffectiveFR?: number;
+  dutyLocal?: number;
+  concurrent?: number;
+  total?: number;
+
+  // view handling
+  viewFraction?: number;        // defaults to concurrent/total when averaging
+  viewAveraging?: boolean;      // default true
+};
+
+// ──────────────── Helpers ───────────────
+const EPS = 1e-12;
+
+export function resolveDutyFR({
+  dFR,
+  dutyEffectiveFR,
+  dutyLocal = 0.01,
+  concurrent = 1,
+  total = 400
+}: Partial<ThetaExpectedArgs>): number {
+  const fr = Number.isFinite(dFR as number)
+    ? (dFR as number)
+    : Number.isFinite(dutyEffectiveFR as number)
+      ? (dutyEffectiveFR as number)
+      : dutyLocal * (concurrent / Math.max(1, total));
+  return Math.max(EPS, Math.min(1, Number(fr) || EPS));
 }
 
-/**
- * Convert "expected" (which already includes √d_FR) into what the renderer
- * actually uses. When view averaging is ON, the engine applies no further duty
- * scaling—only the view-mass fraction matters. When view averaging is OFF, the
- * engine drops the √d_FR factor; undo it here for apples-to-apples checks.
- */
-export function thetaScaleUsed(
-  expected: number,
-  { concurrent=1, total=400, dutyLocal=0.01, viewFraction=1, viewAveraging=true }
-){
-  const dFR = Math.max(1e-12, dutyLocal * (concurrent / Math.max(1, total)));
+// ─────────────── Expected θ (engine law) ───────────────
+// Matches engine θ-scale: θ = γ_geo^3 · q · γ_VdB_vis · √d_FR
+export function thetaScaleExpected(args: ThetaExpectedArgs = {}) {
+  const gammaGeo = Math.max(1, Number(args.gammaGeo ?? 26));
+
+  // q (ΔA/A) with aliases
+  const qRaw = Number(args.q ?? args.deltaAOverA ?? args.qSpoilingFactor ?? 1);
+  const q = Math.max(EPS, qRaw);
+
+  // visual γ_VdB with aliases; keep ≥1 so it never damps visuals
+  const gammaV = Number(args.gammaVanDenBroeck_vis ?? args.gammaVdB ?? args.gammaVanDenBroeck ?? 1.4e5);
+  const gammaV_vis = Math.max(1, gammaV);
+
+  const dFR = resolveDutyFR(args);
+
+  return Math.pow(gammaGeo, 3) * q * gammaV_vis * Math.sqrt(dFR);
+}
+
+// ─────────────── Used θ in renderer ───────────────
+// Convert expected (which already includes √d_FR) into what the renderer actually uses.
+export function thetaScaleUsed(expected: number, opts: ThetaUsedArgs = {}) {
+  const concurrent = Math.max(1, Number(opts.concurrent ?? 1));
+  const total = Math.max(1, Number(opts.total ?? 400));
+  const dutyLocal = Math.max(EPS, Number(opts.dutyLocal ?? 0.01));
+
+  const dFR = resolveDutyFR({
+    dFR: opts.dFR,
+    dutyEffectiveFR: opts.dutyEffectiveFR,
+    dutyLocal,
+    concurrent,
+    total
+  });
+
+  // If averaging ON, the engine applies no further duty scaling—only the view-mass fraction matters.
+  // Default viewFraction to the pane’s visible mass fraction (S_live / S_total).
+  const viewFractionDefault = concurrent / total;
+  const viewFraction = Math.max(0, Math.min(1, Number(opts.viewFraction ?? viewFractionDefault)));
+  const viewAveraging = (opts.viewAveraging ?? true) ? true : false;
+
   if (viewAveraging) {
-    // Renderer law matches expected; just scale by view fraction.
-    return expected * Math.max(0, viewFraction);
+    return expected * viewFraction;
   }
-  // No averaging: engine omits √d_FR, so remove it from expected.
+  // No averaging: engine omits √d_FR, so remove it from expected for apples-to-apples checks.
   return expected / Math.sqrt(dFR);
 }
