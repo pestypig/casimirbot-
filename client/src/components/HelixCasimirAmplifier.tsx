@@ -558,7 +558,7 @@ export default function HelixCasimirAmplifier({
       Number.isFinite(state?.qMechanical)   && state!.qMechanical!   > 0 ? state!.qMechanical :
       1
     ) as number;
-    const N_tiles =
+    const N_tiles_internal =
       hud.tilesTotal ??
       state.N_tiles ??
       metrics?.totalTiles ??
@@ -575,7 +575,7 @@ export default function HelixCasimirAmplifier({
     const U_Q       = U_geo * qMech;                   // per-tile stored energy proxy during ON
     const P_tile_on = (omega * Math.abs(U_Q)) / qCav;  // physics
     const P_tile_instant_W = gateOn ? P_tile_on : 0;   // display-gated
-    const P_ship_avg_calc_MW = (P_tile_on * N_tiles * d_eff) / 1e6; // ship-avg with effective duty
+    const P_ship_avg_calc_MW = (P_tile_on * N_tiles_internal * d_eff) / 1e6; // ship-avg with effective duty
     const P_ship_avg_report_MW = hud.powerMW;          // authoritative calibration (if provided)
 
     // Debug: badge ON but 0 W
@@ -592,19 +592,21 @@ export default function HelixCasimirAmplifier({
     const E_tile_VdB  = E_tile_geo3 * gammaVdB;                // step: ×γ_VdB
     const E_tile_mass = E_tile_VdB * d_eff;                    // step: ×d_eff (averaging)
     const M_tile      = E_tile_mass / (C * C);                 // kg per tile
-    const M_total_calc   = M_tile * N_tiles;
+    const M_total_calc   = M_tile * N_tiles_internal;
     const M_total_report = hud.exoticMassKg;
 
     // Debug: log all derived calculations (after all variables are calculated)
-    console.debug("[HelixCasimirAmplifier] Derived calculations:", {
-      U_geo: U_geo,
-      U_Q: U_Q,
-      P_tile_on: P_tile_on,
-      P_ship_avg_calc_MW: P_ship_avg_calc_MW,
-      M_total_calc: M_total_calc,
-      d_eff: d_eff,
-      N_tiles: N_tiles
-    });
+    if (Math.random() < 0.1) { // Log 10% of the time for debugging
+      console.debug("[HelixCasimirAmplifier] Fixed derived calculations:", {
+        U_geo: U_geo,
+        U_Q: U_Q,
+        P_tile_on: P_tile_on,
+        P_ship_avg_calc_MW: P_ship_avg_calc_MW,
+        M_total_calc: M_total_calc,
+        d_eff: d_eff,
+        N_tiles_internal: N_tiles_internal
+      });
+    }
 
     // casimir foundation (unchanged)
     const gap_m       = Math.max(1e-12, (state.gap_nm ?? 16) * 1e-9);
@@ -613,7 +615,7 @@ export default function HelixCasimirAmplifier({
     const casimir_per_tile = casimir_theory * tileA_m2 * gap_m;
 
     return {
-      U_static, gammaGeo, qMech, d_eff, N_tiles, omega, qCav, gammaVdB,
+      U_static, gammaGeo, qMech, d_eff, N_tiles_internal, omega, qCav, gammaVdB,
       U_geo, U_Q,
       P_tile_on, P_tile_instant_W, P_ship_avg_calc_MW, P_ship_avg_report_MW,
       geo3, E_tile_geo3, E_tile_VdB, E_tile_mass, M_tile, M_total_calc, M_total_report,
@@ -920,7 +922,7 @@ export default function HelixCasimirAmplifier({
         <div><EquationChip eq="U_geo = U_static × γ_geo" /> <EquationChip eq="U_Q = U_geo × q_mech" /></div>
         <div><EquationChip eq="P_tile,on = ω · |U_Q| / Q_cav" /> <EquationChip eq="P_ship,avg = P_tile,on · N_tiles · d_eff" /></div>
         <div className="mt-1">
-          ω = {fmtNum(omega, "rad/s", 2)}, Q<sub>cav</sub> = {fmtNum(qCav, "", 0)}, N = {fmtNum(N_tiles, "", 0)}, d<sub>eff</sub> = {fmtNum(dRef, "", 5)}
+          ω = {fmtNum(omega, "rad/s", 2)}, Q<sub>cav</sub> = {fmtNum(qCav, "", 0)}, N = {fmtNum(derived?.N_tiles_internal ?? 0, "", 0)}, d<sub>eff</sub> = {fmtNum(dRef, "", 5)}
         </div>
       </div>
       <div>
@@ -978,10 +980,9 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">q_mech = {fmtNum(derived.qMech, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">γ_VdB = {fmtNum(state.gammaVanDenBroeck, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">Q_cav = {fmtNum(qCav, "", 0)}</Badge>
-              <Badge variant="outline" className="justify-center">N = {fmtNum(N_tiles, "", 0)}</Badge>
+              <Badge variant="outline" className="justify-center">N = {fmtNum(derived?.N_tiles_internal ?? 0, "", 0)}</Badge>
               <Badge variant="outline" className="justify-center">P = {fmtNum(P_MW_badge, "MW", 2)}</Badge>
               <Badge variant="outline" className="justify-center">M = {fmtNum(M_kg_badge, "kg", 0)}</Badge>
-              <Badge variant="outline" className="justify-center">N = {fmtNum(N_tiles, "", 0)}</Badge>
             </div>
 
             {/* Debug info for troubleshooting N=0, P=0, M=0 issues */}
