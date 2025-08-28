@@ -86,6 +86,29 @@ const getUnifiedPhysicsTilt = (parameters: any, mode: string) =>
 // Helper for clamping values to 0-1 range
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// Install warp prelude function
+function installWarpPrelude(initialScale = 1.0) {
+  if (typeof window === 'undefined') return;
+
+  // Avoid double-injection on rerenders
+  if ((window as any).__warpPreludeInstalled) return;
+
+  // Create a <script> whose top-level runs in the global scope
+  const prelude = document.createElement('script');
+  prelude.id = 'warp-prelude';
+  prelude.text = `
+    // Ensure a real global variable (not just window.sceneScale)
+    if (typeof sceneScale === 'undefined') { var sceneScale = ${Number.isFinite(initialScale) ? initialScale : 1.0}; }
+
+    // Make setStrobingState a safe global, too (engine may call it)
+    if (typeof setStrobingState === 'undefined') {
+      function setStrobingState(_) { /* no-op until Helix wires it */ }
+    }
+  `;
+  document.head.appendChild(prelude);
+  (window as any).__warpPreludeInstalled = true;
+}
+
 // 🔧 Compute cameraZ from axes + canvas for deterministic framing
 function computeCameraZ(
   axesClip: [number, number, number],
@@ -213,36 +236,22 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   // Default cabin "down" (can be overridden via props.parameters.betaTiltVec)
   const defaultBetaTilt: [number, number, number] = [0, -1, 0];
 
-function installWarpPrelude(initialScale = 1.0) {
-  if (typeof window === 'undefined') return;
+  const init = async () => {
+    const initialScale = Number(parameters.gridScale ?? 1.0);
+    installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
 
-  // Avoid double-injection on rerenders
-  if ((window as any).__warpPreludeInstalled) return;
+    setLoadError(null);
+    setIsLoaded(false);
 
-  // Create a <script> whose top-level runs in the global scope
-  const prelude = document.createElement('script');
-  prelude.id = 'warp-prelude';
-  prelude.text = `
-    // Ensure a real global variable (not just window.sceneScale)
-    if (typeof sceneScale === 'undefined') { var sceneScale = ${Number.isFinite(initialScale) ? initialScale : 1.0}; }
+    // 6s watchdog to avoid infinite spinner
+    let watchdog = window.setTimeout(() => {
+      setLoadError("Timeout waiting for WarpEngine. Check /public/warp-engine.js and WebGL support.");
+    }, 6000) as any;
 
-    // Make setStrobingState a safe global, too (engine may call it)
-    if (typeof setStrobingState === 'undefined') {
-      function setStrobingState(_) { /* no-op until Helix wires it */ }
-    }
-  `;
-  document.head.appendChild(prelude);
-  (window as any).__warpPreludeInstalled = true;
-}
+    const setLoaded = () => { setIsLoaded(true); };
+    const setFailed = (msg: string) => { setIsLoaded(false); setLoadError(msg); };
 
-useEffect(() => {
-  let cancelled = false;
-  let watchdog: number | undefined;
-
-  const setLoaded = () => { if (!cancelled) setIsLoaded(true); };
-  const setFailed = (msg: string) => { if (!cancelled) { setIsLoaded(false); setLoadError(msg); } };
-
-  const makeEngine = (EngineCtor: any) => {
+    const makeEngine = (EngineCtor: any) => {
     if (!canvasRef.current) throw new Error("canvas missing");
     const engine = new EngineCtor(canvasRef.current);
 
