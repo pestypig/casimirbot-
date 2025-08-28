@@ -103,7 +103,7 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
 // Sanitize uniform values for safe WebGL consumption
 function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
-  
+
   // Numeric coercions + clamps
   if ('cameraZ' in s) s.cameraZ = Number.isFinite(s.cameraZ) ? Math.max(-10, Math.min(-0.1, s.cameraZ)) : -2.0;
   if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
@@ -111,18 +111,18 @@ function sanitizeUniforms(u: any = {}) {
   if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
   if ('gammaVanDenBroeck' in s) s.gammaVanDenBroeck = Number.isFinite(s.gammaVanDenBroeck) ? Math.max(1, s.gammaVanDenBroeck) : 1.4e5;
   if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
-  
+
   // Boolean sanitization
   if ('physicsParityMode' in s) s.physicsParityMode = !!s.physicsParityMode;
   if ('parityMode' in s) s.parityMode = !!s.parityMode;
   if ('lockFraming' in s) s.lockFraming = !!s.lockFraming;
   if ('viewAvg' in s) s.viewAvg = !!s.viewAvg;
-  
+
   // Integer sanitization
   if ('ridgeMode' in s) s.ridgeMode = Math.max(0, Math.min(1, Math.floor(s.ridgeMode || 0)));
   if ('sectorCount' in s) s.sectorCount = Math.max(1, Math.floor(s.sectorCount || 400));
   if ('split' in s) s.split = Math.max(0, Math.floor(s.split || 0));
-  
+
   return s;
 }
 
@@ -578,7 +578,7 @@ export default function WarpRenderInspector(props: {
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const grid3dRef = useRef<Grid3DHandle>(null);
-  
+
   // Batched push system for performance optimization
   const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
   const pushRight = useRef<(p:any, tag?:string)=>void>(() => {});
@@ -626,6 +626,27 @@ export default function WarpRenderInspector(props: {
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
   ), [live, props]);
+
+  // Theta scale calculation helper
+  const computeThetaScale = (phys: any, source: 'fr' | 'ui') => {
+    const gammaGeo = phys.gammaGeo || phys.γ_geo || 26;
+    const qSpoil = phys.qSpoilingFactor || phys.q || 1;
+    const gammaVdB = phys.gammaVanDenBroeck || phys.gammaVdB || phys.γ_VdB || 1;
+    const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
+
+    // Use different duty cycles based on source
+    let dutyCycle = 0.14; // Default if not provided
+    if (source === 'fr') {
+      dutyCycle = (live?.dutyCycle || 0.14); // Use live pipeline duty cycle for FR
+    } else if (source === 'ui') {
+      dutyCycle = 0.01; // Fixed UI duty cycle
+    }
+
+    return Math.pow(Number(gammaGeo)||0, 3)
+         * Number(qSpoil)||1
+         * Number(gammaVdB)||1
+         * Math.sqrt(Math.max(1e-12, Number(dutyFR)||0));
+  };
 
   const realPayload = useMemo(() => buildREAL(wu), [wu]);
   const showPayload = useMemo(() => buildSHOW(wu, {
@@ -678,22 +699,22 @@ export default function WarpRenderInspector(props: {
   // Hard-lock parity & block late thetaScale writers at the engine edge
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
-    
+
     // Store the forced parity settings for this pane
     const forcedParity = (pane === 'REAL');
     const forcedRidge = (pane === 'REAL') ? 0 : 1;
-    
+
     console.log(`[${pane}] Locking pane with parity=${forcedParity}, ridge=${forcedRidge}`);
-    
+
     // Intercept ALL uniform update methods to enforce parity
     const originalUpdateUniforms = engine.updateUniforms?.bind(engine);
     const originalApplyUniforms = engine.applyUniforms?.bind(engine);
     const originalSetUniforms = engine.setUniforms?.bind(engine);
-    
+
     // Create the enforcement wrapper
     const enforceParityWrapper = (patch: any, methodName: string) => {
       const safe = { ...(patch || {}) };
-      
+
       // Never accept direct θ writes; renderer derives θ from physics
       if ('thetaScale' in safe) {
         console.warn(`[${pane}] Blocking direct thetaScale write via ${methodName}`);
@@ -706,7 +727,7 @@ export default function WarpRenderInspector(props: {
       safe.ridgeMode = forcedRidge;
 
       console.log(`[${pane}] ${methodName} - enforcing parity=${forcedParity}, ridge=${forcedRidge}`);
-      
+
       return safe;
     };
 
@@ -715,15 +736,15 @@ export default function WarpRenderInspector(props: {
       engine.updateUniforms = (patch: any) => {
         const enforced = enforceParityWrapper(patch, 'updateUniforms');
         const result = originalUpdateUniforms(enforced);
-        
+
         // Double-check enforcement worked
         queueMicrotask(() => {
           if (engine.uniforms) {
             const actualParity = engine.uniforms.physicsParityMode;
             const actualRidge = engine.uniforms.ridgeMode;
-            
+
             console.log(`[${pane}] Post-updateUniforms check: parity=${actualParity} (should be ${forcedParity}), ridge=${actualRidge} (should be ${forcedRidge})`);
-            
+
             if (actualParity !== forcedParity || actualRidge !== forcedRidge) {
               console.error(`[${pane}] PARITY BREACH DETECTED - forcing correction`);
               engine.uniforms.physicsParityMode = forcedParity;
@@ -732,7 +753,7 @@ export default function WarpRenderInspector(props: {
             }
           }
         });
-        
+
         return result;
       };
     }
@@ -756,16 +777,16 @@ export default function WarpRenderInspector(props: {
     engine.__locked = true;
     engine.__forcedParity = forcedParity;
     engine.__forcedRidge = forcedRidge;
-    
+
     // Set up continuous enforcement via RAF
     let rafId: number;
     const continuousEnforcement = () => {
       if (engine._destroyed || !engine.__locked) return;
-      
+
       if (engine.uniforms) {
         const actualParity = engine.uniforms.physicsParityMode;
         const actualRidge = engine.uniforms.ridgeMode;
-        
+
         if (actualParity !== forcedParity || actualRidge !== forcedRidge) {
           console.warn(`[${pane}] RAF enforcement: correcting parity=${actualParity}->${forcedParity}, ridge=${actualRidge}->${forcedRidge}`);
           engine.uniforms.physicsParityMode = forcedParity;
@@ -773,13 +794,13 @@ export default function WarpRenderInspector(props: {
           engine.uniforms.ridgeMode = forcedRidge;
         }
       }
-      
+
       rafId = requestAnimationFrame(continuousEnforcement);
     };
-    
+
     // Start continuous enforcement
     rafId = requestAnimationFrame(continuousEnforcement);
-    
+
     // Store cleanup function
     engine.__cleanupEnforcement = () => {
       if (rafId) cancelAnimationFrame(rafId);
@@ -791,7 +812,7 @@ export default function WarpRenderInspector(props: {
       parityMode: forcedParity,
       ridgeMode: forcedRidge
     };
-    
+
     console.log(`[${pane}] Setting initial parity:`, initialParity);
     if (originalUpdateUniforms) {
       originalUpdateUniforms(initialParity);
@@ -822,258 +843,294 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
-  // Use shared WebGL detection from gl/capabilities
-
-  // Engine creation & lifecycle
+  // Initialize engines with enhanced error handling and validation
   useEffect(() => {
-    const W: any = (window as any).WarpEngine;
-    if (!W) {
-      console.error("WarpEngine not found on window. Load warp-engine.js first.");
-      setLoadError("WarpEngine not loaded");
-      return;
-    }
+    let mounted = true;
 
-    // Soft check: only hard-fail if APIs are truly absent
-    if (!isWebGLAvailable()) {
-      setLoadError("WebGL not supported in this browser");
-      return;
-    }
-
-    // Prevent double initialization
-    if (leftEngine.current || rightEngine.current) {
-      console.log("Engines already initialized, skipping...");
-      return;
-    }
-
-    console.log("Initializing WarpRenderInspector engines...");
-
-    // REAL engine
-    if (leftRef.current && !leftEngine.current) {
-      try {
-        sizeCanvasSafe(leftRef.current);
-
-        // Clear any existing engine on this canvas
-        delete (leftRef.current as any).__warpEngine;
-
-        leftEngine.current = new W(leftRef.current);
-        leftOwnedRef.current = true;
-        console.log("REAL engine created successfully");
-
-        // Initialize with safe defaults
-        gatedUpdateUniforms(leftEngine.current, {
-          exposure: 5.0,
-          zeroStop: 1e-7,
-          physicsParityMode: true,
-          ridgeMode: 0
-        }, 'client');
-
-        // Let engines render immediately; canonical uniforms will override later
-        leftEngine.current?.setVisible?.(true);
-        lockPane(leftEngine.current, 'REAL');
-
-      } catch (error) {
-        console.error("Failed to create REAL engine:", error);
-        setLoadError("Failed to initialize REAL WebGL engine");
+    const initEngines = async () => {
+      if (!isWebGLAvailable()) {
+        setLoadError("WebGL not supported in this browser");
         return;
       }
-    }
 
-    // SHOW engine
-    if (rightRef.current && !rightEngine.current) {
-      try {
-        sizeCanvasSafe(rightRef.current);
-
-        // Clear any existing engine on this canvas
-        delete (rightRef.current as any).__warpEngine;
-
-        rightEngine.current = createEngineWithFallback(showRendererType, rightRef.current);
-        rightOwnedRef.current = true;
-        console.log("SHOW engine created successfully");
-
-        // Initialize with safe defaults
-        gatedUpdateUniforms(rightEngine.current, {
-          exposure: 5.0,
-          zeroStop: 1e-7,
-          physicsParityMode: false,
-          ridgeMode: 1
-        }, 'client');
-
-        // Let engines render immediately; canonical uniforms will override later
-        rightEngine.current?.setVisible?.(true);
-        lockPane(rightEngine.current, 'SHOW');
-
-        // attach SHOW checkpoints so the panel/devtools get live data
-        bindShowCheckpoints(rightEngine.current, rightRef.current);
-
-      } catch (error) {
-        console.error("Failed to create SHOW engine:", error);
-        setLoadError("Failed to initialize SHOW WebGL engine");
+      const W = (window as any).WarpEngine;
+      if (!W) {
+        console.error("WarpEngine not found on window. Load warp-engine.js first.");
+        setLoadError("WarpEngine not loaded");
         return;
       }
-    }
 
-    // No extra hard lock — lockPane is the single authority now.
-
-    // bootstrap both
-    leftEngine.current?.bootstrap({ ...realPayload });
-    rightEngine.current?.bootstrap({ ...showPayload });
-
-    // Build shared frame data once
-    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-    const shared = {
-      axesScene: deriveAxesClip(hull, 1) as [number,number,number]
-    };
-
-    // After creating both engines and building `shared` once:
-    (async () => {
-      await firstCorrectFrame({
-        engine: leftEngine.current,
-        canvas: leftRef.current!,
-        sharedAxesScene: shared.axesScene,
-        pane: 'REAL'
-      });
-      await firstCorrectFrame({
-        engine: rightEngine.current,
-        canvas: rightRef.current!,
-        sharedAxesScene: shared.axesScene,
-        pane: 'SHOW'
-      });
-
-      // Enable low-FPS mode for mobile after first correct frame
-      enableLowFps(leftEngine.current, 12);
-      enableLowFps(rightEngine.current, 12);
-    })();
-
-    // Setup engine checkpoints after first frame is guaranteed correct
-    setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
-    setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
-
-    // Diagnostics -> window for quick comparison
-    leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
-    rightEngine.current && (rightEngine.current.onDiagnostics = (d: any) => ((window as any).__diagSHOW = d));
-
-    // Wire lost/restored guards to both canvases
-    const handleContextLost = (e: Event) => {
-      e.preventDefault();
-      console.warn('WebGL context lost, will attempt restore');
-    };
-    const handleContextRestored = () => {
-      console.log('WebGL context restored, reinitializing engines');
-      // Engines will auto-reinitialize on next render
-    };
-
-    if (leftRef.current) {
-      leftRef.current.addEventListener('webglcontextlost', handleContextLost);
-      leftRef.current.addEventListener('webglcontextrestored', handleContextRestored);
-    }
-    if (rightRef.current) {
-      rightRef.current.addEventListener('webglcontextlost', handleContextLost);
-      rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
-    }
-
-    // Subscribe to canonical server uniforms
-    const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
-      setHaveUniforms(true); // Mark that we've received first uniforms
-      if (leftEngine.current) {
-        applyToEngine(leftEngine.current,  { ...u, physicsParityMode: true,  ridgeMode: 0 });
-      }
-      if (rightEngine.current) {
-        applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 });
+      // Prevent double initialization
+      if (leftEngine.current || rightEngine.current) {
+        console.log("Engines already initialized, skipping...");
+        return;
       }
 
-      // Unmute engines when canonical uniforms arrive
-      leftEngine.current?.setVisible?.(true);
-      rightEngine.current?.setVisible?.(true);
-      // Also unmute Grid3D engine if active
-      if (showRendererType === 'grid3d') {
-        grid3dRef.current?.getEngine()?.setVisible?.(true);
-      }
-    });
+      console.log("Initializing WarpRenderInspector engines...");
 
-    // Let engines render immediately; canonical uniforms will override later.
-    leftEngine.current?.setVisible?.(true);
-    rightEngine.current?.setVisible?.(true);
-    if (!haveUniforms) {
-      if (leftEngine.current) {
-        leftEngine.current.updateUniforms?.({
-          physicsParityMode: true,
-          exposure: TONEMAP_LOCK.exp,
-          zeroStop: TONEMAP_LOCK.zero,
-          colorMode: TONEMAP_LOCK.colorMode,
-          viewAvg: TONEMAP_LOCK.viewAvg
+      // REAL engine
+      if (leftRef.current && !leftEngine.current) {
+        try {
+          sizeCanvasSafe(leftRef.current);
+
+          // Clear any existing engine on this canvas
+          delete (leftRef.current as any).__warpEngine;
+
+          leftEngine.current = new W(leftRef.current);
+          leftOwnedRef.current = true;
+          console.log("REAL engine created successfully");
+
+          // Wait for engine to be fully loaded before applying uniforms
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('REAL engine init timeout')), 3000);
+            const checkReady = () => {
+              if (leftEngine.current?.isLoaded && leftEngine.current?.gridProgram) {
+                clearTimeout(timeout);
+                resolve();
+              } else {
+                setTimeout(checkReady, 50);
+              }
+            };
+            checkReady();
+          });
+
+          // Initialize with ENFORCED parity mode for REAL
+          const realInitUniforms = {
+            exposure: 5.0,
+            zeroStop: 1e-7,
+            physicsParityMode: true,
+            ridgeMode: 0,
+            colorMode: 2, // Force shear mode for truth view
+            lockFraming: true
+          };
+
+          gatedUpdateUniforms(leftEngine.current, realInitUniforms, 'client');
+          console.log("REAL engine initialized with parity mode:", leftEngine.current.uniforms?.physicsParityMode);
+
+          leftEngine.current?.setVisible?.(true);
+          lockPane(leftEngine.current, 'REAL');
+
+        } catch (error) {
+          console.error("Failed to create REAL engine:", error);
+          setLoadError("Failed to initialize REAL WebGL engine");
+          return; // Stop initialization if REAL engine fails
+        }
+      }
+
+      // SHOW engine
+      if (rightRef.current && !rightEngine.current) {
+        try {
+          sizeCanvasSafe(rightRef.current);
+
+          // Clear any existing engine on this canvas
+          delete (rightRef.current as any).__warpEngine;
+
+          rightEngine.current = new W(rightRef.current);
+          rightOwnedRef.current = true;
+          console.log("SHOW engine created successfully");
+
+          // Wait for engine to be fully loaded before applying uniforms
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('SHOW engine init timeout')), 3000);
+            const checkReady = () => {
+              if (rightEngine.current?.isLoaded && rightEngine.current?.gridProgram) {
+                clearTimeout(timeout);
+                resolve();
+              } else {
+                setTimeout(checkReady, 50);
+              }
+            };
+            checkReady();
+          });
+
+          // Initialize with ENFORCED non-parity mode for SHOW
+          const showInitUniforms = {
+            exposure: 7.5,
+            zeroStop: 1e-7,
+            physicsParityMode: false,
+            ridgeMode: 1,
+            curvatureGainT: 0.70,
+            curvatureBoostMax: 40,
+            userGain: 1.25,
+            colorMode: 1, // Force theta mode for visual enhancement
+            lockFraming: true
+          };
+
+          gatedUpdateUniforms(rightEngine.current, showInitUniforms, 'client');
+          console.log("SHOW engine initialized with parity mode:", rightEngine.current.uniforms?.physicsParityMode);
+
+          rightEngine.current?.setVisible?.(true);
+          lockPane(rightEngine.current, 'SHOW');
+
+        } catch (error) {
+          console.error("Failed to create SHOW engine:", error);
+          setLoadError("Failed to initialize SHOW WebGL engine");
+          return; // Stop initialization if SHOW engine fails
+        }
+      }
+
+      // Bootstrap both engines once they are ready
+      leftEngine.current?.bootstrap?.({ ...realPayload });
+      rightEngine.current?.bootstrap?.({ ...showPayload });
+
+      // Build shared frame data once
+      const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+      const shared = {
+        axesScene: deriveAxesClip(hull, 1) as [number,number,number]
+      };
+
+      // After creating both engines and building `shared` once:
+      (async () => {
+        await firstCorrectFrame({
+          engine: leftEngine.current,
+          canvas: leftRef.current!,
+          sharedAxesScene: shared.axesScene,
+          pane: 'REAL'
         });
-      }
-      if (rightEngine.current) {
-        rightEngine.current.updateUniforms?.({
-          physicsParityMode: false,
-          exposure: TONEMAP_LOCK.exp,
-          zeroStop: TONEMAP_LOCK.zero,
-          colorMode: TONEMAP_LOCK.colorMode,
-          viewAvg: TONEMAP_LOCK.viewAvg
+        await firstCorrectFrame({
+          engine: rightEngine.current,
+          canvas: rightRef.current!,
+          sharedAxesScene: shared.axesScene,
+          pane: 'SHOW'
         });
-      }
-    }
 
-    return () => {
-      // Cleanup low-FPS timers
-      try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
-      try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
+        // Enable low-FPS mode for mobile after first correct frame
+        enableLowFps(leftEngine.current, 12);
+        enableLowFps(rightEngine.current, 12);
+      })();
 
-      // Unsubscribe from canonical uniforms
-      unsubscribe(unsubscribeHandler);
-      setHaveUniforms(false); // Reset on cleanup
+      // Setup engine checkpoints after first frame is guaranteed correct
+      setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
+      setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
 
-      // Remove WebGL context event listeners
+      // Diagnostics -> window for quick comparison
+      leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
+      rightEngine.current && (rightEngine.current.onDiagnostics = (d: any) => ((window as any).__diagSHOW = d));
+
+      // Wire lost/restored guards to both canvases
+      const handleContextLost = (e: Event) => {
+        e.preventDefault();
+        console.warn('WebGL context lost, will attempt restore');
+      };
+      const handleContextRestored = () => {
+        console.log('WebGL context restored, reinitializing engines');
+        // Engines will auto-reinitialize on next render
+      };
+
       if (leftRef.current) {
-        leftRef.current.removeEventListener('webglcontextlost', handleContextLost);
-        leftRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+        leftRef.current.addEventListener('webglcontextlost', handleContextLost);
+        leftRef.current.addEventListener('webglcontextrestored', handleContextRestored);
       }
       if (rightRef.current) {
-        rightRef.current.removeEventListener('webglcontextlost', handleContextLost);
-        rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+        rightRef.current.addEventListener('webglcontextlost', handleContextLost);
+        rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
       }
 
-      // Clean up parity enforcement
-      try { 
-        if (leftEngine.current?.__cleanupEnforcement) {
-          leftEngine.current.__cleanupEnforcement();
+      // Subscribe to canonical server uniforms
+      const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+        setHaveUniforms(true); // Mark that we've received first uniforms
+        if (leftEngine.current) {
+          applyToEngine(leftEngine.current,  { ...u, physicsParityMode: true,  ridgeMode: 0 });
         }
-        if (leftOwnedRef.current) leftEngine.current?.destroy(); 
-      } catch {}
-      
-      try { 
-        if (rightEngine.current?.__cleanupEnforcement) {
-          rightEngine.current.__cleanupEnforcement();
+        if (rightEngine.current) {
+          applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 });
         }
-        if (rightOwnedRef.current) rightEngine.current?.destroy(); 
-      } catch {}
-      
-      leftOwnedRef.current = false;
-      rightOwnedRef.current = false;
-      leftEngine.current = null as any;
-      rightEngine.current = null as any;
 
-      // Robust cleanup for HMR/StrictMode
-      if (leftRef.current) {
-        try {
-          if ((leftRef.current as any)[ENGINE_KEY] && !(leftRef.current as any)[ENGINE_KEY]._destroyed) {
-            (leftRef.current as any)[ENGINE_KEY].destroy?.();
-          }
-          delete (leftRef.current as any)[ENGINE_KEY];
-        } catch {}
+        // Unmute engines when canonical uniforms arrive
+        leftEngine.current?.setVisible?.(true);
+        rightEngine.current?.setVisible?.(true);
+        // Also unmute Grid3D engine if active
+        if (showRendererType === 'grid3d') {
+          grid3dRef.current?.getEngine()?.setVisible?.(true);
+        }
+      });
+
+      // Let engines render immediately; canonical uniforms will override later.
+      leftEngine.current?.setVisible?.(true);
+      rightEngine.current?.setVisible?.(true);
+      if (!haveUniforms) {
+        if (leftEngine.current) {
+          leftEngine.current.updateUniforms?.({
+            physicsParityMode: true,
+            exposure: TONEMAP_LOCK.exp,
+            zeroStop: TONEMAP_LOCK.zero,
+            colorMode: TONEMAP_LOCK.colorMode,
+            viewAvg: TONEMAP_LOCK.viewAvg
+          });
+        }
+        if (rightEngine.current) {
+          rightEngine.current.updateUniforms?.({
+            physicsParityMode: false,
+            exposure: TONEMAP_LOCK.exp,
+            zeroStop: TONEMAP_LOCK.zero,
+            colorMode: TONEMAP_LOCK.colorMode,
+            viewAvg: TONEMAP_LOCK.viewAvg
+          });
+        }
       }
 
-      if (rightRef.current && rightOwnedRef.current) {
+      return () => {
+        // Cleanup low-FPS timers
+        try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
+        try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
+
+        // Unsubscribe from canonical uniforms
+        unsubscribe(unsubscribeHandler);
+        setHaveUniforms(false); // Reset on cleanup
+
+        // Remove WebGL context event listeners
+        if (leftRef.current) {
+          leftRef.current.removeEventListener('webglcontextlost', handleContextLost);
+          leftRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+        }
+        if (rightRef.current) {
+          rightRef.current.removeEventListener('webglcontextlost', handleContextLost);
+          rightRef.current.removeEventListener('webglcontextrestored', handleContextRestored);
+        }
+
+        // Clean up parity enforcement
         try {
-          if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
-            (rightRef.current as any)[ENGINE_KEY].destroy?.();
+          if (leftEngine.current?.__cleanupEnforcement) {
+            leftEngine.current.__cleanupEnforcement();
           }
-          delete (rightRef.current as any)[ENGINE_KEY];
+          if (leftOwnedRef.current) leftEngine.current?.destroy();
         } catch {}
-      }
+
+        try {
+          if (rightEngine.current?.__cleanupEnforcement) {
+            rightEngine.current.__cleanupEnforcement();
+          }
+          if (rightOwnedRef.current) rightEngine.current?.destroy();
+        } catch {}
+
+        leftOwnedRef.current = false;
+        rightOwnedRef.current = false;
+        leftEngine.current = null as any;
+        rightEngine.current = null as any;
+
+        // Robust cleanup for HMR/StrictMode
+        if (leftRef.current) {
+          try {
+            if ((leftRef.current as any)[ENGINE_KEY] && !(leftRef.current as any)[ENGINE_KEY]._destroyed) {
+              (leftRef.current as any)[ENGINE_KEY].destroy?.();
+            }
+            delete (leftRef.current as any)[ENGINE_KEY];
+          } catch {}
+        }
+
+        if (rightRef.current && rightOwnedRef.current) {
+          try {
+            if ((rightRef.current as any)[ENGINE_KEY] && !(rightRef.current as any)[ENGINE_KEY]._destroyed) {
+              (rightRef.current as any)[ENGINE_KEY].destroy?.();
+            }
+            delete (rightRef.current as any)[ENGINE_KEY];
+          } catch {}
+        }
+      };
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    initEngines();
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Ford-Roman duty computation (outside useEffect for prop access)
   const dutyLocal = (() => {
@@ -1179,275 +1236,95 @@ export default function WarpRenderInspector(props: {
     publish(); // kick once now
   }
 
-  function normalizeKeys(u: any) {
-    const x = { ...(u || {}) };
-    if (typeof x.gammaVanDenBroeck === 'number' && typeof x.gammaVdB !== 'number') x.gammaVdB = x.gammaVanDenBroeck;
-    if (typeof x.gammaVdB === 'number' && typeof x.gammaVanDenBroeck !== 'number') x.gammaVanDenBroeck = x.gammaVdB;
-    if (typeof x.qSpoilingFactor === 'number' && typeof x.qSpoil !== 'number') x.qSpoil = x.qSpoilingFactor;
-    if (typeof x.qSpoil === 'number' && typeof x.qSpoilingFactor !== 'number') x.qSpoilingFactor = x.qSpoil;
-    return x;
-  }
-
-  function reportThetaConsistency(bound:{
-    gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number;
-  }, viewMassFraction: number = 1.0, isShow: boolean = false) {
-    // Expected: Pure pipeline physics (γ_geo³ × q × γ_VdB × d_FR)
-    const expected = thetaGainExpected(bound);
-
-    // Used: Same physics chain × viewMassFraction only (no display gains)
-    const used = expected * viewMassFraction;
-
-    const delta = pctDelta(used, expected);
-    const range = Math.max(expected, used) || 1;
-
-    const fmt = (v: number) => v.toExponential(2);
-    const fmtPct = (v: number) => (v * 100).toFixed(1) + '%';
-
-    console.log(`[HELIX][θ] θ-scale — ${fmt(used)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
-    console.log(`[HELIX][θ] view fraction: ${fmtPct(viewMassFraction)}`);
-    console.log(`[HELIX][θ] renderer: ${isShow ? 'grid3d' : 'slice2d'}`);
-
-    return { expected, used, delta };
-  }
-
-  // Transform uniforms with viewMassFraction support and name normalization
-  const toUniforms = (src: any) => {
-    const u = { ...(src || {}) };
-
-    // Ensure both spellings exist for gamma VdB
-    if (typeof u.gammaVanDenBroeck === 'number' && typeof u.gammaVdB !== 'number') {
-      u.gammaVdB = u.gammaVanDenBroeck;
+  // Helper to dump uniforms and diagnostics for debugging
+  const dumpUniforms = (engine: any, label: string) => {
+    console.log(`--- Uniforms & Diagnostics for ${label} ---`);
+    if (!engine) {
+      console.log("Engine not available.");
+      return;
     }
-    if (typeof u.gammaVdB === 'number' && typeof u.gammaVanDenBroeck !== 'number') {
-      u.gammaVanDenBroeck = u.gammaVdB;
+    const u = engine.uniforms || {};
+    console.log("Uniforms:", Object.fromEntries(Object.entries(u).filter(([k]) => !k.startsWith('_')))); // Filter internal properties
+    try {
+      console.log("Diagnostics:", engine.computeDiagnostics?.() || "N/A");
+    } catch (e) {
+      console.log("Diagnostics error:", e);
     }
-
-    // Ensure both spellings exist for q spoiling
-    if (typeof u.qSpoilingFactor === 'number' && typeof u.qSpoil !== 'number') {
-      u.qSpoil = u.qSpoilingFactor;
-    }
-    if (typeof u.qSpoil === 'number' && typeof u.qSpoilingFactor !== 'number') {
-      u.qSpoilingFactor = u.qSpoil;
-    }
-
-    // View fraction default
-    if (typeof u.viewMassFraction !== 'number') u.viewMassFraction = 1.0;
-
-    return u;
+    console.log("---------------------------------------------");
   };
 
-  // Bound parameters for theta consistency check
-  const bound = {
-    gammaGeo: N(live?.gammaGeo, 26),
-    qSpoilingFactor: N(live?.qSpoilingFactor, 1),
-    gammaVdB: gammaVdBBound,
-    dutyEffectiveFR,
+  // Debug button handler
+  const debugEngineStates = () => {
+    console.log("--- Debugging Inspector State ---");
+    console.log("REAL Engine:", leftEngine.current);
+    console.log("SHOW Engine:", rightEngine.current);
+    console.log("Grid3D Ref:", grid3dRef.current);
+    console.log("Have Uniforms:", haveUniforms);
+    console.log("Load Error:", loadError);
+    console.log("Current Mode:", mode);
+    console.log("---------------------------------");
   };
-  // Calculate theta scale properly for both engines
-  const realViewMassFraction = viewMassFracREAL;
-  const showViewMassFraction = 1.0; // SHOW always uses full bubble
 
-  // Don't push thetaScale directly - let engines compute it from physics parameters
-  // The theta scale should be computed internally from the physics parameters
+  // Apply physics from props with comprehensive validation
+    const realPhys = props.parityPhys || {};
+    const showPhys = props.showPhys || {};
+    const baseShared = props.baseShared || {};
 
-  // --- BRIDGE Grid3D wrapper → inspector refs (engine + canvas)
-  useEffect(() => {
-    if (showRendererType !== 'grid3d') return;
+    // Enhanced theta scale calculation with debugging
+    const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
+      const gammaGeo = phys.gammaGeo || phys.γ_geo || 26;
+      const qSpoil = phys.qSpoilingFactor || phys.q || 1;
+      const gammaVdB = phys.gammaVanDenBroeck || phys.gammaVdB || phys.γ_VdB || 1;
+      const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
 
-    let raf = 0, tries = 0;
-    const attach = () => {
-      const g  = grid3dRef.current?.getEngine?.();
-      const cv = grid3dRef.current?.getCanvas?.();
+      const calculated = computeThetaScale(phys, source);
+      const actualTheta = source === 'fr' ?
+        (leftEngine.current?.uniforms?.thetaScale) :
+        (rightEngine.current?.uniforms?.thetaScale);
 
-      if (g && cv) {
-        // Hand the real objects to the inspector/checkpoints
-        rightEngine.current = g;
-        (rightRef as any).current = cv;
-        rightOwnedRef.current = false;
+      console.log(`[${label}] Theta calculation debug:`, {
+        γ_geo: gammaGeo,
+        q: qSpoil,
+        γ_VdB: gammaVdB,
+        d_FR: dutyFR,
+        viewAvg: true,
+        calculated,
+        actualTheta
+      });
 
-        // Seed framing so buffers build promptly
-        const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-        const ax = deriveAxesClip(hull, 1);
-        const cz = compactCameraZ(ax);
-        // Grid3D bridge - use direct gated update since it's not left/right engine
-        gatedUpdateUniforms(g, sanitizeUniforms({ axesClip: ax, cameraZ: cz, lockFraming: true }), 'client');
-
-        // Sensible render quality
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        grid3dRef.current?.setPixelRatio?.(dpr);
-        grid3dRef.current?.setSupersample?.(1.25);
-
-        // Nudge grid density once the canvas has real dimensions
-        const W = cv.width, H = cv.height;
-        const pxAcross = estimatePxAcrossWall({
-          canvasPxW: W, canvasPxH: H,
-          gridSpan: 1, hull,
-          wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
-        });
-        const seg = Math.max(24, Math.min(256, Math.ceil(pxAcross * 2)));
-        grid3dRef.current?.setGridResolution?.({ radial: seg, angular: seg, axial: seg });
-
-        // Match visibility gate
-        g.setVisible?.(haveUniforms);
-        return; // stop loop
-      }
-
-      if (tries++ < 90) raf = requestAnimationFrame(attach);
+      return calculated;
     };
 
-    attach();
-    return () => cancelAnimationFrame(raf);
-  }, [showRendererType, haveUniforms]);
-
-  // Black-screen guard for SHOW - force redraw when Grid3D canvas gets real dimensions
-  useEffect(() => {
-    if (showRendererType !== 'grid3d') return;
-    const cv = grid3dRef.current?.getCanvas?.();
-    if (!cv) return;
-    const ro = new ResizeObserver(() => {
-      if (cv.width > 0 && cv.height > 0) {
-        // Use batched redraw instead of immediate forceRedraw
-        pushRight.current?.({}, 'grid3d-resize');
-      }
-    });
-    ro.observe(cv);
-    return () => ro.disconnect();
-  }, [showRendererType]);
-
-  // Apply shared physics inputs any time calculator/shared/controls change
-  useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
-
-    // Create base physics parameters with proper theta calculation debugging
-    const basePhysics = {
-      gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
-      qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-      gammaVanDenBroeck: gammaVdBBound,
-      dutyEffectiveFR,
-      dutyCycle: N(props.parityPhys?.dutyCycle ?? live?.dutyCycle, 0.14),
-      sectorCount: sTotal,
-      sectors: sConcurrent,
-      lightCrossing: {
-        burst_ms: props.lightCrossing?.burst_ms ?? 0.01,
-        dwell_ms: props.lightCrossing?.dwell_ms ?? 1
-      },
-      hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-      wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
-      driveDir: props.baseShared?.driveDir ?? [1,0,0],
-      vShip: props.baseShared?.vShip ?? 0,
-      lockFraming: true,
-      currentMode: props.baseShared?.currentMode ?? 'hover'
-    };
-
-    // Calculate expected theta for debugging
-    const expectedTheta = Math.pow(basePhysics.gammaGeo, 3) * 
-                         basePhysics.qSpoilingFactor * 
-                         basePhysics.gammaVanDenBroeck * 
-                         Math.sqrt(basePhysics.dutyEffectiveFR);
-
-    console.log('[REAL] Theta calculation debug:', {
-      γ_geo: basePhysics.gammaGeo,
-      q: basePhysics.qSpoilingFactor,
-      γ_VdB: basePhysics.gammaVanDenBroeck,
-      d_FR: basePhysics.dutyEffectiveFR,
-      viewAvg: true,
-      calculated: expectedTheta,
-      actualTheta: leftEngine.current?.uniforms?.thetaScale
-    });
-
-    console.log('[SHOW] Theta calculation debug:', {
-      γ_geo: basePhysics.gammaGeo,
-      q: basePhysics.qSpoilingFactor,
-      γ_VdB: basePhysics.gammaVanDenBroeck,
-      d_FR: basePhysics.dutyEffectiveFR,
-      viewAvg: true,
-      calculated: expectedTheta,
-      actualTheta: rightEngine.current?.uniforms?.thetaScale
-    });
-
-    // REAL engine - exact physics truth with FORCED parity
-    const realUniforms = {
-      ...basePhysics,
-      physicsParityMode: true,  // This MUST be true for REAL
-      parityMode: true,
-      ridgeMode: 0,            // This MUST be 0 for REAL
-      colorMode: 'theta',
-      viewAvg: true,
+    // Build REAL payload (Ford–Roman parity)
+    const realThetaScale = computeThetaWithDebug(realPhys, 'fr', 'REAL');
+    const realPayload = {
+      ...baseShared,
+      physicsParityMode: true,
+      ridgeMode: 0,
+      ...realPhys,
+      thetaScale: realThetaScale,
       exposure: 5.0,
       zeroStop: 1e-7,
-      viewMassFraction: realViewMassFraction
+      colorMode: 2, // Shear proxy for truth view
+      lockFraming: true
     };
 
-    // SHOW engine - same physics but enhanced visuals with FORCED parity
-    const showUniforms = {
-      ...basePhysics,
-      physicsParityMode: false, // This MUST be false for SHOW
-      parityMode: false,
-      ridgeMode: 1,            // This MUST be 1 for SHOW
-      colorMode: 'theta',
-      viewAvg: true,
-      displayGain: 4.0,
-      curvatureGainT: 0.6,
-      curvatureBoostMax: 40,
-      exposure: 6.0,
+    // Build SHOW payload (UI boosted)
+    const showThetaScale = computeThetaWithDebug(showPhys, 'ui', 'SHOW');
+    const showPayload = {
+      ...baseShared,
+      physicsParityMode: false,
+      ridgeMode: 1,
+      ...showPhys,
+      thetaScale: showThetaScale,
+      exposure: 7.5,
       zeroStop: 1e-7,
-      viewMassFraction: 1.0
+      curvatureGainT: 0.70,
+      curvatureBoostMax: 40,
+      userGain: 1.25,
+      colorMode: 1, // Theta mode for visual enhancement
+      lockFraming: true
     };
-
-    console.log("Applying physics to engines:", {
-      real: { parity: realUniforms.physicsParityMode, ridge: realUniforms.ridgeMode },
-      show: { parity: showUniforms.physicsParityMode, ridge: showUniforms.ridgeMode }
-    });
-
-    // Apply to engines using the locked updateUniforms which will enforce parity
-    if (leftEngine.current.updateUniforms) {
-      leftEngine.current.updateUniforms(realUniforms);
-    }
-    if (rightEngine.current.updateUniforms) {
-      rightEngine.current.updateUniforms(showUniforms);
-    }
-
-    // Ensure visibility
-    leftEngine.current?.setVisible?.(true);
-    rightEngine.current?.setVisible?.(true);
-
-    // Camera framing
-    const ax = wu.axesScene || leftEngine.current?.uniforms?.axesClip;
-    const cz = compactCameraZ(ax);
-    leftEngine.current.updateUniforms?.({ cameraZ: cz });
-    rightEngine.current.updateUniforms?.({ cameraZ: cz });
-
-    // Verify parity was applied correctly after a short delay
-    setTimeout(() => verifyEngineStates(), 100);
-
-  }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
-
-  // Dummy uniforms for render (updated via useEffect)
-  const realUniforms = useMemo(() => toUniforms({
-    gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
-    qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-    gammaVanDenBroeck: gammaVdBBound,
-    dutyEffectiveFR,
-    viewMassFraction: viewFracREAL,
-    hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-    wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
-    exposure: 5.0,
-    zeroStop: 1e-7,
-    physicsParityMode: true
-  }), [props.parityPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared, viewFracREAL]);
-
-  const showUniforms = useMemo(() => toUniforms({
-    gammaGeo: N(props.parityPhys?.gammaGeo ?? live?.gammaGeo, 26),
-    qSpoilingFactor: N(props.parityPhys?.qSpoilingFactor ?? live?.qSpoilingFactor, 1),
-    gammaVanDenBroeck: gammaVdBBound,
-    dutyEffectiveFR,
-    viewMassFraction: 1.0,
-    hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-    wallWidth_m: props.baseShared?.wallWidth_m ?? 6.0,
-    exposure: 6.0,
-    zeroStop: 1e-7,
-    physicsParityMode: false
-  }), [props.showPhys, live, gammaVdBBound, dutyEffectiveFR, props.baseShared]);
 
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
@@ -1458,7 +1335,7 @@ export default function WarpRenderInspector(props: {
       }
       leftEngine.current?.gl?.viewport?.(0, 0, leftRef.current?.width || 1, leftRef.current?.height || 1);
       rightEngine.current?.gl?.viewport?.(0, 0, rightRef.current?.width || 1, rightRef.current?.height || 1);
-      
+
       // Use batched redraws instead of immediate forceRedraw
       pushLeft.current?.({}, 'resize');
       pushRight.current?.({}, 'resize');
@@ -1521,14 +1398,14 @@ export default function WarpRenderInspector(props: {
   const verifyEngineStates = () => {
     const leftState = leftEngine.current;
     const rightState = rightEngine.current;
-    
+
     console.log('=== PARITY VERIFICATION ===');
     console.log('REAL parity?', leftState?.uniforms?.physicsParityMode, '(should be true)');
     console.log('SHOW parity?', rightState?.uniforms?.physicsParityMode, '(should be false)');
     console.log('REAL ridge?', leftState?.uniforms?.ridgeMode, '(should be 0)');
     console.log('SHOW ridge?', rightState?.uniforms?.ridgeMode, '(should be 1)');
     console.log('Theta scales - REAL:', leftState?.uniforms?.thetaScale?.toExponential?.(2), 'SHOW:', rightState?.uniforms?.thetaScale?.toExponential?.(2));
-    
+
     // Check for parity violations and attempt correction
     if (leftState?.uniforms && leftState.uniforms.physicsParityMode !== true) {
       console.error('REAL parity violation detected - attempting correction');
@@ -1537,7 +1414,7 @@ export default function WarpRenderInspector(props: {
       leftState.uniforms.ridgeMode = 0;
       console.log('✅ Parity enforcement corrected successfully');
     }
-    
+
     if (rightState?.uniforms && rightState.uniforms.physicsParityMode !== false) {
       console.error('SHOW parity violation detected - attempting correction');
       rightState.uniforms.physicsParityMode = false;
@@ -1620,6 +1497,7 @@ export default function WarpRenderInspector(props: {
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             {realRendererType === 'grid3d' ? (
               <Grid3DEngine
+                ref={grid3dRef}
                 uniforms={realUniforms}
                 className="w-full h-full block"
                 style={{background: 'black'}}
@@ -1700,22 +1578,17 @@ export default function WarpRenderInspector(props: {
             <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
-            className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
             onClick={() => {
-              const L = leftEngine.current?.uniforms; const R = rightEngine.current?.uniforms;
-              console.table({
-                REAL_thetaScale: L?.thetaScale, SHOW_thetaScale: R?.thetaScale,
-                REAL_gammaVdB: L?.gammaVdB, SHOW_gammaVdB: R?.gammaVdB,
-                REAL_dutyFR: leftEngine.current?.uniforms?.dutyEffectiveFR,
-                REAL_dutyCycle: L?.dutyCycle, SHOW_dutyCycle: R?.dutyCycle,
-                sectors: L?.sectors, split: L?.split,
-                REAL_parity: L?.physicsParityMode, SHOW_parity: R?.physicsParityMode,
-              });
-              console.log('REAL diag', (window as any).__diagREAL);
-              console.log('SHOW diag', (window as any).__diagSHOW);
+              dumpUniforms(leftEngine.current, 'REAL');
+              dumpUniforms(rightEngine.current, 'SHOW');
             }}
+            className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
           >Dump uniforms + diagnostics</button>
           <p className="text-xs text-neutral-500 mt-2">Opens a concise table/diagnostics in DevTools.</p>
+          <button
+            onClick={debugEngineStates}
+            className="px-3 py-1 rounded bg-orange-600 hover:bg-orange-700 text-white text-sm mt-2"
+          >Debug Inspector State</button>
         </div>
       </section>
 
