@@ -4,7 +4,7 @@ export type Body = {
   name: string;
   x_pc: number;   // parsecs in your 2-D plane
   y_pc: number;
-  kind?: "snr" | "ob-assoc" | "star" | "nebula" | "station" | "planet";
+  kind?: "snr" | "ob-assoc" | "star" | "nebula" | "station";
   notes?: string;
 };
 
