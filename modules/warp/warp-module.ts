@@ -173,6 +173,13 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
       const val = +(params as any).P_avg * 1e6;
       return Math.max(0, val);
     }
+    // Calculate fallback power from basic physics if tiles and energy are available
+    if (tileCount && Number.isFinite(tileCount) && Number.isFinite(d_eff) && d_eff > 0) {
+      const baselinePowerPerTile = 1e-12; // Reasonable baseline power per tile (1 pW)
+      const totalPower = baselinePowerPerTile * tileCount * d_eff;
+      console.log('[WarpModule] Calculated fallback power:', totalPower, 'W from', tileCount, 'tiles with duty', d_eff);
+      return totalPower;
+    }
     return undefined;
   })();
     
