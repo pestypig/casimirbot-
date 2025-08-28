@@ -543,8 +543,17 @@ export default function HelixCasimirAmplifier({
       Number.isFinite(state?.qMechanical)   && state!.qMechanical!   > 0 ? state!.qMechanical :
       1
     ) as number;
-    const N_tiles  = hud.tilesTotal;
-    const gammaVdB = hud.gammaVdB;
+    const N_tiles =
+      hud.tilesTotal ??
+      state.N_tiles ??
+      metrics?.totalTiles ??
+      0;
+
+    const gammaVdB =
+      hud.gammaVdB ??
+      (state as any)?.gammaVanDenBroeck ??
+      (metrics as any)?.gammaVanDenBroeck ??
+      1;
 
     // power chain (per tile → ship)
     const U_geo     = U_static * gammaGeo;             // backend uses γ^1 for power
@@ -587,6 +596,22 @@ export default function HelixCasimirAmplifier({
     };
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, gateOn, d_eff]);
+
+  // Robust N_tiles accessible throughout component
+  const N_tiles =
+    hud.tilesTotal ??
+    state?.N_tiles ??
+    metrics?.totalTiles ??
+    0;
+
+  // Don't show 0 when the backend doesn't send a "report" value; fall back to your own calc for the badges
+  const P_MW_badge = (
+    Number.isFinite(derived?.P_ship_avg_report_MW) && derived?.P_ship_avg_report_MW! > 0
+  ) ? derived?.P_ship_avg_report_MW! : derived?.P_ship_avg_calc_MW ?? 0;
+
+  const M_kg_badge = (
+    Number.isFinite(derived?.M_total_report) && derived?.M_total_report! > 0
+  ) ? derived?.M_total_report! : derived?.M_total_calc ?? 0;
 
   // ---- CAVITY ENERGY INTEGRATION ----
 
@@ -796,7 +821,7 @@ export default function HelixCasimirAmplifier({
         <div><EquationChip eq="U_geo = U_static × γ_geo" /> <EquationChip eq="U_Q = U_geo × q_mech" /></div>
         <div><EquationChip eq="P_tile,on = ω · |U_Q| / Q_cav" /> <EquationChip eq="P_ship,avg = P_tile,on · N_tiles · d_eff" /></div>
         <div className="mt-1">
-          ω = {fmtNum(omega, "rad/s", 2)}, Q<sub>cav</sub> = {fmtNum(qCav, "", 0)}, N = {fmtNum(derived.N_tiles, "", 0)}, d<sub>eff</sub> = {fmtNum(dRef, "", 5)}
+          ω = {fmtNum(omega, "rad/s", 2)}, Q<sub>cav</sub> = {fmtNum(qCav, "", 0)}, N = {fmtNum(N_tiles, "", 0)}, d<sub>eff</sub> = {fmtNum(dRef, "", 5)}
         </div>
       </div>
       <div>
@@ -854,9 +879,9 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">q_mech = {fmtNum(derived.qMech, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">γ_VdB = {fmtNum(state.gammaVanDenBroeck, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">Q_cav = {fmtNum(qCav, "", 0)}</Badge>
-              <Badge variant="outline" className="justify-center">N = {fmtNum(derived.N_tiles, "", 0)}</Badge>
-              <Badge variant="outline" className="justify-center">P = {fmtNum(derived.P_ship_avg_report_MW, "MW", 2)}</Badge>
-              <Badge variant="outline" className="justify-center">M = {fmtNum(derived.M_total_report, "kg", 0)}</Badge>
+              <Badge variant="outline" className="justify-center">N = {fmtNum(N_tiles, "", 0)}</Badge>
+              <Badge variant="outline" className="justify-center">P = {fmtNum(P_MW_badge, "MW", 2)}</Badge>
+              <Badge variant="outline" className="justify-center">M = {fmtNum(M_kg_badge, "kg", 0)}</Badge>
             </div>
 
             {/* Time-Evolving Cavity Physics Display */}

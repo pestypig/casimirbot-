@@ -172,30 +172,7 @@ export default function CavitySideView({
   // Gap is 0.001 μm (1 nm), we want at least 8 pixels for visibility: 8 px / 0.001 μm = 8000 px/μm
   const pxPerUmY = veY; // Use full vertical exaggeration: 8000 px/μm
 
-  // DEBUG: Log scaling calculations for 1nm gap issue
-  if (gap_nm <= 2) {
-    console.debug("[CavitySideView] Scaling debug - FIXED VERSION:", {
-      gap_nm, gap_um, sag_nm, sag_um,
-      tileWidth_mm, tileWidth_um,
-      scales: { veY, pxPerUmX_eff, pxPerUmY },
-      canvas: { width, height },
-      OLD_scaling: {
-        gaps_px_old: gap_um * veY * pxPerUmX_eff,
-        sag_px_old: sag_um * veY * pxPerUmX_eff
-      },
-      NEW_scaling: {
-        gaps_px_new: gap_um * pxPerUmY,
-        sag_px_new: sag_um * pxPerUmY,
-        pocket_span_px: pocketDiameter_um * pxPerUmX_eff,
-        pocket_diameter_um: pocketDiameter_um,
-        calculated_visibility: {
-          gap_visible: gap_um * pxPerUmY >= 4,
-          sag_visible: sag_um * pxPerUmY >= 4,
-          pocket_visible: pocketDiameter_um * pxPerUmX_eff >= 4
-        }
-      }
-    });
-  }
+  // Scaling issue fixed: 1nm gap now 8px, 16nm sag now 128px, 2mm pocket now 38px
   
   // Baseline (top of bottom mirror) - use proper Y scale
   const baselineY = H - margin - botMirror_thick_um * pxPerUmY;
