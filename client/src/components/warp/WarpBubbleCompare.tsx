@@ -938,10 +938,11 @@ export default function WarpBubbleCompare({
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
     try {
-      // Strong detection up-front
-      const support = webglSupport();
+      // Strong detection up-front (DOM-mounted probe for mobile webviews)
+      const support = webglSupport(undefined, { mountProbeCanvas: true });
       if (!support.ok) {
         setLoadError(support.reason || 'WebGL not available');
+        (window as any).__whyNoGL = support;
         return;
       }
 
@@ -1424,19 +1425,19 @@ export default function WarpBubbleCompare({
     </div>
   ) : (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
+      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '280px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
         <canvas
           ref={leftRef}
-          className="w-full h-[calc(100%-32px)] block"
+          className="w-full h-[calc(100%-32px)] block min-h-[240px]"
           style={{ background: '#111', display: 'block' }}
         />
       </div>
-      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
+      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '280px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{showPanelTitle}</div>
         <canvas
           ref={rightRef}
-          className="w-full h-[calc(100%-32px)] block"
+          className="w-full h-[calc(100%-32px)] block min-h-[240px]"
           style={{ background: '#111', display: 'block' }}
         />
       </div>
