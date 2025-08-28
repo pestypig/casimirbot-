@@ -656,11 +656,26 @@ export default function WarpBubbleCompare({
   colorMode = "theta",
   lockFraming = true, // reserved; we always lock from inside
 }: Props) {
+  // ✨ DEBUG: heroExaggeration variable tracing
+  console.log(`[WarpBubbleCompare] 🎯 heroExaggeration DEBUG:`, {
+    prop: heroExaggeration,
+    type: typeof heroExaggeration,
+    isFinite: Number.isFinite(heroExaggeration),
+    source: 'component props'
+  });
+
   // Physics parameters are now handled directly from props.parameters in useEffect
 
   // Optional: set per-pane display gain
   const parityX = parityExaggeration ?? 1;
   const heroX = heroExaggeration ?? 82;
+  
+  console.log(`[WarpBubbleCompare] 🎯 heroX calculated:`, {
+    heroExaggeration,
+    fallback: 82,
+    result: heroX,
+    willUse: heroX
+  });
 
   const leftRef = useRef<HTMLCanvasElement>(null);
   const rightRef = useRef<HTMLCanvasElement>(null);
@@ -995,7 +1010,7 @@ export default function WarpBubbleCompare({
       cameraZ: camZ,
       // Apply heroExaggeration to visual amplification
       curvatureGainT: 0.70,
-      curvatureBoostMax: Math.max(1, heroExaggeration || 40),
+      curvatureBoostMax: (console.log(`[DEBUG] heroExaggeration=${heroExaggeration}, result=${Math.max(1, heroExaggeration || 40)}`), Math.max(1, heroExaggeration || 40)),
       userGain: 4,
       displayGain: 1,
     });
@@ -1005,6 +1020,14 @@ export default function WarpBubbleCompare({
     // Apply heroExaggeration as display gain for SHOW engine
     const heroDisplayGain = Math.max(1, 1 + 0.5 * Math.log10(Math.max(1, heroExaggeration || 82)));
     rightEngine.current.setDisplayGain?.(heroDisplayGain);
+    console.log(`[SHOW] 🎯 heroExaggeration DEBUG CHAIN:`, {
+      original: heroExaggeration,
+      withFallback: heroExaggeration || 82,
+      mathMaxResult: Math.max(1, heroExaggeration || 82),
+      logCalculation: Math.log10(Math.max(1, heroExaggeration || 82)),
+      finalDisplayGain: heroDisplayGain,
+      appliedToEngine: !!rightEngine.current.setDisplayGain
+    });
     console.log(`[SHOW] Applied heroExaggeration: ${heroExaggeration} -> displayGain: ${heroDisplayGain.toFixed(2)}`);
 
     // Verify and correct parity enforcement after a short delay
@@ -1093,6 +1116,13 @@ export default function WarpBubbleCompare({
 
     // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
     const displayGain = Math.max(1, (1) * (heroX ? 1 + 0.5*Math.log10(Math.max(1, heroX)) : 1));
+    console.log(`[SHOW] 🎯 Final displayGain calculation:`, {
+      heroX,
+      heroXExists: !!heroX,
+      logCalc: heroX ? Math.log10(Math.max(1, heroX)) : 'N/A',
+      finalGain: displayGain,
+      appliedToEngine: !!rightEngine.current.setDisplayGain
+    });
     rightEngine.current.setDisplayGain?.(displayGain);
   }, [parameters, colorMode, lockFraming, heroX]);
 
