@@ -44,8 +44,8 @@ function resolveDutyEff(params: SimulationParameters): number {
   
   console.log('[WarpModule] FR from pipeline:', frFromPipeline);
   
-  if (Number.isFinite(+frFromPipeline)) {
-    const result = Math.max(0, Math.min(1, +frFromPipeline));
+  if (Number.isFinite(+frFromPipeline) && +frFromPipeline > 0) {
+    const result = Math.max(1e-12, Math.min(1, +frFromPipeline));
     console.log('[WarpModule] Using pipeline FR duty:', result);
     return result;
   }
@@ -61,29 +61,29 @@ function resolveDutyEff(params: SimulationParameters): number {
     console.log('[WarpModule] Calculated local duty:', d_local);
     
     // If a sectorDuty is provided and already ≤ local, assume it's FR and don't divide again
-    if (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) <= d_local) {
-      const result = Math.max(0, Math.min(1, dyn.sectorDuty as number));
+    if (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) <= d_local && (dyn.sectorDuty as number) > 0) {
+      const result = Math.max(1e-12, Math.min(1, dyn.sectorDuty as number));
       console.log('[WarpModule] Using provided sectorDuty as FR:', result);
       return result;
     }
-    const result = Math.max(0, Math.min(1, d_local * (1 / S_total)));
+    const result = Math.max(1e-12, Math.min(1, d_local / S_total));
     console.log('[WarpModule] Converting local to FR duty:', result, '(', d_local, '/', S_total, ')');
     return result;
   }
 
   // 3) Fall back to sectorDuty:
   // Use standard physical default of 2.5e-5 (matching MODE_POLICY hover mode)
-  const dProvided = (dyn && Number.isFinite(dyn.sectorDuty)) ? (dyn.sectorDuty as number) : 2.5e-5;
+  const dProvided = (dyn && Number.isFinite(dyn.sectorDuty) && (dyn.sectorDuty as number) > 0) ? (dyn.sectorDuty as number) : 2.5e-5;
   console.log('[WarpModule] Fallback sectorDuty:', dProvided);
   
   // More physically reasonable threshold: if duty < 1/S_total, likely already FR
   const localThreshold = 1.0 / S_total;
   if (S_total > 1 && dProvided < localThreshold * 0.1) {
     console.log('[WarpModule] Treating small duty as already FR (< 10% of local threshold):', dProvided);
-    return Math.max(0, Math.min(1, dProvided));
+    return Math.max(1e-12, Math.min(1, dProvided));
   }
   
-  const result = Math.max(0, Math.min(1, dProvided * (1 / S_total)));
+  const result = Math.max(1e-12, Math.min(1, dProvided / S_total));
   console.log('[WarpModule] Treating as local duty, converting to FR:', result);
   return result;
 }
@@ -245,9 +245,16 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
  * Validate warp bubble calculation results using pipeline inputs (not fixed "paper" bands)
  */
 function validateWarpResults(result: NatarioWarpResult, params: SimulationParameters): WarpBubbleResult['validationSummary'] {
+  console.log('[WarpModule] Validating warp results:', {
+    inputParams: params,
+    warpResult: result
+  });
+
   const γ_geo = (params as any).amps?.gammaGeo ?? 26;
   const γ_vdb = (params as any).amps?.gammaVanDenBroeck ?? 3.83e1;
   const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
+
+  console.log('[WarpModule] Validation parameters:', { γ_geo, γ_vdb, Q });
 
   // More reasonable validation bands based on physics
   const geomMin = 0.1 * γ_geo;  // Allow 90% deviation below
@@ -259,17 +266,46 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
   const ampMin  = baseAmp * 1e-3;  // Very conservative lower bound
   const ampMax  = baseAmp * 1e12;  // Allow very high amplification
 
-  const geometryValid = (result.geometricBlueshiftFactor > geomMin) && (result.geometricBlueshiftFactor < geomMax) && Number.isFinite(result.effectivePathLength);
-  const amplificationValid = (result.totalAmplificationFactor > ampMin) && (result.totalAmplificationFactor < ampMax) && (result.qEnhancementFactor >= qEnhMin) && Number.isFinite(result.totalAmplificationFactor);
+  console.log('[WarpModule] Validation bounds:', {
+    geometry: { min: geomMin, max: geomMax, actual: result.geometricBlueshiftFactor },
+    amplification: { min: ampMin, max: ampMax, actual: result.totalAmplificationFactor },
+    qEnhancement: { min: qEnhMin, actual: result.qEnhancementFactor }
+  });
+
+  const geometryValid = (result.geometricBlueshiftFactor > geomMin) && 
+                       (result.geometricBlueshiftFactor < geomMax) && 
+                       Number.isFinite(result.effectivePathLength);
+  
+  const amplificationValid = (result.totalAmplificationFactor > ampMin) && 
+                            (result.totalAmplificationFactor < ampMax) && 
+                            (result.qEnhancementFactor >= qEnhMin) && 
+                            Number.isFinite(result.totalAmplificationFactor);
 
   const quantumSafe = !!result.isQuantumSafe && result.quantumSafetyStatus !== 'violation';
-  const warpFieldStable = !!result.isZeroExpansion && !!result.isCurlFree && !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
+  const warpFieldStable = !!result.isZeroExpansion && 
+                         !!result.isCurlFree && 
+                         !!result.stressEnergyTensor?.isNullEnergyConditionSatisfied;
+
+  console.log('[WarpModule] Validation checks:', {
+    geometryValid,
+    amplificationValid, 
+    quantumSafe,
+    warpFieldStable,
+    detailedChecks: {
+      isZeroExpansion: result.isZeroExpansion,
+      isCurlFree: result.isCurlFree,
+      nullEnergyCondition: result.stressEnergyTensor?.isNullEnergyConditionSatisfied,
+      quantumSafetyStatus: result.quantumSafetyStatus
+    }
+  });
 
   const overallStatus =
     geometryValid && amplificationValid && quantumSafe && warpFieldStable ? 'optimal' :
     geometryValid && amplificationValid && quantumSafe                       ? 'acceptable' :
     geometryValid && quantumSafe                                             ? 'warning' : 'failure';
 
+  console.log('[WarpModule] Overall validation status:', overallStatus);
+  
   return { geometryValid, amplificationValid, quantumSafe, warpFieldStable, overallStatus };
 }
 
@@ -293,13 +329,41 @@ export const warpBubbleModule: CasimirModule = {
     console.log('[WarpModule] Starting calculation with params:', params);
 
     try {
+      // Validate input parameters first
+      if (!params) {
+        throw new Error('No simulation parameters provided');
+      }
+
+      if (!params.dynamicConfig) {
+        console.warn('[WarpModule] No dynamicConfig found, using defaults');
+      }
+
       // Convert simulation parameters to warp parameters
       const warpParams = convertToWarpParams(params);
       console.log('[WarpModule] Converted warp parameters:', warpParams);
 
+      // Validate critical warp parameters
+      if (!Number.isFinite(warpParams.bowlRadius) || warpParams.bowlRadius <= 0) {
+        throw new Error(`Invalid bowl radius: ${warpParams.bowlRadius}`);
+      }
+
+      if (!Number.isFinite(warpParams.effectiveDuty) || warpParams.effectiveDuty <= 0) {
+        throw new Error(`Invalid effective duty: ${warpParams.effectiveDuty}`);
+      }
+
+      if (!Number.isFinite(warpParams.gammaGeo) || warpParams.gammaGeo <= 0) {
+        throw new Error(`Invalid gamma geometric: ${warpParams.gammaGeo}`);
+      }
+
       // Perform Natário warp bubble calculations
       const warpResult = calculateNatarioWarpBubble(warpParams);
       console.log('[WarpModule] Warp calculation result:', warpResult);
+
+      // Validate critical results
+      if (!Number.isFinite(warpResult.totalAmplificationFactor)) {
+        console.error('[WarpModule] Invalid amplification factor result');
+        throw new Error('Calculation produced invalid amplification factor');
+      }
 
       // Validate results
       const validationSummary = validateWarpResults(warpResult, params);
@@ -308,6 +372,17 @@ export const warpBubbleModule: CasimirModule = {
       const calculationTime = Date.now() - startTime;
       console.log('[WarpModule] Calculation completed in', calculationTime, 'ms');
 
+      // Add debug information for shift vector field
+      if (warpResult.shiftVectorField) {
+        console.log('[WarpModule] Shift vector field validation:', {
+          amplitude: warpResult.shiftVectorField.amplitude,
+          hasRadialProfile: typeof warpResult.shiftVectorField.radialProfile === 'function',
+          tangentialComponent: warpResult.shiftVectorField.tangentialComponent,
+          axialComponent: warpResult.shiftVectorField.axialComponent,
+          netShiftAmplitude: warpResult.shiftVectorField.netShiftAmplitude
+        });
+      }
+
       const finalResult = {
         ...warpResult,
         moduleVersion: '1.0.0',
@@ -315,11 +390,12 @@ export const warpBubbleModule: CasimirModule = {
         validationSummary
       };
       
-      console.log('[WarpModule] Final result:', finalResult);
+      console.log('[WarpModule] Final result keys:', Object.keys(finalResult));
       return finalResult;
 
     } catch (error) {
       console.error('[WarpModule] Calculation failed:', error);
+      console.error('[WarpModule] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw new Error(`Warp bubble calculation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }

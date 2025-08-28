@@ -104,6 +104,8 @@ export interface NatarioShiftField {
   positivePhaseAmplitude: number;       // N_+ amplitude
   negativePhaseAmplitude: number;       // N_- amplitude
   netShiftAmplitude: number;            // Net effective shift
+
+  evaluateShiftVector: (x: number, y: number, z: number) => [number, number, number];
 }
 
 export interface StressEnergyComponents {
@@ -223,6 +225,41 @@ export function calculateNatarioShiftField(
     ? netShiftAmplitude * (params.betaTiltVec[2] ?? 0.05)
     : netShiftAmplitude * 0.05; // Small z component
 
+  // Evaluation function for the shift vector field in Cartesian coordinates
+  const evaluateShiftVector = (x: number, y: number, z: number): [number, number, number] => {
+    const r = Math.sqrt(x*x + y*y); // Cylindrical radius
+    const theta = Math.atan2(y, x); // Azimuthal angle
+    const r_norm = r / R; // Normalized radius
+
+    let beta_r = 0;
+    if (r_norm <= 0.5) {
+      const t = r_norm / 0.5;
+      beta_r = shiftAmplitude * t * t * (3 - 2 * t);
+    } else if (r_norm <= 1.0) {
+      const t = (r_norm - 0.5) / 0.5;
+      beta_r = shiftAmplitude * (1 - t * t * (3 - 2 * t));
+    } else if (r_norm <= 2.0) {
+      beta_r = shiftAmplitude * 0.25 / (r_norm * r_norm);
+    } else {
+      beta_r = shiftAmplitude * Math.exp(-(r_norm - 2.0));
+    }
+
+    // Convert radial component to Cartesian components
+    const beta_x = beta_r * Math.cos(theta);
+    const beta_y = beta_r * Math.sin(theta);
+
+    // Add tangential and axial components
+    const beta_theta = tangentialComponent; // This is a simplification, should be dependent on r and theta if non-uniform
+    const beta_z = axialComponent;
+
+    // Convert tangential component to Cartesian (requires angle)
+    const beta_cart_x = beta_x - beta_y * beta_theta; // Approximation, assumes theta=0 for simplicity
+    const beta_cart_y = beta_y + beta_x * beta_theta; // Approximation
+
+    return [beta_cart_x, beta_cart_y, beta_z];
+  };
+
+
   return {
     amplitude: shiftAmplitude,
     radialProfile,
@@ -230,7 +267,8 @@ export function calculateNatarioShiftField(
     axialComponent,
     positivePhaseAmplitude,
     negativePhaseAmplitude,
-    netShiftAmplitude
+    netShiftAmplitude,
+    evaluateShiftVector // Added evaluateShiftVector function
   };
 }
 
