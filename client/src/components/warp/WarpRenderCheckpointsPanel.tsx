@@ -507,16 +507,29 @@ function useCheckpointList(
     // Build expected θ from the bound terms, honoring √d_FR when averaging
     const thetaExpectedFromBound =
       echo && echo.terms
-        ? Math.pow(N(echo.terms.γ_geo, 26), 3) *
+        ? Math.pow(Math.max(1, N(echo.terms.γ_geo, 26)), 3) *
           Math.max(1e-12, N(echo.terms.q, 1)) *
           Math.max(1, N(echo.terms.γ_VdB, 1.4e5)) *
-          (viewAvg ? Math.sqrt(Math.max(1e-12, N(echo.terms.d_FR, 0))) : 1)
+          (viewAvg ? Math.sqrt(Math.max(1e-12, N(echo.terms.d_FR, 1e-6))) : 1)
         : undefined;
+
+    // Enhanced theta debugging
+    if (echo && echo.terms) {
+      console.log(`[${label}] Theta calculation debug:`, {
+        γ_geo: echo.terms.γ_geo,
+        q: echo.terms.q,
+        γ_VdB: echo.terms.γ_VdB,
+        d_FR: echo.terms.d_FR,
+        viewAvg,
+        calculated: thetaExpectedFromBound,
+        actualTheta: ts
+      });
+    }
 
     const mismatch = echo && thetaExpectedFromBound && tsOk
       ? (ts / thetaExpectedFromBound) : 1;
 
-    if (echo && thetaExpectedFromBound !== undefined) {
+    if (echo && echo.terms) {
       // Use bound uniforms for perfect self-consistency
       const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
 
@@ -600,18 +613,42 @@ function useCheckpointList(
       rows.push({ label: "θ breakdown", detail: breakdown, state: "ok" });
     }
 
-    // Parity & ridge expectations
+    // Parity & ridge expectations with enhanced debugging
     if (expectations) {
       const expParity = expectations.parity;
       const expRidge = expectations.ridge;
       if (expParity != null) {
         const parity = !!(u.physicsParityMode ?? u.parityMode);
         const ok = parity === !!expParity;
-        rows.push({ label: "Parity mode", detail: String(parity), state: ok ? "ok" : "fail" });
+
+        // Enhanced debugging for parity failures
+        if (!ok) {
+          console.error(`❌ ${label} engine parity enforcement FAILED - should be ${!!expParity}, got:`, parity);
+          console.error(`${label} uniforms.physicsParityMode:`, u.physicsParityMode);
+          console.error(`${label} uniforms.parityMode:`, u.parityMode);
+          console.error(`${label} expected parity:`, !!expParity);
+        }
+
+        rows.push({ 
+          label: "Parity mode", 
+          detail: `${String(parity)} (exp: ${!!expParity})`, 
+          state: ok ? "ok" : "fail" 
+        });
       }
       if (expRidge != null) {
-        const ok = (u?.ridgeMode | 0) === (expRidge | 0);
-        rows.push({ label: "Ridge mode", detail: String(u?.ridgeMode), state: ok ? "ok" : "warn" });
+        const actualRidge = u?.ridgeMode | 0;
+        const expectedRidge = expRidge | 0;
+        const ok = actualRidge === expectedRidge;
+
+        if (!ok) {
+          console.warn(`⚠️ ${label} ridge mode mismatch - should be ${expectedRidge}, got:`, actualRidge);
+        }
+
+        rows.push({ 
+          label: "Ridge mode", 
+          detail: `${actualRidge} (exp: ${expectedRidge})`, 
+          state: ok ? "ok" : "warn" 
+        });
       }
     }
 
