@@ -155,27 +155,51 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   const dN = useMemo(() => normalize(divVec(driveDir, safeAxes)), [driveDir, safeAxes]);
 
   const amp = useMemo(() => {
-    // Canonical theta scale calculation (physics chain)
-    const avg = viewAvg
-      ? (Number.isFinite(dutyEffectiveFR)
-          ? Math.max(1e-12, dutyEffectiveFR as number)
-          : Math.max(1e-12, dutyCycle) / Math.max(1, sectors))
-      : 1.0;
+    try {
+      // Validate input parameters
+      const validGammaGeo = Number.isFinite(gammaGeo) && gammaGeo > 0 ? gammaGeo : 26;
+      const validQSpoiling = Number.isFinite(qSpoilingFactor) && qSpoilingFactor >= 0 ? qSpoilingFactor : 1;
+      const validGammaVdB = Number.isFinite(gammaVdB) && gammaVdB >= 0 ? gammaVdB : 3.83e1;
+      const validDutyCycle = Number.isFinite(dutyCycle) && dutyCycle > 0 ? dutyCycle : 0.14;
+      const validSectors = Number.isFinite(sectors) && sectors >= 1 ? sectors : 1;
+      const validViewMassFraction = Number.isFinite(viewMassFraction) && viewMassFraction > 0 ? viewMassFraction : 1.0;
 
-    const thetaScaleCanonical =
-      Math.pow(gammaGeo, 3) *
-      Math.max(1e-12, qSpoilingFactor) *
-      Math.max(1.0, gammaVdB) *
-      avg;
+      // Canonical theta scale calculation (physics chain)
+      const avg = viewAvg
+        ? (Number.isFinite(dutyEffectiveFR) && (dutyEffectiveFR as number) > 0
+            ? Math.max(1e-12, dutyEffectiveFR as number)
+            : Math.max(1e-12, validDutyCycle) / Math.max(1, validSectors))
+        : 1.0;
 
-    // Apply view mass fraction after canonical chain
-    const thetaScaleUsed = thetaScaleCanonical * viewMassFraction;
+      const thetaScaleCanonical =
+        Math.pow(validGammaGeo, 3) *
+        Math.max(1e-12, validQSpoiling) *
+        Math.max(1.0, validGammaVdB) *
+        avg;
 
-    // Visual boost (parity mode kills boosts, otherwise respect viewer gain)
-    const curvatureGainT = Math.max(0, Math.min(1, curvatureGain / 8));
-    const boost = physicsParityMode ? 1 : (1 - curvatureGainT) + curvatureGainT * curvatureBoostMax;
+      // Apply view mass fraction after canonical chain
+      const thetaScaleUsed = thetaScaleCanonical * validViewMassFraction;
 
-    return thetaScaleUsed * boost;
+      // Visual boost (parity mode kills boosts, otherwise respect viewer gain)
+      const validCurvatureGain = Number.isFinite(curvatureGain) ? curvatureGain : 6.0;
+      const validBoostMax = Number.isFinite(curvatureBoostMax) && curvatureBoostMax > 0 ? curvatureBoostMax : 40;
+      const curvatureGainT = Math.max(0, Math.min(1, validCurvatureGain / 8));
+      const boost = physicsParityMode ? 1 : (1 - curvatureGainT) + curvatureGainT * validBoostMax;
+
+      const result = thetaScaleUsed * boost;
+
+      // Debug logging for amplitude calculation
+      console.log('[SliceViewer] Amplitude calculation:', {
+        inputs: { gammaGeo: validGammaGeo, qSpoilingFactor: validQSpoiling, gammaVdB: validGammaVdB },
+        avg, thetaScaleCanonical, thetaScaleUsed, boost, result,
+        physicsParityMode, viewAvg, dutyEffectiveFR
+      });
+
+      return Number.isFinite(result) ? result : 1e-12;
+    } catch (error) {
+      console.error('[SliceViewer] Error in amplitude calculation:', error);
+      return 1e-12;
+    }
   }, [
     gammaGeo, qSpoilingFactor, gammaVdB,
     viewAvg, dutyEffectiveFR, dutyCycle, sectors,
@@ -205,23 +229,48 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-    if (width <= 0 || height <= 0) return;
+    if (!canvas) {
+      console.warn('[SliceViewer] Canvas ref not available');
+      return;
+    }
+    
+    if (width <= 0 || height <= 0) {
+      console.warn('[SliceViewer] Invalid canvas dimensions:', { width, height });
+      return;
+    }
 
-    // Handle high-DPR displays for crisp result
+    // Handle high-DPR displays for crisp result (but cap at 2x for performance)
     const dpr = Math.min(2, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
-    const W = Math.floor(width * dpr);
-    const H = Math.floor(height * dpr);
-    canvas.width = W;
-    canvas.height = H;
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
+    const W = Math.max(1, Math.floor(width * dpr));
+    const H = Math.max(1, Math.floor(height * dpr));
+    
+    // Only resize if dimensions changed
+    if (canvas.width !== W || canvas.height !== H) {
+      canvas.width = W;
+      canvas.height = H;
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+    }
 
     const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('[SliceViewer] Failed to get 2D context');
+      return;
+    }
 
-    const img = ctx.createImageData(W, H);
+    let img: ImageData;
+    try {
+      img = ctx.createImageData(W, H);
+    } catch (error) {
+      console.error('[SliceViewer] Failed to create ImageData:', error);
+      return;
+    }
+    
     const data = img.data;
+    if (!data || data.length !== W * H * 4) {
+      console.error('[SliceViewer] Invalid ImageData:', { W, H, dataLength: data?.length });
+      return;
+    }
 
     const nX = W; // σ samples
     const nY = H; // φ samples
@@ -231,11 +280,17 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
     // φ runs top→bottom
     for (let j = 0; j < nY; j++) {
-      const phi = (j / (nY - 1)) * Math.PI * 2; // 0..2π
+      const phi = (j / Math.max(1, nY - 1)) * Math.PI * 2; // 0..2π, avoid division by zero
       // unit point on equator in ellipsoidal normed coords (y=0)
       // pN is direction only; ρ handled on X sweep
       const pHat: Vec3 = [Math.cos(phi), 0, Math.sin(phi)];
       const xs_over_rs = dot(pHat, dN); // equals cos(angle between p and drive)
+      
+      // Validate critical calculations
+      if (!Number.isFinite(xs_over_rs)) {
+        console.warn('[SliceViewer] Invalid xs_over_rs at phi:', phi);
+        continue;
+      }
 
       // Optional: REAL strobing sign tied to current split
       let strobeSign = 1;
@@ -256,8 +311,15 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
 
         // Canonical Gaussian shell and its derivative
         const w = Math.max(1e-6, wRho);
-        const f = Math.exp(-((rho - 1) * (rho - 1)) / (w * w));
-        const dfdr = (-2 * (rho - 1) / (w * w)) * f; // d/dρ
+        const rhoDiff = rho - 1;
+        const f = Math.exp(-(rhoDiff * rhoDiff) / (w * w));
+        const dfdr = (-2 * rhoDiff / (w * w)) * f; // d/dρ
+
+        // Validate critical calculations
+        if (!Number.isFinite(f) || !Number.isFinite(dfdr)) {
+          console.warn('[SliceViewer] Invalid Gaussian calculation:', { rho, w, f, dfdr });
+          continue;
+        }
 
         // York-time proxy (matches your shader form)
         let theta = vShip * xs_over_rs * dfdr * strobeSign;
@@ -270,21 +332,32 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
           value = value - valueRef;
         }
 
+        // Validate value before color mapping
+        if (!Number.isFinite(value)) {
+          value = 0;
+        }
+
         // Symmetric log mapping to [-1,1]
-        const mag = Math.log10(1 + Math.abs(value) / Math.max(zeroStop, 1e-18));
-        const signed = (value < 0 ? -1 : 1) * (mag / logNorm);
+        const absValue = Math.abs(value);
+        const mag = Math.log10(1 + absValue / Math.max(zeroStop, 1e-18));
+        const signed = (value < 0 ? -1 : 1) * (mag / Math.max(1e-12, logNorm));
         const xCol = Math.max(-1, Math.min(1, signed));
 
         const [r, g, b] = divergeColor(xCol);
         const idx = 4 * (j * nX + i);
-        data[idx + 0] = Math.round(r * 255);
-        data[idx + 1] = Math.round(g * 255);
-        data[idx + 2] = Math.round(b * 255);
+        data[idx + 0] = Math.round(Math.max(0, Math.min(255, r * 255)));
+        data[idx + 1] = Math.round(Math.max(0, Math.min(255, g * 255)));
+        data[idx + 2] = Math.round(Math.max(0, Math.min(255, b * 255)));
         data[idx + 3] = 255;
       }
     }
 
-    ctx.putImageData(img, 0, 0);
+    try {
+      ctx.putImageData(img, 0, 0);
+    } catch (error) {
+      console.error('[SliceViewer] Failed to put ImageData:', error);
+      return;
+    }
 
     // Optional: overlay iso-contours and axes labels
     if (showContours) {
@@ -332,9 +405,10 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
   }, [
     width,
     height,
-    hullAxes,
+    // Serialize complex objects to prevent unnecessary re-renders
+    JSON.stringify(hullAxes),
     wRho,
-    dN,
+    JSON.stringify(dN),
     vShip,
     amp,
     ampRef,
