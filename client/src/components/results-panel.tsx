@@ -86,7 +86,7 @@ export default function ResultsPanel({
   const [activeTab, setActiveTab] = useState("results");
 
   // Authoritative pipeline (server) values
-  const { data: pipeline } = useEnergyPipeline() as { data: any };
+  const { data: pipeline } = useEnergyPipeline();
 
   if (!simulation) {
     return (

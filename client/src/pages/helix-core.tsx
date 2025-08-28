@@ -57,7 +57,7 @@ const buildModeSelectItems = (pipeline: any) => {
 
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpBubbleCompare = lazy(() =>
-  import("@/components/warp/WarpBubbleCompare").then((m) => ({ default: m.default || m.WarpBubbleCompare }))
+  import("@/components/warp/WarpBubbleCompare")
 );
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
 import { SliceViewer } from "@/components/SliceViewer";
