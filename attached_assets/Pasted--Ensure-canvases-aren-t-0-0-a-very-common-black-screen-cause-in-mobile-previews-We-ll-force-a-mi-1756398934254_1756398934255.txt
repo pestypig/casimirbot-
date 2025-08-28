@@ -1,0 +1,123 @@
+) Ensure canvases aren’t 0×0 (a very common black-screen cause in mobile previews)
+
+We’ll force a minimum display height on the viewer panes and guard against measuring before layout.
+
+apply_patch << 'PATCH'
+*** Begin Patch
+*** Update File: src/components/WarpRenderInspector.tsx
+@@
+   // Initialize engines with enhanced error handling and validation
+   useEffect(() => {
+     let mounted = true;
+ 
+     const initEngines = async () => {
+       if (!mounted) return;
+-      
+-      if (!isWebGLAvailable()) {
+-        setLoadError("WebGL not supported in this browser");
+-        return;
+-      }
+ 
+-      const W = (window as any).WarpEngine;
++      // Strong detection (with DOM-mounted probe to avoid false negatives on mobile webviews)
++      const support = webglSupport(undefined, { mountProbeCanvas: true });
++      if (!support.ok) {
++        setLoadError(support.reason || 'WebGL not available');
++        (window as any).__whyNoGL = support;
++        return;
++      }
++
++      const W = (window as any).WarpEngine;
+       if (!W) {
+         console.error("WarpEngine not found on window. Load warp-engine.js first.");
+-        setLoadError("WarpEngine not loaded");
++        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded");
+         return;
+       }
+ 
++      // Ensure canvases are visibly sized before any measurement
++      const ensureDisplaySize = (cv: HTMLCanvasElement | null) => {
++        if (!cv) return;
++        if ((cv.clientWidth|0) === 0 || (cv.clientHeight|0) === 0) {
++          cv.style.minHeight = '240px';
++          cv.style.display = 'block';
++        }
++      };
++      ensureDisplaySize(leftRef.current);
++      ensureDisplaySize(rightRef.current);
++
+       // Prevent double initialization
+       if (leftEngine.current || rightEngine.current) {
+         console.log("Engines already initialized, skipping...");
+         return;
+       }
+@@
+-      // REAL engine
++      // REAL engine
+       if (leftRef.current && !leftEngine.current && mounted) {
+         try {
+-          sizeCanvasSafe(leftRef.current);
++          sizeCanvasSafe(leftRef.current);
++          if ((leftRef.current.clientWidth|0) === 0 || (leftRef.current.clientHeight|0) === 0) {
++            // Final guard: set a default pixel size if layout still not ready
++            leftRef.current.width = 800; leftRef.current.height = 450;
++          }
+@@
+-      // SHOW engine
++      // SHOW engine
+       if (rightRef.current && !rightEngine.current && mounted) {
+         try {
+-          sizeCanvasSafe(rightRef.current);
++          sizeCanvasSafe(rightRef.current);
++          if ((rightRef.current.clientWidth|0) === 0 || (rightRef.current.clientHeight|0) === 0) {
++            rightRef.current.width = 800; rightRef.current.height = 450;
++          }
+@@
+   if (loadError) {
+     return (
+       <div className="w-full p-4">
+         <CanvasFallback
+-          title="WebGL could not start"
++          title="Renderer could not start"
+           reason={String(loadError)}
+           onRetry={() => {
+             try { (window as any).__forceReloadWarpEngine?.(); } catch {}
+             window.location.reload();
+           }}
+         />
+       </div>
+     );
+   }
+@@
+-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
++          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
+@@
+-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
++          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
+*** End Patch
+PATCH
+
+
+Add a small on-screen debugger you can enable with ?debug-gl=1:
+
+apply_patch << 'PATCH'
+*** Begin Patch
+*** Update File: src/components/WarpRenderInspector.tsx
+@@
+   return (
+-    <div className="w-full grid gap-4 p-2 sm:p-4">
++    <div className="w-full grid gap-4 p-2 sm:p-4">
++      {(() => {
++        try {
++          const qs = new URLSearchParams(location.search || '');
++          if (!qs.has('debug-gl')) return null;
++          const report = webglSupport(undefined, { mountProbeCanvas: false });
++          return (
++            <pre className="text-xs p-2 rounded bg-black/70 text-green-200 overflow-auto">
++              GL Debug: {JSON.stringify(report, null, 2)}
++            </pre>
++          );
++        } catch { return null; }
++      })()}
+*** End Patch
+PATCH
