@@ -539,6 +539,18 @@ export default function HelixCasimirAmplifier({
 
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
+    
+    // Debug: log all input values
+    console.debug("[HelixCasimirAmplifier] Input values:", {
+      U_static: state.U_static,
+      gammaGeo: state.gammaGeo,
+      qMechanical: state.qMechanical,
+      N_tiles: state.N_tiles,
+      qCavity: state.qCavity,
+      omega,
+      qCav,
+      gateOn
+    });
     const gammaGeo = hud.gammaGeo || state.gammaGeo || 26; // fallback to pipeline or default
     // HUD → state → safe fallback (avoid silent zeros)
     const qMech = (
@@ -573,6 +585,17 @@ export default function HelixCasimirAmplifier({
         U_static, gammaGeo, qMech, omega, qCav, gateOn, onDisplay: gateOn
       });
     }
+
+    // Debug: log all derived calculations
+    console.debug("[HelixCasimirAmplifier] Derived calculations:", {
+      U_geo: U_geo,
+      U_Q: U_Q,
+      P_tile_on: P_tile_on,
+      P_ship_avg_calc_MW: P_ship_avg_calc_MW,
+      M_total_calc: M_total_calc,
+      d_eff: d_eff,
+      N_tiles: N_tiles
+    });
 
     // mass chain (no Q in energy; Q is for power)
     const geo3        = Math.pow(gammaGeo, 3);
@@ -627,6 +650,16 @@ export default function HelixCasimirAmplifier({
 
   // Robust power badge with multiple fallbacks
   const P_MW_badge = (() => {
+    const sources = {
+      hud: hud.powerMW,
+      metrics: metrics?.energyOutput,
+      derivedReport: derived?.P_ship_avg_report_MW,
+      derivedCalc: derived?.P_ship_avg_calc_MW,
+      stateAvg: state?.P_avg
+    };
+    
+    console.debug("[HelixCasimirAmplifier] Power fallback sources:", sources);
+    
     // Try HUD first (most authoritative)
     if (Number.isFinite(hud.powerMW) && hud.powerMW! > 0) return hud.powerMW!;
     
@@ -647,6 +680,17 @@ export default function HelixCasimirAmplifier({
 
   // Robust mass badge with multiple fallbacks
   const M_kg_badge = (() => {
+    const sources = {
+      hud: hud.exoticMassKg,
+      metrics: metrics?.exoticMass,
+      derivedReport: derived?.M_total_report,
+      derivedCalc: derived?.M_total_calc,
+      stateExotic: state?.M_exotic,
+      metricsRaw: metrics?.exoticMassRaw
+    };
+    
+    console.debug("[HelixCasimirAmplifier] Mass fallback sources:", sources);
+    
     // Try HUD first (most authoritative)
     if (Number.isFinite(hud.exoticMassKg) && hud.exoticMassKg! > 0) return hud.exoticMassKg!;
     
