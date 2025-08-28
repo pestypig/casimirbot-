@@ -91,6 +91,60 @@ const getAppBuild = () =>
 const CM = { solid: 0, theta: 1, shear: 2 };
 const finite = (x: any, d: number) => (Number.isFinite(+x) ? +x : d);
 
+// Parameter validation and clamping helper
+const validatePhysicsParams = (params: any, label: string) => {
+  const validated = { ...params };
+  
+  // Clamp gamma values to reasonable ranges
+  if ('gammaGeo' in validated) {
+    validated.gammaGeo = Math.max(1, Math.min(1000, validated.gammaGeo || 26));
+  }
+  if ('gammaVdB' in validated || 'gammaVanDenBroeck' in validated) {
+    const gamma = validated.gammaVdB || validated.gammaVanDenBroeck || 1;
+    validated.gammaVdB = Math.max(1, Math.min(1000, gamma));
+    validated.gammaVanDenBroeck = validated.gammaVdB;
+  }
+  
+  // Clamp q-spoiling factor
+  if ('qSpoilingFactor' in validated || 'deltaAOverA' in validated) {
+    const q = validated.qSpoilingFactor || validated.deltaAOverA || 1;
+    validated.qSpoilingFactor = Math.max(0.01, Math.min(10, q));
+    validated.deltaAOverA = validated.qSpoilingFactor;
+  }
+  
+  // Clamp theta scale
+  if ('thetaScale' in validated) {
+    validated.thetaScale = Math.max(0, Math.min(1e15, validated.thetaScale || 0));
+  }
+  
+  // Clamp duty cycles
+  if ('dutyEffectiveFR' in validated) {
+    validated.dutyEffectiveFR = Math.max(1e-6, Math.min(1, validated.dutyEffectiveFR || 0.000025));
+  }
+  if ('dutyCycle' in validated) {
+    validated.dutyCycle = Math.max(0, Math.min(1, validated.dutyCycle || 0.14));
+  }
+  
+  // Clamp sectors
+  if ('sectors' in validated) {
+    validated.sectors = Math.max(1, Math.min(1000, validated.sectors || 400));
+  }
+  if ('sectorCount' in validated) {
+    validated.sectorCount = Math.max(1, Math.min(1000, validated.sectorCount || 400));
+  }
+  
+  console.log(`[${label}] Parameter validation:`, {
+    gammaGeo: validated.gammaGeo,
+    gammaVdB: validated.gammaVdB,
+    qSpoil: validated.qSpoilingFactor,
+    theta: validated.thetaScale,
+    dutyFR: validated.dutyEffectiveFR,
+    sectors: validated.sectors
+  });
+  
+  return validated;
+};
+
 // Engine mounting helper functions
 const getBuild = () =>
   (typeof window !== 'undefined' && (window as any).__APP_WARP_BUILD) || 'dev';
@@ -743,18 +797,39 @@ export default function WarpBubbleCompare({
       try {
         if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
 
+        // Ensure canvas has proper dimensions before creating engine
+        ensureCanvasSize(cv);
+        
         let eng: any;
         try {
+          console.log(`[WarpBubbleCompare] Creating engine for canvas:`, cv.id, cv.width, cv.height);
           eng = new Ctor(cv);
+          
+          // Wait for engine to be fully ready
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('Engine initialization timeout')), 5000);
+            const checkReady = () => {
+              if (eng.isLoaded && eng.gridProgram) {
+                clearTimeout(timeout);
+                resolve();
+              } else {
+                setTimeout(checkReady, 50);
+              }
+            };
+            checkReady();
+          });
+          
         } catch (err: any) {
           const msg = String(err?.message || err).toLowerCase();
           if (msg.includes('already attached')) {
             // Another call won the race; reuse the survivor
             if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
           }
+          console.error(`[WarpBubbleCompare] Engine creation failed:`, err);
           throw err;
         }
         (cv as any)[ENGINE_KEY] = eng;
+        console.log(`[WarpBubbleCompare] Engine created successfully for:`, cv.id);
         return eng as WarpType;
       } finally {
         delete (cv as any)[ENGINE_PROMISE];
@@ -968,8 +1043,12 @@ export default function WarpBubbleCompare({
 
     // build both payloads from the SAME source of truth
     const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
-    const real = buildREAL(wu);
-    const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
+    let real = buildREAL(wu);
+    let show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
+    
+    // Validate and clamp physics parameters
+    real = validatePhysicsParams(real, 'REAL');
+    show = validatePhysicsParams(show, 'SHOW');
 
     // Build shared geometry data
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
@@ -997,22 +1076,37 @@ export default function WarpBubbleCompare({
       currentMode: parameters.currentMode,
       vShip: 0,                          // never "fly" in REAL
       // strictly physical: no boosts, no gains, wall to ρ-units
-      userGain: parityExaggeration || 1,
+      userGain: Math.max(0.1, Math.min(10, parityExaggeration || 1)), // clamp exaggeration
       displayGain: 1,
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
-      gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
-      deltaAOverA: real.qSpoilingFactor,
-      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
-      sectors: Math.max(1, parameters.sectors),
+      gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
+      deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
+      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
+      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
+      // Force parity mode explicitly
+      physicsParityMode: true,
+      ridgeMode: 0,
     });
 
     console.log('Applying physics to engines:', {
-      real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode },
-      show: { parity: false, ridge: 1 }
+      real: { 
+        parity: realPhysicsPayload.physicsParityMode, 
+        ridge: realPhysicsPayload.ridgeMode,
+        theta: realPhysicsPayload.thetaScale,
+        gammaVdB: realPhysicsPayload.gammaVdB,
+        qSpoil: realPhysicsPayload.deltaAOverA
+      },
+      show: { 
+        parity: showPhysicsPayload.physicsParityMode, 
+        ridge: showPhysicsPayload.ridgeMode,
+        theta: showPhysicsPayload.thetaScale,
+        gammaVdB: showPhysicsPayload.gammaVdB,
+        qSpoil: showPhysicsPayload.deltaAOverA
+      }
     });
 
     // REAL (parity / Ford–Roman)
@@ -1028,17 +1122,20 @@ export default function WarpBubbleCompare({
       ...show,
       currentMode: parameters.currentMode,
       vShip: parameters.currentMode === 'standby' ? 0 : 1,
-      thetaScale: showTheta,
-      gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
-      deltaAOverA: show.qSpoilingFactor,
-      sectors: Math.max(1, parameters.sectors),
+      thetaScale: Math.max(0, Math.min(1e15, showTheta)), // clamp theta scale
+      gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
+      deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor ?? 1)), // clamp q-spoiling
+      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ,
       // Apply heroExaggeration to visual amplification (normalized heroBoost)
-      curvatureGainT: 0.70,
-      curvatureBoostMax: heroBoost,
-      userGain: 4,
+      curvatureGainT: Math.max(0, Math.min(1, 0.70)), // clamp gain T
+      curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
+      userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
       displayGain: 1,
+      // Force non-parity mode explicitly
+      physicsParityMode: false,
+      ridgeMode: 1,
     });
 
     pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
