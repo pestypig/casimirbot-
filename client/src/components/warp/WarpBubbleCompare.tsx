@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useState } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
+import { webglSupport } from '@/lib/gl/webgl-support';
+import CanvasFallback from '@/components/CanvasFallback';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -675,6 +677,7 @@ export default function WarpBubbleCompare({
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
   const reinitInFlight = useRef<Promise<void> | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // Batched push system for performance optimization
   const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
@@ -934,6 +937,13 @@ export default function WarpBubbleCompare({
 
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
+    // Strong detection up-front
+    const support = webglSupport();
+    if (!support.ok) {
+      setLoadError(support.reason || 'WebGL not available');
+      return;
+    }
+    
     await ensureScript();
     const W = (window as any).WarpEngine;
     if (!W || !parameters) return;
@@ -1396,7 +1406,18 @@ export default function WarpBubbleCompare({
     colorMode, lockFraming
   ]);
 
-  return (
+  return loadError ? (
+    <div className="p-4">
+      <CanvasFallback
+        title="WebGL could not start"
+        reason={String(loadError)}
+        onRetry={() => {
+          try { (window as any).__forceReloadWarpEngine?.(); } catch {}
+          window.location.reload();
+        }}
+      />
+    </div>
+  ) : (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '320px' }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
