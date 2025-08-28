@@ -819,7 +819,7 @@ export default function WarpRenderInspector(props: {
     const fmt = (v: number) => v.toExponential(2);
     const fmtPct = (v: number) => (v * 100).toFixed(1) + '%';
     
-    console.log(`[HELIX][θ] θ-scale — ${fmt(expected)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
+    console.log(`[HELIX][θ] θ-scale — ${fmt(used)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${fmtPct(used / range)}`);
     console.log(`[HELIX][θ] view fraction: ${fmtPct(viewMassFraction)}`);
     console.log(`[HELIX][θ] renderer: ${isShow ? 'grid3d' : 'slice2d'}`);
     
