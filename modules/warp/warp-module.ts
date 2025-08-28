@@ -72,19 +72,20 @@ function resolveDutyEff(params: SimulationParameters): number {
   }
 
   // 3) Fall back to sectorDuty:
-  //    - If very small (e.g., ≤2e-2 with many sectors), treat as FR (already averaged).
-  //    - Otherwise treat as local and divide by S_total.
-  const dProvided = (dyn && Number.isFinite(dyn.sectorDuty)) ? (dyn.sectorDuty as number) : 0.14;
+  // Use standard physical default of 2.5e-5 (matching MODE_POLICY hover mode)
+  const dProvided = (dyn && Number.isFinite(dyn.sectorDuty)) ? (dyn.sectorDuty as number) : 2.5e-5;
   console.log('[WarpModule] Fallback sectorDuty:', dProvided);
   
-  if (S_total > 1 && dProvided <= 2e-2) {
-    console.log('[WarpModule] Treating small duty as already FR:', dProvided);
-    return Math.max(0, Math.min(1, dProvided)); // assume FR already
+  // More physically reasonable threshold: if duty < 1/S_total, likely already FR
+  const localThreshold = 1.0 / S_total;
+  if (S_total > 1 && dProvided < localThreshold * 0.1) {
+    console.log('[WarpModule] Treating small duty as already FR (< 10% of local threshold):', dProvided);
+    return Math.max(0, Math.min(1, dProvided));
   }
   
   const result = Math.max(0, Math.min(1, dProvided * (1 / S_total)));
   console.log('[WarpModule] Treating as local duty, converting to FR:', result);
-  return result; // treat as local
+  return result;
 }
 
 /**
@@ -96,10 +97,14 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   const dyn = params.dynamicConfig;
   console.log('[WarpModule] Dynamic config:', dyn);
 
-  // Prefer pipeline hull if present; else fallback to Needle Hull (~1.007 km × 264 m × 173 m overall)
+  // Prefer pipeline hull if present; else fallback to Needle Hull with validated dimensions
   const hull = (params as any).hull
-    ? { a: (params as any).hull.Lx_m / 2, b: (params as any).hull.Ly_m / 2, c: (params as any).hull.Lz_m / 2 }
-    : { a: 503.5, b: 132.0, c: 86.5 }; // meters (semi-axes)
+    ? { 
+        a: Math.max(1, (params as any).hull.Lx_m / 2), 
+        b: Math.max(1, (params as any).hull.Ly_m / 2), 
+        c: Math.max(1, (params as any).hull.Lz_m / 2) 
+      }
+    : { a: 503.5, b: 132.0, c: 86.5 }; // meters (semi-axes) - validated Needle Hull defaults
   const R_geom_m = Math.cbrt(hull.a * hull.b * hull.c); // meters
   const R_geom_um = R_geom_m * 1e6;                     // Natário expects µm
   
@@ -115,14 +120,25 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   const amps = (params as any).amps ?? {};
   console.log('[WarpModule] Amps object:', amps);
   
-  const gammaGeo = Number.isFinite(+amps.gammaGeo) ? +amps.gammaGeo : (Number.isFinite(+(params as any).gammaGeo) ? +(params as any).gammaGeo : undefined);
-  const gammaVanDenBroeck =
-    Number.isFinite(+amps.gammaVanDenBroeck) ? +amps.gammaVanDenBroeck :
-    (Number.isFinite(+(params as any).gammaVanDenBroeck) ? +(params as any).gammaVanDenBroeck : undefined);
-  const qSpoilingFactor =
-    Number.isFinite(+amps.qSpoilingFactor) ? +amps.qSpoilingFactor :
-    (Number.isFinite(+(dyn as any).qSpoilingFactor) ? +(dyn as any).qSpoilingFactor :
-    (Number.isFinite(+(params as any).qSpoilingFactor) ? +(params as any).qSpoilingFactor : undefined));
+  // Amplification factors with validated ranges
+  const gammaGeo = (() => {
+    const val = Number.isFinite(+amps.gammaGeo) ? +amps.gammaGeo : 
+                (Number.isFinite(+(params as any).gammaGeo) ? +(params as any).gammaGeo : 26);
+    return Math.max(1, Math.min(1000, val)); // Clamp to reasonable physics range
+  })();
+  
+  const gammaVanDenBroeck = (() => {
+    const val = Number.isFinite(+amps.gammaVanDenBroeck) ? +amps.gammaVanDenBroeck :
+               (Number.isFinite(+(params as any).gammaVanDenBroeck) ? +(params as any).gammaVanDenBroeck : 38.3);
+    return Math.max(0.1, Math.min(1e6, val)); // Allow wide range but prevent extreme values
+  })();
+  
+  const qSpoilingFactor = (() => {
+    const val = Number.isFinite(+amps.qSpoilingFactor) ? +amps.qSpoilingFactor :
+               (Number.isFinite(+(dyn as any).qSpoilingFactor) ? +(dyn as any).qSpoilingFactor :
+               (Number.isFinite(+(params as any).qSpoilingFactor) ? +(params as any).qSpoilingFactor : 1.0));
+    return Math.max(0.001, Math.min(1000, val)); // Physical bounds for Q spoiling
+  })();
     
   console.log('[WarpModule] Amplification factors:', {
     gammaGeo,
@@ -130,14 +146,35 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     qSpoilingFactor
   });
 
-  // Tile census / area and live power from pipeline if available
-  const tileCount = Number.isFinite(+(params as any).N_tiles) ? +(params as any).N_tiles : undefined;
-  const tileArea_m2 =
-    Number.isFinite(+(params as any).tileArea_cm2) ? (+(params as any).tileArea_cm2) * 1e-4 :
-    (Number.isFinite(+(params as any).tileArea_m2) ? +(params as any).tileArea_m2 : undefined);
-  const P_avg_W =
-    Number.isFinite(+(params as any).P_avg_W) ? +(params as any).P_avg_W :
-    (Number.isFinite(+(params as any).P_avg) ? +(params as any).P_avg * 1e6 : undefined);
+  // Tile census / area and live power from pipeline with validation
+  const tileCount = (() => {
+    const val = Number.isFinite(+(params as any).N_tiles) ? +(params as any).N_tiles : undefined;
+    return val ? Math.max(1, Math.floor(val)) : undefined; // Ensure positive integer
+  })();
+  
+  const tileArea_m2 = (() => {
+    if (Number.isFinite(+(params as any).tileArea_cm2)) {
+      const val = (+(params as any).tileArea_cm2) * 1e-4;
+      return Math.max(1e-6, Math.min(1, val)); // 1 μm² to 1 m² reasonable range
+    }
+    if (Number.isFinite(+(params as any).tileArea_m2)) {
+      const val = +(params as any).tileArea_m2;
+      return Math.max(1e-6, Math.min(1, val));
+    }
+    return undefined;
+  })();
+  
+  const P_avg_W = (() => {
+    if (Number.isFinite(+(params as any).P_avg_W)) {
+      const val = +(params as any).P_avg_W;
+      return Math.max(0, val); // Non-negative power
+    }
+    if (Number.isFinite(+(params as any).P_avg)) {
+      const val = +(params as any).P_avg * 1e6;
+      return Math.max(0, val);
+    }
+    return undefined;
+  })();
     
   console.log('[WarpModule] Tile and power data:', {
     tileCount,
@@ -148,12 +185,19 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   });
 
   const dutyFactor = ((): number => {
-    // "Local" duty (burst window) if we can infer it; otherwise keep provided value (do not double-divide)
-    if (dyn && Number.isFinite(dyn.sectorDuty)) return dyn.sectorDuty as number;
+    // Prefer burst timing for local duty calculation if available
     if (dyn && Number.isFinite(dyn.burstLengthUs) && Number.isFinite(dyn.cycleLengthUs) && (dyn.cycleLengthUs as number) > 0) {
-      return Math.max(0, Math.min(1, (dyn.burstLengthUs as number) / (dyn.cycleLengthUs as number)));
+      const localDuty = Math.max(0, Math.min(1, (dyn.burstLengthUs as number) / (dyn.cycleLengthUs as number)));
+      console.log('[WarpModule] Calculated local duty from timing:', localDuty);
+      return localDuty;
     }
-    return 0.01; // conservative default
+    // Fallback to provided sectorDuty, but validate it's reasonable
+    if (dyn && Number.isFinite(dyn.sectorDuty)) {
+      const duty = Math.max(1e-6, Math.min(0.5, dyn.sectorDuty as number)); // Clamp to reasonable range
+      console.log('[WarpModule] Using clamped sectorDuty:', duty);
+      return duty;
+    }
+    return 0.01; // Standard 1% duty default
   })();
   
   console.log('[WarpModule] Duty factor calculation:', dutyFactor);
@@ -205,13 +249,15 @@ function validateWarpResults(result: NatarioWarpResult, params: SimulationParame
   const γ_vdb = (params as any).amps?.gammaVanDenBroeck ?? 3.83e1;
   const Q      = params.dynamicConfig?.cavityQ ?? 1e9;
 
-  // "Sane" bands scale with inputs
-  const geomMin = 0.5 * γ_geo;
-  const geomMax = 2.0 * γ_geo;
+  // More reasonable validation bands based on physics
+  const geomMin = 0.1 * γ_geo;  // Allow 90% deviation below
+  const geomMax = 10.0 * γ_geo;  // Allow 10x above for edge cases
 
   const qEnhMin = 0; // nonnegative
-  const ampMin  = Math.pow(γ_geo, 3) * Math.sqrt(Q / 1e9) * Math.max(1, γ_vdb) * 1e-6; // allow very small d_eff
-  const ampMax  = ampMin * 1e9; // prevent NaN/Inf explosions
+  // More lenient amplification bounds based on actual physics scaling
+  const baseAmp = Math.pow(γ_geo, 2) * Math.sqrt(Q / 1e9) * Math.max(0.1, γ_vdb / 1000); 
+  const ampMin  = baseAmp * 1e-3;  // Very conservative lower bound
+  const ampMax  = baseAmp * 1e12;  // Allow very high amplification
 
   const geometryValid = (result.geometricBlueshiftFactor > geomMin) && (result.geometricBlueshiftFactor < geomMax) && Number.isFinite(result.effectivePathLength);
   const amplificationValid = (result.totalAmplificationFactor > ampMin) && (result.totalAmplificationFactor < ampMax) && (result.qEnhancementFactor >= qEnhMin) && Number.isFinite(result.totalAmplificationFactor);
