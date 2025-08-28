@@ -70,6 +70,7 @@ export function usePollingSmart<T = any>(
     const tick = async () => {
       if (disposed) return;
       if (document.hidden || !navigator.onLine) {
+        console.log(`[usePollingSmart] Skipping fetch - hidden: ${document.hidden}, offline: ${!navigator.onLine}`);
         ch.timer = window.setTimeout(tick, minMs); // cheap wait while hidden/offline
         return;
       }
@@ -77,13 +78,32 @@ export function usePollingSmart<T = any>(
         // cancel any in-flight request from the previous cycle
         abortWith(ch.controller, "restart");
         ch.controller = new AbortController();
-        const res = await fetch(url, { signal: ch.controller.signal });
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        
+        // Add debugging for fetch attempts
+        console.log(`[usePollingSmart] Fetching: ${url}`);
+        
+        const res = await fetch(url, { 
+          signal: ch.controller.signal,
+          // Add basic headers and timeout handling
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!res.ok) {
+          const errorMsg = `HTTP ${res.status} ${res.statusText}`;
+          console.error(`[usePollingSmart] Request failed: ${errorMsg} for ${url}`);
+          throw new Error(errorMsg);
+        }
+        
         const json = await parser(res);
         ch.last = json;
         ch.subscribers.forEach(fn => fn(json));
         if (!disposed) setErr(null);
         delayRef.current = minMs; // reset backoff on success
+        
+        console.log(`[usePollingSmart] Success: ${url}`);
       } catch (e: any) {
         // Treat our own aborts as benign: no error/backoff
         const isAbort =
@@ -91,8 +111,11 @@ export function usePollingSmart<T = any>(
           e?.message?.toLowerCase?.().includes("abort") ||
           e === "restart" ||
           e === "cleanup";
+          
         if (!disposed && !isAbort) {
-          setErr(e?.message ?? "fetch failed");
+          const errorMsg = e?.message ?? "fetch failed";
+          console.error(`[usePollingSmart] Error for ${url}:`, e);
+          setErr(errorMsg);
           delayRef.current = Math.min(
             maxMs,
             Math.max(minMs, Math.round(delayRef.current * backoffFactor))
