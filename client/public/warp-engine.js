@@ -65,7 +65,31 @@ class WarpEngine {
         });
 
         if (!this.gl) {
-            throw new Error('WebGL not supported');
+            console.error('🚨 WebGL Debug Info:');
+            console.error('  - Canvas:', canvas);
+            console.error('  - Canvas.getContext available:', typeof canvas.getContext === 'function');
+            console.error('  - WebGL2 test:', canvas.getContext('webgl2') !== null);
+            console.error('  - WebGL test:', canvas.getContext('webgl') !== null);
+            console.error('  - Navigator GPU info:', navigator.gpu ? 'Available' : 'Not available');
+            console.error('  - Hardware concurrency:', navigator.hardwareConcurrency || 'Unknown');
+            console.error('  - User Agent:', navigator.userAgent.slice(0, 100) + '...');
+            
+            // Try to get more detailed info
+            try {
+                const testCanvas = document.createElement('canvas');
+                const testGl = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+                if (testGl) {
+                    console.error('  - WebGL Renderer:', testGl.getParameter(testGl.RENDERER));
+                    console.error('  - WebGL Vendor:', testGl.getParameter(testGl.VENDOR));
+                    console.error('  - WebGL Version:', testGl.getParameter(testGl.VERSION));
+                } else {
+                    console.error('  - Test canvas WebGL context: FAILED');
+                }
+            } catch (e) {
+                console.error('  - WebGL detection error:', e.message);
+            }
+            
+            throw new Error('WebGL not supported in this environment');
         }
 
         console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
