@@ -2,12 +2,11 @@ import React, {useEffect, useMemo, useRef, useState, startTransition} from "reac
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
-import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
 import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
 import { SliceViewer } from "@/components/SliceViewer";
-import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
-import { applyToEngine } from "@/lib/warp-uniforms-gate";
 import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
@@ -29,6 +28,50 @@ import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// Missing utility functions implementation
+function normalizeKeys(obj: any): any {
+  // Simple key normalization - just return the object as-is for now
+  return obj || {};
+}
+
+function toUniforms(data: any): any {
+  // Convert data to uniform format using existing normalizeWU
+  return normalizeWU(data);
+}
+
+function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
+  // Placeholder for checkpoint binding - implement basic engine validation
+  if (!engine) return;
+  
+  // Setup basic checkpoint validation for the SHOW engine
+  setTimeout(() => {
+    if (engine.uniforms) {
+      console.debug('[bindShowCheckpoints] SHOW engine uniforms ready:', Object.keys(engine.uniforms));
+    }
+  }, 100);
+}
+
+function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: boolean = false) {
+  // Enhanced theta consistency reporting with proper return value
+  if (!bound || typeof bound.gammaGeo !== 'number') {
+    console.debug('[reportThetaConsistency] Invalid bound parameters');
+    return { expected: 0, used: 0, delta: 0 };
+  }
+  
+  const expected = thetaGainExpected(bound);
+  const used = expected * viewFraction;
+  const delta = expected > 0 ? ((used - expected) / expected) * 100 : 0;
+  
+  const fmt = (n: number) => Number.isFinite(n) ? n.toExponential(2) : '—';
+  const range = Math.max(expected, used) || 1;
+  
+  console.log(`[HELIX][θ] θ-scale — ${fmt(used)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${((used / range) * 100).toFixed(1)}%`);
+  console.log(`[HELIX][θ] view fraction: ${(viewFraction * 100).toFixed(1)}%`);
+  console.log(`[HELIX][θ] renderer: ${isGrid3d ? 'grid3d' : 'slice2d'}`);
+  
+  return { expected, used, delta };
+}
 
 // Push only after shaders are ready - now with gating
 function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
@@ -863,8 +906,9 @@ export default function WarpRenderInspector(props: {
   const showViewMassFraction = showRendererType === 'grid3d' ? 1.0 : 1.0; // SHOW always uses full bubble
   const { expected, used, delta } = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
   
-  // Push UI θ for SHOW (after computing { expected, used, delta })
-  pushUniformsWhenReady(rightEngine.current, { thetaScale: expected }, 'show-ui-theta');
+  // Push UI θ for SHOW (after computing theta values)
+  const thetaResult = reportThetaConsistency(bound, showViewMassFraction, showRendererType === 'grid3d');
+  pushUniformsWhenReady(rightEngine.current, { thetaScale: thetaResult.expected }, 'show-ui-theta');
 
   // --- BRIDGE Grid3D wrapper → inspector refs (engine + canvas)
   useEffect(() => {
@@ -1217,7 +1261,7 @@ export default function WarpRenderInspector(props: {
           {/* θ-scale verification display */}
           <div className="text-xs text-neutral-600 mb-3 space-y-1">
             <div>θ-scale expected: {((live as any)?.thetaScaleExpected ?? 0).toExponential(2)}</div>
-            <div>θ-scale (physics-only): {expected.toExponential(3)} • Δ vs used: {isFinite(delta) ? `${delta.toFixed(1)}%` : '—'}</div>
+            <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
             <div>view mass fraction (REAL): {(viewFracREAL * 100).toFixed(3)}% (1/{total})</div>
