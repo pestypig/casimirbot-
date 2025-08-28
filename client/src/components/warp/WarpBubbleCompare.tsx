@@ -151,12 +151,12 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
     p.physicsParityMode = true;
     p.parityMode = true;  // Also set the fallback field
     p.ridgeMode = 0;
-    console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
+    if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
     p.physicsParityMode = false;
     p.parityMode = false; // Also set the fallback field
     p.ridgeMode = 1;
-    console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
+    if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
 }
@@ -401,36 +401,6 @@ function attachGLContextGuards(canvas: HTMLCanvasElement, recreate: () => void) 
   }, false);
 }
 
-function applyShowSafe(e:any, payload:any) {
-  if (!e) return;
-  let applied = false;
-  const recheck = () => {
-    const anyVerts = (e?.gridVertices?.length || 0) + (e?.originalGridVertices?.length || 0);
-    const ready = anyVerts > 0 && Number.isFinite(e?.uniforms?.cameraZ);
-    if (!ready && !applied) {
-      applied = true;
-      const clean = sanitizeUniforms({ cosmeticLevel: 0, exposure: 5.5, vizGain: 1.0 });
-      if (e.isLoaded && e.gridProgram) {
-        gatedUpdateUniforms(e, clean, 'client');
-      } else {
-        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'client'));
-      }
-      e.setDisplayGain?.(1);
-      console.warn('[SHOW] cosmetics disabled as safety fallback');
-    } else if (ready && applied) {
-      // re-apply SHOW once; use whatever you computed in applyShow
-      const clean = sanitizeUniforms(payload);
-      if (e.isLoaded && e.gridProgram) {
-        gatedUpdateUniforms(e, clean, 'client');
-      } else {
-        e.onceReady?.(() => gatedUpdateUniforms(e, clean, 'client'));
-      }
-      console.log('[SHOW] re-applied boosted settings after grid ready');
-    }
-  };
-  requestAnimationFrame(recheck);
-  setTimeout(recheck, 120); // belt & suspenders
-}
 
 // (removed unused import + helper; this component computes θ-scale inline)
 
@@ -472,84 +442,7 @@ const compactCameraZ = (canvas: HTMLCanvasElement, axesScene: [number,number,num
   return (margin * R) / Math.tan(fov * 0.5);
 };
 
-/* ---------------- Overlay scrub (kills demo/ref/instant paths) ---------------- */
-function scrubOverlays(e: any) {
-  if (!e?.uniforms || !e.updateUniforms) return;
-  const u = e.uniforms;
-  const patch: any = {};
 
-  // Prefer calibrated geometry only
-  if ('modelMode' in u) patch.modelMode = 'calibrated';
-
-  for (const k of Object.keys(u)) {
-    // Only nuke obvious "reference overlays"
-    if (/(ref|reference).*(hull|ring|layer|alpha)/i.test(k)) patch[k] = 0;
-    // Keep average view on, but don't touch displacement gates
-    if (/avg|showAvg|viewAvg/i.test(k)) patch[k] = 1;
-  }
-
-  // Make sure we don't accidentally switch cameras by reusing hull
-  if ('hullAxes' in u && !patch.hullAxes) patch.hullAxes = u.hullAxes;
-  if ('axesScene' in u && !patch.axesScene) patch.axesScene = u.axesScene;
-
-  gatedUpdateUniforms(e, patch, 'client');
-}
-
-/* ---------------- Safe uniform push with compatibility shim ---------------- */
-function compatifyUniforms(raw: any) {
-  const p = { ...(raw || {}) };
-
-  // Enhanced color mode compatibility - normalize to numeric
-  const map: any = { solid: 0, theta: 1, shear: 2 };
-  if (typeof p.colorMode === 'string') p.colorMode = map[p.colorMode] ?? 0;
-  if (!Number.isFinite(p.colorMode) && Number.isFinite(p.colorModeIndex)) p.colorMode = p.colorModeIndex;
-  if (p.colorModeName == null && typeof raw?.colorMode === 'string') p.colorModeName = raw.colorMode;
-  if (p.colorModeIndex == null && Number.isFinite(p.colorMode)) p.colorModeIndex = p.colorMode;
-
-  // Sector/strobe synonyms
-  if (Number.isFinite(p.sectors)) {
-    p.sectorCount = p.sectorCount ?? p.sectors;
-  }
-  if (Number.isFinite(p.sectorIdx)) {
-    p.currentSector = p.currentSector ?? p.sectorIdx;
-    p.sectorIndex   = p.sectorIndex   ?? p.sectorIdx;
-  }
-  if (Number.isFinite(p.split)) {
-    p.sectorSplit = p.sectorSplit ?? p.split;
-  }
-
-  // Gain/boost synonyms
-  if (p.curvatureGainT != null) {
-    p.gainT      = p.gainT      ?? p.curvatureGainT;
-    p.thetaGainT = p.thetaGainT ?? p.curvatureGainT;
-  }
-  if (p.curvatureBoostMax != null) {
-    p.boostMax = p.boostMax ?? p.curvatureBoostMax;
-  }
-  if (p.curvatureGainDec != null) {
-    p.gainDec   = p.gainDec   ?? p.curvatureGainDec;
-    p.gainDecs  = p.gainDecs  ?? p.curvatureGainDec;
-    p.gainDecades = p.gainDecades ?? p.curvatureGainDec;
-  }
-
-  // Exposure synonyms
-  if (p.exposure != null) {
-    p.exposureEV = p.exposureEV ?? p.exposure;
-  }
-
-  // Camera synonyms
-  if (p.cameraZ != null) {
-    p.camZ = p.camZ ?? p.cameraZ;
-  }
-
-  // Parity synonyms
-  if (p.physicsParityMode != null) {
-    p.parityMode = p.parityMode ?? p.physicsParityMode;
-    p.isParity   = p.isParity   ?? p.physicsParityMode;
-  }
-
-  return p;
-}
 
 
 /* ---------------- Pane configurators ---------------- */
@@ -933,14 +826,7 @@ export default function WarpBubbleCompare({
       if (!eng._raf && typeof eng._renderLoop === 'function') eng._renderLoop();
       eng.start?.();
 
-      // keep sized
-      const ro = new ResizeObserver(() => {
-        const { w: w2, h: h2 } = sizeCanvas(cv);
-        eng.gl.viewport(0, 0, w2, h2);
-        eng.resize?.(w2, h2);
-      });
-      ro.observe(cv);
-      eng.__ro = ro;
+      // Sizing handled by top-level ResizeObserver
       return eng;
     };
 
@@ -1134,50 +1020,14 @@ export default function WarpBubbleCompare({
     });
     rightEngine.current.setDisplayGain?.(displayGain);
 
-    // Verify and correct parity enforcement after a short delay
-    setTimeout(() => {
-      const realParity = leftEngine.current?.uniforms?.physicsParityMode ?? leftEngine.current?.uniforms?.parityMode;
-      const showParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
-      const realRidge = leftEngine.current?.uniforms?.ridgeMode;
-      const showRidge = rightEngine.current?.uniforms?.ridgeMode;
-
-      // Force correction if parity is wrong
-      if (realParity !== true) {
-        console.log('[REAL] Forced correction applied');
-        pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ physicsParityMode: true, parityMode: true, ridgeMode: 0 })), 'REAL');
-        leftEngine.current?.forceRedraw?.();
-      }
-
-      if (showParity !== false) {
-        console.log('[SHOW] Forced correction applied');
-        pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ physicsParityMode: false, parityMode: false, ridgeMode: 1 })), 'SHOW');
-        rightEngine.current?.forceRedraw?.();
-      }
-
-      // Final verification
-      setTimeout(() => {
-        const finalRealParity = leftEngine.current?.uniforms?.physicsParityMode ?? leftEngine.current?.uniforms?.parityMode;
-        const finalShowParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
-        const finalRealRidge = leftEngine.current?.uniforms?.ridgeMode;
-        const finalShowRidge = rightEngine.current?.uniforms?.ridgeMode;
-
-        console.log('[SHOW] Post-update verification: parity=' + finalShowParity + ', ridge=' + finalShowRidge + (finalShowParity === false && finalShowRidge === 1 ? ' ✓' : ' ✗'));
-        console.log('[REAL] Post-update verification: parity=' + finalRealParity + ', ridge=' + finalRealRidge + (finalRealParity === true && finalRealRidge === 0 ? ' ✓' : ' ✗'));
-
-        if (finalRealParity === true && finalShowParity === false) {
-          console.log('✅ Parity enforcement corrected successfully');
-        } else {
-          console.error('❌ Parity enforcement still failing after correction');
-        }
-      }, 50);
-    }, 100);
+    // Redundant parity verification removed - batched writer ensures correctness
 
     // Force a draw so the user sees the change immediately
     leftEngine.current.forceRedraw?.();
     rightEngine.current.forceRedraw?.();
 
     // optional: quick console check
-    console.log('[WBC] uniforms applied', {
+    if (DEBUG) console.log('[WBC] uniforms applied', {
       real_thetaScale: real.thetaScale,
       show_thetaScale: show.thetaScale,
       sectors: real.sectors, sectorCount: real.sectorCount,

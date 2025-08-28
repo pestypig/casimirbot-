@@ -208,7 +208,7 @@ function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: bool
     const push = () => {
       try {
         gatedUpdateUniforms(engine, patch, 'client');
-        console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(patch));
+        if (DEBUG) console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(patch));
       } catch (error) {
         console.error(`[${source}] Failed to push uniforms:`, error);
       }
@@ -219,11 +219,11 @@ function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: bool
     if (isReady) {
       push();
     } else {
-      console.log(`[${source}] Engine not ready (isLoaded: ${!!engine.isLoaded}, gridProgram: ${!!engine.gridProgram}), waiting...`);
+      if (DEBUG) console.log(`[${source}] Engine not ready (isLoaded: ${!!engine.isLoaded}, gridProgram: ${!!engine.gridProgram}), waiting...`);
 
       if (typeof engine.onceReady === "function") {
         engine.onceReady(() => {
-          console.log(`[${source}] Engine ready callback triggered`);
+          if (DEBUG) console.log(`[${source}] Engine ready callback triggered`);
           push();
         });
       } else {
@@ -239,7 +239,7 @@ function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: bool
           }
 
           if (engine.isLoaded && engine.gridProgram) {
-            console.log(`[${source}] Engine became ready after ${attempts * 50}ms`);
+            if (DEBUG) console.log(`[${source}] Engine became ready after ${attempts * 50}ms`);
             push();
           } else if (attempts < maxAttempts) {
             setTimeout(checkReady, 50);
@@ -697,7 +697,7 @@ export default function WarpRenderInspector(props: {
       safe.ridgeMode = forcedRidge;
 
       // Debug logging to verify parity is being set
-      console.log(`[${pane}] Parity lock: physicsParityMode=${safe.physicsParityMode}, ridgeMode=${safe.ridgeMode}`);
+      if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=${safe.physicsParityMode}, ridgeMode=${safe.ridgeMode}`);
 
       // Call original updateUniforms
       let result = false;
@@ -788,25 +788,7 @@ export default function WarpRenderInspector(props: {
     console.log(`[${pane}] Setting initial parity:`, initialParity);
     engine.updateUniforms(initialParity);
     
-    // Periodic enforcement to catch any drift
-    const enforceInterval = setInterval(() => {
-      if (engine._destroyed) {
-        clearInterval(enforceInterval);
-        return;
-      }
-      
-      if (engine.uniforms && 
-          (engine.uniforms.physicsParityMode !== forcedParity || 
-           engine.uniforms.ridgeMode !== forcedRidge)) {
-        console.warn(`[${pane}] Parity drift detected, re-enforcing`);
-        engine.uniforms.physicsParityMode = forcedParity;
-        engine.uniforms.parityMode = forcedParity;
-        engine.uniforms.ridgeMode = forcedRidge;
-      }
-    }, 1000);
-    
-    // Store cleanup reference
-    engine.__enforceInterval = enforceInterval;
+    // Parity enforcement removed - batched writer + paneSanitize ensures correctness
   }
 
   // Helper to create engine with conditional selection and 3D fallback
@@ -1412,68 +1394,7 @@ export default function WarpRenderInspector(props: {
     gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'client');
     gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'client');
 
-    // Enhanced parity verification with detailed logging and correction
-    setTimeout(() => {
-      const realParity = leftEngine.current?.uniforms?.physicsParityMode;
-      const showParity = rightEngine.current?.uniforms?.physicsParityMode;
-      const realRidge = leftEngine.current?.uniforms?.ridgeMode;
-      const showRidge = rightEngine.current?.uniforms?.ridgeMode;
-
-      console.log('=== PARITY VERIFICATION ===');
-      console.log('REAL parity?', realParity, '(should be true)');
-      console.log('SHOW parity?', showParity, '(should be false)');
-      console.log('REAL ridge?', realRidge, '(should be 0)');
-      console.log('SHOW ridge?', showRidge, '(should be 1)');
-
-      // Check if parity enforcement failed and attempt correction
-      if (realParity !== true) {
-        console.error('❌ REAL engine parity enforcement FAILED - should be true, got:', realParity);
-        console.log('REAL uniforms.physicsParityMode:', leftEngine.current?.uniforms?.physicsParityMode);
-        console.log('REAL uniforms.parityMode:', leftEngine.current?.uniforms?.parityMode);
-        console.log('REAL expected parity:', true);
-        
-        // Attempt direct correction
-        if (leftEngine.current?.uniforms) {
-          leftEngine.current.uniforms.physicsParityMode = true;
-          leftEngine.current.uniforms.parityMode = true;
-          leftEngine.current.uniforms.ridgeMode = 0;
-          console.log('🔧 REAL parity corrected via direct assignment');
-        }
-      }
-      
-      if (showParity !== false) {
-        console.error('❌ SHOW engine parity enforcement FAILED - should be false, got:', showParity);
-        
-        // Attempt direct correction
-        if (rightEngine.current?.uniforms) {
-          rightEngine.current.uniforms.physicsParityMode = false;
-          rightEngine.current.uniforms.parityMode = false;
-          rightEngine.current.uniforms.ridgeMode = 1;
-          console.log('🔧 SHOW parity corrected via direct assignment');
-        }
-      }
-
-      // Report theta consistency after engine updates
-      const realTheta = leftEngine.current?.uniforms?.thetaScale;
-      const showTheta = rightEngine.current?.uniforms?.thetaScale;
-      console.log('Theta scales - REAL:', realTheta?.toExponential?.(2), 'SHOW:', showTheta?.toExponential?.(2));
-
-      reportThetaConsistency(bound, realViewMassFraction, false);
-      
-      // Final verification after corrections
-      setTimeout(() => {
-        const finalRealParity = leftEngine.current?.uniforms?.physicsParityMode;
-        const finalShowParity = rightEngine.current?.uniforms?.physicsParityMode;
-        
-        if (finalRealParity === true && finalShowParity === false) {
-          console.log('✅ Parity enforcement corrected successfully');
-        } else {
-          console.error('❌ Parity enforcement still failing after correction attempts');
-          console.log('Final REAL parity:', finalRealParity);
-          console.log('Final SHOW parity:', finalShowParity);
-        }
-      }, 100);
-    }, 200);
+    // Redundant parity verification removed - batched writer ensures correctness
   }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
   // Dummy uniforms for render (updated via useEffect)
@@ -1642,7 +1563,7 @@ export default function WarpRenderInspector(props: {
               <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
             )}
             {/* ⬇️ live badge */}
-            <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>
+            {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -1653,7 +1574,7 @@ export default function WarpRenderInspector(props: {
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
             <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
-            <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>
+            {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
           </div>
         </article>
       </section>
