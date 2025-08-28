@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, Monitor, Cpu, HelpCircle } from 'lucide-react';
+import { isWebGLAvailable, getWebGLContextAttributes } from '@/lib/gl/capabilities';
 
 interface WebGLCapabilities {
   hasWebGL: boolean;
@@ -11,14 +12,25 @@ interface WebGLCapabilities {
 }
 
 function detectWebGLCapabilities(): WebGLCapabilities {
+  // Use shared WebGL detection with mobile compatibility
+  if (!isWebGLAvailable()) {
+    return {
+      hasWebGL: false,
+      hasWebGL2: false,
+      error: 'WebGL APIs not available'
+    };
+  }
+  
   try {
     const canvas = document.createElement('canvas');
     canvas.width = 1;
     canvas.height = 1;
     
-    const gl2 = canvas.getContext('webgl2', { failIfMajorPerformanceCaveat: true }) as WebGL2RenderingContext | null;
-    const gl = gl2 || (canvas.getContext('webgl', { failIfMajorPerformanceCaveat: true }) as WebGLRenderingContext | null) || 
-               (canvas.getContext('experimental-webgl', { failIfMajorPerformanceCaveat: true }) as WebGLRenderingContext | null);
+    const attrs = getWebGLContextAttributes(false); // Use desktop attributes for diagnostics
+    const gl2 = canvas.getContext('webgl2', attrs) as WebGL2RenderingContext | null;
+    const webglContext = canvas.getContext('webgl', attrs) as WebGLRenderingContext | null;
+    const experimentalContext = canvas.getContext('experimental-webgl', attrs) as WebGLRenderingContext | null;
+    const gl = gl2 || webglContext || experimentalContext;
     
     if (gl) {
       const caps: WebGLCapabilities = {
@@ -65,6 +77,10 @@ export default function WebGLFallback({
 }: WebGLFallbackProps) {
   const [capabilities, setCapabilities] = useState<WebGLCapabilities | null>(null);
   
+  const isReplit = typeof window !== 'undefined' && 
+                  (window.location?.hostname?.includes('replit') || 
+                   window.location?.hostname?.includes('repl.co'));
+
   useEffect(() => {
     const caps = detectWebGLCapabilities();
     setCapabilities(caps);
@@ -84,10 +100,6 @@ export default function WebGLFallback({
     "Outdated graphics drivers",
     "Hardware acceleration disabled in browser settings"
   ];
-
-  const isReplit = typeof window !== 'undefined' && 
-                  (window.location?.hostname?.includes('replit') || 
-                   window.location?.hostname?.includes('repl.co'));
 
   const troubleshootingSteps = isReplit ? [
     "Try refreshing the page (F5 or Ctrl+R)",

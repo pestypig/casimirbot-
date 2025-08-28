@@ -1,0 +1,190 @@
+Got it — if phones still render a black screen, the early “do we even have WebGL?” probe wasn’t the only culprit. There are 4 other hotspots that commonly blank mobile:
+
+off-DOM context probes and “hard” bailouts elsewhere (other files still doing the old check)
+
+canvases sized to 0×0 (or absurdly large DPR → context init fails)
+
+visibility gating that never unmutes on mobile (waiting for events that don’t fire)
+
+real-canvas context creation attributes that are too heavy for mobile GPUs
+
+Below are drop-in patches to fix those across your app. You can paste them as-is; they’re conservative and safe.
+
+0) Add a single shared helper and use it everywhere
+
+Create client/src/lib/gl/capabilities.ts:
+
+// client/src/lib/gl/capabilities.ts
+export function isWebGLAvailable(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  // If the APIs simply don't exist, we can hard-fail.
+  const hasAPI =
+    !!(window as any).WebGL2RenderingContext ||
+    !!(window as any).WebGLRenderingContext;
+  if (!hasAPI) return false;
+
+  // Some mobile/webviews return null for off-DOM canvases even when
+  // real canvases succeed. Treat probe failure as non-fatal.
+  try {
+    const canvas = document.createElement('canvas');
+    const attrs: WebGLContextAttributes = {
+      alpha: false, antialias: false, depth: false, stencil: false,
+      preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false,
+      // Avoid “prefer-low-power” here; browsers pick a sane default on mobile.
+    };
+    const gl =
+      canvas.getContext('webgl2', attrs) ||
+      canvas.getContext('webgl', attrs) ||
+      // old iOS/Safari:
+      (canvas.getContext as any)?.('experimental-webgl', attrs);
+    return !!gl || hasAPI;
+  } catch {
+    return hasAPI;
+  }
+}
+
+export function clampMobileDPR(maxDesktop = 2, maxMobile = 1.5) {
+  const isMobile =
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(pointer: coarse)').matches ||
+     window.matchMedia?.('(max-width: 768px)').matches);
+  const dpr = window.devicePixelRatio || 1;
+  return Math.min(isMobile ? maxMobile : maxDesktop, dpr);
+}
+
+// Safe canvas sizing that prevents “too big” drawing buffers on phones.
+export function sizeCanvasSafe(cv: HTMLCanvasElement) {
+  const dpr = clampMobileDPR();
+  const rect = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(rect.width * dpr));
+  const h = Math.max(1, Math.floor(rect.height * dpr));
+
+  // Keep buffer under ~4–8MP on weak GPUs to avoid allocation failures.
+  const maxPx = 3840 * 2160; // ~8.3 MP (tweak lower if needed)
+  if (w * h > maxPx) {
+    const s = Math.sqrt(maxPx / (w * h));
+    cv.width = Math.max(1, Math.floor(w * s));
+    cv.height = Math.max(1, Math.floor(h * s));
+  } else {
+    cv.width = w;
+    cv.height = h;
+  }
+  return { w: cv.width, h: cv.height, dpr };
+}
+
+1) WarpRenderInspector — replace the local probe + hard gate, fix sizing & visibility
+
+Edits inside your posted file:
+
+Top: import the shared helpers.
+
+// add with your other imports
+import { isWebGLAvailable, sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
+
+
+Replace the old inline checker & early return:
+
+-  // WebGL detection helper
+-  const isWebGLSupported = () => {
+-    try {
+-      const canvas = document.createElement('canvas');
+-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+-      return !!gl;
+-    } catch {
+-      return false;
+-    }
+-  };
+
+
+…and in the init effect:
+
+-    // Check WebGL support before attempting to create engines
+-    if (!isWebGLSupported()) {
+-      console.warn("WebGL not supported - WarpRenderInspector will not function");
+-      setLoadError("WebGL not supported in this environment");
+-      return;
+-    }
++    // Soft check: only hard-fail if APIs are truly absent
++    if (!isWebGLAvailable()) {
++      setLoadError("WebGL not supported in this browser");
++      return;
++    }
+
+
+Ensure canvases have a non-zero buffer before constructing engines:
+
+    // REAL engine
+    if (leftRef.current && !leftEngine.current) {
+      try {
+-        const dpr = Math.min(2, window.devicePixelRatio || 1);
+-        leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
+-        leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
++        sizeCanvasSafe(leftRef.current);
+
+
+…and same for SHOW:
+
+-        const dpr = Math.min(2, window.devicePixelRatio || 1);
+-        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+-        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
++        sizeCanvasSafe(rightRef.current);
+
+
+Relax the “mute until uniforms arrive” gate (a very common mobile black-screen cause when the event never fires). Let us render immediately; when canonical uniforms arrive we’ll just update:
+
+-    // Keep engines muted until first canonical uniforms arrive
+-    if (!haveUniforms) {
+-      leftEngine.current?.setVisible?.(false);
+-      rightEngine.current?.setVisible?.(false);
+-      ...
+-    }
++    // Let engines render immediately; canonical uniforms will override later.
++    leftEngine.current?.setVisible?.(true);
++    rightEngine.current?.setVisible?.(true);
+
+
+Your later “physics application” effect also gates visibility:
+
+-    const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
+-    leftEngine.current.setVisible?.(ready);
+-    rightEngine.current.setVisible?.(ready);
++    // Don't hide on mobile — render even if metrics lag behind.
++    leftEngine.current.setVisible?.(true);
++    rightEngine.current.setVisible?.(true);
+
+
+Tighten the ResizeObserver sizing to use the shared helper and force a draw:
+
+  useEffect(() => {
+    const ro = new ResizeObserver(() => {
+-      const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+-      const dpr = isMobile ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1);
+-      for (const c of [leftRef.current, rightRef.current]) {
+-        if (!c) continue;
+-        const w = Math.max(1, Math.floor((c.clientWidth  || 1) * dpr));
+-        const h = Math.max(1, Math.floor((c.clientHeight || 1) * dpr));
+-        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+-      }
+-      leftEngine.current?._resize?.();
+-      rightEngine.current?._resize?.();
++      for (const c of [leftRef.current, rightRef.current]) {
++        if (!c) continue;
++        sizeCanvasSafe(c);
++      }
++      leftEngine.current?.gl?.viewport?.(0, 0, leftRef.current?.width || 1, leftRef.current?.height || 1);
++      rightEngine.current?.gl?.viewport?.(0, 0, rightRef.current?.width || 1, rightRef.current?.height || 1);
++      leftEngine.current?.forceRedraw?.();
++      rightEngine.current?.forceRedraw?.();
+    });
+
+
+After both engines are created, add a first-frame nudge (some Android GPUs won’t paint until a frame is requested):
+
+    // bootstrap both
+    leftEngine.current?.bootstrap({ ...realPayload });
+    rightEngine.current?.bootstrap({ ...showPayload });
+
++   // Mobile nudge: ensure we get a first frame even if observers haven't fired yet
++   leftEngine.current?.forceRedraw?.();
++   rightEngine.current?.forceRedraw?.();

@@ -11,6 +11,7 @@ import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isWebGLAvailable, sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 
 /**
  * WarpRenderInspector
@@ -51,6 +52,16 @@ function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
       console.debug('[bindShowCheckpoints] SHOW engine uniforms ready:', Object.keys(engine.uniforms));
     }
   }, 100);
+}
+
+// Simple theta calculation helper (early definition to avoid hoisting issues)
+function thetaGainExpected(bound: any): number {
+  if (!bound) return 0;
+  const { gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR } = bound;
+  return Math.pow(Number(gammaGeo) || 0, 3) *
+         (Number(qSpoilingFactor) || 1) *
+         (Number(gammaVdB) || 1) *
+         (Number(dutyEffectiveFR) || 1);
 }
 
 function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: boolean = false) {
@@ -705,31 +716,7 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
-  // WebGL detection helper (soft): presence of APIs is enough.
-  // Some mobile browsers/webviews return null for off-DOM test canvases even though
-  // real canvases will create a context just fine.
-  const isWebGLAvailable = () => {
-    if (typeof window === 'undefined') return false;
-    const hasAPI =
-      !!(window as any).WebGL2RenderingContext ||
-      !!(window as any).WebGLRenderingContext;
-    if (!hasAPI) return false;
-    // Try a context, but don't treat failure here as fatal.
-    try {
-      const canvas = document.createElement('canvas');
-      const attrs: WebGLContextAttributes = {
-        alpha: false, antialias: false, depth: false, stencil: false,
-        preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false,
-      };
-      const gl =
-        (canvas.getContext('webgl2', attrs) as any) ||
-        (canvas.getContext('webgl', attrs) as any) ||
-        (canvas.getContext('experimental-webgl' as any, attrs as any) as any);
-      return !!gl || hasAPI;
-    } catch {
-      return hasAPI;
-    }
-  };
+  // Use shared WebGL detection from gl/capabilities
 
   // Engine creation & lifecycle
   useEffect(() => {
@@ -740,8 +727,7 @@ export default function WarpRenderInspector(props: {
       return;
     }
 
-    // Only hard-fail if the APIs are genuinely absent.
-    // Otherwise let the engine try to create a real context on real canvases.
+    // Soft check: only hard-fail if APIs are truly absent
     if (!isWebGLAvailable()) {
       setLoadError("WebGL not supported in this browser");
       return;
@@ -758,9 +744,7 @@ export default function WarpRenderInspector(props: {
     // REAL engine
     if (leftRef.current && !leftEngine.current) {
       try {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
-        leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
+        sizeCanvasSafe(leftRef.current);
 
         // Clear any existing engine on this canvas
         delete (leftRef.current as any).__warpEngine;
@@ -777,7 +761,8 @@ export default function WarpRenderInspector(props: {
           ridgeMode: 0
         }, 'real-init');
 
-        leftEngine.current?.setVisible?.(false);
+        // Let engines render immediately; canonical uniforms will override later
+        leftEngine.current?.setVisible?.(true);
         lockPane(leftEngine.current, 'REAL');
 
       } catch (error) {
@@ -790,9 +775,7 @@ export default function WarpRenderInspector(props: {
     // SHOW engine
     if (rightRef.current && !rightEngine.current) {
       try {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+        sizeCanvasSafe(rightRef.current);
 
         // Clear any existing engine on this canvas
         delete (rightRef.current as any).__warpEngine;
@@ -809,7 +792,8 @@ export default function WarpRenderInspector(props: {
           ridgeMode: 1
         }, 'show-init');
 
-        rightEngine.current?.setVisible?.(false);
+        // Let engines render immediately; canonical uniforms will override later
+        rightEngine.current?.setVisible?.(true);
         lockPane(rightEngine.current, 'SHOW');
 
         // attach SHOW checkpoints so the panel/devtools get live data
@@ -827,6 +811,10 @@ export default function WarpRenderInspector(props: {
     // bootstrap both
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
+
+    // Mobile nudge: ensure we get a first frame even if observers haven't fired yet
+    leftEngine.current?.forceRedraw?.();
+    rightEngine.current?.forceRedraw?.();
 
     leftEngine.current?.onceReady?.(() => {
       // Ensure axesClip exists for a reliable cameraZ
@@ -913,10 +901,10 @@ export default function WarpRenderInspector(props: {
       }
     });
 
-    // Keep engines muted until first canonical uniforms arrive
+    // Let engines render immediately; canonical uniforms will override later.
+    leftEngine.current?.setVisible?.(true);
+    rightEngine.current?.setVisible?.(true);
     if (!haveUniforms) {
-      leftEngine.current?.setVisible?.(false);
-      rightEngine.current?.setVisible?.(false);
       if (leftEngine.current) {
         leftEngine.current.updateUniforms?.({
           physicsParityMode: true,
@@ -1236,10 +1224,9 @@ export default function WarpRenderInspector(props: {
     if (!leftEngine.current) return;
     if (!rightEngine.current) return; // ⬅️ add this when SHOW uses JS engine
 
-    // Gate first paint until canonical uniforms arrive (prevents averaging race)
-    const ready = Boolean((live as any)?.thetaScaleExpected && props.lightCrossing?.dwell_ms);
-    leftEngine.current.setVisible?.(ready);
-    rightEngine.current.setVisible?.(ready);
+    // Don't hide on mobile — render even if metrics lag behind.
+    leftEngine.current.setVisible?.(true);
+    rightEngine.current.setVisible?.(true);
 
     // Debug toggle calculations
     const autoExp = N(props.parityPhys?.exposure ?? live?.exposure, 5.0);
@@ -1413,18 +1400,14 @@ export default function WarpRenderInspector(props: {
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
     const ro = new ResizeObserver(() => {
-      // Mobile-optimized device pixel ratio (avoid excessive resolution on mobile)
-      const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-      const dpr = isMobile ? Math.min(1.5, window.devicePixelRatio || 1) : Math.min(2, window.devicePixelRatio || 1);
-      
       for (const c of [leftRef.current, rightRef.current]) {
         if (!c) continue;
-        const w = Math.max(1, Math.floor((c.clientWidth  || 1) * dpr));
-        const h = Math.max(1, Math.floor((c.clientHeight || 1) * dpr));
-        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+        sizeCanvasSafe(c);
       }
-      leftEngine.current?._resize?.();
-      rightEngine.current?._resize?.();
+      leftEngine.current?.gl?.viewport?.(0, 0, leftRef.current?.width || 1, leftRef.current?.height || 1);
+      rightEngine.current?.gl?.viewport?.(0, 0, rightRef.current?.width || 1, rightRef.current?.height || 1);
+      leftEngine.current?.forceRedraw?.();
+      rightEngine.current?.forceRedraw?.();
     });
     leftRef.current && ro.observe(leftRef.current);
     rightRef.current && ro.observe(rightRef.current);
