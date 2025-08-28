@@ -66,7 +66,7 @@ export interface NatarioWarpResult {
   qEnhancementFactor: number;           // √(Q / Q0)
   totalAmplificationFactor: number;     // per-pulse: γ_geo³ × γ_VdB × √Q × (qSpoil)
 
-  // Energy and mass (time-averaged) 
+  // Energy and mass (time-averaged)
   baselineEnergyDensity: number;        // J/m³ (from gap)
   amplifiedEnergyDensity: number;       // J/m³ (includes d_eff)
   exoticMassPerTile: number;            // kg (time-averaged)
@@ -178,34 +178,50 @@ export function calculateSectorStrobing(
 
 /**
  * Calculate Natário shift vector field β(r) for zero-expansion warp bubble
+ * This creates the actual shift field used for grid visualization
  */
 export function calculateNatarioShiftField(
   params: NatarioWarpParams,
   _totalExoticMass: number
 ): NatarioShiftField {
-  const { shiftAmplitude, bowlRadius } = params;
+  const { shiftAmplitude, bowlRadius, effectiveDuty } = params;
+  const R = Math.max(1e-12, bowlRadius * 1e-6); // μm → m
 
-  // Radial profile for zero-expansion condition
-  // β(r) = A × f(r/R) where f ensures smooth center & finite support
+  // Natário shift vector profile for zero-expansion bubble
+  // β(r) follows the classic "Mexican hat" profile with smooth transitions
   const radialProfile = (r: number): number => {
-    const R = Math.max(1e-12, bowlRadius * 1e-6); // μm → m
-    const ρ = r / R;
-    if (ρ <= 1) {
-      // C¹ smooth “ease-in-out” profile
-      return shiftAmplitude * (ρ * ρ) * (3 - 2 * ρ);
+    const ρ = Math.abs(r) / R;
+
+    if (ρ <= 0.5) {
+      // Inner region: smooth rise from center
+      const t = ρ / 0.5;
+      return shiftAmplitude * t * t * (3 - 2 * t);
+    } else if (ρ <= 1.0) {
+      // Outer region: peak and smooth decline to zero at boundary
+      const t = (ρ - 0.5) / 0.5;
+      return shiftAmplitude * (1 - t * t * (3 - 2 * t));
+    } else if (ρ <= 2.0) {
+      // Extended transition region with 1/r² falloff
+      return shiftAmplitude * 0.25 / (ρ * ρ);
+    } else {
+      // Far field: exponential decay
+      return shiftAmplitude * Math.exp(-(ρ - 2.0));
     }
-    // Outside the active region: 1/r² falloff
-    return shiftAmplitude / (ρ * ρ);
   };
 
-  // Sector strobing phases (N_+ and N_- amplitudes)
-  const positivePhaseAmplitude = shiftAmplitude * (1 + Math.max(0, params.effectiveDuty));
-  const negativePhaseAmplitude = shiftAmplitude * (1 - Math.max(0, params.effectiveDuty));
+  // Sector strobing creates time-varying amplitude
+  // Effective duty cycle modulates the net shift strength
+  const d_eff = Math.max(0, Math.min(1, effectiveDuty));
+  const positivePhaseAmplitude = shiftAmplitude * (1 + 0.5 * d_eff);
+  const negativePhaseAmplitude = shiftAmplitude * (1 - 0.5 * d_eff);
   const netShiftAmplitude = positivePhaseAmplitude - negativePhaseAmplitude;
 
-  // Tangential and axial components (curl-free construction)
-  const tangentialComponent = 0; // β_θ = 0 for axial symmetry
-  const axialComponent = Array.isArray(params.betaTiltVec) ? shiftAmplitude * (params.betaTiltVec[2] ?? 0) : 0;
+  // For visualization: include small tilt components
+  // These create the "purple grid" effect by slightly breaking symmetry
+  const tangentialComponent = netShiftAmplitude * 0.1; // Small θ component for visualization
+  const axialComponent = Array.isArray(params.betaTiltVec)
+    ? netShiftAmplitude * (params.betaTiltVec[2] ?? 0.05)
+    : netShiftAmplitude * 0.05; // Small z component
 
   return {
     amplitude: shiftAmplitude,
@@ -326,7 +342,7 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
     params.bowlRadius,
     params.sagDepth,
     params.gap,
-    { 
+    {
       gammaGeo: params.gammaGeo,
       gammaVanDenBroeck: params.gammaVanDenBroeck
     }
