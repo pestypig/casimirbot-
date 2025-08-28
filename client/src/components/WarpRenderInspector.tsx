@@ -417,6 +417,7 @@ export default function WarpRenderInspector(props: {
   const realRendererType = props.realRenderer || 'slice2d';
   const showRendererType = props.showRenderer || 'grid3d';
   const [haveUniforms, setHaveUniforms] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Live energy pipeline data for diagnostics
   const { data: live } = useEnergyPipeline({
@@ -543,36 +544,66 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
+  // WebGL detection helper
+  const isWebGLSupported = () => {
+    try {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      return !!gl;
+    } catch {
+      return false;
+    }
+  };
+
   // Engine creation & lifecycle
   useEffect(() => {
     const W: any = (window as any).WarpEngine;
     if (!W) { console.error("WarpEngine not found on window. Load warp-engine.js first."); return; }
 
+    // Check WebGL support before attempting to create engines
+    if (!isWebGLSupported()) {
+      console.warn("WebGL not supported - WarpRenderInspector will not function");
+      setLoadError("WebGL not supported in this environment");
+      return;
+    }
+
     // REAL (unchanged)
     if (leftRef.current && !leftEngine.current) {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
-      leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
-      leftEngine.current = W.getOrCreate?.(leftRef.current) || new W(leftRef.current);
-      leftOwnedRef.current = true;
-      gatedUpdateUniforms(leftEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
-      leftEngine.current?.setVisible?.(false);
-      lockPane(leftEngine.current, 'REAL');
+      try {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        leftRef.current.width  = Math.max(1, Math.floor((leftRef.current.clientWidth  || 800) * dpr));
+        leftRef.current.height = Math.max(1, Math.floor((leftRef.current.clientHeight || 450) * dpr));
+        leftEngine.current = W.getOrCreate?.(leftRef.current) || new W(leftRef.current);
+        leftOwnedRef.current = true;
+        gatedUpdateUniforms(leftEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
+        leftEngine.current?.setVisible?.(false);
+        lockPane(leftEngine.current, 'REAL');
+      } catch (error) {
+        console.error("Failed to create REAL engine:", error);
+        setLoadError("Failed to initialize WebGL engine");
+        return;
+      }
     }
 
     // SHOW — use plain WarpEngine (fast path), not the TSX wrapper
     if (rightRef.current && !rightEngine.current) {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
-      rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
-      rightEngine.current = W.getOrCreate?.(rightRef.current) || new W(rightRef.current);
-      rightOwnedRef.current = true;
-      gatedUpdateUniforms(rightEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
-      rightEngine.current?.setVisible?.(false);
-      lockPane(rightEngine.current, 'SHOW');
+      try {
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        rightRef.current.width  = Math.max(1, Math.floor((rightRef.current.clientWidth  || 800) * dpr));
+        rightRef.current.height = Math.max(1, Math.floor((rightRef.current.clientHeight || 450) * dpr));
+        rightEngine.current = W.getOrCreate?.(rightRef.current) || new W(rightRef.current);
+        rightOwnedRef.current = true;
+        gatedUpdateUniforms(rightEngine.current, { exposure: 5.0, zeroStop: 1e-7 }, 'mute');
+        rightEngine.current?.setVisible?.(false);
+        lockPane(rightEngine.current, 'SHOW');
 
-      // attach SHOW checkpoints so the panel/devtools get live data
-      bindShowCheckpoints(rightEngine.current, rightRef.current);
+        // attach SHOW checkpoints so the panel/devtools get live data
+        bindShowCheckpoints(rightEngine.current, rightRef.current);
+      } catch (error) {
+        console.error("Failed to create SHOW engine:", error);
+        setLoadError("Failed to initialize WebGL engine");
+        return;
+      }
     }
 
     // No extra hard lock — lockPane is the single authority now.
@@ -1159,6 +1190,26 @@ export default function WarpRenderInspector(props: {
       });
     });
   };
+
+  // Show error state if WebGL is not supported
+  if (loadError) {
+    return (
+      <div className="w-full grid gap-4 p-4">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+          <h3 className="text-lg font-semibold text-red-800">WebGL Not Supported</h3>
+          <p className="text-red-600 mt-2">{loadError}</p>
+          <p className="text-sm text-red-500 mt-2">
+            The Warp Render Inspector requires WebGL support. This may occur in:
+          </p>
+          <ul className="text-sm text-red-500 mt-1 ml-4 list-disc">
+            <li>Headless environments or CI/CD systems</li>
+            <li>Browsers with WebGL disabled</li>
+            <li>Virtual machines without GPU acceleration</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full grid gap-4 p-4">
