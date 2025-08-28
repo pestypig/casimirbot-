@@ -960,7 +960,7 @@ export default function HelixCasimirAmplifier({
               </h4>
               <CavitySideView
                 key={`${tileWidthMM}|${gap_nm_display}|${sag_nm_display}|${lc?.onWindow ? 1 : 0}`}
-                pocketDiameter_um={40}
+                pocketDiameter_um={2000} // Increase to 2mm for visibility with 50mm tile
                 sag_nm={sag_nm_display}
                 gap_nm={gap_nm_display}
                 topMirror_thick_um={1.5}
@@ -976,8 +976,8 @@ export default function HelixCasimirAmplifier({
 
                 // READABILITY: keep X to-scale, exaggerate Y only, plus a gap zoom inset
                 pxPerUmX={undefined}           // auto-fit the tile horizontally
-                verticalExaggeration={5000}    // make nm-scale clearly visible
-                gapInsetMagnification={12000}  // inset zoom of the stack
+                verticalExaggeration={8000}    // make nm-scale clearly visible (increased for 1nm gap)
+                gapInsetMagnification={15000}  // inset zoom of the stack (increased for better visibility)
                 fontScale={1.15}
               />
             </div>
