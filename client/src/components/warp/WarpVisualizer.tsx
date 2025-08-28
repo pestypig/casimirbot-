@@ -338,7 +338,22 @@ useEffect(() => {
     // single bootstrap: fit + all uniforms in one shot
     engine.bootstrap(uniforms);
 
-    // 🎯 seed cameraZ so “CameraZ unset” never trips (via gate)
+    // CRITICAL: Force parity mode immediately after bootstrap
+    if (parity) {
+      console.log('[WarpVisualizer] Enforcing parity mode after bootstrap');
+      gatedUpdateUniforms(engine, { 
+        physicsParityMode: true, 
+        ridgeMode: 0,
+        exposure: 3.5,
+        zeroStop: 1e-5,
+        vizGain: 1,
+        curvatureGainDec: 0,
+        curvatureBoostMax: 1,
+        curvatureGainT: 0,
+      }, 'client');
+    }
+
+    // 🎯 seed cameraZ so "CameraZ unset" never trips (via gate)
     try {
       const camZ0 = computeCameraZ(axesSceneSeed, canvasRef.current!);
       gatedUpdateUniforms(engine, { cameraZ: camZ0, lockFraming: true }, 'client');
@@ -554,39 +569,43 @@ useEffect(() => {
     }
   };
 
-  const el = canvasRef.current;
-  if (!el) return;
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(([entry]) => {
-      if (entry.isIntersecting) {
-        init();
-        io.disconnect();
-      }
-    }, { root: null, rootMargin: '200px 0px', threshold: 0.01 });
-    io.observe(el);
-    return () => io.disconnect();
-  }
-  // Fallback for very old browsers
-  init();
+  // Initialize engine on intersection or directly
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver(([entry]) => {
+        if (entry.isIntersecting) {
+          init();
+          io.disconnect();
+        }
+      }, { root: null, rootMargin: '200px 0px', threshold: 0.01 });
+      io.observe(el);
+      return () => io.disconnect();
+    }
+    // Fallback for very old browsers
+    init();
 
-  return () => {
-    cancelled = true;
-    if (watchdog) clearTimeout(watchdog);
+    return () => {
+      // Cleanup function
+      // cancelled = true; // This is handled at the top of the effect
+      if (watchdog) clearTimeout(watchdog);
 
-    try {
-      (engineRef.current as any)?.__resizeObserver?.disconnect?.();
-    } catch {}
+      try {
+        (engineRef.current as any)?.__resizeObserver?.disconnect?.();
+      } catch {}
 
-    try {
-      (engineRef.current as any)?.__strobingCleanup?.();
-    } catch {}
+      try {
+        (engineRef.current as any)?.__strobingCleanup?.();
+      } catch {}
 
-    try { engineRef.current?.destroy?.(); } catch {}
-    engineRef.current = null;
-  };
-  // re-run on retry
-}, [initNonce]);
+      try { engineRef.current?.destroy?.(); } catch {}
+      engineRef.current = null;
+    };
+  // Re-run init if nonce changes (e.g., on retry)
+  }, [initNonce]); // Include initNonce in dependencies
 
+  // Live updates to parameters
   useEffect(() => {
     if (!isLoaded || !engineRef.current) return;
     const lc = parameters.lightCrossing;
@@ -645,7 +664,7 @@ useEffect(() => {
         dutyCycle: parameters.dutyCycle,
         dutyShip: parameters.dutyEffectiveFR ?? parameters.dutyCycle,
         sectorCount: sectorCountResolved,
-        gammaGeo: gammaGeo,
+        gammaGeo,
         gammaVanDenBroeck: num(parameters.gammaVanDenBroeck, 1.4e5),
         qCavity: qCavity,
         qSpoilingFactor: qSpoil,
@@ -704,7 +723,6 @@ useEffect(() => {
           curvatureGainDec: 0,
           curvatureBoostMax: 1,
           curvatureGainT: 0,
-          displayGain: 1,
         } : {
           exposure: 6,
           zeroStop: 1e-7,
@@ -750,7 +768,7 @@ useEffect(() => {
         ),
 
         curvatureGainDec: parity ? 0 : Math.max(0, Math.min(8, parameters.curvatureGainDec ?? 0)),
-        curvatureBoostMax: parity ? 1 : Math.max(1, parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
+        curvatureBoostMax: parity ? 1 : Math.max(1, parameters.curvatureBoostMax ?? 40),
         curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
 
         colorMode: (() => {
@@ -775,8 +793,9 @@ useEffect(() => {
     } catch (e) {
       console.warn("WarpVisualizer live update failed:", e);
     }
-  }, [parameters, parameters.lightCrossing, isLoaded]);
+  }, [parameters, parameters.lightCrossing, isLoaded]); // Rerun on relevant parameter changes and load state
 
+  // Handle window resize events to update canvas and camera
   useEffect(() => {
     const handleResize = () => {
       if (engineRef.current && canvasRef.current) {
@@ -796,40 +815,43 @@ useEffect(() => {
     };
 
     if (isLoaded && engineRef.current) {
-      handleResize();
+      handleResize(); // Initial call to set correct size on load
     }
 
     window.addEventListener('resize', handleResize);
+    // Cleanup on component unmount
     return () => window.removeEventListener('resize', handleResize);
-  }, [isLoaded]);
+  }, [isLoaded]); // Re-run if loaded state changes
 
-  // Wire up diagnostics callback
+  // Wire up diagnostics callback from the engine
   useEffect(() => {
     if (!engineRef.current) return;
     engineRef.current.onDiagnostics = (d: any) => setDiag(d);
+    // Cleanup: remove the callback when component unmounts or engine is destroyed
     return () => { if (engineRef.current) engineRef.current.onDiagnostics = null; };
-  }, [isLoaded]);
+  }, [isLoaded]); // Dependency on isLoaded ensures engineRef.current is available
 
   // Keyboard controls for live tilt tuning
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!engineRef.current) return;
-      if (e.key === ']') {
+      if (e.key === ']') { // Increase tilt gain
         engineRef.current.uniforms.tiltGain = (engineRef.current.uniforms.tiltGain ?? 0.25) * 1.25;
         engineRef.current.requestRewarp?.();
-      } else if (e.key === '[') {
+      } else if (e.key === '[') { // Decrease tilt gain
         engineRef.current.uniforms.tiltGain = (engineRef.current.uniforms.tiltGain ?? 0.25) / 1.25;
         engineRef.current.requestRewarp?.();
       }
     };
     window.addEventListener('keydown', onKey);
+    // Cleanup: remove event listener on component unmount
     return () => window.removeEventListener('keydown', onKey);
-  }, [isLoaded]);
+  }, [isLoaded]); // Depend on isLoaded to ensure engine is ready
 
-  // Compute the same display boost used by SliceViewer
+  // Compute the same display boost used by SliceViewer for exaggeration
   function computeDisplayBoost(curvatureGainDec: number, curvatureBoostMax = 40) {
     const t = Math.max(0, Math.min(1, curvatureGainDec / 8));
-    return (1 - t) + t * curvatureBoostMax; // 1..curvatureBoostMax
+    return (1 - t) + t * curvatureBoostMax; // Scales from 1 to curvatureBoostMax
   }
 
   // Display gain multiplier effect - respects physics parity mode
@@ -837,64 +859,68 @@ useEffect(() => {
     if (!engineRef.current) return;
 
     if (parameters.physicsParityMode) {
-      engineRef.current.setDisplayGain?.(1);              // userGain = 1
-      gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client');
+      engineRef.current.setDisplayGain?.(1);              // userGain = 1 for parity mode
+      gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client'); // Ensure shader also uses neutral gain
       return;
     }
 
+    // Calculate exaggeration boost for non-parity modes
     const boost = computeDisplayBoost(
       parameters.curvatureGainDec ?? 0,
       parameters.curvatureBoostMax ?? 40
     );
-    engineRef.current.setDisplayGain?.(boost);            // userGain = boost (geometry + shader)
-    gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client'); // keep shader's u_displayGain neutral
+    engineRef.current.setDisplayGain?.(boost);            // Apply boost to userGain (influences geometry & shader)
+    gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client'); // Keep shader's internal u_displayGain neutral
     console.log(`🎛️ EXAGGERATION (userGain): ×${boost.toFixed(2)}`);
   }, [
     parameters.physicsParityMode,
     parameters.curvatureGainDec,
     parameters.curvatureBoostMax,
-    isLoaded
+    isLoaded // Ensure this effect runs after the engine is loaded
   ]);
 
+  // Effect to set the global scene scale and update the engine
   useEffect(() => {
     const s = Number(parameters.gridScale ?? 1.0);
-    (window as any).sceneScale = Number.isFinite(s) ? s : 1.0;
+    (window as any).sceneScale = Number.isFinite(s) ? s : 1.0; // Update global sceneScale
 
     if (engineRef.current?.setSceneScale) {
-      engineRef.current.setSceneScale((window as any).sceneScale);
-      engineRef.current.requestRewarp?.();
+      engineRef.current.setSceneScale((window as any).sceneScale); // Apply scale to the engine
+      engineRef.current.requestRewarp?.(); // Request a rewarp to apply the scale change
     }
-  }, [parameters.gridScale, isLoaded]);
+  }, [parameters.gridScale, isLoaded]); // Rerun when gridScale or loaded state changes
 
+  // Toggle animation (Play/Pause button functionality)
   const toggleAnimation = () => {
     setIsRunning(prev => {
       const next = !prev;
       if (engineRef.current) {
         if (next) {
-          engineRef.current._startRenderLoop?.();
+          engineRef.current._startRenderLoop?.(); // Restart render loop
         } else if (engineRef.current.animationId) {
-          cancelAnimationFrame(engineRef.current.animationId);
+          cancelAnimationFrame(engineRef.current.animationId); // Stop render loop
           engineRef.current.animationId = null;
         }
       }
-      return next;
+      return next; // Update state
     });
   };
 
+  // Reset view function (reapplies current uniforms)
   const resetView = () => {
     if (!engineRef.current) return;
-    const u = engineRef.current.uniforms || {};
-    gatedUpdateUniforms(engineRef.current, { ...u }, 'client');
-    if (engineRef.current.requestRewarp) engineRef.current.requestRewarp();
+    const u = engineRef.current.uniforms || {}; // Get current uniforms
+    gatedUpdateUniforms(engineRef.current, { ...u }, 'client'); // Reapply them to reset
+    if (engineRef.current.requestRewarp) engineRef.current.requestRewarp(); // Request rewarp
   };
 
   // Safety: if shader ready callback was missed (older drivers), unhide after first RAF
   useEffect(() => {
     if (!isLoaded && engineRef.current) {
-      const id = requestAnimationFrame(() => setIsLoaded(true));
-      return () => cancelAnimationFrame(id);
+      const id = requestAnimationFrame(() => setIsLoaded(true)); // Force loaded state after first frame
+      return () => cancelAnimationFrame(id); // Cleanup animation frame
     }
-  }, [isLoaded]);
+  }, [isLoaded]); // Only run if isLoaded is false and engine is present
 
   return (
     <Card className="h-full">
@@ -914,8 +940,8 @@ useEffect(() => {
               variant="outline"
               size="sm"
               onClick={() => {
-                toggleAnimation();
-                zenLongToast("helix:pulse", {
+                toggleAnimation(); // Toggle the animation state
+                zenLongToast("helix:pulse", { // Show a toast notification
                   duty: parameters.dutyCycle,
                   freqGHz: 15.0, // Based on 15 GHz from TS ratio
                   sectors: parameters.sectorStrobing || 1,
@@ -926,14 +952,14 @@ useEffect(() => {
               }}
               data-testid="button-toggle-animation"
             >
-              {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />} {/* Icon changes based on running state */}
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                resetView();
-                zenLongToast("helix:diagnostics", {
+                resetView(); // Reset the camera view
+                zenLongToast("helix:diagnostics", { // Show a toast notification
                   zeta: VIS.zetaDefault,
                   tsRatio: parameters.tsRatio,
                   frOk: true,
@@ -943,7 +969,7 @@ useEffect(() => {
               }}
               data-testid="button-reset-view"
             >
-              <RotateCcw className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4" /> {/* Rotate icon */}
             </Button>
           </div>
         </div>
@@ -952,29 +978,29 @@ useEffect(() => {
         <div 
           className="relative w-full bg-slate-900 rounded-lg overflow-hidden border border-slate-700"
           style={{ 
-            aspectRatio: '16 / 9',
-            width: 'min(100%, 900px)',
-            minHeight: '320px'
+            aspectRatio: '16 / 9', // Maintain 16:9 aspect ratio
+            width: 'min(100%, 900px)', // Max width constraint
+            minHeight: '320px' // Minimum height
           }}
         >
           <canvas
-            ref={canvasRef}
+            ref={canvasRef} // Attach ref for accessing the canvas element
             className="w-full h-full block transition-opacity duration-200"
             style={{ 
-              opacity: isLoaded ? 1 : 0,
+              opacity: isLoaded ? 1 : 0, // Fade in when loaded
               width: '100%',
               height: '100%',
               display: 'block'
             }}
-            width={VIS.canvasWidthDefault}
-            height={VIS.canvasHeightDefault}
+            width={VIS.canvasWidthDefault} // Default canvas width
+            height={VIS.canvasHeightDefault} // Default canvas height
             data-testid="canvas-warp-bubble"
           />
-          {!isLoaded && (
+          {!isLoaded && ( // Loading indicator
             <div className="absolute inset-0 flex items-center justify-center text-white/70">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div>
-                <div className="text-sm">{loadingState.message}</div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mb-2 mx-auto"></div> {/* Spinner */}
+                <div className="text-sm">{loadingState.message}</div> {/* Loading message */}
                 {loadingState.type === 'compiling' && (
                   <div className="text-xs text-yellow-400 mt-1">
                     ⚡ Non-blocking shader compilation in progress...
@@ -983,14 +1009,14 @@ useEffect(() => {
               </div>
             </div>
           )}
-          {loadError && (
+          {loadError && ( // Error display
             <div className="absolute inset-0 grid place-items-center bg-black/60 text-red-200 px-4">
               <div className="max-w-md text-center space-y-3">
-                <div className="font-mono text-sm">{loadError}</div>
+                <div className="font-mono text-sm">{loadError}</div> {/* Error message */}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setInitNonce(n => n + 1)}
+                  onClick={() => setInitNonce(n => n + 1)} // Retry button
                   className="mx-auto"
                 >
                   Retry Load
