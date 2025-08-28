@@ -47,6 +47,17 @@ function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
   };
 }
 
+// Low-FPS mode for coarse/phone: stop the engine's RAF, render at ~12fps
+function enableLowFps(engine: any, fps = 12) {
+  if (!IS_COARSE) return;
+  try { engine.stop?.(); } catch {}
+  if (engine.__lowFpsTimer) clearInterval(engine.__lowFpsTimer);
+  engine.__lowFpsTimer = setInterval(() => {
+    // draw only if there were uniform changes or a resize; batched push already redraws
+    engine._render ? engine._render() : engine.forceRedraw?.();
+  }, Math.max(30, Math.floor(1000 / Math.max(1, fps))));
+}
+
 // Wait until the engine is really ready, then compute camera once and draw once
 async function firstCorrectFrame({
   engine, canvas, sharedAxesScene, pane
@@ -918,52 +929,33 @@ export default function WarpRenderInspector(props: {
     leftEngine.current?.bootstrap({ ...realPayload });
     rightEngine.current?.bootstrap({ ...showPayload });
 
-    // Mobile nudge: ensure we get a first frame even if observers haven't fired yet
-    leftEngine.current?.forceRedraw?.();
-    rightEngine.current?.forceRedraw?.();
+    // Build shared frame data once
+    const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+    const shared = {
+      axesScene: deriveAxesClip(hull, 1) as [number,number,number]
+    };
 
-    leftEngine.current?.onceReady?.(() => {
-      // Ensure axesClip exists for a reliable cameraZ
-      let ax = leftEngine.current?.uniforms?.axesClip;
-      if (!ax) {
-        const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-        ax = deriveAxesClip(hull, 1);
-        gatedUpdateUniforms(leftEngine.current, { axesClip: ax }, 'client');
-      }
-      const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(leftEngine.current, { cameraZ: cz, lockFraming: true }, 'client');
-      // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
-      setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
+    // After creating both engines and building `shared` once:
+    await firstCorrectFrame({
+      engine: leftEngine.current,
+      canvas: leftRef.current!,
+      sharedAxesScene: shared.axesScene,
+      pane: 'REAL'
+    });
+    await firstCorrectFrame({
+      engine: rightEngine.current,
+      canvas: rightRef.current!,
+      sharedAxesScene: shared.axesScene,
+      pane: 'SHOW'
     });
 
-    rightEngine.current?.onceReady?.(() => {
-      // seed axes/camera immediately so buffers build and checkpoints flip to "set"
-      const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
-      const ax = deriveAxesClip(hull, 1);
-      const cz = compactCameraZ(ax);
-      gatedUpdateUniforms(rightEngine.current, { axesClip: ax, cameraZ: cz, lockFraming: true, ridgeMode: 1 }, 'client');
+    // Enable low-FPS mode for mobile after first correct frame
+    enableLowFps(leftEngine.current, 12);
+    enableLowFps(rightEngine.current, 12);
 
-      // (Nice-to-have) instant grid buffers for the "0/0 floats" row
-      rightEngine.current?.updateUniforms?.({
-        hull: props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 },
-        wallWidth_m: props.baseShared?.wallWidth_m ?? 0.6,
-        physicsParityMode: false,
-        ridgeMode: 1, colorMode: 'theta',
-      });
-      rightEngine.current?.forceRedraw?.();
-
-      // B) WarpRenderInspector.tsx wire-in: Engine ready + RAF checkpoints
-      setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
-    });
-
-    // Additional guard to ensure cameraZ is set after onceReady
-    setTimeout(() => {
-      // After onceReady has fired and axes are known:
-      const cz = compactCameraZ(leftEngine.current?.uniforms?.axesClip);
-      leftEngine.current?.updateUniforms?.({ cameraZ: cz, lockFraming: true });
-      const czR = compactCameraZ(rightEngine.current?.uniforms?.axesClip);
-      rightEngine.current?.updateUniforms?.({ cameraZ: czR, lockFraming: true });
-    }, 100);
+    // Setup engine checkpoints after first frame is guaranteed correct
+    setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
+    setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
 
     // Diagnostics -> window for quick comparison
     leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
@@ -1032,6 +1024,10 @@ export default function WarpRenderInspector(props: {
     }
 
     return () => {
+      // Cleanup low-FPS timers
+      try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
+      try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
+
       // Unsubscribe from canonical uniforms
       unsubscribe(unsubscribeHandler);
       setHaveUniforms(false); // Reset on cleanup

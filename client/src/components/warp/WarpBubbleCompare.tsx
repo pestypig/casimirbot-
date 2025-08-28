@@ -38,6 +38,17 @@ function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
   };
 }
 
+// Low-FPS mode for coarse/phone: stop the engine's RAF, render at ~12fps
+function enableLowFps(engine: any, fps = 12) {
+  if (!IS_COARSE) return;
+  try { engine.stop?.(); } catch {}
+  if (engine.__lowFpsTimer) clearInterval(engine.__lowFpsTimer);
+  engine.__lowFpsTimer = setInterval(() => {
+    // draw only if there were uniform changes or a resize; batched push already redraws
+    engine._render ? engine._render() : engine.forceRedraw?.();
+  }, Math.max(30, Math.floor(1000 / Math.max(1, fps))));
+}
+
 // Wait until the engine is really ready, then compute camera once and draw once
 async function firstCorrectFrame({
   engine, canvas, sharedAxesScene, pane
@@ -969,35 +980,23 @@ export default function WarpBubbleCompare({
     leftEngine.current  = await initOne(leftRef.current,  realPacket);
     rightEngine.current = await initOne(rightRef.current, showPacket);
 
-    // 5) Deterministic camera for both panes
-    const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
-    pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ cameraZ: camZ, lockFraming: true })), 'REAL');
-    pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: camZ, lockFraming: true })), 'SHOW');
+    // 5) After creating both engines and building `shared` once:
+    await firstCorrectFrame({
+      engine: leftEngine.current,
+      canvas: leftRef.current!,
+      sharedAxesScene: shared.axesScene as [number,number,number],
+      pane: 'REAL'
+    });
+    await firstCorrectFrame({
+      engine: rightEngine.current,
+      canvas: rightRef.current!,
+      sharedAxesScene: shared.axesScene as [number,number,number],
+      pane: 'SHOW'
+    });
 
-    // 6) Verify parity enforcement worked
-    setTimeout(() => {
-      console.log('=== PARITY VERIFICATION ===');
-      const realParity = leftEngine.current?.uniforms?.physicsParityMode ?? leftEngine.current?.uniforms?.parityMode;
-      const showParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
-      const realRidge = leftEngine.current?.uniforms?.ridgeMode;
-      const showRidge = rightEngine.current?.uniforms?.ridgeMode;
-
-      console.log('REAL parity?', realParity, '(should be true)');
-      console.log('SHOW parity?', showParity, '(should be false)');
-      console.log('REAL ridge?', realRidge, '(should be 0)');
-      console.log('SHOW ridge?', showRidge, '(should be 1)');
-
-      // Log theta scales for comparison
-      const realTheta = leftEngine.current?.uniforms?.thetaScale;
-      const showTheta = rightEngine.current?.uniforms?.thetaScale;
-      console.log('Theta scales - REAL:', realTheta?.toExponential?.(2) || realTheta, 'SHOW:', showTheta?.toExponential?.(2) || showTheta);
-
-      if (realParity !== true || showParity !== false) {
-        console.error('❌ Parity enforcement failed! Check engine uniform application.');
-      } else {
-        console.log('✅ Parity enforcement successful');
-      }
-    }, 100);
+    // Enable low-FPS mode for mobile after first correct frame
+    enableLowFps(leftEngine.current, 12);
+    enableLowFps(rightEngine.current, 12);
 
     // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
     ensureStrobeMux();
@@ -1008,9 +1007,6 @@ export default function WarpBubbleCompare({
       const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
       (window as any).setStrobingState?.({ sectorCount: total, currentSector: cur, split: cur });
     }
-
-    leftEngine.current?.forceRedraw?.();
-    rightEngine.current?.forceRedraw?.();
   }
 
   const roRef = useRef<ResizeObserver | null>(null);
@@ -1255,6 +1251,10 @@ export default function WarpBubbleCompare({
     mql.addEventListener?.('change', onDpr);
     window.addEventListener('resize', onDpr);
     return () => {
+      // Cleanup low-FPS timers
+      try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
+      try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
+      
       mql.removeEventListener?.('change', onDpr);
       window.removeEventListener('resize', onDpr);
     };
