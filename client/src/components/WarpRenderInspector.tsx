@@ -3,8 +3,7 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
-import Grid3DEngine, { Grid3DHandle } from "@/components/engines/Grid3DEngine";
-import { SliceViewer } from "@/components/SliceViewer";
+
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import MarginHunterPanel from "./MarginHunterPanel";
@@ -517,14 +516,11 @@ export default function WarpRenderInspector(props: {
   showPhys?: Record<string, any>;
   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
-  realRenderer?: 'slice2d' | 'grid3d'; // REAL engine type (default: slice2d)
-  showRenderer?: 'slice2d' | 'grid3d'; // SHOW engine type (default: grid3d)
 }){
   const leftRef = useRef<HTMLCanvasElement>(null);   // REAL
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
   const rightEngine = useRef<any>(null);
-  const grid3dRef = useRef<Grid3DHandle>(null);
 
   // Batched push system for performance optimization
   const pushLeft = useRef<(p:any, tag?:string)=>void>(() => {});
@@ -532,9 +528,6 @@ export default function WarpRenderInspector(props: {
   const leftOwnedRef = useRef(false);
   const rightOwnedRef = useRef(false);
 
-  // Renderer type configuration
-  const realRendererType = props.realRenderer || 'slice2d';
-  const showRendererType = props.showRenderer || 'grid3d';
   const [haveUniforms, setHaveUniforms] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -1040,10 +1033,6 @@ export default function WarpRenderInspector(props: {
         // Unmute engines when canonical uniforms arrive
         leftEngine.current?.setVisible?.(true);
         rightEngine.current?.setVisible?.(true);
-        // Also unmute Grid3D engine if active
-        if (showRendererType === 'grid3d') {
-          grid3dRef.current?.getEngine()?.setVisible?.(true);
-        }
       });
 
       // Let engines render immediately; canonical uniforms will override later.
@@ -1327,9 +1316,7 @@ export default function WarpRenderInspector(props: {
       lockFraming: true
     };
 
-    // Convert payloads to uniforms for Grid3DEngine
-    const realUniforms = useMemo(() => realPayload, [realPayload]);
-    const showUniforms = useMemo(() => showPayload, [showPayload]);
+    
 
     // Physics bound for theta calculations
     const bound = useMemo(() => ({
@@ -1504,40 +1491,22 @@ export default function WarpRenderInspector(props: {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) ({realRendererType})</h3>
+            <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {realRendererType === 'grid3d' ? (
-              <Grid3DEngine
-                ref={grid3dRef}
-                uniforms={realUniforms}
-                className="w-full h-full block"
-                style={{background: 'black'}}
-              />
-            ) : (
-              <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
-            )}
+            <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">SHOW — Boosted (UI) ({showRendererType})</h3>
+            <h3 className="text-sm font-semibold">SHOW — Boosted (UI) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            {showRendererType === 'grid3d' ? (
-              <Grid3DEngine
-                ref={grid3dRef}
-                uniforms={showUniforms}
-                className="w-full h-full block"
-                style={{ background: 'black' }}
-              />
-            ) : (
-              <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
-            )}
+            <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
             {/* ⬇️ live badge */}
             {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
           </div>
