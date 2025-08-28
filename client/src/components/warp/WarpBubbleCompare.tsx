@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { sizeCanvasSafe } from '@/lib/gl/capabilities';
 
 // Build token: read lazily so SSR never touches `window`
 const getAppBuild = () =>
@@ -1209,9 +1210,9 @@ export default function WarpBubbleCompare({
     const onDpr = () => {
       if (!leftRef.current || !rightRef.current) return;
       const L = leftEngine.current, R = rightEngine.current;
-      const { w: wL, h: hL } = sizeCanvas(leftRef.current);
+      const { w: wL, h: hL } = sizeCanvasSafe(leftRef.current);
       L?.gl?.viewport(0, 0, wL, hL); L?.forceRedraw?.();
-      const { w: wR, h: hR } = sizeCanvas(rightRef.current);
+      const { w: wR, h: hR } = sizeCanvasSafe(rightRef.current);
       R?.gl?.viewport(0, 0, wR, hR); R?.forceRedraw?.();
     };
     const mql = matchMedia(`(resolution: ${devicePixelRatio}dppx)`);
