@@ -532,7 +532,10 @@ export default function HelixCasimirAmplifier({
   })();
 
   const derived = useMemo(() => {
-    if (!state || !metrics) return null;
+    if (!state || !metrics) {
+      console.debug("[HelixCasimirAmplifier] Missing state or metrics", { state: !!state, metrics: !!metrics });
+      return null;
+    }
 
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
@@ -597,21 +600,73 @@ export default function HelixCasimirAmplifier({
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, gateOn, d_eff]);
 
-  // Robust N_tiles accessible throughout component
-  const N_tiles =
-    hud.tilesTotal ??
-    state?.N_tiles ??
-    metrics?.totalTiles ??
-    0;
+  // Robust N_tiles accessible throughout component with multiple fallbacks
+  const N_tiles = (() => {
+    // Try HUD first
+    if (Number.isFinite(hud.tilesTotal) && hud.tilesTotal! > 0) return hud.tilesTotal!;
+    
+    // Try state pipeline
+    if (Number.isFinite(state?.N_tiles) && state!.N_tiles! > 0) return state!.N_tiles!;
+    
+    // Try metrics
+    if (Number.isFinite(metrics?.totalTiles) && metrics!.totalTiles! > 0) return metrics!.totalTiles!;
+    
+    // Try derived calculation from activeTiles and activeFraction
+    if (Number.isFinite(metrics?.activeTiles) && Number.isFinite(metrics?.activeFraction) && metrics!.activeFraction! > 0) {
+      const total = Math.round(metrics!.activeTiles! / metrics!.activeFraction!);
+      if (total > 0) return total;
+    }
+    
+    // Try from sectors calculation
+    const sectors = metrics?.totalSectors ?? state?.sectorStrobing ?? 400;
+    const tilesPerSector = Math.floor(sectors / 4); // rough estimate
+    if (sectors > 0) return sectors * tilesPerSector;
+    
+    return 0;
+  })();
 
-  // Don't show 0 when the backend doesn't send a "report" value; fall back to your own calc for the badges
-  const P_MW_badge = (
-    Number.isFinite(derived?.P_ship_avg_report_MW) && derived?.P_ship_avg_report_MW! > 0
-  ) ? derived?.P_ship_avg_report_MW! : derived?.P_ship_avg_calc_MW ?? 0;
+  // Robust power badge with multiple fallbacks
+  const P_MW_badge = (() => {
+    // Try HUD first (most authoritative)
+    if (Number.isFinite(hud.powerMW) && hud.powerMW! > 0) return hud.powerMW!;
+    
+    // Try metrics direct power
+    if (Number.isFinite(metrics?.energyOutput) && metrics!.energyOutput! > 0) return metrics!.energyOutput!;
+    
+    // Try derived report (backend calculated)
+    if (Number.isFinite(derived?.P_ship_avg_report_MW) && derived?.P_ship_avg_report_MW! > 0) return derived?.P_ship_avg_report_MW!;
+    
+    // Try derived calculation
+    if (Number.isFinite(derived?.P_ship_avg_calc_MW) && derived?.P_ship_avg_calc_MW! > 0) return derived?.P_ship_avg_calc_MW!;
+    
+    // Try state pipeline average
+    if (Number.isFinite(state?.P_avg) && state!.P_avg! > 0) return state!.P_avg!;
+    
+    return 0;
+  })();
 
-  const M_kg_badge = (
-    Number.isFinite(derived?.M_total_report) && derived?.M_total_report! > 0
-  ) ? derived?.M_total_report! : derived?.M_total_calc ?? 0;
+  // Robust mass badge with multiple fallbacks
+  const M_kg_badge = (() => {
+    // Try HUD first (most authoritative)
+    if (Number.isFinite(hud.exoticMassKg) && hud.exoticMassKg! > 0) return hud.exoticMassKg!;
+    
+    // Try metrics direct mass
+    if (Number.isFinite(metrics?.exoticMass) && metrics!.exoticMass! > 0) return metrics!.exoticMass!;
+    
+    // Try derived report (backend calculated)
+    if (Number.isFinite(derived?.M_total_report) && derived?.M_total_report! > 0) return derived?.M_total_report!;
+    
+    // Try derived calculation
+    if (Number.isFinite(derived?.M_total_calc) && derived?.M_total_calc! > 0) return derived?.M_total_calc!;
+    
+    // Try state pipeline
+    if (Number.isFinite(state?.M_exotic) && state!.M_exotic! > 0) return state!.M_exotic!;
+    
+    // Try raw metrics fields
+    if (Number.isFinite(metrics?.exoticMassRaw) && metrics!.exoticMassRaw! > 0) return metrics!.exoticMassRaw!;
+    
+    return 0;
+  })();
 
   // ---- CAVITY ENERGY INTEGRATION ----
 
@@ -882,7 +937,20 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">N = {fmtNum(N_tiles, "", 0)}</Badge>
               <Badge variant="outline" className="justify-center">P = {fmtNum(P_MW_badge, "MW", 2)}</Badge>
               <Badge variant="outline" className="justify-center">M = {fmtNum(M_kg_badge, "kg", 0)}</Badge>
+              <Badge variant="outline" className="justify-center">N = {fmtNum(N_tiles, "", 0)}</Badge>
             </div>
+
+            {/* Debug info for troubleshooting N=0, P=0, M=0 issues */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-2 text-xs">
+                <summary className="text-slate-400 cursor-pointer">Debug Data Sources</summary>
+                <div className="mt-1 p-2 bg-slate-800/20 rounded text-slate-300 font-mono">
+                  <div>N_tiles: {N_tiles} (hud:{hud.tilesTotal}, state:{state?.N_tiles}, metrics:{metrics?.totalTiles})</div>
+                  <div>P_MW: {P_MW_badge.toFixed(3)} (hud:{hud.powerMW}, metrics:{metrics?.energyOutput}, state:{state?.P_avg})</div>
+                  <div>M_kg: {M_kg_badge.toFixed(0)} (hud:{hud.exoticMassKg}, metrics:{metrics?.exoticMass}, state:{state?.M_exotic})</div>
+                </div>
+              </details>
+            )}
 
             {/* Time-Evolving Cavity Physics Display */}
             {lc && (
