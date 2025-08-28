@@ -144,59 +144,6 @@ type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Missing utility functions implementation
-function normalizeKeys(obj: any): any {
-  // Simple key normalization - just return the object as-is for now
-  return obj || {};
-}
-
-function toUniforms(data: any): any {
-  // Convert data to uniform format using existing normalizeWU
-  return normalizeWU(data);
-}
-
-function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
-  // Placeholder for checkpoint binding - implement basic engine validation
-  if (!engine) return;
-
-  // Setup basic checkpoint validation for the SHOW engine
-  setTimeout(() => {
-    if (engine.uniforms) {
-      console.debug('[bindShowCheckpoints] SHOW engine uniforms ready:', Object.keys(engine.uniforms));
-    }
-  }, 100);
-}
-
-// Simple theta calculation helper (early definition to avoid hoisting issues)
-function thetaGainExpected(bound: any): number {
-  if (!bound) return 0;
-  const { gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR } = bound;
-  return Math.pow(Number(gammaGeo) || 0, 3) *
-         (Number(qSpoilingFactor) || 1) *
-         (Number(gammaVdB) || 1) *
-         (Number(dutyEffectiveFR) || 1);
-}
-
-function reportThetaConsistency(bound: any, viewFraction: number, isGrid3d: boolean = false) {
-  // Enhanced theta consistency reporting with proper return value
-  if (!bound || typeof bound.gammaGeo !== 'number') {
-    console.debug('[reportThetaConsistency] Invalid bound parameters');
-    return { expected: 0, used: 0, delta: 0 };
-  }
-
-  const expected = thetaGainExpected(bound);
-  const used = expected * viewFraction;
-  const delta = expected > 0 ? ((used - expected) / expected) * 100 : 0;
-
-  const fmt = (n: number) => Number.isFinite(n) ? n.toExponential(2) : '—';
-  const range = Math.max(expected, used) || 1;
-
-  console.log(`[HELIX][θ] θ-scale — ${fmt(used)} • exp ${fmt(expected)} (${delta.toFixed(1)} off) • used≈${((used / range) * 100).toFixed(1)}%`);
-  console.log(`[HELIX][θ] view fraction: ${(viewFraction * 100).toFixed(1)}%`);
-  console.log(`[HELIX][θ] renderer: ${isGrid3d ? 'grid3d' : 'slice2d'}`);
-
-  return { expected, used, delta };
-}
 
 // Push only after shaders are ready - now with enhanced gating and diagnostics
   function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
@@ -648,10 +595,6 @@ export default function WarpRenderInspector(props: {
          * Math.sqrt(Math.max(1e-12, Number(dutyFR)||0));
   };
 
-  const realPayload = useMemo(() => buildREAL(wu), [wu]);
-  const showPayload = useMemo(() => buildSHOW(wu, {
-    T: (decades/8), boost: 40, userGain
-  }), [wu, decades, userGain]);
 
   function emitDebug(level: 'info'|'warn'|'error', tag: string, msg: string, data?: any) {
     // ship to console
@@ -1326,6 +1269,18 @@ export default function WarpRenderInspector(props: {
       lockFraming: true
     };
 
+    // Convert payloads to uniforms for Grid3DEngine
+    const realUniforms = useMemo(() => realPayload, [realPayload]);
+    const showUniforms = useMemo(() => showPayload, [showPayload]);
+
+    // Physics bound for theta calculations
+    const bound = useMemo(() => ({
+      gammaGeo: realPhys.gammaGeo || 26,
+      qSpoilingFactor: realPhys.qSpoilingFactor || 1,
+      gammaVdB: realPhys.gammaVanDenBroeck || realPhys.gammaVdB || 1,
+      dutyEffectiveFR: realPhys.dutyEffectiveFR || 0.000025
+    }), [realPhys]);
+
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
     const ro = new ResizeObserver(() => {
@@ -1515,7 +1470,16 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
           <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90">
-            <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
+            {showRendererType === 'grid3d' ? (
+              <Grid3DEngine
+                ref={grid3dRef}
+                uniforms={showUniforms}
+                className="w-full h-full block"
+                style={{ background: 'black' }}
+              />
+            ) : (
+              <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
+            )}
             {/* ⬇️ live badge */}
             {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
           </div>

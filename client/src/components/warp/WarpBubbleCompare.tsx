@@ -1092,23 +1092,6 @@ export default function WarpBubbleCompare({
       ridgeMode: 0,
     });
 
-    console.log('Applying physics to engines:', {
-      real: { 
-        parity: realPhysicsPayload.physicsParityMode, 
-        ridge: realPhysicsPayload.ridgeMode,
-        theta: realPhysicsPayload.thetaScale,
-        gammaVdB: realPhysicsPayload.gammaVdB,
-        qSpoil: realPhysicsPayload.deltaAOverA
-      },
-      show: { 
-        parity: showPhysicsPayload.physicsParityMode, 
-        ridge: showPhysicsPayload.ridgeMode,
-        theta: showPhysicsPayload.thetaScale,
-        gammaVdB: showPhysicsPayload.gammaVdB,
-        qSpoil: showPhysicsPayload.deltaAOverA
-      }
-    });
-
     // REAL (parity / Ford–Roman)
     pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
 
@@ -1136,6 +1119,23 @@ export default function WarpBubbleCompare({
       // Force non-parity mode explicitly
       physicsParityMode: false,
       ridgeMode: 1,
+    });
+
+    console.log('Applying physics to engines:', {
+      real: { 
+        parity: realPhysicsPayload.physicsParityMode, 
+        ridge: realPhysicsPayload.ridgeMode,
+        theta: realPhysicsPayload.thetaScale,
+        gammaVdB: realPhysicsPayload.gammaVdB,
+        qSpoil: realPhysicsPayload.deltaAOverA
+      },
+      show: { 
+        parity: showPhysicsPayload.physicsParityMode, 
+        ridge: showPhysicsPayload.ridgeMode,
+        theta: showPhysicsPayload.thetaScale,
+        gammaVdB: showPhysicsPayload.gammaVdB,
+        qSpoil: showPhysicsPayload.deltaAOverA
+      }
     });
 
     pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
