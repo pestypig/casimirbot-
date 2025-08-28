@@ -214,7 +214,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
         </div>
         <div>
           <div className="text-muted-foreground">P_avg</div>
-          <div><Eq>{P_avg_W !== undefined ? ${(P_avg_W / 1e6).toFixed(1)} MW : "—"}</Eq></div>
+          <div><Eq>{P_avg_W !== undefined ? `${(P_avg_W / 1e6).toFixed(1)} MW` : "—"}</Eq></div>
         </div>
       </div>
 

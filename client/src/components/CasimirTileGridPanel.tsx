@@ -137,9 +137,9 @@ export function CasimirTileGridPanel({
 
     const txt = [
       `Sectors: ${metrics.sectorStrobing}/${metrics.totalSectors}`,
-      `Tiles/sector: ${metrics.tilesPerSector.toLocaleString()}`,
+      `Tiles/sector: ${(metrics.tilesPerSector || 0).toLocaleString()}`,
       `Active fraction: ${(fracOn*100).toFixed(5)}%`,
-      `Sweep: ${(metrics.strobeHz).toLocaleString()} Hz`,
+      `Sweep: ${(metrics.strobeHz || 0).toLocaleString()} Hz`,
     ];
 
     let cx = Lx;
@@ -187,7 +187,7 @@ export function CasimirTileGridPanel({
       <div className="flex items-center justify-between px-1 pb-1">
         <div className="text-[12px] font-medium text-white/90">Casimir Tile Grid</div>
         <div className="text-[11px] text-white/60">
-          {metrics.sectorStrobing}/{metrics.totalSectors} sectors • {metrics.strobeHz.toLocaleString()} Hz
+          {metrics.sectorStrobing}/{metrics.totalSectors} sectors • {(metrics.strobeHz || 0).toLocaleString()} Hz
         </div>
       </div>
       <canvas ref={ref} style={{ width, height, display: "block" }} />
