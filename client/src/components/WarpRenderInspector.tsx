@@ -550,32 +550,81 @@ export default function WarpRenderInspector(props: {
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
     const orig = engine.updateUniforms?.bind(engine);
+    
+    // Store the forced parity settings for this pane
+    const forcedParity = (pane === 'REAL');
+    const forcedRidge = (pane === 'REAL') ? 0 : 1;
+    
     engine.updateUniforms = (patch: any) => {
       const safe = normalizeKeys({ ...(patch || {}) });
       // Never accept direct θ writes; renderer derives θ from physics.
       if ('thetaScale' in safe) delete safe.thetaScale;
 
       // FORCE parity mode settings - these cannot be overridden
-      safe.physicsParityMode = (pane === 'REAL');
-      safe.parityMode        = (pane === 'REAL');
+      safe.physicsParityMode = forcedParity;
+      safe.parityMode = forcedParity;
 
       // Respect caller's ridgeMode if set; else enforce pane default.
-      if (safe.ridgeMode == null) safe.ridgeMode = (pane === 'REAL') ? 0 : 1;
+      if (safe.ridgeMode == null) safe.ridgeMode = forcedRidge;
 
       // Debug logging to verify parity is being set
       console.log(`[${pane}] Parity lock: physicsParityMode=${safe.physicsParityMode}, ridgeMode=${safe.ridgeMode}`);
 
-      return gatedUpdateUniforms({ updateUniforms: orig }, safe, `${pane.toLowerCase()}-locked`);
+      // Call original updateUniforms directly to bypass gatedUpdateUniforms
+      if (orig) {
+        try {
+          const result = orig(safe);
+          
+          // Verify the settings were actually applied
+          setTimeout(() => {
+            const actualParity = engine.uniforms?.physicsParityMode;
+            const actualRidge = engine.uniforms?.ridgeMode;
+            console.log(`[${pane}] Post-update verification: parity=${actualParity}, ridge=${actualRidge}`);
+            
+            if (actualParity !== forcedParity) {
+              console.error(`[${pane}] PARITY ENFORCEMENT FAILURE: expected=${forcedParity}, actual=${actualParity}`);
+              // Force-set again if it didn't stick
+              if (engine.uniforms) {
+                engine.uniforms.physicsParityMode = forcedParity;
+                engine.uniforms.parityMode = forcedParity;
+              }
+            }
+          }, 10);
+          
+          return result;
+        } catch (error) {
+          console.error(`[${pane}] updateUniforms failed:`, error);
+          return false;
+        }
+      }
+      return false;
     };
     engine.__locked = true;
 
     // Immediately set the parity mode to ensure it's applied
     const initialParity = {
-      physicsParityMode: (pane === 'REAL'),
-      parityMode: (pane === 'REAL'),
-      ridgeMode: (pane === 'REAL') ? 0 : 1
+      physicsParityMode: forcedParity,
+      parityMode: forcedParity,
+      ridgeMode: forcedRidge
     };
+    
+    console.log(`[${pane}] Setting initial parity:`, initialParity);
     engine.updateUniforms(initialParity);
+    
+    // Double-check after a brief delay
+    setTimeout(() => {
+      if (engine.uniforms) {
+        const currentParity = engine.uniforms.physicsParityMode;
+        console.log(`[${pane}] Initial parity check: expected=${forcedParity}, actual=${currentParity}`);
+        
+        if (currentParity !== forcedParity) {
+          console.warn(`[${pane}] Initial parity failed, forcing direct assignment`);
+          engine.uniforms.physicsParityMode = forcedParity;
+          engine.uniforms.parityMode = forcedParity;
+          engine.uniforms.ridgeMode = forcedRidge;
+        }
+      }
+    }, 50);
   }
 
   // Helper to create engine with conditional selection and 3D fallback
@@ -1188,7 +1237,7 @@ export default function WarpRenderInspector(props: {
     gatedUpdateUniforms(leftEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
     gatedUpdateUniforms(rightEngine.current, normalizeKeys({ cameraZ: cz }), 'inspector-camera');
 
-    // Enhanced parity verification with detailed logging
+    // Enhanced parity verification with detailed logging and correction
     setTimeout(() => {
       const realParity = leftEngine.current?.uniforms?.physicsParityMode;
       const showParity = rightEngine.current?.uniforms?.physicsParityMode;
@@ -1201,12 +1250,32 @@ export default function WarpRenderInspector(props: {
       console.log('REAL ridge?', realRidge, '(should be 0)');
       console.log('SHOW ridge?', showRidge, '(should be 1)');
 
-      // Check if parity enforcement failed
+      // Check if parity enforcement failed and attempt correction
       if (realParity !== true) {
         console.error('❌ REAL engine parity enforcement FAILED - should be true, got:', realParity);
+        console.log('REAL uniforms.physicsParityMode:', leftEngine.current?.uniforms?.physicsParityMode);
+        console.log('REAL uniforms.parityMode:', leftEngine.current?.uniforms?.parityMode);
+        console.log('REAL expected parity:', true);
+        
+        // Attempt direct correction
+        if (leftEngine.current?.uniforms) {
+          leftEngine.current.uniforms.physicsParityMode = true;
+          leftEngine.current.uniforms.parityMode = true;
+          leftEngine.current.uniforms.ridgeMode = 0;
+          console.log('🔧 REAL parity corrected via direct assignment');
+        }
       }
+      
       if (showParity !== false) {
         console.error('❌ SHOW engine parity enforcement FAILED - should be false, got:', showParity);
+        
+        // Attempt direct correction
+        if (rightEngine.current?.uniforms) {
+          rightEngine.current.uniforms.physicsParityMode = false;
+          rightEngine.current.uniforms.parityMode = false;
+          rightEngine.current.uniforms.ridgeMode = 1;
+          console.log('🔧 SHOW parity corrected via direct assignment');
+        }
       }
 
       // Report theta consistency after engine updates
@@ -1215,6 +1284,20 @@ export default function WarpRenderInspector(props: {
       console.log('Theta scales - REAL:', realTheta?.toExponential?.(2), 'SHOW:', showTheta?.toExponential?.(2));
 
       reportThetaConsistency(bound, realViewMassFraction, false);
+      
+      // Final verification after corrections
+      setTimeout(() => {
+        const finalRealParity = leftEngine.current?.uniforms?.physicsParityMode;
+        const finalShowParity = rightEngine.current?.uniforms?.physicsParityMode;
+        
+        if (finalRealParity === true && finalShowParity === false) {
+          console.log('✅ Parity enforcement corrected successfully');
+        } else {
+          console.error('❌ Parity enforcement still failing after correction attempts');
+          console.log('Final REAL parity:', finalRealParity);
+          console.log('Final SHOW parity:', finalShowParity);
+        }
+      }, 100);
     }, 200);
   }, [dutyEffectiveFR, sTotal, sConcurrent, props, live, lockTone, lockRidge, forceAvg, gammaVdBBound, props.lightCrossing?.dwell_ms]);
 
