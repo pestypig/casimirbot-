@@ -89,11 +89,23 @@ export default function CurvaturePhysicsPanel({
   
   // derive S_concurrent / S_total straight from the left engine uniforms
   const U = leftEngineRef?.current?.uniforms ?? {};
-  const sConc = Math.max(1, +(U.sectors ?? 1));
+  const sConc = Math.max(1, +(U.sectors ?? concurrentSectors ?? 1));
   const sTot  = Math.max(1, +(totalSectors ?? (pipeline as any)?.sectorCount ?? 400));
   
   const S_total = sTot;
   const S_live = sConc;
+
+  // Debug engine state for parity tracking
+  if (leftEngineRef?.current) {
+    console.log('[CurvaturePhysicsPanel] Engine state debug:', {
+      physicsParityMode: U.physicsParityMode,
+      parityMode: U.parityMode,
+      ridgeMode: U.ridgeMode,
+      sectors: U.sectors,
+      thetaScale: U.thetaScale,
+      engineType: 'REAL'
+    });
+  }
 
   // Timing: prefer actual loop measurements if provided
   const burst_ms = isNum(lightCrossing?.burst_ms) ? lightCrossing!.burst_ms! : undefined;
@@ -107,12 +119,43 @@ export default function CurvaturePhysicsPanel({
 
   // FR duty: use explicit override if provided, else compute from local × sector ratio
   const duty_FR_calc = clamp01(duty_local * (S_live / S_total));
-  const duty_FR = isNum(dutyEffectiveFR) ? clamp01(dutyEffectiveFR!) : duty_FR_calc;
+  const duty_FR_pipeline = (pipeline as any)?.dutyEffectiveFR ?? (pipeline as any)?.dutyShip;
+  const duty_FR = isNum(dutyEffectiveFR) ? clamp01(dutyEffectiveFR!) : 
+                  isNum(duty_FR_pipeline) ? clamp01(duty_FR_pipeline) : duty_FR_calc;
 
-  // Physics factors
-  const gGeo = isNum(gammaGeo) ? gammaGeo! : (pipeline as any)?.gammaGeo ?? 26;
-  const gVdB = isNum(gammaVdB) ? gammaVdB! : (pipeline as any)?.gammaVanDenBroeck ?? 1.4e5;
-  const dAoA = isNum(qSpoilingFactor) ? qSpoilingFactor! : (pipeline as any)?.qSpoilingFactor ?? 1.0;
+  // Debug duty calculation chain
+  console.log('[CurvaturePhysicsPanel] Duty calculation debug:', {
+    burst_ms,
+    dwell_ms,
+    duty_local_measured,
+    duty_local,
+    S_live,
+    S_total,
+    duty_FR_calc,
+    duty_FR_pipeline,
+    dutyEffectiveFR,
+    final_duty_FR: duty_FR
+  });
+
+  // Physics factors with enhanced pipeline integration
+  const gGeo = isNum(gammaGeo) ? gammaGeo! : 
+               (pipeline as any)?.amps?.gammaGeo ?? (pipeline as any)?.gammaGeo ?? 26;
+  const gVdB = isNum(gammaVdB) ? gammaVdB! : 
+               (pipeline as any)?.amps?.gammaVanDenBroeck ?? (pipeline as any)?.gammaVanDenBroeck ?? 1.4e5;
+  const dAoA = isNum(qSpoilingFactor) ? qSpoilingFactor! : 
+               (pipeline as any)?.amps?.qSpoilingFactor ?? (pipeline as any)?.qSpoilingFactor ?? 1.0;
+
+  // Debug physics factors
+  console.log('[CurvaturePhysicsPanel] Physics factors debug:', {
+    props: { gammaGeo, gammaVdB, qSpoilingFactor },
+    pipeline_amps: (pipeline as any)?.amps,
+    pipeline_direct: { 
+      gammaGeo: (pipeline as any)?.gammaGeo, 
+      gammaVanDenBroeck: (pipeline as any)?.gammaVanDenBroeck,
+      qSpoilingFactor: (pipeline as any)?.qSpoilingFactor 
+    },
+    resolved: { gGeo, gVdB, dAoA }
+  });
 
   // Amplitude proxy for the REAL pane (unitless scale factor)
   const ampREAL = gGeo * gVdB * dAoA * duty_FR;
@@ -168,6 +211,9 @@ export default function CurvaturePhysicsPanel({
               <Badge variant="outline" className="text-[10px] border-emerald-400/40 text-emerald-300">
                 duty_FR: {pct(duty_FR, 3)}
               </Badge>
+              <Badge variant="outline" className="text-[10px] border-blue-400/40 text-blue-300">
+                parity: {U.physicsParityMode ?? U.parityMode ? "T" : "F"}
+              </Badge>
               <CopyLine text={asText} />
             </div>
           </div>
@@ -205,6 +251,16 @@ export default function CurvaturePhysicsPanel({
               <div className="rounded-md bg-slate-950/60 border border-slate-800 p-2">
                 <div className="text-slate-300">{line4}</div>
                 <div className="text-slate-400">{line4Filled}</div>
+              </div>
+
+              {/* Enhanced debugging section */}
+              <div className="rounded-md bg-slate-950/60 border border-amber-800 p-2">
+                <div className="text-amber-300 text-[11px] font-medium mb-1">Engine Debug (REAL)</div>
+                <div className="text-amber-400 text-[10px] font-mono space-y-1">
+                  <div>Parity: {U.physicsParityMode ? "physics=T" : U.parityMode ? "ui=T" : "F"} | Ridge: {U.ridgeMode ?? "—"}</div>
+                  <div>Sectors: {U.sectors} | θ-scale: {isNum(U.thetaScale) ? fexp(U.thetaScale, 2) : "—"}</div>
+                  <div>Mode: {mode} | Pipeline amps: {(pipeline as any)?.amps ? "✓" : "✗"}</div>
+                </div>
               </div>
 
               {/* Footnote */}
