@@ -66,7 +66,7 @@ function sizeCanvas(cv: HTMLCanvasElement) {
 
 function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const p = { ...patch };
-  
+
   // Force parity mode based on pane - this is critical for physics validation
   if (pane === 'REAL') { 
     p.physicsParityMode = true;
@@ -120,14 +120,14 @@ function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'RE
     console.warn(`[pushSafe] No engine found for pane: ${pane}`);
     return;
   }
-  
+
   let clean = sanitizeUniforms(patch);
-  
+
   // Apply pane-specific sanitization to prevent cross-contamination
   if (pane) {
     clean = paneSanitize(pane, clean);
   }
-  
+
   // Debug what we're actually sending
   console.log(`[pushSafe][${pane}] Applying uniforms:`, {
     physicsParityMode: clean.physicsParityMode,
@@ -135,7 +135,7 @@ function pushSafe(engineRef: React.MutableRefObject<any>, patch: any, pane?: 'RE
     ridgeMode: clean.ridgeMode,
     thetaScale: clean.thetaScale
   });
-  
+
   if (!e.isLoaded || !e.gridProgram) {
     e.onceReady(() => { 
       gatedUpdateUniforms(e, clean, 'client'); 
@@ -656,25 +656,26 @@ export default function WarpBubbleCompare({
   colorMode = "theta",
   lockFraming = true, // reserved; we always lock from inside
 }: Props) {
-  // ✨ DEBUG: heroExaggeration variable tracing
+  // ✨ DEBUG: heroExaggeration variable tracing (normalize to a sane, finite number once)
+  const heroBoost = Math.max(1, finite(heroExaggeration, 82));
+
   console.log(`[WarpBubbleCompare] 🎯 heroExaggeration DEBUG:`, {
     prop: heroExaggeration,
+    normalized: heroBoost,
     type: typeof heroExaggeration,
-    isFinite: Number.isFinite(heroExaggeration),
+    isFinite: Number.isFinite(+heroExaggeration),
     source: 'component props'
   });
 
-  // Physics parameters are now handled directly from props.parameters in useEffect
-
-  // Optional: set per-pane display gain
+  // Optional: set per-pane display gain (parity kept for future use)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const parityX = parityExaggeration ?? 1;
-  const heroX = heroExaggeration ?? 82;
-  
-  console.log(`[WarpBubbleCompare] 🎯 heroX calculated:`, {
-    heroExaggeration,
+
+  console.log(`[WarpBubbleCompare] 🎯 heroBoost calculated:`, {
+    original: heroExaggeration,
     fallback: 82,
-    result: heroX,
-    willUse: heroX
+    result: heroBoost,
+    willUse: heroBoost
   });
 
   const leftRef = useRef<HTMLCanvasElement>(null);
@@ -871,17 +872,17 @@ export default function WarpBubbleCompare({
       const showParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
       const realRidge = leftEngine.current?.uniforms?.ridgeMode;
       const showRidge = rightEngine.current?.uniforms?.ridgeMode;
-      
+
       console.log('REAL parity?', realParity, '(should be true)');
       console.log('SHOW parity?', showParity, '(should be false)');
       console.log('REAL ridge?', realRidge, '(should be 0)');
       console.log('SHOW ridge?', showRidge, '(should be 1)');
-      
+
       // Log theta scales for comparison
       const realTheta = leftEngine.current?.uniforms?.thetaScale;
       const showTheta = rightEngine.current?.uniforms?.thetaScale;
       console.log('Theta scales - REAL:', realTheta?.toExponential?.(2) || realTheta, 'SHOW:', showTheta?.toExponential?.(2) || showTheta);
-      
+
       if (realParity !== true || showParity !== false) {
         console.error('❌ Parity enforcement failed! Check engine uniform application.');
       } else {
@@ -1008,27 +1009,24 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, parameters.sectors),
       // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ,
-      // Apply heroExaggeration to visual amplification
+      // Apply heroExaggeration to visual amplification (normalized heroBoost)
       curvatureGainT: 0.70,
-      curvatureBoostMax: (console.log(`[DEBUG] heroExaggeration=${heroExaggeration}, result=${Math.max(1, heroExaggeration || 40)}`), Math.max(1, heroExaggeration || 40)),
+      curvatureBoostMax: heroBoost,
       userGain: 4,
       displayGain: 1,
     });
 
     pushSafe(rightEngine, showPhysicsPayload, 'SHOW');
 
-    // Apply heroExaggeration as display gain for SHOW engine
-    const heroDisplayGain = Math.max(1, 1 + 0.5 * Math.log10(Math.max(1, heroExaggeration || 82)));
-    rightEngine.current.setDisplayGain?.(heroDisplayGain);
-    console.log(`[SHOW] 🎯 heroExaggeration DEBUG CHAIN:`, {
-      original: heroExaggeration,
-      withFallback: heroExaggeration || 82,
-      mathMaxResult: Math.max(1, heroExaggeration || 82),
-      logCalculation: Math.log10(Math.max(1, heroExaggeration || 82)),
-      finalDisplayGain: heroDisplayGain,
+    // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
+    const displayGain = Math.max(1, 1 + 0.5 * Math.log10(Math.max(1, heroBoost)));
+    console.log(`[SHOW] 🎯 Final displayGain calculation:`, {
+      heroBoost,
+      logCalc: Math.log10(Math.max(1, heroBoost)),
+      finalGain: displayGain,
       appliedToEngine: !!rightEngine.current.setDisplayGain
     });
-    console.log(`[SHOW] Applied heroExaggeration: ${heroExaggeration} -> displayGain: ${heroDisplayGain.toFixed(2)}`);
+    rightEngine.current.setDisplayGain?.(displayGain);
 
     // Verify and correct parity enforcement after a short delay
     setTimeout(() => {
@@ -1036,14 +1034,14 @@ export default function WarpBubbleCompare({
       const showParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
       const realRidge = leftEngine.current?.uniforms?.ridgeMode;
       const showRidge = rightEngine.current?.uniforms?.ridgeMode;
-      
+
       // Force correction if parity is wrong
       if (realParity !== true) {
         console.log('[REAL] Forced correction applied');
         pushSafe(leftEngine, { physicsParityMode: true, parityMode: true, ridgeMode: 0 }, 'REAL');
         leftEngine.current?.forceRedraw?.();
       }
-      
+
       if (showParity !== false) {
         console.log('[SHOW] Forced correction applied');
         pushSafe(rightEngine, { physicsParityMode: false, parityMode: false, ridgeMode: 1 }, 'SHOW');
@@ -1056,10 +1054,10 @@ export default function WarpBubbleCompare({
         const finalShowParity = rightEngine.current?.uniforms?.physicsParityMode ?? rightEngine.current?.uniforms?.parityMode;
         const finalRealRidge = leftEngine.current?.uniforms?.ridgeMode;
         const finalShowRidge = rightEngine.current?.uniforms?.ridgeMode;
-        
+
         console.log('[SHOW] Post-update verification: parity=' + finalShowParity + ', ridge=' + finalShowRidge + (finalShowParity === false && finalShowRidge === 1 ? ' ✓' : ' ✗'));
         console.log('[REAL] Post-update verification: parity=' + finalRealParity + ', ridge=' + finalRealRidge + (finalRealParity === true && finalRealRidge === 0 ? ' ✓' : ' ✗'));
-        
+
         if (finalRealParity === true && finalShowParity === false) {
           console.log('✅ Parity enforcement corrected successfully');
         } else {
@@ -1080,9 +1078,10 @@ export default function WarpBubbleCompare({
       dutyFR: parameters.dutyEffectiveFR,
       dutyUI: parameters.dutyCycle,
       heroExaggeration,
+      heroBoost,
       parityExaggeration
     });
-    
+
     // Also push FR-window/light-crossing controls if present  
     if (parameters.lightCrossing) {
       const lc = parameters.lightCrossing;
@@ -1113,18 +1112,7 @@ export default function WarpBubbleCompare({
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
       pushSafe(rightEngine, { cameraZ: fixedCamZ, lockFraming: true }, 'SHOW');
     }
-
-    // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
-    const displayGain = Math.max(1, (1) * (heroX ? 1 + 0.5*Math.log10(Math.max(1, heroX)) : 1));
-    console.log(`[SHOW] 🎯 Final displayGain calculation:`, {
-      heroX,
-      heroXExists: !!heroX,
-      logCalc: heroX ? Math.log10(Math.max(1, heroX)) : 'N/A',
-      finalGain: displayGain,
-      appliedToEngine: !!rightEngine.current.setDisplayGain
-    });
-    rightEngine.current.setDisplayGain?.(displayGain);
-  }, [parameters, colorMode, lockFraming, heroX]);
+  }, [parameters, colorMode, lockFraming, heroBoost]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {
@@ -1166,7 +1154,7 @@ export default function WarpBubbleCompare({
   // Debug probe to verify physics parameters are changing with mode switches
   useEffect(() => {
     if (!leftEngine.current) return;
-    
+
     // Add diagnostic function to window for debugging
     (window as any).__debugWarpEngines = () => {
       const leftState = leftEngine.current ? {
@@ -1180,7 +1168,7 @@ export default function WarpBubbleCompare({
           display: leftRef.current?.style.display
         }
       } : null;
-      
+
       const rightState = rightEngine.current ? {
         isLoaded: rightEngine.current.isLoaded,
         hasProgram: !!rightEngine.current.gridProgram,
@@ -1192,19 +1180,19 @@ export default function WarpBubbleCompare({
           display: rightRef.current?.style.display
         }
       } : null;
-      
+
       console.log('=== WARP ENGINE DEBUG ===');
       console.log('LEFT (REAL/Parity):', leftState);
       console.log('RIGHT (SHOW/Boosted):', rightState);
-      
+
       // Try to force a render
       console.log('Attempting force render...');
       leftEngine.current?._render?.();
       rightEngine.current?._render?.();
-      
+
       return { left: leftState, right: rightState };
     };
-    
+
     // Also add a force restart function
     (window as any).__restartWarpEngines = () => {
       console.log('Force restarting warp engines...');
@@ -1216,7 +1204,7 @@ export default function WarpBubbleCompare({
         console.log('Engines restarted');
       }, 100);
     };
-    
+
     // Simple debug output using parameters directly
     if (parameters) {
       console.log('[REAL] Physics from parameters:', {
