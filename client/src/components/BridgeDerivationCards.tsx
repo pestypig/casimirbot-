@@ -109,6 +109,21 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
   const S_total = num(fr.S_total) ?? num(live.S_total);
   const burstLocal = num(fr.burstLocal);
 
+  // UI vs FR duty variants
+  const dutyCycleUI = num((m as any)?.pipeline?.dutyCycle ?? (m as any)?.dutyCycle);
+  const dEff_FR =
+    burstLocal !== undefined && S_live !== undefined && S_total !== undefined
+      ? burstLocal * (S_live / S_total)
+      : undefined;
+  const dEff_sector =
+    dutyCycleUI !== undefined && S_live !== undefined && S_total !== undefined
+      ? dutyCycleUI * (S_live / S_total)
+      : undefined;
+  const dutyRatio =
+    dEff_sector !== undefined && dEff_FR !== undefined && dEff_FR > 0
+      ? dEff_sector / dEff_FR
+      : undefined;
+
   const baseFR = eqn.d_eff || "d_eff = burstLocal × S_live / S_total";
   const subFR =
     burstLocal !== undefined && S_live !== undefined && S_total !== undefined
@@ -119,7 +134,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
   // --- θ numbers ---
   const gammaGeo = num(live.gammaGeo) ?? num(th.inputs?.gammaGeo);
   const q = num(live.qSpoilingFactor) ?? num(th.inputs?.q);
-  const gammaVdB_vis = num(live.gammaVanDenBroeck_vis) ?? num(th.inputs?.gammaVanDenBroeck_vis);
+  const gammaVdB_vis = num(live.gammaVanDenBroeck_vis) ?? num(th.inputs?.gammaVdB_vis);
 
   const thetaExpected =
     gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
@@ -263,6 +278,30 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
           <div>S_live is concurrently strobed sectors; S_total is total tiling. burstLocal is the local ON fraction.</div>
           <div className="mt-1">Backend ship-average often ≈ <Eq>0.01 × 1/400 = 2.5e-5</Eq>.</div>
         </>}
+      />
+
+      <FormulaBlock
+        title="Duty factor (clarified)"
+        base="d_eff(FR) = burstLocal × S_live / S_total;  d_sector = dutyCycle × S_live / S_total"
+        sub={
+          (burstLocal !== undefined || dutyCycleUI !== undefined || S_live !== undefined || S_total !== undefined)
+            ? `burstLocal=${burstLocal !== undefined ? fmt(burstLocal, 3) : "—"}, dutyCycle=${dutyCycleUI !== undefined ? fmt(dutyCycleUI, 3) : "—"}, (S_live,S_total)=(${S_live !== undefined ? fmt(S_live, 0) : "—"}, ${S_total !== undefined ? fmt(S_total, 0) : "—"})`
+            : undefined
+        }
+        result={
+          [dEff_FR !== undefined ? `d_eff(FR) = ${fmt(dEff_FR, 6)}` : undefined,
+           dEff_sector !== undefined ? `d_sector = ${fmt(dEff_sector, 6)}` : undefined]
+            .filter(Boolean)
+            .join("; ") || undefined
+        }
+        notes={
+          <>
+            <div>Backend uses <Eq>d_eff(FR)</Eq> for power & mass.</div>
+            {dutyRatio !== undefined && (
+              <div>Using <Eq>d_sector</Eq> in hand calcs overestimates by ×<Eq>{fmt(dutyRatio, 2)}</Eq>.</div>
+            )}
+          </>
+        }
       />
 
       <FormulaBlock

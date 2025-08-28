@@ -1,0 +1,45 @@
+Drop these edits into your existing UniformsExplainCard (no other files touched).
+
+1) Add these locals near the other FR numbers (right after burstLocal, S_live, S_total):
+  // UI vs FR duty variants
+  const dutyCycleUI = num((m as any)?.pipeline?.dutyCycle ?? (m as any)?.dutyCycle);
+  const dEff_FR =
+    burstLocal !== undefined && S_live !== undefined && S_total !== undefined
+      ? burstLocal * (S_live / S_total)
+      : undefined;
+  const dEff_sector =
+    dutyCycleUI !== undefined && S_live !== undefined && S_total !== undefined
+      ? dutyCycleUI * (S_live / S_total)
+      : undefined;
+  const dutyRatio =
+    dEff_sector !== undefined && dEff_FR !== undefined && dEff_FR > 0
+      ? dEff_sector / dEff_FR
+      : undefined;
+
+
+Note: keep your existing dEff variable as the value you display everywhere else; this block is just for the clarifier card.
+
+2) Right below your existing “Ford–Roman duty aggregation” FormulaBlock, insert this clarifier block:
+      <FormulaBlock
+        title="Duty factor (clarified)"
+        base="d_eff(FR) = burstLocal × S_live / S_total;  d_sector = dutyCycle × S_live / S_total"
+        sub={
+          (burstLocal !== undefined || dutyCycleUI !== undefined || S_live !== undefined || S_total !== undefined)
+            ? `burstLocal=${burstLocal !== undefined ? fmt(burstLocal, 3) : "—"}, dutyCycle=${dutyCycleUI !== undefined ? fmt(dutyCycleUI, 3) : "—"}, (S_live,S_total)=(${S_live !== undefined ? fmt(S_live, 0) : "—"}, ${S_total !== undefined ? fmt(S_total, 0) : "—"})`
+            : undefined
+        }
+        result={
+          [dEff_FR !== undefined ? `d_eff(FR) = ${fmt(dEff_FR, 6)}` : undefined,
+           dEff_sector !== undefined ? `d_sector = ${fmt(dEff_sector, 6)}` : undefined]
+            .filter(Boolean)
+            .join("; ") || undefined
+        }
+        notes={
+          <>
+            <div>Backend uses <Eq>d_eff(FR)</Eq> for power & mass.</div>
+            {dutyRatio !== undefined && (
+              <div>Using <Eq>d_sector</Eq> in hand calcs overestimates by ×<Eq>{fmt(dutyRatio, 2)}</Eq>.</div>
+            )}
+          </>
+        }
+      />
