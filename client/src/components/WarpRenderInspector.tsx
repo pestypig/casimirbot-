@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
-import { subscribe, unsubscribe } from "@/lib/luma-bus";
+import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
 import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
@@ -460,8 +460,14 @@ function PaneOverlay(props:{
       const S  = areaEllipsoid(a,b,c);
       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
 
-      const theta = Number.isFinite(U.thetaScale) ? +U.thetaScale : 0;
-      const mStar = massProxy(theta, Vshell, flavor==='REAL' ? viewFraction : 1.0);
+      // Compute mass based on provided calibration factor or use arb units
+      const K = Number((window as any).__EXOTIC_MASS_CALIB_KG_PER_ARB) || 0;
+      const thetaPhys = thetaPhysicsFromUniforms(U); // Use physics-only theta
+      const mProxy = massProxy(thetaPhys, Vshell, flavor === 'REAL' ? viewFraction : 1.0);
+
+      const mDisplayText = K > 0
+        ? `${fmtSI(mProxy * K, 'kg')}`
+        : `${Number.isFinite(mProxy) ? mProxy.toExponential(3) : '—'} arb`;
 
       // pull contraction/expansion from diagnostics if available
       const diag = (e?.computeDiagnostics?.() || {}) as any;
@@ -472,8 +478,9 @@ function PaneOverlay(props:{
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell, theta, mStar, frontMax, rearMin,
+        a,b,c,aH, w_m, V,S, Vshell, theta: U.thetaScale, mStar: mProxy, frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
+        mDisplayText // Add display text here
       });
       raf = requestAnimationFrame(tick);
     };
@@ -497,10 +504,11 @@ function PaneOverlay(props:{
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
-          <div>θ-scale: <b>{Number.isFinite(s.theta)? s.theta.toExponential(2) : '—'}</b></div>
+          <div>θ-scale: <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
-          <div>exotic mass* : <b>{Number.isFinite(s.mStar)? s.mStar.toExponential(3) : '—'} arb</b></div>
+          {/* Update mass display to use calibrated or arbitrary units properly */}
+          <div>exotic mass* : <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b></div>
           <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
           <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
         </div>
@@ -511,7 +519,7 @@ function PaneOverlay(props:{
           <div className="mt-2 text-[11px] leading-5 text-white/85 space-y-2">
             <div>
               <div className="opacity-80">Ellipsoid geometry</div>
-              <div><code>V = 4/3 · π · a · b · c</code> = <b>{Number.isFinite(s.V)? fmtSI(s.V,'m³') : '—'}</b></div>
+              <div><code>V = 4/3 · π · a · b · c</code> = <b>{Number.isFinite(s.V)? fmtSI(s.V,'m³'):'—'}</b></div>
               <div><code>S ≈ 4π · ((a^p b^p + a^p c^p + b^p c^p)/3)^(1/p)</code>, <i>p</i>=1.6075 → <b>{Number.isFinite(s.S)? fmtSI(s.S,'m²'):'—'}</b></div>
               <div><code>a_H = 3 / (1/a + 1/b + 1/c)</code> = <b>{Number.isFinite(s.aH)? fmtSI(s.aH,'m'):'—'}</b></div>
               <div><code>w_m = wallWidth_m ⟂</code> (or <code>w_ρ · a_H</code>) → <b>{fmtSI(s.w_m,'m')}</b></div>
@@ -526,7 +534,7 @@ function PaneOverlay(props:{
               <div className="opacity-80">Exotic mass proxy (display-only</div>
               <div>
                 <code>M* = θ² · V_shell · {flavor==='REAL' ? 'viewFraction' : '1'}</code>
-                {' '}→ <b>{Number.isFinite(s.mStar)? s.mStar.toExponential(3):'—'} arb</b>
+                {' '}→ <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b>
               </div>
               <div className="text-white/60">(* proportional units for visualization; not a calibrated mass)</div>
             </div>
@@ -879,8 +887,35 @@ export default function WarpRenderInspector(props: {
           console.log("Applying REAL initial uniforms:", realInitUniforms);
           gatedUpdateUniforms(leftEngine.current, realInitUniforms, 'client');
 
+          // CRITICAL: Force parity directly on uniforms object as backup
+          if (leftEngine.current.uniforms) {
+            leftEngine.current.uniforms.physicsParityMode = true;
+            leftEngine.current.uniforms.parityMode = true;
+            leftEngine.current.uniforms.ridgeMode = 0;
+          }
+
           // Verify parity was set
           console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
+
+          // Add aggressive parity correction that runs every frame
+          const enforceParityREAL = () => {
+            const U = leftEngine.current?.uniforms;
+            if (U && U.physicsParityMode !== true) {
+              console.error("❌ REAL parity violation detected - forcing correction");
+              U.physicsParityMode = true;
+              U.parityMode = true;
+              U.ridgeMode = 0;
+            }
+          };
+
+          // Hook into render loop for continuous enforcement
+          if (leftEngine.current._render) {
+            const originalRender = leftEngine.current._render.bind(leftEngine.current);
+            leftEngine.current._render = function(...args: any[]) {
+              enforceParityREAL();
+              return originalRender(...args);
+            };
+          }
 
           leftEngine.current?.setVisible?.(true);
           // Apply parity lock immediately after engine creation
@@ -1729,4 +1764,14 @@ export default function WarpRenderInspector(props: {
       {/* Visual controls removed - using hardcoded defaults */}
     </div>
   );
+}
+
+// physics θ helper (no SHOW boosts)
+function thetaPhysicsFromUniforms(U: any) {
+  const gammaGeo = +U.gammaGeo || 26;
+  const q       = +U.qSpoilingFactor || 1;
+  // prefer a physics (mass) channel if your pipeline provides it; fall back sanely
+  const gammaVdB = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
+  const dFR     = Math.max(1e-12, +U.dutyEffectiveFR || 0.01);
+  return Math.pow(gammaGeo, 3) * q * gammaVdB * Math.sqrt(dFR);
 }
