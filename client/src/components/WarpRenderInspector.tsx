@@ -16,6 +16,21 @@ import CanvasFallback from '@/components/CanvasFallback';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
+// Add near other helpers
+async function waitForNonZeroSize(cv: HTMLCanvasElement, timeoutMs = 3000) {
+  const t0 = performance.now();
+  return new Promise<void>((resolve, reject) => {
+    const tick = () => {
+      const w = cv.clientWidth || cv.getBoundingClientRect().width;
+      const h = cv.clientHeight || cv.getBoundingClientRect().height;
+      if (w > 8 && h > 8) return resolve();
+      if (performance.now() - t0 > timeoutMs) return reject(new Error('canvas size timeout (0×0)'));
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
 const DEBUG = false;
 const IS_COARSE =
   typeof window !== 'undefined' &&
