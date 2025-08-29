@@ -1,0 +1,159 @@
+let’s keep SHOW in arb, and make REAL show calibrated kilograms.
+
+Below is a minimal patch that:
+
+Leaves SHOW exactly as-is (arb units).
+
+Makes REAL display kg (per-slice and ship-total), using a calibration factor.
+
+Supports either a direct calibration factor (__EXOTIC_MASS_CALIB_KG_PER_ARB or pane-specific __EXOTIC_MASS_CALIB_KG_PER_ARB_REAL) or an auto-calibration from a target mass (__EXOTIC_MASS_TARGET_KG).
+
+--- a/client/src/components/WarpRenderInspector.tsx
++++ b/client/src/components/WarpRenderInspector.tsx
+@@
+ function fmtSI(x:number, unit:string){
+   if (!Number.isFinite(x)) return `— ${unit}`;
+   const abs = Math.abs(x);
+@@
+   return x.toExponential(2) + ' ' + unit;
+ }
+ 
++// nice formatting for arbitrary units
++function fmtArb(x:number){
++  if (!Number.isFinite(x)) return '— arb';
++  const abs = Math.abs(x);
++  if (abs < 1e-3) return `${(x*1e6).toFixed(2)} µarb`;
++  if (abs < 1)    return `${(x*1e3).toFixed(2)} marb`;
++  if (abs < 1e3)  return `${x.toFixed(2)} arb`;
++  if (abs < 1e6)  return `${(x/1e3).toFixed(2)} karb`;
++  return `${x.toExponential(2)} arb`;
++}
++
+ // Exotic mass proxy: M* ~ θ^2 · V_shell · viewFraction   (arb units; display-only)
+ function massProxy(theta:number, shellVol_m3:number, viewFraction:number){
+   const th = Math.max(0, theta||0);
+-  // Clamp theta to reasonable physics range to prevent numerical explosion
+-  const thClamped = Math.min(th, 1e6); // Reasonable upper bound for theta scale
+-  return thClamped*thClamped * Math.max(0, shellVol_m3||0) * Math.max(0, viewFraction||0);
++  return th*th * Math.max(0, shellVol_m3||0) * Math.max(0, viewFraction||0);
+ }
+@@
+ function PaneOverlay(props:{
+   title: string;
+   flavor: 'REAL'|'SHOW';
+   engineRef: React.MutableRefObject<any>;
+   viewFraction: number; // REAL uses 1/sectorCount, SHOW uses 1.0
+ }){
+@@
+       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
+-
+-      // Compute mass based on provided calibration factor or use arb units
+-      const K = Number((window as any).__EXOTIC_MASS_CALIB_KG_PER_ARB) || 0;
+-      
++ 
+       // Make the overlay honest: show the two θ's explicitly
+       const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
+       const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+       // optional: keep your paper clamp, but show it as "θ_paper"
+       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
+-      const clamped = Number.isFinite(thetaPhys) && thetaPhys > 1e10;
+-      const thetaForMass = clamped ? 1e10 : thetaPhys;
+-      
+-      const mProxy = massProxy(thetaForMass, Vshell, flavor === 'REAL' ? viewFraction : 1.0);
+-
+-      const mDisplayText = K > 0
+-        ? `${fmtSI(mProxy * K, 'kg')}`
+-        : (() => {
+-            if (!Number.isFinite(mProxy)) return '— arb';
+-            // Better formatting for arbitrary units
+-            if (mProxy < 1e-3) return `${(mProxy * 1e6).toFixed(2)} µarb`;
+-            if (mProxy < 1) return `${(mProxy * 1e3).toFixed(2)} marb`;
+-            if (mProxy < 1e3) return `${mProxy.toFixed(2)} arb`;
+-            if (mProxy < 1e6) return `${(mProxy / 1e3).toFixed(2)} karb`;
+-            return `${mProxy.toExponential(2)} arb`;
+-          })();
++      const thetaForMass = thetaPhys;
++
++      // compute both ship-total (viewFraction=1) and the visible slice
++      const M_ship_arb  = massProxy(thetaForMass, Vshell, 1.0);
++      const M_slice_arb = M_ship_arb * (flavor === 'REAL' ? viewFraction : 1.0);
++
++      // calibration priority: REAL-only → global → auto-from target ship mass
++      const Kreal   = Number((window as any).__EXOTIC_MASS_CALIB_KG_PER_ARB_REAL) || 0;
++      const Kglobal = Number((window as any).__EXOTIC_MASS_CALIB_KG_PER_ARB) || 0;
++      const target  = Number((window as any).__EXOTIC_MASS_TARGET_KG) || 0;
++      const Kauto   = (target > 0 && isFinite(M_ship_arb) && M_ship_arb > 0) ? target / M_ship_arb : 0;
++      const K_used  = (props.flavor === 'REAL') ? (Kreal || Kglobal || Kauto) : 0;
++
++      // Pane-specific display:
++      // - REAL: show kilograms (slice and ship total) if calibrated; else fallback to arb
++      // - SHOW: always arb
++      const mDisplayText =
++        (props.flavor === 'REAL' && K_used > 0)
++          ? `${fmtSI(M_slice_arb * K_used, 'kg')} (slice) · ${fmtSI(M_ship_arb * K_used, 'kg')} total`
++          : fmtArb(M_slice_arb);
+@@
+-      setSnap({
++      setSnap({
+         a,b,c,aH, w_m, V,S, Vshell, 
+         thetaUniform, thetaPhys, thetaPaper,
+-        mStar: mProxy, frontMax, rearMin,
++        M_ship_arb, M_slice_arb, K_used,
++        frontMax, rearMin,
+         sectors: Math.max(1,(U.sectorCount|0)||1),
+-        mDisplayText // Add display text here
+-        clamped
++        mDisplayText
+       });
+@@
+   return (
+@@
+         <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
+           <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
+           <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
+           <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
+           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
+           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
+-          {/* Update mass display to use calibrated or arbitrary units properly */}
+-          <div>exotic mass* : <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b>{s.clamped && <span className="text-[10px] text-yellow-400 ml-1">(clamped)</span>}</div>
++          {/* REAL shows kg when calibrated; SHOW remains arb */}
++          <div>
++            exotic mass{(flavor==='REAL' && s.K_used>0) ? '' : '*'} :
++            {' '}<b>{s.mDisplayText}</b>
++          </div>
+           <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
+           <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
+         </div>
+@@
+             <div>
+               <div className="opacity-80">Exotic mass proxy (display-only</div>
+-              <div>
+-                <code>M* = θ² · V_shell · {flavor==='REAL' ? 'viewFraction' : '1'}</code>
+-                {' '}→ <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b>
+-              </div>
+-              <div className="text-white/60">(* proportional units for visualization; not a calibrated mass)</div>
++              <div className="space-y-1">
++                <div>
++                  <code>M* = θ² · V_shell · 1</code> (ship total, arb) → <b>{fmtArb(s.M_ship_arb)}</b>
++                </div>
++                <div>
++                  <code>M*slice = M* · viewFraction</code> →{' '}
++                  { (flavor==='REAL' && s.K_used>0)
++                    ? <b>{fmtSI(s.M_slice_arb*s.K_used,'kg')} (slice) · {fmtSI(s.M_ship_arb*s.K_used,'kg')} total</b>
++                    : <b>{fmtArb(s.M_slice_arb)}</b>
++                  }
++                </div>
++                {!(flavor==='REAL' && s.K_used>0) && (
++                  <div className="text-white/60">
++                    * arb = arbitrary units. Set <code>window.__EXOTIC_MASS_CALIB_KG_PER_ARB</code> or
++                    {' '}<code>window.__EXOTIC_MASS_TARGET_KG</code> to see kg on REAL.
++                  </div>
++                )}
++              </div>
+             </div>
+           </div>
+         </details>
+       </div>
+     </div>
+   );
+ }
