@@ -56,11 +56,7 @@ const buildModeSelectItems = (pipeline: any) => {
 };
 
 import { useMetrics } from "@/hooks/use-metrics";
-const WarpBubbleCompare = lazy(() =>
-  import("@/components/warp/WarpBubbleCompare")
-);
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
-import { SliceViewer } from "@/components/SliceViewer";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -145,7 +141,6 @@ import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
-import CurvatureSlicePanel from "@/components/CurvatureSlicePanel";
 import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
@@ -654,22 +649,7 @@ export default function HelixCore() {
   // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
 
-  // SliceViewer responsive sizing (single source of truth — fixes duplicate ref crash)
-  const sliceHostRef = useRef<HTMLDivElement>(null);
-  const [sliceSize, setSliceSize] = useState({ w: 480, h: 240 });
-
-  useEffect(() => {
-    const ro = new ResizeObserver((entries) => {
-      for (const e of entries) {
-        const w = Math.floor((e.contentBoxSize?.[0]?.inlineSize ?? e.contentRect.width) || 480);
-        const clampedW = Math.max(360, Math.min(w, 800));
-        setSliceSize({ w: clampedW, h: Math.round(clampedW / 2) });
-      }
-    });
-    const el = sliceHostRef.current;
-    if (el) ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665,
@@ -685,73 +665,14 @@ export default function HelixCore() {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
-  const compareParams = useMemo(() => {
-    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
-
-    return {
-      currentMode: effectiveMode,
-
-      // geometry
-      hull,
-
-      // --- UI duty (FR duty computed separately and added at call-site) ---
-      dutyCycle: dutyUI_safe,
-
-      // --- BOTH sector numbers ---
-      sectorCount: totalSectors, // TOTAL (averaging)
-      sectors: concurrentSectors, // concurrent (sweep)
-      sectorStrobing: sectorsUI, // legacy compatibility
-
-      // physics amps
-      gammaGeo: num(pipeline?.gammaGeo) ?? 26,
-      qSpoilingFactor: num(pipeline?.qSpoilingFactor) ?? 1,
-      gammaVanDenBroeck: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1) ?? 0,
-
-      // viewer niceties
-      viewAvg: true,
-      colorMode: "theta" as const,
-      lockFraming: true,
-    };
-  }, [
-    effectiveMode,
-    hull,
-    systemMetrics?.currentSector,
-    totalSectors,
-    concurrentSectors,
-    pipeline?.modulationFreq_GHz,
-    pipeline?.hull?.wallThickness_m,
-    pipeline?.dutyCycle,
-    pipeline?.sectorCount,
-    pipeline?.sectorStrobing,
-    pipeline?.gammaGeo,
-    pipeline?.qSpoilingFactor,
-    pipeline?.gammaVanDenBroeck,
-    sectorsUI,
-    isStandby,
-    dutyEffectiveFR_safe,
-    dutyUI_safe,
-  ]);
+  
 
   // Also rebind when core FR/sector knobs actually change (local safety net)
   useEffect(() => {
     setRenderNonce((n) => n + 1);
   }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
-  // Create truly separate payloads (no shared nested refs)
-  const heroParams = useMemo(() => {
-    const p: any = structuredClone(compareParams);
-    p.physicsParityMode = false;
-    return p;
-  }, [compareParams]);
-
-  const realParams = useMemo(() => {
-    const p: any = structuredClone(compareParams);
-    p.physicsParityMode = true;
-    p.viz = { ...(p.viz ?? {}), curvatureGainT: 0, curvatureBoostMax: 1, colorMode: "theta" };
-    p.curvatureGainDec = 0;
-    p.curvatureBoostMax = 1;
-    return p;
-  }, [compareParams]);
+  
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -1049,93 +970,7 @@ export default function HelixCore() {
             </div>
           </div>
 
-          {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Atom className="w-5 h-5 text-cyan-400" />
-                {MAINFRAME_ZONES.WARP_VISUALIZER}
-              </CardTitle>
-              <CardDescription>3D spacetime curvature + equatorial slice viewer — live, mode-aware, and physically grounded</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                <div className="space-y-4">
-                  <div className="rounded-lg overflow-hidden bg-slate-950">
-                    <Suspense
-                      fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}
-                    >
-                      <WarpBubbleCompare
-                        key={`hero-${renderNonce}`}
-                        parameters={{
-                          ...compareParams,
-                          currentMode: effectiveMode,
-                          reloadToken: modeNonce,
-                          lightCrossing: lc,
-                          sectorCount: totalSectors,
-                          sectors: concurrentSectors,
-                          dutyEffectiveFR: dutyEffectiveFR_safe,
-                          dutyCycle: dutyUI_safe,
-                          viewAvg: true,
-                          colorMode: "theta",
-                          lockFraming: true,
-                          gammaVanDenBroeck: isStandby
-                            ? 1
-                            : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                          powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
-                          exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
-                        }}
-                        parityExaggeration={1}
-                        heroExaggeration={82}
-                        colorMode="theta"
-                        lockFraming={true}
-                      />
-                    </Suspense>
-                  </div>
-                </div>
-
-                <div className="space-y-4" ref={sliceHostRef}>
-                  <SliceViewer
-                    hullAxes={[
-                      Number(hull.a) || 503.5,
-                      Number(hull.b) || 132.0,
-                      Number(hull.c) || 86.5,
-                    ]}
-                    wallWidth_m={6.0}
-                    driveDir={[1, 0, 0]}
-                    vShip={1.0}
-                    gammaGeo={pipeline?.gammaGeo ?? 26}
-                    qSpoilingFactor={qSpoilUI}
-                    gammaVdB={(() => {
-                      const gammaVdB_vis = Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1);
-                      return isFiniteNumber(gammaVdB_vis) ? gammaVdB_vis : 0;
-                    })()}
-                    dutyCycle={dutyUI_safe}
-                    dutyEffectiveFR={dutyEffectiveFR_safe}
-                    sectors={totalSectors}
-                    viewAvg={true}
-                    diffMode={false}
-                    refParams={{
-                      gammaGeo: 26,
-                      qSpoilingFactor: 1,
-                      gammaVdB: 0,
-                      dutyCycle: 0.14,
-                      sectors: 1,
-                      viewAvg: true,
-                    }}
-                    sigmaRange={6}
-                    exposure={6}
-                    zeroStop={1e-7}
-                    showContours={true}
-                    curvatureBoostMax={40}
-                    width={sliceSize.w}
-                    height={sliceSize.h}
-                    className="xl:sticky xl:top-4"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1345,8 +1180,7 @@ export default function HelixCore() {
             </CardContent>
           </Card>
 
-          {/* ====== REAL Equatorial Slice (to-scale) ====== */}
-          <CurvatureSlicePanel />
+          
 
           {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
