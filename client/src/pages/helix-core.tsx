@@ -79,6 +79,12 @@ let __busSeq = 0;
 
 const toNumber = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 
+// strip purely-meta/bump fields so signature is stable
+const stableWU = (x:any) => {
+  const { __version, __src, thetaScaleExpected, ...rest } = x || {};
+  return rest;
+};
+
 function sanitizeServerUniforms(raw: any, version: number) {
   const gammaVdB_vis = toNumber(raw.gammaVanDenBroeck_vis ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, 1.4e5);
   const gammaVdB_mass = toNumber(raw.gammaVanDenBroeck_mass ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis);
@@ -464,6 +470,7 @@ export default function HelixCore() {
   }, [(systemMetrics as any)?.thetaAudit]);
 
   // Publish canonical uniforms from server metrics
+  const lastWUHashRef = useRef<string>(""); // Use a ref to store the hash of the last published uniforms
   useEffect(() => {
     const wu = (systemMetrics as any)?.warpUniforms;
     if (!wu) return;
@@ -471,7 +478,12 @@ export default function HelixCore() {
     const seq = Number((systemMetrics as any)?.seq);
     const version = Number.isFinite(seq) ? seq : ++__busSeq;
 
-    publish("warp:uniforms", sanitizeServerUniforms(wu, version));
+    const sanitized = sanitizeServerUniforms(wu, version);
+    const sig = JSON.stringify(stableWU(sanitized));
+    if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+
+    lastWUHashRef.current = sig; // Update the stored hash
+    publish("warp:uniforms", sanitized);
   }, [systemMetrics]);
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
@@ -649,7 +661,7 @@ export default function HelixCore() {
   // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
 
-  
+
 
   // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
   const G = 9.80665, c = 299792458;
@@ -677,14 +689,78 @@ export default function HelixCore() {
     betaTiltVecRaw[2] / betaNorm,
   ];
 
-  
 
-  // Also rebind when core FR/sector knobs actually change (local safety net)
-  useEffect(() => {
-    setRenderNonce((n) => n + 1);
-  }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
-  
+  // --- Derived physics uniforms for WarpRenderInspector
+  const realPhys = {
+    gammaGeo: pipeline?.gammaGeo ?? 26,
+    q: qSpoilUI,
+    gammaVdB: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+    dFR: dutyEffectiveFR_safe,
+  };
+
+  const expREAL = thetaScaleExpected(realPhys);
+  const usedREAL = thetaScaleUsed(expREAL, {
+    concurrent: 1,
+    total: 400,
+    dutyLocal: 0.01,
+    viewFraction: 0.0025,
+    viewAveraging: true,
+  });
+
+  // Defer checkpoint calls to avoid render-time state updates
+  React.useEffect(() => {
+    checkpoint({
+      id: "θ-expected",
+      side: "REAL",
+      stage: "expect",
+      pass: true,
+      msg: `θ_expected=${expREAL.toExponential()}`,
+      expect: expREAL,
+    });
+
+    checkpoint({
+      id: "θ-used",
+      side: "REAL",
+      stage: "expect",
+      pass: true,
+      msg: `θ_used=${usedREAL.toExponential()}`,
+      expect: usedREAL,
+    });
+  }, [expREAL, usedREAL]);
+
+  const showPhys = {
+    gammaGeo: pipeline?.gammaGeo ?? 26,
+    qSpoilingFactor: qSpoilUI,
+    gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+    dutyEffectiveFR: dutyEffectiveFR_safe,
+    dutyCycle: dutyUI_safe,
+    viewMassFraction: 1.0,
+  }
+
+  const baseShared = {
+    hull: {
+      a: Number(hull.a) || 503.5,
+      b: Number(hull.b) || 132.0,
+      c: Number(hull.c) || 86.5,
+    },
+    wallWidth_m: 6.0,
+    driveDir: [1, 0, 0],
+    vShip: 0,
+    sectorCount: totalSectors,
+    sectors: concurrentSectors,
+
+    // ✅ attach Purple shift vector + curvature knobs to BOTH renderers
+    epsilonTilt,
+    betaTiltVec: betaTiltVecN,
+    curvatureGainDec: 0.0,
+    curvatureBoostMax: 20,
+
+    colorMode: "theta",
+    lockFraming: true,
+    currentMode: effectiveMode,
+  } as any;
+
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -982,7 +1058,7 @@ export default function HelixCore() {
             </div>
           </div>
 
-          
+
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1077,94 +1153,11 @@ export default function HelixCore() {
             <CardContent className="pt-0">
               <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
                 <WarpRenderInspector
-                  key={`inspector-${modeNonce}-${totalSectors}-${concurrentSectors}`}
-                  parityPhys={(() => {
-                    const realPhys = {
-                      gammaGeo: pipeline?.gammaGeo ?? 26,
-                      q: qSpoilUI,
-                      gammaVdB: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                      dFR: dutyEffectiveFR_safe,
-                    };
-
-                    const expREAL = thetaScaleExpected(realPhys);
-                    const usedREAL = thetaScaleUsed(expREAL, {
-                      concurrent: 1,
-                      total: 400,
-                      dutyLocal: 0.01,
-                      viewFraction: 0.0025,
-                      viewAveraging: true,
-                    });
-
-                    // Defer checkpoint calls to avoid render-time state updates
-                    React.useEffect(() => {
-                      checkpoint({
-                        id: "θ-expected",
-                        side: "REAL",
-                        stage: "expect",
-                        pass: true,
-                        msg: `θ_expected=${expREAL.toExponential()}`,
-                        expect: expREAL,
-                      });
-
-                      checkpoint({
-                        id: "θ-used",
-                        side: "REAL",
-                        stage: "expect",
-                        pass: true,
-                        msg: `θ_used=${usedREAL.toExponential()}`,
-                        expect: usedREAL,
-                      });
-                    }, [expREAL, usedREAL]);
-
-                    return {
-                      gammaGeo: pipeline?.gammaGeo ?? 26,
-                      qSpoilingFactor: qSpoilUI,
-                      gammaVanDenBroeck_vis: isStandby
-                        ? 1
-                        : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                      dutyEffectiveFR: dutyEffectiveFR_safe,
-                      dutyCycle: dutyUI_safe,
-                      viewMassFraction: viewMassFracReal,
-
-                      // 🔎 extras shown on the REAL side HUD (non-breaking extras)
-                      thetaExpected: expREAL,
-                      thetaUsed: usedREAL,
-                      fordRomanZeta: pipeline?.zeta,
-                    } as any;
-                  })()}
-                  showPhys={{
-                    gammaGeo: pipeline?.gammaGeo ?? 26,
-                    qSpoilingFactor: qSpoilUI,
-                    gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                    dutyEffectiveFR: dutyEffectiveFR_safe,
-                    dutyCycle: dutyUI_safe,
-                    viewMassFraction: 1.0,
-                  }}
-                  baseShared={{
-                    hull: {
-                      a: Number(hull.a) || 503.5,
-                      b: Number(hull.b) || 132.0,
-                      c: Number(hull.c) || 86.5,
-                    },
-                    wallWidth_m: 6.0,
-                    driveDir: [1, 0, 0],
-                    vShip: 0,
-                    sectorCount: totalSectors,
-                    sectors: concurrentSectors,
-
-                    // ✅ attach Purple shift vector + curvature knobs to BOTH renderers
-                    epsilonTilt,
-                    betaTiltVec: betaTiltVecN,
-                    curvatureGainDec: 0.0,
-                    curvatureBoostMax: 20,
-
-                    colorMode: "theta",
-                    lockFraming: true,
-                    currentMode: effectiveMode,
-                  } as any}
-                  lightCrossing={{ burst_ms: lc.burst_ms, dwell_ms: lc.dwell_ms }}
-                  realRenderer="slice2d"
-                  showRenderer="grid3d"
+                  key={`inspector-${modeNonce}`}
+                  parityPhys={realPhys}
+                  showPhys={showPhys}
+                  baseShared={baseShared}
+                  lightCrossing={lc}
                 />
               </Suspense>
             </CardContent>
@@ -1204,7 +1197,7 @@ export default function HelixCore() {
             </CardContent>
           </Card>
 
-          
+
 
           {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1651,14 +1644,14 @@ export default function HelixCore() {
               <CurvatureKey />
 
               {/* Shift Vector • Interior Gravity */}
-              <ShiftVectorPanel 
-                mode={pipelineState?.currentMode || "hover"} 
+              <ShiftVectorPanel
+                mode={pipelineState?.currentMode || "hover"}
                 shift={systemMetrics?.shiftVector ? {
                   ...systemMetrics.shiftVector,
                   gTarget: systemMetrics.shiftVector.gTarget ?? 0.980665,
                   R_geom: systemMetrics.shiftVector.R_geom ?? 179.14162298838383,
                   gEff_check: systemMetrics.shiftVector.gEff_check ?? 0.980665
-                } : undefined} 
+                } : undefined}
               />
             </div>
 

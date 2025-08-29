@@ -538,6 +538,13 @@ function PaneOverlay(props:{
 }
 
 // ---- Component --------------------------------------------------------------
+// Stable uniform hashing to reduce bus spam
+const stableWU = (x: any) => {
+  // strip purely-meta/bump fields so signature is stable
+  const { __version, __src, thetaScaleExpected, ...rest } = x || {};
+  return rest;
+};
+
 export default function WarpRenderInspector(props: {
   // Optional: calculator outputs. Pass exactly what your calculator returns
   // (REAL/FR vs SHOW/UI). Any missing fields fall back safely.
@@ -586,6 +593,7 @@ export default function WarpRenderInspector(props: {
   const pushRight = useRef<(p:any, tag?:string)=>void>(() => {});
   const leftOwnedRef = useRef(false);
   const rightOwnedRef = useRef(false);
+  const lastWUHashRef = useRef<string>("");
 
   const [haveUniforms, setHaveUniforms] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -997,6 +1005,25 @@ export default function WarpRenderInspector(props: {
         rightEngine.current?.setVisible?.(true);
       });
 
+      // De-spam the bus: publish only on real changes
+      const publishStableUniforms = () => {
+        const wu = (systemMetrics as any)?.warpUniforms;
+        if (!wu) return;
+
+        const seq = Number((systemMetrics as any)?.seq);
+        const version = Number.isFinite(seq) ? seq : Date.now();
+
+        const sanitized = sanitizeUniforms(wu);
+        const sig = JSON.stringify(stableWU(sanitized));
+        if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+
+        lastWUHashRef.current = sig;
+        publish("warp:uniforms", { ...sanitized, __version: version });
+      };
+
+      // Initial publish
+      publishStableUniforms();
+
       // Let engines render immediately; canonical uniforms will override later.
       leftEngine.current?.setVisible?.(true);
       rightEngine.current?.setVisible?.(true);
@@ -1083,6 +1110,22 @@ export default function WarpRenderInspector(props: {
 
     initEngines();
   }, []); // Empty dependency array ensures this runs only once on mount
+
+  // De-spam the bus: publish only on real changes
+  useEffect(() => {
+    const wu = (systemMetrics as any)?.warpUniforms;
+    if (!wu) return;
+
+    const seq = Number((systemMetrics as any)?.seq);
+    const version = Number.isFinite(seq) ? seq : Date.now();
+
+    const sanitized = sanitizeUniforms(wu);
+    const sig = JSON.stringify(stableWU(sanitized));
+    if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+
+    lastWUHashRef.current = sig;
+    publish("warp:uniforms", { ...sanitized, __version: version });
+  }, [systemMetrics]);
 
   // Ford-Roman duty computation (outside useEffect for prop access)
   const dutyLocal = (() => {
