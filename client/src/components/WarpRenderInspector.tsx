@@ -13,6 +13,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
+import Grid3DEngine from '@/components/engines/Grid3DEngine';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -1502,6 +1503,13 @@ export default function WarpRenderInspector(props: {
     };
   }, []);
 
+  // Missing variables for new layout
+  const realRendererType = 'canvas'; // Default to canvas for now
+  const showRendererType = 'canvas'; // Default to canvas for now
+  const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
+  const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
+  const grid3dRef = useRef<any>(null);
+
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
     startTransition(() => {
@@ -1570,10 +1578,21 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
-            <canvas ref={leftRef} className="w-full h-full block touch-manipulation select-none"/>
-            {/* ⬇️ live badge */}
-            {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
+          <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
+               style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+            <div className="relative flex-1">
+              {realRendererType === 'grid3d' ? (
+                <Grid3DEngine
+                  ref={grid3dRef}
+                  uniforms={realUniforms}
+                  className="absolute inset-0 w-full h-full block"
+                  style={{ background: 'black' }}
+                />
+              ) : (
+                <canvas ref={leftRef} className="absolute inset-0 w-full h-full block touch-manipulation select-none"/>
+              )}
+              {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
+            </div>
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
@@ -1581,10 +1600,21 @@ export default function WarpRenderInspector(props: {
             <h3 className="text-sm font-semibold">SHOW — Boosted (UI) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
           </div>
-          <div className="relative aspect-video rounded-xl overflow-hidden bg-black/90 min-h-[240px]">
-            <canvas ref={rightRef} className="w-full h-full block touch-manipulation select-none"/>
-            {/* ⬇️ live badge */}
-            {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
+          <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
+               style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+            <div className="relative flex-1">
+              {showRendererType === 'grid3d' ? (
+                <Grid3DEngine
+                  ref={grid3dRef}
+                  uniforms={showUniforms}
+                  className="absolute inset-0 w-full h-full block"
+                  style={{ background: 'black' }}
+                />
+              ) : (
+                <canvas ref={rightRef} className="absolute inset-0 w-full h-full block touch-manipulation select-none"/>
+              )}
+              {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
+            </div>
           </div>
         </article>
       </section>
