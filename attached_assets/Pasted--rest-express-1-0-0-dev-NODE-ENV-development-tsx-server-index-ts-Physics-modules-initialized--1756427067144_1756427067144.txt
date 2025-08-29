@@ -1,0 +1,431 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+Physics modules initialized: [ 'static', 'dynamic', 'warp' ]
+[WarpModule] Starting calculation with params: {
+  geometry: 'bowl',
+  gap: 1,
+  radius: 179141622.98838383,
+  sagDepth: 16,
+  material: 'PEC',
+  temperature: 20,
+  moduleType: 'warp',
+  dynamicConfig: {
+    modulationFreqGHz: 15,
+    strokeAmplitudePm: 50,
+    burstLengthUs: 10,
+    cycleLengthUs: 1000,
+    cavityQ: 1000000000,
+    sectorCount: 400,
+    sectorDuty: 0.000025,
+    pulseFrequencyGHz: 15,
+    lightCrossingTimeNs: 3.3356409519815204,
+    shiftAmplitude: 5e-11,
+    expansionTolerance: 1e-12,
+    warpFieldType: 'natario'
+  },
+  amps: {
+    gammaGeo: 26,
+    gammaVanDenBroeck: 135203.8323388882,
+    qSpoilingFactor: 1
+  }
+}
+[WarpModule] convertToWarpParams input: {
+  geometry: 'bowl',
+  gap: 1,
+  radius: 179141622.98838383,
+  sagDepth: 16,
+  material: 'PEC',
+  temperature: 20,
+  moduleType: 'warp',
+  dynamicConfig: {
+    modulationFreqGHz: 15,
+    strokeAmplitudePm: 50,
+    burstLengthUs: 10,
+    cycleLengthUs: 1000,
+    cavityQ: 1000000000,
+    sectorCount: 400,
+    sectorDuty: 0.000025,
+    pulseFrequencyGHz: 15,
+    lightCrossingTimeNs: 3.3356409519815204,
+    shiftAmplitude: 5e-11,
+    expansionTolerance: 1e-12,
+    warpFieldType: 'natario'
+  },
+  amps: {
+    gammaGeo: 26,
+    gammaVanDenBroeck: 135203.8323388882,
+    qSpoilingFactor: 1
+  }
+}
+[WarpModule] Dynamic config: {
+  modulationFreqGHz: 15,
+  strokeAmplitudePm: 50,
+  burstLengthUs: 10,
+  cycleLengthUs: 1000,
+  cavityQ: 1000000000,
+  sectorCount: 400,
+  sectorDuty: 0.000025,
+  pulseFrequencyGHz: 15,
+  lightCrossingTimeNs: 3.3356409519815204,
+  shiftAmplitude: 5e-11,
+  expansionTolerance: 1e-12,
+  warpFieldType: 'natario'
+}
+[WarpModule] Hull geometry: {
+  hull: { a: 503.5, b: 132, c: 86.5 },
+  R_geom_m: 179.14162298838383,
+  R_geom_um: 179141622.98838383
+}
+[WarpModule] resolveDutyEff input params: {
+  dynamicConfig: {
+    modulationFreqGHz: 15,
+    strokeAmplitudePm: 50,
+    burstLengthUs: 10,
+    cycleLengthUs: 1000,
+    cavityQ: 1000000000,
+    sectorCount: 400,
+    sectorDuty: 0.000025,
+    pulseFrequencyGHz: 15,
+    lightCrossingTimeNs: 3.3356409519815204,
+    shiftAmplitude: 5e-11,
+    expansionTolerance: 1e-12,
+    warpFieldType: 'natario'
+  },
+  dutyEffectiveFR: undefined,
+  dutyShip: undefined,
+  dutyEff: undefined
+}
+[WarpModule] Sector count: 400
+[WarpModule] FR from pipeline: undefined
+[WarpModule] Burst/dwell timing: { burst: 10, dwell: 1000 }
+[WarpModule] Calculated local duty: 0.01
+[WarpModule] Using provided sectorDuty as FR: 0.000025
+[WarpModule] Sector/duty resolution: { sectorCount: 400, d_eff: 0.000025 }
+[WarpModule] Amps object: {
+  gammaGeo: 26,
+  gammaVanDenBroeck: 135203.8323388882,
+  qSpoilingFactor: 1
+}
+[WarpModule] Amplification factors: {
+  gammaGeo: 26,
+  gammaVanDenBroeck: 135203.8323388882,
+  qSpoilingFactor: 1
+}
+[WarpModule] Tile and power data: {
+  tileCount: undefined,
+  tileArea_m2: undefined,
+  P_avg_W: undefined,
+  tileArea_cm2: undefined,
+  P_avg: undefined
+}
+[WarpModule] Calculated local duty from timing: 0.01
+[WarpModule] Duty factor calculation: 0.01
+[WarpModule] Final warp parameters: {
+  bowlRadius: 179141622.98838383,
+  sagDepth: 16,
+  gap: 1,
+  cavityQ: 1000000000,
+  burstDuration: 10,
+  cycleDuration: 1000,
+  sectorCount: 400,
+  dutyFactor: 0.01,
+  effectiveDuty: 0.000025,
+  shiftAmplitude: 5e-11,
+  expansionTolerance: 1e-12,
+  gammaGeo: 26,
+  gammaVanDenBroeck: 135203.8323388882,
+  qSpoilingFactor: 1,
+  tileCount: undefined,
+  tileArea_m2: undefined,
+  P_avg_W: undefined,
+  referenceQ: 1000000000
+}
+[WarpModule] Converted warp parameters: {
+  bowlRadius: 179141622.98838383,
+  sagDepth: 16,
+  gap: 1,
+  cavityQ: 1000000000,
+  burstDuration: 10,
+  cycleDuration: 1000,
+  sectorCount: 400,
+  dutyFactor: 0.01,
+  effectiveDuty: 0.000025,
+  shiftAmplitude: 5e-11,
+  expansionTolerance: 1e-12,
+  gammaGeo: 26,
+  gammaVanDenBroeck: 135203.8323388882,
+  qSpoilingFactor: 1,
+  tileCount: undefined,
+  tileArea_m2: undefined,
+  P_avg_W: undefined,
+  referenceQ: 1000000000
+}
+[NatarioWarp] Calculated fallback power: 6066305860183.921 W from physics
+[WarpModule] Warp calculation result: {
+  geometricBlueshiftFactor: 26,
+  effectivePathLength: 1e-9,
+  geometricAmplification: 2376342557.188299,
+  qEnhancementFactor: 1,
+  totalAmplificationFactor: 2376342557.188299,
+  baselineEnergyDensity: -433375257.7481217,
+  amplifiedEnergyDensity: -25746201705482.746,
+  exoticMassPerTile: 7.161628192693288e-16,
+  totalExoticMass: 7.161628192693288e-16,
+  timeAveragedMass: 7.161628192693288e-16,
+  powerDraw: 6066305860183.921,
+  quantumInequalityMargin: 0.008143597555875548,
+  quantumSafetyStatus: 'safe',
+  shiftVectorField: {
+    amplitude: 5e-11,
+    radialProfile: [Function: radialProfile],
+    tangentialComponent: 1.2499999999977984e-16,
+    axialComponent: 6.249999999988992e-17,
+    positivePhaseAmplitude: 5.0000625e-11,
+    negativePhaseAmplitude: 4.9999375e-11,
+    netShiftAmplitude: 1.2499999999977985e-15,
+    evaluateShiftVector: [Function: evaluateShiftVector]
+  },
+  expansionScalar: 0,
+  curlMagnitude: 0,
+  momentumFlux: 10382837103622595000,
+  stressEnergyTensor: {
+    T00: -25746201705482.746,
+    T11: 25746201705482.746,
+    T22: 12873100852741.373,
+    T33: 25746201705482.746,
+    isNullEnergyConditionSatisfied: true
+  },
+  isZeroExpansion: true,
+  isCurlFree: true,
+  isQuantumSafe: true,
+  isPowerCompliant: true
+}
+[WarpModule] Validating warp results: {
+  inputParams: {
+    geometry: 'bowl',
+    gap: 1,
+    radius: 179141622.98838383,
+    sagDepth: 16,
+    material: 'PEC',
+    temperature: 20,
+    moduleType: 'warp',
+    dynamicConfig: {
+      modulationFreqGHz: 15,
+      strokeAmplitudePm: 50,
+      burstLengthUs: 10,
+      cycleLengthUs: 1000,
+      cavityQ: 1000000000,
+      sectorCount: 400,
+      sectorDuty: 0.000025,
+      pulseFrequencyGHz: 15,
+      lightCrossingTimeNs: 3.3356409519815204,
+      shiftAmplitude: 5e-11,
+      expansionTolerance: 1e-12,
+      warpFieldType: 'natario'
+    },
+    amps: {
+      gammaGeo: 26,
+      gammaVanDenBroeck: 135203.8323388882,
+      qSpoilingFactor: 1
+    }
+  },
+  warpResult: {
+    geometricBlueshiftFactor: 26,
+    effectivePathLength: 1e-9,
+    geometricAmplification: 2376342557.188299,
+    qEnhancementFactor: 1,
+    totalAmplificationFactor: 2376342557.188299,
+    baselineEnergyDensity: -433375257.7481217,
+    amplifiedEnergyDensity: -25746201705482.746,
+    exoticMassPerTile: 7.161628192693288e-16,
+    totalExoticMass: 7.161628192693288e-16,
+    timeAveragedMass: 7.161628192693288e-16,
+    powerDraw: 6066305860183.921,
+    quantumInequalityMargin: 0.008143597555875548,
+    quantumSafetyStatus: 'safe',
+    shiftVectorField: {
+      amplitude: 5e-11,
+      radialProfile: [Function: radialProfile],
+      tangentialComponent: 1.2499999999977984e-16,
+      axialComponent: 6.249999999988992e-17,
+      positivePhaseAmplitude: 5.0000625e-11,
+      negativePhaseAmplitude: 4.9999375e-11,
+      netShiftAmplitude: 1.2499999999977985e-15,
+      evaluateShiftVector: [Function: evaluateShiftVector]
+    },
+    expansionScalar: 0,
+    curlMagnitude: 0,
+    momentumFlux: 10382837103622595000,
+    stressEnergyTensor: {
+      T00: -25746201705482.746,
+      T11: 25746201705482.746,
+      T22: 12873100852741.373,
+      T33: 25746201705482.746,
+      isNullEnergyConditionSatisfied: true
+    },
+    isZeroExpansion: true,
+    isCurlFree: true,
+    isQuantumSafe: true,
+    isPowerCompliant: true
+  }
+}
+[WarpModule] Validation parameters: { 'γ_geo': 26, 'γ_vdb': 135203.8323388882, Q: 1000000000 }
+[WarpModule] Validation bounds: {
+  geometry: { min: 2.6, max: 260, actual: 26 },
+  amplification: {
+    min: 91.39779066108842,
+    max: 91397790661088420,
+    actual: 2376342557.188299
+  },
+  qEnhancement: { min: 0, actual: 1 }
+}
+[WarpModule] Validation checks: {
+  geometryValid: true,
+  amplificationValid: true,
+  quantumSafe: true,
+  warpFieldStable: true,
+  detailedChecks: {
+    isZeroExpansion: true,
+    isCurlFree: true,
+    nullEnergyCondition: true,
+    quantumSafetyStatus: 'safe'
+  }
+}
+[WarpModule] Overall validation status: optimal
+[WarpModule] Validation summary: {
+  geometryValid: true,
+  amplificationValid: true,
+  quantumSafe: true,
+  warpFieldStable: true,
+  overallStatus: 'optimal'
+}
+[WarpModule] Calculation completed in 9 ms
+[WarpModule] Shift vector field validation: {
+  amplitude: 5e-11,
+  hasRadialProfile: true,
+  tangentialComponent: 1.2499999999977984e-16,
+  axialComponent: 6.249999999988992e-17,
+  netShiftAmplitude: 1.2499999999977985e-15
+}
+[WarpModule] Final result keys: [
+  'geometricBlueshiftFactor',
+  'effectivePathLength',
+  'geometricAmplification',
+  'qEnhancementFactor',
+  'totalAmplificationFactor',
+  'baselineEnergyDensity',
+  'amplifiedEnergyDensity',
+  'exoticMassPerTile',
+  'totalExoticMass',
+  'timeAveragedMass',
+  'powerDraw',
+  'quantumInequalityMargin',
+  'quantumSafetyStatus',
+  'shiftVectorField',
+  'expansionScalar',
+  'curlMagnitude',
+  'momentumFlux',
+  'stressEnergyTensor',
+  'isZeroExpansion',
+  'isCurlFree',
+  'isQuantumSafe',
+  'isPowerCompliant',
+  'moduleVersion',
+  'calculationTime',
+  'validationSummary'
+]
+12:23:29 AM [express] serving on port 5000
+Browserslist: browsers data (caniuse-lite) is 10 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+12:23:42 AM [express] GET /api/helix/metrics 200 in 4ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:42 AM [express] GET /api/helix/pipeline 200 in 2ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:42 AM [express] GET /api/helix/metrics 200 in 2ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:42 AM [express] GET /api/helix/pipeline 200 in 1ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:42 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:42 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:42 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:43 AM [express] POST /api/helix/command 429 in 666ms :: {"error":"ChatGPT API error: {\n    \"e…
+12:23:44 AM [express] GET /api/helix/pipeline 200 in 1ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:44 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:44 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:45 AM [express] GET /api/helix/pipeline 200 in 5ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:46 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:46 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:47 AM [express] GET /api/helix/pipeline 200 in 0ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:48 AM [express] GET /api/helix/metrics 200 in 0ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:48 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:48 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:48 AM [express] GET /api/helix/pipeline 200 in 1ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:50 AM [express] GET /api/helix/pipeline 200 in 1ms :: {"tileArea_cm2":25,"shipRadius_m":86.5,"g…
+12:23:50 AM [express] GET /api/helix/metrics 200 in 1ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:50 AM [express] GET /api/helix/metrics 200 in 0ms :: {"totalTiles":1961844377,"activeTiles":490…
+12:23:51 AM [vite] Internal server error: /home/runner/workspace/client/src/components/warp/WarpBubbleCompare.tsx: Adjacent JSX elements must be wrapped in an enclosing tag. Did you want a JSX fragment <>...</>? (1467:6)
+
+  1465 |           />
+  1466 |         </div>
+> 1467 |       </div>
+       |       ^
+  1468 |     </div>
+  1469 |   );
+  1470 | }
+  Plugin: vite:react-babel
+  File: /home/runner/workspace/client/src/components/warp/WarpBubbleCompare.tsx:1467:6
+  1465|            />
+  1466|          </div>
+  1467|        </div>
+     |        ^
+  1468|      </div>
+  1469|    );
+      at toParseError (/home/runner/workspace/node_modules/@babel/parser/src/parse-error.ts:95:45)
+      at raise (/home/runner/workspace/node_modules/@babel/parser/src/tokenizer/index.ts:1497:19)
+      at jsxParseElementAt (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:543:20)
+      at jsxParseElement (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:559:19)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:573:21)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:714:23)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:401:23)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at fn (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3588:23)
+      at tryParse (/home/runner/workspace/node_modules/@babel/parser/src/parser/util.ts:174:20)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3587:20)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:252:12)
+      at allowInAnd (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3117:12)
+      at parseMaybeAssignAllowIn (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:251:17)
+      at parseParenAndDistinguishExpression (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:1771:16)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:1131:21)
+      at parseExprAtom (/home/runner/workspace/node_modules/@babel/parser/src/plugins/jsx/index.ts:583:22)
+      at parseExprSubscripts (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:714:23)
+      at parseUpdate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:693:21)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:655:23)
+      at parseMaybeUnary (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3735:20)
+      at parseMaybeUnaryOrPrivate (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:389:14)
+      at parseExprOps (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:401:23)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:356:23)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3607:22)
+      at parseConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:377:29)
+      at parseConditional (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3231:22)
+      at parseMaybeConditional (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:362:17)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:298:21)
+      at parseMaybeAssign (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3607:22)
+      at parseExpressionBase (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:221:23)
+      at callback (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:212:39)
+      at allowInAnd (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:3112:16)
+      at parseExpression (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:212:17)
+      at parseReturnStatement (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1091:28)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:498:21)
+      at parseStatementContent (/home/runner/workspace/node_modules/@babel/parser/src/plugins/typescript/index.ts:3056:20)
+      at parseStatementLike (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:437:17)
+      at parseStatementListItem (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:386:17)
+      at parseBlockOrModuleBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1420:16)
+      at parseBlockBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1393:10)
+      at parseBlock (/home/runner/workspace/node_modules/@babel/parser/src/parser/statement.ts:1361:10)
+      at parseFunctionBody (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:2557:24)
+      at parseFunctionBodyAndFinish (/home/runner/workspace/node_modules/@babel/parser/src/parser/expression.ts:2526:10)
