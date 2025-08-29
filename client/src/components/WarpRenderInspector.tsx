@@ -1511,8 +1511,8 @@ export default function WarpRenderInspector(props: {
   }, []);
 
   // Missing variables for new layout
-  const realRendererType = 'canvas'; // Default to canvas for now
-  const showRendererType = 'canvas'; // Default to canvas for now
+  const realRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
+  const showRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
   const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
   const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
   const grid3dRef = useRef<any>(null);
@@ -1616,7 +1616,7 @@ export default function WarpRenderInspector(props: {
             <div className="relative flex-1">
               {showRendererType === 'grid3d' ? (
                 <Grid3DEngine
-                  ref={grid3dRef2}
+                  ref={grid3dRef}
                   uniforms={showUniforms}
                   className="absolute inset-0 w-full h-full block"
                   style={{ background: '#000' }}

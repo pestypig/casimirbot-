@@ -766,13 +766,14 @@ export default function WarpBubbleCompare({
         if (!testGl) {
           throw new Error('WebGL context test failed');
         }
+        const webglContext = testGl as WebGLRenderingContext;
         console.log(`[${label}] WebGL pre-test passed:`, {
-          version: testGl.getParameter(testGl.VERSION),
-          vendor: testGl.getParameter(testGl.VENDOR),
-          renderer: testGl.getParameter(testGl.RENDERER)
+          version: webglContext.getParameter(webglContext.VERSION),
+          vendor: webglContext.getParameter(webglContext.VENDOR),
+          renderer: webglContext.getParameter(webglContext.RENDERER)
         });
         // Clean up test context
-        const loseContext = testGl.getExtension('WEBGL_lose_context');
+        const loseContext = webglContext.getExtension('WEBGL_lose_context');
         loseContext?.loseContext();
       } catch (webglError) {
         console.error(`[${label}] WebGL pre-test failed:`, webglError);
@@ -814,7 +815,7 @@ export default function WarpBubbleCompare({
         setTimeout(() => reject(new Error('Engine creation timeout after 5000ms')), 5000);
       });
 
-      const engine = await Promise.race([enginePromise, timeoutPromise]);
+      const engine = await Promise.race([enginePromise, timeoutPromise]) as any;
 
       // Additional post-creation validation
       if (engine && engine.gl && engine.gl.isContextLost()) {
@@ -1459,9 +1460,6 @@ export default function WarpBubbleCompare({
             ref={rightRef}
             className="absolute inset-0 w-full h-full block touch-manipulation select-none"
             style={{ background: '#000' }}
-          />
-        </div>
-      </div>={{ background: '#111' }}
           />
         </div>
       </div>
