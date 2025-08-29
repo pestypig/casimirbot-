@@ -20,7 +20,7 @@
 if (typeof window.GRID_DEFAULTS === 'undefined') {
   const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  
+
   window.GRID_DEFAULTS = {
     spanPadding: isMobile 
       ? 1.55   // extra padding on phones for better visibility and touch interaction
@@ -48,7 +48,7 @@ class WarpEngine {
     constructor(canvas) {
         // Per-canvas guard: allow multiple engines across different canvases
         if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
-        if (window.__WARP_ENGINES.has(canvas) && !window.__WARP_ENGINE_ALLOW_MULTI) {
+        if (window.__WARP_ENGINES.has(canvas) && !window.__WarpEngineAllowMulti) {
             console.warn('Duplicate WarpEngine on the same canvas blocked.');
             throw new Error('WarpEngine already attached to this canvas');
         }
@@ -340,7 +340,7 @@ class WarpEngine {
             desynchronized: !isMobile,
             failIfMajorPerformanceCaveat: false
         };
-        
+
         this.gl = this.canvas.getContext('webgl2', contextOptions) ||
                   this.canvas.getContext('webgl', contextOptions) ||
                   this.canvas.getContext('experimental-webgl', contextOptions);
@@ -419,7 +419,7 @@ class WarpEngine {
             const eye = [0, 0.50, -this.currentParams.cameraZ];
             const center = [0, -0.08, 0];
             const up = [0, 1, 0];
-            this._perspective(this.projMatrix, this._fitFovForAspect(aspect), aspect, 0.08, 100.0);
+            this._perspective(this.projMatrix, this._fitFovForAspect(aspect), aspect, 0.08, 100);
             this._lookAt(this.viewMatrix, eye, center, up);
             this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
             console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
@@ -612,7 +612,7 @@ void main() {
   int   ridgeI    = clamp(u_ridgeMode, 0, 1);
   float ridgeF    = float(ridgeI);
   int   colorI    = clamp(u_colorMode, 0, 4);
-  
+
   if (colorI == 0) {
     SET_FRAG(vec4(u_sheetColor, 0.85));
     return;
@@ -647,11 +647,11 @@ void main() {
 
   // Calculate surface normal for Purple shift
   vec3 normalWS = normalize(v_pos);
-  
+
   // Apply Purple shift modulation to theta field
   float purpleWeight = purpleShiftWeight(normalWS);
   float thetaWithPurple = thetaField * (1.0 + purpleWeight);
-  
+
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
   float valTheta  = thetaWithPurple * amp;
@@ -784,7 +784,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             intWidth: gl.getUniformLocation(program, 'u_intWidth'),
             epsTilt:  gl.getUniformLocation(program, 'u_epsTilt'),
             tiltViz:  gl.getUniformLocation(program, 'u_tiltViz'),
-            
+
             // Purple shift uniforms
             epsilonTilt: gl.getUniformLocation(program, 'u_epsilonTilt'),
             betaTiltVec: gl.getUniformLocation(program, 'u_betaTiltVec'),
@@ -1708,7 +1708,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
         if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
         if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
-        
+
         // --- Purple shift uniforms
         if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(u.epsilonTilt, 0.0));
         if (this.gridUniforms.betaTiltVec) {
