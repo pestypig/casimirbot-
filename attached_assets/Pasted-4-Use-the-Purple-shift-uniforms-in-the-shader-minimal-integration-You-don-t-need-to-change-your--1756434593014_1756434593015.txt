@@ -1,0 +1,55 @@
+4) Use the Purple shift uniforms in the shader (minimal integration)
+
+You don’t need to change your physics; just expose a simple directional bias the visual can show even at tiny ε:
+
+// in fragment/common shader scope
+float purpleShiftWeight(vec3 normalWS) {
+  // signed tilt along β; clamp to avoid NaNs if ε=0
+  float proj = dot(normalize(uBetaTiltVec), normalize(normalWS));
+  return uEpsilonTilt * proj; // small signed number
+}
+
+// example blend into your existing theta or color accumulator:
+float θ = thetaBase; // existing θ-scale driven curvature
+θ += purpleShiftWeight(normalWS) * θ; // tiny directional modulation
+
+// or visualize as a faint violet tint:
+vec3 purple = vec3(0.62, 0.36, 0.85);
+float pv = clamp(10.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.12);
+color = mix(color, purple, pv);
+
+
+This keeps SHOW/REAL parity intact and gives you a visible (but subtle) cue that the β direction is wired through.
+
+5) Stop duplicate parity declarations at the JS layer
+
+Your WarpRenderInspector currently locks parity and may cause repeated program rebuilds on some engines. Keep the lock, but don’t re-bootstrap on every tiny update:
+
+Gate recompile to only when the program isn’t linked yet.
+
+Never mutate the shader source strings after the first successful link.
+
+Minimal change near your parity lock:
+
+function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
+  if (!engine || engine.__locked) return;
+  engine.__locked = true;
+
+  // enforce at uniform *values* only – no source rebuilds:
+  const forcedParity = (pane === 'REAL');
+  const forcedRidge  = (pane === 'REAL') ? 0 : 1;
+
+  const enforce = (patch:any={}) => ({
+    ...patch,
+    uPhysicsParity: forcedParity,
+    uRidgeMode: forcedRidge
+  });
+
+  const origUpdate = engine.updateUniforms?.bind(engine);
+  engine.updateUniforms = (p:any) => origUpdate?.(enforce(p));
+  // also set once immediately
+  origUpdate?.(enforce());
+}
+
+
+This ensures you never trigger a fresh shader build just because parity values changed, which is where duplicate uniform declarations were sneaking in.
