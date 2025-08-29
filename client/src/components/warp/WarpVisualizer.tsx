@@ -236,22 +236,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   // Default cabin "down" (can be overridden via props.parameters.betaTiltVec)
   const defaultBetaTilt: [number, number, number] = [0, -1, 0];
 
-  const init = async () => {
-    const initialScale = Number(parameters.gridScale ?? 1.0);
-    installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
-
-    setLoadError(null);
-    setIsLoaded(false);
-
-    // 6s watchdog to avoid infinite spinner
-    let watchdog = window.setTimeout(() => {
-      setLoadError("Timeout waiting for WarpEngine. Check /public/warp-engine.js and WebGL support.");
-    }, 6000) as any;
-
-    const setLoaded = () => { setIsLoaded(true); };
-    const setFailed = (msg: string) => { setIsLoaded(false); setLoadError(msg); };
-
-    const makeEngine = (EngineCtor: any) => {
+  const makeEngine = (EngineCtor: any) => {
     if (!canvasRef.current) throw new Error("canvas missing");
     const engine = new EngineCtor(canvasRef.current);
 
@@ -314,6 +299,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
 
     const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 1.4e5);
+    const gammaVdBVis = num(parameters.gammaVanDenBroeck, 1.35e5); // Visual seed default
 
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
@@ -357,7 +343,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       if (engine.setRidgeMode) {
         engine.setRidgeMode(0);
       }
-      
+
       gatedUpdateUniforms(engine, { 
         physicsParityMode: true, 
         ridgeMode: 0,
@@ -368,7 +354,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         curvatureBoostMax: 1,
         curvatureGainT: 0,
       }, 'client');
-      
+
       // Force immediate application of parity state
       if (engine.applyUniforms) {
         engine.applyUniforms();
@@ -392,7 +378,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sectors: sectorsResolved,           // viz strobing
         gammaGeo,
         qSpoilingFactor: qSpoil,
-        gammaVdB: gammaVdBDefault,
+        gammaVdB: gammaVdBVis,         // use visual seed
         dutyEffectiveFR: dFRShip,           // 🔑 √d_FR source
       }),
       sectorCount: sectorCountResolved,
@@ -456,7 +442,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     engine._startRenderLoop?.();
 
     // mark loaded on the next frame (ensures WebGL context is live)
-    requestAnimationFrame(() => !cancelled && setLoaded());
+    requestAnimationFrame(() => !cancelled && setIsLoaded(true));
 
     return engine;
   };
@@ -477,117 +463,11 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     w.__addStrobingListener = (fn:Function) => { w.__strobeListeners.add(fn); return () => w.__strobeListeners.delete(fn); };
   };
 
-  // Remove duplicate init function - this is handled in the useEffect above
-
-    try {
-      if ((window as any).WarpEngine) {
-        engineRef.current = makeEngine((window as any).WarpEngine);
-        ensureStrobeMux(); // wrap the engine's handler into the mux
-
-        // Add ResizeObserver to react to container changes
-        const resizeObserver = new ResizeObserver(() => {
-          if (engineRef.current?._resizeCanvasToDisplaySize) {
-            engineRef.current._resizeCanvasToDisplaySize();
-          }
-          // keep cameraZ fresh on container resizes
-          try {
-            const u = engineRef.current?.uniforms;
-            if (u && Array.isArray(u.axesClip) && canvasRef.current) {
-              const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
-              gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
-            }
-          } catch {}
-        });
-        if (canvasRef.current?.parentElement) {
-          resizeObserver.observe(canvasRef.current.parentElement);
-        }
-        (engineRef.current as any).__resizeObserver = resizeObserver;
-
-        // Register with strobing multiplexer
-        const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
-          if (!engineRef.current) return;
-          const s = Math.max(1, Math.floor(sectorCount||1));
-          gatedUpdateUniforms(engineRef.current, {
-            sectors: s,
-            split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
-            sectorIdx: Math.max(0, currentSector % s)
-          }, 'client');
-          engineRef.current.requestRewarp?.();
-        });
-        (engineRef.current as any).__strobingCleanup = off;
-
-        return;
-      }
-
-      // --- Robust asset base resolution ---
-      const resolveAssetBase = () => {
-        const w: any = window;
-        if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
-        if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
-        if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
-        if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
-        const baseEl = document.querySelector('base[href]');
-        if (baseEl) return (baseEl as HTMLBaseElement).href;
-        return '/';
-      };
-
-      const assetBase = resolveAssetBase();
-      const stamp = (w => (w.__APP_WARP_BUILD || 'dev'))(window as any);
-      const mk = (p: string) => {
-        try { return new URL(p, assetBase).toString(); } catch { return p; }
-      };
-
-      const trySrcs = [
-        (window as any).__WARP_ENGINE_SRC__,
-        mk(`warp-engine.js?v=${encodeURIComponent(stamp)}`),
-        'warp-engine.js',
-        '/warp-engine.js?v=canonical'
-      ].filter(Boolean) as string[];
-
-      for (const src of trySrcs) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = src;
-          script.async = true;
-          script.onload = () => resolve();
-          script.onerror = () => reject(new Error(`Failed to load ${src}`));
-          document.head.appendChild(script);
-        }).catch((e) => { console.warn(e.message); });
-
-        if ((window as any).WarpEngine) {
-          engineRef.current = makeEngine((window as any).WarpEngine);
-          ensureStrobeMux(); // wrap the engine's handler into the mux
-
-          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
-            if (!engineRef.current) return;
-            const s = Math.max(1, Math.floor(sectorCount||1));
-            gatedUpdateUniforms(engineRef.current, {
-              sectors: s,
-              split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
-              sectorIdx: Math.max(0, currentSector % s)
-            }, 'client');
-            engineRef.current.requestRewarp?.();
-          });
-          (engineRef.current as any).__strobingCleanup = off;
-
-          return;
-        }
-      }
-
-      throw new Error("WarpEngine not found on window after script load (check public path / base URL)");
-    } catch (err: any) {
-      console.error('WarpEngine init error:', err);
-      setFailed(err?.message || "Engine initialization failed");
-    } finally {
-      if (watchdog) clearTimeout(watchdog);
-    }
-  };
-
   // Initialize engine on intersection or directly
   useEffect(() => {
     let cancelled = false;
     let watchdog: number | null = null;
-    
+
     const performInit = async () => {
       const initialScale = Number(parameters.gridScale ?? 1.0);
       installWarpPrelude(Number.isFinite(initialScale) ? initialScale : 1.0);
@@ -710,7 +590,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
     const el = canvasRef.current;
     if (!el) return;
-    
+
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver(([entry]) => {
         if (entry.isIntersecting && !cancelled) {
@@ -735,7 +615,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         engineRef.current = null;
       };
     }
-    
+
     // Fallback for very old browsers
     performInit();
 
@@ -849,41 +729,32 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenBroeck, 1.4e5),
+          gammaVdB: num(parameters.gammaVanDenBroeck, 1.4e5), // This line should be updated in the next block
           dutyEffectiveFR: dFRShip,
         }),
-        dutyEffectiveFR: dFRShip,
-        viewAvg: true,
-
-        // Pipeline-timed gating (if available)
-        ...(lc && {
-          phase: lc.phase,
-          onWindow: !!lc.onWindowDisplay,
-          sectorIdx: Math.max(0, lc.sectorIdx % (parameters.sectorStrobing || lc.sectorCount || 1)),
-          tauLC_ms: lc.tauLC_ms,
-          dwell_ms: lc.dwell_ms,
-          burst_ms: lc.burst_ms,
-        }),
-
-        // Parity-specific visual settings with explicit enforcement
-        ...(parity ? {
-          exposure: 3.5,
-          zeroStop: 1e-5,
-          vizGain: 1,
-          curvatureGainDec: 0,
-          curvatureBoostMax: 1,
-          curvatureGainT: 0,
-        } : {
-          exposure: 6,
-          zeroStop: 1e-7,
-          curvatureGainT: 0.6,
-          curvatureBoostMax: 40,
-        }),
+        sectorCount: sectorCountResolved,
+        sectors: sectorsResolved,
+        dutyEffectiveFR: dFRShip,             // expose for diagnostics
+        viewAvg: true,                        // ensure √d_FR is applied
       };
 
       // Single atomic update to prevent mode conflicts (via gate)
-      gatedUpdateUniforms(engineRef.current, consolidatedUniforms, 'client');
-      
+      gatedUpdateUniforms(engineRef.current, {
+        thetaScale: resolveThetaScale({
+          dutyCycle: dutyResolved,
+          sectorCount: sectorCountResolved,
+          sectors: sectorsResolved,
+          gammaGeo,
+          qSpoilingFactor: qSpoil,
+          gammaVdB: num(parameters.gammaVanDenBroeck, 1.35e5), // use visual seed
+          dutyEffectiveFR: dFRShip,
+        }),
+        sectorCount: sectorCountResolved,
+        sectors: sectorsResolved,
+        dutyEffectiveFR: dFRShip,             // expose for diagnostics
+        viewAvg: true,                        // ensure √d_FR is applied
+      }, 'client');
+
       // CRITICAL: Explicit parity enforcement if enabled
       if (parity && engineRef.current) {
         console.log('[WarpVisualizer] Live update - enforcing parity mode');
