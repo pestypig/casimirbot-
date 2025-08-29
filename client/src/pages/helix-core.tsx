@@ -57,6 +57,7 @@ const buildModeSelectItems = (pipeline: any) => {
 
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
+import WarpBubbleCompare from "@/components/warp/WarpBubbleCompare";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
