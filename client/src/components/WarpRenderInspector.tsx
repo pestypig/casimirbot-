@@ -1631,27 +1631,6 @@ export default function WarpRenderInspector(props: {
               {!IS_COARSE && <PaneOverlay title="SHOW · cosmetic ampl" flavor="SHOW" engineRef={rightEngine} viewFraction={1.0}/>}
             </div>
           </div>
-        </article>-950/40 p-3">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold">SHOW — Boosted (UI) (canvas)</h3>
-            <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
-          </div>
-          <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
-               style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
-            <div className="relative flex-1">
-              {showRendererType === 'grid3d' ? (
-                <Grid3DEngine
-                  ref={grid3dRef}
-                  uniforms={showUniforms}
-                  className="absolute inset-0 w-full h-full block"
-                  style={{ background: 'black' }}
-                />
-              ) : (
-                <canvas ref={rightRef} className="absolute inset-0 w-full h-full block touch-manipulation select-none"/>
-              )}
-              {!IS_COARSE && <PaneOverlay title="SHOW · whole ship" flavor="SHOW" engineRef={rightEngine} viewFraction={1}/>}
-            </div>
-          </div>
         </article>
       </section>
 
