@@ -140,6 +140,17 @@ function sanitizeUniforms(u: any = {}) {
   if ('sectorCount' in s) s.sectorCount = Math.max(1, Math.floor(s.sectorCount || 400));
   if ('split' in s) s.split = Math.max(0, Math.floor(s.split || 0));
 
+  // Purple shift vector sanitization
+  if ('epsilonTilt' in s) {
+    const v = +s.epsilonTilt;
+    s.epsilonTilt = Number.isFinite(v) ? Math.max(0, Math.min(5e-7, v)) : 0;
+  }
+  if ('betaTiltVec' in s && Array.isArray(s.betaTiltVec)) {
+    const v = s.betaTiltVec.map(Number);
+    const L = Math.hypot(v[0]||0,v[1]||0,v[2]||0) || 1;
+    s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L];
+  }
+
   return s;
 }
 
@@ -1103,11 +1114,18 @@ export default function WarpRenderInspector(props: {
       // Subscribe to canonical server uniforms
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true); // Mark that we've received first uniforms
+
+        // bring purple back from props/baseShared (or last known engine value)
+        const purple = {
+          epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
+          betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
+        };
+
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current,  { ...u, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, { ...u, ...purple, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...u, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, { ...u, ...purple, physicsParityMode: false, ridgeMode: 1 });
         }
 
         // Unmute engines when canonical uniforms arrive
@@ -1619,7 +1637,7 @@ export default function WarpRenderInspector(props: {
           <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
                style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
             <div className="relative flex-1">
-              {realRendererType === 'grid3d' ? (
+              {realRendererType === 'grid3d' && false ? (
                 <Grid3DEngine
                   ref={grid3dRef}
                   uniforms={realUniforms}
@@ -1645,7 +1663,7 @@ export default function WarpRenderInspector(props: {
           <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
                style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
             <div className="relative flex-1">
-              {!IS_COARSE && showRendererType === 'grid3d' ? (
+              {!IS_COARSE && showRendererType === 'grid3d' && false ? (
                 <Grid3DEngine
                   ref={grid3dRef}
                   uniforms={showUniforms}

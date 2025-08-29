@@ -1651,7 +1651,15 @@ export default function HelixCore() {
               <CurvatureKey />
 
               {/* Shift Vector • Interior Gravity */}
-              <ShiftVectorPanel mode={pipelineState?.currentMode || "hover"} shift={systemMetrics?.shiftVector} />
+              <ShiftVectorPanel 
+                mode={pipelineState?.currentMode || "hover"} 
+                shift={systemMetrics?.shiftVector ? {
+                  ...systemMetrics.shiftVector,
+                  gTarget: systemMetrics.shiftVector.gTarget ?? 0.980665,
+                  R_geom: systemMetrics.shiftVector.R_geom ?? 179.14162298838383,
+                  gEff_check: systemMetrics.shiftVector.gEff_check ?? 0.980665
+                } : undefined} 
+              />
             </div>
 
             {/* Middle Column - Casimir Tile Grid & Physics Field */}

@@ -53,6 +53,12 @@ export type WarpUniforms = {
   dwell_ms?: number;
   tauLC_ms?: number;
 
+  // --- interior shift (Purple) ---------------------------------------------
+  epsilonTilt?: number;                       // dimensionless, ~1e-16..1e-7
+  betaTiltVec?: [number,number,number];       // arbitrary vec (we'll normalize)
+  // optional aliases (if you want)
+  betaTiltVecN?: [number,number,number];      // normalized copy
+
   // optional provenance
   __src?: 'server'|'client'|'legacy';
   __version?: number;
@@ -61,6 +67,13 @@ export type WarpUniforms = {
 const EPS = 1e-12;
 const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
 const clamp = (v:number, lo:number, hi:number) => Math.min(hi, Math.max(lo, v));
+
+// helpers for Purple shift vector processing
+const V3 = (a:any)=>Array.isArray(a)&&a.length===3 ? [+a[0],+a[1],+a[2]] as [number,number,number] : undefined;
+const norm3 = (v:[number,number,number])=>{
+  const L = Math.hypot(v[0],v[1],v[2]) || 1;
+  return [v[0]/L, v[1]/L, v[2]/L] as [number,number,number];
+};
 
 // Helper to compute Ford-Roman duty consistently across client and server
 const computeFordRomanDuty = (burstLocal: number, live: number, total: number, isStandby: boolean) =>
@@ -157,6 +170,16 @@ export function normalizeWU(raw:any): WarpUniforms {
     ? +raw.thetaScale
     : (dutyEffectiveFR * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
 
+  // --- Purple shift normalization ------------------------------------------
+  const epsRaw = N(raw.epsilonTilt, NaN);
+  // clamp super defensively; 0 disables effect
+  const epsilonTilt = Number.isFinite(epsRaw)
+    ? Math.max(0, Math.min(5e-7, epsRaw))
+    : undefined;
+
+  const betaRaw = V3(raw.betaTiltVec ?? raw.betaTiltVecN) ?? [0, -1, 0];
+  const betaTiltVecN = norm3(betaRaw);
+
   // --- optional time-window gating passthrough ------------------------------
   const onWindowDisplay = !!raw.onWindowDisplay;
   const cyclesPerBurst  = Number.isFinite(+raw.cyclesPerBurst) ? +raw.cyclesPerBurst : undefined;
@@ -199,6 +222,11 @@ export function normalizeWU(raw:any): WarpUniforms {
     viewMassFraction,
     colorMode,
 
+    // Purple shift parameters
+    epsilonTilt,
+    betaTiltVec: betaTiltVecN,
+    betaTiltVecN,
+
     // gating passthrough
     onWindowDisplay,
     cyclesPerBurst,
@@ -224,6 +252,8 @@ export function buildREAL(wu: WarpUniforms) {
     zeroStop: 1e-6,
     userGain: 1,
     displayGain: 1,
+    epsilonTilt: wu.epsilonTilt ?? 0,
+    betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
   } as const;
 }
 
@@ -241,5 +271,7 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?:number; boost?:number; u
     curvatureGainT: T,
     curvatureBoostMax: boost,
     userGain: Math.max(1, N(opts?.userGain, 2)),
+    epsilonTilt: wu.epsilonTilt ?? 0,
+    betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
   } as const;
 }
