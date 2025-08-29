@@ -1408,8 +1408,8 @@ export default function WarpRenderInspector(props: {
     standby: 0,
   };
 
-  const currentMode = effectiveMode.toLowerCase();
-  const gTarget = gTargets[currentMode] ?? 0;
+  const modeKey = effectiveMode.toLowerCase();
+  const gTarget = gTargets[modeKey] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
 
   // ε (dimensionless) used by shaders + viz overlays
