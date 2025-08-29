@@ -492,10 +492,9 @@ function PaneOverlay(props:{
       // Pane-specific display:
       // - REAL: show kilograms (slice and ship total) if calibrated; else fallback to arb
       // - SHOW: always arb
-      const mDisplayText =
-        (props.flavor === 'REAL' && K_used > 0)
-          ? `${fmtSI(M_slice_arb * K_used, 'kg')} (slice) · ${fmtSI(M_ship_arb * K_used, 'kg')} total`
-          : fmtArb(M_slice_arb);
+      const mDisplayText = (flavor === 'REAL' && K_used > 0)
+        ? `${fmtSI(M_slice_arb * K_used, 'kg')} (slice) · ${fmtSI(M_ship_arb * K_used, 'kg')} total`
+        : fmtArb(M_slice_arb);
 
       // pull contraction/expansion from diagnostics if available
       const diag = (e?.computeDiagnostics?.() || {}) as any;
