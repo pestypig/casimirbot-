@@ -940,6 +940,9 @@ export default function WarpRenderInspector(props: {
           // Clear any existing engine on this canvas
           delete (leftRef.current as any)[ENGINE_KEY];
 
+          // ensure the DOM has given the canvas a real size
+          await waitForNonZeroSize(leftRef.current);
+
           console.log("Creating REAL engine...");
           leftEngine.current = createEngine(leftRef.current);
           leftOwnedRef.current = true;
@@ -989,6 +992,9 @@ export default function WarpRenderInspector(props: {
 
           // Clear any existing engine on this canvas
           delete (rightRef.current as any)[ENGINE_KEY];
+
+          // ensure the DOM has given the canvas a real size
+          await waitForNonZeroSize(rightRef.current);
 
           console.log("Creating SHOW engine...");
           rightEngine.current = createEngine(rightRef.current);
@@ -1398,14 +1404,15 @@ export default function WarpRenderInspector(props: {
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
     const ro = new ResizeObserver(() => {
-      for (const c of [leftRef.current, rightRef.current]) {
+      const cvs = [leftRef.current, rightRef.current];
+      for (const c of cvs) {
         if (!c) continue;
+        const rect = c.getBoundingClientRect();
+        if (rect.width < 8 || rect.height < 8) continue; // ignore transient 0×0
         sizeCanvasSafe(c);
       }
       leftEngine.current?.gl?.viewport?.(0, 0, leftRef.current?.width || 1, leftRef.current?.height || 1);
       rightEngine.current?.gl?.viewport?.(0, 0, rightRef.current?.width || 1, rightRef.current?.height || 1);
-
-      // Use batched redraws instead of immediate forceRedraw
       pushLeft.current?.({}, 'resize');
       pushRight.current?.({}, 'resize');
     });
