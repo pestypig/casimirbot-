@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState, startTransition} from "react";
-import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
+import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
@@ -537,26 +537,26 @@ export default function WarpRenderInspector(props: {
 }) {
   // Error boundary wrapper
   const [componentError, setComponentError] = React.useState<string | null>(null);
-  
+
   React.useEffect(() => {
     const handleError = (event: ErrorEvent) => {
-      if (event.filename?.includes('WarpRenderInspector') || 
+      if (event.filename?.includes('WarpRenderInspector') ||
           event.message?.includes('WarpRenderInspector')) {
         setComponentError(event.message);
         console.error('[WarpRenderInspector] Runtime error:', event);
       }
     };
-    
+
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, []);
-  
+
   if (componentError) {
     return (
       <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
         <h3 className="text-red-400 font-medium mb-2">WarpRenderInspector Error</h3>
         <p className="text-sm text-red-300">{componentError}</p>
-        <button 
+        <button
           onClick={() => setComponentError(null)}
           className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded"
         >
@@ -1391,7 +1391,7 @@ export default function WarpRenderInspector(props: {
       lockFraming: true
     };
 
-    
+
 
     // Physics bound for theta calculations
     const bound = useMemo(() => ({
@@ -1596,8 +1596,8 @@ export default function WarpRenderInspector(props: {
                   style={{ background: '#000' }}
                 />
               ) : (
-                <canvas 
-                  ref={leftRef} 
+                <canvas
+                  ref={leftRef}
                   className="absolute inset-0 w-full h-full block touch-manipulation select-none"
                   style={{ background: '#000' }}
                 />
@@ -1614,19 +1614,15 @@ export default function WarpRenderInspector(props: {
           <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
                style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
             <div className="relative flex-1">
-              {showRendererType === 'grid3d' ? (
+              {!IS_COARSE && showRendererType === 'grid3d' ? (
                 <Grid3DEngine
                   ref={grid3dRef}
                   uniforms={showUniforms}
                   className="absolute inset-0 w-full h-full block"
-                  style={{ background: '#000' }}
+                  style={{ background: 'black' }}
                 />
               ) : (
-                <canvas 
-                  ref={rightRef} 
-                  className="absolute inset-0 w-full h-full block touch-manipulation select-none"
-                  style={{ background: '#000' }}
-                />
+                <canvas ref={rightRef} className="absolute inset-0 w-full h-full block touch-manipulation select-none"/>
               )}
               {!IS_COARSE && <PaneOverlay title="SHOW · cosmetic ampl" flavor="SHOW" engineRef={rightEngine} viewFraction={1.0}/>}
             </div>

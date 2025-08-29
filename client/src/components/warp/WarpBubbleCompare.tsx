@@ -973,6 +973,7 @@ export default function WarpBubbleCompare({
       killEngine(rightEngine, rightRef.current);
 
       const initOne = async (cv: HTMLCanvasElement, uniforms: any) => {
+        await waitForNonZeroSize(cv);
         const eng: any = await getOrCreateEngine(W, cv);
         const { w, h } = sizeCanvas(cv);
         eng.gl.viewport(0, 0, w, h);
@@ -1310,6 +1311,20 @@ export default function WarpBubbleCompare({
 
   // DPR-aware sizing + resize observer (keeps "WebGL context — alive / Render loop — active")
   useEffect(() => {
+    const ro = new ResizeObserver(() => {
+      for (const c of [leftRef.current, rightRef.current]) {
+        if (!c) continue;
+        const r = c.getBoundingClientRect();
+        if (r.width < 8 || r.height < 8) continue; // don't shrink GL to 0×0
+        sizeCanvasSafe(c);
+      }
+      leftEngine.current?.gl?.viewport?.(0,0,leftRef.current?.width||1,leftRef.current?.height||1);
+      rightEngine.current?.gl?.viewport?.(0,0,rightRef.current?.width||1,rightRef.current?.height||1);
+    });
+
+    if (leftRef.current) ro.observe(leftRef.current);
+    if (rightRef.current) ro.observe(rightRef.current);
+
     const onDpr = () => {
       if (!leftRef.current || !rightRef.current) return;
       const L = leftEngine.current, R = rightEngine.current;
@@ -1330,6 +1345,7 @@ export default function WarpBubbleCompare({
       try { if (leftEngine.current?.__lowFpsTimer) clearInterval(leftEngine.current.__lowFpsTimer); } catch {}
       try { if (rightEngine.current?.__lowFpsTimer) clearInterval(rightEngine.current.__lowFpsTimer); } catch {}
 
+      ro.disconnect();
       mql.removeEventListener?.('change', onDpr);
       window.removeEventListener('resize', onDpr);
     };
