@@ -590,6 +590,8 @@ export default function WarpRenderInspector(props: {
   // Get current mode from global energy pipeline instead of local state
   const currentMode = ((live as any)?.currentMode as 'hover'|'cruise'|'emergency'|'standby') || 'hover';
   const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>(currentMode);
+  const effectiveMode = currentMode;
+  const systemMetrics = live;
 
   // Sync local mode with global mode
   useEffect(() => {
@@ -614,6 +616,9 @@ export default function WarpRenderInspector(props: {
   const wu = useMemo(() => normalizeWU(
     (live as any)?.warpUniforms || (props as any)?.warpUniforms
   ), [live, props]);
+
+  // Hull geometry for epsilon calculations
+  const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
 
   // Theta scale calculation helper
   const computeThetaScale = (phys: any, source: 'fr' | 'ui') => {
@@ -1393,7 +1398,33 @@ export default function WarpRenderInspector(props: {
 
 
 
-    // Physics bound for theta calculations
+    // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
+  const G = 9.80665, c = 299792458;
+
+  const gTargets: Record<string, number> = {
+    hover: 0.1 * G,
+    cruise: 0.05 * G,
+    emergency: 0.3 * G,
+    standby: 0,
+  };
+
+  const currentMode = effectiveMode.toLowerCase();
+  const gTarget = gTargets[currentMode] ?? 0;
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+
+  // ε (dimensionless) used by shaders + viz overlays
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+
+  // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
+  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
+  const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
+  const betaTiltVecN: [number, number, number] = [
+    betaTiltVecRaw[0] / betaNorm,
+    betaTiltVecRaw[1] / betaNorm,
+    betaTiltVecRaw[2] / betaNorm,
+  ];
+
+  // Physics bound for theta calculations
     const bound = useMemo(() => ({
       gammaGeo: realPhys.gammaGeo || 26,
       qSpoilingFactor: realPhys.qSpoilingFactor || 1,
