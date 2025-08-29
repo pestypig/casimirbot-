@@ -1049,110 +1049,93 @@ export default function HelixCore() {
             </div>
           </div>
 
-          {false && (
-            <>
-              {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
-              <Card className="bg-slate-900/50 border-slate-800 mb-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Atom className="w-5 h-5 text-cyan-400" />
-                    {MAINFRAME_ZONES.WARP_VISUALIZER}
-                  </CardTitle>
-                  <CardDescription>3D spacetime curvature + equatorial slice viewer — live, mode-aware, and physically grounded</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {(() => {
-                    const hullAxes: [number, number, number] =
-                      hullMetrics && hullMetrics.hull
-                        ? [
-                            hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                            hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                            hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2,
-                          ]
-                        : [503.5, 132, 86.5];
+          {/* ====== HERO: Natário Warp Bubble (full width) ====== */}
+          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Atom className="w-5 h-5 text-cyan-400" />
+                {MAINFRAME_ZONES.WARP_VISUALIZER}
+              </CardTitle>
+              <CardDescription>3D spacetime curvature + equatorial slice viewer — live, mode-aware, and physically grounded</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <div className="rounded-lg overflow-hidden bg-slate-950">
+                    <Suspense
+                      fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}
+                    >
+                      <WarpBubbleCompare
+                        key={`hero-${renderNonce}`}
+                        parameters={{
+                          ...compareParams,
+                          currentMode: effectiveMode,
+                          reloadToken: modeNonce,
+                          lightCrossing: lc,
+                          sectorCount: totalSectors,
+                          sectors: concurrentSectors,
+                          dutyEffectiveFR: dutyEffectiveFR_safe,
+                          dutyCycle: dutyUI_safe,
+                          viewAvg: true,
+                          colorMode: "theta",
+                          lockFraming: true,
+                          gammaVanDenBroeck: isStandby
+                            ? 1
+                            : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+                          powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
+                          exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
+                        }}
+                        parityExaggeration={1}
+                        heroExaggeration={82}
+                        colorMode="theta"
+                        lockFraming={true}
+                      />
+                    </Suspense>
+                  </div>
+                </div>
 
-                    return (
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <div className="space-y-4">
-                          <div className="rounded-lg overflow-hidden bg-slate-950">
-                            <Suspense
-                              fallback={<div className="h-64 grid place-items-center text-slate-400">Loading visualizers…</div>}
-                            >
-                              <WarpBubbleCompare
-                                key={`hero-${renderNonce}`}
-                                parameters={{
-                                  ...compareParams,
-                                  currentMode: effectiveMode,
-                                  reloadToken: modeNonce,
-                                  lightCrossing: lc,
-                                  sectorCount: totalSectors,
-                                  sectors: concurrentSectors,
-                                  dutyEffectiveFR: dutyEffectiveFR_safe,
-                                  dutyCycle: dutyUI_safe,
-                                  viewAvg: true,
-                                  colorMode: "theta",
-                                  lockFraming: true,
-                                  gammaVanDenBroeck: isStandby
-                                    ? 1
-                                    : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                                  powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
-                                  exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
-                                }}
-                                parityExaggeration={1}
-                                heroExaggeration={82}
-                                colorMode="theta"
-                                lockFraming={true}
-                              />
-                            </Suspense>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4" ref={sliceHostRef}>
-                          <SliceViewer
-                            hullAxes={[
-                              Number(hullAxes[0]) || 503.5,
-                              Number(hullAxes[1]) || 132.0,
-                              Number(hullAxes[2]) || 86.5,
-                            ]}
-                            wallWidth_m={6.0}
-                            driveDir={[1, 0, 0]}
-                            vShip={1.0}
-                            gammaGeo={pipeline?.gammaGeo ?? 26}
-                            qSpoilingFactor={qSpoilUI}
-                            gammaVdB={(() => {
-                              const gammaVdB_vis = Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1);
-                              return isFiniteNumber(gammaVdB_vis) ? gammaVdB_vis : 0;
-                            })()}
-                            dutyCycle={dutyUI_safe}
-                            dutyEffectiveFR={dutyEffectiveFR_safe}
-                            sectors={totalSectors}
-                            viewAvg={true}
-                            diffMode={false}
-                            refParams={{
-                              gammaGeo: 26,
-                              qSpoilingFactor: 1,
-                              gammaVdB: 0,
-                              dutyCycle: 0.14,
-                              sectors: 1,
-                              viewAvg: true,
-                            }}
-                            sigmaRange={6}
-                            exposure={6}
-                            zeroStop={1e-7}
-                            showContours={true}
-                            curvatureBoostMax={40}
-                            width={sliceSize.w}
-                            height={sliceSize.h}
-                            className="xl:sticky xl:top-4"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
-            </>
-          )}
+                <div className="space-y-4" ref={sliceHostRef}>
+                  <SliceViewer
+                    hullAxes={[
+                      Number(hullAxes[0]) || 503.5,
+                      Number(hullAxes[1]) || 132.0,
+                      Number(hullAxes[2]) || 86.5,
+                    ]}
+                    wallWidth_m={6.0}
+                    driveDir={[1, 0, 0]}
+                    vShip={1.0}
+                    gammaGeo={pipeline?.gammaGeo ?? 26}
+                    qSpoilingFactor={qSpoilUI}
+                    gammaVdB={(() => {
+                      const gammaVdB_vis = Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1);
+                      return isFiniteNumber(gammaVdB_vis) ? gammaVdB_vis : 0;
+                    })()}
+                    dutyCycle={dutyUI_safe}
+                    dutyEffectiveFR={dutyEffectiveFR_safe}
+                    sectors={totalSectors}
+                    viewAvg={true}
+                    diffMode={false}
+                    refParams={{
+                      gammaGeo: 26,
+                      qSpoilingFactor: 1,
+                      gammaVdB: 0,
+                      dutyCycle: 0.14,
+                      sectors: 1,
+                      viewAvg: true,
+                    }}
+                    sigmaRange={6}
+                    exposure={6}
+                    zeroStop={1e-7}
+                    showContours={true}
+                    curvatureBoostMax={40}
+                    width={sliceSize.w}
+                    height={sliceSize.h}
+                    className="xl:sticky xl:top-4"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1265,23 +1248,26 @@ export default function HelixCore() {
                       viewAveraging: true,
                     });
 
-                    checkpoint({
-                      id: "θ-expected",
-                      side: "REAL",
-                      stage: "expect",
-                      pass: true,
-                      msg: `θ_expected=${expREAL.toExponential()}`,
-                      expect: expREAL,
-                    });
+                    // Defer checkpoint calls to avoid render-time state updates
+                    React.useEffect(() => {
+                      checkpoint({
+                        id: "θ-expected",
+                        side: "REAL",
+                        stage: "expect",
+                        pass: true,
+                        msg: `θ_expected=${expREAL.toExponential()}`,
+                        expect: expREAL,
+                      });
 
-                    checkpoint({
-                      id: "θ-used",
-                      side: "REAL",
-                      stage: "expect",
-                      pass: true,
-                      msg: `θ_used=${usedREAL.toExponential()}`,
-                      expect: usedREAL,
-                    });
+                      checkpoint({
+                        id: "θ-used",
+                        side: "REAL",
+                        stage: "expect",
+                        pass: true,
+                        msg: `θ_used=${usedREAL.toExponential()}`,
+                        expect: usedREAL,
+                      });
+                    }, [expREAL, usedREAL]);
 
                     return {
                       gammaGeo: pipeline?.gammaGeo ?? 26,
