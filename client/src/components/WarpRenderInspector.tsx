@@ -746,6 +746,9 @@ export default function WarpRenderInspector(props: {
     const initEngines = async () => {
       if (!mounted) return;
 
+      // Force explicit script source to fix ENGINE_SCRIPT_MISSING
+      (window as any).__WARP_ENGINE_SRC__ = "/warp-engine.js?v=build123";
+
       // Strong detection (with DOM-mounted probe to avoid false negatives on mobile webviews)
       const support = webglSupport(undefined);
       if (!support.ok) {
@@ -754,9 +757,27 @@ export default function WarpRenderInspector(props: {
         return;
       }
 
+      // Ensure WarpEngine script is loaded
+      if (!(window as any).WarpEngine) {
+        console.log("WarpEngine not found, loading script...");
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = (window as any).__WARP_ENGINE_SRC__;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${script.src}`));
+            document.head.appendChild(script);
+          });
+        } catch (error) {
+          console.error("Failed to load WarpEngine script:", error);
+          setLoadError("ENGINE_SCRIPT_MISSING: Failed to load warp-engine.js");
+          return;
+        }
+      }
+
       const W = (window as any).WarpEngine;
       if (!W) {
-        console.error("WarpEngine not found on window. Load warp-engine.js first.");
+        console.error("WarpEngine not found on window after script load.");
         setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded");
         return;
       }
