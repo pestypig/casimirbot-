@@ -246,15 +246,15 @@ function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1) {
 function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any) {
   if (!engine) return;
 
-  // Get expected values from payload
-  const realPhys = {
+  // Get expected values from payload with correct gamma channel per pane
+  const expected = thetaScaleExpected({
     gammaGeo: payload?.gammaGeo ?? 26,
     q: payload?.qSpoilingFactor ?? 1,
-    gammaVdB: payload?.gammaVanDenBroeck_vis ?? 1,
-    dFR: payload?.dutyEffectiveFR ?? 0.000025
-  };
-
-  const expREAL = thetaScaleExpected(realPhys);
+    gammaVdB: side === 'REAL'
+      ? (payload?.gammaVanDenBroeck_mass ?? payload?.gammaVanDenBroeck ?? 1)
+      : (payload?.gammaVanDenBroeck_vis  ?? payload?.gammaVanDenBroeck ?? 1),
+    dFR: payload?.dutyEffectiveFR ?? 2.5e-5
+  });
 
   // Setup RAF-based validation
   const validateUniforms = () => {
@@ -263,10 +263,10 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
 
     checkpoint({
       id:'uniforms/θ', side, stage:'uniforms',
-      pass: within(θu, expREAL, 0.05),
-      sev: within(θu, expREAL, 0.2) ? 'warn' : 'error',
-      msg:`uniform θ=${θu?.toExponential()} vs expected=${expREAL.toExponential()}`,
-      expect: expREAL, actual: θu
+      pass: within(θu, expected, 0.05),
+      sev: within(θu, expected, 0.2) ? 'warn' : 'error',
+      msg:`uniform θ=${θu?.toExponential()} vs expected=${expected.toExponential()}`,
+      expect: expected, actual: θu
     });
 
     checkpoint({
