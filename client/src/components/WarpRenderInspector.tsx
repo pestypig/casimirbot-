@@ -126,7 +126,10 @@ function sanitizeUniforms(u: any = {}) {
   if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
   if ('gammaGeo' in s) s.gammaGeo = Number.isFinite(s.gammaGeo) ? Math.max(1, s.gammaGeo) : 26;
   if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
-  if ('gammaVanDenBroeck' in s) s.gammaVanDenBroeck = Number.isFinite(s.gammaVanDenBroeck) ? Math.max(1, s.gammaVanDenBroeck) : 1.4e5;
+  // default to the visual pocket seed (1.35e5) when missing
+  if ('gammaVanDenBroeck' in s) s.gammaVanDenBroeck = Number.isFinite(s.gammaVanDenBroeck)
+    ? Math.max(1, s.gammaVanDenBroeck)
+    : 1.35e5;
   if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
 
   // Boolean sanitization
@@ -698,23 +701,13 @@ export default function WarpRenderInspector(props: {
 
   // Theta scale calculation helper
   const computeThetaScale = (phys: any, source: 'fr' | 'ui') => {
-    const g = +(
-      phys.gammaGeo ??
-      phys.γ_geo ??
-      26
-    ) || 26;
-
-    const q = +(
-      phys.qSpoilingFactor ??
-      phys.q
-    ) || 1;
-
-    // Pick the right pocket factor per channel
-    const v = source === 'fr' 
-      ? +(phys.gammaVanDenBroeck_mass ?? phys.gammaVanDenBroeck ?? 1) || 1  // REAL (mass)
-      : +(phys.gammaVanDenBroeck_vis ?? phys.gammaVanDenBroeck ?? 1) || 1;  // SHOW (visual)
-
-    // Use the same duty the cards use (d_eff) for SHOW
+    const g = +phys.gammaGeo || 26;
+    const q = +phys.qSpoilingFactor || 1;
+    // force use of explicit mass vs. visual pocket factors
+    const vMass = +phys.gammaVanDenBroeck_mass || 1;
+    const vVis  = +phys.gammaVanDenBroeck_vis  || 1;
+    const v     = source === 'fr' ? vMass : vVis;
+    // d_eff is always the Ford–Roman ship‐wide average
     const dutyRaw = 
       phys.dutyEffectiveFR ??
       live?.dutyEffectiveFR ??              // if server feeds it
@@ -1395,21 +1388,24 @@ export default function WarpRenderInspector(props: {
 
     // Enhanced theta scale calculation with debugging
     const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
-      const gammaGeo = phys.gammaGeo || phys.γ_geo || 26;
-      const qSpoil = phys.qSpoilingFactor || phys.q || 1;
-      const gammaVdB = phys.gammaVanDenBroeck || phys.gammaVdB || phys.γ_VdB || 1;
+      const gammaGeo = +phys.gammaGeo || 26;
+      const qSpoil   = +phys.qSpoilingFactor || 1;
+      // use explicit pocket factors
+      const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
+      const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
+      const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
       const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
 
       const calculated = computeThetaScale(phys, source);
-      const actualTheta = source === 'fr' ?
-        (leftEngine.current?.uniforms?.thetaScale) :
-        (rightEngine.current?.uniforms?.thetaScale);
+      const actualTheta = source === 'fr'
+        ? leftEngine.current?.uniforms?.thetaScale
+        : rightEngine.current?.uniforms?.thetaScale;
 
       console.log(`[${label}] Theta calculation debug:`, {
-        γ_geo: gammaGeo,
-        q: qSpoil,
-        γ_VdB: gammaVdB,
-        d_FR: dutyFR,
+        gammaGeo,
+        qSpoil,
+        gammaVdB,
+        dutyFR,
         viewAvg: true,
         calculated,
         actualTheta
