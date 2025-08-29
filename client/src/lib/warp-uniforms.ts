@@ -69,10 +69,10 @@ const N = (x:any,d:any)=>Number.isFinite(+x)?+x:d;
 const clamp = (v:number, lo:number, hi:number) => Math.min(hi, Math.max(lo, v));
 
 // helpers for Purple shift vector processing
-const V3 = (a:any)=>Array.isArray(a)&&a.length===3 ? [+a[0],+a[1],+a[2]] as [number,number,number] : undefined;
+const V3 = (a:any)=>Array.isArray(a)&&a.length===3 ? [+a[0],+a[1],+a[2]] : undefined;
 const norm3 = (v:[number,number,number])=>{
   const L = Math.hypot(v[0],v[1],v[2]) || 1;
-  return [v[0]/L, v[1]/L, v[2]/L] as [number,number,number];
+  return [v[0]/L, v[1]/L, v[2]/L];
 };
 
 // Helper to compute Ford-Roman duty consistently across client and server
@@ -252,7 +252,7 @@ export function buildREAL(wu: WarpUniforms) {
     displayGain: 1,
     epsilonTilt: wu.epsilonTilt ?? 0,
     betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
-  } as const;
+  };
 }
 
 export function buildSHOW(wu: WarpUniforms, opts?: { T?:number; boost?:number; userGain?:number }) {
@@ -271,5 +271,5 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?:number; boost?:number; u
     userGain: Math.max(1, N(opts?.userGain, 2)),
     epsilonTilt: wu.epsilonTilt ?? 0,
     betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
-  } as const;
+  };
 }

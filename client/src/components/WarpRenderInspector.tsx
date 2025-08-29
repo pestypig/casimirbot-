@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState, startTransition} from "reac
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
-import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
+import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
@@ -448,7 +448,7 @@ const TONEMAP_LOCK = {
   exp: 5.0,
   zero: 1e-7,
   // no ridgeMode here — ridge is enforced per-pane in the lock
-  colorMode: 'theta' as const,
+  colorMode: 'theta',
   viewAvg: true
 };
 
@@ -674,8 +674,8 @@ export default function WarpRenderInspector(props: {
   const queryClient = useQueryClient();
 
   // Get current mode from global energy pipeline instead of local state
-  const currentMode = ((live as any)?.currentMode as 'hover'|'cruise'|'emergency'|'standby') || 'hover';
-  const [mode, setMode] = useState<'hover'|'cruise'|'emergency'|'standby'>(currentMode);
+  const currentMode = (live?.currentMode) || 'hover';
+  const [mode, setMode] = useState(currentMode);
   const effectiveMode = currentMode;
   const systemMetrics = live;
 
@@ -1057,7 +1057,7 @@ export default function WarpRenderInspector(props: {
       // Build shared frame data once
       const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
       const shared = {
-        axesScene: deriveAxesClip(hull, 1) as [number,number,number]
+        axesScene: deriveAxesClip(hull, 1)
       };
 
       // After creating both engines and building `shared` once:
@@ -1469,7 +1469,7 @@ export default function WarpRenderInspector(props: {
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
   // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
-  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
+  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]);
   const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
   const betaTiltVecN: [number, number, number] = [
     betaTiltVecRaw[0] / betaNorm,
@@ -1665,7 +1665,7 @@ export default function WarpRenderInspector(props: {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="text-xs sm:text-sm font-medium">Mode</label>
-          {(['hover','cruise','emergency','standby'] as const).map(m => (
+          {(['hover','cruise','emergency','standby']).map(m => (
             <button
               key={m}
               onClick={() => onMode(m)}
