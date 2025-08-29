@@ -116,10 +116,12 @@ const validatePhysicsParams = (params: any, label: string) => {
   if ('gammaGeo' in validated) {
     validated.gammaGeo = Math.max(1, Math.min(1000, validated.gammaGeo || 26));
   }
+  // default missing γ_VdB to the visual seed and allow large values
   if ('gammaVdB' in validated || 'gammaVanDenBroeck' in validated) {
-    const gamma = validated.gammaVdB || validated.gammaVanDenBroeck || 1;
-    validated.gammaVdB = Math.max(1, Math.min(1000, gamma));
-    validated.gammaVanDenBroeck = validated.gammaVdB;
+    const raw = validated.gammaVanDenBroeck ?? validated.gammaVdB;
+    const vis = Number.isFinite(raw) ? raw : 1.35e5;
+    validated.gammaVdB = vis;                    // visual pocket factor
+    validated.gammaVanDenBroeck = validated.gammaVanDenBroeck_mass ?? vis;
   }
 
   // Clamp q-spoiling factor
@@ -236,6 +238,10 @@ function sanitizeUniforms(u: any = {}) {
   const s = { ...u };
 
   // numeric coercions + clamps
+  // default missing γ_VdB to visual seed
+  if ('gammaVanDenBroeck' in s && !Number.isFinite(s.gammaVanDenBroeck)) {
+    s.gammaVanDenBroeck = 1.35e5;
+  }
   if ('thetaScale' in s) {
     // allow 0 (standby), clamp negatives to 0
     s.thetaScale = Math.max(0, finite(s.thetaScale, 0));
@@ -311,7 +317,10 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
   // canonical: θ-scale = γ^3 · (ΔA/A) · γ_VdB · √(duty / sectors_avg)
   const g3   = Math.pow(Math.max(1, base.gammaGeo), 3);
   const dAA  = Math.max(1e-12, base.qSpoilingFactor);
-  const gVdB = Math.max(1, base.gammaVanDenBroeck);
+  // pick mass vs visual pocket factors explicitly
+  const gVdB_mass = Math.max(1, base.gammaVanDenBroeck_mass ?? base.gammaVanDenBroeck);
+  const gVdB_vis  = Math.max(1, base.gammaVanDenBroeck_vis  ?? base.gammaVanDenBroeck);
+  const gVdB      = flavor === 'fr' ? gVdB_mass : gVdB_vis;
 
   const duty = (flavor === 'fr')
     ? clampValue(base.dutyEffectiveFR)                     // ship-averaged FR duty
