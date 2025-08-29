@@ -692,10 +692,16 @@ void main() {
   // Use colorI (int) for safe comparisons
   vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
 
-  // Add subtle Purple shift visualization
+  // Add subtle Purple shift visualization (BOOSTED FOR DEBUG)
   vec3 purple = vec3(0.62, 0.36, 0.85);
-  float pv = clamp(10.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.12);
+  float pv = clamp(1000000.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.5); // Boosted 100000x
   col = mix(col, purple, pv);
+
+  // Debug: Show any non-zero epsilon as bright purple
+  if (abs(u_epsilonTilt) > 1e-9) {
+    float debugIntensity = min(1.0, abs(u_epsilonTilt) * 1e6); // Scale for visibility
+    col = mix(col, vec3(1.0, 0.0, 1.0), 0.3 + 0.4 * debugIntensity); // Bright magenta overlay
+  }
 
   // Interior tilt mode (3): purple visualization
   if (colorI == 3) {
@@ -994,7 +1000,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // Debug mode switch and operational state
             const isModeSwitch = !!p.currentMode;
             const isOperationalChange = !!(p.currentMode || p.physicsParityMode !== undefined || p.ridgeMode !== undefined);
-            
+
             if (isModeSwitch || isOperationalChange) {
                 console.log(`[WarpEngine] Operational change detected:`, {
                     mode: p.currentMode,
