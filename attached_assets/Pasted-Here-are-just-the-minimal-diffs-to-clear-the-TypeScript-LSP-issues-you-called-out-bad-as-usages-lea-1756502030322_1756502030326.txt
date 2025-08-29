@@ -1,0 +1,209 @@
+Here are just the minimal diffs to clear the TypeScript/LSP issues you called out (bad as usages leaking to runtime, window globals, and the cancelled scope), plus wiring the live pipeline mass into uniforms and making the visual pocket factor robust.
+
+⸻
+
+1) Add safe window globals (fixes TS complaints on window.__FOO etc.)
+
++++ b/src/types/window.d.ts
++/* global window augmentation for Helix/Warp */
++export {};
++declare global {
++  interface Window {
++    // runtime flags / paths
++    __warpPreludeInstalled?: boolean;
++    __ASSET_BASE__?: string;
++    __APP_WARP_BUILD?: string;
++    __WARP_ENGINE_SRC__?: string;
++    __webpack_public_path__?: string;
++    __NEXT_DATA__?: { assetPrefix?: string };
++    // strobing mux
++    __strobingListeners?: Set<(p:{sectorCount:number;currentSector:number;split?:number})=>void>;
++    __strobeListeners?: Set<(p:{sectorCount:number;currentSector:number;split?:number})=>void>;
++    __addStrobingListener?: (fn:(p:{sectorCount:number;currentSector:number;split?:number})=>void)=>()=>void;
++    setStrobingState?: (p:{sectorCount:number;currentSector:number;split?:number})=>void;
++    // engine + scene
++    WarpEngine?: new (canvas: HTMLCanvasElement) => any;
++    sceneScale?: number;
++    // debug echo
++    __warpEcho?: any;
++  }
++}
+
+
+⸻
+
+2) Fix invalid as assertions at runtime, and scope-safe cancel (WarpVisualizer)
+
+--- a/src/components/warp/WarpVisualizer.tsx
++++ b/src/components/warp/WarpVisualizer.tsx
+@@
+ import { gatedUpdateUniforms } from '@/lib/warp-uniforms-gate';
+@@
+ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
+   const canvasRef = useRef<HTMLCanvasElement>(null);
+   const engineRef = useRef<any>(null);
+   const animationRef = useRef<number>();
++  // guard async setState after unmount
++  const unmountedRef = useRef(false);
+@@
+-  const makeEngine = (EngineCtor: any) => {
++  const makeEngine = (EngineCtor: any) => {
+@@
+-    // default missing γ_VdB(vis) → 1.35e5
+-    const gammaVdB_vis = Number.isFinite(parameters.gammaVanDenbroeck_vis) 
+-      ? Math.max(1, parameters.gammaVanDenbroeck_vis)
+-      : (Number.isFinite(parameters.gammaVanDenbroeck) 
+-         ? Math.max(1, parameters.gammaVanDenbroeck)
+-         : 1.35e5); // visual seed default
++    // resolve γ_VdB(vis) robustly (supports both spellings), default 1.35e5
++    const resolveGammaVdBVis = () => {
++      const p: any = parameters;
++      const cand =
++        Number.isFinite(p.gammaVanDenBroeck_vis) ? p.gammaVanDenBroeck_vis :
++        Number.isFinite(p.gammaVanDenbroeck_vis) ? p.gammaVanDenbroeck_vis :
++        Number.isFinite(p.gammaVanDenBroeck)     ? p.gammaVanDenBroeck :
++        Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 1.35e5;
++      return Math.max(1, Number(cand));
++    };
++    const gammaVdB_vis = resolveGammaVdBVis();
+@@
+-    // mark loaded on the next frame (ensures WebGL context is live)
+-    requestAnimationFrame(() => !cancelled && setIsLoaded(true));
++    // mark loaded on the next frame (ensures WebGL context is live)
++    requestAnimationFrame(() => { if (!unmountedRef.current) setIsLoaded(true); });
+@@
+   // --- global strobing multiplexer (supports many viewers) ---
+@@
+-        const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
++        const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{
++          sectorCount:number; currentSector:number; split?:number;
++        })=>{
+           if (!engineRef.current) return;
+           const s = Math.max(1, Math.floor(sectorCount||1));
++          const splitSafe = (typeof split === 'number' && Number.isFinite(split))
++            ? Math.max(0, Math.min(s-1, Math.floor(split)))
++            : Math.floor(s/2);
+           gatedUpdateUniforms(engineRef.current, {
+             sectors: s,
+-            split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
++            split: splitSafe,
+             sectorIdx: Math.max(0, currentSector % s)
+           }, 'client');
+           engineRef.current.requestRewarp?.();
+         });
+@@
+-          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
++          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{
++            sectorCount:number; currentSector:number; split?:number;
++          })=>{
+             if (!engineRef.current) return;
+             const s = Math.max(1, Math.floor(sectorCount||1));
++            const splitSafe = (typeof split === 'number' && Number.isFinite(split))
++              ? Math.max(0, Math.min(s-1, Math.floor(split)))
++              : Math.floor(s/2);
+             gatedUpdateUniforms(engineRef.current, {
+               sectors: s,
+-              split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
++              split: splitSafe,
+               sectorIdx: Math.max(0, currentSector % s)
+             }, 'client');
+             engineRef.current.requestRewarp?.();
+           });
+@@
+   useEffect(() => {
+-    let cancelled = false;
++    let cancelled = false;
++    unmountedRef.current = false;
+@@
+-      return () => {
++      return () => {
+         cancelled = true;
++        unmountedRef.current = true;
+         io.disconnect();
+@@
+-    return () => {
++    return () => {
+       cancelled = true;
++      unmountedRef.current = true;
+@@
+   }, [initNonce])
+
+
+⸻
+
+3) Use pipeline’s mass and fix θ-scale γVdB(vis) in live updates
+
+--- a/src/components/warp/WarpVisualizer.tsx
++++ b/src/components/warp/WarpVisualizer.tsx
+@@
+-      // First set core physics via pipeline adapter
+-      driveWarpFromPipeline(engineRef.current, pipelineState);
++      // First set core physics via pipeline adapter (pull back calibrated state)
++      const liveState = driveWarpFromPipeline(engineRef.current, pipelineState);
+@@
+-      // Single atomic update to prevent mode conflicts (via gate)
+-      gatedUpdateUniforms(engineRef.current, {
++      // resolve γ_VdB(vis) each tick (mode-aware default 1.35e5)
++      const resolveGammaVdBVis = () => {
++        const p: any = parameters;
++        const cand =
++          Number.isFinite(p.gammaVanDenBroeck_vis) ? p.gammaVanDenBroeck_vis :
++          Number.isFinite(p.gammaVanDenbroeck_vis) ? p.gammaVanDenbroeck_vis :
++          Number.isFinite(p.gammaVanDenBroeck)     ? p.gammaVanDenBroeck :
++          Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 1.35e5;
++        return Math.max(1, Number(cand));
++      };
++      const gammaVdB_vis = resolveGammaVdBVis();
++
++      // Single atomic update to prevent mode conflicts (via gate)
++      gatedUpdateUniforms(engineRef.current, {
+         thetaScale: resolveThetaScale({
+           dutyCycle: dutyResolved,
+           sectorCount: sectorCountResolved,
+           sectors: sectorsResolved,
+           gammaGeo,
+           qSpoilingFactor: qSpoil,
+-          gammaVdB: num(parameters.gammaVanDenBroeck_vis, 1.35e5), // use visual seed
++          gammaVdB: gammaVdB_vis,
+           dutyEffectiveFR: dFRShip,
+         }),
+         sectorCount: sectorCountResolved,
+         sectors: sectorsResolved,
+         dutyEffectiveFR: dFRShip,             // expose for diagnostics
+         viewAvg: true,                        // ensure √d_FR is applied
++        // show calibrated exotic mass from pipeline when available
++        exoticMass_kg: isFinite(liveState?.M_exotic as number) ? (liveState!.M_exotic as number) : parameters.exoticMass_kg,
+       }, 'client');
+@@
+-      (window as any).__warpEcho = {
++      (window as any).__warpEcho = {
+         src: 'visualizer',
+         v: Date.now(),
+-        terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: num(parameters.gammaVanDenBroeck, 1.4e5), d_FR: dFRShip }
++        terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: gammaVdB_vis, d_FR: dFRShip }
+       };
+
+
+⸻
+
+4) Show live γVdB(vis) & calibrated mass in HUD (no undefineds)
+
+--- a/src/components/warp/WarpVisualizer.tsx
++++ b/src/components/warp/WarpVisualizer.tsx
+@@
+-            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {Number(parameters.gammaVanDenBroeck ?? 1).toExponential(2)} curvature amplifier</div>
++            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {Number(engineRef.current?.uniforms?.gammaVdB ?? (parameters as any).gammaVanDenBroeck_vis ?? (parameters as any).gammaVanDenbroeck_vis ?? parameters.gammaVanDenBroeck ?? 1.35e5).toExponential(2)} curvature amplifier</div>
+@@
+-                <span className="text-purple-400">{safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)} kg</span>
++                <span className="text-purple-400">{safeFix(engineRef.current?.uniforms?.exoticMass_kg ?? parameters.exoticMass_kg, VIS.exoticMassFallback, 0)} kg</span>
+
+
+⸻
+
+Why these fix the errors
+	•	“Unexpected identifier as” at runtime: both split sites no longer rely on as assertions; they compute a safe integer at runtime (splitSafe). If your bundler ever served untranspiled code, this prevents the browser from seeing TS-only syntax.
+	•	Window property access: the window.d.ts augmentation removes LSP/TS errors on window.__ASSET_BASE__, __APP_WARP_BUILD, __addStrobingListener, etc.
+	•	cancelled scope: using a unmountedRef avoids closing over an out-of-scope cancelled flag inside makeEngine’s requestAnimationFrame callback.
+	•	Pipeline parity: live M_exotic from driveWarpFromPipeline(...) is now pushed into uniforms so the HUD shows the calibrated ≈1405 kg (or 0 in standby), and γ_VdB(vis) uses the right default 1.35×10⁵ while tolerating both spelling variants.
+
+If you still see a stray as runtime error after this, it’s almost always because a file with TS syntax is being loaded directly by the browser (e.g., an accidental .ts/.tsx import from /public or a misconfigured Vite/SWC include). In that case, check for any script that bypasses your bundler and make sure only transpiled assets are referenced.

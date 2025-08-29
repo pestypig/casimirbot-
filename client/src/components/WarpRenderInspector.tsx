@@ -758,7 +758,8 @@ export default function WarpRenderInspector(props: {
       const msg = String(err?.message || err).toLowerCase();
       if (msg.includes('already attached')) {
         // Another owner (e.g., Grid3DEngine) already attached; reuse theirs
-        return ((cv as any)[ENGINE_KEY] || (eng as any)) as WarpType;
+        const engine = (cv as any)[ENGINE_KEY] || eng;
+        return engine as WarpType;
       }
       throw err;
     }

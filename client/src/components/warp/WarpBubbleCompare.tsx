@@ -371,7 +371,7 @@ const TONEMAP_LOCK = {
   exp: 5.0,
   zero: 1e-7,
   ridgeMode: 0,
-  colorMode: 'theta' as const,
+  colorMode: 'theta',
   viewAvg: true
 };
 
@@ -430,7 +430,7 @@ function resolveAssetBase() {
   // explicit override wins
   if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
   // Vite
-  if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+  if (import.meta?.env?.BASE_URL) return String(import.meta.env.BASE_URL);
   // Webpack public path
   if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
   // Next.js base path
@@ -569,10 +569,11 @@ const applyReal = (
 
   let shared = sharedIn;
   const axesOK = shared?.axesScene?.every?.(n => Number.isFinite(n) && Math.abs(n) > 0);
-  if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+  if (!axesOK) shared = { ...shared, axesScene: [1, 0.26, 0.17] };
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
-  const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
+  const colorModeMapping = { solid:0, theta:1, shear:2 };
+  const colorModeIndex = colorModeMapping[colorMode] ?? 1;
 
   const clean = sanitizeUniforms({
     ...shared,
@@ -624,7 +625,8 @@ const applyShow = (
   const b = Math.max(1, boostMax);
 
   // Use numeric color mode for engine compatibility (engine: 0=solid,1=theta,2=shear)
-  const colorModeIndex = ({ solid:0, theta:1, shear:2 } as const)[colorMode] ?? 1;
+  const colorModeMapping = { solid:0, theta:1, shear:2 };
+  const colorModeIndex = colorModeMapping[colorMode] ?? 1;
 
   console.log('[SHOW] camZ', camZ, 't', t, 'b', b, 'colorMode', colorMode, 'colorModeIndex', colorModeIndex);
 
@@ -882,7 +884,10 @@ export default function WarpBubbleCompare({
     cv: HTMLCanvasElement
   ): Promise<WarpType> {
     // Reuse existing
-    if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
+    if (hasLiveEngine(cv)) {
+      const engine = (cv as any)[ENGINE_KEY];
+      return engine as WarpType;
+    }
 
     // Someone else is attaching? wait for it
     if ((cv as any)[ENGINE_PROMISE]) return (cv as any)[ENGINE_PROMISE];
@@ -890,7 +895,10 @@ export default function WarpBubbleCompare({
     // Single-flight lock
     (cv as any)[ENGINE_PROMISE] = (async () => {
       try {
-        if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
+        if (hasLiveEngine(cv)) {
+          const engine = (cv as any)[ENGINE_KEY];
+          return engine as WarpType;
+        }
 
         // Ensure canvas has proper dimensions before creating engine
         ensureCanvasSize(cv);
@@ -918,7 +926,10 @@ export default function WarpBubbleCompare({
           const msg = String(err?.message || err).toLowerCase();
           if (msg.includes('already attached')) {
             // Another call won the race; reuse the survivor
-            if (hasLiveEngine(cv)) return (cv as any)[ENGINE_KEY] as WarpType;
+            if (hasLiveEngine(cv)) {
+              const engine = (cv as any)[ENGINE_KEY];
+              return engine as WarpType;
+            }
           }
           console.error(`[WarpBubbleCompare] Engine creation failed:`, err);
           throw err;

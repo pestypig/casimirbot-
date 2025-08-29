@@ -217,6 +217,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<any>(null);
   const animationRef = useRef<number>();
+  // guard async setState after unmount
+  const unmountedRef = useRef(false);
   const [isRunning, setIsRunning] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [diag, setDiag] = useState<any|null>(null);
@@ -300,12 +302,17 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     const axesSceneSeed: [number,number,number] = [a*s, b*s, c*s];
     const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
 
-    // default missing γ_VdB(vis) → 1.35e5
-    const gammaVdB_vis = Number.isFinite(parameters.gammaVanDenbroeck_vis) 
-      ? Math.max(1, Number(parameters.gammaVanDenbroeck_vis))
-      : (Number.isFinite(parameters.gammaVanDenBroeck) 
-         ? Math.max(1, Number(parameters.gammaVanDenBroeck))
-         : 1.35e5); // visual seed default
+    // resolve γ_VdB(vis) robustly (supports both spellings), default 1.35e5
+    const resolveGammaVdBVis = () => {
+      const p: any = parameters;
+      const cand =
+        Number.isFinite(p.gammaVanDenBroeck_vis) ? p.gammaVanDenBroeck_vis :
+        Number.isFinite(p.gammaVanDenbroeck_vis) ? p.gammaVanDenbroeck_vis :
+        Number.isFinite(p.gammaVanDenBroeck)     ? p.gammaVanDenBroeck :
+        Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 1.35e5;
+      return Math.max(1, Number(cand));
+    };
+    const gammaVdB_vis = resolveGammaVdBVis();
 
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
@@ -448,7 +455,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     engine._startRenderLoop?.();
 
     // mark loaded on the next frame (ensures WebGL context is live)
-    requestAnimationFrame(() => !cancelled && setIsLoaded(true));
+    requestAnimationFrame(() => { if (!unmountedRef.current) setIsLoaded(true); });
 
     return engine;
   };
@@ -472,6 +479,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
   // Initialize engine on intersection or directly
   useEffect(() => {
     let cancelled = false;
+    unmountedRef.current = false;
     let watchdog: number | null = null;
 
     const performInit = async () => {
@@ -518,7 +526,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? Number(split) : Math.floor(s/2))),
+                split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -532,7 +540,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         const resolveAssetBase = () => {
           const w: any = window;
           if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
-          if ((import.meta as any)?.env?.BASE_URL) return (import.meta as any).env.BASE_URL as string;
+          if (import.meta?.env?.BASE_URL) return String(import.meta.env.BASE_URL);
           if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
           if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
           const baseEl = document.querySelector('base[href]');
@@ -572,7 +580,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? Number(split) : Math.floor(s/2))),
+                split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -607,6 +615,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       io.observe(el);
       return () => {
         cancelled = true;
+        unmountedRef.current = true;
         io.disconnect();
         if (watchdog) clearTimeout(watchdog);
         try {
@@ -627,6 +636,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
     return () => {
       cancelled = true;
+      unmountedRef.current = true;
       if (watchdog) clearTimeout(watchdog);
       try {
         (engineRef.current as any)?.__resizeObserver?.disconnect?.();
@@ -707,10 +717,10 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sag_nm: num(parameters.sagDepth_nm, 16),
         hull: parameters.hull || { Lx_m: 1007, Ly_m: 264, Lz_m: 173 },
         shipRadius_m: parameters.hull?.c ?? 86.5,
-        modelMode: parity ? 'raw' as const : 'calibrated' as const,
+        modelMode: parity ? 'raw' : 'calibrated',
       };
 
-      // First set core physics via pipeline adapter
+      // First set core physics via pipeline adapter (pull back calibrated state)
       const liveState = driveWarpFromPipeline(engineRef.current, pipelineState);
 
       // Now build the consolidated uniform update that preserves currentMode
@@ -744,6 +754,18 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         viewAvg: true,                        // ensure √d_FR is applied
       };
 
+      // resolve γ_VdB(vis) each tick (mode-aware default 1.35e5)
+      const resolveGammaVdBVis = () => {
+        const p: any = parameters;
+        const cand =
+          Number.isFinite(p.gammaVanDenBroeck_vis) ? p.gammaVanDenBroeck_vis :
+          Number.isFinite(p.gammaVanDenbroeck_vis) ? p.gammaVanDenbroeck_vis :
+          Number.isFinite(p.gammaVanDenBroeck)     ? p.gammaVanDenBroeck :
+          Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 1.35e5;
+        return Math.max(1, Number(cand));
+      };
+      const gammaVdB_vis = resolveGammaVdBVis();
+
       // Single atomic update to prevent mode conflicts (via gate)
       gatedUpdateUniforms(engineRef.current, {
         thetaScale: resolveThetaScale({
@@ -752,13 +774,15 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenbroeck_vis, 1.35e5), // use visual seed
+          gammaVdB: gammaVdB_vis,
           dutyEffectiveFR: dFRShip,
         }),
         sectorCount: sectorCountResolved,
         sectors: sectorsResolved,
         dutyEffectiveFR: dFRShip,             // expose for diagnostics
         viewAvg: true,                        // ensure √d_FR is applied
+        // show calibrated exotic mass from pipeline when available
+        exoticMass_kg: (typeof liveState?.M_exotic === 'number' && isFinite(liveState.M_exotic)) ? liveState.M_exotic : parameters.exoticMass_kg,
       }, 'client');
 
       // CRITICAL: Explicit parity enforcement if enabled
@@ -780,7 +804,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       (window as any).__warpEcho = {
         src: 'visualizer',
         v: Date.now(),
-        terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: num(parameters.gammaVanDenBroeck, 1.4e5), d_FR: dFRShip }
+        terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: gammaVdB_vis, d_FR: dFRShip }
       };
 
       // Apply display gain based on mode
@@ -1129,7 +1153,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Exotic Mass:</span>
-                <span className="text-purple-400">{safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)} kg</span>
+                <span className="text-purple-400">{safeFix(engineRef.current?.uniforms?.exoticMass_kg ?? parameters.exoticMass_kg, VIS.exoticMassFallback, 0)} kg</span>
               </div>
             </div>
           </div>
@@ -1145,7 +1169,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
             </div>
             <div>• <span className="text-orange-400">Sector Strobing</span>: {parameters.sectorStrobing || 1}× spatial coherence</div>
             <div>• <span className="text-yellow-400">Q Spoiling</span>: {((parameters.qSpoilingFactor || 1) * 100).toFixed(0)}% cavity efficiency</div>
-            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {Number(parameters.gammaVanDenBroeck ?? 1).toExponential(2)} curvature amplifier</div>
+            <div>• <span className="text-purple-400">γ Van den Broeck</span>: {Number(engineRef.current?.uniforms?.gammaVdB ?? (parameters as any).gammaVanDenBroeck_vis ?? (parameters as any).gammaVanDenbroeck_vis ?? parameters.gammaVanDenBroeck ?? 1.35e5).toExponential(2)} curvature amplifier</div>
             <div className="mt-2 text-slate-500">
               <span className="font-semibold">3D Grid:</span> Live Natário spacetime curvature with mode-specific deformation scaling
             </div>
@@ -1253,7 +1277,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                   </div>
                 )}
                 <div className="text-green-300">Q-Factor: {safeExp(parameters.cavityQ, 0, '1e+9')}</div>
-                <div className="text-green-300">Exotic Mass: {safeFix(parameters.exoticMass_kg, VIS.exoticMassFallback, 0)}kg</div>
+                <div className="text-green-300">Exotic Mass: {safeFix(engineRef.current?.uniforms?.exoticMass_kg ?? parameters.exoticMass_kg, VIS.exoticMassFallback, 0)}kg</div>
               </div>
 
               {/* Debug Controls */}
