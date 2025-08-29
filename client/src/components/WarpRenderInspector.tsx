@@ -539,7 +539,7 @@ function PaneOverlay(props:{
             <div>
               <div className="opacity-80">Curvature (York-time proxy</div>
               <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
-              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
+              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
             </div>
             <div>
               <div className="opacity-80">Exotic mass proxy (display-only</div>
