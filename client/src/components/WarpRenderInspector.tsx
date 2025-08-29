@@ -410,7 +410,9 @@ function fmtSI(x:number, unit:string){
 // Exotic mass proxy: M* ~ θ^2 · V_shell · viewFraction   (arb units; display-only)
 function massProxy(theta:number, shellVol_m3:number, viewFraction:number){
   const th = Math.max(0, theta||0);
-  return th*th * Math.max(0, shellVol_m3||0) * Math.max(0, viewFraction||0);
+  // Clamp theta to reasonable physics range to prevent numerical explosion
+  const thClamped = Math.min(th, 1e6); // Reasonable upper bound for theta scale
+  return thClamped*thClamped * Math.max(0, shellVol_m3||0) * Math.max(0, viewFraction||0);
 }
 
 // Mode → visual seasoning presets (so changes are obvious)
@@ -475,7 +477,15 @@ function PaneOverlay(props:{
 
       const mDisplayText = K > 0
         ? `${fmtSI(mProxy * K, 'kg')}`
-        : `${Number.isFinite(mProxy) ? mProxy.toExponential(3) : '—'} arb`;
+        : (() => {
+            if (!Number.isFinite(mProxy)) return '— arb';
+            // Better formatting for arbitrary units
+            if (mProxy < 1e-3) return `${(mProxy * 1e6).toFixed(2)} µarb`;
+            if (mProxy < 1) return `${(mProxy * 1e3).toFixed(2)} marb`;
+            if (mProxy < 1e3) return `${mProxy.toFixed(2)} arb`;
+            if (mProxy < 1e6) return `${(mProxy / 1e3).toFixed(2)} karb`;
+            return `${mProxy.toExponential(2)} arb`;
+          })();
 
       // pull contraction/expansion from diagnostics if available
       const diag = (e?.computeDiagnostics?.() || {}) as any;
@@ -1798,7 +1808,9 @@ export default function WarpRenderInspector(props: {
 function thetaPhysicsFromUniforms(U: any) {
   const gammaGeo = +U.gammaGeo || 26;
   const q        = +U.qSpoilingFactor || 1;
-  const vdb      = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
+  // Use reasonable gamma values - avoid the extreme 1e11 values causing explosion
+  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
+  const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
   const dRaw     = Number(U.dutyEffectiveFR);
   const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.01; // 0 stays 0 for standby
   return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
