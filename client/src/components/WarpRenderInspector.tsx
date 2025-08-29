@@ -379,7 +379,7 @@ function estimatePxAcrossWall({
   return deltaRho * Rgeom * pxPerMeter;       // pixels across wall
 }
 
-// --- Ellipsoid + wall math ---------------------------------------------------
+// ---- Ellipsoid + wall math ---------------------------------------------------
 function volEllipsoid(a:number,b:number,c:number){ return (4/3)*Math.PI*a*b*c; }
 // Knud Thomsen surface area approximation (p≈1.6075)
 function areaEllipsoid(a:number,b:number,c:number){
@@ -1453,7 +1453,13 @@ export default function WarpRenderInspector(props: {
       leftState.uniforms.physicsParityMode = true;
       leftState.uniforms.parityMode = true;
       leftState.uniforms.ridgeMode = 0;
-      console.log('✅ Parity enforcement corrected successfully');
+
+      // Also push through update system
+      gatedUpdateUniforms(leftEngine.current, {
+        physicsParityMode: true,
+        parityMode: true,
+        ridgeMode: 0
+      }, 'client');
     }
 
     if (rightState?.uniforms && rightState.uniforms.physicsParityMode !== false) {
@@ -1461,7 +1467,13 @@ export default function WarpRenderInspector(props: {
       rightState.uniforms.physicsParityMode = false;
       rightState.uniforms.parityMode = false;
       rightState.uniforms.ridgeMode = 1;
-      console.log('✅ Parity enforcement corrected successfully');
+
+      // Also push through update system
+      gatedUpdateUniforms(rightEngine.current, {
+        physicsParityMode: false,
+        parityMode: false,
+        ridgeMode: 1
+      }, 'client');
     }
   };
 
