@@ -653,20 +653,14 @@ export default function WarpRenderInspector(props: {
     const gammaGeo = phys.gammaGeo || phys.γ_geo || 26;
     const qSpoil = phys.qSpoilingFactor || phys.q || 1;
     const gammaVdB = phys.gammaVanDenBroeck || phys.gammaVdB || phys.γ_VdB || 1;
-    const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
-
+    
     // Use different duty cycles based on source
-    let dutyCycle = 0.14; // Default if not provided
-    if (source === 'fr') {
-      dutyCycle = (live?.dutyCycle || 0.14); // Use live pipeline duty cycle for FR
-    } else if (source === 'ui') {
-      dutyCycle = 0.01; // Fixed UI duty cycle
-    }
-
+    const duty = source === 'fr' ? (live?.dutyCycle ?? 0.14) : 0.01;
+    
     return Math.pow(Number(gammaGeo)||0, 3)
          * Number(qSpoil)||1
          * Number(gammaVdB)||1
-         * Math.sqrt(Math.max(1e-12, Number(dutyFR)||0));
+         * Math.sqrt(Math.max(1e-12, duty));
   };
 
 
@@ -1244,7 +1238,7 @@ export default function WarpRenderInspector(props: {
 
   // -- SHOW checkpoints binder: exports a full snapshot every frame
   function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
-    const publish = () => {
+    const emitSnap = () => {
       const u = engine?.uniforms || {};
       const floats = (engine?.gridVertices?.length || 0);
       const snap = {
@@ -1291,9 +1285,9 @@ export default function WarpRenderInspector(props: {
     };
 
     // fire on every diagnostics beat & on loading state changes
-    engine.onDiagnostics = () => publish();
-    engine.onLoadingStateChange = () => publish();
-    publish(); // kick once now
+    engine.onDiagnostics = () => emitSnap();
+    engine.onLoadingStateChange = () => emitSnap();
+    emitSnap(); // kick once now
   }
 
   // Helper to dump uniforms and diagnostics for debugging
