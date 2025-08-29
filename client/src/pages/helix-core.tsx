@@ -1097,9 +1097,9 @@ export default function HelixCore() {
                 <div className="space-y-4" ref={sliceHostRef}>
                   <SliceViewer
                     hullAxes={[
-                      Number(hullAxes[0]) || 503.5,
-                      Number(hullAxes[1]) || 132.0,
-                      Number(hullAxes[2]) || 86.5,
+                      Number(hull.a) || 503.5,
+                      Number(hull.b) || 132.0,
+                      Number(hull.c) || 86.5,
                     ]}
                     wallWidth_m={6.0}
                     driveDir={[1, 0, 0]}
