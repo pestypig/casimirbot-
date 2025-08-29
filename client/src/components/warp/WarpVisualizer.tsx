@@ -303,8 +303,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     // default missing γ_VdB(vis) → 1.35e5
     const gammaVdB_vis = Number.isFinite(parameters.gammaVanDenbroeck_vis) 
       ? Math.max(1, parameters.gammaVanDenbroeck_vis)
-      : (Number.isFinite(parameters.gammaVanDenbroeck) 
-         ? Math.max(1, parameters.gammaVanDenbroeck)
+      : (Number.isFinite(parameters.gammaVanDenBroeck) 
+         ? Math.max(1, parameters.gammaVanDenBroeck)
          : 1.35e5); // visual seed default
 
     const uniforms = {
@@ -389,7 +389,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       }),
       sectorCount: sectorCountResolved,
       sectors: sectorsResolved,
-      dutyEffectiveFR: dFRShip,           // expose for diagnostics
+      dutyEffectiveFR: dFRShip,
       viewAvg: true,                        // ensure √d_FR is applied
     }, 'client');
 
@@ -711,7 +711,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       };
 
       // First set core physics via pipeline adapter
-      driveWarpFromPipeline(engineRef.current, pipelineState);
+      const liveState = driveWarpFromPipeline(engineRef.current, pipelineState);
 
       // Now build the consolidated uniform update that preserves currentMode
       const consolidatedUniforms = {
@@ -740,7 +740,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         }),
         sectorCount: sectorCountResolved,
         sectors: sectorsResolved,
-        dutyEffectiveFR: dFRShip,             // expose for diagnostics
+        dutyEffectiveFR: dFRShip,
         viewAvg: true,                        // ensure √d_FR is applied
       };
 
@@ -752,7 +752,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenBroeck_vis, 1.35e5), // use visual seed
+          gammaVdB: num(parameters.gammaVanDenbroeck_vis, 1.35e5), // use visual seed
           dutyEffectiveFR: dFRShip,
         }),
         sectorCount: sectorCountResolved,
@@ -785,7 +785,8 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
       // Apply display gain based on mode
       if (parity) {
-        engineRef.current.setDisplayGain?.(1);
+        engineRef.current.setDisplayGain?.(1);              // userGain = 1 for parity mode
+        gatedUpdateUniforms(engineRef.current, { displayGain: 1 }, 'client'); // Ensure shader also uses neutral gain
       } else {
         engineRef.current.setDisplayGain?.(2.5);
       }
