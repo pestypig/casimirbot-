@@ -1,0 +1,176 @@
+1) Add purple fields to the canonical uniforms (TS)
+
+client/src/lib/warp-uniforms.ts
+
+Extend the type, normalize + clamp values, and mirror aliases.
+
+// 1) add to type
+export type WarpUniforms = {
+  // ...
+  // --- interior shift (Purple) ---------------------------------------------
+  epsilonTilt?: number;                       // dimensionless, ~1e-16..1e-7
+  betaTiltVec?: [number,number,number];       // arbitrary vec (we'll normalize)
+  // optional aliases (if you want)
+  betaTiltVecN?: [number,number,number];      // normalized copy
+  // ...
+};
+
+// helpers near top
+const V3 = (a:any)=>Array.isArray(a)&&a.length===3 ? [+a[0],+a[1],+a[2]] as [number,number,number] : undefined;
+const norm3 = (v:[number,number,number])=>{
+  const L = Math.hypot(v[0],v[1],v[2]) || 1;
+  return [v[0]/L, v[1]/L, v[2]/L] as [number,number,number];
+};
+
+export function normalizeWU(raw:any): WarpUniforms {
+  // ...existing code...
+
+  // --- Purple shift normalization ------------------------------------------
+  const epsRaw = N(raw.epsilonTilt, NaN);
+  // clamp super defensively; 0 disables effect
+  const epsilonTilt = Number.isFinite(epsRaw)
+    ? Math.max(0, Math.min(5e-7, epsRaw))
+    : undefined;
+
+  const betaRaw = V3(raw.betaTiltVec ?? raw.betaTiltVecN) ?? [0, -1, 0];
+  const betaTiltVecN = norm3(betaRaw);
+
+  const wu: WarpUniforms = {
+    ...raw,
+    // ...existing normalized mirrors...
+    epsilonTilt,
+    betaTiltVec: betaTiltVecN,
+    betaTiltVecN,
+    // ...
+  };
+  return wu;
+}
+
+// ensure builders pass them through
+export function buildREAL(wu: WarpUniforms) {
+  return {
+    ...wu,
+    // ...
+    epsilonTilt: wu.epsilonTilt ?? 0,
+    betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
+  } as const;
+}
+
+export function buildSHOW(wu: WarpUniforms, opts?: { T?:number; boost?:number; userGain?:number }) {
+  // ...
+  return {
+    ...wu,
+    // ...
+    epsilonTilt: wu.epsilonTilt ?? 0,
+    betaTiltVec: wu.betaTiltVec ?? [0,-1,0],
+  } as const;
+}
+
+2) Don’t drop purple at the gate; clamp it
+
+If your gate/bridge uses a whitelist, add keys. If it just merges, add clamping to your local sanitizers so garbage can’t get to GL.
+
+WarpRenderInspector.tsx (and the second WarpBubbleCompare file’s sanitizeUniforms)
+
+function sanitizeUniforms(u: any = {}) {
+  const s = { ...u };
+
+  // ...existing clamps...
+
+  // purple clamps
+  if ('epsilonTilt' in s) {
+    const v = +s.epsilonTilt;
+    s.epsilonTilt = Number.isFinite(v) ? Math.max(0, Math.min(5e-7, v)) : 0;
+  }
+  if ('betaTiltVec' in s && Array.isArray(s.betaTiltVec)) {
+    const v = s.betaTiltVec.map(Number);
+    const L = Math.hypot(v[0]||0,v[1]||0,v[2]||0) || 1;
+    s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L] as [number,number,number];
+  }
+
+  return s;
+}
+
+
+If gatedUpdateUniforms has an allow-list, add:
+
+// e.g., ALLOWED_UNIFORMS.add('epsilonTilt'); ALLOWED_UNIFORMS.add('betaTiltVec');
+
+3) Keep purple alive when bus uniforms arrive
+
+Right now bus payloads lack purple. Merge them back in when applying to the engines.
+
+WarpRenderInspector.tsx
+
+Find the bus subscription:
+
+const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+  setHaveUniforms(true);
+
+  // bring purple back from props/baseShared (or last known engine value)
+  const purple = {
+    epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
+    betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
+  };
+
+  if (leftEngine.current) {
+    applyToEngine(leftEngine.current, { ...u, ...purple, physicsParityMode: true,  ridgeMode: 0 });
+  }
+  if (rightEngine.current) {
+    applyToEngine(rightEngine.current, { ...u, ...purple, physicsParityMode: false, ridgeMode: 1 });
+  }
+});
+
+
+(Do the same in the other inspector variant if you keep both.)
+
+4) WebGL engine: bind the uniforms
+
+In your engine (JS side, likely warp-engine.js or similar), map the incoming uniforms to GL locations (WebGL1 & 2 safe).
+
+// during program link:
+prog.u_epsilonTilt = gl.getUniformLocation(program, 'u_epsilonTilt');
+prog.u_betaTilt    = gl.getUniformLocation(program, 'u_betaTilt');
+
+// in your uniform-apply path:
+function applyUniforms(u) {
+  // ...existing uniforms...
+  if (prog.u_epsilonTilt) gl.uniform1f(prog.u_epsilonTilt, +u.epsilonTilt || 0.0);
+  if (prog.u_betaTilt) {
+    const v = u.betaTiltVec || [0,-1,0];
+    gl.uniform3f(prog.u_betaTilt, v[0]||0, v[1]||-1, v[2]||0);
+  }
+}
+
+
+This is backward compatible: if callers omit purple, the shader sees zero.
+
+5) GLSL: add uniforms + incorporate into the field
+
+Minimal, conservative integration that leaves legacy output unchanged when epsilonTilt==0.
+
+Vertex shader (if you have normals here) or fragment shader (if normals are reconstructed):
+
+// common.glsl or directly in grid shader
+uniform float u_epsilonTilt;   // ≈ (g_target * R_geom) / c^2
+uniform vec3  u_betaTilt;      // normalized direction (nose-down default)
+
+// if you have world-space or local surface normal; assume normalized
+// name it `n_ws` or derive from your field basis:
+vec3 n_ws = normalize(Normal_ws);
+
+// base legacy beta:
+float betaBase = /* existing dutyCycle*g_y or your current betaField */;
+
+// purple contribution: directional, signed by alignment with the surface
+float purple = u_epsilonTilt * dot(normalize(u_betaTilt), n_ws);
+
+// final beta used where appropriate (curvature/tonemap/mask)
+float betaField = betaBase + purple;
+
+// use betaField downstream exactly where betaBase was used
+
+
+If you don’t have a stable normal, use your field direction/tangent instead (e.g., normalize(∇ρ) or your slice’s normal). The key is the dot with u_betaTilt so the effect is directional.
+
+Optional: for subtle color hinting without altering physics magnitude, you can route purple into a separate channel used by the diverging colormap (keeps quantitative scales identical while showing tilt).
