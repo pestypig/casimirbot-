@@ -57,7 +57,6 @@ const buildModeSelectItems = (pipeline: any) => {
 
 import { useMetrics } from "@/hooks/use-metrics";
 const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
-import WarpBubbleCompare from "@/components/warp/WarpBubbleCompare";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -650,7 +649,7 @@ export default function HelixCore() {
   // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
 
-
+  
 
   // Calculate epsilonTilt after pipeline is available
   const G = 9.80665,
@@ -665,19 +664,15 @@ export default function HelixCore() {
   const gTarget = gTargets[currentMode] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
-  // betaTiltVecN is not defined in the original code, assuming it's intended to be used here for the purple arrow.
-  // For now, providing a placeholder or deriving it if possible.
-  // If betaTiltVecN is intended to be derived from hullMetrics or pipeline, that logic would go here.
-  // For this example, let's assume it's available or can be defaulted.
-  const betaTiltVecN: [number, number, number] = systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0];
 
+  
 
   // Also rebind when core FR/sector knobs actually change (local safety net)
   useEffect(() => {
     setRenderNonce((n) => n + 1);
   }, [pipeline?.currentMode, dutyUI_safe, dutyEffectiveFR_safe, totalSectors, concurrentSectors]);
 
-
+  
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -899,14 +894,6 @@ export default function HelixCore() {
     [activeMode, chatMessages, refetchMetrics, trail]
   );
 
-  // compareParams is used in the original WarpBubbleCompare call. It needs to be defined or passed down.
-  // Assuming compareParams is a prop or a context value available in this component's scope.
-  // If it's defined elsewhere, ensure it's accessible. For this example, defining a placeholder.
-  const compareParams = useMemo(() => ({
-    // Placeholder for compareParams, replace with actual values if available
-    // Example: warpFieldScale: pipeline?.warpFieldScale ?? 1,
-  }), [pipeline]);
-
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-slate-100 relative z-10">
@@ -983,83 +970,7 @@ export default function HelixCore() {
             </div>
           </div>
 
-
-
-          {/* ====== HERO CARD (includes Warp Bubble Compare) ====== */}
-          <Card className="bg-gradient-to-tr from-blue-900/40 via-purple-900/40 to-black border-blue-700/50 mb-4">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2">
-                <Atom className="w-6 h-6 text-purple-400" />
-                HERO: Warp Bubble Dynamics
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-sm">
-                    <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
-                    <p className="mb-2">
-                      The warp bubble's geometry and curvature are driven by the energy pipeline. Here we visualize the primary
-                      Natário metric parameters and their simulated effects on spacetime.
-                    </p>
-                    <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                    <p className="text-xs italic">What bends space, bends time. What bends time, bends us.</p>
-                  </TooltipContent>
-                </Tooltip>
-              </CardTitle>
-              <CardDescription className="text-muted-foreground/70">
-                Visualizing spacetime curvature and internal dynamics.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="relative h-[400px] overflow-hidden rounded-b-lg">
-              {/* Warp Bubble Compare - Updated with new parameters */}
-              <WarpBubbleCompare
-                key={`hero-${renderNonce}`}
-                parameters={{
-                  ...compareParams,
-                  currentMode: effectiveMode,
-
-                  // physics + timing
-                  lightCrossing: lc,
-                  sectorCount: totalSectors,          // total (averaging)
-                  sectors: concurrentSectors,         // live (sweep)
-                  dutyEffectiveFR: dutyEffectiveFR_safe,
-                  dutyCycle: dutyUI_safe,
-
-                  // curvature + shift vector (Purple arrow)
-                  epsilonTilt,
-                  betaTiltVec: betaTiltVecN,
-
-                  // hero curvature “pop”
-                  curvatureGainDec: 0.0,              // keep transfer flat
-                  curvatureBoostMax: 40,              // larger for hero
-                  colorMode: "theta",
-                  lockFraming: true,
-
-                  // amps + bookkeeping
-                  gammaVanDenBroeck: isStandby
-                    ? 1
-                    : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                  gammaGeo: pipeline?.gammaGeo ?? 26,
-                  qSpoilingFactor: qSpoilUI,
-
-                  // HUD helpers
-                  powerAvg_MW: Number(pipeline?.P_avg ?? 83.3),
-                  exoticMass_kg: Number(pipeline?.M_exotic ?? 1405),
-                }}
-                parityExaggeration={1}
-                heroExaggeration={82}
-                colorMode="theta"
-                lockFraming={true}
-              />
-
-              {/* Optional: visual legend under the hero block */}
-              <div className="mt-2">
-                <CurvatureKey />
-              </div>
-            </CardContent>
-          </Card>
-
-
+          
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1155,14 +1066,55 @@ export default function HelixCore() {
               <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
                 <WarpRenderInspector
                   key={`inspector-${modeNonce}-${totalSectors}-${concurrentSectors}`}
-                  parityPhys={{
-                    gammaGeo: pipeline?.gammaGeo ?? 26,
-                    qSpoilingFactor: qSpoilUI,
-                    gammaVanDenBroeck_vis: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
-                    dutyEffectiveFR: dutyEffectiveFR_safe,
-                    dutyCycle: dutyUI_safe,
-                    viewMassFraction: viewMassFracReal,
-                  }}
+                  parityPhys={(() => {
+                    const realPhys = {
+                      gammaGeo: pipeline?.gammaGeo ?? 26,
+                      q: qSpoilUI,
+                      gammaVdB: isStandby ? 1 : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+                      dFR: dutyEffectiveFR_safe,
+                    };
+
+                    const expREAL = thetaScaleExpected(realPhys);
+                    const usedREAL = thetaScaleUsed(expREAL, {
+                      concurrent: 1,
+                      total: 400,
+                      dutyLocal: 0.01,
+                      viewFraction: 0.0025,
+                      viewAveraging: true,
+                    });
+
+                    // Defer checkpoint calls to avoid render-time state updates
+                    React.useEffect(() => {
+                      checkpoint({
+                        id: "θ-expected",
+                        side: "REAL",
+                        stage: "expect",
+                        pass: true,
+                        msg: `θ_expected=${expREAL.toExponential()}`,
+                        expect: expREAL,
+                      });
+
+                      checkpoint({
+                        id: "θ-used",
+                        side: "REAL",
+                        stage: "expect",
+                        pass: true,
+                        msg: `θ_used=${usedREAL.toExponential()}`,
+                        expect: usedREAL,
+                      });
+                    }, [expREAL, usedREAL]);
+
+                    return {
+                      gammaGeo: pipeline?.gammaGeo ?? 26,
+                      qSpoilingFactor: qSpoilUI,
+                      gammaVanDenBroeck_vis: isStandby
+                        ? 1
+                        : Number(pipeline?.gammaVanDenBroeck_vis ?? pipeline?.gammaVanDenBroeck ?? 1),
+                      dutyEffectiveFR: dutyEffectiveFR_safe,
+                      dutyCycle: dutyUI_safe,
+                      viewMassFraction: viewMassFracReal,
+                    };
+                  })()}
                   showPhys={{
                     gammaGeo: pipeline?.gammaGeo ?? 26,
                     qSpoilingFactor: qSpoilUI,
@@ -1228,7 +1180,7 @@ export default function HelixCore() {
             </CardContent>
           </Card>
 
-
+          
 
           {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
