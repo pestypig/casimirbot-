@@ -161,7 +161,7 @@ export function normalizeWU(raw:any): WarpUniforms {
   const qCav         = clamp(N(raw.qCav ?? raw.qCavity, 1e9), 1, 1e12);
 
   // --- renderer helpers -----------------------------------------------------
-  const viewAvg = (raw.viewAvg ?? true) ? true : false;
+  const viewAvg = typeof raw.viewAvg === 'boolean' ? raw.viewAvg : true;
   const viewMassFraction = clamp(N(raw.viewMassFraction, sectors / sectorCount), 0, 1);
   const colorMode: 'theta'|'rho' = (raw.colorMode === 'rho' ? 'rho' : 'theta');
 
@@ -171,14 +171,13 @@ export function normalizeWU(raw:any): WarpUniforms {
     : (dutyEffectiveFR * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
 
   // --- Purple shift normalization ------------------------------------------
-  const epsRaw = N(raw.epsilonTilt, NaN);
-  // clamp super defensively; 0 disables effect
-  const epsilonTilt = Number.isFinite(epsRaw)
-    ? Math.max(0, Math.min(5e-7, epsRaw))
-    : undefined;
-
-  const betaRaw = V3(raw.betaTiltVec ?? raw.betaTiltVecN) ?? [0, -1, 0];
-  const betaTiltVecN = norm3(betaRaw);
+  const epsilonTilt = Number.isFinite(+raw.epsilonTilt) ? Math.max(0, +raw.epsilonTilt) : undefined;
+  let betaTiltVec: [number,number,number] | undefined;
+  if (Array.isArray(raw.betaTiltVec) && raw.betaTiltVec.length === 3) {
+    const [x,y,z] = raw.betaTiltVec.map(Number);
+    const n = Math.hypot(x,y,z) || 1;
+    betaTiltVec = [x/n, y/n, z/n];
+  }
 
   // --- optional time-window gating passthrough ------------------------------
   const onWindowDisplay = !!raw.onWindowDisplay;
@@ -224,8 +223,7 @@ export function normalizeWU(raw:any): WarpUniforms {
 
     // Purple shift parameters
     epsilonTilt,
-    betaTiltVec: betaTiltVecN,
-    betaTiltVecN,
+    betaTiltVec,
 
     // gating passthrough
     onWindowDisplay,

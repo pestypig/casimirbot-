@@ -3,6 +3,42 @@
  * Prevents renderer conflicts by gating all engine uniform writes
  */
 
+import { DebounceConfig, createDebouncedFunction } from './usePollingSmart';
+
+// Canonical uniform name mapping to prevent shader header duplication
+const CANON = {
+  physicsParityMode: 'uPhysicsParity',
+  ridgeMode:         'uRidgeMode',
+  epsilonTilt:       'uEpsilonTilt',
+  betaTiltVec:       'uBetaTiltVec'
+} as const;
+
+// Create a debounced uniform update function per engine instance
+const engineDebouncers = new WeakMap<any, ReturnType<typeof createDebouncedFunction>>();
+
+function getDebouncedUpdate(engine: any): ReturnType<typeof createDebouncedFunction> {
+  if (!engineDebouncers.has(engine)) {
+    const config: DebounceConfig = {
+      delay: 16, // ~60fps
+      maxDelay: 100, // Force update after 100ms max
+      immediate: false
+    };
+
+    const debouncedFn = createDebouncedFunction((uniforms: any) => {
+      if (engine && typeof engine.updateUniforms === 'function') {
+        engine.updateUniforms(uniforms);
+      }
+      if (engine && typeof engine.forceRedraw === 'function') {
+        engine.forceRedraw();
+      }
+    }, config);
+
+    engineDebouncers.set(engine, debouncedFn);
+  }
+
+  return engineDebouncers.get(engine)!;
+}
+
 export type WarpUniforms = {
   // geometry
   hull?: { a:number; b:number; c:number };
@@ -262,16 +298,46 @@ export function applyToEngine(
  * Automatically adds version and source tracking
  */
 export function gatedUpdateUniforms(
-  engine: { updateUniforms: (u: any) => void },
-  uniforms: any,
+  engine: any,
+  patch: any,
   source: 'server'|'client'|'legacy' = 'legacy'
 ) {
-  const gatedUniforms: WarpUniforms = {
-    ...uniforms,
-    __src: source,
-    __version: Date.now()
-  };
-  applyToEngine(engine, gatedUniforms);
+  if (!engine || !patch) return;
+
+  try {
+    const u: Record<string, any> = {...patch};
+
+    // sanitize + rename to prevent shader header duplication
+    if ('physicsParityMode' in u) u[CANON.physicsParityMode] = !!u.physicsParityMode;
+    if ('ridgeMode' in u)         u[CANON.ridgeMode]         = (u.ridgeMode|0) ? 1 : 0;
+
+    if ('epsilonTilt' in u)       u[CANON.epsilonTilt]       = Math.max(0, +u.epsilonTilt || 0);
+    if ('betaTiltVec' in u && Array.isArray(u.betaTiltVec)) {
+      const [x=0,y=0,z=0] = u.betaTiltVec.map(Number);
+      const n = Math.hypot(x,y,z) || 1;
+      u[CANON.betaTiltVec] = [x/n, y/n, z/n] as [number,number,number];
+    }
+
+    // strip legacy keys so we never double-write engine params
+    delete u.physicsParityMode; delete u.ridgeMode;
+    delete u.epsilonTilt; delete u.betaTiltVec;
+
+    const debouncedUpdate = getDebouncedUpdate(engine);
+    debouncedUpdate(u);
+  } catch (error) {
+    console.warn(`[warp-uniforms-gate] Error updating uniforms from ${source}:`, error);
+    // Fallback to direct update
+    try {
+      if (engine && typeof engine.updateUniforms === 'function') {
+        engine.updateUniforms(patch);
+      }
+      if (engine && typeof engine.forceRedraw === 'function') {
+        engine.forceRedraw();
+      }
+    } catch (fallbackError) {
+      console.error(`[warp-uniforms-gate] Fallback update also failed:`, fallbackError);
+    }
+  }
 }
 
 /**
