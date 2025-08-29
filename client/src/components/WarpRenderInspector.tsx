@@ -523,7 +523,7 @@ function PaneOverlay(props:{
               <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
             </div>
             <div>
-              <div className="opacity-80">Exotic mass proxy (display-only)</div>
+              <div className="opacity-80">Exotic mass proxy (display-only</div>
               <div>
                 <code>M* = θ² · V_shell · {flavor==='REAL' ? 'viewFraction' : '1'}</code>
                 {' '}→ <b>{Number.isFinite(s.mStar)? s.mStar.toExponential(3):'—'} arb</b>
