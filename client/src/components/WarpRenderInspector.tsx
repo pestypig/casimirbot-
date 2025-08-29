@@ -707,21 +707,17 @@ export default function WarpRenderInspector(props: {
     const vMass = +phys.gammaVanDenBroeck_mass || 1;
     const vVis  = +phys.gammaVanDenBroeck_vis  || 1;
     const v     = source === 'fr' ? vMass : vVis;
-    // d_eff is always the Ford–Roman ship‐wide average
-    const dutyRaw = 
-      phys.dutyEffectiveFR ??
-      live?.dutyEffectiveFR ??              // if server feeds it
-      ( (() => {
-          // compute the FR average the same way your cards do
-          const dutyLocal = 0.01; // burstLocal
-          const eng = source === 'fr' ? leftEngine.current : rightEngine.current;
-          const sLive = +(phys.sectors ?? eng?.uniforms?.sectors ?? 1);
-          const sTotal = +(phys.sectorCount ?? live?.sectorCount ?? 400);
-          return dutyLocal * (sLive / Math.max(1, sTotal));
-        })()
-      );
-    const duty = Math.max(1e-12, Math.min(1, +dutyRaw || 1e-2));
+    // pick duty depending on mode:
+    let duty: number;
+    if (source === 'fr') {
+      duty = Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0);
+    } else {
+      // UI‐average = dutyCycle ÷ concurrent sectors
+      duty = Number(phys.dutyCycle ?? 0) / Math.max(1, Number(phys.sectors ?? 1));
+    }
+    duty = Math.max(1e-12, Math.min(1, duty));
 
+    // published: θ = γ_geo³ · q · γ_VdB · √duty
     return Math.pow(g, 3) * q * v * Math.sqrt(duty);
   };
 
@@ -1435,6 +1431,7 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: false,
       ridgeMode: 1,
       ...showPhys,
+      // now truly θ=γ³·q·γ_VdB_vis·√(dutyCycle/sectors)
       thetaScale: showThetaScale,
       exposure: 7.5,
       zeroStop: 1e-7,
