@@ -991,15 +991,19 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             this._pendingUpdate = null;
             this._flushId = 0;
 
-            // Debug mode switch
+            // Debug mode switch and operational state
             const isModeSwitch = !!p.currentMode;
-            if (isModeSwitch) {
-                console.log('[WarpEngine] Mode switch detected:', {
+            const isOperationalChange = !!(p.currentMode || p.physicsParityMode !== undefined || p.ridgeMode !== undefined);
+            
+            if (isModeSwitch || isOperationalChange) {
+                console.log(`[WarpEngine] Operational change detected:`, {
                     mode: p.currentMode,
+                    parity: p.physicsParityMode,
+                    ridge: p.ridgeMode,
                     canvas: this.canvas?.id || 'unknown',
                     isLoaded: this.isLoaded,
                     hasProgram: !!this.gridProgram,
-                    uniforms: this.uniforms
+                    thetaScale: p.thetaScale
                 });
             }
 
@@ -1176,16 +1180,37 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           dutyEffFR = dutyLocal * (sectorsConcurrent / sectorsTotal);
         }
 
-        // build theta scale
-        const thetaScaleFromChain = zeroStandby ? 0 :
+        // build theta scale with parity-aware differentiation
+        let thetaScaleFromChain = zeroStandby ? 0 :
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
           (nextUniforms.viewAvg ? Math.sqrt(Math.max(0, dutyEffFR)) : 1);
 
+        // Apply mode-specific scaling for operational differentiation
+        if (!parity && !zeroStandby) {
+          // SHOW mode: apply visual amplification for demonstration
+          const modeAmplifier = mode === 'emergency' ? 2.0 : 
+                               mode === 'cruise' ? 0.8 : 1.2; // hover default
+          thetaScaleFromChain *= modeAmplifier;
+        }
+
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
           : thetaScaleFromChain;
+
+        // Debug operational mode theta calculation
+        if (this._dbgThetaTick !== (this._dbgThetaTick||0)+1 % 30) {
+          console.log(`[${parity ? 'REAL' : 'SHOW'}] Theta calculation debug:`, {
+            γ_geo: nextUniforms.gammaGeo,
+            q: nextUniforms.deltaAOverA,
+            γ_VdB: nextUniforms.gammaVdB,
+            d_FR: dutyEffFR,
+            viewAvg: nextUniforms.viewAvg,
+            calculated: thetaScaleFromChain,
+            actualTheta: nextUniforms.thetaScale
+          });
+        }
         nextUniforms.dutyUsed   = dutyEffFR;   // 🔍 for checkpoints UI
         nextUniforms.dutyEffectiveFR = dutyEffFR; // <- for UI & future patches
 
@@ -1201,6 +1226,20 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           nextUniforms.curvatureBoostMax = 1;
           nextUniforms.userGain = 1;
           nextUniforms.vShip = 0;
+        }
+
+        // --- Operational mode validation and enforcement ---
+        const debugTag = this.debugTag || 'WarpEngine';
+        if (debugTag.includes('REAL') || parity) {
+          // Enforce REAL mode constraints
+          nextUniforms.physicsParityMode = true;
+          nextUniforms.ridgeMode = 0; // physics double-lobe
+          if (nextUniforms.userGain > 10) nextUniforms.userGain = 1; // limit exaggeration
+        } else if (debugTag.includes('SHOW') || !parity) {
+          // Enforce SHOW mode enhancements
+          nextUniforms.physicsParityMode = false;
+          nextUniforms.ridgeMode = 1; // clean single crest
+          nextUniforms.curvatureGainT = Math.max(nextUniforms.curvatureGainT || 0, 0.3);
         }
 
         // --- decide if the CPU warp needs recompute ---
