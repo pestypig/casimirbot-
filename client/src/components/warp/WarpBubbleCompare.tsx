@@ -1441,24 +1441,27 @@ export default function WarpBubbleCompare({
   ) : (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div className="rounded-md overflow-hidden bg-black/40 flex flex-col"
-           style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+           style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300 shrink-0">{realPanelTitle}</div>
         <div className="relative flex-1">
           <canvas
             ref={leftRef}
-            className="absolute inset-0 w-full h-full block"
-            style={{ background: '#111' }}
+            className="absolute inset-0 w-full h-full block touch-manipulation select-none"
+            style={{ background: '#000' }}
           />
         </div>
       </div>
       <div className="rounded-md overflow-hidden bg-black/40 flex flex-col"
-           style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+           style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
         <div className="px-2 py-1 text-xs font-mono text-slate-300 shrink-0">{showPanelTitle}</div>
         <div className="relative flex-1">
           <canvas
             ref={rightRef}
-            className="absolute inset-0 w-full h-full block"
-            style={{ background: '#111' }}
+            className="absolute inset-0 w-full h-full block touch-manipulation select-none"
+            style={{ background: '#000' }}
+          />
+        </div>
+      </div>={{ background: '#111' }}
           />
         </div>
       </div>

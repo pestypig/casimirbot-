@@ -1586,23 +1586,52 @@ export default function WarpRenderInspector(props: {
             <div className="text-xs text-neutral-400">ridgeMode=0 • {colorMode}</div>
           </div>
           <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
-               style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+               style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
             <div className="relative flex-1">
               {realRendererType === 'grid3d' ? (
                 <Grid3DEngine
                   ref={grid3dRef}
                   uniforms={realUniforms}
                   className="absolute inset-0 w-full h-full block"
-                  style={{ background: 'black' }}
+                  style={{ background: '#000' }}
                 />
               ) : (
-                <canvas ref={leftRef} className="absolute inset-0 w-full h-full block touch-manipulation select-none"/>
+                <canvas 
+                  ref={leftRef} 
+                  className="absolute inset-0 w-full h-full block touch-manipulation select-none"
+                  style={{ background: '#000' }}
+                />
               )}
               {!IS_COARSE && <PaneOverlay title="REAL · per-pane slice" flavor="REAL" engineRef={leftEngine} viewFraction={viewMassFracREAL}/>}
             </div>
           </div>
         </article>
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold">SHOW — Cosmetic (θ-diverging) (canvas)</h3>
+            <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
+          </div>
+          <div className="rounded-xl overflow-hidden bg-black/90 flex flex-col"
+               style={{ aspectRatio: '16 / 10', minHeight: 420 }}>
+            <div className="relative flex-1">
+              {showRendererType === 'grid3d' ? (
+                <Grid3DEngine
+                  ref={grid3dRef2}
+                  uniforms={showUniforms}
+                  className="absolute inset-0 w-full h-full block"
+                  style={{ background: '#000' }}
+                />
+              ) : (
+                <canvas 
+                  ref={rightRef} 
+                  className="absolute inset-0 w-full h-full block touch-manipulation select-none"
+                  style={{ background: '#000' }}
+                />
+              )}
+              {!IS_COARSE && <PaneOverlay title="SHOW · cosmetic ampl" flavor="SHOW" engineRef={rightEngine} viewFraction={1.0}/>}
+            </div>
+          </div>
+        </article>-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">SHOW — Boosted (UI) (canvas)</h3>
             <div className="text-xs text-neutral-400">ridgeMode=1 • {colorMode}</div>
