@@ -1,0 +1,62 @@
+The Visualizer is a standalone one‐canvas “SHOW” view, so it wasn’t pulling in the same Inspector‐style fixes for splitting mass vs. visual pocket factors or defaulting γ_VdB. Below is a minimal patch—drop it into your WarpVisualizer file to:
+Default any missing gammaVanDenbroeck to the proper visual seed (1.35×10⁵)
+Ensure the single‐θ resolve uses that visual seed
+--- a/src/components/WarpVisualizer.tsx
++++ b/src/components/WarpVisualizer.tsx
+@@ interface WarpVisualizerProps {
+   parameters: {
+     // … existing props …
+-    /** Optional: live pocket factor (raw physics or calibrated) */
+-    gammaVanDenbroeck?: number;
++    /** Optional: live visual pocket factor */
++    gammaVanDenbroeck_vis?: number;
++    /** Optional: live mass pocket factor (not used in SHOW) */
++    gammaVanDenbroeck_mass?: number;
+@@ init = async () => {
+     // Harden unit/finite guards for Q, γ, wall width
+     const gammaGeo = Math.max(1, num(parameters.g_y, 26));
+     const qCavity  = Math.max(1, num(parameters.cavityQ, 1e9));
+     const qSpoil   = Math.max(1e-6, num(parameters.qSpoilingFactor, 1));
+-    const wallNorm = Math.max(1e-5, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho));
++    const wallNorm = Math.max(1e-5, num(parameters.wall?.w_norm, VIS_LOCAL.defaultWallWidthRho));
++
++    // default missing γ_VdB(vis) → 1.35e5
++    const gammaVdBVis = num(parameters.gammaVanDenbroeck_vis, 1.35e5);
+@@     const uniforms = {
+       // … other uniforms …
+-      gammaVdB: gammaVdBDefault,           // unified default
++      // Always use the visual pocket factor for this SHOW view:
++      gammaVdB: gammaVdBVis,
+@@     gatedUpdateUniforms(engine, {
+-      thetaScale: resolveThetaScale({
+-        dutyCycle: dutyResolved,
+-        sectorCount: sectorCountResolved,
+-        sectors: sectorsResolved,
+-        gammaGeo,
+-        qSpoilingFactor: qSpoil,
+-        gammaVdB: num(parameters.gammaVanDenbroeck, 1.4e5),
+-        dutyEffectiveFR: dFRShip,
+-      }),
++      thetaScale: resolveThetaScale({
++        dutyCycle: dutyResolved,
++        sectorCount: sectorCountResolved,
++        sectors: sectorsResolved,
++        gammaGeo,
++        qSpoilingFactor: qSpoil,
++        gammaVdB: gammaVdBVis,         // use visual seed
++        dutyEffectiveFR: dFRShip,
++      }),
+@@ useEffect(() => {
+     // Live updates to parameters
+     useEffect(() => {
+       if (!isLoaded || !engineRef.current) return;
+       const lc = parameters.lightCrossing;
+@@
+-      const gammaVdBDefault = num(parameters.gammaVanDenbroeck, 1.4e5);
++      // default missing γ_VdB_vis to the visual seed
++      const gammaVdBVis2 = num(parameters.gammaVanDenbroeck_vis, 1.35e5);
+
+       const uniforms = {
+         // … other uniforms …
+-      gammaVdB: gammaVdBDefault,           // unified default
++      gammaVdB: gammaVdBVis2,               // visual seed
