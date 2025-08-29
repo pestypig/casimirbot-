@@ -1158,34 +1158,45 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           // 🔗 physics chain fields used by CPU warp & shader
           thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
           dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
-          sectors: Math.max(1, Math.floor(sectorsIn)),
-          split: Math.max(0, Math.min(sLive - 1, splitIn|0)),
-          viewAvg: parameters.viewAvg ?? prev.viewAvg ?? true,
+          sectors: Math.max(1, Math.floor(sectorsConcurrent)),
+          sectorCount: Math.max(1, Math.floor(sectorCountOut)),
+          // clamp split against the *live* sectors for this pane
+          split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsConcurrent)) - 1, (splitIn|0))),
+          viewAvg: viewAvgResolved,
+          viewMassFraction: isREAL ? (1 / Math.max(1, sectorCountOut)) : 1.0,
           gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
           deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
           gammaVdB: gammaVdBIn,
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
 
-        // --- Bullet-proof θ-scale (prevents "θ-scale — invalid" row) ---
-        const sectorsEff = Math.max(1, nextUniforms.sectors|0 || 1);
+        // --- Parity-aware defaults ---
+        const isREAL = !!parity;
+        // SHOW should be "instantaneous" (no √(FR) averaging), REAL uses FR-averaged
+        const viewAvgResolved = (parameters?.viewAvg !== undefined) ? !!parameters.viewAvg : isREAL;
+        // What sectorCount should the pane *think* it sees
+        const sectorCountOut  = isREAL ? sectorsTotal : sectorsConcurrent;
 
+        // Duty used in the chain:
+        //  - REAL: Ford–Roman averaged (dutyLocal × S_live/S_total)
+        //  - SHOW: instantaneous local burst (≈ dutyLocal)
         let dutyEffFR;
         if (zeroStandby) {
-          dutyEffFR = 0;                    // 🔒 TRUE ZERO in standby
+          dutyEffFR = 0;
         } else if (frFromParams != null) {
-          dutyEffFR = Math.max(0, +frFromParams);
+          dutyEffFR = Math.max(0, Math.min(1, +frFromParams));
         } else {
-          // ✅ Ford–Roman fallback: duty_local × (S_concurrent / S_total)
-          dutyEffFR = dutyLocal * (sectorsConcurrent / sectorsTotal);
+          dutyEffFR = isREAL
+            ? Math.max(0, Math.min(1, dutyLocal * (sectorsConcurrent / Math.max(1, sectorsTotal))))
+            : Math.max(0, Math.min(1, dutyLocal));
         }
 
-        // build theta scale with parity-aware differentiation
-        let thetaScaleFromChain = zeroStandby ? 0 :
+        // build theta scale
+        const thetaScaleFromChain = zeroStandby ? 0 :
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
-          (nextUniforms.viewAvg ? Math.sqrt(Math.max(0, dutyEffFR)) : 1);
+          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
         // Apply mode-specific scaling for operational differentiation
         if (!parity && !zeroStandby) {
@@ -1211,8 +1222,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             actualTheta: nextUniforms.thetaScale
           });
         }
-        nextUniforms.dutyUsed   = dutyEffFR;   // 🔍 for checkpoints UI
-        nextUniforms.dutyEffectiveFR = dutyEffFR; // <- for UI & future patches
+        nextUniforms.dutyUsed   = dutyEffFR;
+        nextUniforms.dutyEffectiveFR = dutyEffFR;
 
         // --- If amplitude just went "off", restore the pristine grid ---
         const wasActive = (prev.thetaScale ?? 0) > 1e-12;
