@@ -541,6 +541,10 @@ uniform float u_curvatureBoostMax;
 uniform int   u_colorMode;
 uniform int   u_ridgeMode;
 
+// Purple shift (interior gravity)
+uniform float u_epsilonTilt;
+uniform vec3  u_betaTiltVec;
+
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -595,6 +599,12 @@ vec3 seqTealLime(float u) {
   vec3 b = vec3(0.00, 1.00, 0.60);
   return mix(a,b, pow(u, 0.8));
 }
+
+float purpleShiftWeight(vec3 normalWS) {
+  // signed tilt along β; clamp to avoid NaNs if ε=0
+  float proj = dot(normalize(u_betaTiltVec), normalize(normalWS));
+  return u_epsilonTilt * proj; // small signed number
+}
 void main() {
   // Safe type conversions to avoid bool/int/float mixing
   bool  isREAL    = u_physicsParityMode;
@@ -635,9 +645,16 @@ void main() {
     ? abs(dfdrs) * sinphi * u_vShip
     : f * sinphi * u_vShip;
 
+  // Calculate surface normal for Purple shift
+  vec3 normalWS = normalize(v_pos);
+  
+  // Apply Purple shift modulation to theta field
+  float purpleWeight = purpleShiftWeight(normalWS);
+  float thetaWithPurple = thetaField * (1.0 + purpleWeight);
+  
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
-  float valTheta  = thetaField * amp;
+  float valTheta  = thetaWithPurple * amp;
   float valShear  = shearProxy * amp;
 
   float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
@@ -650,9 +667,14 @@ void main() {
   // Use colorI (int) for safe comparisons
   vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
 
+  // Add subtle Purple shift visualization
+  vec3 purple = vec3(0.62, 0.36, 0.85);
+  float pv = clamp(10.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.12);
+  col = mix(col, purple, pv);
+
   // Interior tilt mode (3): purple visualization
   if (colorI == 3) {
-    float tilt = abs(u_epsTilt);
+    float tilt = abs(u_epsilonTilt);
     vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
     vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
                         smoothstep(0.0, 1.0, tilt * u_thetaScale));
@@ -762,6 +784,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             intWidth: gl.getUniformLocation(program, 'u_intWidth'),
             epsTilt:  gl.getUniformLocation(program, 'u_epsTilt'),
             tiltViz:  gl.getUniformLocation(program, 'u_tiltViz'),
+            
+            // Purple shift uniforms
+            epsilonTilt: gl.getUniformLocation(program, 'u_epsilonTilt'),
+            betaTiltVec: gl.getUniformLocation(program, 'u_betaTiltVec'),
         };
 
         // (Optional) quick sanity log once
@@ -1682,6 +1708,13 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
         if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
         if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
+        
+        // --- Purple shift uniforms
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(u.epsilonTilt, 0.0));
+        if (this.gridUniforms.betaTiltVec) {
+            const betaTilt = V3(u.betaTiltVec, [0, -1, 0]);
+            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+        }
 
 
         const vertexCount = (this.gridVertices?.length || 0) / 3;
