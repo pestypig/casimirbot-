@@ -692,29 +692,18 @@ void main() {
   // Use colorI (int) for safe comparisons
   vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
 
-  // Add subtle Purple shift visualization (BOOSTED FOR DEBUG)
+  // Add subtle Purple shift visualization
   vec3 purple = vec3(0.62, 0.36, 0.85);
-  float pv = clamp(1000000.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.5); // Boosted 100000x
+  float pv = clamp(10.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.12);
   col = mix(col, purple, pv);
-  
-  // Debug: Show any non-zero epsilon as bright purple
-  if (abs(u_epsilonTilt) > 0.0) {
-    col = mix(col, vec3(1.0, 0.0, 1.0), 0.3); // Bright magenta overlay
-  }
 
   // Interior tilt mode (3): purple visualization
   if (colorI == 3) {
     float tilt = abs(u_epsilonTilt);
     vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
-    
-    // Make Purple shift more visible in debug mode
-    float tiltVis = tilt > 0.0 ? max(0.5, tilt * 1000000.0) : 0.0; // Boost visibility
-    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, tiltVis);
+    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
+                        smoothstep(0.0, 1.0, tilt * u_thetaScale));
     col = baseColor;
-    
-    // Show direction with beta vector
-    float betaEffect = abs(purpleShiftWeight(normalWS)) * 1000000.0;
-    col = mix(col, vec3(1.0, 0.0, 1.0), betaEffect); // Bright magenta for direction
   }
 
   // Debug modes (4+)
@@ -1805,17 +1794,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
 
         // --- Purple shift uniforms
-        const epsilonTiltValue = F(u.epsilonTilt, 0.0);
-        const betaTiltValue = V3(u.betaTiltVec, [0, -1, 0]);
-        
-        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, epsilonTiltValue);
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(u.epsilonTilt, 0.0));
         if (this.gridUniforms.betaTiltVec) {
-            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTiltValue));
-        }
-        
-        // Debug Purple shift every 60 frames
-        if ((this._purpleDebugTick = (this._purpleDebugTick || 0) + 1) % 60 === 0) {
-            console.log(`🟣 Purple Shift Debug: ε=${epsilonTiltValue.toExponential(3)}, β=[${betaTiltValue.join(',')}]`);
+            const betaTilt = V3(u.betaTiltVec, [0, -1, 0]);
+            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
         }
 
 

@@ -1533,20 +1533,6 @@ export default function WarpRenderInspector(props: {
           <p className="text-xs sm:text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <button
-            onClick={() => {
-              // Force Purple shift color mode for debugging
-              if (realEngine?.updateUniforms) {
-                realEngine.updateUniforms({ colorMode: 3, epsilonTilt: 1e-6 });
-              }
-              if (showEngine?.updateUniforms) {
-                showEngine.updateUniforms({ colorMode: 3, epsilonTilt: 1e-6 });
-              }
-            }}
-            className="px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700"
-          >
-            Test Purple
-          </button>
           <label className="text-xs sm:text-sm font-medium">Mode</label>
           {(['hover','cruise','emergency','standby'] as const).map(m => (
             <button
