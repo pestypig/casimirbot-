@@ -684,7 +684,8 @@ export default function WarpRenderInspector(props: {
       ( (() => {
           // compute the FR average the same way your cards do
           const dutyLocal = 0.01; // burstLocal
-          const sLive = +(phys.sectors ?? rightEngine.current?.uniforms?.sectors ?? 1);
+          const eng = source === 'fr' ? leftEngine.current : rightEngine.current;
+          const sLive = +(phys.sectors ?? eng?.uniforms?.sectors ?? 1);
           const sTotal = +(phys.sectorCount ?? live?.sectorCount ?? 400);
           return dutyLocal * (sLive / Math.max(1, sTotal));
         })()
