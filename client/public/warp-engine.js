@@ -510,6 +510,44 @@ class WarpEngine {
         return new Float32Array(verts);
     }
 
+    // Idempotent uniform injection helper
+    _injectUniforms(src) {
+        if (!/WARP_UNIFORMS_INCLUDED/.test(src)) {
+            const uniformsBlock = `
+#ifndef WARP_UNIFORMS_INCLUDED
+#define WARP_UNIFORMS_INCLUDED
+
+// Core uniforms (idempotent)
+uniform vec3  u_sheetColor;
+uniform float u_thetaScale;
+uniform int   u_sectorCount;
+uniform int   u_split;
+uniform vec3  u_axesScene;
+uniform vec3  u_axes;
+uniform vec3  u_driveDir;
+uniform float u_wallWidth;
+uniform float u_vShip;
+uniform float u_epsTilt;
+uniform float u_intWidth;
+uniform float u_tiltViz;
+uniform float u_exposure;
+uniform float u_zeroStop;
+uniform float u_userGain;
+uniform bool  u_physicsParityMode;
+uniform float u_displayGain;
+uniform float u_vizGain;
+uniform float u_curvatureGainT;
+uniform float u_curvatureBoostMax;
+uniform int   u_colorMode;
+uniform int   u_ridgeMode;
+
+#endif
+`;
+            return `${uniformsBlock}\n${src}`;
+        }
+        return src;
+    }
+
     // Precision + profile-aware shader factory
     _makeShaderSources(gl) {
         const isGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
@@ -539,31 +577,9 @@ void main() {
   gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
 }`;
 
-        // --- Fragment (shared body) ---
+        // --- Fragment (shared body with proper type handling) ---
         const fsBody = `
 ${prec}
-uniform vec3  u_sheetColor;
-uniform float u_thetaScale;
-uniform int   u_sectorCount;
-uniform int   u_split;
-uniform vec3  u_axesScene;
-uniform vec3  u_axes;
-uniform vec3  u_driveDir;
-uniform float u_wallWidth;
-uniform float u_vShip;
-uniform float u_epsTilt;
-uniform float u_intWidth;
-uniform float u_tiltViz;
-uniform float u_exposure;
-uniform float u_zeroStop;
-uniform float u_userGain;
-uniform bool  u_physicsParityMode;
-uniform float u_displayGain;
-uniform float u_vizGain;
-uniform float u_curvatureGainT;
-uniform float u_curvatureBoostMax;
-uniform int   u_colorMode;
-uniform int   u_ridgeMode;
 VARY_DECL vec3 v_pos;
 VEC4_DECL frag;
 
@@ -580,17 +596,25 @@ vec3 seqTealLime(float u) {
   return mix(a,b, pow(u, 0.8));
 }
 void main() {
-  if (u_colorMode == 0) {
+  // Safe type conversions to avoid bool/int/float mixing
+  bool  isREAL    = u_physicsParityMode;
+  bool  isShowcase = !isREAL;
+  int   ridgeI    = clamp(u_ridgeMode, 0, 1);
+  float ridgeF    = float(ridgeI);
+  int   colorI    = clamp(u_colorMode, 0, 4);
+  
+  if (colorI == 0) {
     SET_FRAG(vec4(u_sheetColor, 0.85));
     return;
   }
 
   vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0 ? u_axesScene : u_axes;
 
-  float showGain  = u_physicsParityMode ? 1.0 : u_displayGain;
-  float vizSeason = u_physicsParityMode ? 1.0 : u_vizGain;
-  float tBlend    = u_physicsParityMode ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);
-  float tBoost    = u_physicsParityMode ? 1.0 : max(1.0, u_curvatureBoostMax);
+  // Use explicit boolean checks instead of direct float conversion
+  float showGain  = isREAL ? 1.0 : u_displayGain;
+  float vizSeason = isREAL ? 1.0 : u_vizGain;
+  float tBlend    = isREAL ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);
+  float tBoost    = isREAL ? 1.0 : max(1.0, u_curvatureBoostMax);
 
   vec3 pN = v_pos / axes;
   float rs = length(pN) + 1e-6;
@@ -601,12 +625,13 @@ void main() {
   float f     = exp(-delta*delta);
   float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;
 
-  float thetaField = (u_ridgeMode == 0)
+  // Use ridge mode with explicit int comparison (ridgeI already computed above)
+  float thetaField = (ridgeI == 0)
     ? u_vShip * (xs/rs) * dfdrs
     : u_vShip * (xs/rs) * f;
 
   float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));
-  float shearProxy = (u_ridgeMode == 0)
+  float shearProxy = (ridgeI == 0)
     ? abs(dfdrs) * sinphi * u_vShip
     : f * sinphi * u_vShip;
 
@@ -622,10 +647,11 @@ void main() {
   float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);
   float sVis = clamp( magS / norm, 0.0, 1.0);
 
-  vec3 col = (u_colorMode == 1) ? diverge(tVis) : seqTealLime(sVis);
+  // Use colorI (int) for safe comparisons
+  vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
 
   // Interior tilt mode (3): purple visualization
-  if (u_colorMode == 3) {
+  if (colorI == 3) {
     float tilt = abs(u_epsTilt);
     vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
     vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
@@ -634,7 +660,7 @@ void main() {
   }
 
   // Debug modes (4+)
-  if (u_colorMode >= 4) {
+  if (colorI >= 4) {
     float debug = abs(thetaField) * u_thetaScale; // Use thetaField for debug based on context
     vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
     col = debugColor;
@@ -642,11 +668,12 @@ void main() {
   SET_FRAG(vec4(col, 0.9));
 }`;
 
-        const fs2 = `#version 300 es
-${fsBody.replace('VARY_DECL', 'in').replace('VEC4_DECL frag;', 'out vec4 frag;').replace(/SET_FRAG/g,'frag=')}`;
+        // Apply idempotent uniform injection
+        const fs2 = this._injectUniforms(`#version 300 es
+${fsBody.replace('VARY_DECL', 'in').replace('VEC4_DECL frag;', 'out vec4 frag;').replace(/SET_FRAG/g,'frag=')}`);
 
-        const fs1 = `
-${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(/SET_FRAG/g,'gl_FragColor=')}`;
+        const fs1 = this._injectUniforms(`
+${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(/SET_FRAG/g,'gl_FragColor=')}`);
 
         return isGL2 ? { vs: vs2, fs: fs2, profile: 'webgl2', wantHighp }
                      : { vs: vs1, fs: fs1, profile: 'webgl1', wantHighp };
