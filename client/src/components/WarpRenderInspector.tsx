@@ -463,25 +463,14 @@ function PaneOverlay(props:{
       // Compute mass based on provided calibration factor or use arb units
       const K = Number((window as any).__EXOTIC_MASS_CALIB_KG_PER_ARB) || 0;
       
-      // Use physics-only theta calculation to avoid inflated SHOW values
-      const gammaGeo = +(U.gammaGeo || 26);
-      const qSpoil = +(U.qSpoilingFactor || 1);
-      const gammaVdB_phys = +(U.gammaVanDenBroeck_mass || U.gammaVanDenBroeck || 38.3); // Use mass channel
-      const dutyFR = Math.max(1e-12, +(U.dutyEffectiveFR || 0.000025));
+      // Make the overlay honest: show the two θ's explicitly
+      const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
+      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+      // optional: keep your paper clamp, but show it as "θ_paper"
+      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
+      const thetaForMass = Number.isFinite(thetaPhys) ? Math.min(thetaPhys, 1e10) : thetaUniform;
       
-      // Physics-only theta (no visual boosts)
-      const thetaPhys = Math.pow(gammaGeo, 3) * qSpoil * gammaVdB_phys * Math.sqrt(dutyFR);
-      
-      // Apply realistic scaling if theta is inflated (>1e10 indicates visual amplification)
-      let scaledTheta = thetaPhys;
-      if (thetaPhys > 1e10) {
-        // Use research paper constants: 1405 kg target, 83.3 MW power
-        const paperTheta = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(0.000025); // ≈17576
-        scaledTheta = paperTheta;
-        console.log(`🔧 Exotic mass: scaling inflated theta ${thetaPhys.toExponential(2)} → ${scaledTheta.toExponential(2)}`);
-      }
-      
-      const mProxy = massProxy(scaledTheta, Vshell, flavor === 'REAL' ? viewFraction : 1.0);
+      const mProxy = massProxy(thetaForMass, Vshell, flavor === 'REAL' ? viewFraction : 1.0);
 
       const mDisplayText = K > 0
         ? `${fmtSI(mProxy * K, 'kg')}`
@@ -496,7 +485,9 @@ function PaneOverlay(props:{
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell, theta: U.thetaScale, mStar: mProxy, frontMax, rearMin,
+        a,b,c,aH, w_m, V,S, Vshell, 
+        thetaUniform, thetaPhys, thetaPaper,
+        mStar: mProxy, frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
         mDisplayText // Add display text here
       });
@@ -522,7 +513,9 @@ function PaneOverlay(props:{
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
-          <div>θ-scale: <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
+          <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
+          <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
+          <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
           {/* Update mass display to use calibrated or arbitrary units properly */}
@@ -679,15 +672,24 @@ export default function WarpRenderInspector(props: {
       phys.q
     ) || 1;
 
-    const v = +(
-      phys.gammaVanDenBroeck ??
-      phys.gammaVdB ??
-      phys.γ_VdB
-    ) || 1;
+    // Pick the right pocket factor per channel
+    const v = source === 'fr' 
+      ? +(phys.gammaVanDenBroeck_mass ?? phys.gammaVanDenBroeck ?? 1) || 1  // REAL (mass)
+      : +(phys.gammaVanDenBroeck_vis ?? phys.gammaVanDenBroeck ?? 1) || 1;  // SHOW (visual)
 
-    // duty selection (ensure it's finite and in [0,1])
-    const dutyRaw = source === 'fr' ? (live?.dutyCycle ?? 0.14) : 0.01;
-    const duty = Math.max(1e-12, Math.min(1, +dutyRaw || 0.01));
+    // Use the same duty the cards use (d_eff) for SHOW
+    const dutyRaw = 
+      phys.dutyEffectiveFR ??
+      live?.dutyEffectiveFR ??              // if server feeds it
+      ( (() => {
+          // compute the FR average the same way your cards do
+          const dutyLocal = 0.01; // burstLocal
+          const sLive = +(phys.sectors ?? rightEngine.current?.uniforms?.sectors ?? 1);
+          const sTotal = +(phys.sectorCount ?? live?.sectorCount ?? 400);
+          return dutyLocal * (sLive / Math.max(1, sTotal));
+        })()
+      );
+    const duty = Math.max(1e-12, Math.min(1, +dutyRaw || 1e-2));
 
     return Math.pow(g, 3) * q * v * Math.sqrt(duty);
   };
