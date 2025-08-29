@@ -126,10 +126,17 @@ function sanitizeUniforms(u: any = {}) {
   if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
   if ('gammaGeo' in s) s.gammaGeo = Number.isFinite(s.gammaGeo) ? Math.max(1, s.gammaGeo) : 26;
   if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
-  // default to the visual pocket seed (1.35e5) when missing
-  if ('gammaVanDenBroeck' in s) s.gammaVanDenBroeck = Number.isFinite(s.gammaVanDenBroeck)
-    ? Math.max(1, s.gammaVanDenBroeck)
-    : 1.35e5;
+  // preserve separate mass vs visual pocket amplifications
+  if ('gammaVanDenBroeck_mass' in s) {
+    s.gammaVanDenBroeck_mass = Number.isFinite(s.gammaVanDenBroeck_mass)
+      ? Math.max(1, s.gammaVanDenBroeck_mass)
+      : 1.35e5;
+  }
+  if ('gammaVanDenBroeck_vis' in s) {
+    s.gammaVanDenBroeck_vis = Number.isFinite(s.gammaVanDenBroeck_vis)
+      ? Math.max(1, s.gammaVanDenBroeck_vis)
+      : 1.35e5;
+  }
   if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
 
   // Boolean sanitization
