@@ -678,13 +678,7 @@ export default function HelixCore() {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
 
   // ε (dimensionless) used by shaders + viz overlays
-  const epsilonTiltPhysics = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
-  
-  // DEBUG: Force visible Purple shift for testing (remove this later)
-  const purpleDebugMode = true; // Set to false to use real physics values
-  const epsilonTilt = purpleDebugMode ? 1e-6 : epsilonTiltPhysics; // Boosted 1000x for visibility
-  
-  console.log(`🟣 Purple Debug: physics=${epsilonTiltPhysics.toExponential(3)}, debug=${epsilonTilt.toExponential(3)}, mode=${currentMode}`);
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
   // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
   const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
