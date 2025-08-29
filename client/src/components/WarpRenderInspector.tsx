@@ -570,7 +570,6 @@ export default function WarpRenderInspector(props: {
     return () => window.removeEventListener('error', handleError);
   }, []);
 
-  // Show error boundary if there was a component error
   if (componentError) {
     return (
       <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
@@ -585,7 +584,6 @@ export default function WarpRenderInspector(props: {
       </div>
     );
   }
-
   const leftRef = useRef<HTMLCanvasElement>(null);   // REAL
   const rightRef = useRef<HTMLCanvasElement>(null);  // SHOW
   const leftEngine = useRef<any>(null);
@@ -1168,13 +1166,6 @@ export default function WarpRenderInspector(props: {
   // FR duty for both engines - let them derive thetaScale internally
   const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
 
-  // Visual-only mass fraction scaling
-  const total = Math.max(1, Number(live?.sectorCount) || 400);
-  const viewFracREAL = 1 / total;
-
-  // FR duty for both engines - let them derive thetaScale internally
-  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
-
   // Debug toggle: choose between mass-calibrated vs visual-only γ_VdB (outside useEffect for display access)
   const gammaVdB_vis = N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11);
   const gammaVdB_mass = N(live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck, 1e11);
@@ -1356,7 +1347,7 @@ export default function WarpRenderInspector(props: {
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
 
   // ε (dimensionless) used by shaders + viz overlays
-  const epsilonTiltPhysics = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
   // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
   const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
@@ -1444,7 +1435,7 @@ export default function WarpRenderInspector(props: {
     if (typeof clampMobileDPR === 'function') clampMobileDPR(1);
   }, []);
 
-  // Verify engine states for parity and log to console
+  // Debug verification function
   const verifyEngineStates = () => {
     const leftState = leftEngine.current;
     const rightState = rightEngine.current;
@@ -1523,72 +1514,39 @@ export default function WarpRenderInspector(props: {
   }
 
   return (
-    <TooltipProvider>
-      <div className="space-y-4">
-        {/* Debug Controls Row */}
-        <div className="flex flex-wrap gap-2 p-2 bg-slate-800/50 rounded border border-slate-700">
+    <div className="w-full grid gap-4 p-2 sm:p-4">
+      {(() => {
+        try {
+          const qs = new URLSearchParams(location.search || '');
+          if (!qs.has('debug-gl')) return null;
+          const report = webglSupport(undefined);
+          return (
+            <pre className="text-xs p-2 rounded bg-black/70 text-green-200 overflow-auto">
+              GL Debug: {JSON.stringify(report, null, 2)}
+            </pre>
+          );
+        } catch { return null; }
+      })()}
+      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3">
+        <div>
+          <h2 className="text-lg sm:text-xl font-semibold">Operational Render Inspector</h2>
+          <p className="text-xs sm:text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={() => {
-              console.log('🔍 REAL WebGL Debug Values:');
-              console.log('Left Engine (REAL):', leftEngine.current);
-              console.log('Left Engine Uniforms:', leftEngine.current?.uniforms);
-              console.log('Left Engine GL Context:', leftEngine.current?.gl);
-              console.log('Left Engine Program:', leftEngine.current?.gridProgram);
-              console.log('Left Engine Loaded:', leftEngine.current?.isLoaded);
-            }}
-            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
-          >
-            Debug REAL
-          </button>
-          <button
-            onClick={() => {
-              console.log('🔍 SHOW WebGL Debug Values:');
-              console.log('Right Engine (SHOW):', rightEngine.current);
-              console.log('Right Engine Uniforms:', rightEngine.current?.uniforms);
-              console.log('Right Engine GL Context:', rightEngine.current?.gl);
-              console.log('Right Engine Program:', rightEngine.current?.gridProgram);
-              console.log('Right Engine Loaded:', rightEngine.current?.isLoaded);
-            }}
-            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
-          >
-            Debug SHOW
-          </button>
-          <button
-            onClick={() => {
-              console.log('🟣 Test Purple button clicked');
-              console.log('🟣 Left engine:', leftEngine.current);
-              console.log('🟣 Right engine:', rightEngine.current);
-
               // Force Purple shift color mode for debugging
-              if (leftEngine.current?.updateUniforms) {
-                console.log('🟣 Updating left engine (REAL)');
-                leftEngine.current.updateUniforms({
-                  colorMode: 3,
-                  epsilonTilt: 1e-6,
-                  betaTiltVec: [0, -1, 0]
-                });
+              if (realEngine?.updateUniforms) {
+                realEngine.updateUniforms({ colorMode: 3, epsilonTilt: 1e-6 });
               }
-              if (rightEngine.current?.updateUniforms) {
-                console.log('🟣 Updating right engine (SHOW)');
-                rightEngine.current.updateUniforms({
-                  colorMode: 3,
-                  epsilonTilt: 1e-6,
-                  betaTiltVec: [0, -1, 0]
-                });
+              if (showEngine?.updateUniforms) {
+                showEngine.updateUniforms({ colorMode: 3, epsilonTilt: 1e-6 });
               }
             }}
             className="px-2 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700"
           >
             Test Purple
           </button>
-        </div>
-
-      <header className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 px-2">
-        <div>
-          <h2 className="text-lg sm:text-xl font-semibold">Operational Render Inspector</h2>
-          <p className="text-xs sm:text-sm text-neutral-500">REAL (Ford–Roman parity) vs SHOW (UI boosted) — uses the same render path as WarpBubbleCompare.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <label className="text-xs sm:text-sm font-medium">Mode</label>
           {(['hover','cruise','emergency','standby'] as const).map(m => (
             <button
@@ -1600,7 +1558,7 @@ export default function WarpRenderInspector(props: {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4 px-2">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         <article className="rounded-2xl border border-neutral-200 bg-neutral-950/40 p-3">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold">REAL — Parity (Ford–Roman) (canvas)</h3>
@@ -1651,7 +1609,7 @@ export default function WarpRenderInspector(props: {
         </article>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 px-2">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Debug Toggles</h4>
           <fieldset className="flex gap-3 text-xs">
