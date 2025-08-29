@@ -1440,22 +1440,27 @@ export default function WarpBubbleCompare({
     </div>
   ) : (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '280px' }}>
-        <div className="px-2 py-1 text-xs font-mono text-slate-300">{realPanelTitle}</div>
-        <canvas
-          id="realCanvas" // Added ID for diagnostic purposes
-          ref={leftRef}
-          className="w-full h-[calc(100%-32px)] block min-h-[240px]"
-          style={{ background: '#111', display: 'block' }}
-        />
+      <div className="rounded-md overflow-hidden bg-black/40 flex flex-col"
+           style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+        <div className="px-2 py-1 text-xs font-mono text-slate-300 shrink-0">{realPanelTitle}</div>
+        <div className="relative flex-1">
+          <canvas
+            ref={leftRef}
+            className="absolute inset-0 w-full h-full block"
+            style={{ background: '#111' }}
+          />
+        </div>
       </div>
-      <div className="rounded-md overflow-hidden bg-black/40" style={{ aspectRatio: '16 / 10', minHeight: '280px' }}>
-        <div className="px-2 py-1 text-xs font-mono text-slate-300">{showPanelTitle}</div>
-        <canvas
-          ref={rightRef}
-          className="w-full h-[calc(100%-32px)] block min-h-[240px]"
-          style={{ background: '#111', display: 'block' }}
-        />
+      <div className="rounded-md overflow-hidden bg-black/40 flex flex-col"
+           style={{ aspectRatio: '16 / 10', minHeight: 280 }}>
+        <div className="px-2 py-1 text-xs font-mono text-slate-300 shrink-0">{showPanelTitle}</div>
+        <div className="relative flex-1">
+          <canvas
+            ref={rightRef}
+            className="absolute inset-0 w-full h-full block"
+            style={{ background: '#111' }}
+          />
+        </div>
       </div>
     </div>
   );
