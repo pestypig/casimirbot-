@@ -32,6 +32,58 @@ const bus = new Map<
   }
 >();
 
+export type DebounceConfig = {
+  delay: number;
+  maxDelay: number;
+  immediate: boolean;
+};
+
+export function createDebouncedFunction<T extends (...args: any[]) => any>(
+  fn: T,
+  config: DebounceConfig
+): T & { cancel: () => void } {
+  let timeoutId: number | null = null;
+  let lastCallTime = 0;
+
+  const debouncedFn = ((...args: Parameters<T>) => {
+    const now = Date.now();
+    
+    // Clear existing timeout
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+
+    // If immediate is true and it's the first call, execute immediately
+    if (config.immediate && lastCallTime === 0) {
+      lastCallTime = now;
+      return fn(...args);
+    }
+
+    // If max delay exceeded, execute immediately
+    if (now - lastCallTime >= config.maxDelay) {
+      lastCallTime = now;
+      return fn(...args);
+    }
+
+    // Otherwise, debounce with delay
+    timeoutId = window.setTimeout(() => {
+      lastCallTime = Date.now();
+      timeoutId = null;
+      fn(...args);
+    }, config.delay);
+  }) as T & { cancel: () => void };
+
+  debouncedFn.cancel = () => {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+  };
+
+  return debouncedFn;
+}
+
 export function usePollingSmart<T = any>(
   url: string,
   { minMs = 8000, maxMs = 30000, backoffFactor = 1.6, dedupeKey, enabled = true, parser = defaultParser }: Opts = {}
