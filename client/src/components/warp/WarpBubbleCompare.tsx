@@ -332,7 +332,7 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
 
   const duty = (flavor === 'fr')
     ? clampValue(base.dutyEffectiveFR)                     // ship-averaged FR duty
-    : clampValue(base.dutyCycle / Math.max(1, base.sectorCount)); // UI duty averaged over all sectors
+    : clampValue(base.dutyCycle / Math.max(1, base.sectors));      // UI duty averaged over concurrent sectors
 
   const dutyTerm = Math.sqrt(Math.max(1e-12, duty));    // ✓ Apply square root per published formula
 
