@@ -651,19 +651,31 @@ export default function HelixCore() {
 
   
 
-  // Calculate epsilonTilt after pipeline is available
-  const G = 9.80665,
-    c = 299792458;
+  // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
+  const G = 9.80665, c = 299792458;
+
   const gTargets: Record<string, number> = {
     hover: 0.1 * G,
     cruise: 0.05 * G,
     emergency: 0.3 * G,
     standby: 0,
   };
+
   const currentMode = effectiveMode.toLowerCase();
   const gTarget = gTargets[currentMode] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+
+  // ε (dimensionless) used by shaders + viz overlays
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+
+  // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
+  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
+  const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
+  const betaTiltVecN: [number, number, number] = [
+    betaTiltVecRaw[0] / betaNorm,
+    betaTiltVecRaw[1] / betaNorm,
+    betaTiltVecRaw[2] / betaNorm,
+  ];
 
   
 
@@ -1113,7 +1125,12 @@ export default function HelixCore() {
                       dutyEffectiveFR: dutyEffectiveFR_safe,
                       dutyCycle: dutyUI_safe,
                       viewMassFraction: viewMassFracReal,
-                    };
+
+                      // 🔎 extras shown on the REAL side HUD (non-breaking extras)
+                      thetaExpected: expREAL,
+                      thetaUsed: usedREAL,
+                      fordRomanZeta: pipeline?.zeta,
+                    } as any;
                   })()}
                   showPhys={{
                     gammaGeo: pipeline?.gammaGeo ?? 26,
@@ -1134,10 +1151,17 @@ export default function HelixCore() {
                     vShip: 0,
                     sectorCount: totalSectors,
                     sectors: concurrentSectors,
+
+                    // ✅ attach Purple shift vector + curvature knobs to BOTH renderers
+                    epsilonTilt,
+                    betaTiltVec: betaTiltVecN,
+                    curvatureGainDec: 0.0,
+                    curvatureBoostMax: 20,
+
                     colorMode: "theta",
                     lockFraming: true,
                     currentMode: effectiveMode,
-                  }}
+                  } as any}
                   lightCrossing={{ burst_ms: lc.burst_ms, dwell_ms: lc.dwell_ms }}
                   realRenderer="slice2d"
                   showRenderer="grid3d"
