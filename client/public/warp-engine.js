@@ -1125,6 +1125,13 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           ));
         const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
 
+        // --- Parity-aware defaults ---
+        const isREAL = !!parity;
+        // SHOW should be "instantaneous" (no √(FR) averaging), REAL uses FR-averaged
+        const viewAvgResolved = (parameters?.viewAvg !== undefined) ? !!parameters.viewAvg : isREAL;
+        // What sectorCount should the pane *think* it sees
+        const sectorCountOut  = isREAL ? sectorsTotal : sectorsConcurrent;
+
         // --- build next uniforms without mutating prev ---
         const nextUniforms = {
           ...prev,
@@ -2297,6 +2304,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     setPresetParity() {
         this.updateUniforms({
             physicsParityMode: true,
+            viewAvg: true,
             ridgeMode: 0,              // show true physics double-lobe
             curvatureGainT: 0.0,
             curvatureBoostMax: 1.0,
@@ -2310,6 +2318,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     setPresetShowcase() {
         this.updateUniforms({
             physicsParityMode: false,
+            viewAvg: false,
             ridgeMode: 1,              // clean single crest at ρ=1
             curvatureGainT: 0.6,       // slider blend → boost
             curvatureBoostMax: 40.0,
