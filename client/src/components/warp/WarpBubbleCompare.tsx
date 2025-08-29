@@ -957,9 +957,9 @@ export default function WarpBubbleCompare({
       // Strong detection up-front (DOM-mounted probe for mobile webviews)
       const support = webglSupport(undefined, { mountProbeCanvas: true });
       if (!support.ok) {
-        setLoadError(support.reason || 'WebGL not available');
+        console.warn("[init] Preflight failed; attempting lazy init anyway");
         (window as any).__whyNoGL = support;
-        return;
+        // fall through and try to create the engine — we'll error only if constructor/linking fails
       }
 
       await ensureScript();
