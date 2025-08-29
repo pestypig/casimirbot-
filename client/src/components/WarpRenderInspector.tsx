@@ -1817,9 +1817,9 @@ export default function WarpRenderInspector(props: {
         leftLabel="REAL"
         rightLabel="SHOW"
         leftEngineRef={leftEngine}
-        rightEngineRef={rightEngine}   // ⬅️ this is now the JS WarpEngine
+        rightEngineRef={rightEngine}   // this is now the JS WarpEngine
         leftCanvasRef={leftRef}
-        rightCanvasRef={rightRef}      // ⬅️ same canvas the engine draws into
+        rightCanvasRef={rightRef}      // same canvas the engine draws into
         live={live}
         lightCrossing={{ burst_ms: live?.burst_ms, dwell_ms: live?.dwell_ms }}
       />
@@ -1833,10 +1833,10 @@ export default function WarpRenderInspector(props: {
 function thetaPhysicsFromUniforms(U: any) {
   const gammaGeo = +U.gammaGeo || 26;
   const q        = +U.qSpoilingFactor || 1;
-  // Use reasonable gamma values - avoid the extreme 1e11 values causing explosion
-  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
+  // Use Ford-Roman mass gamma, not visual gamma for physics calculations
+  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
   const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
   const dRaw     = Number(U.dutyEffectiveFR);
-  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.01; // 0 stays 0 for standby
+  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.000025; // Use Ford-Roman duty as fallback
   return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
 }
