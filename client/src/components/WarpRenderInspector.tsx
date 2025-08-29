@@ -1795,9 +1795,9 @@ export default function WarpRenderInspector(props: {
 // physics θ helper (no SHOW boosts)
 function thetaPhysicsFromUniforms(U: any) {
   const gammaGeo = +U.gammaGeo || 26;
-  const q       = +U.qSpoilingFactor || 1;
-  // prefer a physics (mass) channel if your pipeline provides it; fall back sanely
-  const gammaVdB = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
-  const dFR     = Math.max(1e-12, +U.dutyEffectiveFR || 0.01);
-  return Math.pow(gammaGeo, 3) * q * gammaVdB * Math.sqrt(dFR);
+  const q        = +U.qSpoilingFactor || 1;
+  const vdb      = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 1;
+  const dRaw     = Number(U.dutyEffectiveFR);
+  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.01; // 0 stays 0 for standby
+  return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
 }
