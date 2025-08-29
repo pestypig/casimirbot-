@@ -120,8 +120,16 @@ const validatePhysicsParams = (params: any, label: string) => {
   if ('gammaVdB' in validated || 'gammaVanDenBroeck' in validated) {
     const raw = validated.gammaVanDenBroeck ?? validated.gammaVdB;
     const vis = Number.isFinite(raw) ? raw : 1.35e5;
-    validated.gammaVdB = vis;                    // visual pocket factor
-    validated.gammaVanDenBroeck = validated.gammaVanDenBroeck_mass ?? vis;
+    // assign separate visual and mass seeds
+    validated.gammaVanDenBroeck_vis  = vis;
+    validated.gammaVdB               = vis;
+    // override mass pocket if provided, otherwise fallback to vis
+    const mass = Number.isFinite(validated.gammaVanDenBroeck_mass)
+               ? validated.gammaVanDenBroeck_mass
+               : vis;
+    validated.gammaVanDenBroeck_mass = mass;
+    // and keep the "unified" field in sync
+    validated.gammaVanDenBroeck      = mass;
   }
 
   // Clamp q-spoiling factor
