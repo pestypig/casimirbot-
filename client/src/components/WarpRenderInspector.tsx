@@ -706,27 +706,21 @@ export default function WarpRenderInspector(props: {
   // Hull geometry for epsilon calculations
   const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
 
-  // Theta scale calculation helper
-  const computeThetaScale = (phys: any, source: 'fr' | 'ui') => {
-    const g = +phys.gammaGeo || 26;
-    const q = +phys.qSpoilingFactor || 1;
-    // force use of explicit mass vs. visual pocket factors
-    const vMass = +phys.gammaVanDenBroeck_mass || 1;
-    const vVis  = +phys.gammaVanDenBroeck_vis  || 1;
-    const v     = source === 'fr' ? vMass : vVis;
-    // pick duty depending on mode:
-    let duty: number;
-    if (source === 'fr') {
-      duty = Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0);
-    } else {
-      // UI‐average = dutyCycle ÷ concurrent sectors
-      duty = Number(phys.dutyCycle ?? 0) / Math.max(1, Number(phys.sectors ?? 1));
-    }
-    duty = Math.max(1e-12, Math.min(1, duty));
-
-    // published: θ = γ_geo³ · q · γ_VdB · √duty
+  /**  
+   * Compute θ using exactly the physics pipeline formula  
+   * θ = γ_geo³ · q · γ_VdB_mass · √(dutyEffectiveFR)  
+   * (always uses the mass pocket-factor and Ford–Roman duty)  
+   */  
+  function computeThetaScale(phys: any) {
+    const g    = +phys.gammaGeo || 26;
+    const q    = +phys.qSpoilingFactor || 1;
+    const v    = +phys.gammaVanDenBroeck_mass || +phys.gammaVanDenBroeck || 1;
+    const duty = Math.max(
+      1e-12,
+      Math.min(1, Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0))
+    );
     return Math.pow(g, 3) * q * v * Math.sqrt(duty);
-  };
+  }
 
 
   function emitDebug(level: 'info'|'warn'|'error', tag: string, msg: string, data?: any) {
@@ -1390,35 +1384,35 @@ export default function WarpRenderInspector(props: {
     const baseShared = props.baseShared || {};
 
     // Enhanced theta scale calculation with debugging
-    const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
-      const gammaGeo = +phys.gammaGeo || 26;
-      const qSpoil   = +phys.qSpoilingFactor || 1;
-      // use explicit pocket factors
-      const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
-      const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
-      const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
-      const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
+    // const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
+    //   const gammaGeo = +phys.gammaGeo || 26;
+    //   const qSpoil   = +phys.qSpoilingFactor || 1;
+    //   // use explicit pocket factors
+    //   const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
+    //   const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
+    //   const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
+    //   const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
 
-      const calculated = computeThetaScale(phys, source);
-      const actualTheta = source === 'fr'
-        ? leftEngine.current?.uniforms?.thetaScale
-        : rightEngine.current?.uniforms?.thetaScale;
+    //   const calculated = computeThetaScale(phys);
+    //   const actualTheta = source === 'fr'
+    //     ? leftEngine.current?.uniforms?.thetaScale
+    //     : rightEngine.current?.uniforms?.thetaScale;
 
-      console.log(`[${label}] Theta calculation debug:`, {
-        gammaGeo,
-        qSpoil,
-        gammaVdB,
-        dutyFR,
-        viewAvg: true,
-        calculated,
-        actualTheta
-      });
+    //   console.log(`[${label}] Theta calculation debug:`, {
+    //     gammaGeo,
+    //     qSpoil,
+    //     gammaVdB,
+    //     dutyFR,
+    //     viewAvg: true,
+    //     calculated,
+    //     actualTheta
+    //   });
 
-      return calculated;
-    };
+    //   return calculated;
+    // };
 
     // Build REAL payload (Ford–Roman parity)
-    const realThetaScale = computeThetaWithDebug(realPhys, 'fr', 'REAL');
+    const realThetaScale = computeThetaScale(realPhys);
     const realPayload = {
       ...baseShared,
       physicsParityMode: true,
@@ -1432,7 +1426,7 @@ export default function WarpRenderInspector(props: {
     };
 
     // Build SHOW payload (UI boosted)
-    const showThetaScale = computeThetaWithDebug(showPhys, 'ui', 'SHOW');
+    const showThetaScale = computeThetaScale(showPhys);
     const showPayload = {
       ...baseShared,
       physicsParityMode: false,

@@ -49,7 +49,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
     gTarget: liveShift?.gTarget ?? propShift?.gTarget ?? fallbackGTarget,
     R_geom: liveShift?.R_geom ?? propShift?.R_geom ?? fallbackRGeom,
     epsilonTilt: liveShift?.epsilonTilt ?? propShift?.epsilonTilt ?? fallbackEpsilonTilt,
-    betaTiltVec: (liveShift?.betaTiltVec ?? propShift?.betaTiltVec ?? fallbackBetaTiltVec) as [number, number, number],
+    betaTiltVec: liveShift?.betaTiltVec ?? propShift?.betaTiltVec ?? fallbackBetaTiltVec,
     gEff_check: liveShift?.gEff_check ?? propShift?.gEff_check ?? fallbackGEffCheck,
   };
   

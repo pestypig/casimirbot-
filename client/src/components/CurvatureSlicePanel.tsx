@@ -29,38 +29,38 @@ export default function CurvatureSlicePanel() {
   const hull = useMemo(() => {
     const H = (hullMetrics && hullMetrics.hull) || null;
     return H
-      ? ([H.a ?? H.Lx_m/2, H.b ?? H.Ly_m/2, H.c ?? H.Lz_m/2] as [number, number, number])
-      : ([503.5, 132.0, 86.5] as [number, number, number]);
+      ? [H.a ?? H.Lx_m/2, H.b ?? H.Ly_m/2, H.c ?? H.Lz_m/2]
+      : [503.5, 132.0, 86.5];
   }, [hullMetrics]);
 
   // Concurrent/total sectors (for FR fallback). Total = paper 400.
   const totalSectors = 400;
   const concurrentSectors = useMemo(() => {
     // Prefer explicit "how many are ON right now?"
-    const liveFromMetrics  = Number.isFinite((live as any)?.activeSectors) ? Number((live as any)?.activeSectors) : undefined;
-    const liveFromPipeline = Number.isFinite((live as any)?.sectorsConcurrent) ? Number((live as any)?.sectorsConcurrent) : undefined;
+    const liveFromMetrics  = Number.isFinite(live?.activeSectors) ? Number(live?.activeSectors) : undefined;
+    const liveFromPipeline = Number.isFinite(live?.sectorsConcurrent) ? Number(live?.sectorsConcurrent) : undefined;
 
     const S_total = Math.max(1, Number(totalSectors) || 400);
     // Our strobe energizes exactly ONE sector at a time
     const S_live = Math.max(1, Math.min(S_total, liveFromMetrics ?? liveFromPipeline ?? 1));
     return S_live; // ← will be 1 in Hover/Cruise; clamp prevents 400/400
-  }, [(live as any)?.activeSectors, (live as any)?.sectorsConcurrent, totalSectors]);
+  }, [live?.activeSectors, live?.sectorsConcurrent, totalSectors]);
   const concurrent = concurrentSectors;
 
   // REAL ship-wide FR duty (server > computed fallback)
-  const mode = String((live as any)?.currentMode || "hover").toLowerCase();
+  const mode = String(live?.currentMode || "hover").toLowerCase();
   const isStandby = mode === "standby";
   const dutyFR = useMemo(() => {
     if (isStandby) return 0;
     const frFromPipeline =
-      (live as any)?.dutyEffectiveFR ??
-      (live as any)?.dutyShip ??
-      (live as any)?.dutyEff;
+      live?.dutyEffectiveFR ??
+      live?.dutyShip ??
+      live?.dutyEff;
 
     if (Number.isFinite(frFromPipeline)) return Math.max(0, Math.min(1, Number(frFromPipeline)));
 
-    const burst = Number((live as any)?.burst_ms);
-    const dwell = Number((live as any)?.dwell_ms);
+    const burst = Number(live?.burst_ms);
+    const dwell = Number(live?.dwell_ms);
     const dutyLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
       ? burst / dwell : 0.01;
 

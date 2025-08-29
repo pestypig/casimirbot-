@@ -284,9 +284,9 @@ type ModeKey = "hover" | "cruise" | "emergency" | "standby";
 
 // Safe unit formatting for either live MW or config W
 const formatPower = (P_MW?: number, P_W?: number) => {
-  if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
-  if (Number.isFinite(P_W as number)) {
-    const w = P_W as number;
+  if (Number.isFinite(Number(P_MW))) return `${Number(P_MW).toFixed(1)} MW`;
+  if (Number.isFinite(Number(P_W))) {
+    const w = Number(P_W);
     if (w >= 1e6) return `${(w / 1e6).toFixed(1)} MW`;
     if (w >= 1e3) return `${(w / 1e3).toFixed(1)} kW`;
     return `${w.toFixed(1)} W`;
@@ -314,6 +314,8 @@ type BaseInputs = {
   gammaGeo: number;           // γ_geo
   qSpoilingFactor: number;    // ΔA/A
   gammaVanDenBroeck: number;  // γ_VdB
+  gammaVanDenBroeck_mass?: number; // mass-specific γ_VdB
+  gammaVanDenBroeck_vis?: number;  // visual-specific γ_VdB
 
   colorMode?: 'theta'|'shear'|'solid';
   lockFraming?: boolean;
@@ -342,7 +344,7 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
 function buildCommonUniforms(base: BaseInputs) {
   return {
     // geometry
-    hullAxes: [base.hull.a, base.hull.b, base.hull.c] as [number,number,number],
+    hullAxes: [base.hull.a, base.hull.b, base.hull.c],
     wallWidth_m: base.wallWidth_m ?? 6.0,
     driveDir: base.driveDir ?? [1,0,0],
     vShip: base.vShip ?? 1.0,
@@ -505,11 +507,11 @@ const frameFromHull = (hull?: Partial<Hull>, gridSpan?: number) => {
   const axesScene: [number,number,number] = [a*s, b*s, c*s];
 
   const span = Number.isFinite(gridSpan)
-    ? (gridSpan as number)
+    ? Number(gridSpan)
     : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
   return {
-    hullAxes: [a,b,c] as [number,number,number],
+    hullAxes: [a,b,c],
     axesScene,
     axesClip: axesScene,                        // seed clip to avoid null paths
     gridSpan: span,
@@ -614,7 +616,7 @@ const applyShow = (
   const axesOK = shared?.axesScene?.every?.((n:any)=>Number.isFinite(n)&&Math.abs(n)>0);
   if (!axesOK) {
     console.warn('[SHOW] invalid axesScene, fixing');
-    shared = { ...shared, axesScene: [1, 0.26, 0.17] as any };
+    shared = { ...shared, axesScene: [1, 0.26, 0.17] };
   }
 
   const camZ = safeCamZ(compactCameraZ(canvas, shared.axesScene));
@@ -1052,13 +1054,13 @@ export default function WarpBubbleCompare({
       await firstCorrectFrame({
         engine: leftEngine.current,
         canvas: leftRef.current!,
-        sharedAxesScene: shared.axesScene as [number,number,number],
+        sharedAxesScene: shared.axesScene || [1,1,1],
         pane: 'REAL'
       });
       await firstCorrectFrame({
         engine: rightEngine.current,
         canvas: rightRef.current!,
-        sharedAxesScene: shared.axesScene as [number,number,number],
+        sharedAxesScene: shared.axesScene || [1,1,1],
         pane: 'SHOW'
       });
 
@@ -1170,9 +1172,9 @@ export default function WarpBubbleCompare({
     const wallWidth_m = Number(parameters?.wallWidth_m ?? 6.0);
     const wallWidth_rho = Math.max(1e-6, wallWidth_m / Math.max(1e-6, aEff));
     // compact camera exactly to hull scale
-    const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene as [number,number,number]));
+    const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene || [1,1,1]));
     // make the grid span just outside the hull so the ridge is readable
-    const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene as [number,number,number])) * 1.10);
+    const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene || [1,1,1])) * 1.10);
     // -------------------------------------- //
 
     // Build physics payload for REAL engine with enforced parity

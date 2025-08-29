@@ -47,7 +47,7 @@ export function useResonatorAutoDuty({
         }
         onAfterRun?.();
       } catch (e) {
-        onLog?.(`[SCHED:ERR] ${(e as Error)?.message ?? 'update failed'}`);
+        onLog?.(`[SCHED:ERR] ${e instanceof Error ? e.message : 'update failed'}`);
       }
     });
 

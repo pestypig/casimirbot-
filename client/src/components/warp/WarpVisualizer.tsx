@@ -77,7 +77,7 @@ const safeFix = (v: any, d = 0, digits = 1) => isFiniteNum(v) ? v.toFixed(digits
 const safeExp = (v: any, digits = 1, fallback = '—') => isFiniteNum(v) ? v.toExponential(digits) : fallback;
 const num = (v: any, d = 0) => (isFiniteNum(v) ? v : d);
 const vec3 = (v: any, d: [number, number, number] = [0, -1, 0]) =>
-  Array.isArray(v) && v.length === 3 && v.every(isFiniteNum) ? (v as [number, number, number]) : d;
+  Array.isArray(v) && v.length === 3 && v.every(isFiniteNum) ? ([+v[0], +v[1], +v[2]]) : d;
 
 // Unified physics tilt calculation
 const getUnifiedPhysicsTilt = (parameters: any, mode: string) => 
@@ -302,9 +302,9 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
     // default missing γ_VdB(vis) → 1.35e5
     const gammaVdB_vis = Number.isFinite(parameters.gammaVanDenbroeck_vis) 
-      ? Math.max(1, parameters.gammaVanDenbroeck_vis)
+      ? Math.max(1, Number(parameters.gammaVanDenbroeck_vis))
       : (Number.isFinite(parameters.gammaVanDenBroeck) 
-         ? Math.max(1, parameters.gammaVanDenBroeck)
+         ? Math.max(1, Number(parameters.gammaVanDenBroeck))
          : 1.35e5); // visual seed default
 
     const uniforms = {
@@ -324,7 +324,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       // Seed framing so engine has non-null axes in first frame
       axesScene: axesSceneSeed,
       axesClip:  axesSceneSeed,
-      hullAxes:  [a,b,c] as [number,number,number],
+      hullAxes:  [a,b,c],
       gridSpan:  parameters.gridSpan ?? spanSeed,
 
       wallWidth: wallNorm,
@@ -502,7 +502,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               try {
                 const u = engineRef.current?.uniforms;
                 if (u && Array.isArray(u.axesClip) && canvasRef.current) {
-                  const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
+                  const cam = computeCameraZ(u.axesClip || [1,1,1], canvasRef.current);
                   gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
                 }
               } catch {}
@@ -518,7 +518,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? Number(split) : Math.floor(s/2))),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -572,7 +572,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
               const s = Math.max(1, Math.floor(sectorCount||1));
               gatedUpdateUniforms(engineRef.current, {
                 sectors: s,
-                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? (split as number|0) : Math.floor(s/2))),
+                split: Math.max(0, Math.min(s-1, Number.isFinite(split)? Number(split) : Math.floor(s/2))),
                 sectorIdx: Math.max(0, currentSector % s)
               }, 'client');
               engineRef.current.requestRewarp?.();
@@ -718,7 +718,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         // Framing
         axesScene: axesSceneNow,
         axesClip:  axesSceneNow,
-        hullAxes:  [ah,bh,ch] as [number,number,number],
+        hullAxes:  [ah,bh,ch],
         gridSpan:  parameters.gridSpan ?? spanNow,
         ...(isFiniteNum(camZnow) ? { cameraZ: camZnow, lockFraming: true } : {}),
 
@@ -802,7 +802,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
       gatedUpdateUniforms(engineRef.current, {
         epsilonTilt: Number(epsilonTiltResolved || 0),
-        betaTiltVec: betaTiltVec as [number, number, number],
+        betaTiltVec: betaTiltVec,
         tiltGain: tiltGainResolved,
 
         vizGain: parity ? 1 : (
@@ -846,7 +846,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         try {
           const u = engineRef.current.uniforms || {};
           if (Array.isArray(u.axesClip) && u.axesClip.length === 3) {
-            const cam = computeCameraZ(u.axesClip as [number,number,number], canvasRef.current);
+            const cam = computeCameraZ(u.axesClip || [1,1,1], canvasRef.current);
             gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
           }
         } catch {}
@@ -1199,7 +1199,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
                 const modeTiltDefaults: Record<string, number> = { emergency: 0.035, hover: 0.020, cruise: 0.012, standby: 0.000 };
                 const epsilonTilt = hasGoodPanelEps ? epsFromPanel : (modeTiltDefaults[mode] ?? 0.0);
                 const betaTiltVec = Array.isArray(parameters.shift?.betaTiltVec || parameters.betaTiltVec)
-                  ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec) as [number, number, number]
+                  ? (parameters.shift?.betaTiltVec || parameters.betaTiltVec || [0,-1,0])
                   : [0, -1, 0];
 
                 return [

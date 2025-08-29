@@ -82,7 +82,7 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       hullAxes: [hull.a, hull.b, hull.c],
       wallWidth: parameters?.wallWidth ?? 0.06,
       epsilonTilt: parameters?.epsilonTilt ?? 0.0,
-      betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
+      betaTiltVec: parameters?.betaTiltVec || [0,-1,0],
       // Mode coupling
       mode: parameters?.mode || 'hover',
       dutyCycle: parameters?.dutyCycle ?? 0.14,
@@ -112,7 +112,7 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       hullAxes: [hull.a, hull.b, hull.c],
       wallWidth: parameters?.wallWidth ?? 0.06,
       epsilonTilt: parameters?.epsilonTilt ?? 0.0,
-      betaTiltVec: (parameters?.betaTiltVec || [0,-1,0]) as [number,number,number],
+      betaTiltVec: parameters?.betaTiltVec || [0,-1,0],
       // Mode coupling
       mode: parameters?.mode || 'hover',
       dutyCycle: parameters?.dutyCycle ?? 0.14,

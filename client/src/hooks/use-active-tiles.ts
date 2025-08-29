@@ -29,7 +29,7 @@ export function useActiveTiles(opts: {
       !Number.isFinite(lc?.phase) ||
       !Number.isFinite(lc?.burst_ms) ||
       !Number.isFinite(lc?.dwell_ms) ||
-      (Number.isFinite(lc?.dwell_ms) && (lc!.dwell_ms as number) <= 0);
+      (Number.isFinite(lc?.dwell_ms) && Number(lc!.dwell_ms) <= 0);
     if (lc && bad) {
       console.warn("[HELIX] LC loop missing/invalid timing — 'now' tiles will be flat", {
         phase: lc?.phase,
@@ -66,9 +66,9 @@ export function useActiveTiles(opts: {
       !lc ||
       !Number.isFinite(lc.burst_ms) ||
       !Number.isFinite(lc.dwell_ms) ||
-      (lc.dwell_ms as number) <= 0
+      Number(lc.dwell_ms) <= 0
     ) return 0.01;
-    return Math.max(0, Math.min(1, (lc.burst_ms as number) / (lc.dwell_ms as number)));
+    return Math.max(0, Math.min(1, Number(lc.burst_ms) / Number(lc.dwell_ms)));
   }, [lc?.burst_ms, lc?.dwell_ms]);
 
   // instantaneous gate
@@ -78,11 +78,11 @@ export function useActiveTiles(opts: {
       !Number.isFinite(lc.phase) ||
       !Number.isFinite(lc.burst_ms) ||
       !Number.isFinite(lc.dwell_ms) ||
-      (lc.dwell_ms as number) <= 0
+      Number(lc.dwell_ms) <= 0
     ) return false;
-    const dwell = lc.dwell_ms as number;
-    const t = (lc.phase as number) % dwell;
-    return t < (lc.burst_ms as number);
+    const dwell = Number(lc.dwell_ms);
+    const t = Number(lc.phase) % dwell;
+    return t < Number(lc.burst_ms);
   }, [lc?.phase, lc?.burst_ms, lc?.dwell_ms]);
 
   const instBase = (tilesPerSector ?? Math.floor(T / S_total));
@@ -99,7 +99,7 @@ export function useActiveTiles(opts: {
   const badStreak = useRef(0);
   useEffect(() => {
     if (!Number.isFinite(serverActiveTiles) || !Number.isFinite(avgTiles)) return;
-    const srv = serverActiveTiles as number, drv = avgTiles as number;
+    const srv = Number(serverActiveTiles), drv = Number(avgTiles);
     const rel = Math.abs(srv - drv) / Math.max(1, drv);
     badStreak.current = rel > 0.05 ? badStreak.current + 1 : 0;
     if (badStreak.current >= 3) {

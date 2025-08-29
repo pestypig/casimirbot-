@@ -315,7 +315,7 @@ export function gatedUpdateUniforms(
     if ('betaTiltVec' in u && Array.isArray(u.betaTiltVec)) {
       const [x=0,y=0,z=0] = u.betaTiltVec.map(Number);
       const n = Math.hypot(x,y,z) || 1;
-      u[CANON.betaTiltVec] = [x/n, y/n, z/n] as [number,number,number];
+      u[CANON.betaTiltVec] = [x/n, y/n, z/n];
     }
 
     // strip legacy keys so we never double-write engine params

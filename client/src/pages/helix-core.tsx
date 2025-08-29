@@ -681,7 +681,7 @@ export default function HelixCore() {
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
   // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
-  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number];
+  const betaTiltVecRaw = systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0];
   const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
   const betaTiltVecN: [number, number, number] = [
     betaTiltVecRaw[0] / betaNorm,
@@ -1100,7 +1100,7 @@ export default function HelixCore() {
                         },
                   wallWidth: 0.06,
                   epsilonTilt: systemMetrics?.shiftVector?.epsilonTilt ?? epsilonTilt,
-                  betaTiltVec: (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]) as [number, number, number],
+                  betaTiltVec: systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0],
                   // Mode coupling from live pipeline data
                   mode: effectiveMode,
                   dutyCycle: dutyUI_safe,
@@ -1993,7 +1993,7 @@ export default function HelixCore() {
                       Emergency: "Breathe once. Choose the useful distance.",
                       Standby: "Meet change with correct posture. The rest aligns.",
                     } as const;
-                    publish("luma:whisper", { text: (whispers as any)[mode] || "Configuration updated." });
+                    publish("luma:whisper", { text: whispers[mode] || "Configuration updated." });
                   }
                 }}
                 setDuty={(duty) => {
