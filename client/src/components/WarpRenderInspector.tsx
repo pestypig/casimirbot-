@@ -97,7 +97,7 @@ async function firstCorrectFrame({
 
 // Helper functions needed by firstCorrectFrame
 function safeCamZ(z: number): number {
-  return Number.isFinite(z) ? Math.max(-10, Math.min(-0.5, z)) : -2.0;
+  return Number.isFinite(z) ? Math.max(-10, Math.min(-0.1, z)) : -2.0;
 }
 
 function calculateCameraZ(canvas: HTMLCanvasElement, axes: [number,number,number]): number {
@@ -518,7 +518,7 @@ function PaneOverlay(props:{
               <div><code>V_shell ≈ S · w_m</code> → <b>{Number.isFinite(s.Vshell)? fmtSI(s.Vshell,'m³'):'—'}</b></div>
             </div>
             <div>
-              <div className="opacity-80">Curvature (York-time proxy)</div>
+              <div className="opacity-80">Curvature (York-time proxy</div>
               <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
               <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.theta)? s.theta.toExponential(2):'—'}</b></div>
             </div>
@@ -705,167 +705,29 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
-  // Hard-lock parity & block late thetaScale writers at the engine edge
+  // Minimal parity lock function to prevent duplicate shader rebuilds
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
-
-    // Store the forced parity settings for this pane
-    const forcedParity = (pane === 'REAL');
-    const forcedRidge = (pane === 'REAL') ? 0 : 1;
-
-    console.log(`[${pane}] Locking pane with parity=${forcedParity}, ridge=${forcedRidge}`);
-
-    // IMMEDIATE enforcement - set uniforms directly first
-    if (engine.uniforms) {
-      engine.uniforms.physicsParityMode = forcedParity;
-      engine.uniforms.parityMode = forcedParity;
-      engine.uniforms.ridgeMode = forcedRidge;
-      console.log(`[${pane}] Direct uniform enforcement applied`);
-    }
-
-    // Intercept ALL uniform update methods to enforce parity
-    const originalUpdateUniforms = engine.updateUniforms?.bind(engine);
-    const originalApplyUniforms = engine.applyUniforms?.bind(engine);
-    const originalSetUniforms = engine.setUniforms?.bind(engine);
-
-    // Create the enforcement wrapper
-    const enforceParityWrapper = (patch: any, methodName: string) => {
-      const safe = { ...(patch || {}) };
-
-      // Only block θ writes on REAL pane; SHOW may receive explicit θ
-      if (pane === 'REAL' && 'thetaScale' in safe) {
-        console.warn(`[${pane}] Blocking direct thetaScale write via ${methodName}`);
-        delete safe.thetaScale;          // SHOW may receive explicit θ
-      }
-
-      // ABSOLUTE FORCE parity mode settings - these cannot be overridden
-      safe.physicsParityMode = forcedParity;
-      safe.parityMode = forcedParity;
-      safe.ridgeMode = forcedRidge;
-
-      console.log(`[${pane}] ${methodName} - enforcing parity=${forcedParity}, ridge=${forcedRidge}`);
-
-      return safe;
-    };
-
-    // Override all uniform-setting methods
-    if (originalUpdateUniforms) {
-      engine.updateUniforms = (patch: any) => {
-        const enforced = enforceParityWrapper(patch, 'updateUniforms');
-        const result = originalUpdateUniforms(enforced);
-
-        // IMMEDIATE post-enforcement
-        if (engine.uniforms) {
-          engine.uniforms.physicsParityMode = forcedParity;
-          engine.uniforms.parityMode = forcedParity;
-          engine.uniforms.ridgeMode = forcedRidge;
-        }
-
-        // Double-check enforcement worked
-        queueMicrotask(() => {
-          if (engine.uniforms) {
-            const actualParity = engine.uniforms.physicsParityMode;
-            const actualRidge = engine.uniforms.ridgeMode;
-
-            console.log(`[${pane}] Post-updateUniforms check: parity=${actualParity} (should be ${forcedParity}), ridge=${actualRidge} (should be ${forcedRidge})`);
-
-            if (actualParity !== forcedParity || actualRidge !== forcedRidge) {
-              console.error(`[${pane}] PARITY BREACH DETECTED - forcing correction`);
-              engine.uniforms.physicsParityMode = forcedParity;
-              engine.uniforms.parityMode = forcedParity;
-              engine.uniforms.ridgeMode = forcedRidge;
-            }
-          }
-        });
-
-        return result;
-      };
-    }
-
-    // Also override other potential uniform setters with immediate enforcement
-    if (originalApplyUniforms) {
-      engine.applyUniforms = (patch: any) => {
-        const enforced = enforceParityWrapper(patch, 'applyUniforms');
-        const result = originalApplyUniforms(enforced);
-        // IMMEDIATE enforcement
-        if (engine.uniforms) {
-          engine.uniforms.physicsParityMode = forcedParity;
-          engine.uniforms.parityMode = forcedParity;
-          engine.uniforms.ridgeMode = forcedRidge;
-        }
-        return result;
-      };
-    }
-
-    if (originalSetUniforms) {
-      engine.setUniforms = (patch: any) => {
-        const enforced = enforceParityWrapper(patch, 'setUniforms');
-        const result = originalSetUniforms(enforced);
-        // IMMEDIATE enforcement
-        if (engine.uniforms) {
-          engine.uniforms.physicsParityMode = forcedParity;
-          engine.uniforms.parityMode = forcedParity;
-          engine.uniforms.ridgeMode = forcedRidge;
-        }
-        return result;
-      };
-    }
-
-    // Mark as locked
     engine.__locked = true;
-    engine.__forcedParity = forcedParity;
-    engine.__forcedRidge = forcedRidge;
 
-    // Set up continuous enforcement via RAF with stronger intervention
-    let rafId: number;
-    const continuousEnforcement = () => {
-      if (engine._destroyed || !engine.__locked) return;
+    // enforce at uniform *values* only – no source rebuilds:
+    const forcedParity = (pane === 'REAL');
+    const forcedRidge  = (pane === 'REAL') ? 0 : 1;
 
-      if (engine.uniforms) {
-        const actualParity = engine.uniforms.physicsParityMode;
-        const actualRidge = engine.uniforms.ridgeMode;
-
-        if (actualParity !== forcedParity || actualRidge !== forcedRidge) {
-          console.warn(`[${pane}] RAF enforcement: correcting parity=${actualParity}->${forcedParity}, ridge=${actualRidge}->${forcedRidge}`);
-          engine.uniforms.physicsParityMode = forcedParity;
-          engine.uniforms.parityMode = forcedParity;
-          engine.uniforms.ridgeMode = forcedRidge;
-
-          // Force a redraw to ensure changes are applied
-          engine.forceRedraw?.();
-        }
-      }
-
-      rafId = requestAnimationFrame(continuousEnforcement);
-    };
-
-    // Start continuous enforcement
-    rafId = requestAnimationFrame(continuousEnforcement);
-
-    // Store cleanup function
-    engine.__cleanupEnforcement = () => {
-      if (rafId) cancelAnimationFrame(rafId);
-    };
-
-    // Immediately set the parity mode multiple ways to ensure it's applied
-    const initialParity = {
+    const enforce = (patch: any = {}) => ({
+      ...patch,
       physicsParityMode: forcedParity,
-      parityMode: forcedParity,
+      uPhysicsParity: forcedParity,
+      uRidgeMode: forcedRidge,
       ridgeMode: forcedRidge
-    };
+    });
 
-    console.log(`[${pane}] Setting initial parity:`, initialParity);
+    const origUpdate = engine.updateUniforms?.bind(engine);
+    engine.updateUniforms = (p: any) => origUpdate?.(enforce(p));
+    // also set once immediately
+    origUpdate?.(enforce());
 
-    // Apply via all available methods
-    if (originalUpdateUniforms) {
-      originalUpdateUniforms(initialParity);
-    }
-    if (engine.uniforms) {
-      Object.assign(engine.uniforms, initialParity);
-    }
-
-    // Force immediate redraw
-    engine.forceRedraw?.();
+    console.log(`[${pane}] Parity locked: parity=${forcedParity}, ridge=${forcedRidge}`);
   }
 
   // Initialize engines with enhanced error handling and validation
@@ -987,6 +849,7 @@ export default function WarpRenderInspector(props: {
           console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
 
           leftEngine.current?.setVisible?.(true);
+          // Apply parity lock immediately after engine creation
           lockPane(leftEngine.current, 'REAL');
 
           console.log("REAL engine fully initialized");
@@ -1043,6 +906,7 @@ export default function WarpRenderInspector(props: {
           console.log("SHOW engine parity after init:", rightEngine.current.uniforms?.physicsParityMode);
 
           rightEngine.current?.setVisible?.(true);
+          // Apply parity lock immediately after engine creation
           lockPane(rightEngine.current, 'SHOW');
 
           console.log("SHOW engine fully initialized");
