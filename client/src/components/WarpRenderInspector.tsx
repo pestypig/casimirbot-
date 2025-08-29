@@ -650,17 +650,28 @@ export default function WarpRenderInspector(props: {
 
   // Theta scale calculation helper
   const computeThetaScale = (phys: any, source: 'fr' | 'ui') => {
-    const gammaGeo = phys.gammaGeo || phys.γ_geo || 26;
-    const qSpoil = phys.qSpoilingFactor || phys.q || 1;
-    const gammaVdB = phys.gammaVanDenBroeck || phys.gammaVdB || phys.γ_VdB || 1;
-    
-    // Use different duty cycles based on source
-    const duty = source === 'fr' ? (live?.dutyCycle ?? 0.14) : 0.01;
-    
-    return Math.pow(Number(gammaGeo)||0, 3)
-         * Number(qSpoil)||1
-         * Number(gammaVdB)||1
-         * Math.sqrt(Math.max(1e-12, duty));
+    const g = +(
+      phys.gammaGeo ??
+      phys.γ_geo ??
+      26
+    ) || 26;
+
+    const q = +(
+      phys.qSpoilingFactor ??
+      phys.q
+    ) || 1;
+
+    const v = +(
+      phys.gammaVanDenBroeck ??
+      phys.gammaVdB ??
+      phys.γ_VdB
+    ) || 1;
+
+    // duty selection (ensure it's finite and in [0,1])
+    const dutyRaw = source === 'fr' ? (live?.dutyCycle ?? 0.14) : 0.01;
+    const duty = Math.max(1e-12, Math.min(1, +dutyRaw || 0.01));
+
+    return Math.pow(g, 3) * q * v * Math.sqrt(duty);
   };
 
 
