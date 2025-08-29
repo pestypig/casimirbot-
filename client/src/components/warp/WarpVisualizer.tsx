@@ -208,6 +208,8 @@ interface WarpVisualizerProps {
     shift?: ShiftParams;
     // 🔬 Physics Parity Mode for debugging baseline
     physicsParityMode?: boolean;
+    // NEW: Visual scaling factor for gammaVanDenBroeck
+    gammaVanDenbroeck_vis?: number;
   };
 }
 
@@ -298,8 +300,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     const axesSceneSeed: [number,number,number] = [a*s, b*s, c*s];
     const spanSeed = Math.max(VIS_LOCAL.minSpan, Math.max(...axesSceneSeed) * VIS_LOCAL.spanPaddingDesktop);
 
-    const gammaVdBDefault = num(parameters.gammaVanDenBroeck, 1.4e5);
-    const gammaVdBVis = num(parameters.gammaVanDenBroeck, 1.35e5); // Visual seed default
+    // default missing γ_VdB(vis) → 1.35e5
+    const gammaVdB_vis = Number.isFinite(parameters.gammaVanDenbroeck_vis) 
+      ? Math.max(1, parameters.gammaVanDenbroeck_vis)
+      : (Number.isFinite(parameters.gammaVanDenbroeck) 
+         ? Math.max(1, parameters.gammaVanDenbroeck)
+         : 1.35e5); // visual seed default
 
     const uniforms = {
       // camera/exposure defaults moved into single bootstrap
@@ -313,7 +319,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       gammaGeo,
       Qburst: qCavity,
       deltaAOverA: qSpoil,
-      gammaVdB: gammaVdBDefault,           // unified default
+      gammaVdB: gammaVdB_vis,           // use visual seed
 
       // Seed framing so engine has non-null axes in first frame
       axesScene: axesSceneSeed,
@@ -378,12 +384,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sectors: sectorsResolved,           // viz strobing
         gammaGeo,
         qSpoilingFactor: qSpoil,
-        gammaVdB: gammaVdBVis,         // use visual seed
+        gammaVdB: gammaVdB_vis,         // use visual seed
         dutyEffectiveFR: dFRShip,           // 🔑 √d_FR source
       }),
       sectorCount: sectorCountResolved,
       sectors: sectorsResolved,
-      dutyEffectiveFR: dFRShip,             // expose for diagnostics
+      dutyEffectiveFR: dFRShip,           // expose for diagnostics
       viewAvg: true,                        // ensure √d_FR is applied
     }, 'client');
 
@@ -391,7 +397,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
     (window as any).__warpEcho = {
       src: 'visualizer',
       v: Date.now(),
-      terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: gammaVdBDefault, d_FR: dFRShip }
+      terms: { γ_geo: gammaGeo, q: qSpoil, γ_VdB: gammaVdB_vis, d_FR: dFRShip }
     };
 
     // Apply viz overrides if provided
@@ -746,7 +752,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenBroeck, 1.35e5), // use visual seed
+          gammaVdB: num(parameters.gammaVanDenBroeck_vis, 1.35e5), // use visual seed
           dutyEffectiveFR: dFRShip,
         }),
         sectorCount: sectorCountResolved,
@@ -1145,7 +1151,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           </div>
         </div>
 
-        {/* Real-time β Calculations Panel - Moved outside visualization canvas */}
+        {/* Real-Time β Calculations Panel - Moved outside visualization canvas */}
         <div className="mt-4 bg-slate-800/50 border border-cyan-500/20 rounded-lg p-4">
           <h3 className="text-cyan-400 font-mono text-sm mb-3">Real-Time Natário β Field Calculations</h3>
 
