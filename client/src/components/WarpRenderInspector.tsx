@@ -468,7 +468,8 @@ function PaneOverlay(props:{
       const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
       // optional: keep your paper clamp, but show it as "θ_paper"
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
-      const thetaForMass = Number.isFinite(thetaPhys) ? Math.min(thetaPhys, 1e10) : thetaUniform;
+      const clamped = Number.isFinite(thetaPhys) && thetaPhys > 1e10;
+      const thetaForMass = clamped ? 1e10 : thetaPhys;
       
       const mProxy = massProxy(thetaForMass, Vshell, flavor === 'REAL' ? viewFraction : 1.0);
 
@@ -489,7 +490,8 @@ function PaneOverlay(props:{
         thetaUniform, thetaPhys, thetaPaper,
         mStar: mProxy, frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
-        mDisplayText // Add display text here
+        mDisplayText, // Add display text here
+        clamped
       });
       raf = requestAnimationFrame(tick);
     };
@@ -519,7 +521,7 @@ function PaneOverlay(props:{
           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
           {/* Update mass display to use calibrated or arbitrary units properly */}
-          <div>exotic mass* : <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b></div>
+          <div>exotic mass* : <b>{s.mDisplayText || (Number.isFinite(s.mStar)? s.mStar.toExponential(3)+'arb':'—')}</b>{s.clamped && <span className="text-[10px] text-yellow-400 ml-1">(clamped)</span>}</div>
           <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
           <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
         </div>
