@@ -314,7 +314,7 @@ type BaseInputs = {
 const clampValue = (x: number) => Math.max(0, Math.min(1, x));
 
 function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
-  // canonical: θ-scale = γ^3 · (ΔA/A) · γ_VdB · √(duty / sectors_avg)
+  // canonical: θ-scale = γ^3 · (ΔA/A) · γ_VdB · √(duty)
   const g3   = Math.pow(Math.max(1, base.gammaGeo), 3);
   const dAA  = Math.max(1e-12, base.qSpoilingFactor);
   // pick mass vs visual pocket factors explicitly
@@ -326,8 +326,7 @@ function buildThetaScale(base: BaseInputs, flavor: 'fr'|'ui') {
     ? clampValue(base.dutyEffectiveFR)                     // ship-averaged FR duty
     : clampValue(base.dutyCycle / Math.max(1, base.sectorCount)); // UI duty averaged over all sectors
 
-  const sectorsAvg = Math.max(1, base.sectorCount);
-  const dutyTerm = Math.max(1e-12, duty);    // duty ; sectors already averaged in "duty" above
+  const dutyTerm = Math.sqrt(Math.max(1e-12, duty));    // ✓ Apply square root per published formula
 
   return g3 * dAA * gVdB * dutyTerm;
 }
