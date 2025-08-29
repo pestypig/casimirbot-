@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState, startTransition} from "react";
-import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointPanel";
+import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW, type WarpUniforms } from "@/lib/warp-uniforms";
