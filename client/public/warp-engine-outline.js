@@ -63,10 +63,26 @@
     this._resize = this._resize.bind(this);
     window.addEventListener('resize', this._resize);
     this._resize();
+    this.debugTag = 'OutlineEngine';
   }
 
+  OutlineEngine.prototype.setDebugTag = function (tag) {
+        this.debugTag = tag || 'OutlineEngine';
+    }
+
   OutlineEngine.prototype.destroy = function () {
-    window.removeEventListener('resize', this._resize);
+    if (this._raf) {
+      cancelAnimationFrame(this._raf);
+      this._raf = null;
+    }
+    if (this.gl && this.gl.getExtension) {
+      try {
+        const loseContext = this.gl.getExtension('WEBGL_lose_context');
+        if (loseContext) loseContext.loseContext();
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+    }
   };
 
   OutlineEngine.prototype.bootstrap = function (params) {

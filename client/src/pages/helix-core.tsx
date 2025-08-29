@@ -1084,6 +1084,7 @@ export default function HelixCore() {
             </CardHeader>
             <CardContent>
               <ShellOutlineVisualizer
+                debugTag="HelixCore/ShellOutlineVisualizer"
                 parameters={{
                   hull:
                     hullMetrics && hullMetrics.hull
@@ -1154,6 +1155,7 @@ export default function HelixCore() {
               <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
                 <WarpRenderInspector
                   key={`inspector-${modeNonce}`}
+                  debugTag="HelixCore/WarpRenderInspector"
                   parityPhys={realPhys}
                   showPhys={showPhys}
                   baseShared={baseShared}

@@ -54,8 +54,10 @@ class WarpEngine {
         }
         window.__WARP_ENGINES.add(canvas);
 
-        this._destroyed = false;
         this.canvas = canvas;
+        this.isLoaded = false;
+        this._destroyed = false;
+        this.debugTag = 'WarpEngine';
         canvas.__warpEngine = this;
         // Create WebGL context with comprehensive error handling
         let gl = null;
@@ -327,6 +329,29 @@ class WarpEngine {
         // Start render loop
         console.log('[WarpEngine] Starting render loop...');
         this._renderLoop();
+    }
+
+    setDebugTag(tag) {
+        this.debugTag = tag || 'WarpEngine';
+    }
+
+    destroy() {
+        this._destroyed = true;
+        if (this._raf) {
+            cancelAnimationFrame(this._raf);
+            this._raf = null;
+        }
+        if (this.gl && this.gl.getExtension) {
+            // Clean up WebGL resources
+            try {
+                const loseContext = this.gl.getExtension('WEBGL_lose_context');
+                if (loseContext) {
+                    loseContext.loseContext();
+                }
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        }
     }
 
     _recreateGL() {
@@ -733,9 +758,11 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     _onProgramLinked(program) {
         const gl = this.gl;
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            console.error('Shader program link error:', gl.getProgramInfoLog(program));
-            gl.deleteProgram(program);
-            return false;
+            const error = gl.getProgramInfoLog(program);
+            console.error(`[${this.debugTag}] Program linking failed:`, error);
+            throw new Error(`[${this.debugTag}] Program linking failed: ${error}`);
+        } else {
+            console.log(`[${this.debugTag}] Program linked successfully`);
         }
         // cache locations & mark ready
         this._cacheGridLocations(program);
@@ -794,7 +821,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (!this._uniformAuditOnce) {
             this._uniformAuditOnce = true;
             for (const [k,v] of Object.entries(this.gridUniforms)) {
-                if (v == null) console.warn('[WarpEngine] Missing uniform location:', k);
+                if (v == null) console.warn(`[${this.debugTag}] Missing uniform location:`, k);
             }
         }
         this.gridAttribs = {
@@ -904,8 +931,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     getShaderHealth() {
         const gl = this.gl;
         const prog = this.gridProgram;
-        if (!gl) return { ok:false, reason:'no GL', status:this.loadingState, profile:this.getShaderProfile() };
-        if (!prog) return { ok:false, reason:'no program', status:this.loadingState, profile:this.getShaderProfile() };
+        if (!gl) return {ok:false, reason:'no GL', status:this.loadingState, profile:this.getShaderProfile() };
+        if (!prog) return {ok:false, reason:'no program', status:this.loadingState, profile:this.getShaderProfile() };
         let ok = false, reason = 'unknown';
         try {
             ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
@@ -1128,7 +1155,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
           dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
           sectors: Math.max(1, Math.floor(sectorsIn)),
-          split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsIn)) - 1, splitIn|0)),
+          split: Math.max(0, Math.min(sLive - 1, splitIn|0)),
           viewAvg: parameters.viewAvg ?? prev.viewAvg ?? true,
           gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
           deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
@@ -1644,7 +1671,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gl = this.gl;
         if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
             if (!this._warnNoProgramOnce) {
-                console.warn("Grid program not ready yet; waiting for shader link…");
+                console.warn(`[${this.debugTag}] Grid program not ready yet; waiting for shader link…`);
                 this._warnNoProgramOnce = true;
             }
             return;
@@ -1795,8 +1822,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
         const gl = this.gl;
 
-        const vertexShader   = this._compileShader(gl.VERTEX_SHADER,   vertexSource);
-        const fragmentShader = this._compileShader(gl.FRAGMENT_SHADER, fragmentSource);
+        const vertexShader   = this.compileShader(gl.VERTEX_SHADER,   vertexSource, 'vertex');
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentSource, 'fragment');
         if (!vertexShader || !fragmentShader) return null;
 
         const program = gl.createProgram();
@@ -1844,7 +1871,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
             const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
             const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
-            console.error('[WarpEngine] Link error:', { vsLog, fsLog, pgLog });
+            console.error(`[${this.debugTag}] Link error:`, { vsLog, fsLog, pgLog });
             gl.deleteProgram(program);
             this._setLoadingState('failed');
             return null;
@@ -1873,7 +1900,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
                     onReady(program);
                     this._setLoadingState('linked');
                 } else {
-                    console.error('Shader program link error:', gl.getProgramInfoLog(program));
+                    console.error(`[${this.debugTag}] Shader program link error:`, gl.getProgramInfoLog(program));
                     gl.deleteProgram(program);
                     onReady(null);
                     this._setLoadingState('failed');
@@ -1886,16 +1913,18 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         poll();
     }
 
-    _compileShader(type, source) {
-        const gl = this.gl;
-        const shader = gl.createShader(type);
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
+    compileShader(type, source, shaderType = 'unknown') {
+        const shader = this.gl.createShader(type);
+        this.gl.shaderSource(shader, source);
+        this.gl.compileShader(shader);
 
-        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-            console.error('Shader compilation error:', gl.getShaderInfoLog(shader));
-            gl.deleteShader(shader);
-            return null;
+        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+            const error = this.gl.getShaderInfoLog(shader);
+            this.gl.deleteShader(shader);
+            console.error(`[${this.debugTag}] ${shaderType} shader compilation failed:`, error);
+            throw new Error(`[${this.debugTag}] ${shaderType} shader compilation failed: ${error}`);
+        } else {
+            console.log(`[${this.debugTag}] ${shaderType} shader compiled successfully`);
         }
 
         return shader;
@@ -2101,7 +2130,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         this._accumShear = 0; 
         this._accumShearN = 0;
 
-        // C) WarpEngine.js wire-in: Return physics values for CPU comparison
+        // C) Additional physics values for CPU comparison
         // Single source of truth for duty: what the engine actually used
         let d_FR = U.dutyEffectiveFR;
         if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
@@ -2145,7 +2174,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         };
     }
 
-    // Generic uniform setter for display gain and other shader uniforms
     setUniform(name, value) {
         if (!this.gl || !this.gridProgram) return;
 

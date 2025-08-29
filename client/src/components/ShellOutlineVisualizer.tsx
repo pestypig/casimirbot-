@@ -34,11 +34,12 @@ type Props = {
     lightCrossing?: { tauLC_ms?: number; dwell_ms?: number; burst_ms?: number; };
     zeta?: number;                // Ford-Roman ζ for breach warnings
   };
+  debugTag?: string; // Debug tag for console logging
 };
 
 declare global { interface Window { OutlineEngine?: any; } }
 
-export function ShellOutlineVisualizer({ parameters }: Props) {
+export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<any>(null);
   const [ready, setReady] = useState(!!window.OutlineEngine);
@@ -73,6 +74,9 @@ export function ShellOutlineVisualizer({ parameters }: Props) {
     if (!ready || !canvasRef.current) return;
     if (!engineRef.current) {
       engineRef.current = new window.OutlineEngine(canvasRef.current);
+      if (debugTag && typeof engineRef.current.setDebugTag === 'function') {
+        engineRef.current.setDebugTag(debugTag);
+      }
     }
     const initialUniforms = {
       hullAxes: [hull.a, hull.b, hull.c],

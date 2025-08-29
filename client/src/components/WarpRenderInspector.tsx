@@ -552,6 +552,7 @@ export default function WarpRenderInspector(props: {
   showPhys?: Record<string, any>;
   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
+  debugTag?: string; // Debug tag for console logging
 }) {
   // Error boundary wrapper
   const [componentError, setComponentError] = React.useState<string | null>(null);
@@ -829,10 +830,14 @@ export default function WarpRenderInspector(props: {
           // ensure the DOM has given the canvas a real size
           await waitForNonZeroSize(leftRef.current);
 
-          console.log("Creating REAL engine...");
+          const realTag = props.debugTag ? `${props.debugTag}/REAL` : "REAL";
+          console.log(`Creating ${realTag} engine...`);
           leftEngine.current = createEngine(leftRef.current);
+          if (leftEngine.current && typeof leftEngine.current.setDebugTag === 'function') {
+            leftEngine.current.setDebugTag(realTag);
+          }
           leftOwnedRef.current = true;
-          console.log("REAL engine instance created");
+          console.log(`${realTag} engine instance created`);
 
           // Wait for engine to be fully ready
           await waitForEngineReady(leftEngine.current, 'REAL');
@@ -883,10 +888,14 @@ export default function WarpRenderInspector(props: {
           // ensure the DOM has given the canvas a real size
           await waitForNonZeroSize(rightRef.current);
 
-          console.log("Creating SHOW engine...");
+          const showTag = props.debugTag ? `${props.debugTag}/SHOW` : "SHOW";
+          console.log(`Creating ${showTag} engine...`);
           rightEngine.current = createEngine(rightRef.current);
+          if (rightEngine.current && typeof rightEngine.current.setDebugTag === 'function') {
+            rightEngine.current.setDebugTag(showTag);
+          }
           rightOwnedRef.current = true;
-          console.log("SHOW engine instance created");
+          console.log(`${showTag} engine instance created`);
 
           // Wait for engine to be fully ready
           await waitForEngineReady(rightEngine.current, 'SHOW');
