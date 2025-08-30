@@ -38,6 +38,9 @@ if (typeof window.SCENE_SCALE === 'undefined') {
 }
 const SCENE_SCALE = window.SCENE_SCALE;
 
+// Math helpers and constants
+const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
+
 class WarpEngine {
     static getOrCreate(canvas) {
         const existing = canvas.__warpEngine;
@@ -118,6 +121,8 @@ class WarpEngine {
         }
 
         this.gl = gl;
+        // Enable derivatives so we can do screen-space curvature (WebGL1 needs this; WebGL2 has dFdx/dFdy)
+        this._derivExt = this.gl.getExtension('OES_standard_derivatives');
 
         if (!this.gl) {
             console.error('🚨 WebGL Debug Info:');
@@ -614,8 +619,20 @@ void main() {
         // --- Fragment (shared body with proper type handling) ---
         const fsBody = `
 ${prec}
+#ifdef GL_OES_standard_derivatives
+#extension GL_OES_standard_derivatives : enable
+#endif
 VARY_DECL vec3 v_pos;
 VEC4_DECL frag;
+
+// ───────── Metric helpers (g_ij and its inverse) ─────────
+uniform mat3  u_metric;     // g_ij
+uniform mat3  u_metricInv;  // g^{ij}
+uniform float u_metricOn;   // 0 = Euclidean, 1 = metric-enabled
+
+float dot_g(vec3 a, vec3 b){ return dot(a, u_metric * b); }
+float norm_g(vec3 v){ return sqrt(max(1e-12, dot_g(v,v))); }
+vec3  normalize_g(vec3 v){ float L = norm_g(v); return v / max(L, 1e-12); }
 
 vec3 diverge(float t) {
   float x = clamp((t+1.0)*0.5, 0.0, 1.0);
@@ -630,7 +647,7 @@ vec3 seqTealLime(float u) {
   return mix(a,b, pow(u, 0.8));
 }
 
-// Metric-aware helper functions
+// Enhanced metric-aware helper functions
 float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
 float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
 vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
@@ -664,9 +681,11 @@ void main() {
   float tBoost    = isREAL ? 1.0 : max(1.0, u_curvatureBoostMax);
 
   vec3 pN = v_pos / axes;
-  float rs = (u_useMetric ? normG(pN) : length(pN)) + 1e-6;
-  vec3 dN = u_useMetric ? normalizeG(u_driveDir / axes) : normalize(u_driveDir / axes);
-  float xs = u_useMetric ? dotG(pN, dN) : dot(pN, dN);
+  float rs = (u_metricOn > 0.5 ? norm_g(pN) : length(pN)) + 1e-6;
+  vec3 dN = (u_metricOn > 0.5)
+          ? normalize_g(u_metricInv * (u_driveDir / axes))
+          : normalize(u_driveDir / axes);
+  float xs = (u_metricOn > 0.5) ? dot_g(pN, dN) : dot(pN, dN);
   float w = max(1e-4, u_wallWidth);
   float delta = (rs - 1.0) / w;
   float f     = exp(-delta*delta);
@@ -682,8 +701,21 @@ void main() {
     ? abs(dfdrs) * sinphi * u_vShip
     : f * sinphi * u_vShip;
 
-  // Calculate surface normal for Purple shift
+  // Metric-aware screen-space curvature (adds ridge accent when enabled)
+#ifdef GL_OES_standard_derivatives
   vec3 normalWS = normalize(v_pos);
+  vec3 Nm = (u_metricOn > 0.5) ? normalize_g(u_metricInv * normalWS) : normalize(normalWS);
+  float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
+#else
+  vec3 normalWS = normalize(v_pos);
+  float kScreen = 0.0;
+#endif
+  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0);
+  float kval = shearProxy;
+  if (ridgeI > 0) {
+    // Blend some metric-aware curvature into the shear proxy when ridge overlay is active
+    kval = clamp(mix(kval, kval + curvVis, 0.5), 0.0, 1.0);
+  }
 
   // Apply Purple shift modulation to theta field
   float purpleWeight = purpleShiftWeight(normalWS);
@@ -692,7 +724,7 @@ void main() {
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
   float valTheta  = thetaWithPurple * amp;
-  float valShear  = shearProxy * amp;
+  float valShear  = kval * amp;
 
   float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
   float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
@@ -701,8 +733,12 @@ void main() {
   float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);
   float sVis = clamp( magS / norm, 0.0, 1.0);
 
-  // Use colorI (int) for safe comparisons
+  // color mode mux
   vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
+  if (colorI == 6) {
+    col = seqTealLime(curvVis);
+    SET_FRAG(vec4(col, 1.0)); return;
+  }
 
   // Add subtle Purple shift visualization
   vec3 purple = vec3(0.62, 0.36, 0.85);
@@ -832,6 +868,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             metric: gl.getUniformLocation(program, 'u_metric'),
             metricInv: gl.getUniformLocation(program, 'u_metricInv'),
             useMetric: gl.getUniformLocation(program, 'u_useMetric'),
+            metricOn: gl.getUniformLocation(program, 'u_metricOn'),
         };
 
         // (Optional) quick sanity log once
@@ -1067,6 +1104,27 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             return;
         }
         this._enqueueUniforms(parameters);
+    }
+
+    /** Set/enable a 3×3 metric tensor (and its inverse). Pass `on=false` to revert to Euclidean. */
+    setMetric(g, gInv=null, on=true) {
+        if (!g) {
+            this.updateUniforms({
+                metric: ID3,
+                metricInv: ID3,
+                metricOn: 0.0,
+                useMetric: false
+            });
+            return this;
+        }
+        this.updateUniforms({
+            metric: (g instanceof Float32Array) ? g : new Float32Array(g),
+            metricInv: (gInv instanceof Float32Array) ? gInv : 
+                      (gInv ? new Float32Array(gInv) : ID3),
+            metricOn: on ? 1.0 : 0.0,
+            useMetric: on
+        });
+        return this;
     }
 
     // Keep original update logic but move it into _applyUniformsNow
@@ -1814,10 +1872,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const metric = u.metric || [1,0,0, 0,1,0, 0,0,1];
         const metricInv = u.metricInv || [1,0,0, 0,1,0, 0,0,1];
         const useMetric = u.useMetric || false;
+        const metricOn = u.metricOn || 0.0;
         if (this.gridUniforms.metric) {
             gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
             gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
             gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+            gl.uniform1f(this.gridUniforms.metricOn, metricOn);
         }
 
 
