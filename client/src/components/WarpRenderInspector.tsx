@@ -1204,7 +1204,7 @@ export default function WarpRenderInspector(props: {
         rightRef.current.addEventListener('webglcontextrestored', handleContextRestored);
       }
 
-      // Subscribe to canonical server uniforms
+      // Subscribe to canonical uniforms
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true); // Mark that we've received first uniforms
 
