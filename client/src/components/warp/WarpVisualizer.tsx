@@ -341,6 +341,19 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       epsilonTilt: epsilonTiltResolved,
       betaTiltVec: betaTiltResolved,
       tiltGain: tiltGainResolved,
+      // --- Metric integration (identity default) ---
+      u_useMetric: Number(parameters?.metric?.use ?? 0),     // 0 or 1
+      u_metric: (parameters?.metric?.G as number[] | undefined) ??
+                [1,0,0, 0,1,0, 0,0,1],
+      // keep aliases so either naming convention works
+      useMetric: Number(parameters?.metric?.use ?? 0),
+      metric:    (parameters?.metric?.G as number[] | undefined) ??
+                 [1,0,0, 0,1,0, 0,0,1],
+      // purple shift aliases (shader may expect u_* names)
+      u_epsilonTilt: epsilonTiltResolved,
+      u_betaTiltVec: betaTiltResolved,
+      // drive direction for θ/shear (default: +x in world space)
+      u_driveDir: parameters?.driveDir ?? [1,0,0],
     };
 
     // single bootstrap: fit + all uniforms in one shot
@@ -824,6 +837,12 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       const betaTiltVec = parameters.shift?.betaTiltVec ?? parameters.betaTiltVec ?? [0, -1, 0];
       const tiltGainResolved = Math.max(0, Math.min(0.65, (epsilonTiltResolved / 5e-7) * 0.35));
 
+      // Metric integration for live updates
+      const useMetric = Number(parameters?.metric?.use ?? 0);
+      const G = (parameters?.metric?.G as number[] | undefined) ??
+                [1,0,0, 0,1,0, 0,0,1];
+      const driveDir = (parameters?.driveDir as number[] | undefined) ?? [1,0,0];
+
       gatedUpdateUniforms(engineRef.current, {
         epsilonTilt: Number(epsilonTiltResolved || 0),
         betaTiltVec: betaTiltVec,
@@ -853,7 +872,17 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sagDepth_nm: parameters.sagDepth_nm || 16,
         powerAvg_MW: parameters.powerAvg_MW || VIS.powerAvgFallback,
         exoticMass_kg: parameters.exoticMass_kg || VIS.exoticMassFallback,
-        tsRatio: parameters.tsRatio || VIS.tsRatioDefault
+        tsRatio: parameters.tsRatio || VIS.tsRatioDefault,
+
+        // --- Metric tensor uniforms (live updates) ---
+        u_useMetric: useMetric,
+        u_metric: G,
+        useMetric,
+        metric: G,
+        u_driveDir: driveDir,
+        // Purple shift aliases (for u_* shader compatibility)
+        u_epsilonTilt: Number(epsilonTiltResolved || 0),
+        u_betaTiltVec: betaTiltVec,
       }, 'client');
 
       engineRef.current.requestRewarp?.();
