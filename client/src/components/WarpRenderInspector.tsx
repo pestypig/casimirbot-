@@ -262,7 +262,7 @@ function compactCameraZ(axesScene?: number[] | null) {
   return Math.max(1.2, 1.8 * R);
 }
 
-function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1) {
+function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1): [number, number, number] {
   const m = Math.max(hull.a, hull.b, hull.c) || 1;
   return [ (hull.a/m)*span, (hull.b/m)*span, (hull.c/m)*span ];
 }
@@ -737,7 +737,6 @@ export default function WarpRenderInspector(props: {
     hover: 0.980665,     cruise: 0.980665, 
     emergency: 0.980665, standby: 0.980665
   };
-  const effectiveMode = currentMode || 'hover';
   const modeKey = effectiveMode.toLowerCase();
   const gTarget = gTargets[modeKey] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
@@ -1029,8 +1028,8 @@ export default function WarpRenderInspector(props: {
             useMetric: (props.baseShared?.useMetric ?? false),
             metric:    (props.baseShared?.metric ?? metricDiag.g),
             metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
-            epsilonTilt: purpleShift.epsilonTilt,
-            betaTiltVec: purpleShift.betaTiltVecN,
+            epsilonTilt: epsilonTilt,
+            betaTiltVec: betaTiltVecN,
           };
 
           console.log("Applying REAL initial uniforms:", realInitUniforms);
@@ -1123,8 +1122,8 @@ export default function WarpRenderInspector(props: {
             useMetric: (props.baseShared?.useMetric ?? false),
             metric:    (props.baseShared?.metric ?? metricDiag.g),
             metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
-            epsilonTilt: purpleShift.epsilonTilt,
-            betaTiltVec: purpleShift.betaTiltVecN,
+            epsilonTilt: epsilonTilt,
+            betaTiltVec: betaTiltVecN,
           };
 
           console.log("Applying SHOW initial uniforms:", showInitUniforms);
@@ -1559,32 +1558,6 @@ export default function WarpRenderInspector(props: {
     (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
 
-
-    // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
-  const G = 9.80665, c = 299792458;
-
-  const gTargets: Record<string, number> = {
-    hover: 0.1 * G,
-    cruise: 0.05 * G,
-    emergency: 0.3 * G,
-    standby: 0,
-  };
-
-  const modeKey = effectiveMode.toLowerCase();
-  const gTarget = gTargets[modeKey] ?? 0;
-  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
-
-  // ε (dimensionless) used by shaders + viz overlays
-  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
-
-  // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
-  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]);
-  const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
-  const betaTiltVecN: [number, number, number] = [
-    betaTiltVecRaw[0] / betaNorm,
-    betaTiltVecRaw[1] / betaNorm,
-    betaTiltVecRaw[2] / betaNorm,
-  ];
 
   // Physics bound for theta calculations
     const bound = useMemo(() => ({
