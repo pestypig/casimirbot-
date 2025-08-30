@@ -51,6 +51,7 @@ export interface FieldSample {
   n: [number, number, number];   // outward normal
   sgn: number;                   // sector sign (+/-)
   disp: number;                  // scalar displacement magnitude used
+  dA?: number;                   // proper area element at sample (m^2) — from metric
 }
 
 export interface FieldRequest {
@@ -169,6 +170,11 @@ export const PAPER_DUTY = { TOTAL_SECTORS, BURST_DUTY_LOCAL } as const;
 export const PAPER_Q    = { Q_BURST } as const;
 export const PAPER_VDB  = { GAMMA_VDB } as const;
 
+// ── Metric imports (induced surface metric on hull)
+import {
+  firstFundamentalForm,
+} from "../src/metric.js";
+
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
@@ -237,18 +243,24 @@ export const MODE_CONFIGS = {
   }
 };
 
-/** Ellipsoid surface area via Knud–Thomsen (very good for prolate/needle shapes). 
- *  a = Lx/2, b = Ly/2, c = Lz/2 (meters)
+/** Ellipsoid surface area via induced metric integral (replaces Knud–Thomsen).
+ *  a = Lx/2, b = Ly/2, c = Lz/2 (meters). Numerical quadrature over (θ,φ).
  */
-function surfaceAreaEllipsoidFromHullDims(Lx_m: number, Ly_m: number, Lz_m: number): number {
-  const a = Lx_m / 2;
-  const b = Ly_m / 2;
-  const c = Lz_m / 2;
-  const p = 1.6075; // Knud–Thomsen exponent
-  const term1 = Math.pow(a * b, p);
-  const term2 = Math.pow(a * c, p);
-  const term3 = Math.pow(b * c, p);
-  return 4 * Math.PI * Math.pow((term1 + term2 + term3) / 3, 1 / p);
+function surfaceAreaEllipsoidMetric(Lx_m: number, Ly_m: number, Lz_m: number,
+  nTheta = 256, nPhi = 128): number {
+  const a = Lx_m/2, b = Ly_m/2, c = Lz_m/2;
+  const dθ = (2*Math.PI) / nTheta;
+  const dφ = Math.PI / (nPhi-1); // φ ∈ [-π/2, π/2]
+  let A = 0;
+  for (let i=0; i<nTheta; i++) {
+    const θ = i * dθ;
+    for (let j=0; j<nPhi; j++) {
+      const φ = -Math.PI/2 + j * dφ;
+      const { dA } = firstFundamentalForm(a,b,c, θ, φ);
+      A += dA * dθ * dφ;
+    }
+  }
+  return A;
 }
 
 // Initialize pipeline state with defaults
@@ -323,16 +335,7 @@ function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
   return E_overA * area_m2; // J
 }
 
-// Memoize hull surface area to avoid repeated pow/roots in tight loops
-const hullAreaCache = new Map<string, number>();
-function getHullArea(Lx_m: number, Ly_m: number, Lz_m: number) {
-  const key = `${Lx_m}|${Ly_m}|${Lz_m}`;
-  const hit = hullAreaCache.get(key);
-  if (hit) return hit;
-  const area = surfaceAreaEllipsoidFromHullDims(Lx_m, Ly_m, Lz_m);
-  hullAreaCache.set(key, area);
-  return area;
-}
+// Cache removed - surfaceAreaEllipsoidMetric is called directly for accuracy
 
 // Main pipeline calculation
 export async function calculateEnergyPipeline(state: EnergyPipelineState): Promise<EnergyPipelineState> {
@@ -346,7 +349,10 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     Ly_m: state.shipRadius_m * 2,
     Lz_m: state.shipRadius_m * 2,
   };
-  const hullArea_m2 = getHullArea(hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m);
+  // Proper surface area from induced metric (ellipsoid shell)
+  const hullArea_m2 = surfaceAreaEllipsoidMetric(
+    hullDims.Lx_m, hullDims.Ly_m, hullDims.Lz_m
+  );
 
   // Store hull area for Bridge display
   state.hullArea_m2 = hullArea_m2;
@@ -1096,7 +1102,10 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       const softness = 0.6;
       disp = maxPush * Math.tanh(disp / (softness * maxPush));
 
-      samples.push({ p, rho, bell, n, sgn, disp });
+      // Calculate proper area element from metric at this surface point
+      const { dA } = firstFundamentalForm(axes.a, axes.b, axes.c, theta, phi);
+
+      samples.push({ p, rho, bell, n, sgn, disp, dA });
     }
   }
   return samples;

@@ -1,0 +1,110 @@
+--- a/src/energy-pipeline.ts
++++ b/src/energy-pipeline.ts
+@@
+ // ---------- Ellipsoid helpers (match renderer math) ----------
+ export type HullAxes = { a: number; b: number; c: number };
+@@
+   return [n0 / m, n1 / m, n2 / m];
+ }
+ 
+ // ---------- Physics-side displacement sampling for debug/validation ----------
+ export interface FieldSample {
+   p: [number, number, number];   // sample coordinate (meters)
+   rho: number;                   // ellipsoidal radius (unitless)
+   bell: number;                  // canonical bell weight
+   n: [number, number, number];   // outward normal
+   sgn: number;                   // sector sign (+/-)
+   disp: number;                  // scalar displacement magnitude used
++  dA?: number;                   // proper area element at sample (m^2) — from metric
+ }
+@@
+ export interface EnergyPipelineState {
+@@
+   hullArea_m2?: number;     // Hull surface area (for Bridge display)
+@@
+ }
+@@
+ // ── Paper-backed constants (consolidated physics)
+@@
+ export const PAPER = { TOTAL_SECTORS, BURST_DUTY_LOCAL, Q_BURST, GAMMA_VDB };
+ 
++// ── Metric imports (induced surface metric on hull)
++import {
++  firstFundamentalForm,
++} from "./metric.js";
++
+@@
+-/** Ellipsoid surface area via Knud–Thomsen (very good for prolate/needle shapes). 
+- *  a = Lx/2, b = Ly/2, c = Lz/2 (meters)
+- */
+-function surfaceAreaEllipsoidFromHullDims(Lx_m: number, Ly_m: number, Lz_m: number): number {
+-  const a = Lx_m / 2;
+-  const b = Ly_m / 2;
+-  const c = Lz_m / 2;
+-  const p = 1.6075; // Knud–Thomsen exponent
+-  const term1 = Math.pow(a * b, p);
+-  const term2 = Math.pow(a * c, p);
+-  const term3 = Math.pow(b * c, p);
+-  return 4 * Math.PI * Math.pow((term1 + term2 + term3) / 3, 1 / p);
+-}
++/** Ellipsoid surface area via induced metric integral (replaces Knud–Thomsen).
++ *  a = Lx/2, b = Ly/2, c = Lz/2 (meters). Numerical quadrature over (θ,φ).
++ */
++function surfaceAreaEllipsoidMetric(Lx_m: number, Ly_m: number, Lz_m: number,
++  nTheta = 256, nPhi = 128): number {
++  const a = Lx_m/2, b = Ly_m/2, c = Lz_m/2;
++  const dθ = (2*Math.PI) / nTheta;
++  const dφ = Math.PI / (nPhi-1); // φ ∈ [-π/2, π/2]
++  let A = 0;
++  for (let i=0; i<nTheta; i++) {
++    const θ = i * dθ;
++    for (let j=0; j<nPhi; j++) {
++      const φ = -Math.PI/2 + j * dφ;
++      const { dA } = firstFundamentalForm(a,b,c, θ, φ);
++      A += dA * dθ * dφ;
++    }
++  }
++  return A;
++}
+@@
+ export function calculateEnergyPipeline(state: EnergyPipelineState): EnergyPipelineState {
+   // --- Surface area & tile count from actual hull dims ---
+   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
+ 
+-  // If a full rectangular needle + rounded caps is added later, we can refine this.
+-  // For now, the ellipsoid (a=Lx/2, b=Ly/2, c=Lz/2) is an excellent approximation.
+-  const hullArea_m2 = surfaceAreaEllipsoidFromHullDims(state.hull!.Lx_m, state.hull!.Ly_m, state.hull!.Lz_m);
++  // Proper surface area from induced metric (ellipsoid shell)
++  const hullArea_m2 = surfaceAreaEllipsoidMetric(
++    state.hull!.Lx_m, state.hull!.Ly_m, state.hull!.Lz_m
++  );
+@@
+   // 1) N_tiles — paper-authentic tile census
+   const surfaceTiles = Math.floor(hullArea_m2 / tileArea_m2);
+   const PACKING = 0.88; // edge/packing factor to match paper's ~1.96e9
+   state.N_tiles = Math.max(1, Math.round(surfaceTiles * RADIAL_LAYERS * PACKING));
+@@
+ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSample[] {
+@@
+-  for (let i = 0; i < nTheta; i++) {
++  // For dA weights, keep the same angular grid used above
++  const dθ = (2*Math.PI) / nTheta;
++  const dφ = Math.PI / (nPhi-1);
++
++  for (let i = 0; i < nTheta; i++) {
+     const theta = (i / nTheta) * 2 * Math.PI;      // [-π, π] ring index
+@@
+-    for (let j = 0; j < nPhi; j++) {
++    for (let j = 0; j < nPhi; j++) {
+       const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [-π/2, π/2]
+@@
+-      samples.push({ p, rho, bell, n, sgn, disp });
++      // --- Proper area element via induced metric at (θ,φ) ---
++      const { dA } = firstFundamentalForm(a,b,c, theta, phi);
++      const dAcell = dA * dθ * dφ;
++
++      samples.push({ p, rho, bell, n, sgn, disp, dA: dAcell });
+     }
+   }
+   return samples;
+ }
