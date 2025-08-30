@@ -262,7 +262,7 @@ function compactCameraZ(axesScene?: number[] | null) {
   return Math.max(1.2, 1.8 * R);
 }
 
-function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1): [number, number, number] {
+function deriveAxesClip(hull: {a:number;b:number;c:number}, span = 1) {
   const m = Math.max(hull.a, hull.b, hull.c) || 1;
   return [ (hull.a/m)*span, (hull.b/m)*span, (hull.c/m)*span ];
 }
@@ -495,7 +495,7 @@ function PaneOverlay(props:{
       const V  = volEllipsoid(a,b,c);
       const S  = areaEllipsoid(a,b,c);
       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
- 
+
       // Make the overlay honest: show the two θ's explicitly
       const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
       const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
@@ -530,7 +530,7 @@ function PaneOverlay(props:{
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell, 
+        a,b,c,aH, w_m, V,S, Vshell,
         thetaUniform, thetaPhys, thetaPaper,
         M_ship_arb, M_slice_arb, K_used,
         frontMax, rearMin,
@@ -562,6 +562,7 @@ function PaneOverlay(props:{
           <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
           <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
           <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
+          <div>θ (metric): <b>{Number.isFinite(s.u_epsilonTilt)? s.u_epsilonTilt.toExponential(2):'—'}</b></div>
           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
           {/* REAL shows kg when calibrated; SHOW remains arb */}
@@ -734,9 +735,10 @@ export default function WarpRenderInspector(props: {
 
   // Calculate Purple shift parameters early for use in initial uniforms
   const gTargets: Record<string, number> = {
-    hover: 0.980665,     cruise: 0.980665, 
+    hover: 0.980665,     cruise: 0.980665,
     emergency: 0.980665, standby: 0.980665
   };
+  const effectiveMode = currentMode || 'hover';
   const modeKey = effectiveMode.toLowerCase();
   const gTarget = gTargets[modeKey] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
@@ -749,11 +751,11 @@ export default function WarpRenderInspector(props: {
     betaTiltVecRaw[2] / betaNorm
   ];
 
-  /**  
-   * Compute θ using exactly the physics pipeline formula  
-   * θ = γ_geo³ · q · γ_VdB_mass · √(dutyEffectiveFR)  
-   * (always uses the mass pocket-factor and Ford–Roman duty)  
-   */  
+  /**
+   * Compute θ using exactly the physics pipeline formula
+   * θ = γ_geo³ · q · γ_VdB_mass · √(dutyEffectiveFR)
+   * (always uses the mass pocket-factor and Ford–Roman duty)
+   */
   function computeThetaScale(phys: any) {
     const g    = +phys.gammaGeo || 26;
     const q    = +phys.qSpoilingFactor || 1;
@@ -847,7 +849,7 @@ export default function WarpRenderInspector(props: {
           // Grid3D cleanup handled elsewhere
         }
       };
-      
+
       (canvas as any)[ENGINE_KEY] = grid3DWrapper;
       return grid3DWrapper;
     }
@@ -1234,8 +1236,7 @@ export default function WarpRenderInspector(props: {
         const wu = (systemMetrics as any)?.warpUniforms;
         if (!wu) return;
 
-        const seq = Number((systemMetrics as any)?.seq);
-        const version = Number.isFinite(seq) ? seq : Date.now();
+        const version = Number.isFinite(systemMetrics?.seq) ? systemMetrics.seq : Date.now();
 
         const sanitized = sanitizeUniforms(wu);
         const sig = JSON.stringify(stableWU(sanitized));
@@ -1340,8 +1341,7 @@ export default function WarpRenderInspector(props: {
     const wu = (systemMetrics as any)?.warpUniforms;
     if (!wu) return;
 
-    const seq = Number((systemMetrics as any)?.seq);
-    const version = Number.isFinite(seq) ? seq : Date.now();
+    const version = Number.isFinite(systemMetrics?.seq) ? systemMetrics.seq : Date.now();
 
     const sanitized = sanitizeUniforms(wu);
     const sig = JSON.stringify(stableWU(sanitized));
@@ -1558,6 +1558,32 @@ export default function WarpRenderInspector(props: {
     (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
 
+
+    // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
+  const G = 9.80665, c = 299792458;
+
+  const gTargets: Record<string, number> = {
+    hover: 0.1 * G,
+    cruise: 0.05 * G,
+    emergency: 0.3 * G,
+    standby: 0,
+  };
+
+  const modeKey = effectiveMode.toLowerCase();
+  const gTarget = gTargets[modeKey] ?? 0;
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+
+  // ε (dimensionless) used by shaders + viz overlays
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
+
+  // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
+  const betaTiltVecRaw = (systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0]);
+  const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
+  const betaTiltVecN: [number, number, number] = [
+    betaTiltVecRaw[0] / betaNorm,
+    betaTiltVecRaw[1] / betaNorm,
+    betaTiltVecRaw[2] / betaNorm,
+  ];
 
   // Physics bound for theta calculations
     const bound = useMemo(() => ({
@@ -1811,7 +1837,7 @@ export default function WarpRenderInspector(props: {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-2xl border border-neutral-200 p-4">
           <h4 className="font-medium mb-3">Debug Toggles</h4>
-          <fieldset className="flex gap-3 text-xs">
+          <fieldset className="flex flex-wrap gap-3 text-xs">
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={lockTone} onChange={e=>setLockTone(e.target.checked)} />
               Lock tonemap
@@ -1874,7 +1900,7 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
-            <div>view mass fraction (REAL): {(viewFracREAL * 100).toFixed(3)}% (1/{total})</div>
+            <div>view mass fraction (REAL): {(viewMassFracREAL * 100).toFixed(3)}% (1/{total})</div>
             <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
