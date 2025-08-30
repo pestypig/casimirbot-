@@ -1,0 +1,140 @@
+Sweet — with that exact header + theta/shear block, here are **surgical diffs** that (a) declare the metric/tilt uniforms, (b) switch radius/projection/normal to the metric when enabled, and (c) add a simple, metric-aware screen-space curvature boost (using derivatives).
+
+---
+
+### Patch 1 — fragment header: add metric/tilt uniforms & derivatives, keep helpers
+
+```diff
+*** a/warp-engine.js
+--- b/warp-engine.js
+@@
+-// --- Fragment (shared body with proper type handling) ---
++// --- Fragment (shared body with proper type handling) ---
+ const fsBody = `
+ ${prec}
+ VARY_DECL vec3 v_pos;
+ VEC4_DECL frag;
++// Enable derivatives for curvature cue (WebGL1)
++#ifdef GL_OES_standard_derivatives
++#extension GL_OES_standard_derivatives : enable
++#endif
++
++// Metric & tilt uniforms (new)
++uniform mat3  u_metric;          // covariant g_ij
++uniform mat3  u_metricInv;       // inverse g^{ij} (kept for future use)
++uniform bool  u_useMetric;       // toggle metric-aware math
++uniform vec3  u_betaTiltVec;     // "down" direction
++uniform float u_epsilonTilt;     // small signed tilt magnitude
++uniform float u_curvatureGainT;  // curvature strength (already in engine)
++uniform float u_curvatureBoostMax;
++uniform int   u_ridgeMode;       // 0/1, already in engine
++uniform int   u_colorMode;       // palette selector (add slot 6 = curvature debug)
+ 
+ vec3 diverge(float t) {
+   float x = clamp((t+1.0)*0.5, 0.0, 1.0);
+   vec3 c1 = vec3(0.15, 0.45, 1.0);
+   vec3 c2 = vec3(1.0);
+   vec3 c3 = vec3(1.0, 0.45, 0.0);
+   return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);
+ }
+ vec3 seqTealLime(float u) {
+   vec3 a = vec3(0.05, 0.30, 0.35);
+   vec3 b = vec3(0.00, 1.00, 0.60);
+   return mix(a,b, pow(u, 0.8));
+ }
+ // Metric-aware helper functions
+ float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
+ float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
+ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
+ float purpleShiftWeight(vec3 normalWS) {
+   // signed tilt along β; clamp to avoid NaNs if ε=0
+   vec3 beta_normalized = u_useMetric ? normalizeG(u_betaTiltVec) : normalize(u_betaTiltVec);
+   vec3 normal_normalized = u_useMetric ? normalizeG(normalWS) : normalize(normalWS);
+   float proj = u_useMetric ? dotG(beta_normalized, normal_normalized) : dot(beta_normalized, normal_normalized);
+   return u_epsilonTilt * proj; // small signed number
+ }
+`
+```
+
+---
+
+### Patch 2 — theta/shear block: metric-aware normal + curvature boost
+
+```diff
+*** a/warp-engine.js
+--- b/warp-engine.js
+@@
+   vec3 pN = v_pos / axes;
+   float rs = (u_useMetric ? normG(pN) : length(pN)) + 1e-6;
+   vec3 dN = u_useMetric ? normalizeG(u_driveDir / axes) : normalize(u_driveDir / axes);
+   float xs = u_useMetric ? dotG(pN, dN) : dot(pN, dN);
+   float w = max(1e-4, u_wallWidth);
+   float delta = (rs - 1.0) / w;
+   float f     = exp(-delta*delta);
+   float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;
+   // Use ridge mode with explicit int comparison (ridgeI already computed above)
+   float thetaField = (ridgeI == 0)
+     ? u_vShip * (xs/rs) * dfdrs
+     : u_vShip * (xs/rs) * f;
+   float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));
+   float shearProxy = (ridgeI == 0)
+     ? abs(dfdrs) * sinphi * u_vShip
+     : f * sinphi * u_vShip;
+-  // Calculate surface normal for Purple shift
+-  vec3 normalWS = normalize(v_pos);
++  // Calculate surface normal for Purple shift (metric-aware)
++  vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
+   // Apply Purple shift modulation to theta field
+   float purpleWeight = purpleShiftWeight(normalWS);
+   float thetaWithPurple = thetaField * (1.0 + purpleWeight);
++
++  // --- Metric-aware screen-space curvature cue (adds soft ridge accent) ---
++#ifdef GL_OES_standard_derivatives
++  vec3 Nm = normalWS;                        // already metric-aware above
++  float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
++  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, u_curvatureBoostMax);
++  if (ridgeI != 0) {
++    // when ridge overlay is on, blend in curvature to the shear proxy
++    shearProxy = clamp(shearProxy + 0.5 * curvVis, 0.0, 1.0);
++  }
++#endif
+```
+
+---
+
+### Patch 3 — (optional) palette slot to visualize curvature directly
+
+If you want a quick debug view (palette index **6**) that paints just the curvature term:
+
+```diff
+*** a/warp-engine.js
+--- b/warp-engine.js
+@@
+-  // final color selection happens later (existing code)
++  // final color selection (add curvature debug slot = 6)
++  if (u_colorMode == 6) {
++#ifdef GL_OES_standard_derivatives
++    vec3 dbg = seqTealLime(clamp(u_curvatureGainT * (length(dFdx(normalWS)) + length(dFdy(normalWS))), 0.0, 1.0));
++#else
++    vec3 dbg = vec3(0.0);
++#endif
++    frag = VEC4_CTOR(dbg, 1.0);
++    return;
++  }
+```
+
+---
+
+## Wiring notes (JS side)
+
+You already pass `u_curvatureGainT`, `u_curvatureBoostMax`, `u_ridgeMode`, and `u_colorMode`. For the new bits, make sure you also set:
+
+* `u_metric` (mat3, identity if unused)
+* `u_metricInv` (mat3, identity is fine for now)
+* `u_useMetric` (bool)
+* `u_betaTiltVec` (vec3)
+* `u_epsilonTilt` (float)
+
+If you used my earlier JS patches, those uniforms are already cached and set; otherwise, add them to your uniform cache + `gl.uniform*` calls.
+
+That’s it—your graph will now respect a general metric for ρ/θ/shear, purple-tilt, and curvature accents, while remaining Euclidean when `u_useMetric` is false.

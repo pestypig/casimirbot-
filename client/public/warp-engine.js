@@ -701,13 +701,14 @@ void main() {
     ? abs(dfdrs) * sinphi * u_vShip
     : f * sinphi * u_vShip;
 
+  // Calculate surface normal for Purple shift (metric-aware)
+  vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
+  
   // Metric-aware screen-space curvature (adds ridge accent when enabled)
 #ifdef GL_OES_standard_derivatives
-  vec3 normalWS = normalize(v_pos);
-  vec3 Nm = (u_metricOn > 0.5) ? normalize_g(u_metricInv * normalWS) : normalize(normalWS);
+  vec3 Nm = normalWS;                        // already metric-aware above
   float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
 #else
-  vec3 normalWS = normalize(v_pos);
   float kScreen = 0.0;
 #endif
   float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0);
@@ -720,6 +721,15 @@ void main() {
   // Apply Purple shift modulation to theta field
   float purpleWeight = purpleShiftWeight(normalWS);
   float thetaWithPurple = thetaField * (1.0 + purpleWeight);
+
+  // --- Metric-aware screen-space curvature cue (adds soft ridge accent) ---
+#ifdef GL_OES_standard_derivatives
+  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, u_curvatureBoostMax);
+  if (ridgeI != 0) {
+    // when ridge overlay is on, blend in curvature to the shear proxy
+    shearProxy = clamp(shearProxy + 0.5 * curvVis, 0.0, 1.0);
+  }
+#endif
 
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
@@ -752,6 +762,17 @@ void main() {
     vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
                         smoothstep(0.0, 1.0, tilt * u_thetaScale));
     col = baseColor;
+  }
+
+  // final color selection (add curvature debug slot = 6)
+  if (u_colorMode == 6) {
+#ifdef GL_OES_standard_derivatives
+    vec3 dbg = seqTealLime(clamp(u_curvatureGainT * (length(dFdx(normalWS)) + length(dFdy(normalWS))), 0.0, 1.0));
+#else
+    vec3 dbg = vec3(0.0);
+#endif
+    SET_FRAG(vec4(dbg, 1.0));
+    return;
   }
 
   // Debug modes (4+)
