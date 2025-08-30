@@ -202,4 +202,300 @@ export default class WarpEngine {
             this.canvas.height = bh;
         }
     }
+
+    //----------------------------------------------------------------
+    //  8.  Shader injection & uniforms
+    //----------------------------------------------------------------
+    // Idempotent uniform injection helper
+    _injectUniforms(src) {
+        if (!/WARP_UNIFORMS_INCLUDED/.test(src)) {
+            const uniformsBlock = `
+#ifndef WARP_UNIFORMS_INCLUDED
+#define WARP_UNIFORMS_INCLUDED
+
+// Core uniforms (idempotent)
+uniform vec3  u_sheetColor;
+uniform float u_thetaScale;
+uniform int   u_sectorCount;
+uniform int   u_split;
+uniform vec3  u_axesScene;
+uniform vec3  u_axes;
+uniform vec3  u_driveDir;
+uniform float u_wallWidth;
+uniform float u_vShip;
+uniform float u_epsTilt;
+uniform float u_intWidth;
+uniform float u_tiltViz;
+uniform float u_exposure;
+uniform float u_zeroStop;
+uniform float u_userGain;
+uniform bool  u_physicsParityMode;
+uniform float u_displayGain;
+uniform float u_vizGain;
+uniform float u_curvatureGainT;
+uniform float u_curvatureBoostMax;
+uniform int   u_colorMode;
+uniform int   u_ridgeMode;
+
+// Purple shift (interior gravity)
+uniform float u_epsilonTilt;
+uniform vec3  u_betaTiltVec;
+
+// Metric tensor uniforms (covariant & inverse)
+uniform mat3 u_metric;
+uniform mat3 u_metricInv;
+uniform bool u_useMetric;
+
+// Metric-aware helper functions
+float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
+float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
+vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
+
+#endif
+`;
+            return `${uniformsBlock}\n${src}`;
+        }
+        return src;
+    }
+
+    _compileShadersWithInjection(vs_src, fs_src) {
+        const gl = this.gl;
+        // Inject uniforms into fragment shader
+        const injected_fs = this._injectUniforms(fs_src);
+        const vs = this._compile(gl.VERTEX_SHADER, vs_src);
+        const fs = this._compile(gl.FRAGMENT_SHADER, injected_fs);
+        const prog = gl.createProgram();
+        gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+            throw new Error("Program link error: " + gl.getProgramInfoLog(prog));
+        }
+        gl.deleteShader(vs); gl.deleteShader(fs);
+        return prog;
+    }
+
+    //----------------------------------------------------------------
+    //  9.  Shader Uniforms & Grid Processing
+    //----------------------------------------------------------------
+    _cacheGridUniformLocations(program) {
+        const gl = this.gl;
+        this.gridUniforms = {
+            // matrices / basics
+            mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+            sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
+
+            // core physics chain
+            thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+            colorMode:  gl.getUniformLocation(program, 'u_colorMode'),
+            ridgeMode:  gl.getUniformLocation(program, 'u_ridgeMode'),
+            parity:     gl.getUniformLocation(program, 'u_physicsParityMode'),
+
+            // sectoring
+            sectorCount: gl.getUniformLocation(program, 'u_sectorCount'),
+            split:       gl.getUniformLocation(program, 'u_split'),
+
+            // scene & hull
+            axesScene: gl.getUniformLocation(program, 'u_axesScene'),
+            axes:      gl.getUniformLocation(program, 'u_axes'),
+
+            // drive + wall
+            driveDir:  gl.getUniformLocation(program, 'u_driveDir'),
+            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
+            vShip:     gl.getUniformLocation(program, 'u_vShip'),
+
+            // viz / exposure chain
+            exposure:          gl.getUniformLocation(program, 'u_exposure'),
+            zeroStop:          gl.getUniformLocation(program, 'u_zeroStop'),
+            userGain:          gl.getUniformLocation(program, 'u_userGain'),
+            displayGain:       gl.getUniformLocation(program, 'u_displayGain'),
+            vizGain:           gl.getUniformLocation(program, 'u_vizGain'),
+            curvatureGainT:    gl.getUniformLocation(program, 'u_curvatureGainT'),
+            curvatureBoostMax: gl.getUniformLocation(program, 'u_curvatureBoostMax'),
+
+            // interior tilt (safe no-ops if unused)
+            intWidth: gl.getUniformLocation(program, 'u_intWidth'),
+            epsTilt:  gl.getUniformLocation(program, 'u_epsTilt'),
+            tiltViz:  gl.getUniformLocation(program, 'u_tiltViz'),
+
+            // Purple shift uniforms
+            epsilonTilt: gl.getUniformLocation(program, 'u_epsilonTilt'),
+            betaTiltVec: gl.getUniformLocation(program, 'u_betaTiltVec'),
+
+            // Metric tensor uniforms
+            metric: gl.getUniformLocation(program, 'u_metric'),
+            metricInv: gl.getUniformLocation(program, 'u_metricInv'),
+            useMetric: gl.getUniformLocation(program, 'u_useMetric'),
+        };
+    }
+
+    updateUniforms(obj){
+        // --- Metric tensor wiring --------------------------------------------
+        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
+        // metricMode: 'identity' | 'ellipsoid' | 'custom'
+        const parameters = obj; // Use 'parameters' to distinguish from internal uniforms
+        const prev = this.uniforms; // Store previous uniforms for comparison
+
+        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
+        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
+        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
+        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
+
+        // Need axesScene for ellipsoid mode, fall back to default if not provided
+        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
+
+        if (!metric) {
+            if (metricMode === 'ellipsoid') {
+                // covariant g_ij in clip space, aligned to axesClip:
+                // g = diag(1/a^2, 1/b^2, 1/c^2)
+                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
+                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
+                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
+                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
+                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
+                useMetric = true;
+            } else {
+                // Identity (Euclidean)
+                metric    = [1,0,0, 0,1,0, 0,0,1];
+                metricInv = [1,0,0, 0,1,0, 0,0,1];
+            }
+        }
+        // Update uniforms object with metric information
+        parameters.metricMode = metricMode;
+        parameters.metric     = metric;
+        parameters.metricInv  = metricInv;
+        parameters.useMetric  = !!useMetric;
+
+
+        // --- decide if the CPU warp needs recompute ---
+        const geoChanged =
+          (prev.hullAxes?.[0] !== parameters.hullAxes?.[0]) ||
+          (prev.hullAxes?.[1] !== parameters.hullAxes?.[1]) ||
+          (prev.hullAxes?.[2] !== parameters.hullAxes?.[2]) ||
+          (prev.gridSpan !== parameters.gridSpan);
+
+        // Update core uniforms
+        Object.assign(this.uniforms, parameters);
+
+        // Recompute warp geometry if necessary
+        if (geoChanged) {
+            this._updateWarpGeometry(this.uniforms);
+        }
+    }
+
+    //----------------------------------------------------------------
+    //  10. Rendering
+    //----------------------------------------------------------------
+    _draw(time){
+        const gl = this.gl;
+        gl.viewport(0,0, this.canvas.width, this.canvas.height);
+        gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(this.program);
+
+        // --- Standard uniforms ---------------------------------------
+        // dutyCycle, g_y, cavityQ, sagDepth_nm, tsRatio, powerAvg_MW, exoticMass_kg, time
+        for (const name in this.uLoc) {
+            const loc = this.uLoc[name];
+            const value = this.uniforms[name];
+            if (loc) {
+                if (typeof value === 'number') gl.uniform1f(loc, value);
+                else if (typeof value === 'boolean') gl.uniform1i(loc, value ? 1 : 0);
+                // Add more type checks if needed (e.g., vec3, mat3)
+            }
+        }
+
+        // --- Purple shift uniforms ---------------------------------------
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, this.uniforms.epsilonTilt ?? 0.0);
+        if (this.gridUniforms.betaTiltVec) {
+            const betaTilt = this.uniforms.betaTiltVec || [0, -1, 0];
+            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+        }
+
+        // --- Metric tensor uniforms (default to identity if not provided)
+        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = this.uniforms.useMetric || false;
+        if (this.gridUniforms.metric) {
+            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
+            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
+            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+        }
+
+        // --- Grid-specific uniforms ----------------------------------
+        // (Assuming _cacheGridUniformLocations has been called)
+        if (this.gridUniforms) {
+            for (const name in this.gridUniforms) {
+                const loc = this.gridUniforms[name];
+                const value = this.uniforms[name];
+                if (loc && value !== undefined) {
+                    // Determine uniform type based on name or value structure
+                    if (name.includes('Matrix')) {
+                        gl.uniformMatrix3fv(loc, false, new Float32Array(value));
+                    } else if (name.includes('Color') || name.includes('Vec') || name.includes('Dir') || name.includes('Scene') || name.includes('axes')) {
+                        gl.uniform3fv(loc, new Float32Array(value));
+                    } else if (typeof value === 'number') {
+                        gl.uniform1f(loc, value);
+                    } else if (typeof value === 'boolean') {
+                        gl.uniform1i(loc, value ? 1 : 0);
+                    } else if (Array.isArray(value)) {
+                         // Handle arrays, e.g., for vec4, mat4 etc. if needed
+                        if (value.length === 3) gl.uniform3fv(loc, new Float32Array(value));
+                        else if (value.length === 4) gl.uniform4fv(loc, new Float32Array(value));
+                        // Add more array type handling if necessary
+                    }
+                }
+            }
+        }
+
+        // --- Draw the full-screen quad ---
+        const posLoc = gl.getAttribLocation(this.program, "a_position");
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    }
+
+    //----------------------------------------------------------------
+    //  11. Utility Functions (for uniform processing)
+    //----------------------------------------------------------------
+    // Helper to get uniform location, caching results
+    _getUniformLocation(program, name) {
+        if (!this.uniformCache) this.uniformCache = {};
+        if (this.uniformCache[name] === undefined) {
+            this.uniformCache[name] = this.gl.getUniformLocation(program, name);
+        }
+        return this.uniformCache[name];
+    }
+
+    // Update warp geometry based on uniforms
+    _updateWarpGeometry(uniforms) {
+        // This function would contain the logic to recalculate warp geometry
+        // based on the current uniforms, especially if metric-aware calculations
+        // require changes to the underlying grid or vertex data.
+        // For now, it's a placeholder.
+        console.log("Warp geometry update triggered (placeholder)");
+    }
+
+    // Metric (covariant) for CPU-side ops (defaults to identity)
+    _getMetricHelpers() {
+        const uniforms = this.uniforms;
+        const G = (uniforms?.metric && uniforms.metric.length === 9)
+                    ? uniforms.metric
+                    : [1,0,0, 0,1,0, 0,0,1];
+        const dotG = (ax, ay, az, bx, by, bz) =>
+            ax*(G[0]*bx + G[3]*by + G[6]*bz) +
+            ay*(G[1]*bx + G[4]*by + G[7]*bz) +
+            az*(G[2]*bx + G[5]*by + G[8]*bz);
+        const normG = (x,y,z) => Math.sqrt(Math.max(1e-12, dotG(x,y,z, x,y,z)));
+
+        return { G, dotG, normG };
+    }
+
+    // Ellipsoid utilities (using consistent scene-scaled axes)
+    rhoEllipsoidal(p) {
+        const { axesScene, useMetric, metric } = this.uniforms;
+        const metricHelpers = this._getMetricHelpers(); // Get metric helpers
+
+        const pN = [p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]];
+        return useMetric ? metricHelpers.normG(pN[0], pN[1], pN[2]) : Math.hypot(pN[0], pN[1], pN[2]);
+    }
 }
