@@ -488,7 +488,7 @@ function PaneOverlay(props:{
       const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
       // optional: keep your paper clamp, but show it as "θ_paper"
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
-      
+
       // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
       const M_ship_kg  = Number.isFinite(shipMassKg as number) ? Number(shipMassKg) : NaN;
       const M_slice_kg = Number.isFinite(M_ship_kg) ? M_ship_kg * (flavor === 'REAL' ? viewFraction : 1.0) : NaN;
@@ -563,7 +563,7 @@ function PaneOverlay(props:{
             <div>
               <div className="opacity-80">Curvature (York-time proxy</div>
               <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
-              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_FR): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
+              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
             </div>
             <div>
               <div className="opacity-80">Exotic mass proxy (display-only</div>
