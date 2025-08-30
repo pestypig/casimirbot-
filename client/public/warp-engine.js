@@ -165,7 +165,7 @@ class WarpEngine {
                 userAgent: navigator.userAgent.slice(0, 100) + '...',
                 hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown',
                 platform: navigator.platform,
-                gpu: (navigator as any)?.gpu ? 'Available' : 'Not available',
+                gpu: navigator.gpu ? 'Available' : 'Not available',
                 onLine: navigator.onLine
             });
 
@@ -570,6 +570,11 @@ uniform int   u_ridgeMode;
 uniform float u_epsilonTilt;
 uniform vec3  u_betaTiltVec;
 
+// Metric tensor uniforms (covariant & inverse)
+uniform mat3 u_metric;
+uniform mat3 u_metricInv;
+uniform bool u_useMetric;
+
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -625,9 +630,16 @@ vec3 seqTealLime(float u) {
   return mix(a,b, pow(u, 0.8));
 }
 
+// Metric-aware helper functions
+float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
+float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
+vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
+
 float purpleShiftWeight(vec3 normalWS) {
   // signed tilt along β; clamp to avoid NaNs if ε=0
-  float proj = dot(normalize(u_betaTiltVec), normalize(normalWS));
+  vec3 beta_normalized = u_useMetric ? normalizeG(u_betaTiltVec) : normalize(u_betaTiltVec);
+  vec3 normal_normalized = u_useMetric ? normalizeG(normalWS) : normalize(normalWS);
+  float proj = u_useMetric ? dotG(beta_normalized, normal_normalized) : dot(beta_normalized, normal_normalized);
   return u_epsilonTilt * proj; // small signed number
 }
 void main() {
@@ -652,9 +664,9 @@ void main() {
   float tBoost    = isREAL ? 1.0 : max(1.0, u_curvatureBoostMax);
 
   vec3 pN = v_pos / axes;
-  float rs = length(pN) + 1e-6;
-  vec3 dN = normalize(u_driveDir / axes);
-  float xs = dot(pN, dN);
+  float rs = (u_useMetric ? normG(pN) : length(pN)) + 1e-6;
+  vec3 dN = u_useMetric ? normalizeG(u_driveDir / axes) : normalize(u_driveDir / axes);
+  float xs = u_useMetric ? dotG(pN, dN) : dot(pN, dN);
   float w = max(1e-4, u_wallWidth);
   float delta = (rs - 1.0) / w;
   float f     = exp(-delta*delta);
@@ -815,6 +827,11 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // Purple shift uniforms
             epsilonTilt: gl.getUniformLocation(program, 'u_epsilonTilt'),
             betaTiltVec: gl.getUniformLocation(program, 'u_betaTiltVec'),
+
+            // Metric tensor uniforms
+            metric: gl.getUniformLocation(program, 'u_metric'),
+            metricInv: gl.getUniformLocation(program, 'u_metricInv'),
+            useMetric: gl.getUniformLocation(program, 'u_useMetric'),
         };
 
         // (Optional) quick sanity log once
@@ -1176,13 +1193,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           gammaVdB: gammaVdBIn,
           currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
-
-        // --- Parity-aware defaults ---
-        const isREAL = !!parity;
-        // SHOW should be "instantaneous" (no √(FR) averaging), REAL uses FR-averaged
-        const viewAvgResolved = (parameters?.viewAvg !== undefined) ? !!parameters.viewAvg : isREAL;
-        // What sectorCount should the pane *think* it sees
-        const sectorCountOut  = isREAL ? sectorsTotal : sectorsConcurrent;
 
         // Duty used in the chain:
         //  - REAL: Ford–Roman averaged (dutyLocal × S_live/S_total)
@@ -1798,6 +1808,16 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (this.gridUniforms.betaTiltVec) {
             const betaTilt = V3(u.betaTiltVec, [0, -1, 0]);
             gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+        }
+
+        // --- Metric tensor uniforms (default to identity if not provided)
+        const metric = u.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = u.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = u.useMetric || false;
+        if (this.gridUniforms.metric) {
+            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
+            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
+            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
         }
 
 
