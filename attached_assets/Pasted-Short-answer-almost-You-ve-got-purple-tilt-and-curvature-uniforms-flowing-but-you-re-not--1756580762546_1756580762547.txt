@@ -1,0 +1,240 @@
+Short answer: **almost**. You’ve got purple-tilt and curvature uniforms flowing, but you’re **not** pushing the metric toggles/matrices the fragment expects (`u_useMetric`, `u_metric`, `u_metricInv`). Also, your names are currently `epsilonTilt`/`betaTiltVec` while the shader uses `u_epsilonTilt`/`u_betaTiltVec` (most engines alias these, but let’s make it explicit so there’s no reliance on mapper magic).
+
+Below are surgical diffs to make this inspector *conform 1:1* with the patched engine.
+
+---
+
+### 1) Sanitize + default the metric uniforms
+
+Add identity defaults, boolean clamp, and shape checks so we never send garbage.
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+ function sanitizeUniforms(u: any = {}) {
+   const s = { ...u };
+@@
+   if ('betaTiltVec' in s && Array.isArray(s.betaTiltVec)) {
+     const v = s.betaTiltVec.map(Number);
+     const L = Math.hypot(v[0]||0,v[1]||0,v[2]||0) || 1;
+     s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L];
+   }
++
++  // Metric uniforms: defaults = identity and off
++  if (!('useMetric' in s)) s.useMetric = false;
++  s.useMetric = !!s.useMetric;
++  const I = [1,0,0, 0,1,0, 0,0,1];
++  const isMat3 = (m:any)=> Array.isArray(m) && m.length===9 && m.every((x:any)=>Number.isFinite(+x));
++  s.metric    = isMat3(s.metric)    ? s.metric.map(Number)    : I;
++  s.metricInv = isMat3(s.metricInv) ? s.metricInv.map(Number) : I;
++
++  // Also provide u_* aliases explicitly to match shader names
++  s.u_useMetric   = s.useMetric;
++  s.u_metric      = s.metric;
++  s.u_metricInv   = s.metricInv;
++  s.u_epsilonTilt = s.epsilonTilt ?? 0;
++  s.u_betaTiltVec = s.betaTiltVec ?? [0,-1,0];
+ 
+   return s;
+ }
+```
+
+---
+
+### 2) Compute a sensible default metric (ellipsoidal scale) and wire into payloads
+
+This gives you an immediate “metric-on” that matches your ellipsoid axes; override later with real tensors.
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+   const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
++  // Simple diagonal metric in world units (inverse-square scaling in each axis)
++  const metricDiag = useMemo(() => {
++    const ax = Math.max(1e-9, +hull.a||503.5);
++    const by = Math.max(1e-9, +hull.b||132.0);
++    const cz = Math.max(1e-9, +hull.c||86.5);
++    // g_ij = diag(1/a^2, 1/b^2, 1/c^2), so geodesic “radius” ~ ellipsoidal radius
++    const g = [1/(ax*ax),0,0,  0,1/(by*by),0,  0,0,1/(cz*cz)];
++    const inv = [ax*ax,0,0, 0,by*by,0, 0,0,cz*cz]; // inverse for future use
++    return { g, inv };
++  }, [hull.a, hull.b, hull.c]);
+@@
+   const showPayload = {
+     ...baseShared,
+     physicsParityMode: false,
+     ridgeMode: 1,
+     ...showPhys,
+@@
+     colorMode: 1, // Theta mode for visual enhancement
+     lockFraming: true
+   };
++
++  // Attach metric defaults to both panes (you can turn them off via useMetric=false)
++  (realPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
++  (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
++  (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
++  (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
++  (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
++  (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
+```
+
+---
+
+### 3) Push metric + purple uniforms on init for both engines
+
+Make sure the initial “lock” packets include the fields the shader reads.
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+           const realInitUniforms = {
+             exposure: 5.0,
+             zeroStop: 1e-7,
+             physicsParityMode: true,
+             parityMode: true, // Explicit fallback
+             ridgeMode: 0,
+-            colorMode: 2, // Force shear mode for truth view
++            colorMode: 2, // shear/”truth”
+             lockFraming: true,
++            // metric & purple tilt
++            useMetric: (props.baseShared?.useMetric ?? false),
++            metric:    (props.baseShared?.metric ?? metricDiag.g),
++            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
++            epsilonTilt,
++            betaTiltVec: betaTiltVecN,
+           };
+@@
+           const showInitUniforms = {
+             exposure: 7.5,
+             zeroStop: 1e-7,
+             physicsParityMode: false,
+             parityMode: false, // Explicit fallback
+             ridgeMode: 1,
+             curvatureGainT: 0.70,
+             curvatureBoostMax: 40,
+             userGain: 1.25,
+-            colorMode: 1, // Force theta mode for visual enhancement
++            colorMode: 1, // theta/cosmetic
+             lockFraming: true,
++            // metric & purple tilt
++            useMetric: (props.baseShared?.useMetric ?? false),
++            metric:    (props.baseShared?.metric ?? metricDiag.g),
++            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
++            epsilonTilt,
++            betaTiltVec: betaTiltVecN,
+           };
+```
+
+---
+
+### 4) Ensure the bus subscriber forwards the same fields (so server pushes override)
+
+You already merge purple here; add metric too.
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+         setHaveUniforms(true); // Mark that we've received first uniforms
+@@
+         const purple = {
+           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
+           betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
+         };
++        const metricU = {
++          useMetric:  props.baseShared?.useMetric  ?? u?.useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
++          metric:     props.baseShared?.metric     ?? u?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
++          metricInv:  props.baseShared?.metricInv  ?? u?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
++        };
+ 
+         if (leftEngine.current) {
+-          applyToEngine(leftEngine.current, { ...u, ...purple, physicsParityMode: true,  ridgeMode: 0 });
++          applyToEngine(leftEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+         }
+         if (rightEngine.current) {
+-          applyToEngine(rightEngine.current, { ...u, ...purple, physicsParityMode: false, ridgeMode: 1 });
++          applyToEngine(rightEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+         }
+```
+
+---
+
+### 5) Optionally expose a quick “Metric On/Off” dev toggle (handy for A/B)
+
+Totally optional, but helpful while validating.
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+   const [useMassGamma, setUseMassGamma] = useState(false);
++  const [useMetric, setUseMetric] = useState(!!props.baseShared?.useMetric);
+@@
+         <div className="rounded-2xl border border-neutral-200 p-4">
+           <h4 className="font-medium mb-3">Debug Toggles</h4>
+           <fieldset className="flex gap-3 text-xs">
+@@
+             <label className="flex items-center gap-1">
+               <input type="checkbox" checked={forceAvg} onChange={e=>setForceAvg(e.target.checked)} />
+               Force FR-avg
+             </label>
++            <label className="flex items-center gap-1">
++              <input
++                type="checkbox"
++                checked={useMetric}
++                onChange={e=>{
++                  const v = e.target.checked;
++                  setUseMetric(v);
++                  const patch = sanitizeUniforms({ useMetric: v, metric: metricDiag.g, metricInv: metricDiag.inv });
++                  pushLeft.current(paneSanitize('REAL', patch), 'REAL');
++                  pushRight.current(paneSanitize('SHOW', patch), 'SHOW');
++                }}
++              />
++              Metric on
++            </label>
+           </fieldset>
+```
+
+---
+
+### 6) (Optional) Curvature debug palette
+
+If you want to test the curvature channel I added (palette = 6), add a quick button:
+
+```diff
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+           <button
+             onClick={() => {
+               dumpUniforms(leftEngine.current, 'REAL');
+               dumpUniforms(rightEngine.current, 'SHOW');
+             }}
+             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
+           >Dump uniforms + diagnostics</button>
++          <button
++            onClick={()=>{
++              pushLeft.current({ colorMode: 6 }, 'REAL');
++              pushRight.current({ colorMode: 6 }, 'SHOW');
++            }}
++            className="ml-2 px-3 py-1 rounded bg-indigo-700 text-white text-sm"
++          >Curvature Debug</button>
+```
+
+---
+
+## Why this matters
+
+* The fragment shader explicitly reads **`u_useMetric`, `u_metric`, `u_metricInv`** and **`u_*` purple uniforms**. Your inspector was only shipping purple (and without `u_` aliases) and **not** shipping the metric toggles/matrices. With these diffs:
+
+  * You always send identity metric when off (so Euclidean remains unchanged).
+  * You can flip to a proper ellipsoidal metric instantly by checking “Metric on”.
+  * The purple modulation and curvature boosts remain wired and consistent.
+  * Names match the shader, removing reliance on any hidden aliasing.
+
+If you drop these in, the file conforms to the patched engine’s expectations.

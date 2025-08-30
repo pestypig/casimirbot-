@@ -161,6 +161,21 @@ function sanitizeUniforms(u: any = {}) {
     s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L];
   }
 
+  // Metric uniforms: defaults = identity and off
+  if (!('useMetric' in s)) s.useMetric = false;
+  s.useMetric = !!s.useMetric;
+  const I = [1,0,0, 0,1,0, 0,0,1];
+  const isMat3 = (m:any)=> Array.isArray(m) && m.length===9 && m.every((x:any)=>Number.isFinite(+x));
+  s.metric    = isMat3(s.metric)    ? s.metric.map(Number)    : I;
+  s.metricInv = isMat3(s.metricInv) ? s.metricInv.map(Number) : I;
+
+  // Also provide u_* aliases explicitly to match shader names
+  s.u_useMetric   = s.useMetric;
+  s.u_metric      = s.metric;
+  s.u_metricInv   = s.metricInv;
+  s.u_epsilonTilt = s.epsilonTilt ?? 0;
+  s.u_betaTiltVec = s.betaTiltVec ?? [0,-1,0];
+
   return s;
 }
 
@@ -694,6 +709,7 @@ export default function WarpRenderInspector(props: {
   const [lockRidge, setLockRidge] = useState(true);
   const [forceAvg, setForceAvg] = useState(true);
   const [useMassGamma, setUseMassGamma] = useState(false);
+  const [useMetric, setUseMetric] = useState(!!props.baseShared?.useMetric);
 
   // Curvature control
   const [curvT, setCurvT] = useState(0.45);
@@ -705,6 +721,34 @@ export default function WarpRenderInspector(props: {
 
   // Hull geometry for epsilon calculations
   const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
+  // Simple diagonal metric in world units (inverse-square scaling in each axis)
+  const metricDiag = useMemo(() => {
+    const ax = Math.max(1e-9, +hull.a||503.5);
+    const by = Math.max(1e-9, +hull.b||132.0);
+    const cz = Math.max(1e-9, +hull.c||86.5);
+    // g_ij = diag(1/a^2, 1/b^2, 1/c^2), so geodesic "radius" ~ ellipsoidal radius
+    const g = [1/(ax*ax),0,0,  0,1/(by*by),0,  0,0,1/(cz*cz)];
+    const inv = [ax*ax,0,0, 0,by*by,0, 0,0,cz*cz]; // inverse for future use
+    return { g, inv };
+  }, [hull.a, hull.b, hull.c]);
+
+  // Calculate Purple shift parameters early for use in initial uniforms
+  const gTargets: Record<string, number> = {
+    hover: 0.980665,     cruise: 0.980665, 
+    emergency: 0.980665, standby: 0.980665
+  };
+  const effectiveMode = currentMode || 'hover';
+  const modeKey = effectiveMode.toLowerCase();
+  const gTarget = gTargets[modeKey] ?? 0;
+  const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
+  const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (299792458 * 299792458)));
+  const betaTiltVecRaw = [0, -1, 0]; // canonical "nose down"
+  const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
+  const betaTiltVecN: [number, number, number] = [
+    betaTiltVecRaw[0] / betaNorm,
+    betaTiltVecRaw[1] / betaNorm,
+    betaTiltVecRaw[2] / betaNorm
+  ];
 
   /**  
    * Compute θ using exactly the physics pipeline formula  
@@ -979,8 +1023,14 @@ export default function WarpRenderInspector(props: {
             physicsParityMode: true,
             parityMode: true, // Explicit fallback
             ridgeMode: 0,
-            colorMode: 2, // Force shear mode for truth view
-            lockFraming: true
+            colorMode: 2, // shear/"truth"
+            lockFraming: true,
+            // metric & purple tilt
+            useMetric: (props.baseShared?.useMetric ?? false),
+            metric:    (props.baseShared?.metric ?? metricDiag.g),
+            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
+            epsilonTilt: purpleShift.epsilonTilt,
+            betaTiltVec: purpleShift.betaTiltVecN,
           };
 
           console.log("Applying REAL initial uniforms:", realInitUniforms);
@@ -1067,8 +1117,14 @@ export default function WarpRenderInspector(props: {
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
             userGain: 1.25,
-            colorMode: 1, // Force theta mode for visual enhancement
-            lockFraming: true
+            colorMode: 1, // theta/cosmetic
+            lockFraming: true,
+            // metric & purple tilt
+            useMetric: (props.baseShared?.useMetric ?? false),
+            metric:    (props.baseShared?.metric ?? metricDiag.g),
+            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
+            epsilonTilt: purpleShift.epsilonTilt,
+            betaTiltVec: purpleShift.betaTiltVecN,
           };
 
           console.log("Applying SHOW initial uniforms:", showInitUniforms);
@@ -1156,12 +1212,17 @@ export default function WarpRenderInspector(props: {
           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
           betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
         };
+        const metricU = {
+          useMetric:  props.baseShared?.useMetric  ?? u?.useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
+          metric:     props.baseShared?.metric     ?? u?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
+          metricInv:  props.baseShared?.metricInv  ?? u?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
+        };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...u, ...purple, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...u, ...purple, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
         }
 
         // Unmute engines when canonical uniforms arrive
@@ -1471,6 +1532,11 @@ export default function WarpRenderInspector(props: {
       lockFraming: true
     };
 
+    // Attach metric defaults to both panes (you can turn them off via useMetric=false)
+    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
+    (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
+
     // Build SHOW payload (UI boosted)
     const showThetaScale = computeThetaScale(showPhys);
     const showPayload = {
@@ -1488,6 +1554,9 @@ export default function WarpRenderInspector(props: {
       colorMode: 1, // Theta mode for visual enhancement
       lockFraming: true
     };
+    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
+    (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
 
 
@@ -1782,6 +1851,20 @@ export default function WarpRenderInspector(props: {
               <input type="checkbox" checked={forceAvg} onChange={e=>setForceAvg(e.target.checked)} />
               Force FR-avg
             </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={useMetric}
+                onChange={e=>{
+                  const v = e.target.checked;
+                  setUseMetric(v);
+                  const patch = sanitizeUniforms({ useMetric: v, metric: metricDiag.g, metricInv: metricDiag.inv });
+                  pushLeft.current(paneSanitize('REAL', patch), 'REAL');
+                  pushRight.current(paneSanitize('SHOW', patch), 'SHOW');
+                }}
+              />
+              Metric on
+            </label>
           </fieldset>
           <fieldset className="text-xs mt-2 pt-2 border-t border-red-300">
             <label className="flex items-center gap-2 text-red-400">
@@ -1828,6 +1911,13 @@ export default function WarpRenderInspector(props: {
             }}
             className="px-3 py-1 rounded bg-neutral-900 text-white text-sm"
           >Dump uniforms + diagnostics</button>
+          <button
+            onClick={()=>{
+              pushLeft.current({ colorMode: 6 }, 'REAL');
+              pushRight.current({ colorMode: 6 }, 'SHOW');
+            }}
+            className="ml-2 px-3 py-1 rounded bg-indigo-700 text-white text-sm"
+          >Curvature Debug</button>
           <p className="text-xs text-neutral-500 mt-2">Opens a concise table/diagnostics in DevTools.</p>
           <button
             onClick={debugEngineStates}
