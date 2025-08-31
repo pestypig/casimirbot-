@@ -1,19 +1,67 @@
+
 /**
  * Energy Pipeline Display Component (aligned with Helix-Core)
  * Shares pipeline mode + FR duty with the rest of the app
+ * + Green's-function (φ = G * ρ) stage with live stats and publish-to-renderer
  */
 
-import { useEffect, useMemo, startTransition } from "react";
+import { useEffect, useMemo, startTransition, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp } from "lucide-react";
+import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp, Activity } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 
+// ---------- Green's helpers (local, no new deps) ----------
+type Vec3 = [number, number, number];
+type Kernel = (r: number) => number;
+
+// safe kernels (avoid r=0 blowup)
+const poissonKernel: Kernel = r => 1 / (4 * Math.PI * Math.max(r, 1e-6));
+const helmholtzKernel = (m: number): Kernel =>
+  r => Math.exp(-m * Math.max(r, 1e-6)) / (4 * Math.PI * Math.max(r, 1e-6));
+
+function computeGreenPotential(
+  positions: Vec3[],
+  rho: number[],
+  kernel: Kernel,
+  normalize = true
+): Float32Array {
+  const N = positions.length;
+  const out = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    let sum = 0;
+    const [xi, yi, zi] = positions[i];
+    for (let j = 0; j < N; j++) {
+      const [xj, yj, zj] = positions[j];
+      const dx = xi - xj, dy = yi - yj, dz = zi - zj;
+      const r = Math.hypot(dx, dy, dz) + 1e-6;
+      sum += kernel(r) * rho[j];
+    }
+    out[i] = sum;
+  }
+  if (normalize) {
+    let min = +Infinity, max = -Infinity;
+    for (let i = 0; i < N; i++) { const v = out[i]; if (v < min) min = v; if (v > max) max = v; }
+    const span = max - min || 1;
+    for (let i = 0; i < N; i++) out[i] = (out[i] - min) / span;
+  }
+  return out;
+}
+
+function stats(arr: ArrayLike<number>) {
+  let min = +Infinity, max = -Infinity, sum = 0;
+  const N = arr.length;
+  for (let i = 0; i < N; i++) {
+    const v = arr[i] as number;
+    if (v < min) min = v; if (v > max) max = v; sum += v;
+  }
+  return { min, max, mean: N ? sum / N : 0, N };
+}
+
+// ---------- Component ----------
 type EnergyPipelineProps = {
-  /** Optional precomputed snapshot (e.g., from a one-off sim). Live pipeline always wins if present */
   results?: any;
-  /** If true, show small inline mode switcher here too (uses the same hook Helix-Core uses) */
   allowModeSwitch?: boolean;
 };
 
@@ -23,7 +71,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const switchMode = useSwitchMode();
   const queryClient = useQueryClient();
 
-  // --- Metrics (to reconstruct FR duty if server didn't put it on pipeline) ---
+  // --- Metrics (to reconstruct FR duty or find tiles if server didn't inject them) ---
   const { data: systemMetrics } = useQuery({
     queryKey: ["/api/helix/metrics"],
     refetchInterval: 5000,
@@ -39,7 +87,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "cruise" | "emergency";
 
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
-  // FR duty ≈ local on-window × (concurrent / total). local on-window ≈ 1% if not provided
   const dutyEffectiveFR: number = useMemo(() => {
     const frFromPipeline =
       (live as any)?.dutyEffectiveFR ??
@@ -57,7 +104,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     const concurrentSectors = Math.max(1, Math.min(S_total, Math.floor((live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors ?? 1)));
     const S_live = Math.max(1, Math.min(S_total, Math.floor(concurrentSectors || 1)));
 
-    return clamp01(dutyLocal * (S_live / S_total)); // ← with S_live=1 this is 0.01/400
+    return clamp01(dutyLocal * (S_live / S_total));
   }, [live, systemMetrics]);
 
   // UI duty (for display only)
@@ -83,19 +130,12 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // Per-tile ON-window dissipation (with robust fallbacks)
   const P_tile_on = useMemo(() => {
-    // 1) server-calibrated value wins if present
     const fromPipeline = (live as any)?.P_tile_on_W;
     if (isFiniteNum(fromPipeline)) return fromPipeline;
-
-    // 2) physics chain (preferred when U_static is available)
     const base = Math.abs(U_geo_raw) * ω; // P_tile_on = U_geo_raw · ω
     if (base > 0) return base;
-
-    // 3) backsolve from ship-avg: P_tile_on ≈ (P_avg / N_tiles) / d_FR
-    // (use P_avg if server provided it)
     const P_avg_fromSrv_MW = (live as any)?.P_avg;
     const P_avg_fromSrv_W = isFiniteNum(P_avg_fromSrv_MW) ? P_avg_fromSrv_MW * 1e6 : undefined;
-
     if (isFiniteNum(P_avg_fromSrv_W) && N > 0 && dutyEffectiveFR > 0) {
       return (P_avg_fromSrv_W / N) / Math.max(1e-12, dutyEffectiveFR);
     }
@@ -109,8 +149,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const P_avg_W = isFiniteNum(live?.P_avg) ? live.P_avg * 1e6 : P_total_W;
   const m_exotic = isFiniteNum(live?.M_exotic) ? live.M_exotic : (Number(live?.M_exotic_raw) || 0);
 
-  // Time-scale separation — keep semantics consistent with Helix-Core HUD:
-  // "SAFE" when TS_ratio >> 1 (long > light-crossing, i.e., homogenized)
+  // Time-scale separation
   const TS_ratio = isFiniteNum(live?.TS_ratio) ? live.TS_ratio : isFiniteNum(live?.TS_long) ? live.TS_long : undefined;
 
   // Derive τ_Q from Q and ω
@@ -129,21 +168,16 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const StatusBadge = ({ ok }: { ok: boolean }) =>
     ok ? <Badge className="bg-green-100 text-green-800">PASS</Badge> : <Badge className="bg-red-100 text-red-800">FAIL</Badge>;
 
-  // Validation targets (show "as-computed" rather than arbitrary specs)
-  const targets = {
-    U_cycle: Math.abs(U_cycle),
-    m_exotic,
-    P_total: P_avg_W,
-    TS_ratio
-  };
+  // Validation targets (show "as-computed")
+  const targets = { U_cycle: Math.abs(U_cycle), m_exotic, P_total: P_avg_W, TS_ratio };
   const validation = {
     U_cycle: true,
     m_exotic: true,
     P_total: true,
-    TS_ratio: isFiniteNum(TS_ratio) ? TS_ratio > 1 : false // consistent with HUD ("SAFE" when > 1)
+    TS_ratio: isFiniteNum(TS_ratio) ? TS_ratio > 1 : false
   };
 
-  // --- Publish a shared derived object so all panels can subscribe consistently ---
+  // --- Share derived values globally for other panels (unchanged) ---
   useEffect(() => {
     const tau_LC_ms = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
     queryClient.setQueryData(["helix:pipeline:derived"], {
@@ -152,7 +186,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       dutyEffectiveFR,
       P_tile_on_W: P_tile_on,
       P_total_W: P_avg_W,
-      // expose both ASCII and Unicode keys for convenience
       tau_Q_ms: τ_Q_ms,
       τ_Q_ms,
       tau_LC_ms,
@@ -164,11 +197,81 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       sectorsTotal: (systemMetrics as any)?.totalSectors ?? (live as any)?.sectorCount,
       sectorsConcurrent: (live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors,
     });
-  }, [
-    mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms,
-    live, N, fGHz, γ_geo, Q, systemMetrics, queryClient
-  ]);
+  }, [mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms, live, N, fGHz, γ_geo, Q, systemMetrics, queryClient]);
 
+  // ========================================================================
+  //                       GREEN'S FUNCTION (NEW)
+  // ========================================================================
+  // 1) Try to use server-provided greens payload first
+  const serverGreens = (live as any)?.greens as
+    | { phi?: number[] | Float32Array; kind?: "poisson" | "helmholtz"; m?: number; normalize?: boolean }
+    | undefined;
+
+  // 2) Else attempt on-client build from available tiles: [{ pos:[x,y,z], t00 }]
+  const clientTiles = useMemo(() => {
+    // look in pipeline first, then metrics
+    const tA = (live as any)?.tiles as { pos: Vec3; t00: number }[] | undefined;
+    const tB = (systemMetrics as any)?.tiles as { pos: Vec3; t00: number }[] | undefined;
+    return Array.isArray(tA) ? tA : (Array.isArray(tB) ? tB : undefined);
+  }, [live, systemMetrics]);
+
+  // Kernel selection: prefer what the server says, else Poisson
+  const greenKind = (serverGreens?.kind === "helmholtz" || serverGreens?.kind === "poisson")
+    ? serverGreens.kind
+    : "poisson";
+  const mHelm = isFiniteNum(serverGreens?.m) ? (serverGreens?.m as number) : 0; // 0 → Poisson limit when used
+  const normalizeGreens = serverGreens?.normalize !== false; // default true
+
+  // Compute or adopt φ
+  const greenPhi = useMemo(() => {
+    // server-provided wins
+    if (serverGreens?.phi && (serverGreens.phi as any).length > 0) {
+      const arr = serverGreens.phi instanceof Float32Array
+        ? serverGreens.phi
+        : new Float32Array(serverGreens.phi);
+      return { phi: arr, source: "server" as const };
+    }
+
+    // otherwise derive on the client if we have tiles
+    if (clientTiles && clientTiles.length > 0) {
+      const positions: Vec3[] = clientTiles.map(t => t.pos);
+      const rho: number[] = clientTiles.map(t => t.t00); // time-averaged T00 per tile
+
+      const kernel = (greenKind === "helmholtz")
+        ? helmholtzKernel(Math.max(0, mHelm))
+        : poissonKernel;
+
+      const phi = computeGreenPotential(positions, rho, kernel, normalizeGreens);
+      return { phi, source: "client" as const };
+    }
+
+    // no data available
+    return { phi: new Float32Array(0), source: "none" as const };
+  }, [serverGreens, clientTiles, greenKind, mHelm, normalizeGreens]);
+
+  const greenStats = useMemo(() => stats(greenPhi.phi), [greenPhi]);
+
+  // Publisher for renderer: exposes a canonical query cache + fires a window event
+  const publishGreens = useCallback(() => {
+    const payload = {
+      kind: greenKind,
+      m: mHelm,
+      normalize: normalizeGreens,
+      phi: greenPhi.phi,     // Float32Array
+      size: greenPhi.phi.length,
+      source: greenPhi.source
+    };
+    // cache it so any consumer (inspector/engine adapter) can grab it
+    queryClient.setQueryData(["helix:pipeline:greens"], payload);
+    // also broadcast for engines already listening in the tab
+    try {
+      window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload }));
+    } catch {}
+  }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient]);
+
+  // ========================================================================
+  //                               UI
+  // ========================================================================
   return (
     <div className="space-y-6">
       <Card>
@@ -268,7 +371,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
             <div className="space-y-4">
               <h4 className="font-semibold text-sm">5. Power (per cavity, ON-window)</h4>
               <div className="bg-muted rounded-lg p-4">
-                {/* correct label: P_tile_on = (U_Q * ω / Q) = U_geo_raw * ω */}
                 <div className="text-sm text-muted-foreground">P_tile_on = U_geo_raw · ω</div>
                 <div className="font-mono text-lg">{sci(P_tile_on)} W</div>
                 <div className="text-xs text-muted-foreground mt-1">ω = {sci(ω)} rad/s</div>
@@ -279,7 +381,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
             <div className="space-y-4">
               <h4 className="font-semibold text-sm">6. Time-Scale Separation</h4>
               <div className="bg-muted rounded-lg p-4">
-                <div className="text-sm text-muted-foreground">TS = {`τ_long / τ_LC`}</div>
+                <div className="text-sm text-muted-foreground">TS = τ_long / τ_LC</div>
                 <div className="font-mono text-lg">{isFiniteNum(TS_ratio) ? TS_ratio.toExponential(2) : "—"}</div>
                 <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
                   Should be ≫ 1
@@ -287,6 +389,49 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 </div>
               </div>
             </div>
+
+            {/* 7. Green's Potential (NEW) */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Activity className="h-4 w-4" />
+                7. Green's Potential (φ = G * ρ)
+                {greenPhi.source !== "none" ? (
+                  <Badge variant="outline" className="ml-2">{greenPhi.source.toUpperCase()}</Badge>
+                ) : null}
+              </h4>
+              <div className="bg-muted rounded-lg p-4">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="text-muted-foreground">Kernel</div>
+                  <div className="font-mono">
+                    {greenKind === "helmholtz" ? `Helmholtz (m=${mHelm})` : "Poisson"}
+                    {normalizeGreens ? " · norm" : ""}
+                  </div>
+                  <div className="text-muted-foreground">N (tiles)</div>
+                  <div className="font-mono">{greenStats.N || "—"}</div>
+                  <div className="text-muted-foreground">φ_min</div>
+                  <div className="font-mono">{isFiniteNum(greenStats.min) ? greenStats.min.toExponential(3) : "—"}</div>
+                  <div className="text-muted-foreground">φ_max</div>
+                  <div className="font-mono">{isFiniteNum(greenStats.max) ? greenStats.max.toExponential(3) : "—"}</div>
+                  <div className="text-muted-foreground">φ_mean</div>
+                  <div className="font-mono">{isFiniteNum(greenStats.mean) ? greenStats.mean.toExponential(3) : "—"}</div>
+                </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button
+                    className="px-2 py-1 text-xs rounded bg-slate-900 border border-slate-700"
+                    onClick={publishGreens}
+                    disabled={greenPhi.phi.length === 0}
+                    title="Publish φ to renderer (broadcast + cache)"
+                  >
+                    Publish to renderer
+                  </button>
+                  <span className="text-xs text-muted-foreground self-center">
+                    Emits <code>helix:greens</code> & caches <code>["helix:pipeline:greens"]</code>
+                  </span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </CardContent>
       </Card>
