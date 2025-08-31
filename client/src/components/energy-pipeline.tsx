@@ -257,13 +257,24 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // Publisher for renderer: exposes a canonical query cache + fires a window event
   const publishGreens = useCallback(() => {
+    // Pull timing to assess reciprocity (instant snapshot vs cycle-avg)
+    const tauLC_ms = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+    const burst_ms = Number((live as any)?.burst_ms);
+    const reciprocity =
+      Number.isFinite(burst_ms) && Number.isFinite(tauLC_ms)
+        ? (burst_ms < tauLC_ms
+            ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
+            : { status: "PASS_AVG",       message: "burst ≥ τ_LC → avg. reciprocal" })
+        : { status: "UNKNOWN", message: "missing burst/τ_LC" };
+
     const payload = {
       kind: greenKind,
       m: mHelm,
       normalize: normalizeGreens,
       phi: greenPhi.phi,     // Float32Array
       size: greenPhi.phi.length,
-      source: greenPhi.source
+      source: greenPhi.source,
+      reciprocity
     };
     // cache it so any consumer (inspector/engine adapter) can grab it
     queryClient.setQueryData(["helix:pipeline:greens"], payload);
@@ -271,7 +282,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     try {
       window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload }));
     } catch {}
-  }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient]);
+  }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient, live]);
 
   // LIVE READING: auto-publish whenever phi/config changes and φ is non-empty
   const lastSigRef = useRef<string>("");
@@ -448,6 +459,16 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                   <div className="font-mono">{fmtExp(greenStats.max)}</div>
                   <div className="text-muted-foreground">φ_mean</div>
                   <div className="font-mono">{fmtExp(greenStats.mean)}</div>
+                  {/* Reciprocity status (instant vs cycle-avg) */}
+                  <div className="text-muted-foreground">Reciprocity</div>
+                  <div className="font-mono">
+                    {(() => {
+                      const tauLC = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+                      const burst  = Number((live as any)?.burst_ms);
+                      if (!Number.isFinite(burst) || !Number.isFinite(tauLC)) return "—";
+                      return burst < tauLC ? "BROKEN (inst.)" : "PASS (avg.)";
+                    })()}
+                  </div>
                 </div>
 
                 <div className="mt-3 flex gap-2">
