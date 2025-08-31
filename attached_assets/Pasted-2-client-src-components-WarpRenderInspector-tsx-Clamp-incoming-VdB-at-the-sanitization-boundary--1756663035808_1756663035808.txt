@@ -1,0 +1,76 @@
+2) client/src/components/WarpRenderInspector.tsx
+
+Clamp incoming γ_VdB at the sanitization boundary and keep theta derived from physics only. (You already stopped sending thetaScale; this just enforces sane γ_VdB values.)
+
+@@
+-  if ('gammaVanDenBroeck_mass' in s) {
+-    s.gammaVanDenBroeck_mass = Number.isFinite(s.gammaVanDenBroeck_mass)
+-      ? Math.max(1, s.gammaVanDenBroeck_mass)
+-      : 1.35e5;
+-  }
+-  if ('gammaVanDenBroeck_vis' in s) {
+-    s.gammaVanDenBroeck_vis = Number.isFinite(s.gammaVanDenBroeck_vis)
+-      ? Math.max(1, s.gammaVanDenBroeck_vis)
+-      : 1.35e5;
+-  }
++  // γ_VdB clamps (physics: keep realistic; paper ≈ 38.3; cap at 100)
++  const clampVdB = (v:any) => {
++    const x = Number(v);
++    const clamped = Number.isFinite(x) ? Math.max(1, Math.min(100, x)) : 38.3;
++    if (Number.isFinite(x) && x !== clamped) {
++      console.warn('[warp] γ_VdB clamped', { in: x, out: clamped });
++    }
++    return clamped;
++  };
++  if ('gammaVanDenBroeck_mass' in s) {
++    s.gammaVanDenBroeck_mass = clampVdB(s.gammaVanDenBroeck_mass);
++  }
++  if ('gammaVanDenBroeck_vis' in s) {
++    s.gammaVanDenBroeck_vis = clampVdB(s.gammaVanDenBroeck_vis);
++  }
++  if ('gammaVanDenBroeck' in s) {
++    s.gammaVanDenBroeck = clampVdB(s.gammaVanDenBroeck);
++  }
+
+
+Replace your local theta helper to use the shared lib (and the same clamps):
+
+-// physics θ helper (no SHOW boosts)
+-function thetaPhysicsFromUniforms(U: any) {
+-  const gammaGeo = +U.gammaGeo || 26;
+-  const q        = +U.qSpoilingFactor || 1;
+-  // Use Ford-Roman mass gamma, not visual gamma for physics calculations
+-  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
+-  const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
+-  const dRaw     = Number(U.dutyEffectiveFR);
+-  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.000025; // Use Ford-Roman duty as fallback
+-  return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
+-}
++import { computeThetaScale } from '@/lib/warp-theta';
++// physics θ helper (uses mass channel with clamped γ_VdB)
++function thetaPhysicsFromUniforms(U: any) {
++  return computeThetaScale({
++    gammaGeo: U.gammaGeo,
++    qSpoilingFactor: U.qSpoilingFactor,
++    gammaVanDenBroeck: U.gammaVanDenBroeck,
++    gammaVanDenBroeck_mass: U.gammaVanDenBroeck_mass,
++    dutyEffectiveFR: U.dutyEffectiveFR
++  }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 });
++}
+
+
+Also make sure the uniforms bus can’t slip a θ in:
+
+@@
+-    const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
++    const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+       setHaveUniforms(true);
+-      // bring purple...
++      // strip any external theta (engine computes it)
++      const { thetaScale, u_thetaScale, ...uSafe } = u || {};
+@@
+-      applyToEngine(leftEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
++      applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+@@
+-      applyToEngine(rightEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
++      applyToEngine(rightEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
