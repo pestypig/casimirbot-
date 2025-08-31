@@ -6,6 +6,7 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
+import { computeThetaScale } from '@/lib/warp-theta';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -1210,6 +1211,14 @@ export default function WarpBubbleCompare({
       // Force parity mode explicitly
       physicsParityMode: true,
       ridgeMode: 0,
+      // Use shared theta calculation with mass-focused gamma VdB
+      thetaScale: computeThetaScale({
+        gammaGeo: real.gammaGeo,
+        qSpoilingFactor: real.qSpoilingFactor,
+        gammaVanDenBroeck: real.gammaVanDenBroeck,
+        gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+        dutyEffectiveFR: real.dutyEffectiveFR
+      }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     // REAL (parity / Ford–Roman)
@@ -1225,7 +1234,6 @@ export default function WarpBubbleCompare({
       ...show,
       currentMode: parameters.currentMode,
       vShip: parameters.currentMode === 'standby' ? 0 : 1,
-      thetaScale: Math.max(0, Math.min(1e15, showTheta)), // clamp theta scale
       gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
       deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor ?? 1)), // clamp q-spoiling
       sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
@@ -1239,6 +1247,14 @@ export default function WarpBubbleCompare({
       // Force non-parity mode explicitly
       physicsParityMode: false,
       ridgeMode: 1,
+      // Use shared theta calculation with visual-focused gamma VdB, handle standby mode
+      thetaScale: parameters.currentMode === 'standby' ? 0 : computeThetaScale({
+        gammaGeo: show.gammaGeo,
+        qSpoilingFactor: show.qSpoilingFactor,
+        gammaVanDenBroeck: show.gammaVanDenBroeck,
+        gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
+        dutyEffectiveFR: show.dutyEffectiveFR
+      }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     console.log('Applying physics to engines:', {
