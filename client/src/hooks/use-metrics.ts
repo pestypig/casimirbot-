@@ -62,30 +62,60 @@ export type HelixMetrics = {
 };
 
 export function useMetrics(pollMs = 2000) {
+  // Configure API base once. In dev, point to your backend port.
+  // Example: VITE_API_BASE=http://localhost:3001
+  const API_BASE = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_BASE : '') || '';
   const [data, setData] = React.useState<HelixMetrics | null>(null);
   const [err, setErr] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let alive = true;
+    const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
     const tick = async () => {
       try {
-        const r = await fetch("/api/helix/metrics", {
+        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly
+        const ctrl = new AbortController();
+        const to = setTimeout(() => ctrl.abort(), 7000);
+        const r = await fetch(makeUrl("/api/helix/metrics"), {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
-          }
+          },
+          signal: ctrl.signal
         });
-        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-        const j = await r.json();
+        clearTimeout(to);
+        if (!r.ok) {
+          // Try to extract any text error for easier debugging
+          let body = '';
+          try { body = await r.text(); } catch {}
+          throw new Error(`HTTP ${r.status} ${r.statusText}${body ? ` — ${body.slice(0,200)}` : ''}`);
+        }
+        
+        // Some runtimes return empty; guard JSON parse
+        const text = await r.text();
+        const j = text ? JSON.parse(text) : null;
         if (alive) {
           setData(j);
           setErr(null); // Clear any previous errors
         }
       } catch (e: any) {
         if (alive) {
-          console.error('[useMetrics] Fetch error:', e);
-          setErr(e.message ?? "network error");
+          const msg = e?.name === 'AbortError'
+            ? 'request timeout (7s)'
+            : (e?.message || 'network error');
+          console.error('[useMetrics] Fetch error:', msg);
+          setErr(msg);
+          // Fallback mock so the Bridge stays interactive in dev
+          setData(d => d ?? {
+            energyOutput: 0,
+            exoticMass: 0,
+            timeScaleRatio: 0,
+            curvatureMax: 0,
+            fordRoman: { value: 0, limit: 1, status: 'PASS' },
+            modelMode: 'calibrated',
+            tiles: { tileArea_cm2: 25, hullArea_m2: null, N_tiles: 0 }
+          });
         }
       }
     };
