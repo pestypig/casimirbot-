@@ -1,6 +1,6 @@
 ;(() => {
   // Prevent duplicate loads (HMR, script re-inject, etc.)
-  const BUILD = globalThis.__APP_WARP_BUILD || 'dev';
+  const BUILD = globalThis.__APP_WARP_BUILD || 'dev-2';
   // Only skip if we've *already* executed this exact build.
   if (globalThis.__WARP_ENGINE_LOADED__ === BUILD) {
     console.warn('[warp-engine] duplicate load detected — same build; skipping body');
@@ -2492,7 +2492,7 @@ if (typeof module !== 'undefined' && module.exports) {
     WarpEngine.BUILD = BUILD;
     globalThis.__WarpEngineBuild = BUILD;
     globalThis.WarpEngine = WarpEngine;
-    console.log("WarpEngine class loaded - OPERATIONAL MODE INTEGRATION", Date.now());
+    console.log("🔥 PATCHED ENGINE BODY RUNNING - Build:", BUILD, "Time:", Date.now());
 }
 
 // Build token already stamped in guard section above
