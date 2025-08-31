@@ -404,7 +404,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
         sectors: sectorsResolved,           // viz strobing
         gammaGeo,
         qSpoilingFactor: qSpoil,
-        gammaVdB: gammaVdB_vis,         // use visual seed
+        gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // use pipeline physics value
         dutyEffectiveFR: dFRShip,           // 🔑 √d_FR source
       }),
       sectorCount: sectorCountResolved,
@@ -758,7 +758,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           sectors: sectorsResolved,
           gammaGeo,
           qSpoilingFactor: qSpoil,
-          gammaVdB: num(parameters.gammaVanDenBroeck, 1.4e5), // This line should be updated in the next block
+          gammaVdB: num(parameters.gammaVanDenBroeck, 2.86e5), // use pipeline physics value
           dutyEffectiveFR: dFRShip,
         }),
         sectorCount: sectorCountResolved,
@@ -774,7 +774,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
           Number.isFinite(p.gammaVanDenBroeck_vis) ? p.gammaVanDenBroeck_vis :
           Number.isFinite(p.gammaVanDenbroeck_vis) ? p.gammaVanDenbroeck_vis :
           Number.isFinite(p.gammaVanDenBroeck)     ? p.gammaVanDenBroeck :
-          Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 1.35e5;
+          Number.isFinite(p.gammaVanDenbroeck)     ? p.gammaVanDenbroeck : 2.86e5;
         return Math.max(1, Number(cand));
       };
       const gammaVdB_vis = resolveGammaVdBVis();

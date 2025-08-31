@@ -1294,17 +1294,18 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
-        // Apply mode-specific scaling for operational differentiation
-        if (!parity && !zeroStandby) {
+        // Apply mode-specific scaling for operational differentiation (disabled for pipeline compliance)
+        if (!parity && !zeroStandby && false) { // DISABLED: always use pure physics theta scale
           // SHOW mode: apply visual amplification for demonstration
           const modeAmplifier = mode === 'emergency' ? 2.0 : 
                                mode === 'cruise' ? 0.8 : 1.2; // hover default
           thetaScaleFromChain *= modeAmplifier;
         }
 
+        // Always prefer React-computed thetaScale for pipeline compliance
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
-          : thetaScaleFromChain;
+          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback but don't amplify
 
         // Debug operational mode theta calculation
         if (this._dbgThetaTick !== (this._dbgThetaTick||0)+1 % 30) {
@@ -1866,7 +1867,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
 
         // --- θ-scale (you already set a fallback in JS if missing)
-        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, F(u.thetaScale, 5.03e3));
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, u.thetaScale || 0); // Direct pipeline value, no fallback amplification
 
         // --- exposure / viz chain
         if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
