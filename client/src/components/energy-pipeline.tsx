@@ -1,4 +1,3 @@
-
 /**
  * Energy Pipeline Display Component (aligned with Helix-Core)
  * Shares pipeline mode + FR duty with the rest of the app
@@ -207,15 +206,15 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     | { phi?: number[] | Float32Array; kind?: "poisson" | "helmholtz"; m?: number; normalize?: boolean }
     | undefined;
 
-  // 2) Use any available client tiles from metrics (fallback - main Green's data comes from HelixCore hook now)
+  // 2) Use any available client tiles from metrics (server now emits `tileData`, legacy was `tiles`)
   const clientTiles = useMemo(() => {
-    // Try tileData first (current server format), then fallback to tiles (legacy)
-    const tiles = (systemMetrics as any)?.tileData || (systemMetrics as any)?.tiles;
+    const tiles =
+      (systemMetrics as any)?.tileData ||
+      (systemMetrics as any)?.tiles;
     if (!Array.isArray(tiles)) return undefined;
-    
     return tiles.map((t: any) => ({
       pos: t.pos as Vec3,
-      t00: t.t00 || 0
+      t00: t.t00 || 0,
     }));
   }, [systemMetrics]);
 

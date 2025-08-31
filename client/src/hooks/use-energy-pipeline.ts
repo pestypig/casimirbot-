@@ -78,6 +78,12 @@ export interface EnergyPipelineState {
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
 }
 
+// Server emits per-tile stress–energy samples for φ = G · ρ
+export type TileDatum = {
+  pos: [number, number, number];
+  t00: number;
+};
+
 // Chat message interface for HELIX-CORE
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -85,18 +91,22 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-// System metrics interface
+// System metrics interface (add tile arrays for φ compute back-compat)
 export interface SystemMetrics {
   totalTiles: number;
   activeTiles: number;
   currentMode?: string;
+  tileData?: TileDatum[]; // current server shape
+  tiles?: TileDatum[];    // legacy shape
 }
 
-// Helix metrics interface
+// Helix metrics interface (some callers read directly from here)
 export interface HelixMetrics {
   totalTiles: number;
   activeTiles: number;
   data?: any;
+  tileData?: TileDatum[];
+  tiles?: TileDatum[];
 }
 
 // Shared physics constants from pipeline backend
