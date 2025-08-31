@@ -1180,6 +1180,9 @@ export default function WarpRenderInspector(props: {
 
       // Subscribe to canonical uniforms
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+        // Guard against accidental theta injection on the bus
+        const { thetaScale, u_thetaScale, ...safe } = u || {};
+
         setHaveUniforms(true); // Mark that we've received first uniforms
 
         // bring purple back from props/baseShared (or last known engine value)
@@ -1194,10 +1197,10 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
         }
 
         // Unmute engines when canonical uniforms arrive
@@ -1491,13 +1494,12 @@ export default function WarpRenderInspector(props: {
     //   return calculated;
     // };
 
-    // Build REAL payload (Ford–Roman parity) - use physics chain thetaScale
+    // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
     const realPayload = {
       ...baseShared,
       physicsParityMode: true,
       ridgeMode: 0,
       ...realPhys,
-      // Let the engine compute thetaScale from the physics chain - don't override
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 2, // Shear proxy for truth view
@@ -1509,13 +1511,12 @@ export default function WarpRenderInspector(props: {
     (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
-    // Build SHOW payload (UI boosted) - use physics chain thetaScale
+    // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
     const showPayload = {
       ...baseShared,
       physicsParityMode: false,
       ridgeMode: 1,
       ...showPhys,
-      // Let the engine compute thetaScale from the physics chain - don't override
       exposure: 7.5,
       zeroStop: 1e-7,
       curvatureGainT: 0.70,
@@ -1617,7 +1618,15 @@ export default function WarpRenderInspector(props: {
     console.log('SHOW parity?', rightState?.uniforms?.physicsParityMode, '(should be false)');
     console.log('REAL ridge?', leftState?.uniforms?.ridgeMode, '(should be 0)');
     console.log('SHOW ridge?', rightState?.uniforms?.ridgeMode, '(should be 1)');
-    console.log('Theta scales - REAL:', leftState?.uniforms?.thetaScale?.toExponential?.(2), 'SHOW:', rightState?.uniforms?.thetaScale?.toExponential?.(2));
+    const thL = leftState?.uniforms?.thetaScale;
+    const thR = rightState?.uniforms?.thetaScale;
+    const thLact = leftState?.uniforms?.thetaScale_actual;
+    const thRact = rightState?.uniforms?.thetaScale_actual;
+    console.log(
+      'Theta scales - REAL:', thL?.toExponential?.(2),
+      'SHOW:', thR?.toExponential?.(2),
+      ' [engine actual]', thLact?.toExponential?.(2), thRact?.toExponential?.(2)
+    );
 
     // Check for parity violations and attempt correction
     if (leftState?.uniforms && leftState.uniforms.physicsParityMode !== true) {

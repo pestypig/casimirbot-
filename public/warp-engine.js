@@ -328,10 +328,16 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     updateUniforms(obj){
+        // Guard against external thetaScale overrides - engine computes this from physics chain
+        const { thetaScale, u_thetaScale, ...safeParameters } = obj || {};
+        if (thetaScale !== undefined || u_thetaScale !== undefined) {
+            console.warn('[WarpEngine] Ignored external thetaScale override - engine uses physics chain calculation');
+        }
+
         // --- Metric tensor wiring --------------------------------------------
         // Accept either explicit metric(s) or derive an ellipsoidal cometric.
         // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const parameters = obj; // Use 'parameters' to distinguish from internal uniforms
+        const parameters = safeParameters; // Use filtered parameters
         const prev = this.uniforms; // Store previous uniforms for comparison
 
         const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
@@ -374,6 +380,15 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
 
         // Update core uniforms
         Object.assign(this.uniforms, parameters);
+
+        // Compute thetaScale from physics chain (γ_geo³ · q · γ_VdB_mass · √d_eff)
+        const gammaGeo = this.uniforms.gammaGeo || this.uniforms.g_y || 26;
+        const qSpoil = this.uniforms.qSpoilingFactor || this.uniforms.q || 1;
+        const gammaVdB = this.uniforms.gammaVanDenBroeck_mass || this.uniforms.gammaVanDenBroeck || 38.3;
+        const dutyFR = Math.max(1e-12, this.uniforms.dutyEffectiveFR || 0.000025);
+        
+        this.uniforms.thetaScale = Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(dutyFR);
+        this.uniforms.thetaScale_actual = this.uniforms.thetaScale; // Store for diagnostics
 
         // Recompute warp geometry if necessary
         if (geoChanged) {
