@@ -44,7 +44,7 @@ function computeGreenPotential(
     let min = +Infinity, max = -Infinity;
     for (let i = 0; i < N; i++) { const v = out[i]; if (v < min) min = v; if (v > max) max = v; }
     const span = max - min || 1;
-    for (let i = 0; i < N; i++) out[i] = (out[i] - min) / span;
+    for (let i = 0; i i < N; i++) out[i] = (out[i] - min) / span;
   }
   return out;
 }
@@ -71,15 +71,18 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const switchMode = useSwitchMode();
   const queryClient = useQueryClient();
 
-  // --- Metrics (to reconstruct FR duty or find tiles if server didn't inject them) ---
+  // --- Metrics (system snapshot) ---
   const { data: systemMetrics } = useQuery({
     queryKey: ["/api/helix/metrics"],
-    refetchInterval: 5000,
+    // Make stats visibly live with mode changes & LC updates
+    refetchInterval: 1000,
   });
 
   // Helper type guards
-  const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
-  const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+  const C_M_PER_S = 299_792_458;
+  const ms = (s: number) => s * 1000;
+  const isFiniteNum = (x: any): x is number => typeof x === 'number' && Number.isFinite(x);
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
   // Prefer *live* pipeline; fall back to `results` snapshot
   const live = pipelineState ?? results ?? {};
