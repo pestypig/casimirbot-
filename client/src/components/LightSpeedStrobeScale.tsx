@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { toHUDModel } from "@/lib/hud-adapter";
@@ -15,6 +16,14 @@ type ScaleProps = {
 export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const { data: metrics } = useMetrics();
   const { data: pipeline } = useEnergyPipeline();
+  const qc = useQueryClient();
+
+  // Prefer the pipeline's derived snapshot for consistent τ_LC/duty across panels
+  const derived = qc.getQueryData(["helix:pipeline:derived"]) as any;
+  const dutyFRDerived = Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR : undefined;
+  const burstDerived = Number.isFinite(derived?.burst_ms) ? derived.burst_ms : undefined;
+  const dwellDerived = Number.isFinite(derived?.dwell_ms) ? derived.dwell_ms : undefined;
+  const sectorsTotalDerived = Number.isFinite(derived?.sectorsTotal) ? derived.sectorsTotal : undefined;
 
   // HUD model (source of truth with sensible fallbacks)
   const wu  = metrics?.warpUniforms ?? pipeline?.warpUniforms ?? null;
@@ -34,7 +43,10 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
     // 1) explicit prop (ms)
     if (Number.isFinite(props.tauLcMs)) return (props.tauLcMs as number) / 1000;
 
-    // 2) HUD/metrics common shapes
+    // 2) derived pipeline data
+    if (Number.isFinite(derived?.τ_LC_ms)) return (derived?.τ_LC_ms as number) / 1000;
+
+    // 3) HUD/metrics common shapes
     const lc = (metrics as any)?.lightCrossing ?? {};
     const fromHUDs =
       (hud as any)?.tauLC_s ??
@@ -45,27 +57,29 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
 
     if (Number.isFinite(fromHUDs)) return fromHUDs as number;
 
-    // 3) conservative fallback (ensure visible marker even if LC missing)
+    // 4) conservative fallback (ensure visible marker even if LC missing)
     return Tm; // fall back to one modulation period as a placeholder
-  }, [props.tauLcMs, hud, metrics, Tm]);
+  }, [props.tauLcMs, derived, hud, metrics, Tm]);
 
   // Sector dwell (seconds)
   const Tsec: number = React.useMemo(() => {
     if (Number.isFinite(props.dwellMs)) return (props.dwellMs as number) / 1000;
+    if (Number.isFinite(dwellDerived)) return (dwellDerived as number) / 1000;
     const dwellMs =
       (hud as any)?.sectorPeriod_ms ??
       (metrics as any)?.lightCrossing?.sectorPeriod_ms ??
       undefined;
     return Number.isFinite(dwellMs) ? (dwellMs as number) / 1000 : Tm * 100; // benign fallback
-  }, [props.dwellMs, hud, metrics, Tm]);
+  }, [props.dwellMs, dwellDerived, hud, metrics, Tm]);
 
   // Duty (Ford–Roman, ship-avg) and burst window
-  const dutyFR = Number.isFinite((hud as any)?.dutyShip) ? (hud as any).dutyShip : 0;
+  const dutyFR = Number.isFinite(dutyFRDerived) ? dutyFRDerived : (Number.isFinite((hud as any)?.dutyShip) ? (hud as any).dutyShip : 0);
   const burst: number = React.useMemo(() => {
     if (Number.isFinite(props.burstMs)) return (props.burstMs as number) / 1000;
+    if (Number.isFinite(burstDerived)) return (burstDerived as number) / 1000;
     // default: dutyShip × Tsec
     return Math.max(0, dutyFR) * Math.max(0, Tsec);
-  }, [props.burstMs, dutyFR, Tsec]);
+  }, [props.burstMs, burstDerived, dutyFR, Tsec]);
 
   // Optional phase offset within the sector
   const burstOffset: number = React.useMemo(() => {
@@ -78,6 +92,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   // Multi-sector readout (display only)
   const sectors =
     Number.isFinite(props.sectorCount) ? (props.sectorCount as number)
+    : Number.isFinite(sectorsTotalDerived) ? sectorsTotalDerived
     : Number.isFinite((hud as any)?.sectorsConcurrent) ? (hud as any).sectorsConcurrent
     : undefined;
   const sectorIdx =
@@ -193,7 +208,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-violet-400" />Tₛₑc: dwell per sector</div>
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-white/70" />
-          Duty (FR): {(Math.max(0, dutyFR) * 100).toFixed(3)}% • burst {fmtSI(burst)}
+          Duty (FR): {(Math.max(0, dutyFR) * 100).toFixed(3)}% • burst {fmtSI(burst)} • dwell {fmtSI(Tsec)}
           {Number.isFinite(burstOffset) && burstOffset > 0 ? ` • phase ${fmtSI(burstOffset)}` : ""}
         </div>
       </div>
