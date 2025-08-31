@@ -504,7 +504,7 @@ class WarpEngine {
         const step = (spanSafe * 2) / divisions;  // Full span width divided by divisions
         const half = spanSafe;  // Half-extent
 
-        // Create a slight height variation across the grid for proper 3D visualization
+        // Create a slight height variation across the grid for better 3D visualization
         const yBase = -0.15;  // Base Y level
         const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
 
@@ -703,7 +703,7 @@ void main() {
 
   // Calculate surface normal for Purple shift (metric-aware)
   vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
-  
+
   // Metric-aware screen-space curvature (adds ridge accent when enabled)
 #ifdef GL_OES_standard_derivatives
   vec3 Nm = normalWS;                        // already metric-aware above
@@ -1069,7 +1069,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // Debug mode switch and operational state
             const isModeSwitch = !!p.currentMode;
             const isOperationalChange = !!(p.currentMode || p.physicsParityMode !== undefined || p.ridgeMode !== undefined);
-            
+
             if (isModeSwitch || isOperationalChange) {
                 console.log(`[WarpEngine] Operational change detected:`, {
                     mode: p.currentMode,
@@ -1402,9 +1402,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         this.gridVertices.set(this.originalGridVertices);
 
         // Apply warp field deformation
-        const vtx = this.gridVertices;
-
-        this._warpGridVertices(vtx, this.currentParams);
+        this._warpGridVertices(this.gridVertices, this.currentParams);
 
         // Upload updated vertices to GPU efficiently
         const gl = this.gl;
@@ -1473,7 +1471,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Higher resolution for smoother canonical curvature
         const gridDivisions = 120; // increased from default for smoother profiles
-        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1, 0, 0];
+        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1,0,0];
         const gridK = 0.10;                       // mild base (acts as unit scale)
 
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
@@ -1892,14 +1890,17 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         }
 
         // --- Metric tensor uniforms (default to identity if not provided)
-        const metric = u.metric || [1,0,0, 0,1,0, 0,0,1];
-        const metricInv = u.metricInv || [1,0,0, 0,1,0, 0,0,1];
-        const useMetric = u.useMetric || false;
-        const metricOn = u.metricOn || 0.0;
+        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = this.uniforms.useMetric || false;
+        const metricOn = this.uniforms.metricOn !== undefined ? this.uniforms.metricOn : (useMetric ? 1.0 : 0.0);
+
         if (this.gridUniforms.metric) {
             gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
             gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
             gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+        }
+        if (this.gridUniforms.metricOn) {
             gl.uniform1f(this.gridUniforms.metricOn, metricOn);
         }
 

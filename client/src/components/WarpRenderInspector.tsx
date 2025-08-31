@@ -981,6 +981,15 @@ export default function WarpRenderInspector(props: {
 
           if (!mounted) return;
 
+          // Set metric first before any uniforms
+          if (props.baseShared?.useMetric) {
+            leftEngine.current.setMetric(
+              props.baseShared?.metric ?? metricDiag.g,
+              props.baseShared?.metricInv ?? metricDiag.inv,
+              true
+            );
+          }
+
           // Initialize with ENFORCED parity mode for REAL
           const realInitUniforms = {
             exposure: 5.0,
@@ -990,10 +999,6 @@ export default function WarpRenderInspector(props: {
             ridgeMode: 0,
             colorMode: 2, // shear/"truth"
             lockFraming: true,
-            // metric & purple tilt
-            useMetric: (props.baseShared?.useMetric ?? false),
-            metric:    (props.baseShared?.metric ?? metricDiag.g),
-            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
             epsilonTilt: epsilonTilt,
             betaTiltVec: betaTiltVecN,
           };
@@ -1072,6 +1077,15 @@ export default function WarpRenderInspector(props: {
 
           if (!mounted) return;
 
+          // Set metric first before any uniforms
+          if (props.baseShared?.useMetric) {
+            rightEngine.current.setMetric(
+              props.baseShared?.metric ?? metricDiag.g,
+              props.baseShared?.metricInv ?? metricDiag.inv,
+              true
+            );
+          }
+
           // Initialize with ENFORCED non-parity mode for SHOW
           const showInitUniforms = {
             exposure: 7.5,
@@ -1084,10 +1098,6 @@ export default function WarpRenderInspector(props: {
             userGain: 1.25,
             colorMode: 1, // theta/cosmetic
             lockFraming: true,
-            // metric & purple tilt
-            useMetric: (props.baseShared?.useMetric ?? false),
-            metric:    (props.baseShared?.metric ?? metricDiag.g),
-            metricInv: (props.baseShared?.metricInv ?? metricDiag.inv),
             epsilonTilt: epsilonTilt,
             betaTiltVec: betaTiltVecN,
           };
@@ -1481,14 +1491,13 @@ export default function WarpRenderInspector(props: {
     //   return calculated;
     // };
 
-    // Build REAL payload (Ford–Roman parity)
-    const realThetaScale = computeThetaScale(realPhys);
+    // Build REAL payload (Ford–Roman parity) - use physics chain thetaScale
     const realPayload = {
       ...baseShared,
       physicsParityMode: true,
       ridgeMode: 0,
       ...realPhys,
-      thetaScale: realThetaScale,
+      // Let the engine compute thetaScale from the physics chain - don't override
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 2, // Shear proxy for truth view
@@ -1500,15 +1509,13 @@ export default function WarpRenderInspector(props: {
     (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
-    // Build SHOW payload (UI boosted)
-    const showThetaScale = computeThetaScale(showPhys);
+    // Build SHOW payload (UI boosted) - use physics chain thetaScale
     const showPayload = {
       ...baseShared,
       physicsParityMode: false,
       ridgeMode: 1,
       ...showPhys,
-      // now truly θ=γ³·q·γ_VdB_vis·√(dutyCycle/sectors)
-      thetaScale: showThetaScale,
+      // Let the engine compute thetaScale from the physics chain - don't override
       exposure: 7.5,
       zeroStop: 1e-7,
       curvatureGainT: 0.70,
