@@ -683,6 +683,20 @@ function GreensCard({ m }: { m: HelixMetrics }) {
 
         <div className="text-muted-foreground">φ_mean</div>
         <div className="font-mono">{fmtExp(gstats.mean)}</div>
+
+        {/* Reciprocity status pulled from the same greens payload (if present) */}
+        <div className="text-muted-foreground">Reciprocity</div>
+        <div className="font-mono">
+          {(() => {
+            const r = (greens as any)?.reciprocity as
+              | { status: "BROKEN_INSTANT" | "PASS_AVG" | "UNKNOWN"; message?: string }
+              | undefined;
+            if (!r) return "—";
+            if (r.status === "BROKEN_INSTANT") return "BROKEN (inst.)";
+            if (r.status === "PASS_AVG") return "PASS (avg.)";
+            return "—";
+          })()}
+        </div>
       </div>
 
       <div className="text-[11px] text-slate-400 space-y-1">
