@@ -1,5 +1,5 @@
 // client/src/pages/helix-core.tsx
-import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition } from "react";
+import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Cpu, Send, Settings, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -210,6 +210,32 @@ const nnonneg = (x: unknown, d = 0) => {
   const v = Number(x);
   return Number.isFinite(v) && v >= 0 ? v : d;
 };
+
+// ---------- Green's function cache helpers ----------
+type GreensPayload = {
+  kind: "poisson" | "helmholtz";
+  m?: number;
+  normalize?: boolean;
+  phi: Float32Array | number[];
+  size?: number;
+  source?: "server" | "client" | "none";
+};
+
+const fmtExp = (v: unknown, digits = 3) =>
+  (typeof v === "number" && Number.isFinite(v)) ? v.toExponential(digits) : "—";
+
+function stats(arr: ArrayLike<number>) {
+  let min = Infinity, max = -Infinity, sum = 0;
+  const N = arr.length;
+  for (let i = 0; i < N; i++) {
+    const v = Number(arr[i]);
+    if (!Number.isFinite(v)) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+    sum += v;
+  }
+  return { min, max, mean: N ? sum / N : NaN, N };
+}
 
 // Mainframe zones configuration
 const MAINFRAME_ZONES = {
@@ -660,6 +686,47 @@ export default function HelixCore() {
 
   // 🎛️ RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
+
+  // ===== Green's Potential (φ = G * ρ) — live hookup =====
+  const [greens, setGreens] = useState<GreensPayload | null>(() => {
+    const cached = queryClient.getQueryData<GreensPayload>(["helix:pipeline:greens"]);
+    return cached ?? null;
+  });
+
+  const updateGreensFromCache = useCallback(() => {
+    const cached = queryClient.getQueryData<GreensPayload>(["helix:pipeline:greens"]);
+    if (cached) setGreens(cached);
+  }, [queryClient]);
+
+  useEffect(() => {
+    // keep in sync if something populates cache without firing an event
+    const id = setInterval(updateGreensFromCache, 1500);
+    return () => clearInterval(id);
+  }, [updateGreensFromCache]);
+
+  useEffect(() => {
+    function onGreens(ev: Event) {
+      const e = ev as CustomEvent<GreensPayload>;
+      const payload = e.detail;
+      if (!payload) return;
+      try {
+        // normalize to Float32Array for consistent stats
+        const phi =
+          payload.phi instanceof Float32Array ? payload.phi : new Float32Array(payload.phi || []);
+        const normalizedPayload: GreensPayload = {
+          ...payload,
+          phi,
+          size: phi.length,
+        };
+        queryClient.setQueryData(["helix:pipeline:greens"], normalizedPayload);
+        setGreens(normalizedPayload);
+      } catch {
+        // no-op
+      }
+    }
+    window.addEventListener("helix:greens", onGreens as any);
+    return () => window.removeEventListener("helix:greens", onGreens as any);
+  }, [queryClient]);
 
 
 
@@ -1695,6 +1762,66 @@ export default function HelixCore() {
 
             {/* Right Column - Terminal & Inspector */}
             <div className="space-y-4">
+              {/* ===== Green's Potential (φ = G * ρ) — Live Panel ===== */}
+              <Card className="bg-slate-900/50 border-slate-800">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyan-300" />
+                    Green's Potential (φ = G · ρ)
+                  </CardTitle>
+                  <CardDescription>
+                    Live convolution stage published by Energy Pipeline
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {greens?.phi && (greens.size ?? greens.phi.length) > 0 ? (
+                    (() => {
+                      const phiArr = greens.phi instanceof Float32Array ? greens.phi : new Float32Array(greens.phi);
+                      const s = stats(phiArr);
+                      return (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="text-slate-400">Kernel</div>
+                          <div className="font-mono">
+                            {greens.kind === "helmholtz" ? `Helmholtz (m=${greens.m ?? 0})` : "Poisson"}
+                            {greens.normalize !== false ? " · norm" : ""}
+                          </div>
+                          <div className="text-slate-400">Source</div>
+                          <div className="font-mono">{(greens.source ?? "client").toUpperCase()}</div>
+                          <div className="text-slate-400">N (tiles)</div>
+                          <div className="font-mono">{s.N.toLocaleString()}</div>
+                          <div className="text-slate-400">φ_min</div>
+                          <div className="font-mono">{fmtExp(s.min, 3)}</div>
+                          <div className="text-slate-400">φ_max</div>
+                          <div className="font-mono">{fmtExp(s.max, 3)}</div>
+                          <div className="text-slate-400">φ_mean</div>
+                          <div className="font-mono">{fmtExp(s.mean, 3)}</div>
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-sm text-slate-400">
+                      Waiting for <code>helix:greens</code>… Open Energy Pipeline and click
+                      <span className="ml-1 font-mono">Publish to renderer</span>.
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      className="px-2 py-1 text-xs rounded bg-slate-900 border border-slate-700"
+                      onClick={() => {
+                        // manual refresh from cache if something else published
+                        const cached = queryClient.getQueryData<GreensPayload>(["helix:pipeline:greens"]);
+                        if (cached) setGreens(cached);
+                      }}
+                    >
+                      Refresh
+                    </button>
+                    <span className="text-xs text-slate-400 self-center">
+                      Cache key: <code>["helix:pipeline:greens"]</code>
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
               {/* Log + Document Terminal */}
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader>
