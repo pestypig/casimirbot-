@@ -232,3 +232,52 @@ export const xyzFromSph = (rho:number,theta:number,phi:number): [number,number,n
 
 // (4–6, 7–9, 11–12) are compositions of the above: graphs and transforms can be
 // expressed by wrapping your f(u,v,…) and applying sphFromXYZ/xyzFromSph as needed.
+
+// ---------------------------------------------------------------------------
+// 🔁 Legacy API shims (compat with older imports)
+// ---------------------------------------------------------------------------
+// Old signature: (params, casimirEnergy) -> NatarioMetricResult
+export function calculateNatarioMetric(
+  params: any,
+  casimirEnergy: number
+): NatarioMetricResult & MetricUniforms {
+  // Adapt older shapes into the new pipeline-like state
+  const state: PipelineLike & { U_static?: number } = {
+    // geometry/tiles
+    tileArea_cm2:
+      (typeof params?.tileArea_cm2 === 'number' && params.tileArea_cm2) ? params.tileArea_cm2 :
+      (typeof params?.tileArea_m2 === 'number' ? params.tileArea_m2 * 1e4 : undefined),
+    gap_nm: params?.gap_nm ?? params?.gap ?? 1,
+    N_tiles: params?.N_tiles,
+    hull: params?.hull,
+    // sectors/duty (prefer FR if provided)
+    dutyEffective_FR: params?.dutyEffective_FR ?? params?.dutyEffectiveFR,
+    sectorCount: params?.sectorCount,
+    sectorStrobing: params?.sectorStrobing,
+    // gains
+    gammaGeo: params?.gammaGeo,
+    gammaVanDenBroeck: params?.gammaVanDenBroeck ?? params?.gammaVdB,
+    qCavity: params?.qCavity ?? params?.cavityQ,
+    qSpoilingFactor: params?.qSpoilingFactor ?? params?.deltaAOverA,
+    // modulation
+    modulationFreq_GHz: params?.modulationFreq_GHz,
+    // pipeline per-tile energy (legacy call passed total/flat energy separately)
+    U_static: casimirEnergy
+  };
+  return natarioFromPipeline(state);
+}
+
+// Old helper: keep same booleans/thresholds
+export function validateGRConsistency(result: NatarioMetricResult): {
+  strategyA: boolean;       // τ_pulse ≪ τ_LC
+  burnettConjecture: boolean;
+  fordRomanBound: boolean;
+} {
+  return {
+    strategyA: result.homogenizationRatio < 1e-3,
+    burnettConjecture: result.timeAveragedCurvature > 0 && result.grValidityCheck,
+    fordRomanBound: result.sectorStrobingEfficiency > 0.1 && result.stressEnergyT00 < 0
+  };
+}
+
+// Note: NatarioMetricResult is already exported above, so legacy imports will work
