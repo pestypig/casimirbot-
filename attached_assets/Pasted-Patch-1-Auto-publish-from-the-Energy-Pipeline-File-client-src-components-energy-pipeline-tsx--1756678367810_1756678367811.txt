@@ -1,0 +1,69 @@
+Patch 1 — Auto-publish φ from the Energy Pipeline
+
+File: client/src/components/energy-pipeline.tsx
+
+Add a tiny effect right after publishGreens is defined. This effect re-publishes whenever φ or its config changes and φ is non-empty.
+
+@@
+   const publishGreens = useCallback(() => {
+     const payload = {
+       kind: greenKind,
+       m: mHelm,
+       normalize: normalizeGreens,
+       phi: greenPhi.phi,     // Float32Array
+       size: greenPhi.phi.length,
+       source: greenPhi.source
+     };
+     // cache it so any consumer (inspector/engine adapter) can grab it
+     queryClient.setQueryData(["helix:pipeline:greens"], payload);
+     // also broadcast for engines already listening in the tab
+     try {
+       window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload }));
+     } catch {}
+   }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient]);
+ 
++  // LIVE READING: auto-publish whenever phi/config changes and φ is non-empty
++  const lastSigRef = useRef<string>("");
++  useEffect(() => {
++    const phi = greenPhi.phi;
++    if (!phi || phi.length === 0) return;
++    // simple signature to avoid redundant publishes
++    let min = Infinity, max = -Infinity, sum = 0;
++    for (let i = 0; i < phi.length; i++) {
++      const v = phi[i]!;
++      if (v < min) min = v;
++      if (v > max) max = v;
++      sum += v;
++    }
++    const mean = sum / phi.length;
++    const sig = JSON.stringify({
++      src: greenPhi.source,
++      kind: greenKind,
++      m: mHelm,
++      n: phi.length,
++      min: +min.toPrecision(6),
++      max: +max.toPrecision(6),
++      mean: +mean.toPrecision(6),
++      norm: !!normalizeGreens,
++    });
++    if (sig !== lastSigRef.current) {
++      lastSigRef.current = sig;
++      publishGreens();
++    }
++  }, [greenPhi.phi, greenPhi.source, greenKind, mHelm, normalizeGreens, publishGreens]);
+
+
+Result: as soon as the pipeline computes φ (server or client path), the cache key ["helix:pipeline:greens"] gets updated and the helix:greens event is broadcast—continuously. Your panels that listen to either (or both) will now show LIVE values.
+
+(Optional) Patch 2 — Show “LIVE” in the Bridge card header
+
+File: client/src/components/BridgeDerivationCards.tsx
+If you want the panel to visually reflect that it’s now live, add a tiny flourish where you render the Greens header (where you already show source). For example:
+
+- <Badge variant="outline" className="ml-2">{greens?.source?.toUpperCase() || "NONE"}</Badge>
++ <Badge variant="outline" className="ml-2">
++   {(greens?.source?.toUpperCase() || "NONE")} · LIVE
++ </Badge>
+
+
+(Keep this if you like; purely cosmetic.)

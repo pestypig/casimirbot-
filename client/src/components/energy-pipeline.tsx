@@ -5,7 +5,7 @@
  * + Green's-function (φ = G * ρ) stage with live stats and publish-to-renderer
  */
 
-import { useEffect, useMemo, startTransition, useCallback } from "react";
+import { useEffect, useMemo, startTransition, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp, Activity } from "lucide-react";
@@ -273,12 +273,35 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     } catch {}
   }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient]);
 
-  // NEW: auto-publish whenever φ becomes available/changes
+  // LIVE READING: auto-publish whenever phi/config changes and φ is non-empty
+  const lastSigRef = useRef<string>("");
   useEffect(() => {
-    if (greenPhi.phi && greenPhi.phi.length > 0) {
+    const phi = greenPhi.phi;
+    if (!phi || phi.length === 0) return;
+    // simple signature to avoid redundant publishes
+    let min = Infinity, max = -Infinity, sum = 0;
+    for (let i = 0; i < phi.length; i++) {
+      const v = phi[i]!;
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+    }
+    const mean = sum / phi.length;
+    const sig = JSON.stringify({
+      src: greenPhi.source,
+      kind: greenKind,
+      m: mHelm,
+      n: phi.length,
+      min: +min.toPrecision(6),
+      max: +max.toPrecision(6),
+      mean: +mean.toPrecision(6),
+      norm: !!normalizeGreens,
+    });
+    if (sig !== lastSigRef.current) {
+      lastSigRef.current = sig;
       publishGreens();
     }
-  }, [greenPhi.phi, publishGreens]);
+  }, [greenPhi.phi, greenPhi.source, greenKind, mHelm, normalizeGreens, publishGreens]);
 
   // ========================================================================
   //                               UI

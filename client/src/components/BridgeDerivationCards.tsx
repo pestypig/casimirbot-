@@ -660,7 +660,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         Green's Potential (φ = G · ρ)
         {greens?.source ? (
           <span className="ml-2 rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[10px]">
-            {String(greens.source).toUpperCase()}
+            {String(greens.source).toUpperCase()} · LIVE
           </span>
         ) : null}
       </h3>
