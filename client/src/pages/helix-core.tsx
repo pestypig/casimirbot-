@@ -378,7 +378,7 @@ interface ChatMessage {
 }
 
 export default function HelixCore() {
-  // Always keep Greens data flowing to the shared cache/event for the Greens cards
+  // Auto-publish φ from server pipeline/metrics into the shared cache/event bus
   useGreensBridge();
 
   // Preload lazy bundles to avoid suspending during user input
