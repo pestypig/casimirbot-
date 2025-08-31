@@ -380,6 +380,18 @@ export default function HelixCore() {
   // Auto-publish φ from server pipeline/metrics into the shared cache/event bus
   useGreensBridge();
 
+  // Feed φ values to WarpEngine/renderer automatically
+  useEffect(() => {
+    const handleGreens = (e: any) => {
+      const { phi, kind, m } = e.detail || {};
+      // Adapt to engine's buffer/texture API
+      (window as any).WarpEngine?.setGreensPotential?.({ phi, kind, m });
+    };
+    
+    window.addEventListener("helix:greens", handleGreens);
+    return () => window.removeEventListener("helix:greens", handleGreens);
+  }, []);
+
   // Preload lazy bundles to avoid suspending during user input
   useEffect(() => {
     const preload = () => {
