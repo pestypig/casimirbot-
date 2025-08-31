@@ -723,7 +723,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
                     normalize: true, 
                     phi, 
                     size: phi.length, 
-                    source: "manual" as const 
+                    source: "client" as const 
                   };
                   qc.setQueryData(["helix:pipeline:greens"], payload);
                   setGreens(payload);

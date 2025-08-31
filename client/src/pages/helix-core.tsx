@@ -46,7 +46,6 @@ function useGreensBridge() {
   const { data: systemMetrics } = useQuery({
     queryKey: ["/api/helix/metrics"],
     refetchInterval: 5000,
-    suspense: false,
   });
 
   useEffect(() => {
@@ -67,7 +66,7 @@ function useGreensBridge() {
     }
 
     // 2) Otherwise derive from metrics tiles if present
-    const tiles = systemMetrics?.tiles as { pos: V3; t00: number }[] | undefined;
+    const tiles = (systemMetrics as any)?.tileData as { pos: V3; t00: number }[] | undefined;
     if (Array.isArray(tiles) && tiles.length > 0) {
       const positions = tiles.map(t => t.pos);
       const rho = tiles.map(t => t.t00);

@@ -5,7 +5,7 @@ export type GreensPayload = {
   normalize?: boolean;
   phi?: Float32Array | number[];
   size?: number;
-  source?: "server" | "client" | "none";
+  source?: "server" | "client" | "none" | "manual";
 };
 
 export type GreensStats = { N: number; min?: number; max?: number; mean?: number };

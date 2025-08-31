@@ -548,6 +548,30 @@ export function getTileStatus(req: Request, res: Response) {
   setGlobalPipelineState(pipelineState);
 })();
 
+// Generate sample tiles with positions and T00 values for Green's Potential computation
+function generateSampleTiles(count: number): Array<{ pos: [number, number, number]; t00: number }> {
+  const tiles = [];
+  const hullA = 503.5, hullB = 132, hullC = 86.5; // Half-dimensions in meters
+  
+  for (let i = 0; i < count; i++) {
+    // Generate random positions on ellipsoid surface
+    const theta = Math.random() * 2 * Math.PI;
+    const phi = Math.acos(2 * Math.random() - 1);
+    
+    const x = hullA * Math.sin(phi) * Math.cos(theta);
+    const y = hullB * Math.sin(phi) * Math.sin(theta);
+    const z = hullC * Math.cos(phi);
+    
+    // Generate T00 values with realistic stress-energy distribution
+    const r = Math.hypot(x / hullA, y / hullB, z / hullC);
+    const t00 = -2.568e13 * (1 + 0.1 * Math.sin(5 * theta) * Math.cos(3 * phi)) * (1 - 0.5 * r);
+    
+    tiles.push({ pos: [x, y, z] as [number, number, number], t00 });
+  }
+  
+  return tiles;
+}
+
 // System metrics endpoint (physics-first, strobe-aware)
 export function getSystemMetrics(req: Request, res: Response) {
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
@@ -732,6 +756,9 @@ export function getSystemMetrics(req: Request, res: Response) {
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
+    
+    // Add tile data with positions and T00 values for Green's Potential computation
+    tileData: generateSampleTiles(Math.min(100, activeTiles)), // Generate sample tiles for φ computation
 
     geometry: { Lx_m: hull.Lx_m, Ly_m: hull.Ly_m, Lz_m: hull.Lz_m, TS_ratio: s.TS_ratio, TS_long: s.TS_long, TS_geom: s.TS_geom },
 
