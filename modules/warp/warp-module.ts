@@ -209,6 +209,13 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
   
   console.log('[WarpModule] Duty factor calculation:', dutyFactor);
 
+  // **CRITICAL FIX**: Pass through calibrated pipeline mass to avoid independent calculation
+  const exoticMassTarget_kg = Number.isFinite(+(params as any).exoticMassTarget_kg) 
+    ? +(params as any).exoticMassTarget_kg 
+    : undefined;
+  
+  console.log('[WarpModule] Exotic mass target from pipeline:', exoticMassTarget_kg);
+
   const finalParams = {
     // Geometry (Natário warp currently expects µm & nm)
     bowlRadius: R_geom_um,                              // µm
@@ -239,6 +246,8 @@ function convertToWarpParams(params: SimulationParameters): NatarioWarpParams {
     tileArea_m2,
     P_avg_W,
     referenceQ: 1e9,
+    // **Pass calibrated pipeline mass instead of calculating independently**
+    exoticMassTarget_kg,
     // Optional knobs (left undefined unless you want to enforce targets)
     // powerTarget_W: MODE_POLICY[...]?.P_target_W, // not available here
     // powerTolerance: 0.10,

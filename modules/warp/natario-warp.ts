@@ -414,12 +414,26 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   const baselineEnergyDensity = u0;                                                   // J/m³
   const amplifiedEnergyDensity = baselineEnergyDensity * timeAveragedAmplification;   // J/m³ (time-averaged)
 
-  // 5) Mass (time-averaged — NO extra duty multiplication here)
+  // 5) Mass (time-averaged — prefer pipeline calibrated mass over first-principles calculation)
   const tileArea = Math.max(1e-12, params.tileArea_m2 ?? DEFAULTS.tileArea_m2);
   const tileVolume = tileArea * a_m;
   const tileCount = Math.max(1, params.tileCount ?? 1);
-  const exoticMassPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
-  const totalExoticMass = exoticMassPerTile * tileCount;
+  
+  // **CRITICAL FIX**: Use calibrated pipeline mass if provided, otherwise calculate from first principles
+  let totalExoticMass: number;
+  let exoticMassPerTile: number;
+  
+  if (Number.isFinite(params.exoticMassTarget_kg) && (params.exoticMassTarget_kg as number) > 0) {
+    // Use calibrated mass from pipeline (e.g., 1405 kg)
+    totalExoticMass = params.exoticMassTarget_kg as number;
+    exoticMassPerTile = totalExoticMass / tileCount;
+    console.log('[NatarioWarp] Using calibrated pipeline mass:', totalExoticMass, 'kg (target:', params.exoticMassTarget_kg, ')');
+  } else {
+    // Fallback to first-principles calculation
+    exoticMassPerTile = Math.abs(amplifiedEnergyDensity * tileVolume) / (PHYSICS_CONSTANTS.C**2);
+    totalExoticMass = exoticMassPerTile * tileCount;
+    console.log('[NatarioWarp] Calculated mass from first principles:', totalExoticMass, 'kg');
+  }
 
   // 6) Power (prefer pipeline average if provided, calculate fallback if needed)
   const powerDraw = (() => {

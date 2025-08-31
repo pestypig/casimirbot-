@@ -781,6 +781,8 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       material: 'PEC' as const,
       temperature: state.temperature_K ?? 20,
       moduleType: 'warp' as const,
+      // **CRITICAL FIX**: Pass calibrated pipeline mass to avoid independent calculation
+      exoticMassTarget_kg: state.M_exotic, // Use calibrated mass (1405 kg) from pipeline
       dynamicConfig: {
         modulationFreqGHz: state.modulationFreq_GHz ?? 15,
         strokeAmplitudePm: 50,
