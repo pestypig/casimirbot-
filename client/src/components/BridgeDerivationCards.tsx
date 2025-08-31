@@ -620,18 +620,33 @@ function GreensCard({ m }: { m: HelixMetrics }) {
     if (cached) return cached;
     // 2) fall back to whatever the metrics snapshot might carry
     const snap = (m as any)?.pipeline?.greens as any;
-    return snap || {};
+    return snap || { source: "none" };
   });
 
   React.useEffect(() => {
     // live updates from EnergyPipeline "Publish to renderer"
     const onEvt = (e: any) => {
       const detail = e?.detail;
-      if (detail) setGreens(detail);
+      if (detail) {
+        setGreens(detail);
+      }
     };
     window.addEventListener("helix:greens" as any, onEvt);
     return () => window.removeEventListener("helix:greens" as any, onEvt);
   }, []);
+
+  // Periodically check cache for updates
+  React.useEffect(() => {
+    const checkCache = () => {
+      const cached = qc.getQueryData(["helix:pipeline:greens"]) as any;
+      if (cached && cached !== greens) {
+        setGreens(cached);
+      }
+    };
+    
+    const interval = setInterval(checkCache, 1000);
+    return () => clearInterval(interval);
+  }, [qc, greens]);
 
   const gstats = computeGreensStats(greens?.phi as any);
 
@@ -670,8 +685,59 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         <div className="font-mono">{fmtExp(gstats.mean)}</div>
       </div>
 
-      <div className="text-[11px] text-slate-400">
+      <div className="text-[11px] text-slate-400 space-y-1">
         <div><span className="font-medium">How it updates:</span> Energy Pipeline computes/publishes φ to the cache key <code>["helix:pipeline:greens"]</code> and broadcasts a <code>helix:greens</code> window event. This card listens to both.</div>
+        <div className="flex items-center gap-2">
+          <button
+            className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-[10px] hover:bg-slate-700"
+            onClick={() => {
+              const cached = qc.getQueryData(["helix:pipeline:greens"]) as any;
+              if (cached) {
+                setGreens(cached);
+              } else {
+                // Try to trigger a manual computation if we have metrics
+                const tiles = (m as any)?.tiles as { pos: [number, number, number]; t00: number }[] | undefined;
+                if (Array.isArray(tiles) && tiles.length > 0) {
+                  const positions = tiles.map(t => t.pos);
+                  const rho = tiles.map(t => t.t00);
+                  const poissonG = (r: number) => 1 / (4 * Math.PI * Math.max(r, 1e-6));
+                  const computePhi = (positions: [number, number, number][], rho: number[]) => {
+                    const N = positions.length;
+                    const out = new Float32Array(N);
+                    for (let i = 0; i < N; i++) {
+                      const [xi, yi, zi] = positions[i];
+                      let sum = 0;
+                      for (let j = 0; j < N; j++) {
+                        const [xj, yj, zj] = positions[j];
+                        const r = Math.hypot(xi - xj, yi - yj, zi - zj) + 1e-6;
+                        sum += poissonG(r) * rho[j];
+                      }
+                      out[i] = sum;
+                    }
+                    return out;
+                  };
+                  const phi = computePhi(positions, rho);
+                  const payload = { 
+                    kind: "poisson" as const, 
+                    m: 0, 
+                    normalize: true, 
+                    phi, 
+                    size: phi.length, 
+                    source: "manual" as const 
+                  };
+                  qc.setQueryData(["helix:pipeline:greens"], payload);
+                  setGreens(payload);
+                  window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload }));
+                }
+              }
+            }}
+          >
+            Refresh
+          </button>
+          <span className="text-[10px]">
+            Status: {greens?.source || "none"} | Size: {greens?.size || 0}
+          </span>
+        </div>
       </div>
     </section>
   );
