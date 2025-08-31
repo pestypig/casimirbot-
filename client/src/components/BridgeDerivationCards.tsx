@@ -623,6 +623,17 @@ function GreensCard({ m }: { m: HelixMetrics }) {
     return snap || { source: "none" };
   });
 
+  // Also mirror the latest derived duty/LC for display without re-deriving
+  const derived = qc.getQueryData(["helix:pipeline:derived"]) as any;
+  const dEff = Number.isFinite(derived?.dutyEffectiveFR)
+    ? derived.dutyEffectiveFR
+    : (
+        num(uexp?.live?.dutyEffectiveFR) ??
+        num(uexp?.fordRomanDuty?.computed_d_eff) ??
+        num((m as any)?.dutyEffectiveFR) ??
+        num((m as any)?.pipeline?.dutyEffectiveFR) ?? num((m as any)?.pipeline?.dutyEff)
+      );
+
   React.useEffect(() => {
     // live updates from EnergyPipeline "Publish to renderer"
     const onEvt = (e: any) => {
