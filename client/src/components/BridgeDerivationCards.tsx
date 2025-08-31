@@ -1,4 +1,6 @@
 import React from "react";
+import { Activity } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useMetrics } from "@/hooks/use-metrics";
 import type { HelixMetrics } from "@/hooks/use-metrics";
 
@@ -601,6 +603,99 @@ function ConstraintCard({ m }: { m: HelixMetrics }) {
   );
 }
 
+/* ----------------------- Green's Potential (φ = G * ρ) ---------------------- */
+function GreensCard({ m }: { m: HelixMetrics }) {
+  const qc = useQueryClient();
+  const [greens, setGreens] = React.useState<{
+    kind?: "poisson" | "helmholtz";
+    m?: number;
+    normalize?: boolean;
+    phi?: Float32Array | number[];
+    size?: number;
+    source?: "server" | "client" | "none";
+  }>(() => {
+    // 1) try cache (EnergyPipeline publishes here)
+    const cached = qc.getQueryData(["helix:pipeline:greens"]) as any;
+    if (cached) return cached;
+    // 2) fall back to whatever the metrics snapshot might carry
+    const snap = (m as any)?.pipeline?.greens as any;
+    return snap || {};
+  });
+
+  React.useEffect(() => {
+    // live updates from EnergyPipeline "Publish to renderer"
+    const onEvt = (e: any) => {
+      const detail = e?.detail;
+      if (detail) setGreens(detail);
+    };
+    window.addEventListener("helix:greens" as any, onEvt);
+    return () => window.removeEventListener("helix:greens" as any, onEvt);
+  }, []);
+
+  // stats helper
+  const computeStats = React.useCallback((arr?: Float32Array | number[]) => {
+    if (!arr || arr.length === 0) return { N: 0, min: undefined, max: undefined, mean: undefined };
+    let min = +Infinity, max = -Infinity, sum = 0;
+    for (let i = 0; i < arr.length; i++) {
+      const v = Number((arr as any)[i]);
+      if (!Number.isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+    }
+    const N = arr.length;
+    return { N, min, max, mean: N ? sum / N : undefined };
+  }, []);
+
+  const gstats = computeStats(greens?.phi as any);
+
+  // local helpers from this file
+  const kindLabel =
+    greens?.kind === "helmholtz"
+      ? `Helmholtz${greens?.m != null ? ` (m=${greens.m})` : ""}`
+      : greens?.kind === "poisson"
+      ? "Poisson"
+      : "—";
+
+  return (
+    <section className="bg-card/60 border rounded-lg p-4 space-y-3">
+      <h3 className="font-semibold text-sm flex items-center gap-2">
+        <Activity className="h-4 w-4" />
+        Green's Potential (φ = G · ρ)
+        {greens?.source ? (
+          <span className="ml-2 rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[10px]">
+            {String(greens.source).toUpperCase()}
+          </span>
+        ) : null}
+      </h3>
+
+      <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="text-muted-foreground">Kernel</div>
+        <div className="font-mono">
+          {kindLabel}
+          {greens?.normalize === false ? "" : " · norm"}
+        </div>
+
+        <div className="text-muted-foreground">N (tiles)</div>
+        <div className="font-mono">{gstats.N ? gstats.N.toLocaleString() : "—"}</div>
+
+        <div className="text-muted-foreground">φ_min</div>
+        <div className="font-mono">{gstats.min != null ? (Number(gstats.min)).toExponential(3) : "—"}</div>
+
+        <div className="text-muted-foreground">φ_max</div>
+        <div className="font-mono">{gstats.max != null ? (Number(gstats.max)).toExponential(3) : "—"}</div>
+
+        <div className="text-muted-foreground">φ_mean</div>
+        <div className="font-mono">{gstats.mean != null ? (Number(gstats.mean)).toExponential(3) : "—"}</div>
+      </div>
+
+      <div className="text-[11px] text-slate-400">
+        <div><span className="font-medium">How it updates:</span> Energy Pipeline computes/publishes φ to the cache key <code>["helix:pipeline:greens"]</code> and broadcasts a <code>helix:greens</code> window event. This card listens to both.</div>
+      </div>
+    </section>
+  );
+}
+
 /* ===================== Main Component ===================== */
 
 export default function BridgeDerivationCards() {
@@ -705,6 +800,8 @@ export default function BridgeDerivationCards() {
           <TimeScaleCard m={m} />
           <TilesCard m={m} />
           <ConstraintCard m={m} />
+          {/* NEW: Green's function live view (matches Energy Pipeline section 7) */}
+          <GreensCard m={m} />
         </div>
 
         <div className="mt-6 text-xs text-slate-400 space-y-1">
