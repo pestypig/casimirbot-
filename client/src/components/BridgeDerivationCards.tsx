@@ -710,7 +710,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
                 setGreens(cached);
               } else {
                 // Try to trigger a manual computation if we have metrics
-                const tiles = (m as any)?.tiles as { pos: [number, number, number]; t00: number }[] | undefined;
+                const tiles = (m as any)?.tileData || (m as any)?.tiles as { pos: [number, number, number]; t00: number }[] | undefined;
                 if (Array.isArray(tiles) && tiles.length > 0) {
                   const positions = tiles.map(t => t.pos);
                   const rho = tiles.map(t => t.t00);

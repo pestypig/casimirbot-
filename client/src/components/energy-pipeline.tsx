@@ -209,7 +209,8 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // 2) Use any available client tiles from metrics (fallback - main Green's data comes from HelixCore hook now)
   const clientTiles = useMemo(() => {
-    const tiles = (systemMetrics as any)?.tiles;
+    // Try tileData first (current server format), then fallback to tiles (legacy)
+    const tiles = (systemMetrics as any)?.tileData || (systemMetrics as any)?.tiles;
     if (!Array.isArray(tiles)) return undefined;
     
     return tiles.map((t: any) => ({
