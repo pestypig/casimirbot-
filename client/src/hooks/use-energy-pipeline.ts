@@ -34,6 +34,17 @@ export interface EnergyPipelineState {
   sectorStrobing: number;
   qSpoilingFactor: number;
   
+  // Additional mode knobs (explicit to drive FR duty & timing)
+  localBurstFrac?: number;     // sector-local burst fraction (0..1); defaults to dutyCycle
+  sectorsTotal?: number;       // total sectors in sweep
+  sectorsConcurrent?: number;  // how many sectors fire simultaneously
+
+  // Light-crossing & cycle timing (server may emit, else client derives)
+  tau_LC_ms?: number;          // light-crossing time across hull/bubble (ms)
+  sectorPeriod_ms?: number;    // dwell period per sector (ms)
+  burst_ms?: number;           // instantaneous burst window (ms)
+  dwell_ms?: number;           // gap between bursts (ms)
+  
   // Scheduling truth
   sectorCount?: number;
   concurrentSectors?: number;
@@ -98,6 +109,17 @@ export interface SystemMetrics {
   currentMode?: string;
   tileData?: TileDatum[]; // current server shape
   tiles?: TileDatum[];    // legacy shape
+  // Optional LC/timing structure from backend metrics, if available
+  lightCrossing?: {
+    tauLC_ms?: number;        // preferred
+    tau_ms?: number;          // alias
+    tauLC_s?: number;         // alt units
+    sectorPeriod_ms?: number; // dwell per sector
+    burst_ms?: number;
+    dwell_ms?: number;
+    sectorsTotal?: number;
+    activeSectors?: number;
+  };
 }
 
 // Helix metrics interface (some callers read directly from here)
@@ -107,6 +129,7 @@ export interface HelixMetrics {
   data?: any;
   tileData?: TileDatum[];
   tiles?: TileDatum[];
+  lightCrossing?: SystemMetrics['lightCrossing'];
 }
 
 // Shared physics constants from pipeline backend
@@ -257,6 +280,9 @@ export function useSwitchMode() {
           dutyCycle: cfg.dutyCycle,
           sectorStrobing: cfg.sectorStrobing,
           qSpoilingFactor: cfg.qSpoilingFactor,
+          sectorsConcurrent: (cfg as any).sectorsConcurrent ?? (cfg as any).concurrentSectors,
+          localBurstFrac: (cfg as any).localBurstFrac ?? cfg.dutyCycle,
+          sectorsTotal: (cfg as any).sectorsTotal,
         });
       }
       publish("warp:reload", { reason: "mode-switch-local", mode, ts: Date.now() });
