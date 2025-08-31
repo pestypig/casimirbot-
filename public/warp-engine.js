@@ -37,6 +37,12 @@ export default class WarpEngine {
             exoticMass_kg: 1405
         };
 
+        // Add thetaScale_actual as a computed property for diagnostics
+        Object.defineProperty(this.uniforms, 'thetaScale_actual', {
+            get: () => this._thetaScaleActual ?? NaN,
+            enumerable: true
+        });
+
         this._compileShaders();
         this._initQuad();
         this._cacheUniformLocations();
@@ -151,14 +157,36 @@ export default class WarpEngine {
     }
 
     //----------------------------------------------------------------
-    //  5.  Public API
+    //  5.  Physics Chain Computation
+    //----------------------------------------------------------------
+    _computeThetaScaleFromUniforms(u) {
+        const g    = +u.gammaGeo || +u.g_y || 26;
+        const q    = +u.qSpoilingFactor || +u.deltaAOverA || 1;
+        const v    = +(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck ?? u.gammaVdB ?? 286000);
+        const dRaw = +u.dutyEffectiveFR;
+        const d    = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
+        return Math.pow(g, 3) * q * v * Math.sqrt(d);
+    }
+
+    bootstrap(payload) {
+        // Ensure metric is set first if present
+        const m = {};
+        if ('useMetric' in (payload||{})) m.useMetric = payload.useMetric;
+        if ('metric'    in (payload||{})) m.metric    = payload.metric;
+        if ('metricInv' in (payload||{})) m.metricInv = payload.metricInv;
+        if (Object.keys(m).length) this.updateUniforms(m);
+        this.updateUniforms(payload);
+    }
+
+    //----------------------------------------------------------------
+    //  6.  Public API
     //----------------------------------------------------------------
     updateUniforms(obj){
         Object.assign(this.uniforms, obj);
     }
 
     //----------------------------------------------------------------
-    //  6.  Frame loop
+    //  7.  Frame loop
     //----------------------------------------------------------------
     _loop(t){
         this._draw(t*0.001);
@@ -191,7 +219,7 @@ export default class WarpEngine {
     }
 
     //----------------------------------------------------------------
-    //  7.  Responsive resize
+    //  8.  Responsive resize
     //----------------------------------------------------------------
     _resize(){
         const dpr = window.devicePixelRatio || 1;
@@ -204,7 +232,7 @@ export default class WarpEngine {
     }
 
     //----------------------------------------------------------------
-    //  8.  Shader injection & uniforms
+    //  9.  Shader injection & uniforms
     //----------------------------------------------------------------
     // Idempotent uniform injection helper
     _injectUniforms(src) {
@@ -274,7 +302,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     //----------------------------------------------------------------
-    //  9.  Shader Uniforms & Grid Processing
+    //  10. Shader Uniforms & Grid Processing
     //----------------------------------------------------------------
     _cacheGridUniformLocations(program) {
         const gl = this.gl;
@@ -328,10 +356,40 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     updateUniforms(obj){
-        // Guard against external thetaScale overrides - engine computes this from physics chain
-        const { thetaScale, u_thetaScale, ...safeParameters } = obj || {};
-        if (thetaScale !== undefined || u_thetaScale !== undefined) {
-            console.warn('[WarpEngine] Ignored external thetaScale override - engine uses physics chain calculation');
+        const patch = obj || {};
+
+        // 1) Bind metric first (+ mirror to u_*)
+        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
+            const useMetric = !!patch.useMetric;
+            const I = [1,0,0, 0,1,0, 0,0,1];
+            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
+            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
+            this.uniforms.useMetric   = useMetric; this.uniforms.u_useMetric = useMetric;
+            this.uniforms.metric      = m;         this.uniforms.u_metric    = m;
+            this.uniforms.metricInv   = mi;        this.uniforms.u_metricInv = mi;
+        }
+
+        // 2) Merge rest, but strip any external thetaScale
+        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
+        Object.assign(this.uniforms, safeParameters);
+
+        // 3) Recompute thetaScale from physics chain (engine is source of truth)
+        const theta = this._computeThetaScaleFromUniforms(this.uniforms);
+        this._thetaScaleActual = theta;
+        this.uniforms.thetaScale = theta;
+        this.uniforms.u_thetaScale = theta;
+
+        // 4) Warn if external thetaScale tried to override (once per instance)
+        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
+            const asked = +(u_thetaScale ?? thetaScale);
+            if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
+                console.warn('[WarpEngine] Ignored external thetaScale override', { 
+                    asked: asked.toExponential(2), 
+                    engine: theta.toExponential(2), 
+                    ratio: (theta/asked).toFixed(2) 
+                });
+                this.__thetaWarned = true;
+            }
         }
 
         // --- Metric tensor wiring --------------------------------------------
@@ -381,14 +439,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         // Update core uniforms
         Object.assign(this.uniforms, parameters);
 
-        // Compute thetaScale from physics chain (γ_geo³ · q · γ_VdB_mass · √d_eff)
-        const gammaGeo = this.uniforms.gammaGeo || this.uniforms.g_y || 26;
-        const qSpoil = this.uniforms.qSpoilingFactor || this.uniforms.q || 1;
-        const gammaVdB = this.uniforms.gammaVanDenBroeck_mass || this.uniforms.gammaVanDenBroeck || 38.3;
-        const dutyFR = Math.max(1e-12, this.uniforms.dutyEffectiveFR || 0.000025);
-        
-        this.uniforms.thetaScale = Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(dutyFR);
-        this.uniforms.thetaScale_actual = this.uniforms.thetaScale; // Store for diagnostics
+        // thetaScale is now computed in updateUniforms() using physics chain
 
         // Recompute warp geometry if necessary
         if (geoChanged) {
@@ -397,7 +448,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     //----------------------------------------------------------------
-    //  10. Rendering
+    //  11. Rendering
     //----------------------------------------------------------------
     _draw(time){
         const gl = this.gl;
@@ -470,7 +521,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     //----------------------------------------------------------------
-    //  11. Utility Functions (for uniform processing)
+    //  12. Utility Functions (for uniform processing)
     //----------------------------------------------------------------
     // Helper to get uniform location, caching results
     _getUniformLocation(program, name) {
