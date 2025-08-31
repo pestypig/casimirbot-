@@ -252,6 +252,16 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   const greenStats = useMemo(() => computeGreensStats(greenPhi.phi), [greenPhi]);
 
+  // Debug the data sources
+  useEffect(() => {
+    console.log("🔍 Green's Debug:", {
+      serverGreens: serverGreens ? { kind: serverGreens.kind, phiLength: (serverGreens.phi as any)?.length || 0 } : null,
+      clientTiles: clientTiles ? { count: clientTiles.length } : null,
+      greenPhi: { length: greenPhi.phi.length, source: greenPhi.source },
+      greenStats
+    });
+  }, [serverGreens, clientTiles, greenPhi, greenStats]);
+
   // Publisher for renderer: exposes a canonical query cache + fires a window event
   const publishGreens = useCallback(() => {
     const payload = {
