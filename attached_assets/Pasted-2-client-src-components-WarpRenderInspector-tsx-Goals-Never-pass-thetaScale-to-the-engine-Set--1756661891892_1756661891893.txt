@@ -1,0 +1,102 @@
+2) client/src/components/WarpRenderInspector.tsx
+
+Goals:
+
+Never pass thetaScale to the engine.
+
+Set the metric before other uniforms on init (you’re already doing this—just keep it).
+
+Add a quick runtime checkpoint to flag if anyone tries to push thetaScale from outside again.
+
+Minimal changes:
+
+@@
+-  // Build REAL payload (Ford–Roman parity) - use physics chain thetaScale
++  // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
+   const realPayload = {
+     ...baseShared,
+     physicsParityMode: true,
+     ridgeMode: 0,
+     ...realPhys,
+-    // Let the engine compute thetaScale from the physics chain - don't override
+     exposure: 5.0,
+     zeroStop: 1e-7,
+     colorMode: 2, // Shear proxy for truth view
+     lockFraming: true
+   };
+@@
+-  // Build SHOW payload (UI boosted) - use physics chain thetaScale
++  // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
+   const showPayload = {
+     ...baseShared,
+     physicsParityMode: false,
+     ridgeMode: 1,
+     ...showPhys,
+-    // Let the engine compute thetaScale from the physics chain - don't override
+     exposure: 7.5,
+     zeroStop: 1e-7,
+     curvatureGainT: 0.70,
+     curvatureBoostMax: 40,
+     userGain: 1.25,
+     colorMode: 1, // Theta mode for visual enhancement
+     lockFraming: true
+   };
+@@
+   // Subscribe to canonical uniforms
+   const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
++    // Guard against accidental theta injection on the bus
++    const { thetaScale, u_thetaScale, ...safe } = u || {};
++
+     setHaveUniforms(true);
+@@
+-    if (leftEngine.current) {
+-      applyToEngine(leftEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+-    }
+-    if (rightEngine.current) {
+-      applyToEngine(rightEngine.current, { ...u, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+-    }
++    if (leftEngine.current) {
++      applyToEngine(leftEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
++    }
++    if (rightEngine.current) {
++      applyToEngine(rightEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
++    }
+   });
+
+
+Optional: add a fast validator to show what the engine is actually using:
+
+@@
+   const verifyEngineStates = () => {
+@@
+-    console.log('Theta scales - REAL:', leftState?.uniforms?.thetaScale?.toExponential?.(2), 'SHOW:', rightState?.uniforms?.thetaScale?.toExponential?.(2));
++    const thL = leftState?.uniforms?.thetaScale;
++    const thR = rightState?.uniforms?.thetaScale;
++    const thLact = leftState?.uniforms?.thetaScale_actual;
++    const thRact = rightState?.uniforms?.thetaScale_actual;
++    console.log(
++      'Theta scales - REAL:', thL?.toExponential?.(2),
++      'SHOW:', thR?.toExponential?.(2),
++      ' [engine actual]', thLact?.toExponential?.(2), thRact?.toExponential?.(2)
++    );
+   };
+
+Why this fixes your 1.88×10⁹
+
+The engine recomputes θ every update from (γ_geo³)·q·γ_VdB_mass·√d_FR.
+
+Any later thetaScale pushed from elsewhere is ignored (and warned once).
+
+The inspector never sends thetaScale anymore—only the physics inputs.
+
+Metric uniforms are bound first (and mirrored to u_*) before anything else.
+
+You should see your logs converge to:
+
+calculated θ: 2.5133680e7
+engine u_thetaScale (actual): 2.5133680e7
+
+
+If anything upstream tries to push θ again, the console will show:
+
+[WarpEngine] Ignored external thetaScale override { asked: 1.880832388e9, engine: 2.5133680e7, ratio: ~0.013 }
