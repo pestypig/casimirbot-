@@ -1,0 +1,54 @@
+error means timeoutId was declared inside the tick function body in my patch but TypeScript/JS scope didn’t line up the way I intended. It needs to be declared in the same scope as the finally so it’s always defined (even if we don’t assign it).
+
+Here’s the corrected patch:
+
+*** a/client/src/hooks/use-metrics.ts
+--- b/client/src/hooks/use-metrics.ts
+@@
+-    const tick = async () => {
+-      try {
+-        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
+-        // Prefer native AbortSignal.timeout when available; else use controller with a reason.
+-        let controller: AbortController | null = null;
+-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+-        let signal: AbortSignal | undefined;
++    const tick = async () => {
++      // ensure timeoutId is visible to try/catch/finally
++      let timeoutId: ReturnType<typeof setTimeout> | null = null;
++      try {
++        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
++        // Prefer native AbortSignal.timeout when available; else use controller with a reason.
++        let controller: AbortController | null = null;
++        let signal: AbortSignal | undefined;
+         if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+           // @ts-ignore: TS lib may not have AbortSignal.timeout yet
+           signal = AbortSignal.timeout(7000);
+         } else {
+           controller = new AbortController();
+           signal = controller.signal;
+-          timeoutId = setTimeout(() => {
+-            try {
+-              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
+-            } catch {}
+-          }, 7000);
++          timeoutId = setTimeout(() => {
++            try {
++              controller!.abort(
++                new DOMException('Request timed out', 'TimeoutError')
++              );
++            } catch {}
++          }, 7000);
+         }
+ 
+         const r = await fetch(makeUrl("/api/helix/metrics"), {
+@@
+-      } finally {
+-        // Make sure the fallback timer is always cleared
+-        if (timeoutId) clearTimeout(timeoutId);
+-      }
+-    };
++      } finally {
++        // Always clear the timer if one was created
++        if (timeoutId !== null) clearTimeout(timeoutId);
++      }
++    };

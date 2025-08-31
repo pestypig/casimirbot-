@@ -72,11 +72,12 @@ export function useMetrics(pollMs = 2000) {
     let alive = true;
     const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
     const tick = async () => {
+      // ensure timeoutId is visible to try/catch/finally
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
         // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
         // Prefer native AbortSignal.timeout when available; else use controller with a reason.
         let controller: AbortController | null = null;
-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
         let signal: AbortSignal | undefined;
         if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
           // @ts-ignore: TS lib may not have AbortSignal.timeout yet
@@ -86,7 +87,9 @@ export function useMetrics(pollMs = 2000) {
           signal = controller.signal;
           timeoutId = setTimeout(() => {
             try {
-              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
+              controller!.abort(
+                new DOMException('Request timed out', 'TimeoutError')
+              );
             } catch {}
           }, 7000);
         }
@@ -133,8 +136,8 @@ export function useMetrics(pollMs = 2000) {
           });
         }
       } finally {
-        // Make sure the fallback timer is always cleared
-        if (timeoutId) clearTimeout(timeoutId);
+        // Always clear the timer if one was created
+        if (timeoutId !== null) clearTimeout(timeoutId);
       }
     };
     
