@@ -1,0 +1,153 @@
+You can drop a Green’s-function pass straight into your existing pipeline without touching the Natário chain. Here’s a tight, “copy-in and wire” version that (a) computes φ from your stress-energy, (b) streams it to the renderer as a buffer texture, and (c) mixes it with θ in the shader behind a toggle.
+
+1) Minimal CPU pass (O(N²)), pluggable kernels
+// lib/greens.ts
+export type Vec3 = [number, number, number];
+export type Kernel = (r: number) => number;
+
+// Safe kernels (avoid r=0 blowup)
+export const poissonKernel: Kernel = r => 1 / (4 * Math.PI * Math.max(r, 1e-6));
+export const helmholtzKernel = (m: number): Kernel =>
+  r => Math.exp(-m * Math.max(r, 1e-6)) / (4 * Math.PI * Math.max(r, 1e-6));
+
+export function computeGreenPotential(
+  positions: Vec3[],
+  rho: number[],
+  kernel: Kernel,
+  opts?: { normalize?: boolean; bias?: number; scale?: number }
+): Float32Array {
+  const N = positions.length;
+  const out = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    let sum = 0;
+    const [xi, yi, zi] = positions[i];
+    for (let j = 0; j < N; j++) {
+      const [xj, yj, zj] = positions[j];
+      const dx = xi - xj, dy = yi - yj, dz = zi - zj;
+      const r = Math.hypot(dx, dy, dz) + 1e-6;
+      sum += kernel(r) * rho[j];
+    }
+    out[i] = sum;
+  }
+  // optional normalization to keep shader ranges sane
+  if (opts?.normalize) {
+    let min = +Infinity, max = -Infinity;
+    for (let i = 0; i < N; i++) { const v = out[i]; if (v < min) min = v; if (v > max) max = v; }
+    const denom = max - min || 1;
+    for (let i = 0; i < N; i++) out[i] = (out[i] - min) / denom;
+  }
+  const s = opts?.scale ?? 1, b = opts?.bias ?? 0;
+  if (s !== 1 || b !== 0) for (let i = 0; i < N; i++) out[i] = out[i] * s + b;
+  return out;
+}
+
+
+Where rho[j] should be your time-averaged 
+𝑇
+00
+T
+00
+	​
+
+ per tile (you already have this from the Natário stage).
+
+2) Wire into the server step that already computes 
+𝑇
+00
+T
+00
+	​
+
+
+Wherever you aggregate tiles (you showed calculateNatarioMetric(...) returning stressEnergyT00 per region), gather tile centroids and per-tile T00:
+
+// server/dynamic/greens-stage.ts
+import { computeGreenPotential, poissonKernel, helmholtzKernel } from '../../client/src/lib/greens';
+
+export function buildGreenPotentialPayload(tiles: {
+  pos: [number,number,number]; // meters
+  t00: number;                  // J/m^3 (signed, Casimir negative)
+}[], kind: 'poisson' | 'helmholtz', mHelm = 0.0) {
+
+  const positions = tiles.map(t => t.pos as [number,number,number]);
+  const rho       = tiles.map(t => t.t00);
+
+  const kernel = kind === 'helmholtz'
+    ? helmholtzKernel(mHelm)   // m in 1/m
+    : poissonKernel;
+
+  const phi = computeGreenPotential(positions, rho, kernel, {
+    normalize: true,   // keep it [0..1] for easy debug
+    scale: 1, bias: 0
+  });
+
+  // return in the same ordering as your grid/tiles
+  return { phi, positions };
+}
+
+
+Expose this via your existing /api/helix/pipeline or /api/helix/metrics response (e.g. greens:{ phi:ArrayLike, kind:string, m:number }).
+
+3) Push into the engine as a buffer texture
+
+If your engine already supports “buffer uniforms” (Float texture), add a small helper:
+
+// client/lib/engine-green-upload.ts
+export function uploadScalarBuffer(engine: any, name: string, data: Float32Array) {
+  // engine should create a 1D R32F texture or SSBO under the hood
+  engine.updateUniforms?.({ [name]: data, [`${name}Size`]: data.length });
+}
+
+
+In your component, after you receive pipeline data:
+
+// client/components/WarpRenderInspector.tsx (after uniforms arrive)
+useEffect(() => {
+  const greens = (live as any)?.greens as { phi: number[]; kind: string; m: number } | undefined;
+  if (!greens || !leftEngine.current || !rightEngine.current) return;
+
+  const phi = new Float32Array(greens.phi);
+  uploadScalarBuffer(leftEngine.current,  'u_greenPotential',  phi);
+  uploadScalarBuffer(rightEngine.current, 'u_greenPotential',  phi);
+
+  // toggle on
+  leftEngine.current.updateUniforms?.({ useGreenPotential: true });
+  rightEngine.current.updateUniforms?.({ useGreenPotential: true });
+}, [live, leftEngine.current, rightEngine.current]);
+
+
+If your WarpEngine prefers textures over raw arrays, expose an engine method like setFloatBuffer(name, Float32Array) that internally builds a 1D texture.
+
+4) Shader mix-in (fragment or vertex)
+
+Add uniforms and a tiny sampler path. If you index tiles procedurally, pass an integer v_tileIndex (or map world→uv to sample a 1D tex).
+
+// common uniforms
+uniform bool  u_useGreenPotential;
+uniform sampler2D u_greenTex;   // 1D laid out as Nx1
+uniform float u_greenSize;      // N
+
+float greenSample(float tileIndex) {
+  // sample at center of texel
+  float u = (tileIndex + 0.5) / max(u_greenSize, 1.0);
+  return texture(u_greenTex, vec2(u, 0.5)).r;
+}
+
+
+Then combine with your θ chain:
+
+// existing
+float theta_natario = u_thetaScale * thetaBase(); // your current field generator
+
+// new
+float phi_green = (u_useGreenPotential && u_greenSize > 0.5)
+  ? greenSample(v_tileIndex)
+  : 0.0;
+
+// choice: replace, add, or blend (expose a knob u_greenMix in [0..1])
+float theta_total = mix(theta_natario, phi_green, u_greenMix);
+// or additive with scale:
+// float theta_total = theta_natario + u_greenGain * phi_green;
+
+
+Plumb u_greenMix / u_greenGain as uniforms you can tweak from the inspector.
