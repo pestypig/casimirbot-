@@ -1309,14 +1309,15 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Debug operational mode theta calculation
         if (this._dbgThetaTick !== (this._dbgThetaTick||0)+1 % 30) {
-          console.log(`[${parity ? 'REAL' : 'SHOW'}] Theta calculation debug:`, {
+          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] PATCHED Theta calculation:`, {
             γ_geo: nextUniforms.gammaGeo,
             q: nextUniforms.deltaAOverA,
             γ_VdB: nextUniforms.gammaVdB,
             d_FR: dutyEffFR,
             viewAvg: nextUniforms.viewAvg,
             calculated: thetaScaleFromChain,
-            actualTheta: nextUniforms.thetaScale
+            actualTheta: nextUniforms.thetaScale,
+            parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'NONE'
           });
         }
         nextUniforms.dutyUsed   = dutyEffFR;
