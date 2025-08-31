@@ -269,6 +269,11 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     } catch {}
   }, [greenKind, mHelm, normalizeGreens, greenPhi, queryClient]);
 
+  // auto-publish whenever φ changes and is non-empty
+  useEffect(() => {
+    if (greenPhi.phi.length > 0) publishGreens();
+  }, [greenPhi, publishGreens]);
+
   // ========================================================================
   //                               UI
   // ========================================================================
