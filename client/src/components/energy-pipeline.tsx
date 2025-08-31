@@ -44,7 +44,7 @@ function computeGreenPotential(
     let min = +Infinity, max = -Infinity;
     for (let i = 0; i < N; i++) { const v = out[i]; if (v < min) min = v; if (v > max) max = v; }
     const span = max - min || 1;
-    for (let i = 0; i i < N; i++) out[i] = (out[i] - min) / span;
+    for (let i = 0; i < N; i++) out[i] = (out[i] - min) / span;
   }
   return out;
 }
