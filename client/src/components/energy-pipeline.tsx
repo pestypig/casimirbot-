@@ -76,7 +76,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   const { data: systemMetrics } = useQuery({
     queryKey: ["/api/helix/metrics"],
     refetchInterval: 5000,
-    suspense: false,
   });
 
   // Helper type guards
@@ -208,22 +207,16 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     | { phi?: number[] | Float32Array; kind?: "poisson" | "helmholtz"; m?: number; normalize?: boolean }
     | undefined;
 
-  // 2) Fetch field data from /api/helix/field for Green's function calculation
-  const { data: fieldData } = useQuery({
-    queryKey: ["/api/helix/field", { nTheta: 32, nPhi: 16 }],
-    suspense: false,
-    refetchInterval: 10000,
-  });
-
-  // Convert field data to tile format for Green's function
+  // 2) Use any available client tiles from metrics (fallback - main Green's data comes from HelixCore hook now)
   const clientTiles = useMemo(() => {
-    if (!fieldData?.data || !Array.isArray(fieldData.data)) return undefined;
+    const tiles = (systemMetrics as any)?.tiles;
+    if (!Array.isArray(tiles)) return undefined;
     
-    return fieldData.data.map((sample: any) => ({
-      pos: sample.p as Vec3,  // position
-      t00: sample.disp        // use displacement as source density
+    return tiles.map((t: any) => ({
+      pos: t.pos as Vec3,
+      t00: t.t00 || 0
     }));
-  }, [fieldData]);
+  }, [systemMetrics]);
 
   // Kernel selection: prefer what the server says, else Poisson
   const greenKind = (serverGreens?.kind === "helmholtz" || serverGreens?.kind === "poisson")
@@ -261,16 +254,6 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   const greenStats = useMemo(() => computeGreensStats(greenPhi.phi), [greenPhi]);
 
-  // Debug the data sources
-  useEffect(() => {
-    console.log("🔍 Green's Debug:", {
-      fieldData: fieldData ? { count: fieldData.count, dataLength: fieldData.data?.length } : null,
-      serverGreens: serverGreens ? { kind: serverGreens.kind, phiLength: (serverGreens.phi as any)?.length || 0 } : null,
-      clientTiles: clientTiles ? { count: clientTiles.length } : null,
-      greenPhi: { length: greenPhi.phi.length, source: greenPhi.source },
-      greenStats
-    });
-  }, [fieldData, serverGreens, clientTiles, greenPhi, greenStats]);
 
   // Publisher for renderer: exposes a canonical query cache + fires a window event
   const publishGreens = useCallback(() => {

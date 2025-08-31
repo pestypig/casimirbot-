@@ -17,6 +17,68 @@ import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey } from "@/hooks/use-energy-pipeline";
 
+// Greens bridge: auto-publish φ from pipeline/metrics so the Greens cards populate
+type V3 = [number, number, number];
+const poissonG = (r: number) => 1 / (4 * Math.PI * Math.max(r, 1e-6));
+function computePhi(positions: V3[], rho: number[], kernel = poissonG, normalize = true) {
+  const N = positions.length, out = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const [xi, yi, zi] = positions[i]; let sum = 0;
+    for (let j = 0; j < N; j++) {
+      const [xj, yj, zj] = positions[j];
+      const r = Math.hypot(xi - xj, yi - yj, zi - zj) + 1e-6;
+      sum += kernel(r) * rho[j];
+    }
+    out[i] = sum;
+  }
+  if (normalize && N > 0) {
+    let mn = +Infinity, mx = -Infinity;
+    for (let i = 0; i < N; i++) { const v = out[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    const span = mx - mn || 1;
+    for (let i = 0; i < N; i++) out[i] = (out[i] - mn) / span;
+  }
+  return out;
+}
+
+function useGreensBridge() {
+  const qc = useQueryClient();
+  const { data: pipelineState } = useEnergyPipeline();
+  const { data: systemMetrics } = useQuery({
+    queryKey: ["/api/helix/metrics"],
+    refetchInterval: 5000,
+    suspense: false,
+  });
+
+  useEffect(() => {
+    // 1) Server already provided φ?
+    const srv = pipelineState?.greens;
+    if (srv?.phi && (srv.phi as number[]).length) {
+      const payload = {
+        kind: srv.kind ?? "poisson",
+        m: srv.m ?? 0,
+        normalize: srv.normalize !== false,
+        phi: srv.phi instanceof Float32Array ? srv.phi : new Float32Array(srv.phi),
+        size: (srv.phi as number[]).length,
+        source: "server" as const,
+      };
+      qc.setQueryData(["helix:pipeline:greens"], payload);
+      try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
+      return;
+    }
+
+    // 2) Otherwise derive from metrics tiles if present
+    const tiles = systemMetrics?.tiles as { pos: V3; t00: number }[] | undefined;
+    if (Array.isArray(tiles) && tiles.length > 0) {
+      const positions = tiles.map(t => t.pos);
+      const rho = tiles.map(t => t.t00);
+      const phi = computePhi(positions, rho, poissonG, true);
+      const payload = { kind: "poisson" as const, m: 0, normalize: true, phi, size: phi.length, source: "client" as const };
+      qc.setQueryData(["helix:pipeline:greens"], payload);
+      try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
+    }
+  }, [qc, pipelineState?.greens, systemMetrics?.tiles]);
+}
+
 // Utils for live mode descriptions
 
 const formatPower = (P_MW?: number, P_W?: number) => {
@@ -316,6 +378,9 @@ interface ChatMessage {
 }
 
 export default function HelixCore() {
+  // Always keep Greens data flowing to the shared cache/event for the Greens cards
+  useGreensBridge();
+
   // Preload lazy bundles to avoid suspending during user input
   useEffect(() => {
     const preload = () => {
