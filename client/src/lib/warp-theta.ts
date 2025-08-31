@@ -6,6 +6,57 @@
 
 export type DutySource = 'fr' | 'ui';
 
+export type ThetaInputs = {
+  gammaGeo?: number;                 // ~26
+  qSpoilingFactor?: number;          // ~1
+  gammaVanDenBroeck?: number;        // legacy single value
+  gammaVanDenBroeck_mass?: number;   // physics chain (used for REAL)
+  gammaVanDenBroeck_vis?: number;    // cosmetic chain (used for SHOW)
+  dutyEffectiveFR?: number;          // Ford–Roman duty (0..1)
+};
+
+export type ThetaOptions = {
+  mode?: 'mass' | 'vis' | 'auto'; // which γ_VdB to pick
+  vdbMin?: number;                // clamp lower bound
+  vdbMax?: number;                // clamp upper bound
+  vdbDefault?: number;            // fallback if missing (paper ≈ 38.3)
+};
+
+const DEFAULTS: Required<ThetaOptions> = {
+  mode: 'auto',
+  vdbMin: 1,
+  vdbMax: 100,      // ⬅️ hard ceiling to avoid 2.86e5 inflations
+  vdbDefault: 38.3, // ⬅️ paper value
+};
+
+export function clampVdB(x: unknown, opt: ThetaOptions = {}): number {
+  const { vdbMin, vdbMax, vdbDefault } = { ...DEFAULTS, ...opt };
+  const v = Number(x);
+  if (!Number.isFinite(v)) return vdbDefault;
+  return Math.max(vdbMin, Math.min(vdbMax, v));
+}
+
+export function pickGammaVdB(inp: ThetaInputs, opt: ThetaOptions = {}): number {
+  const o = { ...DEFAULTS, ...opt };
+  if (o.mode === 'mass') return clampVdB(inp.gammaVanDenBroeck_mass ?? inp.gammaVanDenBroeck, o);
+  if (o.mode === 'vis')  return clampVdB(inp.gammaVanDenBroeck_vis  ?? inp.gammaVanDenBroeck, o);
+  // auto: prefer mass, else vis, else legacy
+  const chosen = inp.gammaVanDenBroeck_mass ?? inp.gammaVanDenBroeck_vis ?? inp.gammaVanDenBroeck;
+  return clampVdB(chosen, o);
+}
+
+/**
+ * θ = γ_geo³ · q · γ_VdB · √(d_FR)
+ */
+export function computeThetaScale(inp: ThetaInputs, opt: ThetaOptions = {}): number {
+  const g    = Number(inp.gammaGeo) || 26;
+  const q    = Number(inp.qSpoilingFactor) || 1;
+  const vdb  = pickGammaVdB(inp, opt);
+  const dRaw = Number(inp.dutyEffectiveFR);
+  const d    = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
+  return Math.pow(g, 3) * q * vdb * Math.sqrt(d);
+}
+
 /**
  * Debug logging utility with environment detection
  */
@@ -109,7 +160,12 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
   // Extract core physics parameters with debugging
   const gammaGeo = pickNum([p?.gammaGeo, p?.g_y], 26, 'gammaGeo');
   const qSpoil = pickNum([p?.qSpoilingFactor, p?.deltaAOverA], 1, 'qSpoilingFactor');
-  const gammaVdB = pickNum([p?.gammaVdB, p?.gammaVanDenBroeck], 0, 'gammaVanDenBroeck');
+  
+  // Use new clamping system for gamma VdB
+  const gammaVdB = clampVdB(
+    p?.gammaVanDenBroeck_mass ?? p?.gammaVanDenBroeck_vis ?? p?.gammaVanDenBroeck ?? p?.gammaVdB,
+    { vdbDefault: 38.3, vdbMax: 100 }
+  );
 
   debugLog('Core physics parameters:', {
     gammaGeo,

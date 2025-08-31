@@ -162,7 +162,9 @@ export default class WarpEngine {
     _computeThetaScaleFromUniforms(u) {
         const g    = +u.gammaGeo || +u.g_y || 26;
         const q    = +u.qSpoilingFactor || +u.deltaAOverA || 1;
-        const v    = +(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck ?? u.gammaVdB ?? 286000);
+        // Clamp gamma VdB to physically reasonable range (1-100, default 38.3)
+        const vRaw = +(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck_vis ?? u.gammaVanDenBroeck ?? u.gammaVdB ?? 38.3);
+        const v    = Number.isFinite(vRaw) ? Math.max(1, Math.min(100, vRaw)) : 38.3;
         const dRaw = +u.dutyEffectiveFR;
         const d    = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
         return Math.pow(g, 3) * q * v * Math.sqrt(d);
