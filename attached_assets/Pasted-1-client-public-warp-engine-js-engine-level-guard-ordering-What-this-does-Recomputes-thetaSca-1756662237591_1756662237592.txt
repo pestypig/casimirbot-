@@ -1,0 +1,83 @@
+1) client/public/warp-engine.js (engine-level guard + ordering)
+
+What this does
+
+Recomputes thetaScale inside the engine from the physics uniforms every update:
+θ = γ_geo³ · q · γ_VdB_mass · √(dutyEffectiveFR)
+
+Applies metric uniforms (useMetric, metric, metricInv) before any other uniforms and mirrors them to u_*.
+
+Ignores external thetaScale/u_thetaScale (warns once) so it can’t be inflated post-calc.
+
+@@
++function computeThetaScaleFromUniforms(u) {
++  const g    = +u.gammaGeo || 26;
++  const q    = +u.qSpoilingFactor || 1;
++  const v    = +(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck ?? 1);
++  const dRaw = +u.dutyEffectiveFR;
++  const d    = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
++  return Math.pow(g, 3) * q * v * Math.sqrt(d);
++}
++const __ALLOW_EXTERNAL_THETA = false;
+@@ class WarpEngine {
+   constructor(canvas) {
+     // …
+     this.uniforms = {};
++    Object.defineProperty(this.uniforms, 'thetaScale_actual', {
++      get: () => this._thetaScaleActual ?? NaN,
++      enumerable: true
++    });
+   }
+@@
+-  updateUniforms(patch) {
+-    Object.assign(this.uniforms, patch);
+-    this.forceRedraw && this.forceRedraw();
+-  }
++  updateUniforms(patch) {
++    const p = patch || {};
++
++    // 1) Bind metric first (+ mirror to u_*)
++    if ('useMetric' in p || 'metric' in p || 'metricInv' in p) {
++      const useMetric = !!p.useMetric;
++      const I = [1,0,0, 0,1,0, 0,0,1];
++      const m  = Array.isArray(p.metric)    && p.metric.length===9 ? p.metric.map(Number)    : I;
++      const mi = Array.isArray(p.metricInv) && p.metricInv.length===9 ? p.metricInv.map(Number) : I;
++      this.uniforms.useMetric   = useMetric; this.uniforms.u_useMetric = useMetric;
++      this.uniforms.metric      = m;         this.uniforms.u_metric    = m;
++      this.uniforms.metricInv   = mi;        this.uniforms.u_metricInv = mi;
++    }
++
++    // 2) Merge rest, but strip any θ
++    const { thetaScale, u_thetaScale, ...rest } = p;
++    Object.assign(this.uniforms, rest);
++
++    // 3) Recompute θ from physics chain (engine is SoT)
++    const theta = computeThetaScaleFromUniforms(this.uniforms);
++    this._thetaScaleActual = theta;
++    this.uniforms.thetaScale  = theta;
++    this.uniforms.u_thetaScale = theta;
++
++    // 4) Warn if an external θ tried to override (once)
++    if (!__ALLOW_EXTERNAL_THETA && (thetaScale != null || u_thetaScale != null) && !this.__thetaWarned) {
++      const asked = +(u_thetaScale ?? thetaScale);
++      if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
++        console.warn('[WarpEngine] Ignored external thetaScale override', { asked, engine: theta, ratio: theta/asked });
++        this.__thetaWarned = true;
++      }
++    }
++
++    this.forceRedraw && this.forceRedraw();
++  }
+@@
+-  bootstrap(payload) {
+-    this.updateUniforms(payload);
+-  }
++  bootstrap(payload) {
++    // Ensure metric is set first if present
++    const m = {};
++    if ('useMetric' in (payload||{})) m.useMetric = payload.useMetric;
++    if ('metric'    in (payload||{})) m.metric    = payload.metric;
++    if ('metricInv' in (payload||{})) m.metricInv = payload.metricInv;
++    if (Object.keys(m).length) this.updateUniforms(m);
++    this.updateUniforms(payload);
++  }
