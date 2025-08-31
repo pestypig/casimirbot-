@@ -1,0 +1,38 @@
+Patch: client/src/components/BridgeDerivationCards.tsx
+
+Reads and displays the reciprocity flag (from cache/event) next to φ stats.
+
+This assumes you already read the payload from ["helix:pipeline:greens"] (your file does). We just add UI to show reciprocity.
+
+*** a/client/src/components/BridgeDerivationCards.tsx
+--- b/client/src/components/BridgeDerivationCards.tsx
+@@
+-            <div className="grid grid-cols-2 gap-3 text-sm">
++            <div className="grid grid-cols-2 gap-3 text-sm">
+               <div className="text-muted-foreground">Kernel</div>
+               <div className="font-mono">
+                 {greens?.kind === "helmholtz" ? `Helmholtz (m=${greens?.m ?? 0})` : "Poisson"}
+                 {greens?.normalize ? " · norm" : ""}
+               </div>
+               <div className="text-muted-foreground">N (tiles)</div>
+               <div className="font-mono">{gstats?.N ?? "—"}</div>
+               <div className="text-muted-foreground">φ_min</div>
+               <div className="font-mono">{gstats?.min != null ? Number(gstats.min).toExponential(3) : "—"}</div>
+               <div className="text-muted-foreground">φ_max</div>
+               <div className="font-mono">{gstats?.max != null ? Number(gstats.max).toExponential(3) : "—"}</div>
+               <div className="text-muted-foreground">φ_mean</div>
+               <div className="font-mono">{gstats?.mean != null ? Number(gstats.mean).toExponential(3) : "—"}</div>
++              {/* Reciprocity status pulled from the same greens payload (if present) */}
++              <div className="text-muted-foreground">Reciprocity</div>
++              <div className="font-mono">
++                {(() => {
++                  const r = (greens as any)?.reciprocity as
++                    | { status: "BROKEN_INSTANT" | "PASS_AVG" | "UNKNOWN"; message?: string }
++                    | undefined;
++                  if (!r) return "—";
++                  if (r.status === "BROKEN_INSTANT") return "BROKEN (inst.)";
++                  if (r.status === "PASS_AVG") return "PASS (avg.)";
++                  return "—";
++                })()}
++              </div>
+             </div>
