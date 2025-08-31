@@ -65,22 +65,19 @@ function useGreensBridge() {
       return;
     }
 
-    // 2) Otherwise derive from metrics tiles if present
-    const tiles = (systemMetrics as any)?.tileData as { pos: V3; t00: number }[] | undefined;
+    // 2) Otherwise derive on the client from metrics tile data (prefer tileData; fallback to tiles)
+    const tiles =
+      ((systemMetrics as any)?.tileData ??
+       (systemMetrics as any)?.tiles) as { pos: V3; t00: number }[] | undefined;
     if (Array.isArray(tiles) && tiles.length > 0) {
-      console.log("🔗 Green's Bridge: Computing φ from", tiles.length, "tiles");
       const positions = tiles.map(t => t.pos);
       const rho = tiles.map(t => t.t00);
       const phi = computePhi(positions, rho, poissonG, true);
-      console.log("🔗 Green's φ computed: min=", Math.min(...phi), "max=", Math.max(...phi), "mean=", phi.reduce((a,b) => a+b, 0)/phi.length);
       const payload = { kind: "poisson" as const, m: 0, normalize: true, phi, size: phi.length, source: "client" as const };
       qc.setQueryData(["helix:pipeline:greens"], payload);
       try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
-      console.log("🔗 Green's Bridge: Published φ payload with", phi.length, "values");
-    } else {
-      console.log("🔗 Green's Bridge: No tileData found in systemMetrics");
     }
-  }, [qc, pipelineState?.greens, systemMetrics?.tileData]);
+  }, [qc, pipelineState?.greens, (systemMetrics as any)?.tileData, (systemMetrics as any)?.tiles]);
 }
 
 // Utils for live mode descriptions
