@@ -3,6 +3,7 @@ import { Activity } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMetrics } from "@/hooks/use-metrics";
 import type { HelixMetrics } from "@/hooks/use-metrics";
+import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
 
 /* ---------- tiny helpers ---------- */
 const Eq = ({ children }: { children: React.ReactNode }) => (
@@ -632,30 +633,10 @@ function GreensCard({ m }: { m: HelixMetrics }) {
     return () => window.removeEventListener("helix:greens" as any, onEvt);
   }, []);
 
-  // stats helper
-  const computeStats = React.useCallback((arr?: Float32Array | number[]) => {
-    if (!arr || arr.length === 0) return { N: 0, min: undefined, max: undefined, mean: undefined };
-    let min = +Infinity, max = -Infinity, sum = 0;
-    for (let i = 0; i < arr.length; i++) {
-      const v = Number((arr as any)[i]);
-      if (!Number.isFinite(v)) continue;
-      if (v < min) min = v;
-      if (v > max) max = v;
-      sum += v;
-    }
-    const N = arr.length;
-    return { N, min, max, mean: N ? sum / N : undefined };
-  }, []);
-
-  const gstats = computeStats(greens?.phi as any);
+  const gstats = computeGreensStats(greens?.phi as any);
 
   // local helpers from this file
-  const kindLabel =
-    greens?.kind === "helmholtz"
-      ? `Helmholtz${greens?.m != null ? ` (m=${greens.m})` : ""}`
-      : greens?.kind === "poisson"
-      ? "Poisson"
-      : "—";
+  const kindLabel = greensKindLabel(greens);
 
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
@@ -680,13 +661,13 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         <div className="font-mono">{gstats.N ? gstats.N.toLocaleString() : "—"}</div>
 
         <div className="text-muted-foreground">φ_min</div>
-        <div className="font-mono">{gstats.min != null ? (Number(gstats.min)).toExponential(3) : "—"}</div>
+        <div className="font-mono">{fmtExp(gstats.min)}</div>
 
         <div className="text-muted-foreground">φ_max</div>
-        <div className="font-mono">{gstats.max != null ? (Number(gstats.max)).toExponential(3) : "—"}</div>
+        <div className="font-mono">{fmtExp(gstats.max)}</div>
 
         <div className="text-muted-foreground">φ_mean</div>
-        <div className="font-mono">{gstats.mean != null ? (Number(gstats.mean)).toExponential(3) : "—"}</div>
+        <div className="font-mono">{fmtExp(gstats.mean)}</div>
       </div>
 
       <div className="text-[11px] text-slate-400">

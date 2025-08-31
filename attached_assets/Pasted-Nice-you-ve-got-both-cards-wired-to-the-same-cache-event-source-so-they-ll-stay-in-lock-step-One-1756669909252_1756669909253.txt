@@ -1,0 +1,117 @@
+Nice — you’ve got both cards wired to the same cache/event source, so they’ll stay in lock-step. One small improvement I’d recommend now is to deduplicate the φ helpers so the two places can’t drift.
+
+Here’s a tiny shared helper you can drop in (and two micro-patches to use it).
+
+1) Add a shared helper
+
+Create client/src/lib/greens.ts:
+
+// client/src/lib/greens.ts
+export type GreensPayload = {
+  kind?: "poisson" | "helmholtz";
+  m?: number;
+  normalize?: boolean;
+  phi?: Float32Array | number[];
+  size?: number;
+  source?: "server" | "client" | "none";
+};
+
+export type GreensStats = { N: number; min?: number; max?: number; mean?: number };
+
+export function computeGreensStats(arr?: Float32Array | number[]): GreensStats {
+  if (!arr || arr.length === 0) return { N: 0 };
+  let min = +Infinity, max = -Infinity, sum = 0;
+  const N = arr.length;
+  for (let i = 0; i < N; i++) {
+    const v = Number((arr as any)[i]);
+    if (!Number.isFinite(v)) continue;
+    if (v < min) min = v;
+    if (v > max) max = v;
+    sum += v;
+  }
+  return { N, min, max, mean: N ? sum / N : undefined };
+}
+
+export function fmtExp(v?: number, digits = 3): string {
+  return Number.isFinite(v as number) ? (v as number).toExponential(digits) : "—";
+}
+
+export function greensKindLabel(g?: GreensPayload): string {
+  if (!g?.kind) return "—";
+  return g.kind === "helmholtz" ? `Helmholtz${g.m != null ? ` (m=${g.m})` : ""}` : "Poisson";
+}
+
+2) Use it in BridgeDerivationCards.tsx
+
+Replace the ad-hoc stats + formatting in your Green’s card with the shared helpers:
+
+-  // stats helper
+-  const computeStats = React.useCallback((arr?: Float32Array | number[]) => {
+-    if (!arr || arr.length === 0) return { N: 0, min: undefined, max: undefined, mean: undefined };
+-    let min = +Infinity, max = -Infinity, sum = 0;
+-    for (let i = 0; i < arr.length; i++) {
+-      const v = Number((arr as any)[i]);
+-      if (!Number.isFinite(v)) continue;
+-      if (v < min) min = v;
+-      if (v > max) max = v;
+-      sum += v;
+-    }
+-    const N = arr.length;
+-    return { N, min, max, mean: N ? sum / N : undefined };
+-  }, []);
+-
+-  const gstats = computeStats(greens?.phi as any);
++  import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
++  const gstats = computeGreensStats(greens?.phi as any);
+@@
+-  const kindLabel =
+-    greens?.kind === "helmholtz"
+-      ? `Helmholtz${greens?.m != null ? ` (m=${greens.m})` : ""}`
+-      : greens?.kind === "poisson"
+-      ? "Poisson"
+-      : "—";
++  const kindLabel = greensKindLabel(greens);
+@@
+-        <div className="text-muted-foreground">φ_min</div>
+-        <div className="font-mono">{gstats.min != null ? (Number(gstats.min)).toExponential(3) : "—"}</div>
+-        <div className="text-muted-foreground">φ_max</div>
+-        <div className="font-mono">{gstats.max != null ? (Number(gstats.max)).toExponential(3) : "—"}</div>
+-        <div className="text-muted-foreground">φ_mean</div>
+-        <div className="font-mono">{gstats.mean != null ? (Number(gstats.mean)).toExponential(3) : "—"}</div>
++        <div className="text-muted-foreground">φ_min</div>
++        <div className="font-mono">{fmtExp(gstats.min)}</div>
++        <div className="text-muted-foreground">φ_max</div>
++        <div className="font-mono">{fmtExp(gstats.max)}</div>
++        <div className="text-muted-foreground">φ_mean</div>
++        <div className="font-mono">{fmtExp(gstats.mean)}</div>
+
+3) Use it in energy-pipeline.tsx
+
+Same tiny swap so both cards render identically:
+
+- const greenStats = useMemo(() => stats(greenPhi.phi), [greenPhi]);
++ import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
++ const greenStats = useMemo(() => computeGreensStats(greenPhi.phi), [greenPhi]);
+@@
+- {isFiniteNum(greenStats.min) ? greenStats.min.toExponential(3) : "—"}
++ {fmtExp(greenStats.min)}
+@@
+- {isFiniteNum(greenStats.max) ? greenStats.max.toExponential(3) : "—"}
++ {fmtExp(greenStats.max)}
+@@
+- {isFiniteNum(greenStats.mean) ? greenStats.mean.toExponential(3) : "—"}
++ {fmtExp(greenStats.mean)}
+@@
+- {greenKind === "helmholtz" ? `Helmholtz (m=${mHelm})` : "Poisson"}
++ {greensKindLabel({ kind: greenKind as any, m: mHelm })}
+
+
+That’s it. Now both locations:
+
+Render φ stats with exactly the same formatter
+
+Share one stats routine (less code, fewer edge-case differences)
+
+Can be extended centrally (e.g., add σ/variance later)
+
+If you want, I can also add a compact sparkline (tiny canvas) that visualizes normalized φ; it plugs cleanly into the same helpers.

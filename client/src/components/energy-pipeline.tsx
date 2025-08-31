@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp, Activity } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
+import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
 
 // ---------- Green's helpers (local, no new deps) ----------
 type Vec3 = [number, number, number];
@@ -249,7 +250,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     return { phi: new Float32Array(0), source: "none" as const };
   }, [serverGreens, clientTiles, greenKind, mHelm, normalizeGreens]);
 
-  const greenStats = useMemo(() => stats(greenPhi.phi), [greenPhi]);
+  const greenStats = useMemo(() => computeGreensStats(greenPhi.phi), [greenPhi]);
 
   // Publisher for renderer: exposes a canonical query cache + fires a window event
   const publishGreens = useCallback(() => {
@@ -408,17 +409,17 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="text-muted-foreground">Kernel</div>
                   <div className="font-mono">
-                    {greenKind === "helmholtz" ? `Helmholtz (m=${mHelm})` : "Poisson"}
+                    {greensKindLabel({ kind: greenKind as any, m: mHelm })}
                     {normalizeGreens ? " · norm" : ""}
                   </div>
                   <div className="text-muted-foreground">N (tiles)</div>
                   <div className="font-mono">{greenStats.N || "—"}</div>
                   <div className="text-muted-foreground">φ_min</div>
-                  <div className="font-mono">{isFiniteNum(greenStats.min) ? greenStats.min.toExponential(3) : "—"}</div>
+                  <div className="font-mono">{fmtExp(greenStats.min)}</div>
                   <div className="text-muted-foreground">φ_max</div>
-                  <div className="font-mono">{isFiniteNum(greenStats.max) ? greenStats.max.toExponential(3) : "—"}</div>
+                  <div className="font-mono">{fmtExp(greenStats.max)}</div>
                   <div className="text-muted-foreground">φ_mean</div>
-                  <div className="font-mono">{isFiniteNum(greenStats.mean) ? greenStats.mean.toExponential(3) : "—"}</div>
+                  <div className="font-mono">{fmtExp(greenStats.mean)}</div>
                 </div>
 
                 <div className="mt-3 flex gap-2">
