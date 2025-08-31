@@ -1180,10 +1180,9 @@ export default function WarpRenderInspector(props: {
 
       // Subscribe to canonical uniforms
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
-        // Guard against accidental theta injection on the bus
-        const { thetaScale, u_thetaScale, ...safe } = u || {};
-
-        setHaveUniforms(true); // Mark that we've received first uniforms
+        setHaveUniforms(true);
+        // strip any external theta (engine computes it)
+        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
 
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
@@ -1191,21 +1190,17 @@ export default function WarpRenderInspector(props: {
           betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
         };
         const metricU = {
-          useMetric:  props.baseShared?.useMetric  ?? u?.useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
-          metric:     props.baseShared?.metric     ?? u?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
-          metricInv:  props.baseShared?.metricInv  ?? u?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
+          useMetric:  props.baseShared?.useMetric  ?? uSafe?.useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
+          metric:     props.baseShared?.metric     ?? uSafe?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
+          metricInv:  props.baseShared?.metricInv  ?? uSafe?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...safe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
         }
-
-        // Unmute engines when canonical uniforms arrive
-        leftEngine.current?.setVisible?.(true);
-        rightEngine.current?.setVisible?.(true);
       });
 
       // De-spam the bus: publish only on real changes
