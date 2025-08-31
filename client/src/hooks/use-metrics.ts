@@ -73,18 +73,32 @@ export function useMetrics(pollMs = 2000) {
     const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
     const tick = async () => {
       try {
-        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly
-        const ctrl = new AbortController();
-        const to = setTimeout(() => ctrl.abort(), 7000);
+        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
+        // Prefer native AbortSignal.timeout when available; else use controller with a reason.
+        let controller: AbortController | null = null;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+        let signal: AbortSignal | undefined;
+        if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
+          // @ts-ignore: TS lib may not have AbortSignal.timeout yet
+          signal = AbortSignal.timeout(7000);
+        } else {
+          controller = new AbortController();
+          signal = controller.signal;
+          timeoutId = setTimeout(() => {
+            try {
+              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
+            } catch {}
+          }, 7000);
+        }
+
         const r = await fetch(makeUrl("/api/helix/metrics"), {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
           },
-          signal: ctrl.signal
+          signal
         });
-        clearTimeout(to);
         if (!r.ok) {
           // Try to extract any text error for easier debugging
           let body = '';
@@ -101,7 +115,8 @@ export function useMetrics(pollMs = 2000) {
         }
       } catch (e: any) {
         if (alive) {
-          const msg = e?.name === 'AbortError'
+          const name = e?.name || '';
+          const msg  = (name === 'AbortError' || name === 'TimeoutError')
             ? 'request timeout (7s)'
             : (e?.message || 'network error');
           console.error('[useMetrics] Fetch error:', msg);
@@ -117,6 +132,9 @@ export function useMetrics(pollMs = 2000) {
             tiles: { tileArea_cm2: 25, hullArea_m2: null, N_tiles: 0 }
           });
         }
+      } finally {
+        // Make sure the fallback timer is always cleared
+        if (timeoutId) clearTimeout(timeoutId);
       }
     };
     

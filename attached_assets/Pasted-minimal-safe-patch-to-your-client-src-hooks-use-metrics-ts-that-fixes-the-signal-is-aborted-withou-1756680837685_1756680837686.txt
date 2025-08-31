@@ -1,0 +1,89 @@
+minimal, safe patch to your client/src/hooks/use-metrics.ts that fixes the “signal is aborted without reason” crash and avoids orphaned timers:
+
+attach the signal to fetch (you already do)
+
+prefer AbortSignal.timeout(7000) when available
+
+otherwise abort with a reason (DOMException('Request timed out','TimeoutError'))
+
+always clear the timeout in finally so it doesn’t fire after the request completes
+
+Patch (unified diff)
+*** a/client/src/hooks/use-metrics.ts
+--- b/client/src/hooks/use-metrics.ts
+@@
+     const tick = async () => {
+       try {
+-        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly
+-        const ctrl = new AbortController();
+-        const to = setTimeout(() => ctrl.abort(), 7000);
+-        const r = await fetch(makeUrl("/api/helix/metrics"), {
++        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
++        // Prefer native AbortSignal.timeout when available; else use controller with a reason.
++        let controller: AbortController | null = null;
++        let timeoutId: ReturnType<typeof setTimeout> | null = null;
++        let signal: AbortSignal | undefined;
++        if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
++          // @ts-ignore: TS lib may not have AbortSignal.timeout yet
++          signal = AbortSignal.timeout(7000);
++        } else {
++          controller = new AbortController();
++          signal = controller.signal;
++          timeoutId = setTimeout(() => {
++            try {
++              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
++            } catch {}
++          }, 7000);
++        }
++
++        const r = await fetch(makeUrl("/api/helix/metrics"), {
+           method: 'GET',
+           headers: {
+             'Accept': 'application/json',
+             'Content-Type': 'application/json'
+           },
+-          signal: ctrl.signal
++          signal
+         });
+-        clearTimeout(to);
+         if (!r.ok) {
+           // Try to extract any text error for easier debugging
+           let body = '';
+           try { body = await r.text(); } catch {}
+           throw new Error(`HTTP ${r.status} ${r.statusText}${body ? ` — ${body.slice(0,200)}` : ''}`);
+         }
+         
+         // Some runtimes return empty; guard JSON parse
+         const text = await r.text();
+         const j = text ? JSON.parse(text) : null;
+         if (alive) {
+           setData(j);
+           setErr(null); // Clear any previous errors
+         }
+       } catch (e: any) {
+         if (alive) {
+-          const msg = e?.name === 'AbortError'
+-            ? 'request timeout (7s)'
+-            : (e?.message || 'network error');
++          const name = e?.name || '';
++          const msg  = (name === 'AbortError' || name === 'TimeoutError')
++            ? 'request timeout (7s)'
++            : (e?.message || 'network error');
+           console.error('[useMetrics] Fetch error:', msg);
+           setErr(msg);
+           // Fallback mock so the Bridge stays interactive in dev
+           setData(d => d ?? {
+             energyOutput: 0,
+             exoticMass: 0,
+             timeScaleRatio: 0,
+             curvatureMax: 0,
+             fordRoman: { value: 0, limit: 1, status: 'PASS' },
+             modelMode: 'calibrated',
+             tiles: { tileArea_cm2: 25, hullArea_m2: null, N_tiles: 0 }
+           });
+         }
++      } finally {
++        // Make sure the fallback timer is always cleared
++        if (timeoutId) clearTimeout(timeoutId);
+       }
+     };
