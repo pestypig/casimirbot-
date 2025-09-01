@@ -15,7 +15,6 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 import { thetaCanonical } from "@/lib/warp-theta";
-import { thetaCanonical } from "@/lib/warp-theta";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 // Single-source pane sanitizer. If you have another copy further down, delete it.
