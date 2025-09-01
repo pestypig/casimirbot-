@@ -23,10 +23,11 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   return {
     ...patch,
     physicsParityMode: isREAL,
+    parityMode: isREAL,
     uPhysicsParity: isREAL,
     ridgeMode: isREAL ? 0 : 1,
     uRidgeMode: isREAL ? 0 : 1,
-    viewAvg: isREAL,
+    viewAvg: isREAL ? true : false, // <- lock
   };
 }
 
@@ -112,7 +113,7 @@ const IS_COARSE =
   (matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
 
 // Batches many uniform patches into ONE engine write + ONE forceRedraw per rAF
-function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
+function makeUniformBatcher(engineRef: React.MutableRefObject<any>, pane: 'REAL'|'SHOW') {
   let pending: any = null;
   let scheduled = false;
   return (patch: any, tag = 'batched') => {
@@ -123,7 +124,8 @@ function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
       scheduled = false;
       const e = engineRef.current;
       if (!e || !pending) return;
-      const toSend = pending; pending = null;
+      const toSend = paneSanitize(pane, pending); // <- ensure all updates go through sanitizer
+      pending = null;
       try {
         if (e.isLoaded && e.gridProgram) {
           gatedUpdateUniforms(e, toSend, 'client');
@@ -254,7 +256,7 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
 
 // Push only after shaders are ready - now with enhanced gating and diagnostics
-  function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
+  function pushUniformsWhenReady(engine: any, patch: Record<string, any>, pane: 'REAL'|'SHOW', source: string = 'inspector') {
     if (!engine) {
       console.warn(`[${source}] Cannot push uniforms - engine is null`);
       return;
@@ -262,8 +264,9 @@ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
     const push = () => {
       try {
-        gatedUpdateUniforms(engine, patch, 'client');
-        if (DEBUG) console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(patch));
+        const sanitizedPatch = paneSanitize(pane, patch);
+        gatedUpdateUniforms(engine, sanitizedPatch, 'client');
+        if (DEBUG) console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(sanitizedPatch));
       } catch (error) {
         console.error(`[${source}] Failed to push uniforms:`, error);
       }
@@ -1448,18 +1451,16 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, {
-            ...uSafe, ...purple, ...metricU,
-            physicsParityMode: true,  ridgeMode: 0, viewAvg: true,
-            u_physicsParityMode: true, u_ridgeMode: 0
+          const leftUpdate = paneSanitize('REAL', {
+            ...uSafe, ...purple, ...metricU
           });
+          applyToEngine(leftEngine.current, leftUpdate);
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, {
-            ...uSafe, ...purple, ...metricU,
-            physicsParityMode: false, ridgeMode: 1, viewAvg: false,
-            u_physicsParityMode: false, u_ridgeMode: 1
+          const rightUpdate = paneSanitize('SHOW', {
+            ...uSafe, ...purple, ...metricU
           });
+          applyToEngine(rightEngine.current, rightUpdate);
         }
       });
 
@@ -1683,8 +1684,8 @@ export default function WarpRenderInspector(props: {
 
   // Initialize batched push functions for performance optimization
   useEffect(() => {
-    pushLeft.current = makeUniformBatcher(leftEngine);
-    pushRight.current = makeUniformBatcher(rightEngine);
+    pushLeft.current = makeUniformBatcher(leftEngine, 'REAL');
+    pushRight.current = makeUniformBatcher(rightEngine, 'SHOW');
   }, []);
 
   // Mobile DPR clamping and canvas sizing
