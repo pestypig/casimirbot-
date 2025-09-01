@@ -625,6 +625,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
 
   // Also mirror the latest derived duty/LC for display without re-deriving
   const derived = qc.getQueryData(["helix:pipeline:derived"]) as any;
+  const uexp: UniformsExplain | undefined = (m as any)?.uniformsExplain;
   const dEff = Number.isFinite(derived?.dutyEffectiveFR)
     ? derived.dutyEffectiveFR
     : (
