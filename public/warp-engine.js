@@ -394,7 +394,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         const patch = obj || {};
         const parameters = { ...this.uniforms, ...patch }; // Copy existing uniforms and apply patch
         const nextUniforms = { ...parameters }; // Create a new object for modifications
-        const mode = parameters?.mode || 'hover'; // Default to 'hover' if mode is not specified
+        const mode = parameters?.currentMode ?? this.uniforms?.currentMode ?? 'hover'; // Default to 'hover' if mode is not specified
         const parity = !!parameters?.physicsParityMode; // Ensure parity is a boolean
 
         // 1) Bind metric first (+ mirror to u_*)
@@ -412,26 +412,41 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         const { thetaScale, u_thetaScale, ...safeParameters } = patch;
         Object.assign(nextUniforms, safeParameters);
 
-        // --- Recalculate physics chain values ---
-        const dutyEffFR = Number.isFinite(nextUniforms.dutyEffectiveFR) ? nextUniforms.dutyEffectiveFR : 2.5e-5;
         const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
-        const isStandby = mode === 'standby';
 
-        // build theta scale (keep actual chain value for telemetry)
-        const thetaScaleFromChain =
-          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
-          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB ?? 1) *
-          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
+        // build theta scale via canonical function; never trust incidental locals
+        const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
+            ...nextUniforms,
+            // Ensure the canonical has the raw inputs (avoid stale locals)
+            dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
+            dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
+            sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
+            sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
+            currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
+            u_physicsParityMode: nextUniforms.physicsParityMode
+        });
+        this.__lastThetaTerms = { // Store for potential debug logging
+            gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
+            qSpoilingFactor: nextUniforms.qSpoilingFactor ?? nextUniforms.deltaAOverA,
+            gammaVanDenBroeck_mass: nextUniforms.gammaVanDenBroeck_mass ?? nextUniforms.gammaVanDenBroeck,
+            dutyLocal: nextUniforms.dutyCycle ?? 0.01,
+            sectorsConcurrent: nextUniforms.sectors ?? 1,
+            sectorsTotal: nextUniforms.sectorCount ?? 400,
+            viewAveraged: parity,
+            currentMode: mode
+        };
 
-        // Engine is authoritative: canonical θ from physics chain only
-        nextUniforms.thetaScale = thetaScaleFromChain;
-        // Report 0 duty in standby so θ(phys) = 0 in inspector/diagnostics
-        nextUniforms.dutyUsed   = isStandby ? 0 : dutyEffFR;
-        nextUniforms.dutyEffectiveFR = isStandby ? 0 : dutyEffFR;
+
+        // Publish FR explicitly (if none was provided, publish the reconstructed FR)
+        const dFRpub = (Number.isFinite(+parameters?.dutyEffectiveFR) ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
+                        : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
+                                                ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
+                                                 Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400))))));
+        nextUniforms.dutyUsed        = dFRpub;
+        nextUniforms.dutyEffectiveFR = dFRpub;
 
         // --- Neutralize visual boosts in standby (keep this REAL-only if desired) ---
-        if (isStandby && parity) {
+        if (mode === 'standby' && parity) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
           nextUniforms.curvatureBoostMax = 1;
@@ -490,13 +505,22 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
 
         // --- decide if the CPU warp needs recompute ---
         const geoChanged =
-          (prev.hullAxes?.[0] !== nextUniforms.hullAxes?.[0]) ||
-          (prev.hullAxes?.[1] !== nextUniforms.hullAxes?.[1]) ||
-          (prev.hullAxes?.[2] !== nextUniforms.hullAxes?.[2]) ||
+          (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
+          (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
+          (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
           (prev.gridSpan !== nextUniforms.gridSpan);
+
+        // Final guardrail: if standby and θ>0, log once for traceability
+        if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
+            console.warn('[warp-engine] Standby θ non-zero — terms:', this.__lastThetaTerms);
+        }
 
         // Update core uniforms
         Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
+
+        // Engine-authoritative θ
+        this.uniforms.thetaScale_actual = thetaScaleFromChain;
+        this.uniforms.thetaScale        = thetaScaleFromChain;
 
         // Recompute warp geometry if necessary
         if (geoChanged) {
