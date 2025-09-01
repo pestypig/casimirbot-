@@ -167,20 +167,20 @@ export default class WarpEngine {
             sectorsConcurrent, sectorsTotal,
             viewAveraged = true, currentMode
         } = params || {};
-        
+
         if (currentMode === 'standby') return 0;
-        
+
         const g = Math.max(1, Number(gammaGeo) || 26);
         const q = Math.max(1e-12, Number(qSpoilingFactor) || 1);
         // physics-only clamp on MASS pocket gamma (visual gamma never enters θ)
         const v = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3));
         const sC = Math.max(1, Number(sectorsConcurrent) || 1);
         const sT = Math.max(1, Number(sectorsTotal) || 400);
-        
+
         // Ford–Roman effective duty: d_FR = dutyLocal * (sC / sT)
         const dFR = Math.max(1e-12, Math.min(1, (Number(dutyLocal) || 0) * (sC / sT)));
         const dutyFactor = viewAveraged ? Math.sqrt(dFR) : 1;
-        
+
         return (g * g * g) * q * v * dutyFactor;
     }
 
@@ -188,7 +188,7 @@ export default class WarpEngine {
         // Derive inputs for canonical θ from uniforms (never accept a param thetaScale here)
         const parityREAL = !!u.physicsParityMode;    // REAL physics pane?
         const mode = u.currentMode || 'hover';
-        
+
         const theta = this._thetaCanonical({
             gammaGeo: u.gammaGeo ?? u.g_y,
             qSpoilingFactor: u.qSpoilingFactor ?? u.deltaAOverA,
@@ -199,7 +199,7 @@ export default class WarpEngine {
             viewAveraged: parityREAL,     // physics (REAL) averages, SHOW does not
             currentMode: mode
         });
-        
+
         return theta;
     }
 
@@ -415,6 +415,7 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         // --- Recalculate physics chain values ---
         const dutyEffFR = Number.isFinite(nextUniforms.dutyEffectiveFR) ? nextUniforms.dutyEffectiveFR : 2.5e-5;
         const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
+        const isStandby = mode === 'standby';
 
         // build theta scale (keep actual chain value for telemetry)
         const thetaScaleFromChain =
@@ -423,10 +424,8 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
-        // Engine is authoritative: ignore incoming thetaScale and use canonical chain only
-        nextUniforms.thetaScale_actual = this._computeThetaScaleFromUniforms(nextUniforms);
-        nextUniforms.thetaScale = nextUniforms.thetaScale_actual;
-
+        // Engine is authoritative: canonical θ from physics chain only
+        nextUniforms.thetaScale = thetaScaleFromChain;
         // Report 0 duty in standby so θ(phys) = 0 in inspector/diagnostics
         nextUniforms.dutyUsed   = isStandby ? 0 : dutyEffFR;
         nextUniforms.dutyEffectiveFR = isStandby ? 0 : dutyEffFR;
