@@ -306,8 +306,16 @@ export function gatedUpdateUniforms(
     const u: Record<string, any> = {...patch};
 
     // sanitize + rename to prevent shader header duplication
-    if ('physicsParityMode' in u) u[CANON.physicsParityMode] = !!u.physicsParityMode;
-    if ('ridgeMode' in u)         u[CANON.ridgeMode]         = (u.ridgeMode|0) ? 1 : 0;
+    if ('physicsParityMode' in u) {
+      u[CANON.physicsParityMode] = !!u.physicsParityMode;
+      // Keep both forms for compatibility
+      u.physicsParityMode = !!u.physicsParityMode;
+    }
+    if ('ridgeMode' in u) {
+      u[CANON.ridgeMode] = (u.ridgeMode|0) ? 1 : 0;
+      // Keep both forms for compatibility  
+      u.ridgeMode = (u.ridgeMode|0) ? 1 : 0;
+    }
 
     if ('epsilonTilt' in u)       u[CANON.epsilonTilt]       = Math.max(0, +u.epsilonTilt || 0);
     if ('betaTiltVec' in u && Array.isArray(u.betaTiltVec)) {
@@ -316,8 +324,7 @@ export function gatedUpdateUniforms(
       u[CANON.betaTiltVec] = [x/n, y/n, z/n];
     }
 
-    // strip legacy keys so we never double-write engine params
-    delete u.physicsParityMode; delete u.ridgeMode;
+    // Only strip the tilt params, keep parity/ridge for engine compatibility
     delete u.epsilonTilt; delete u.betaTiltVec;
 
     const debouncedUpdate = getDebouncedUpdate(engine);
