@@ -14,26 +14,26 @@ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
-// NOTE: Do NOT compute or send theta from the UI. The engine is authoritative.
+import Grid3DEngine from "@/components/engines/Grid3DEngine";
+import { thetaCanonical } from "@/lib/warp-theta";
+
+// --- FAST PATH HELPERS (drop-in) --------------------------------------------
+// Single-source pane sanitizer. If you have another copy further down, delete it.
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  const isREAL = pane === 'REAL';
+  return {
+    ...patch,
+    physicsParityMode: isREAL,
+    uPhysicsParity: isREAL,
+    ridgeMode: isREAL ? 0 : 1,
+    uRidgeMode: isREAL ? 0 : 1,
+    viewAvg: isREAL,
+  };
+}
 
 // --- pane helpers -----------------------------------------------------------
 const sanitizeUniforms = (o: any) =>
   Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
-
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  const p = { ...patch };
-  if (pane === 'REAL') {
-    p.physicsParityMode = true;  p.parityMode = true;
-    p.viewAvg = true;            p.ridgeMode = 0;
-  } else {
-    p.physicsParityMode = false; p.parityMode = false;
-    p.viewAvg = false;           p.ridgeMode = 1;
-  }
-  // Never allow UI to inject theta
-  delete (p as any).thetaScale;
-  delete (p as any).u_thetaScale;
-  return p;
-}
 
 function buildRealPacket(parameters: any, base: any = {}) {
   const dutyFR =
@@ -183,13 +183,7 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  return {
-    ...patch,
-    physicsParityMode: pane === 'REAL',
-    ridgeMode: pane === 'REAL' ? 0 : 1
-  };
-}
+// [deleted duplicate paneSanitize]
 
 // Sanitize uniform values for safe WebGL consumption
 function sanitizeUniforms(u: any = {}) {
