@@ -1,0 +1,111 @@
+Awesome—let’s squash this once and for all. Below is a single, consolidated patch-set that:
+
+makes the engine the only authority on θ (using your thetaCanonical physics chain),
+
+prevents any UI/pipeline module from injecting a thetaScale,
+
+routes all inspector views to the canonical inputs (so “standby ⇒ θ = 0” is guaranteed and visible),
+
+fixes sector/duty aliasing so Ford–Roman duty is correct.
+
+Apply all hunks as-is.
+
+1) public/warp-engine.js — canonical θ only, FR duty resolved, hard-zero in standby
+*** a/public/warp-engine.js
+--- b/public/warp-engine.js
+@@
++  // ===== Canonical physics θ (engine is the sole authority) =====
++  _thetaCanonical(params) {
++    const {
++      gammaGeo, qSpoilingFactor,
++      gammaVanDenBroeck_mass, dutyLocal,
++      sectorsConcurrent, sectorsTotal,
++      viewAveraged = true, mode
++    } = params || {};
++    if (mode === 'standby') return 0;
++    const g = Math.max(1, Number(gammaGeo) || 26);
++    const q = Math.max(1e-12, Number(qSpoilingFactor) || 1);
++    // physics clamp on MASS pocket gamma (visual gamma never enters θ)
++    const v = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3));
++    const sC = Math.max(1, Number(sectorsConcurrent) || 1);
++    const sT = Math.max(1, Number(sectorsTotal) || 400);
++    // Ford–Roman effective duty: d_FR = dutyLocal × (sC/sT)
++    const dFR = Math.max(1e-12, Math.min(1, (Number(dutyLocal) || 0) * (sC / sT)));
++    const dutyFactor = viewAveraged ? Math.sqrt(dFR) : 1;
++    return (g * g * g) * q * v * dutyFactor;
++  }
++
++  _computeThetaScaleFromUniforms(u) {
++    // Resolve aliases & defaults once
++    const parityREAL   = !!(u.u_physicsParityMode ?? u.physicsParityMode);
++    const mode         = u.currentMode || 'hover';
++    const gammaGeo     = u.gammaGeo ?? u.g_y ?? 26;
++    const qSpoil       = u.qSpoilingFactor ?? u.deltaAOverA ?? 1;
++    const gammaMass    = u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck ?? u.gammaVdB ?? 38.3;
++    const dutyLocal    = Number.isFinite(+u.dutyCycle) ? +u.dutyCycle : 0.01; // local burst duty
++    const sectorsConc  = Number.isFinite(+u.sectors) ? +u.sectors : 1;        // concurrent
++    const sectorsTot   = Number.isFinite(+u.sectorCount) ? +u.sectorCount : 400; // total
++    // Prefer provided FR duty if present; else reconstruct from local duty & sectors
++    const dutyFR_param = Number.isFinite(+u.dutyEffectiveFR) ? Math.max(1e-12, Math.min(1, +u.dutyEffectiveFR)) : undefined;
++    const dutyFR_recon = Math.max(1e-12, Math.min(1, dutyLocal * (sectorsConc / Math.max(1, sectorsTot))));
++    const dutyFR_used  = (dutyFR_param !== undefined) ? dutyFR_param : dutyFR_recon;
++
++    // Canonical θ (REAL averages view; SHOW does not)
++    const theta = this._thetaCanonical({
++      gammaGeo,
++      qSpoilingFactor: qSpoil,
++      gammaVanDenBroeck_mass: gammaMass,
++      dutyLocal, sectorsConcurrent: sectorsConc, sectorsTotal: sectorsTot,
++      viewAveraged: parityREAL,
++      mode
++    });
++    // Standby hard-clamp
++    return (mode === 'standby') ? 0 : theta;
++  }
+@@
+-        // 🔗 physics chain fields used by CPU warp & shader
+-        thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
++        // 🔗 physics fields; θ is set below from the canonical chain (never from params)
++        thetaScale: 0,
+@@
+-        // build theta scale (canonical chain)
+-        const thetaScaleFromChain = zeroStandby ? 0 :
+-          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+-          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+-          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+-          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
++        // Canonical θ from uniforms (aliases resolved inside)
++        const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
++          ...nextUniforms,
++          // ensure raw inputs are present (avoid stale locals)
++          dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
++          dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
++          sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
++          sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
++          currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
++          u_physicsParityMode: nextUniforms.physicsParityMode
++        });
+@@
+-        // Always prefer React-computed thetaScale for pipeline compliance
+-        nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
+-          ? +parameters.thetaScale
+-          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback but don't amplify
++        // Engine-authoritative θ only (ignore any incoming thetaScale)
++        nextUniforms.thetaScale_actual = thetaScaleFromChain; // telemetry
++        nextUniforms.thetaScale        = thetaScaleFromChain;
+@@
+-        nextUniforms.dutyUsed        = dutyEffFR;
+-        nextUniforms.dutyEffectiveFR = dutyEffFR;   // expose single source of truth to UI
++        // Publish FR explicitly (use provided FR if present; else reconstruction)
++        const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
++          ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
++          : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
++                                   ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
++                                    Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
++        nextUniforms.dutyUsed        = dFRpub;
++        nextUniforms.dutyEffectiveFR = dFRpub;
+@@
++        // Guardrail: if standby yet θ>0, log once with chain terms
++        if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
++          console.warn('[warp-engine] Standby θ non-zero — uniforms:', nextUniforms);
++        }
