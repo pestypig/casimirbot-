@@ -15,6 +15,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 import { thetaCanonical } from "@/lib/warp-theta";
+import { thetaCanonical } from "@/lib/warp-theta";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -484,40 +485,23 @@ function PaneOverlay(props:{
       const S  = areaEllipsoid(a,b,c);
       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
 
-      // --- Canonical vs Shader ---
-      // Prefer the engine's canonical terms; show shader θ separately.
-      // Shader θ (whatever is actually bound to the uniform)
+      // --- Shader vs Canonical ---
       const thetaShader =
-        Number(+U.thetaScale_actual) || // if engine exposes this, prefer it
-        Number(+U.thetaScale)       ||
-        Number(+U.u_thetaScale)     || NaN;
-
-      // Inputs for canonical θ (mirror engine's chain)
+        Number(+U.thetaScale_actual) ||
+        Number(+U.thetaScale) ||
+        Number(+U.u_thetaScale) || NaN;
       const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
       const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1));
-      // dutyLocal: prefer uniform; else derive from lightCrossing if available; else default
-      const dutyLocal =
-        Number.isFinite(+U.dutyCycle) ? +U.dutyCycle :
-        (Number.isFinite(props?.shipMassKg) && 0) || // (placeholder: keep order stable)
-        (Number.isFinite(+((props as any)?.lightCrossing?.burst_ms)) &&
-         Number.isFinite(+((props as any)?.lightCrossing?.dwell_ms)) &&
-         +((props as any)?.lightCrossing?.dwell_ms) > 0
-          ? Math.max(1e-12, +((props as any)?.lightCrossing?.burst_ms) / +((props as any)?.lightCrossing?.dwell_ms))
-          : 0.01);
-
+      const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
       const thetaCanon = thetaCanonical({
         gammaGeo:               +U.gammaGeo || 26,
         qSpoilingFactor:        +U.qSpoilingFactor || +U.deltaAOverA || 1,
         gammaVanDenBroeck_mass: +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3,
-        dutyLocal,
-        sectorsConcurrent,
-        sectorsTotal,
+        dutyLocal, sectorsConcurrent, sectorsTotal,
         viewAveraged: !!U.physicsParityMode,
         mode: (U.currentMode as any) || 'hover'
       });
-
-      // optional: keep your paper clamp, but show it as "θ_paper"
-      const thetaPaper = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
+      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
 
       // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
       const M_ship_kg  = Number.isFinite(shipMassKg as number) ? Number(shipMassKg) : NaN;
@@ -531,10 +515,7 @@ function PaneOverlay(props:{
       const frontMax  = diag.theta_front_max_viewed ?? (Number.isFinite(frontRaw) ? frontRaw * Math.sqrt(f) : frontRaw);
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
-      setSnap({
-        a,b,c,aH, w_m, V,S, Vshell,
-        thetaShader, thetaCanon, thetaPaper,
-        M_ship_kg, M_slice_kg,
+      setSnap({ a,b,c,aH, w_m, V,S, Vshell, thetaShader, thetaCanon, thetaPaper, M_ship_kg, M_slice_kg,
         frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
         mDisplayText: (flavor === 'REAL')
@@ -1214,7 +1195,7 @@ export default function WarpRenderInspector(props: {
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true);
         // strip any external theta (engine computes it)
-        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
+        const { thetaScale, u_thetaScale, thetaScale_actual, ...uSafe } = u || {};
 
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
@@ -1353,7 +1334,7 @@ export default function WarpRenderInspector(props: {
 
     lastWUHashRef.current = sig;
     // Never publish any thetaScale fields downstream; engine is authoritative.
-    const { thetaScale, u_thetaScale, ...clean } = sanitized as any;
+    const { thetaScale, u_thetaScale, thetaScale_actual, ...clean } = sanitized as any;
     publish("warp:uniforms", { ...clean, __version: version });
   }, [systemMetrics]);
 
@@ -1982,4 +1963,4 @@ export default function WarpRenderInspector(props: {
   );
 }
 
-// (removed) local physics helper — we now rely on the shared thetaCanonical()
+// (removed) local physics helper — we rely on thetaCanonical()
