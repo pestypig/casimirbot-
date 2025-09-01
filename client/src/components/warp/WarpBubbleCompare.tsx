@@ -118,7 +118,7 @@ const validatePhysicsParams = (params: any, label: string) => {
     validated.gammaGeo = Math.max(1, Math.min(1000, validated.gammaGeo || 26));
   }
   // default missing γ_VdB to the visual seed and allow large values
-  if ('gammaVdB' in validated || 'gammaVanDenBroeck' in validated) {
+  if ('gammaVanDenBroeck' in validated || 'gammaVdB' in validated) {
     const raw = validated.gammaVanDenBroeck ?? validated.gammaVdB;
     const vis = Number.isFinite(raw) ? raw : 1.35e5;
     // assign separate visual and mass seeds
@@ -984,7 +984,7 @@ export default function WarpBubbleCompare({
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
     try {
-      // Strong detection up-front (DOM-mounted probe for mobile webviews)
+      // Strong detection up-front (DOM-probe for mobile webviews)
       const support = webglSupport(undefined, { mountProbeCanvas: true });
       if (!support.ok) {
         console.warn("[init] Preflight failed; attempting lazy init anyway");
@@ -1035,6 +1035,7 @@ export default function WarpBubbleCompare({
         ...real,
         currentMode: parameters.currentMode,
         physicsParityMode: true,
+        viewAvg: true,
         vShip: 0,
         gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
         deltaAOverA: real.qSpoilingFactor,
@@ -1044,14 +1045,13 @@ export default function WarpBubbleCompare({
       };
 
       // SHOW packet
-      const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
       const showPacket = {
         ...shared,
         ...show,
         currentMode: parameters.currentMode,
         physicsParityMode: false,
+        viewAvg: false,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
-        thetaScale: showTheta,
         gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
         deltaAOverA: show.qSpoilingFactor,
         sectors: Math.max(1, parameters.sectors),
@@ -1103,7 +1103,7 @@ export default function WarpBubbleCompare({
         ...show,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
         curvatureGainT: 0.70,
-        curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
+        curvatureBoostMax: Math.max(1, Math.min(1000, +heroExaggeration || 82)),
         userGain: 4,
         displayGain: 1,
         physicsParityMode: false,
@@ -1225,10 +1225,6 @@ export default function WarpBubbleCompare({
     pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
 
     // SHOW (UI) with heroExaggeration applied
-    const showTheta = parameters.currentMode === 'standby'
-      ? 0
-      : Math.max(1e-6, show.thetaScale || 0);
-
     const showPhysicsPayload = paneSanitize('SHOW', {
       ...shared,
       ...show,
