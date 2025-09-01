@@ -614,7 +614,6 @@ export default function WarpRenderInspector(props: {
   // ────────────────────────────────────────────────────────────────────────────
   // [WRI θ] INSTRUMENTATION & PARITY LOCK
   // ────────────────────────────────────────────────────────────────────────────
-  console.info('[WRI θ] instrumentation booted');
   const thetaShaderRef = useRef<number | null>(null);
   const thetaJSRef     = useRef<number | null>(null);
   const thetaCanonRef  = useRef<number | null>(null);
@@ -640,6 +639,149 @@ export default function WarpRenderInspector(props: {
     const dutyFactor = viewAvg ? Math.sqrt(dFR) : 1;
     return (g*g*g) * q * v * dutyFactor;
   }
+
+  // engine resolver: find left/right engines from registry or props
+  function resolveEngines(): {left?: any, right?: any} {
+    // prefer explicit refs if provided by parent
+    // @ts-ignore
+    const engProp = (props as any)?.engine || (props as any)?.engineRef?.current;
+    if (engProp) return { left: engProp };
+    // global registry (WarpEngine registers windows.__warp[id] = engine)
+    // @ts-ignore
+    const reg = (window as any).__warp;
+    if (reg && typeof reg === 'object') {
+      const keys = Object.keys(reg);
+      if (keys.length === 1) return { left: reg[keys[0]] };
+      if (keys.length >= 2)  return { left: reg[keys[0]], right: reg[keys[1]] };
+    }
+    // fallback: first canvas engine if attached
+    const canv = document.querySelectorAll('canvas');
+    for (const c of Array.from(canv) as any[]) {
+      if (c.__warpEngine) return { left: c.__warpEngine };
+    }
+    return {};
+  }
+
+  // sticky parity wrapper: blocks legacy aliases & θ injections
+  function lockParity(engine: any, forcedREAL: boolean) {
+    if (!engine || engine.__wriParityLocked) return;
+    engine.__wriParityLocked = true;
+    const orig = typeof engine.updateUniforms === 'function' ? engine.updateUniforms.bind(engine) : null;
+    engine.updateUniforms = function(u: any) {
+      const U = { ...(u||{}) };
+      // strip legacy alias writers that keep flipping parity / inflating θ
+      delete U.parityMode;
+      delete U.uPhysicsParity;
+      delete U.u_ridgeMode;
+      delete U.uThetaScale;
+      delete U.u_thetaScale;
+      delete U.thetaScale;
+      // enforce sticky REAL/SHOW + pane-specific averaging
+      U.physicsParityMode  = !!forcedREAL;
+      U.ridgeMode          = forcedREAL ? 0 : 1;
+      U.viewAvg            = !!forcedREAL;
+      // pass through canonical fields; engine computes θ itself
+      return orig ? orig(U) : undefined;
+    };
+  }
+
+  // pretty formatter
+  const fmt = (x: any) => (typeof x === 'number' && isFinite(x))
+    ? (Math.abs(x) >= 1e3 || Math.abs(x) < 1e-2 ? x.toExponential(3) : x.toFixed(3))
+    : String(x);
+
+  // bootstrap parity locks + start θ sampler
+  useEffect(() => {
+    console.info('[WRI θ] instrumentation booted');
+    let alive = true;
+    let armed = false;
+    const start = () => {
+      if (!alive) return;
+      const { left, right } = resolveEngines();
+      if (!left) return; // try again next tick
+
+      // lock parity once (REAL on left, SHOW on right if present)
+      if (!parityLockedRef.current) {
+        lockParity(left, true);
+        if (right) lockParity(right, false);
+        parityLockedRef.current = true;
+        console.log('[WRI θ] parity locks engaged: left=REAL, right=SHOW');
+      }
+
+      // RAF sampler
+      const eng = left; // sample left (REAL). Duplicate block for right if needed.
+      const sample = () => {
+        if (!alive || !eng) return;
+        try {
+          const U = { ...(eng.uniforms||{}), ...(eng.currentParams||{}) };
+          // JS θ the engine believes it set
+          const thetaJS = (typeof U.thetaScale === 'number' && isFinite(U.thetaScale)) ? U.thetaScale : null;
+          thetaJSRef.current = thetaJS;
+          // GL-latched θ (shader)
+          let thetaGL: number | null = null;
+          try {
+            const loc = eng.gridUniforms?.thetaScale || null;
+            if (loc) {
+              const val = eng.gl.getUniform(eng.gridProgram, loc);
+              thetaGL = (typeof val === 'number') ? val
+                     : (Array.isArray(val) && typeof val[0] === 'number') ? val[0]
+                     : null;
+            }
+          } catch {}
+          thetaShaderRef.current = thetaGL;
+          // canonical reference
+          const thetaCanon = thetaCanonicalLocal(U);
+          thetaCanonRef.current = thetaCanon;
+
+          const parity = !!U.physicsParityMode;
+          const mode = String(U.currentMode || 'hover');
+          const now = performance.now();
+          const parityFlipped = (lastParityRef.current !== null && lastParityRef.current !== parity);
+          if (parityFlipped || now - lastLogAtRef.current > 1000) {
+            lastParityRef.current = parity;
+            lastLogAtRef.current = now;
+            console.log(
+              `[WRI θ] ${parity ? 'REAL' : 'SHOW'} mode=${mode}` +
+              ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}` +
+              ` | g=${fmt(U.gammaGeo)} q=${fmt(U.deltaAOverA)} vdb=${fmt(U.gammaVdB)}` +
+              ` | dLocal=${fmt(U.dutyLocal ?? U.dutyCycle)} S=${U.sectors}/${U.sectorCount}` +
+              ` | viewAvg=${!!U.viewAvg}`
+            );
+          }
+          if (parity && mode.toLowerCase() === 'standby') {
+            const leakGL = (thetaGL ?? 0) > 0;
+            const leakJS = (thetaJS ?? 0) > 0;
+            if (leakGL || leakJS) {
+              console.warn(
+                `[WRI θ][LEAK] REAL standby shows non-zero θ` +
+                ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error('[WRI θ] sampler error:', e);
+        }
+        rafRef.current = requestAnimationFrame(sample);
+      };
+      if (!armed) {
+        armed = true;
+        rafRef.current = requestAnimationFrame(sample);
+      }
+    };
+
+    // try a few times while engines mount
+    const kick = () => {
+      start();
+      if (!parityLockedRef.current) requestAnimationFrame(kick);
+    };
+    kick();
+
+    return () => {
+      alive = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, []);
 
   // engine resolver: find left/right engines from registry or props
   function resolveEngines(): {left?: any, right?: any} {
