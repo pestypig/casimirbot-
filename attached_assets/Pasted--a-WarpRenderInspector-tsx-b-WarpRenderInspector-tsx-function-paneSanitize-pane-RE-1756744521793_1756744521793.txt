@@ -1,0 +1,177 @@
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+-  function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
++  function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+     return {
+       ...patch,
+-      physicsParityMode: pane === 'REAL',
+-      parityMode: pane === 'REAL',
++      physicsParityMode: pane === 'REAL',
+       ridgeMode: pane === 'REAL' ? 0 : 1
+     };
+   }
+@@
+-          const realInitUniforms = {
++          const realInitUniforms = {
+             exposure: 5.0,
+             zeroStop: 1e-7,
+             physicsParityMode: true,
+-            parityMode: true, // Explicit fallback
+             ridgeMode: 0,
+             colorMode: 2, // shear/"truth"
+             lockFraming: true,
+             epsilonTilt: epsilonTilt,
+             betaTiltVec: betaTiltVecN,
+           };
+@@
+-          // CRITICAL: Force parity directly on uniforms object as backup
++          // CRITICAL: Force parity directly on uniforms object as backup
+           if (leftEngine.current.uniforms) {
+             leftEngine.current.uniforms.physicsParityMode = true;
+-            leftEngine.current.uniforms.parityMode = true;
+             leftEngine.current.uniforms.ridgeMode = 0;
+           }
+@@
+-          // Initialize with ENFORCED non-parity mode for SHOW
++          // Initialize with ENFORCED non-parity mode for SHOW
+           const showInitUniforms = {
+             exposure: 7.5,
+             zeroStop: 1e-7,
+             physicsParityMode: false,
+-            parityMode: false, // Explicit fallback
+             ridgeMode: 1,
+             curvatureGainT: 0.70,
+             curvatureBoostMax: 40,
+             userGain: 1.25,
+             colorMode: 1, // theta/cosmetic
+             lockFraming: true,
+             epsilonTilt: epsilonTilt,
+             betaTiltVec: betaTiltVecN,
+           };
+@@
+-      // Bootstrap both engines once they are ready
++      // Bootstrap both engines once they are ready
+       leftEngine.current?.bootstrap?.({ ...realPayload });
+       rightEngine.current?.bootstrap?.({ ...showPayload });
+@@
+-      // Subscribe to canonical uniforms
++      // Subscribe to canonical uniforms
+       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+         setHaveUniforms(true);
+-        // strip any external theta (engine computes it)
+-        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
++        // strip any external theta (engine computes it)
++        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
+@@
+-        if (leftEngine.current) {
++        if (leftEngine.current) {
+           applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+         }
+         if (rightEngine.current) {
+           applyToEngine(rightEngine.current, { ...uSafe, ...metricU, ...purple, physicsParityMode: false, ridgeMode: 1 });
+         }
+       });
+@@
+-  // De-spam the bus: publish only on real changes
++  // De-spam the bus: publish only on real changes
+   useEffect(() => {
+     const wu = (systemMetrics as any)?.warpUniforms;
+     if (!wu) return;
+ 
+     const version = Number.isFinite(systemMetrics?.seq) ? systemMetrics.seq : Date.now();
+ 
+-    const sanitized = sanitizeUniforms(wu);
++    const sanitized = sanitizeUniforms(wu);
+     const sig = JSON.stringify(stableWU(sanitized));
+     if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+ 
+     lastWUHashRef.current = sig;
+-    publish("warp:uniforms", { ...sanitized, __version: version });
++    // Never publish any thetaScale fields downstream; engine is authoritative.
++    const { thetaScale, u_thetaScale, ...clean } = sanitized as any;
++    publish("warp:uniforms", { ...clean, __version: version });
+   }, [systemMetrics]);
+@@
+-  // Ford-Roman duty computation (outside useEffect for prop access)
+-  const dutyLocal = (() => {
+-    const b = Number(props.lightCrossing?.burst_ms);
+-    const d = Number(props.lightCrossing?.dwell_ms);
+-    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
+-  })();
+-  const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
+-  const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
++  // Ford–Roman duty inputs (compute BEFORE payloads so we can embed them)
++  const dutyLocal = (() => {
++    const b = Number(props.lightCrossing?.burst_ms);
++    const d = Number(props.lightCrossing?.dwell_ms);
++    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
++  })();
++  const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
++  const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
++  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // canonical FR
+@@
+-  // Visual-only mass fraction scaling
++  // Visual-only mass fraction scaling
+   const total = Math.max(1, Number(live?.sectorCount) || 400);
+   const viewFracREAL = 1 / total;
+ 
+-  // FR duty for both engines - let them derive thetaScale internally
+-  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
++  // (kept) dutyEffectiveFR already computed above
+@@
+-  // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
+-  const realPayload = {
++  // Build REAL payload (physics pane) — provide canonical θ inputs only
++  const realPayload = {
+     ...baseShared,
+     physicsParityMode: true,
+     ridgeMode: 0,
+     ...realPhys,
+     currentMode: live?.currentMode,
++    // Canonical θ inputs:
++    gammaGeo: realPhys?.gammaGeo ?? 26,
++    qSpoilingFactor: realPhys?.qSpoilingFactor ?? 1,
++    gammaVanDenBroeck_mass:
++      realPhys?.gammaVanDenBroeck_mass ??
++      realPhys?.gammaVanDenBroeck ??
++      live?.gammaVanDenBroeck_mass ??
++      live?.gammaVanDenBroeck ?? 38.3,
++    sectorCount: sTotal,
++    sectors: sConcurrent,       // concurrent sectors
++    dutyCycle: dutyLocal,       // local burst duty
++    dutyEffectiveFR,            // ship-wide Ford–Roman duty
+     exposure: 5.0,
+     zeroStop: 1e-7,
+     colorMode: 2, // Shear proxy for truth view
+     lockFraming: true
+   };
+@@
+-  // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
+-  const showPayload = {
++  // Build SHOW payload (visual pane) — still provide canonical inputs; engine will ignore √d in SHOW
++  const showPayload = {
+     ...baseShared,
+     physicsParityMode: false,
+     ridgeMode: 1,
+     ...showPhys,
+     currentMode: live?.currentMode,
++    // Canonical inputs mirrored for consistency/debug:
++    gammaGeo: showPhys?.gammaGeo ?? realPhys?.gammaGeo ?? 26,
++    qSpoilingFactor: showPhys?.qSpoilingFactor ?? realPhys?.qSpoilingFactor ?? 1,
++    gammaVanDenBroeck_vis:
++      showPhys?.gammaVanDenBroeck_vis ??
++      live?.gammaVanDenBroeck_vis ??
++      live?.gammaVanDenBroeck ?? 1.35e5,
++    sectorCount: sTotal,
++    sectors: 1,                 // SHOW is cosmetic; keep concurrent=1 to avoid accidental √d coupling
++    dutyCycle: dutyLocal,
++    dutyEffectiveFR,
+     exposure: 7.5,
+     zeroStop: 1e-7,
+     curvatureGainT: 0.70,
+     curvatureBoostMax: 40,
+     userGain: 1.25,
+     colorMode: 1, // Theta mode for visual enhancement
+     lockFraming: true
+   };
