@@ -1,0 +1,163 @@
+--- a/public/warp-engine.js
++++ b/public/warp-engine.js
+@@ -1,6 +1,7 @@
+ //====================================================================
+ //  Natário Warp-Bubble Visualiser (pure WebGL – no GLM, no WebAssembly)
+ //  ------------------------------------------------------------------
++//  Canonical θ & parity/viewAvg hardening patch included (see __wrapUpdateUniforms)
+ //  Drop this file next to your React (or plain-JS) front-end.  Create
+ //  <canvas id="warpView"></canvas> in the DOM and then:
+ //
+@@ -32,6 +33,9 @@ export default class WarpEngine {
+         this._cacheUniformLocations();
+         this._resize();
+         window.addEventListener("resize", () => this._resize());
++        // ⛑️ Wrap updateUniforms so inbound overrides can't flip parity/averaging or θ
++        // Works regardless of which class method definition is last.
++        this.__wrapUpdateUniforms();
+         requestAnimationFrame(t => this._loop(t));
+     }
+ 
+@@ -164,11 +168,14 @@ export default class WarpEngine {
+     //----------------------------------------------------------------
+     //  5.  Physics Chain Computation
+     //----------------------------------------------------------------
+     // ---- Canonical physics θ (engine is the only authority) ----
+     _thetaCanonical(params) {
+         const {
+             gammaGeo, qSpoilingFactor,
+             gammaVanDenBroeck_mass, dutyLocal,
+             sectorsConcurrent, sectorsTotal,
+-            viewAveraged = true, currentMode
++            viewAveraged = true, currentMode
+         } = params || {};
+ 
+-        if (currentMode === 'standby') return 0;
++        // Only REAL (view-averaged) standby should go flat; SHOW standby may still visualize.
++        if (currentMode === 'standby' && viewAveraged) return 0;
+ 
+         const g = Math.max(1, Number(gammaGeo) || 26);
+         const q = Math.max(1e-12, Number(qSpoilingFactor) || 1);
+         // physics-only clamp on MASS pocket gamma (visual gamma never enters θ)
+         const v = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3));
+@@ -206,6 +213,93 @@ export default class WarpEngine {
+         return theta;
+     }
+ 
++    // ----------------------------------------------------------------
++    //  5b. Runtime wrapper: enforce canonical θ + REAL↔SHOW averaging
++    // ----------------------------------------------------------------
++    __wrapUpdateUniforms(){
++        if (this.__thetaWrapped) return;
++        this.__thetaWrapped = true;
++        const orig = this.updateUniforms?.bind(this);
++        if (!orig) return;
++
++        this.updateUniforms = (obj) => {
++            const prev = this.uniforms || {};
++            const patch = { ...(obj||{}) };
++
++            // Strip external attempts to steer parity/θ/averaging via aliases.
++            delete patch.thetaScale;
++            delete patch.u_thetaScale;
++            delete patch.uPhysicsParity;
++            delete patch.viewAvg;
++
++            // Parity: sticky unless explicitly set; we never read legacy aliases.
++            const parityREAL = (patch.physicsParityMode !== undefined)
++              ? !!patch.physicsParityMode
++              : !!prev.physicsParityMode;
++
++            const mode = String(patch.currentMode ?? prev.currentMode ?? 'hover').toLowerCase();
++            const sLive  = Math.max(1, Number(patch.sectors     ?? prev.sectors     ?? 1)   | 0);
++            const sTotal = Math.max(1, Number(patch.sectorCount ?? prev.sectorCount ?? 400) | 0);
++            const dutyLocal = Number.isFinite(+patch.dutyCycle) ? +patch.dutyCycle
++                              : Number.isFinite(+prev.dutyCycle) ? +prev.dutyCycle : 0.01;
++
++            // Averaging rule: REAL → FR (√(d_local * S_live/S_total)); SHOW → instantaneous (no √).
++            const viewAveraged = parityREAL;
++            const dEff = viewAveraged ? dutyLocal * (sLive / Math.max(1, sTotal)) : dutyLocal;
++            const dutyEffectiveFR = (mode === 'standby' && viewAveraged) ? 0
++                                     : Math.max(0, Math.min(1, dEff));
++
++            // Canonical θ from uniforms we will publish (REAL standby ⇒ θ=0)
++            const g   = patch.gammaGeo ?? patch.g_y ?? prev.gammaGeo ?? prev.g_y ?? 26;
++            const q   = patch.qSpoilingFactor ?? patch.deltaAOverA ?? prev.qSpoilingFactor ?? prev.deltaAOverA ?? 1;
++            const vM  = patch.gammaVanDenBroeck_mass ?? patch.gammaVanDenBroeck
++                        ?? prev.gammaVanDenBroeck_mass ?? prev.gammaVanDenBroeck ?? 38.3;
++            const theta = this._thetaCanonical({
++                gammaGeo: g,
++                qSpoilingFactor: q,
++                gammaVanDenBroeck_mass: vM,
++                dutyLocal,
++                sectorsConcurrent: sLive,
++                sectorsTotal: sTotal,
++                viewAveraged,
++                currentMode: mode
++            });
++
++            // Force consistent flags; mirror to common uniform name as well.
++            patch.physicsParityMode = parityREAL;
++            patch.u_physicsParityMode = parityREAL;
++            patch.viewAvg = viewAveraged;
++            patch.dutyEffectiveFR = dutyEffectiveFR;
++            patch.thetaScale = theta;
++
++            // Neutralize visuals in REAL+standby
++            if (mode === 'standby' && parityREAL) {
++                patch.vizGain = 1;
++                patch.userGain = 1;
++                patch.curvatureGainT = 0;
++                patch.curvatureBoostMax = 1;
++                patch.vShip = 0;
++            }
++
++            // Optional debug: set window.__WARP_DEBUG_THETA = true to see the chain
++            if (typeof window !== 'undefined' && window.__WARP_DEBUG_THETA) {
++                const g3 = Math.pow(Math.max(1, +g||26), 3);
++                const vC = Math.max(1, Math.min(1e2, +vM||38.3));
++                const dutyTerm = viewAveraged ? Math.sqrt(Math.max(1e-12, dutyEffectiveFR)) : 1;
++                console.log(`[CANON θ] ${parityREAL?'REAL':'SHOW'} mode=${mode}`, {
++                    g, g3, q, vM_raw: vM, vM_clamped: vC,
++                    dutyLocal, sLive, sTotal,
++                    dutyEffectiveFR, viewAveraged,
++                    theta
++                });
++            }
++
++            const r = orig(patch);
++            // Telemetry (mirror onto uniforms for panels that read from JS)
++            try {
++                this.uniforms.thetaScale_actual = theta;
++                this.uniforms.thetaScale = theta;
++                this.uniforms.viewAvg = viewAveraged;
++            } catch {}
++            return r;
++        };
++    }
++
+     _computeThetaScaleFromUniforms(u) {
+         // Derive inputs for canonical θ from uniforms (never accept a param thetaScale here)
+         const parityREAL = !!u.physicsParityMode;    // REAL physics pane?
+         const mode = u.currentMode || 'hover';
+ 
+@@ -235,6 +329,11 @@ export default class WarpEngine {
+         this.__lastThetaTerms = { // Store for potential debug logging
+             gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
+             qSpoilingFactor: nextUniforms.qSpoilingFactor ?? nextUniforms.deltaAOverA,
+             gammaVanDenBroeck_mass: nextUniforms.gammaVanDenBroeck_mass ?? nextUniforms.gammaVanDenBroeck,
+             dutyLocal: nextUniforms.dutyCycle ?? 0.01,
+             sectorsConcurrent: nextUniforms.sectors ?? 1,
+             sectorsTotal: nextUniforms.sectorCount ?? 400,
+             viewAveraged: parity,
+             currentMode: mode
+         };
++        // Mirror canonical θ immediately for panels that read this field directly.
++        this.uniforms.thetaScale_actual = thetaScaleFromChain;
++        this.uniforms.thetaScale = thetaScaleFromChain;
++        this.uniforms.viewAvg = parity;
++        // If REAL+standby leaks non-zero θ, warn once with the input snapshot.
++        if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
++            console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
++            this.__warnStandbyLeakOnce = true;
++        }
