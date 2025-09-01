@@ -202,11 +202,8 @@ export function applyToEngine(
   // Fallback chain matches backend physics by default (exp=1). Viz may compress range with exp=0.5.
   const thetaFromChain = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.pow(dutyFR, dutyExp);
 
-  // If server provided a θ, it wins; otherwise use chain
-  const thetaUsed =
-    (u.thetaScale != null && Number.isFinite(+u.thetaScale))
-      ? +u.thetaScale
-      : thetaFromChain;
+  // Always use chain; never adopt a raw thetaScale from payloads
+  const thetaUsed = thetaFromChain;
 
   // Optional audit vs expected
   if (Number.isFinite(+u.thetaScaleExpected) && Number.isFinite(+thetaUsed)) {
