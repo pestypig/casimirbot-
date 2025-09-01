@@ -551,7 +551,12 @@ function PaneOverlay(props:{
 
       // "θ (shader)" should reflect EFFECTIVE amplitude carried into the fragment math
       const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaCanonical) ? thetaCanonical * vShip : NaN);
-      const thetaShader = thetaEffective;
+      
+      // Presentational clamp: show 0 for REAL + standby regardless of internal calculations
+      let thetaShader = Number(U.thetaScale_actual ?? U.thetaScale ?? NaN);
+      const isREAL = !!U.physicsParityMode;
+      const isStandby = (U.currentMode === 'standby');
+      if (isREAL && isStandby) thetaShader = 0;  // presentational clamp
       const thetaCanon = thetaCanonical;
       const thetaPaper = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
 
