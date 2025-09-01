@@ -1103,7 +1103,7 @@ export default function WarpBubbleCompare({
         ...show,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
         curvatureGainT: 0,
-        curvatureBoostMax: Math.max(1, Math.min(1000, +heroExaggeration || 82)),
+        curvatureBoostMax: Math.max(1, Math.min(1000, heroExaggeration)),
         userGain: 4,
         displayGain: 1,
         physicsParityMode: false,
@@ -1188,7 +1188,13 @@ export default function WarpBubbleCompare({
     const realPhysicsPayload = paneSanitize('REAL', {
       ...shared,
       gridSpan: gridSpanReal,            // tight framing around hull
-      ...real,
+      gammaGeo: real.gammaGeo,
+      qSpoilingFactor: real.qSpoilingFactor,
+      gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? 0.000025)),
+      dutyCycle: real.dutyCycle,
+      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
+      sectorCount: Math.max(1, Math.min(1000, parameters.sectorCount || 400)),
       currentMode: parameters.currentMode,
       vShip: 0,                          // never "fly" in REAL
       // strictly physical: no boosts, no gains, wall to ρ-units
@@ -1197,13 +1203,9 @@ export default function WarpBubbleCompare({
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
-      gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
-      deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
-      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
-      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-      // Do NOT supply thetaScale; engine computes canonical θ from inputs
+      // ❌ Do NOT supply thetaScale; engine computes canonical θ from inputs
       physicsParityMode: true,
       ridgeMode: 0,
     });
