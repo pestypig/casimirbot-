@@ -823,6 +823,69 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         </div>
       )}
 
+      {/* ---------- Method Verification: symbolic line + numeric substitution line ---------- */}
+      <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3 text-xs space-y-3">
+        <div className="font-semibold text-slate-200">Method Verification</div>
+
+        {/* Duty (FR) */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">
+            d_FR = (burst / dwell) × (S_live / S_total)
+          </div>
+          <div className="font-mono">
+            {isNum(burst_ms) && isNum(dwell_ms) && isNum(S_live) && isNum(S_total)
+              ? `= (${burst_ms.toFixed(3)} ms / ${dwell_ms.toFixed(3)} ms) × (${S_live}/${S_total}) = ${( (burst_ms/dwell_ms)*(S_live/S_total) ).toFixed(6)} (${fmtPct((burst_ms/dwell_ms)*(S_live/S_total))})`
+              : "—"}
+          </div>
+        </div>
+
+        {/* Reciprocity */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">
+            Reciprocity = PASS_AVG if burst ≥ τ_LC; else BROKEN_INSTANT
+          </div>
+          <div className="font-mono">
+            {isNum(burst_ms) && isNum(τ_LC_ms)
+              ? `= ${fmtSI(burst_ms)} ${burst_ms >= τ_LC_ms ? "≥" : "<"} ${fmtSI(τ_LC_ms)} → ${reciprocity?.status ?? "UNKNOWN"}`
+              : "—"}
+          </div>
+        </div>
+
+        {/* Kernel */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">
+            G(r) = {greens?.kind === "helmholtz" ? "e^{-m r}/(4π r)" : "1/(4π r)"}
+          </div>
+          <div className="font-mono">
+            {greens?.kind === "helmholtz"
+              ? `= Helmholtz with m = ${Number(greens?.m ?? 0)}`
+              : "= Poisson (m = 0)"}
+          </div>
+        </div>
+
+        {/* Potential */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">
+            φᵢ = Σⱼ G(rᵢⱼ) · ρⱼ
+          </div>
+          <div className="font-mono">
+            {`= Σⱼ G(rᵢⱼ) · ρⱼ over N=${gstats?.N ?? (greens?.size ?? (greens?.phi ? (greens.phi as any)?.length : 0))} tiles; kernel=${greens?.kind ?? "poisson"}${greens?.normalize === false ? "" : ", norm=[0,1]"}`}
+          </div>
+        </div>
+
+        {/* Normalization (only when enabled) */}
+        {greens?.normalize !== false && gstats && Number.isFinite(gstats.min) && Number.isFinite(gstats.max) && (
+          <div className="space-y-0.5">
+            <div className="font-mono text-slate-400">
+              φ_norm = (φ − min) / (max − min)
+            </div>
+            <div className="font-mono">
+              {`= (φ − ${fmtExp(gstats.min)}) / (${fmtExp(gstats.max)} − ${fmtExp(gstats.min)}) → φ_min=${fmtExp(gstats.min)}, φ_max=${fmtExp(gstats.max)}, φ_mean=${fmtExp(gstats.mean)}`}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="text-[11px] text-slate-400 space-y-1">
         <div><span className="font-medium">How it updates:</span> Energy Pipeline computes/publishes φ to the cache key <code>["helix:pipeline:greens"]</code> and broadcasts a <code>helix:greens</code> window event. This card listens to both.</div>
         <div className="flex items-center gap-2">
