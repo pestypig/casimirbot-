@@ -233,11 +233,13 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
     p.physicsParityMode = true;
     p.parityMode = true;  // Also set the fallback field
     p.ridgeMode = 0;
+    p.viewAvg = true;     // REAL: average → √(d_FR)
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
     p.physicsParityMode = false;
     p.parityMode = false; // Also set the fallback field
     p.ridgeMode = 1;
+    p.viewAvg = false;    // SHOW: cosmetic, no averaging
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
@@ -1229,7 +1231,7 @@ export default function WarpBubbleCompare({
       ridgeMode: 1,
     });
 
-    console.log('Applying physics to engines (θ computed by engine):', {
+    console.log('Applying physics to engines (engine computes θ):', {
       real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
       show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
     });
