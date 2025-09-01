@@ -1,6 +1,7 @@
 //====================================================================
 //  Natário Warp‑Bubble Visualiser (pure WebGL – no GLM, no WebAssembly)
 //  ------------------------------------------------------------------
+//  Canonical θ & parity/viewAvg hardening patch included (see __wrapUpdateUniforms)
 //  Drop this file next to your React (or plain‑JS) front‑end.  Create
 //  <canvas id="warpView"></canvas> in the DOM and then:
 //
@@ -8,7 +9,7 @@
 //      const eng = new WarpEngine(document.getElementById("warpView"));
 //      window.addEventListener("message", e => eng.updateUniforms(e.data));
 //
-//  That’s it: the dashboard’s postMessage payload drives the bubble
+//  That's it: the dashboard's postMessage payload drives the bubble
 //  field in real‑time.
 //====================================================================
 
@@ -261,6 +262,15 @@ export default class WarpEngine {
             viewAveraged: parity,
             currentMode: mode
         };
+        // Mirror canonical θ immediately for panels that read this field directly.
+        this.uniforms.thetaScale_actual = thetaScaleFromChain;
+        this.uniforms.thetaScale = thetaScaleFromChain;
+        this.uniforms.viewAvg = parity;
+        // If REAL+standby leaks non-zero θ, warn once with the input snapshot.
+        if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
+            console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
+            this.__warnStandbyLeakOnce = true;
+        }
 
 
         // Publish FR explicitly (use provided FR if present; else reconstruction)
@@ -615,6 +625,15 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             viewAveraged: parity,
             currentMode: mode
         };
+        // Mirror canonical θ immediately for panels that read this field directly.
+        this.uniforms.thetaScale_actual = thetaScaleFromChain;
+        this.uniforms.thetaScale = thetaScaleFromChain;
+        this.uniforms.viewAvg = parity;
+        // If REAL+standby leaks non-zero θ, warn once with the input snapshot.
+        if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
+            console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
+            this.__warnStandbyLeakOnce = true;
+        }
 
 
         // Publish FR explicitly (use provided FR if present; else reconstruction)
