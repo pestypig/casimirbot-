@@ -145,14 +145,14 @@ export default class WarpEngine {
         const gl = this.gl;
         gl.useProgram(this.program);
         this.uLoc = {
-            dutyCycle:    gl.getUniformLocation(this.program,"u_dutyCycle"),
-            g_y:          gl.getUniformLocation(this.program,"u_g_y"),
-            cavityQ:      gl.getUniformLocation(this.program,"u_cavityQ"),
-            sagDepth_nm:  gl.getUniformLocation(this.program,"u_sagDepth_nm"),
-            tsRatio:      gl.getUniformLocation(this.program,"u_tsRatio"),
-            powerAvg_MW:  gl.getUniformLocation(this.program,"u_powerAvg_MW"),
-            exoticMass_kg:gl.getUniformLocation(this.program,"u_exoticMass_kg"),
-            time:         gl.getUniformLocation(this.program,"u_time")
+            dutyCycle:     gl.getUniformLocation(this.program,"u_dutyCycle"),
+            g_y:           gl.getUniformLocation(this.program,"u_g_y"),
+            cavityQ:       gl.getUniformLocation(this.program,"u_cavityQ"),
+            sagDepth_nm:   gl.getUniformLocation(this.program,"u_sagDepth_nm"),
+            tsRatio:       gl.getUniformLocation(this.program,"u_tsRatio"),
+            powerAvg_MW:   gl.getUniformLocation(this.program,"u_powerAvg_MW"),
+            exoticMass_kg: gl.getUniformLocation(this.program,"u_exoticMass_kg"),
+            time:          gl.getUniformLocation(this.program,"u_time")
         };
     }
 
