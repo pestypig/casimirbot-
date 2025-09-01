@@ -175,11 +175,11 @@ export function applyToEngine(
   const gammaGeo = POS(u.gammaGeo, 26);
   const q = POS(u.qSpoilingFactor, 1);
 
-  // Prefer *visual* γ_VdB for renderer; fall back to legacy/short alias
-  const gammaVdB_vis = POS(
-    u.gammaVanDenBroeck_vis ?? u.gammaVanDenBroeck ?? u.gammaVdB,
-    1
-  );
+  // Select appropriate γ_VdB based on parity mode
+  const isREAL = !!u.physicsParityMode;
+  const gammaVdB_vis = isREAL
+    ? POS(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck ?? u.gammaVdB, 1)
+    : POS(u.gammaVanDenBroeck_vis ?? u.gammaVanDenBroeck ?? u.gammaVdB, 1);
 
   // Sectors / Duties
   const sectorsTotal = Math.max(1, N(u.sectorCount, 400));
@@ -197,7 +197,7 @@ export function applyToEngine(
   // Duty exponent: when view-averaged, default to √(d_FR)
   const dutyExp = Number.isFinite(+u.thetaDutyExponent)
     ? +u.thetaDutyExponent
-    : ((u.__vizDutySqrt || (u.viewAvg ?? true)) ? 0.5 : 1.0);
+    : ((u.__vizDutySqrt || (u.viewAvg ?? false)) ? 0.5 : 1.0);
 
   // Fallback chain matches backend physics by default (exp=1). Viz may compress range with exp=0.5.
   const thetaFromChain = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.pow(dutyFR, dutyExp);
@@ -219,7 +219,7 @@ export function applyToEngine(
 
   // --- 4) Display/fit helpers ----------------------------------------------
   const colorMode = (u.colorMode === 'rho' ? 'rho' : 'theta');
-  const viewAvg = (u.viewAvg ?? true) ? true : false;
+  const viewAvg = (u.viewAvg ?? false) ? true : false;
 
   // Ensure viewMassFraction present
   const viewMassFraction = Math.max(0, Math.min(1, N(u.viewMassFraction, sectorsLive / sectorsTotal)));
@@ -257,8 +257,8 @@ export function applyToEngine(
   // --- 5) Final locked uniforms pushed to engine ----------------------------
   const locked: any = {
     ...u,
-    // canonical outputs
-    thetaScale: thetaUsed,
+    // canonical outputs (don't override engine's authoritative theta)
+    // thetaScale: thetaUsed, // REMOVED - let engine compute authoritatively
     dutyEffectiveFR: dutyFR,
     // mirrored aliases (so downstream can use any)
     gammaVdB: gammaVdB_vis,

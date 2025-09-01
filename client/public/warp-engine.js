@@ -1221,7 +1221,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           Math.max(1, Math.floor(
             Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
           ));
-        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
+        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01));
 
         // --- Parity-aware defaults ---
         const isREAL = !!parity;
@@ -1262,9 +1262,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           tiltGain: prev.tiltGain ?? 0.55,
           // 🔗 physics chain fields used by CPU warp & shader
           thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
-          dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
+          dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.01),
           // publish local burst duty so diagnostics can always reconstruct FR
-          dutyLocal: Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14)),
+          dutyLocal: Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01)),
           sectors: Math.max(1, Math.floor(sectorsConcurrent)),
           sectorCount: Math.max(1, Math.floor(sectorCountOut)),
           // clamp split against the *live* sectors for this pane

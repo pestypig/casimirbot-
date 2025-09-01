@@ -1,0 +1,69 @@
+You’re right—the “all green!” message is premature. The θ-mismatch you’re seeing (≈1.88e9 vs ≈2.51e7) is exactly what you get if the engine is still falling back to a local duty of 0.14 and a sectorsTotal fallback = sectorsConcurrent, then taking √(0.14) ≈ 0.374 in the θ chain. That reproduces 5.026736e9 × 0.374 ≈ 1.88e9. The smoking guns are:
+
+Engine fallback still sets sectorsTotal … ?? sectorsConcurrent and dutyCycle … ?? 0.14【turn23file12†warp-engine.js†L31-L41】 while θ is computed with √(dutyEffFR)【turn23file6†warp-engine.js†L1-L6】.
+
+Gate builds θ with viewAvgShow = true for SHOW (so both panes apply √duty)【turn22file12†warp-uniforms-gate.ts†L1-L6】【turn22file15†warp-uniforms-gate.ts†L1-L5】.
+
+The gate also pushes a thetaScale back at the engine, encouraging override of the engine’s authoritative θ【turn22file5†warp-engine.js†L16-L19】.
+
+Your inspector is correctly sending a computed Ford–Roman duty into dutyEffectiveFR (good!)【turn22file8†WarpRenderInspector.tsx†L41-L50】, but when that param is absent or filtered out, the engine’s 0.14 fallback wins.
+
+Below are minimal diffs to fix the three root causes.
+
+Diffs
+1) Engine: correct sector fallback & duty default, and always resolve dutyEffFR before θ
+
+File: /mnt/data/warp-engine.js
+
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@
+-        const sectorsTotal =
+-          Math.max(1, Math.floor(
+-            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? sectorsConcurrent)
+-          ));
+-        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
++        const sectorsTotal =
++          Math.max(1, Math.floor(
++            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
++          ));
++        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01));
+@@
+-        // build theta scale
++        // Resolve Ford–Roman effective duty (pane-local → ship FR)
++        const dutyEffFR = Number.isFinite(frFromParams)
++          ? Math.max(1e-12, Math.min(1, +frFromParams))
++          : dutyLocal * (sectorsConcurrent / Math.max(1, sectorsTotal));
++
++        // build theta scale
+         const thetaScaleFromChain = zeroStandby ? 0 :
+           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+           Math.max(1, nextUniforms.gammaVdB ?? 1) *
+           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
+
+
+Why: the current fallback sectorCount ?? … ?? sectorsConcurrent and dutyCycle ?? 0.14 produce √(0.14) and hence 1.88e9. Use a ship-wide default (400) and a 1% local duty; and compute dutyEffFR up front so θ always uses FR (or the explicit dutyEffectiveFR you already push)【turn23file12†warp-engine.js†L31-L41】【turn23file6†warp-engine.js†L1-L6】.
+
+2) Gate: don’t force √duty on SHOW; feed mass γ for REAL; stop overriding θ
+
+File: /mnt/data/warp-uniforms-gate.ts
+
+--- a/warp-uniforms-gate.ts
++++ b/warp-uniforms-gate.ts
+@@
+-  const gammaVdB = +u.gammaVanDenBroeck_vis || +u.gammaVanDenBroeck || +u.gammaVdB || 1.35e5;
++  const gammaVdB = isREAL
++    ? (+u.gammaVanDenBroeck_mass || +u.gammaVanDenBroeck || +u.gammaVdB || 1.35e5)
++    : (+u.gammaVanDenBroeck_vis  || +u.gammaVanDenBroeck || +u.gammaVdB || 1.35e5);
+   const gammaVdB_c = clamp1p(gammaVdB, 1, 1e11);
+@@
+-  const viewAvgShow = true;
++  const viewAvgShow = false;
+@@
+-    thetaScale: Number.isFinite(u.thetaScale) ? +u.thetaScale : thetaFromChain,
++    // Do NOT override engine θ. If UI needs a display value, use a separate key.
++    // thetaScale: (for display only) thetaFromChain,
+
+
+Why: Gate was always using the visual pocket gamma, setting SHOW to viewAvg=true, and pushing a thetaScale back at the engine. Let the engine stay authoritative for θ【turn22file5†warp-engine.js†L16-L19】; average only on REAL; and use mass γ for REAL vs visual γ for SHOW【turn22file12†warp-uniforms-gate.ts†L1-L6】【turn22file15†warp-uniforms-gate.ts†L1-L5】.
