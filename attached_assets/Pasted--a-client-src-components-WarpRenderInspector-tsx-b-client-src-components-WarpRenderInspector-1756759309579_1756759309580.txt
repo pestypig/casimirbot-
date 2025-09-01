@@ -1,0 +1,187 @@
+--- a/client/src/components/WarpRenderInspector.tsx
++++ b/client/src/components/WarpRenderInspector.tsx
+@@
+-import React, { useEffect, useRef, useState } from "react";
++import React, { useEffect, useRef, useState } from "react";
+@@
+ export default function WarpRenderInspector(props: {
+   // ...your existing props
+ }) {
++  // ────────────────────────────────────────────────────────────────────────────
++  // θ DEBUG INSTRUMENTATION (shader vs JS uniform vs canonical)
++  // Paste once. Safe, side-effect-only, no external imports.
++  // ────────────────────────────────────────────────────────────────────────────
++  const thetaShaderRef  = useRef<number | null>(null); // GL-latched u_thetaScale
++  const thetaJSRef      = useRef<number | null>(null); // engine.uniforms.thetaScale
++  const thetaCanonRef   = useRef<number | null>(null); // computed locally (physics chain)
++  const lastParityRef   = useRef<boolean | null>(null);
++  const lastLogAtRef    = useRef<number>(0);
++  const rafRef          = useRef<number | null>(null);
++
++  // Local canonical θ (no imports; avoids duplicate-import crashes)
++  function thetaCanonicalLocal(U: any): number {
++    const parityREAL = !!U.physicsParityMode;
++    const mode = String(U.currentMode || 'hover').toLowerCase();
++    if (parityREAL && mode === 'standby') return 0;        // hard-zero for REAL standby
++    const g = Math.max(1, +U.gammaGeo || 26);
++    const q = Math.max(1e-12, +U.deltaAOverA || 1);
++    // physics clamp for mass-pocket γVdB (keep visuals out)
++    const v = Math.max(1, Math.min(1e2, +U.gammaVdB || 38.3));
++    const sLive = Math.max(1, (U.sectors|0) || 1);
++    const sTot  = Math.max(1, (U.sectorCount|0) || 400);
++    const dLocal = Number.isFinite(+U.dutyLocal) ? +U.dutyLocal
++                  : Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0;
++    const dFR = Math.max(1e-12, Math.min(1, dLocal * (sLive / sTot)));
++    const viewAvg = (U.viewAvg ?? true) ? true : false;
++    const dutyFactor = viewAvg ? Math.sqrt(dFR) : 1;
++    return (g*g*g) * q * v * dutyFactor;
++  }
++
++  // Find an engine instance we can sample
++  function resolveEngine(): any | null {
++    // Prefer an explicit engine prop/ref if your component passes one
++    // (adjust these names if your props differ)
++    // @ts-ignore
++    if ((props as any)?.engine) return (props as any).engine;
++    // @ts-ignore
++    if ((props as any)?.engineRef?.current) return (props as any).engineRef.current;
++    // Named canvas → window.__warp registry
++    // @ts-ignore
++    const canvasId = (props as any)?.canvasId || (props as any)?.paneId;
++    // @ts-ignore
++    if (canvasId && (window as any).__warp && (window as any).__warp[canvasId]) {
++      // @ts-ignore
++      return (window as any).__warp[canvasId];
++    }
++    // First registered WarpEngine
++    // @ts-ignore
++    const reg = (window as any).__warp;
++    if (reg && typeof reg === 'object') {
++      const firstKey = Object.keys(reg)[0];
++      if (firstKey) return reg[firstKey];
++    }
++    // Last-ditch: any canvas with an attached engine
++    const canv = document.querySelector('canvas') as any;
++    if (canv && canv.__warpEngine) return canv.__warpEngine;
++    return null;
++  }
++
++  // Format helper for logs
++  const fmt = (x: any) => (typeof x === 'number' && isFinite(x))
++    ? (Math.abs(x) >= 1e3 || Math.abs(x) < 1e-2 ? x.toExponential(3) : x.toFixed(3))
++    : String(x);
++
++  // Start a lightweight sampler that compares θ (GL) vs θ (JS) vs θ (canonical)
++  useEffect(() => {
++    const eng = resolveEngine();
++    if (!eng || !eng.gl || !eng.gridProgram) return;
++
++    let alive = true;
++    const sample = () => {
++      if (!alive) return;
++      try {
++        const U = { ...(eng.uniforms || {}), ...(eng.currentParams || {}) };
++        // JS value the engine believes it set
++        const thetaJS = (typeof U.thetaScale === 'number' && isFinite(U.thetaScale)) ? U.thetaScale : null;
++        thetaJSRef.current = thetaJS;
++
++        // Shader-latched uniform (real value used by the fragment shader this frame)
++        let thetaGL: number | null = null;
++        try {
++          const loc = eng.gridUniforms?.thetaScale || null;
++          if (loc) {
++            // gl.getUniform does NOT need the program to be "in use"
++            const val = eng.gl.getUniform(eng.gridProgram, loc);
++            thetaGL = (typeof val === 'number') ? val
++                   : (Array.isArray(val) && typeof val[0] === 'number') ? val[0]
++                   : null;
++          }
++        } catch {}
++        thetaShaderRef.current = thetaGL;
++
++        // Canonical (local) physics chain for reference
++        const thetaCanon = thetaCanonicalLocal(U);
++        thetaCanonRef.current = thetaCanon;
++
++        // Parity + mode (to catch standby leaks)
++        const parity = !!U.physicsParityMode;
++        const mode = String(U.currentMode || 'hover');
++        const now = performance.now();
++
++        // Log once per second or on parity flip
++        const parityFlipped = (lastParityRef.current !== null && lastParityRef.current !== parity);
++        if (parityFlipped || now - lastLogAtRef.current > 1000) {
++          lastParityRef.current = parity;
++          lastLogAtRef.current = now;
++
++          // Publish a handy dump
++          (window as any).__warpEcho = {
++            ...(window as any).__warpEcho,
++            inspectorTheta: {
++              canvasId: eng.__id || '(unknown)',
++              parity: parity ? 'REAL' : 'SHOW',
++              mode,
++              theta_gl: thetaGL,
++              theta_js: thetaJS,
++              theta_canonical: thetaCanon,
++              gammaGeo: U.gammaGeo, q: U.deltaAOverA, gammaVdB: U.gammaVdB,
++              dutyLocal: U.dutyLocal ?? U.dutyCycle,
++              sectors: { live: U.sectors, total: U.sectorCount },
++              viewAvg: U.viewAvg, d_FR: U.dutyEffectiveFR
++            }
++          };
++
++          // Pretty console line
++          // eslint-disable-next-line no-console
++          console.log(
++            `[WRI θ] ${parity ? 'REAL' : 'SHOW'} mode=${mode}` +
++            ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}` +
++            ` | g=${fmt(U.gammaGeo)} q=${fmt(U.deltaAOverA)} vdb=${fmt(U.gammaVdB)}` +
++            ` | dLocal=${fmt(U.dutyLocal ?? U.dutyCycle)} S=${U.sectors}/${U.sectorCount}` +
++            ` | viewAvg=${!!U.viewAvg}`
++          );
++        }
++
++        // Leak detector: REAL + standby must be zero in GL and JS
++        if (parity && mode.toLowerCase() === 'standby') {
++          const leakGL = (thetaGL ?? 0) > 0;
++          const leakJS = (thetaJS ?? 0) > 0;
++          if (leakGL || leakJS) {
++            // eslint-disable-next-line no-console
++            console.warn(
++              `[WRI θ][LEAK] REAL standby shows non-zero θ` +
++              ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}`
++            );
++          }
++        }
++      } catch (e) {
++        // eslint-disable-next-line no-console
++        console.error('[WRI θ] sampler error:', e);
++      }
++      rafRef.current = requestAnimationFrame(sample);
++    };
++
++    rafRef.current = requestAnimationFrame(sample);
++    return () => {
++      alive = false;
++      if (rafRef.current) cancelAnimationFrame(rafRef.current);
++      rafRef.current = null;
++    };
++  }, [
++    // re-run resolver if these props change in your app
++    // @ts-ignore
++    (props as any)?.engine,
++    // @ts-ignore
++    (props as any)?.engineRef?.current,
++    // @ts-ignore
++    (props as any)?.canvasId,
++    // @ts-ignore
++    (props as any)?.paneId
++  ]);
++
++  // ────────────────────────────────────────────────────────────────────────────
++  // (end θ DEBUG INSTRUMENTATION)
++  // ────────────────────────────────────────────────────────────────────────────
+@@
+   // ...rest of your existing component body/UI remains unchanged
+ }

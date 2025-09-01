@@ -516,7 +516,7 @@ class WarpEngine {
 
                 // Add slight Y variation for better 3D visibility
                 const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
-                const y1 = yBase + yVariation * Math.sin(x1 * 2) * Math.cos(zPos * 3);
+                const y1 = yBase + yVariation * * Math.sin(x1 * 2) * Math.cos(zPos * 3);
 
                 verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
             }
@@ -1173,12 +1173,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
         // --- Parity / visualization ---
-        // Accept legacy aliases from UI (uPhysicsParity/uRidgeMode) and keep previous if missing
-        const parity = ((parameters?.physicsParityMode ?? parameters?.uPhysicsParity) !== undefined)
-          ? !!(parameters?.physicsParityMode ?? parameters?.uPhysicsParity)
+        // STRICT: accept ONLY physicsParityMode; ignore legacy aliases
+        const parity = (parameters?.physicsParityMode !== undefined)
+          ? !!parameters.physicsParityMode
           : !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
-        const ridgeMode = (parameters?.ridgeMode ?? parameters?.uRidgeMode ?? prev?.ridgeMode ?? 0)|0;
+        const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4 }; // Added interiorTilt to CM
         let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
         const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
@@ -1291,40 +1291,33 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             : Math.max(0, Math.min(1, dutyLocal));
         }
 
-        // build theta scale (canonical chain)
+        // build theta scale (canonical chain) — ENGINE AUTHORITY
         const thetaScaleFromChain = zeroStandby ? 0 :
           Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
           Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
-        // Apply mode-specific scaling for operational differentiation (disabled for pipeline compliance)
-        if (!parity && !zeroStandby && false) { // DISABLED: always use pure physics theta scale
-          // SHOW mode: apply visual amplification for demonstration
-          const modeAmplifier = mode === 'emergency' ? 2.0 : 
-                               mode === 'cruise' ? 0.8 : 1.2; // hover default
-          thetaScaleFromChain *= modeAmplifier;
-        }
-
-        // Always prefer React-computed thetaScale for pipeline compliance
-        nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
-          ? +parameters.thetaScale
-          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback but don't amplify
+        // Engine authority: never accept external θ; hard-zero REAL+standby
+        nextUniforms.thetaScale = zeroStandby ? 0 : thetaScaleFromChain;
 
         // Debug operational mode theta calculation (fixed math chain)
         this._dbgThetaTick = (this._dbgThetaTick || 0) + 1;
         if (this._dbgThetaTick % 30 === 1) {
-          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] CORRECTED Theta chain:`, {
+          const gamma3 = Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3);
+          const qUsed = Math.max(1e-12, nextUniforms.deltaAOverA ?? 1);
+          const gammaVdBUsed = Math.max(1, nextUniforms.gammaVdB ?? 1);
+          const sqrtDuty = viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0;
+          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] Canonical Theta chain:`, {
             'γ³': gamma3,
-            'q': q,
-            'γ_VdB': gammaVdB,
+            'q': qUsed,
+            'γ_VdB': gammaVdBUsed,
             '√duty': sqrtDuty,
             'chain=γ³×q×γ_VdB×√duty': thetaScaleFromChain,
             actualTheta: nextUniforms.thetaScale,
             dutyEffFR,
             sectorsConcurrent,
-            sectorsTotal,
-            parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'ENGINE_CALC'
+            sectorsTotal
           });
         }
         nextUniforms.dutyUsed        = dutyEffFR;
@@ -1482,8 +1475,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gridK = 0.10;                       // mild base (acts as unit scale)
 
         // === Unified "SliceViewer-consistent" amplitude for geometry ===
-        // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
-        const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
+        // θ comes from engine uniforms; honor REAL+standby zero
+        let thetaScale = Number.isFinite(this.uniforms?.thetaScale) ? +this.uniforms.thetaScale : 0;
+        const modeNow = String(this.uniforms?.currentMode ?? 'hover').toLowerCase();
+        if ((this.uniforms?.physicsParityMode === true) && modeNow === 'standby') {
+          thetaScale = 0;
+        }
         // prefer explicit payload, fall back to current uniforms
         const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
@@ -1502,7 +1499,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
         console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
-        console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${thetaScale.toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
+        console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${(thetaScale||0).toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
         console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
         console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
 
@@ -1565,9 +1562,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
 
-        if (!Number.isFinite(this.uniforms.thetaScale) || this.uniforms.thetaScale <= 0) {
-          this.uniforms.thetaScale = betaUsedUniform; // last-resort sync
-        }
+        // Do NOT overwrite engine θ; engine is authoritative
+        // (No "last-resort sync" of thetaScale here)
 
         // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
         const betaVisUniform = betaUsedUniform;
@@ -1635,17 +1631,14 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
 
             // ---- Existing physics chain (do not change) ----
-            const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
-            const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
-            const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
-            const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
+            const A_geoUniform2 = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+            const sectorsTotalU2 = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
+            const dutyFR_u2 = dutyCycleUniform * (sectorsUniform / sectorsTotalU2);
+            const effDutyUniform2 = viewAvgUniform ? Math.max(1e-12, dutyFR_u2) : 1.0;
 
-            const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
-            const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-            const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-
-            // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
-            const betaVisUniform = betaUsedUniform;
+            const betaInstUniform2 = A_geoUniform2 * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
+            const betaAvgUniform2  = betaInstUniform2 * Math.sqrt(effDutyUniform2);
+            const betaUsedUniform2 = viewAvgUniform ? betaAvgUniform2 : betaInstUniform2;
 
             // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
             // For canonical Natário bubble, disable local gaussian bumps
@@ -1673,9 +1666,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             this._accumShearN = (this._accumShearN||0) + 1;
 
             // Same amplitude chain + user gain as the shader
-            const userGain   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
-            const zeroStop   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
-            const exposure   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+            const userGain2   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+            const zeroStop2   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+            const exposure2   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
 
             // Geometry amplitude should be monotonic with the slider and not instantly saturate.
             // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
@@ -1695,18 +1688,18 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
             // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
             // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
-            const magMax       = Math.log(1.0 + (baseMag * thetaScale * REF_BOOSTMAX) / zeroStop);
-            const magNow       = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);
+            const magMax       = Math.log(1.0 + (baseMag * thetaScale * REF_BOOSTMAX) / zeroStop2);
+            const magNow       = Math.log(1.0 + (baseMag * thetaScale * userGain2 * boostNow) / zeroStop2);
 
             // Normalized geometry amplitude (monotonic in userGain AND boostNow)
             const A_geom       = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
 
             // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
-            const A_vis    = Math.min(1.0, magNow / Math.log(1.0 + exposure));
+            const A_vis2    = Math.min(1.0, magNow / Math.log(1.0 + exposure2));
 
             // Special case: make REAL standby perfectly flat if desired
             let disp;
-            if (mode === 'standby' && parity) {
+            if (mode === 'standby' && physicsParityMode) {
                 disp = 0; // perfectly flat grid for REAL standby mode
             } else {
                 // geometry should follow A_geom (independent of exposure tone-mapping)
@@ -1716,7 +1709,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
                 // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
                 // Let exaggeration raise the ceiling too, but gently (log so it doesn't jump)
-                const exgLog  = Math.log10(Math.max(1, userGain));
+                const exgLog  = Math.log10(Math.max(1, userGain2));
                 // use the actual max from uniforms (fall back to REF_BOOSTMAX)
                 const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
                 const maxPush = 0.12
@@ -1806,7 +1799,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
             if (this._vboBytes !== this.gridVertices.byteLength) {
                 // Buffer size changed, need full reallocation
-                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
                 this._vboBytes = this.gridVertices.byteLength;
             } else {
                 // Buffer size unchanged, use cheaper subdata update
@@ -1872,8 +1865,11 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
         if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
 
-        // --- θ-scale (you already set a fallback in JS if missing)
-        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, u.thetaScale || 0); // Direct pipeline value, no fallback amplification
+        // --- θ-scale: ensure REAL+standby → 0
+        let thetaUniform = Number.isFinite(u.thetaScale) ? +u.thetaScale : 0;
+        const modeNow2 = String(u.currentMode || 'hover').toLowerCase();
+        if (u.physicsParityMode === true && modeNow2 === 'standby') thetaUniform = 0;
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, thetaUniform);
 
         // --- exposure / viz chain
         if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
