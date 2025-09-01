@@ -6,11 +6,12 @@
 import { DebounceConfig, createDebouncedFunction } from './usePollingSmart';
 
 // Canonical uniform name mapping to prevent shader header duplication
+// Match shader uniform names exactly (underscored)
 const CANON = {
-  physicsParityMode: 'uPhysicsParity',
-  ridgeMode:         'uRidgeMode',
-  epsilonTilt:       'uEpsilonTilt',
-  betaTiltVec:       'uBetaTiltVec'
+  physicsParityMode: 'u_physicsParityMode',
+  ridgeMode:         'u_ridgeMode',
+  epsilonTilt:       'u_epsilonTilt',
+  betaTiltVec:       'u_betaTiltVec'
 } as const;
 
 // Create a debounced uniform update function per engine instance
@@ -193,10 +194,10 @@ export function applyToEngine(
     1e-12
   );
 
-  // Duty exponent (physics default = 1.0). Viz can request sqrt(·) via thetaDutyExponent or __vizDutySqrt
+  // Duty exponent: when view-averaged, default to √(d_FR)
   const dutyExp = Number.isFinite(+u.thetaDutyExponent)
     ? +u.thetaDutyExponent
-    : (u.__vizDutySqrt ? 0.5 : 1.0);
+    : ((u.__vizDutySqrt || (u.viewAvg ?? true)) ? 0.5 : 1.0);
 
   // Fallback chain matches backend physics by default (exp=1). Viz may compress range with exp=0.5.
   const thetaFromChain = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.pow(dutyFR, dutyExp);

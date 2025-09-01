@@ -78,9 +78,8 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     (() => {
       const d_ui = clamp(s.dutyCycle ?? 0.14, 0, 1);
       const strobe = Math.max(1, num(s.sectorStrobing) ?? sectorsTotal);
-      const qSpoil = Math.max(1e-12, num(s.qSpoilingFactor) ?? 1);
-      // HELIX effective duty ≈ UI duty × qSpoiling × (1 / sectors)
-      return clamp((d_ui * qSpoil) / strobe, 0, 1);
+      // FR duty is ship-wide time-average per total sectors (do NOT include q here)
+      return clamp(d_ui / strobe, 0, 1);
     })();
 
   d_ship = clamp(d_ship, 0, 1);
@@ -92,11 +91,12 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const gammaVdB = Math.max(0, num(s.gammaVanDenBroeck_vis) ?? num(s.gammaVanDenBroeck) ?? 0);
   const qSpoil = Math.max(1e-12, num(s.qSpoilingFactor) ?? 1);
 
-  const thetaScale =
+  // Let the gate/engine compute authoritative θ. Provide only an audit value.
+  const thetaScaleExpected =
     Math.pow(gammaGeo, 3) *
     qSpoil *
     gammaVdB *
-    Math.max(1e-12, d_ship / sectorsTotal);
+    Math.sqrt(Math.max(1e-12, d_ship));
 
   // --- Burst Q for visuals (matches HELIX Q_BURST semantics) ---
   const Qburst = num(s.qCavity) ?? 1e9;
@@ -121,13 +121,13 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       hullAxes: [a, b, c],
       wallWidth_rho: w_rho,
 
-      // Unified amplitude with qSpoiling included
-      thetaScale,
+      // Audit-only; do not override engine θ
+      thetaScaleExpected,
 
       // Visual defaults locked by gating system
       colorMode: "theta",
       viewAvg: true,
     },
-    "pipeline-adapter"
+    "server"
   );
 }

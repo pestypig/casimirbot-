@@ -107,7 +107,7 @@ export function normalizeWU(raw:any): WarpUniforms {
       viewAvg: true,
       viewMassFraction: sectors / sectorCount,
       colorMode: 'theta',
-      thetaScale: dutyEffectiveFR * Math.pow(gammaGeo,3) * q * gammaVdB,
+      thetaScale: Math.sqrt(dutyEffectiveFR) * Math.pow(gammaGeo,3) * q * gammaVdB,
       __src: 'legacy',
       __version: 1
     };
@@ -168,7 +168,7 @@ export function normalizeWU(raw:any): WarpUniforms {
   // --- expected θ scale (derive if missing) ---------------------------------
   const thetaScale = Number.isFinite(+raw.thetaScale)
     ? +raw.thetaScale
-    : (dutyEffectiveFR * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
+    : (Math.sqrt(dutyEffectiveFR) * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
 
   // --- Purple shift normalization ------------------------------------------
   const epsilonTilt = Number.isFinite(+raw.epsilonTilt) ? Math.max(0, +raw.epsilonTilt) : undefined;
