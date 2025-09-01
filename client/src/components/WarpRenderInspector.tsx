@@ -1016,18 +1016,23 @@ export default function WarpRenderInspector(props: {
           // Verify parity was set
           console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
 
-          // Add aggressive parity correction that runs every frame
+          // Add gentle parity correction with debouncing
+          let lastParityCheck = 0;
           const enforceParityREAL = () => {
+            const now = Date.now();
+            if (now - lastParityCheck < 1000) return; // Check max once per second
+            lastParityCheck = now;
+            
             const U = leftEngine.current?.uniforms;
             if (U && U.physicsParityMode !== true) {
-              console.error("❌ REAL parity violation detected - forcing correction");
+              console.warn("🔧 REAL parity drift detected - applying gentle correction");
               U.physicsParityMode = true;
               U.parityMode = true;
               U.ridgeMode = 0;
             }
           };
 
-          // Hook into render loop for continuous enforcement
+          // Hook into render loop for gentle enforcement
           if (leftEngine.current._render) {
             const originalRender = leftEngine.current._render.bind(leftEngine.current);
             leftEngine.current._render = function(...args: any[]) {
@@ -1623,14 +1628,14 @@ export default function WarpRenderInspector(props: {
       ' [engine actual]', thLact?.toExponential?.(2), thRact?.toExponential?.(2)
     );
 
-    // Check for parity violations and attempt correction
+    // Check for parity violations and attempt gentle correction
     if (leftState?.uniforms && leftState.uniforms.physicsParityMode !== true) {
-      console.error('REAL parity violation detected - attempting correction');
+      console.warn('🔧 REAL parity drift detected in verification - applying correction');
       leftState.uniforms.physicsParityMode = true;
       leftState.uniforms.parityMode = true;
       leftState.uniforms.ridgeMode = 0;
 
-      // Also push through update system
+      // Also push through update system gently
       gatedUpdateUniforms(leftEngine.current, {
         physicsParityMode: true,
         parityMode: true,
@@ -1653,9 +1658,9 @@ export default function WarpRenderInspector(props: {
     }
   };
 
-  // Run verification periodically and expose to window for debugging
+  // Run verification less frequently and expose to window for debugging
   useEffect(() => {
-    const interval = setInterval(verifyEngineStates, 2000);
+    const interval = setInterval(verifyEngineStates, 5000); // Reduce from 2s to 5s
     (window as any).__verifyWarpParity = verifyEngineStates;
     return () => {
       clearInterval(interval);
