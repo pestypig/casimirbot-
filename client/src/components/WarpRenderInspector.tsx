@@ -1030,7 +1030,7 @@ export default function WarpRenderInspector(props: {
             const now = Date.now();
             if (now - lastParityCheck < 1000) return; // Check max once per second
             lastParityCheck = now;
-            
+
             const U = leftEngine.current?.uniforms;
             if (U && U.physicsParityMode !== true) {
               console.warn("🔧 REAL parity drift detected - applying gentle correction");
