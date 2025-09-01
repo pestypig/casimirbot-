@@ -1,0 +1,50 @@
+4) WarpBubbleCompare.tsx — never send θ; set viewAvg per pane
+*** a/WarpBubbleCompare.tsx
+--- b/WarpBubbleCompare.tsx
+@@
+-    p.parityMode = true;
+     p.ridgeMode = 0;
++    p.viewAvg = true;     // REAL: average → √(d_FR)
+@@
+-    p.parityMode = false;
+     p.ridgeMode = 1;
++    p.viewAvg = false;    // SHOW: cosmetic, no averaging
+@@
+-  // REAL packet
++  // REAL packet
+   const realPacket = {
+     ...shared, ...real,
+     currentMode: parameters.currentMode,
+     physicsParityMode: true,
++    viewAvg: true,
+     vShip: 0,
+-    thetaScale: computeThetaScale(/* … */),
+     gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+     deltaAOverA: real.qSpoilingFactor,
+     dutyEffectiveFR: real.dutyEffectiveFR ?? 0.000025,
+     sectors: Math.max(1, parameters.sectors),
+     ridgeMode: 0,
+   };
+@@
+-  const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
+   const showPacket = {
+     ...shared, ...show,
+     currentMode: parameters.currentMode,
+     physicsParityMode: false,
++    viewAvg: false,
+     vShip: parameters.currentMode === 'standby' ? 0 : 1,
+-    thetaScale: showTheta,
+     gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+     deltaAOverA: show.qSpoilingFactor,
+     sectors: Math.max(1, parameters.sectors),
+     ridgeMode: 1,
+   };
+@@
+-    console.log('Applying physics to engines:', {
+-      real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, theta: realPhysicsPayload.thetaScale, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
+-      show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, theta: showPhysicsPayload.thetaScale, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
+-    });
++    console.log('Applying physics to engines (engine computes θ):', {
++      real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
++      show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
++    });
