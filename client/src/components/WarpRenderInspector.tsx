@@ -1501,6 +1501,7 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: true,
       ridgeMode: 0,
       ...realPhys,
+      currentMode: live?.currentMode,
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 2, // Shear proxy for truth view
@@ -1518,6 +1519,7 @@ export default function WarpRenderInspector(props: {
       physicsParityMode: false,
       ridgeMode: 1,
       ...showPhys,
+      currentMode: live?.currentMode,
       exposure: 7.5,
       zeroStop: 1e-7,
       curvatureGainT: 0.70,
