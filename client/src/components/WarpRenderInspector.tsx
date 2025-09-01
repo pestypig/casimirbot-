@@ -1751,6 +1751,41 @@ export default function WarpRenderInspector(props: {
     }
   };
 
+  // --- Dev: dump current engines & θ to console --------------------------------
+  const debugEngineStates = () => {
+    try {
+      // Find any WarpEngine instances attached to canvases
+      const canvases = Array.from(document.querySelectorAll('canvas')) as HTMLCanvasElement[];
+      const engines = canvases
+        .map(c => ({ id: c.id || '(no id)', engine: (c as any).__warpEngine }))
+        .filter(x => !!x.engine);
+
+      const compact = engines.map(({ id, engine }: any) => ({
+        id,
+        isLoaded: !!engine.isLoaded,
+        parity: !!engine.uniforms?.physicsParityMode,
+        ridge: engine.uniforms?.ridgeMode,
+        theta_uniform: engine.uniforms?.thetaScale,
+        theta_actual: engine.uniforms?.thetaScale_actual,
+        gammaGeo: engine.uniforms?.gammaGeo ?? engine.uniforms?.g_y,
+        q: engine.uniforms?.deltaAOverA ?? engine.uniforms?.qSpoilingFactor,
+        gammaVdB: engine.uniforms?.gammaVanDenBroeck_mass ?? engine.uniforms?.gammaVanDenBroeck,
+        dutyLocal: engine.uniforms?.dutyCycle,
+        sectors: engine.uniforms?.sectors,
+        sectorCount: engine.uniforms?.sectorCount,
+        dutyFR: engine.uniforms?.dutyEffectiveFR ?? engine.uniforms?.dutyUsed,
+      }));
+
+      console.group('[WRI] Engine snapshot');
+      console.table(compact);
+      console.log('Full engines:', engines);
+      console.log('window.__warpEcho:', (window as any).__warpEcho);
+      console.groupEnd();
+    } catch (e) {
+      console.warn('[WRI] debugEngineStates failed:', e);
+    }
+  };
+
   // Run verification less frequently and expose to window for debugging
   useEffect(() => {
     const interval = setInterval(verifyEngineStates, 5000); // Reduce from 2s to 5s
