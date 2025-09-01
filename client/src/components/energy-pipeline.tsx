@@ -97,19 +97,20 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       (live as any)?.dutyEff;
     if (isFiniteNum(frFromPipeline)) return clamp01(frFromPipeline);
 
-    // 1) timing
+    // 1) timing (metrics-first, then live)
     const burst_ms = Number(
-      (live as any)?.burst_ms ??
-      (systemMetrics as any)?.lightCrossing?.burst_ms
+      (systemMetrics as any)?.lightCrossing?.burst_ms ??
+      (live as any)?.burst_ms
     );
     const dwell_ms = Number(
-      (live as any)?.dwell_ms ??
       (systemMetrics as any)?.lightCrossing?.dwell_ms ??
-      (systemMetrics as any)?.lightCrossing?.sectorPeriod_ms // <-- accept sector dwell
+      (systemMetrics as any)?.lightCrossing?.sectorPeriod_ms ??
+      (live as any)?.dwell_ms ??
+      (live as any)?.sectorPeriod_ms
     );
     let dutyLocal: number | undefined =
       (Number.isFinite(burst_ms) && Number.isFinite(dwell_ms) && dwell_ms > 0)
-        ? (burst_ms / dwell_ms)
+        ? burst_ms / dwell_ms
         : undefined;
 
     // 2) mode-local burst fraction as physics default
@@ -117,7 +118,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     if (!isFiniteNum(dutyLocal) && isFiniteNum(localBurstFrac)) dutyLocal = clamp01(localBurstFrac);
     if (!isFiniteNum(dutyLocal)) dutyLocal = 0.01; // ultra-conservative fallback
 
-    // 3) sectorization
+    // 3) sectorization (metrics-first)
     const S_total =
       Math.max(1, Math.floor(
         Number((systemMetrics as any)?.lightCrossing?.sectorsTotal) ??
@@ -127,9 +128,9 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       ));
     const S_live =
       Math.max(1, Math.min(S_total, Math.floor(
-        Number((live as any)?.sectorsConcurrent) ??
         Number((systemMetrics as any)?.lightCrossing?.activeSectors) ??
         Number((systemMetrics as any)?.activeSectors) ??
+        Number((live as any)?.sectorsConcurrent) ??
         Number((live as any)?.concurrentSectors) ?? 1
       )));
 
