@@ -59,6 +59,64 @@ function GreensLivePanel() {
   const derived = qc.getQueryData(["helix:pipeline:derived"]) as any | undefined;
 
   // ---- helpers ----
+  type Prov<T> = { val?: T, from?: "metrics" | "derived" | "live" | "none" };
+  const prov = <T,>(val?: T, from: Prov<T>["from"] = "none"): Prov<T> => ({ val, from });
+  const isNum = (x: any): x is number => typeof x === "number" && Number.isFinite(x);
+  const toMs = (v?: number, unit: "ms" | "s" | "us" = "ms") =>
+    isNum(v) ? (unit === "s" ? v * 1000 : unit === "us" ? v / 1000 : v) : undefined;
+  const saneMs = (v?: number) => (isNum(v) && v > 0 ? v : undefined);
+
+  // Returns timing with explicit **priority** and **unit coercion**
+  function pickTiming(): {
+    tauLC: Prov<number>, burst: Prov<number>, dwell: Prov<number>,
+    sectorsTotal: Prov<number>, sectorsConcurrent: Prov<number>
+  } {
+    const lcM = (metrics as any)?.lightCrossing ?? {};
+    const lcL = (live as any)?.lightCrossing ?? {};
+
+    // τ_LC priority: metrics(lightCrossing) → derived → live(lightCrossing/flat)
+    const tauFromMetrics = saneMs(
+      toMs(lcM.tauLC_ms, "ms") ?? toMs(lcM.tau_ms, "ms") ?? toMs(lcM.tauLC_s, "s")
+    );
+    const tauFromDerived = saneMs(derived?.τ_LC_ms);
+    const tauFromLive    = saneMs(
+      toMs((live as any)?.tau_LC_ms, "ms") ?? toMs((live as any)?.tauLC_ms, "ms") ??
+      toMs(lcL.tauLC_ms, "ms") ?? toMs(lcL.tau_ms, "ms") ?? toMs(lcL.tauLC_s, "s")
+    );
+    const tauLC = tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics")
+                : tauFromDerived !== undefined ? prov(tauFromDerived, "derived")
+                : tauFromLive !== undefined ? prov(tauFromLive, "live")
+                : prov(undefined, "none");
+
+    // burst / dwell priority mirrors τ_LC
+    const burst = ((): Prov<number> => {
+      const m = saneMs(toMs(lcM.burst_ms, "ms"));
+      const d = saneMs(derived?.burst_ms);
+      const l = saneMs(toMs((live as any)?.burst_ms, "ms") ?? toMs(lcL.burst_ms, "ms"));
+      return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov(undefined, "none");
+    })();
+    const dwell = ((): Prov<number> => {
+      const m = saneMs(toMs(lcM.dwell_ms, "ms") ?? toMs(lcM.sectorPeriod_ms, "ms"));
+      const d = saneMs(derived?.dwell_ms ?? derived?.sectorPeriod_ms);
+      const l = saneMs(toMs((live as any)?.dwell_ms, "ms") ?? toMs((live as any)?.sectorPeriod_ms, "ms") ?? toMs(lcL.dwell_ms, "ms") ?? toMs(lcL.sectorPeriod_ms, "ms"));
+      return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov(undefined, "none");
+    })();
+
+    // sectors: prefer metrics root (activeSectors/totalSectors), then derived, then live
+    const sectorsTotal =
+      isNum((metrics as any)?.totalSectors) ? prov((metrics as any).totalSectors, "metrics")
+      : isNum(derived?.sectorsTotal) ? prov(derived.sectorsTotal, "derived")
+      : isNum((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) ? prov((live as any)?.sectorsTotal ?? (live as any)?.sectorCount, "live")
+      : prov(undefined, "none");
+    const sectorsConcurrent =
+      isNum((metrics as any)?.activeSectors) ? prov((metrics as any).activeSectors, "metrics")
+      : isNum(derived?.sectorsConcurrent) ? prov(derived.sectorsConcurrent, "derived")
+      : isNum((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors) ? prov((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors, "live")
+      : prov(undefined, "none");
+
+    return { tauLC, burst, dwell, sectorsTotal, sectorsConcurrent };
+  }
+
   const toF32 = (a: Float32Array | number[] | undefined) =>
     !a ? undefined : (a instanceof Float32Array ? a : new Float32Array(a));
   const fmtPct = (x: number) => `${(x * 100).toFixed(3)}%`;
@@ -87,59 +145,29 @@ function GreensLivePanel() {
   const phi = toF32(greens?.phi);
   const phiStat = phi ? stat(phi) : undefined;
 
-  const mode =
-    (derived?.mode ?? live?.currentMode ?? metrics?.currentMode ?? "hover") as string;
-
+  const mode = (derived?.mode ?? live?.currentMode ?? metrics?.currentMode ?? "hover") as string;
   const dutyFR =
     Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR :
     Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
     undefined;
 
-  const sectorsTotal =
-    Number.isFinite(derived?.sectorsTotal) ? derived.sectorsTotal :
-    Number.isFinite(metrics?.lightCrossing?.sectorsTotal) ? metrics!.lightCrossing!.sectorsTotal :
-    Number.isFinite((metrics as any)?.totalSectors) ? (metrics as any).totalSectors :
-    Number.isFinite((live as any)?.sectorsTotal) ? (live as any).sectorsTotal :
-    undefined;
+  // unified, normalized timing and sectorization (with provenance)
+  const T = pickTiming();
+  const τ_LC_ms = T.tauLC.val;
+  const burst_ms = T.burst.val;
+  const dwell_ms = T.dwell.val;
+  const sectorsTotal = T.sectorsTotal.val;
+  const sectorsConcurrent = T.sectorsConcurrent.val;
 
-  const sectorsConcurrent =
-    Number.isFinite((metrics as any)?.activeSectors) ? (metrics as any).activeSectors :
-    Number.isFinite(metrics?.lightCrossing?.activeSectors) ? metrics!.lightCrossing!.activeSectors :
-    Number.isFinite(derived?.sectorsConcurrent) ? derived.sectorsConcurrent :
-    Number.isFinite((live as any)?.sectorsConcurrent) ? (live as any).sectorsConcurrent :
-    undefined;
-
-  const τ_LC_ms =
-    Number.isFinite(metrics?.lightCrossing?.tauLC_ms) ? metrics!.lightCrossing!.tauLC_ms :
-    Number.isFinite(derived?.τ_LC_ms) ? derived.τ_LC_ms :
-    Number.isFinite((live as any)?.lightCrossing?.tauLC_ms) ? (live as any).lightCrossing.tauLC_ms :
-    Number.isFinite((live as any)?.tau_LC_ms) ? (live as any).tau_LC_ms :
-    undefined;
-
-  const burst_ms =
-    Number.isFinite(metrics?.lightCrossing?.burst_ms) ? metrics!.lightCrossing!.burst_ms :
-    Number.isFinite(derived?.burst_ms) ? derived.burst_ms :
-    Number.isFinite((live as any)?.lightCrossing?.burst_ms) ? (live as any).lightCrossing.burst_ms :
-    Number.isFinite((live as any)?.burst_ms) ? (live as any).burst_ms :
-    undefined;
-
-  const dwell_ms =
-    Number.isFinite(metrics?.lightCrossing?.dwell_ms) ? metrics!.lightCrossing!.dwell_ms :
-    Number.isFinite(derived?.dwell_ms) ? derived.dwell_ms :
-    Number.isFinite((live as any)?.lightCrossing?.dwell_ms) ? (live as any).lightCrossing.dwell_ms :
-    Number.isFinite((live as any)?.dwell_ms) ? (live as any).dwell_ms :
-    undefined;
-
-  const reciprocity =
-    derived?.reciprocity ??
-    (() => {
-      if (Number.isFinite(burst_ms) && Number.isFinite(τ_LC_ms)) {
-        return burst_ms! < τ_LC_ms!
-          ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
-          : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
-      }
-      return { status: "UNKNOWN", message: "missing burst/τ_LC" };
-    })();
+  // Reciprocity computed on normalized ms values, but prefer derived if present
+  const reciprocity = derived?.reciprocity ?? (() => {
+    if (isNum(burst_ms) && isNum(τ_LC_ms)) {
+      return burst_ms < τ_LC_ms
+        ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
+        : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+    }
+    return { status: "UNKNOWN", message: "missing burst/τ_LC" };
+  })();
 
   // ---- undeniable liveness: flash + age counter ----
   const [sig, setSig] = React.useState<string>("");
@@ -183,6 +211,15 @@ function GreensLivePanel() {
         <div className="text-xs tabular-nums text-slate-400">
           updated {ageMs.toFixed(0)} ms ago
         </div>
+      </div>
+
+      {/* provenance row — makes it undeniable which path feeds the panel */}
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from ?? "—"}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? "—"}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? "—"}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_total: {T.sectorsTotal.from ?? "—"}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from ?? "—"}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -246,7 +283,7 @@ function GreensLivePanel() {
               {reciprocity?.status ?? "UNKNOWN"}
             </div>
           </div>
-          {Number.isFinite(burst_ms) && Number.isFinite(τ_LC_ms) && (
+          {isNum(burst_ms) && isNum(τ_LC_ms) && (
             <div className="mt-3">
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
                 <div
