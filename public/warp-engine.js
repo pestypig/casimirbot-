@@ -1,4 +1,3 @@
-
 //====================================================================
 //  Natário Warp‑Bubble Visualiser (pure WebGL – no GLM, no WebAssembly)
 //  ------------------------------------------------------------------
@@ -9,7 +8,7 @@
 //      const eng = new WarpEngine(document.getElementById("warpView"));
 //      window.addEventListener("message", e => eng.updateUniforms(e.data));
 //
-//  That's it: the dashboard's postMessage payload drives the bubble
+//  That’s it: the dashboard’s postMessage payload drives the bubble
 //  field in real‑time.
 //====================================================================
 
@@ -22,7 +21,7 @@ export default class WarpEngine {
         this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
         if (!this.gl) throw new Error("WebGL not supported");
 
-        //   Enable derivatives in WebGL1 – they're core in WebGL2
+        //   Enable derivatives in WebGL1 – they’re core in WebGL2
         if (!this.gl.getExtension("OES_standard_derivatives")) {
             console.warn("OES_standard_derivatives extension not available – grid lines will disappear in WebGL1");
         }
@@ -814,6 +813,17 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             ax*(G[0]*bx + G[3]*by + G[6]*bz) +
             ay*(G[1]*bx + G[4]*by + G[7]*bz) +
             az*(G[2]*bx + G[5]*by + G[8]*bz);
-        return { G, dotG };
+        const normG = (x,y,z) => Math.sqrt(Math.max(1e-12, dotG(x,y,z, x,y,z)));
+
+        return { G, dotG, normG };
+    }
+
+    // Ellipsoid utilities (using consistent scene-scaled axes)
+    rhoEllipsoidal(p) {
+        const { axesScene, useMetric, metric } = this.uniforms;
+        const metricHelpers = this._getMetricHelpers(); // Get metric helpers
+
+        const pN = [p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]];
+        return useMetric ? metricHelpers.normG(pN[0], pN[1], pN[2]) : Math.hypot(pN[0], pN[1], pN[2]);
     }
 }
