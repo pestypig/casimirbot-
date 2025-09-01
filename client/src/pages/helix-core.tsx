@@ -156,6 +156,7 @@ function GreensLivePanel() {
   const τ_LC_ms = T.tauLC.val;
   const burst_ms = T.burst.val;
   const dwell_ms = T.dwell.val;
+  const r_b_over_tau = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
   const sectorsTotal = T.sectorsTotal.val;
   const sectorsConcurrent = T.sectorsConcurrent.val;
 
@@ -289,10 +290,12 @@ function GreensLivePanel() {
                 <div
                   className={`h-full ${burst_ms! < τ_LC_ms! ? "bg-amber-400/80" : "bg-emerald-500/80"}`}
                   style={{ width: `${Math.max(0, Math.min(100, (burst_ms! / Math.max(1, τ_LC_ms!)) * 100))}%` }}
-                  title={`burst / τ_LC = ${(burst_ms! / Math.max(1, τ_LC_ms!)).toFixed(3)}`}
+                  title={`burst / τ_LC = ${r_b_over_tau?.toFixed(3) ?? "—"}`}
                 />
               </div>
-              <div className="mt-1 text-xs text-slate-400">burst / τ_LC</div>
+              <div className="mt-1 text-xs text-slate-400">
+                burst / τ_LC = {r_b_over_tau ? `×${r_b_over_tau.toFixed(1)}` : "—"} ({mode})
+              </div>
             </div>
           )}
         </div>
