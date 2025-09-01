@@ -588,7 +588,6 @@ const applyReal = (
     exposure: 4.2,      // slightly up from 3.8 but not blinding
     zeroStop: 1e-6,     // restore parity default
     cosmeticLevel: 0,
-    curvatureGainDec: 0,
     curvatureGainT: 0,
     curvatureBoostMax: 1,
     // ⚠ don't override tilt here; let upstream params decide
@@ -1206,7 +1205,7 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-      // Force parity mode explicitly
+      // Do NOT supply thetaScale; engine computes canonical θ from inputs
       physicsParityMode: true,
       ridgeMode: 0,
     });
@@ -1230,26 +1229,14 @@ export default function WarpBubbleCompare({
       curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
       userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
       displayGain: 1,
-      // Force non-parity mode explicitly
+      // Do NOT supply thetaScale; engine computes θ. Standby is enforced by engine.
       physicsParityMode: false,
       ridgeMode: 1,
     });
 
-    console.log('Applying physics to engines:', {
-      real: {
-        parity: realPhysicsPayload.physicsParityMode,
-        ridge: realPhysicsPayload.ridgeMode,
-        theta: realPhysicsPayload.thetaScale,
-        gammaVdB: realPhysicsPayload.gammaVdB,
-        qSpoil: realPhysicsPayload.deltaAOverA
-      },
-      show: {
-        parity: showPhysicsPayload.physicsParityMode,
-        ridge: showPhysicsPayload.ridgeMode,
-        theta: showPhysicsPayload.thetaScale,
-        gammaVdB: showPhysicsPayload.gammaVdB,
-        qSpoil: showPhysicsPayload.deltaAOverA
-      }
+    console.log('Applying physics to engines (θ computed by engine):', {
+      real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
+      show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
     });
 
     pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
