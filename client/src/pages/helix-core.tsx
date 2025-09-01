@@ -59,6 +59,7 @@ function GreensLivePanel() {
   const derived = qc.getQueryData(["helix:pipeline:derived"]) as any | undefined;
 
   // ---- helpers ----
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
   type Prov<T> = { val?: T, from?: "metrics" | "derived" | "live" | "none" };
   const prov = <T,>(val?: T, from: Prov<T>["from"] = "none"): Prov<T> => ({ val, from });
   const isNum = (x: any): x is number => typeof x === "number" && Number.isFinite(x);
@@ -156,6 +157,19 @@ function GreensLivePanel() {
   const τ_LC_ms = T.tauLC.val;
   const burst_ms = T.burst.val;
   const dwell_ms = T.dwell.val;
+  // Panel-local duty from timing & sectorization (metrics-first, physics-grounded)
+  const dutyFR_calc =
+    (isNum(burst_ms) && isNum(dwell_ms) && dwell_ms! > 0 &&
+     isNum(T.sectorsTotal.val) && T.sectorsTotal.val! > 0 &&
+     isNum(T.sectorsConcurrent.val))
+      ? clamp01((burst_ms! / dwell_ms!) * (T.sectorsConcurrent.val! / T.sectorsTotal.val!))
+      : undefined;
+  // Fallback to derived/live if timing is incomplete
+  const dutyFR_fallback =
+    Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR :
+    Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
+    undefined;
+  const dutyFR_display = (isNum(dutyFR_calc) ? dutyFR_calc : dutyFR_fallback);
   const r_b_over_tau = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
   const sectorsTotal = T.sectorsTotal.val;
   const sectorsConcurrent = T.sectorsConcurrent.val;
@@ -170,6 +184,7 @@ function GreensLivePanel() {
     return { status: "UNKNOWN", message: "missing burst/τ_LC" };
   })();
 
+  const dutyFrom = isNum(dutyFR_calc) ? "calc" : (Number.isFinite(dutyFR_fallback) ? "derived" : "—");
   // ---- undeniable liveness: flash + age counter ----
   const [sig, setSig] = React.useState<string>("");
   const [lastAt, setLastAt] = React.useState<number>(0);
@@ -216,6 +231,7 @@ function GreensLivePanel() {
 
       {/* provenance row — makes it undeniable which path feeds the panel */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">Duty: {dutyFrom}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from ?? "—"}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? "—"}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? "—"}</span>
@@ -254,7 +270,7 @@ function GreensLivePanel() {
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
             <div className="text-slate-400">Duty (FR)</div>
-            <div className="font-mono">{Number.isFinite(dutyFR) ? fmtPct(dutyFR!) : "—"}</div>
+            <div className="font-mono">{Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}</div>
             <div className="text-slate-400">S_total</div>
             <div className="font-mono">{sectorsTotal ?? "—"}</div>
             <div className="text-slate-400">S_live</div>
@@ -264,7 +280,7 @@ function GreensLivePanel() {
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
             <div
               className="h-full bg-emerald-500/80 transition-[width] duration-300"
-              style={{ width: `${Math.max(0, Math.min(100, (Number.isFinite(dutyFR) ? dutyFR! : 0) * 100))}%` }}
+              style={{ width: `${Math.max(0, Math.min(100, (Number.isFinite(dutyFR_display) ? dutyFR_display! : 0) * 100))}%` }}
             />
           </div>
         </div>
