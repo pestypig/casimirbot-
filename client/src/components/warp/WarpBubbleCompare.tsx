@@ -380,7 +380,6 @@ export function buildEngineUniforms(base: BaseInputs) {
   const common = buildCommonUniforms(base);
   const real = {
     ...common,
-    thetaScale: buildThetaScale(base, 'fr'),
     physicsParityMode: true,
     ridgeMode: TONEMAP_LOCK.ridgeMode,
     exposure: TONEMAP_LOCK.exp,
@@ -394,7 +393,6 @@ export function buildEngineUniforms(base: BaseInputs) {
   };
   const show = {
     ...common,
-    thetaScale: buildThetaScale(base, 'ui'),
     physicsParityMode: false,
     ridgeMode: TONEMAP_LOCK.ridgeMode,
     exposure: TONEMAP_LOCK.exp,
@@ -1211,14 +1209,6 @@ export default function WarpBubbleCompare({
       // Force parity mode explicitly
       physicsParityMode: true,
       ridgeMode: 0,
-      // Use shared theta calculation with mass-focused gamma VdB
-      thetaScale: computeThetaScale({
-        gammaGeo: real.gammaGeo,
-        qSpoilingFactor: real.qSpoilingFactor,
-        gammaVanDenBroeck: real.gammaVanDenBroeck,
-        gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
-        dutyEffectiveFR: real.dutyEffectiveFR
-      }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     // REAL (parity / Ford–Roman)
@@ -1243,14 +1233,6 @@ export default function WarpBubbleCompare({
       // Force non-parity mode explicitly
       physicsParityMode: false,
       ridgeMode: 1,
-      // Use shared theta calculation with visual-focused gamma VdB, handle standby mode
-      thetaScale: parameters.currentMode === 'standby' ? 0 : computeThetaScale({
-        gammaGeo: show.gammaGeo,
-        qSpoilingFactor: show.qSpoilingFactor,
-        gammaVanDenBroeck: show.gammaVanDenBroeck,
-        gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
-        dutyEffectiveFR: show.dutyEffectiveFR
-      }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     console.log('Applying physics to engines:', {
