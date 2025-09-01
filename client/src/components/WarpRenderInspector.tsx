@@ -490,7 +490,7 @@ function PaneOverlay(props:{
         Number(+U.thetaScale) ||
         Number(+U.u_thetaScale) || NaN;
       const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
-      const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1));
+      const sectorsConcurrent = Math.max(1, +(U.sectorCount ?? 1)); // FIX: Use sectorCount for CONCURRENT sectors for SHOW pane
       const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
       const thetaCanon = thetaCanonical({
         gammaGeo:               +U.gammaGeo || 26,
@@ -573,7 +573,7 @@ function PaneOverlay(props:{
             <div>
               <div className="opacity-80">Curvature (York-time proxy</div>
               <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
-              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
+              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaCanon)? s.thetaCanon.toExponential(2):'—'}</b></div>
             </div>
             <div>
               <div className="opacity-80">Exotic mass proxy (display-only</div>
@@ -1208,10 +1208,18 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, {
+            ...uSafe, ...purple, ...metricU,
+            physicsParityMode: true,  ridgeMode: 0, viewAvg: true,
+            u_physicsParityMode: true, u_ridgeMode: 0
+          });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, {
+            ...uSafe, ...purple, ...metricU,
+            physicsParityMode: false, ridgeMode: 1, viewAvg: false,
+            u_physicsParityMode: false, u_ridgeMode: 1
+          });
         }
       });
 
@@ -1344,7 +1352,7 @@ export default function WarpRenderInspector(props: {
     return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
   })();
   const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
-  const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
+  const sConcurrent = Math.max(1, +(wu.sectors ?? 1)); // Use sectorCount from wu for concurrent sectors
   const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // canonical FR
 
   // after you compute sTotal etc.
