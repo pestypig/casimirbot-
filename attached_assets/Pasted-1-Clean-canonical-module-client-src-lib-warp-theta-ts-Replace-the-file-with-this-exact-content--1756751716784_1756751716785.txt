@@ -1,0 +1,86 @@
+1) Clean, canonical module: client/src/lib/warp-theta.ts
+
+Replace the file with this exact content (single place that exports thetaCanonical; no duplicates):
+
+// client/src/lib/warp-theta.ts
+
+// -------- Types --------
+export type ThetaMode = 'mass' | 'vis' | 'auto';
+
+export interface ThetaInputs {
+  gammaGeo?: number;                 // γ_geo
+  qSpoilingFactor?: number;          // q
+  gammaVanDenBroeck?: number;        // legacy
+  gammaVanDenBroeck_mass?: number;   // physics VdB
+  gammaVanDenBroeck_vis?: number;    // visual VdB (UI only)
+  dutyEffectiveFR?: number;          // ship-wide FR duty in [0,1]
+}
+
+export interface ThetaOptions {
+  mode?: ThetaMode;                  // which γ_VdB to pick if using computeThetaScale
+  vdbDefault?: number;               // default seed for γ_VdB
+  vdbMax?: number;                   // clamp for γ_VdB
+}
+
+const DEFAULTS: Required<Pick<ThetaOptions, 'mode' | 'vdbDefault' | 'vdbMax'>> = {
+  mode: 'auto',
+  vdbDefault: 38.3,
+  vdbMax: 1e11,
+};
+
+// -------- Legacy helper (UI expected value; DISPLAY ONLY) --------
+export function computeThetaScale(inp: ThetaInputs, opt: ThetaOptions = {}): number {
+  const o = { ...DEFAULTS, ...opt };
+  const g = Number(inp.gammaGeo) || 26;
+  const q = Number(inp.qSpoilingFactor) || 1;
+  const v = pickGammaVdB(inp, o);
+  const dRaw = Number(inp.dutyEffectiveFR);
+  const d = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
+  return Math.pow(g, 3) * q * v * Math.sqrt(d);
+}
+
+// Smart γ_VdB picker (UI helper)
+export function pickGammaVdB(inp: ThetaInputs, opt: ThetaOptions = {}): number {
+  const o = { ...DEFAULTS, ...opt };
+  let chosen: number | undefined;
+  if (o.mode === 'mass') chosen = inp.gammaVanDenBroeck_mass ?? inp.gammaVanDenBroeck;
+  else if (o.mode === 'vis') chosen = inp.gammaVanDenBroeck_vis ?? inp.gammaVanDenBroeck;
+  else chosen = inp.gammaVanDenBroeck_mass ?? inp.gammaVanDenBroeck_vis ?? inp.gammaVanDenBroeck;
+
+  const vRaw = Number(chosen);
+  const v0 = Number.isFinite(vRaw) ? vRaw : o.vdbDefault;
+  return Math.max(1, Math.min(o.vdbMax, v0));
+}
+
+// -------- Canonical physics (mirror of engine) — DISPLAY/TESTS ONLY --------
+export function thetaCanonical(params: {
+  gammaGeo: number;                 // γ_geo
+  qSpoilingFactor: number;          // q
+  gammaVanDenBroeck_mass: number;   // γ_VdB (mass)
+  dutyLocal: number;                // burst duty in [0,1]
+  sectorsConcurrent: number;        // usually 1
+  sectorsTotal: number;             // e.g., 400
+  viewAveraged?: boolean;           // default true for physics/REAL
+  mode?: 'standby'|'hover'|'cruise';// if 'standby' -> 0
+}): number {
+  const {
+    gammaGeo, qSpoilingFactor, gammaVanDenBroeck_mass,
+    dutyLocal, sectorsConcurrent, sectorsTotal,
+    viewAveraged = true, mode
+  } = params;
+
+  if (mode === 'standby') return 0;
+
+  const g  = Math.max(1, Number(gammaGeo) || 26);
+  const q  = Math.max(1e-12, Number(qSpoilingFactor) || 1);
+  const v  = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3)); // physics clamp
+  const sC = Math.max(1, Number(sectorsConcurrent) || 1);
+  const sT = Math.max(1, Number(sectorsTotal) || 400);
+  const dFR = Math.max(1e-12, Math.min(1, (Number(dutyLocal) || 0) * (sC / sT)));
+
+  const dutyFactor = viewAveraged ? Math.sqrt(dFR) : 1;
+  return (g * g * g) * q * v * dutyFactor;
+}
+
+
+This guarantees you have one thetaCanonical export from one module. No default export. No duplicate declarations.
