@@ -1,0 +1,62 @@
+3) warp-pipeline-adapter.ts — send local duty & FR duty; correct sectors; never send θ
+*** a/warp-pipeline-adapter.ts
+--- b/warp-pipeline-adapter.ts
+@@
+-  const sectorsTotal =
++  const sectorsTotal =
+     Math.max(1, Math.floor(
+       num(s.sectorCount) ??
+       num(s.sectorStrobing) ?? 400
+     ));
+-  const split = Math.floor(sectorsTotal/2);
++  // concurrent/live sectors (prefer explicit concurrent, else strobing, else 1)
++  const sectorsConc = Math.max(1, Math.floor(
++    num((s as any).sectorsConcurrent) ??
++    num((s as any).concurrentSectors) ??
++    num(s.sectorStrobing) ?? 1
++  ));
++  const split = Math.floor(sectorsTotal/2); // viz-only legacy
+@@
+-  // --- Ship duty (FR) from UI duty & strobing fallback ---
+-  let d_ship =
+-    num(s.dutyEffective_FR) ??
+-    num(s.dutyShip) ??
+-    (() => {
+-      const d_ui = clamp(s.dutyCycle ?? 0.14, 0, 1);
+-      const strobe = Math.max(1, num(s.sectorStrobing) ?? sectorsTotal);
+-      return clamp(d_ui / strobe, 0, 1);
+-    })();
+-  d_ship = clamp(d_ship, 0, 1);
++  // --- Duty resolution ---
++  // local burst duty (sector-local)
++  const dutyLocal = clamp(
++    num((s as any).localBurstFrac) ?? num((s as any).burstLocal) ?? (s.dutyCycle ?? 0.01),
++    0, 1
++  );
++  // Ford–Roman ship-wide duty: d_FR = dutyLocal × (S_concurrent / S_total)
++  const d_ship = clamp(
++    num(s.dutyEffective_FR) ?? num(s.dutyShip) ?? (dutyLocal * (sectorsConc / sectorsTotal)),
++    0, 1
++  );
+@@
+   gatedUpdateUniforms(engine, {
+     currentMode: s.currentMode,
+-    dutyCycle: d_ship,              // ⛔ wrong: was ship duty
+-    dutyEffectiveFR: d_ship,
+-    sectorCount: sectorsTotal,
+-    sectors: split,
++    dutyCycle: dutyLocal,           // ✅ local burst duty
++    dutyEffectiveFR: d_ship,        // ✅ Ford–Roman ship duty
++    sectorCount: sectorsTotal,      // ✅ total sectors
++    sectors: sectorsConc,           // ✅ concurrent sectors
+@@
+-    // Audit-only; do not override engine θ
+-    thetaScaleExpected,
++    // Audit-only; do not override engine θ
++    thetaScaleExpected,
+@@
+-    colorMode: "theta",
+-    viewAvg: true,
++    colorMode: "theta",
++    viewAvg: true,
+   }, "server");
