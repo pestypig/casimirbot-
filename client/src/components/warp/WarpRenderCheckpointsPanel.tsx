@@ -610,11 +610,16 @@ function useCheckpointList(
     }
 
     // θ readouts (prefer engine's telemetry "thetaScale_actual" when present)
-    const thetaShaderReal   = Number(e?.uniforms?.thetaScale_actual ?? e?.uniforms?.thetaScale ?? NaN);
-    const thetaExpectedPane = expectedThetaForPane(liveSnap, e);
-    const thetaDelta        = Number.isFinite(thetaShaderReal) && Number.isFinite(thetaExpectedPane) 
-      ? ((thetaShaderReal / thetaExpectedPane - 1) * 100).toFixed(1) + '%'
-      : '—';
+    const parity = !!u.physicsParityMode;
+    const mode = String(u.currentMode ?? 'hover');
+    const isREALStandby = parity && mode === 'standby';
+
+    const thetaUniformRaw = Number(u?.thetaScale_actual ?? u?.thetaScale ?? NaN);
+    const vShip = Number.isFinite(u.vShip) ? Number(u.vShip) : (parity ? 0 : 1);
+    const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaUniformRaw) ? thetaUniformRaw * vShip : NaN);
+
+    // expected canonical (what your energy panel computes)
+    const thetaExpected = expectedThetaForPane(liveSnap, e);
 
     // Grid buffers
     const verts = (e?.gridVertices?.length || 0);
@@ -772,14 +777,33 @@ function useCheckpointList(
       }
     }
 
-    // Updated theta scale row with engine telemetry
-    const tsOkRow = Number.isFinite(ts) && ts > 0;
-    let tsStateRow: "ok" | "warn" | "fail" = tsOkRow ? "ok" : "fail";
-    let tsDetailRow = tsOkRow
-      ? `${ts.toExponential(2)} • exp ${thetaExpectedPane.toExponential(2)} (Δ ${thetaDelta})`
-      : "invalid";
+    // Theta scale rows - separate raw and effective for like-for-like comparison
+    const fmt = (n: number) => Number.isFinite(n) ? (Math.abs(n) >= 1e3 ? n.toExponential(2) : n.toPrecision(3)) : '—';
 
-    rows.push({ label: "θ-scale", detail: tsDetailRow, state: tsStateRow });
+    // Raw theta (what engine computed from physics chain)
+    const rawOk = Number.isFinite(thetaUniformRaw) && thetaUniformRaw > 0;
+    const rawDelta = (Number.isFinite(thetaUniformRaw) && Number.isFinite(thetaExpected))
+      ? `${((thetaUniformRaw/thetaExpected - 1) * 100).toFixed(1)}%` : '—';
+    const rawDetail = `raw=${fmt(thetaUniformRaw)} • exp=${fmt(thetaExpected)} (Δ ${rawDelta})`;
+
+    rows.push({ 
+      label: "θ-scale (raw)", 
+      detail: rawDetail, 
+      state: rawOk ? "ok" : "fail" 
+    });
+
+    // Effective theta (what fragments actually see)
+    const effOk = Number.isFinite(thetaEffective);
+    const expectedEffective = (mode === 'standby' && parity) ? 0 : thetaExpected * vShip;
+    const effDelta = (Number.isFinite(thetaEffective) && Number.isFinite(expectedEffective))
+      ? `${((thetaEffective/(expectedEffective || 1) - 1) * 100).toFixed(1)}%` : '—';
+    const effDetail = `eff = raw × vShip = ${fmt(thetaUniformRaw)} × ${fmt(vShip)} (Δ ${effDelta})`;
+
+    rows.push({ 
+      label: "θ-scale (effective)", 
+      detail: effDetail, 
+      state: effOk ? "ok" : "fail" 
+    });
 
     // ── NEW: WebGL projection rows (front/rear shell along drive direction)
     if (ndcF && pixF) {
