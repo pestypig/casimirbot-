@@ -15,6 +15,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 import { thetaCanonical } from "@/lib/warp-theta";
+import { thetaCanonical } from "@/lib/warp-theta";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 // Single-source pane sanitizer. If you have another copy further down, delete it.
@@ -194,6 +195,46 @@ function computeViewMassFraction(u: any): number {
   const sTotal  = Math.max(1, Number(u?.sectorCount ?? 400));
 
   return (parity && viewAvg) ? 1 / sTotal : 1.0;
+}
+
+function thetaGainExpected(bound: any): number {
+  try {
+    const g  = Number(bound?.gammaGeo ?? bound?.gamma_geo ?? 26);
+    const q  = Number(bound?.qSpoilingFactor ?? bound?.deltaAOverA ?? bound?.q ?? 1);
+    // physics "mass pocket" gamma (not the big visual gamma); canonical clamps internally
+    const vM = Number(
+      bound?.gammaVanDenBroeck_mass ??
+      bound?.gammaVanDenBroeck ??
+      bound?.gammaVdB ??
+      bound?.gamma_vdb ??
+      38.3
+    );
+
+    const dutyLocal = Number(bound?.dutyLocal ?? bound?.dutyCycle ?? bound?.duty ?? 0.01);
+    const sC = Math.max(1, Number(bound?.sectorsConcurrent ?? bound?.sectors ?? 1));
+    const sT = Math.max(1, Number(bound?.sectorsTotal ?? bound?.sectorCount ?? 400));
+
+    // REAL panels average by default; SHOW typically does not
+    const viewAveraged =
+      bound?.viewAveraged ??
+      (bound?.physicsParityMode ?? bound?.parity ?? false) ? true : false;
+
+    const mode = (bound?.mode ?? bound?.currentMode) || undefined;
+
+    return thetaCanonical({
+      gammaGeo: g,
+      qSpoilingFactor: q,
+      gammaVanDenBroeck_mass: vM,
+      dutyLocal,
+      sectorsConcurrent: sC,
+      sectorsTotal: sT,
+      viewAveraged,
+      mode,
+    });
+  } catch (e) {
+    console.warn("[WRI] thetaGainExpected error:", e);
+    return NaN;
+  }
 }
 
 // [deleted duplicate paneSanitize]
