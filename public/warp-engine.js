@@ -1,464 +1,545 @@
-//====================================================================
-//  Natário Warp‑Bubble Visualiser (pure WebGL – no GLM, no WebAssembly)
-//  ------------------------------------------------------------------
-//  Canonical θ & parity/viewAvg hardening patch included (see __wrapUpdateUniforms)
-//  Drop this file next to your React (or plain‑JS) front‑end.  Create
-//  <canvas id="warpView"></canvas> in the DOM and then:
-//
-//      import WarpEngine from "./warp_engine.js";
-//      const eng = new WarpEngine(document.getElementById("warpView"));
-//      window.addEventListener("message", e => eng.updateUniforms(e.data));
-//
-//  That's it: the dashboard's postMessage payload drives the bubble
-//  field in real‑time.
-//====================================================================
+;(() => {
+  // Prevent duplicate loads (HMR, script re-inject, etc.)
+  const BUILD = globalThis.__APP_WARP_BUILD || 'dev-2';
+  // Only skip if we've *already* executed this exact build.
+  if (globalThis.__WARP_ENGINE_LOADED__ === BUILD) {
+    console.warn('[warp-engine] duplicate load detected — same build; skipping body');
+    return;
+  }
+  // Mark which build is loaded
+  globalThis.__WARP_ENGINE_LOADED__ = BUILD;
+  globalThis.WarpEngine = globalThis.WarpEngine || {};
+  globalThis.WarpEngine.BUILD = BUILD;
+  globalThis.__WarpEngineBuild = BUILD;
 
-export default class WarpEngine {
-    //----------------------------------------------------------------
-    //  1.  Boiler‑plate
-    //----------------------------------------------------------------
+// Optimized 3D spacetime curvature visualization engine
+// Authentic Natário warp bubble physics with WebGL rendering
+
+
+// --- Grid defaults (scientifically scaled for needle hull) ---
+if (typeof window.GRID_DEFAULTS === 'undefined') {
+  const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+  window.GRID_DEFAULTS = {
+    spanPadding: isMobile 
+      ? 1.55   // extra padding on phones for better visibility and touch interaction
+      : 1.35,  // tighter framing for closer view on desktop
+    minSpan: isMobile ? 2.8 : 2.6,  // slightly larger minimum on mobile for performance
+    divisions: isMobile ? 75 : 100,  // fewer grid lines on mobile for better performance
+    mobileOptimized: isMobile,
+    touchEnabled: isTouch
+  };
+}
+const GRID_DEFAULTS = window.GRID_DEFAULTS;
+
+if (typeof window.SCENE_SCALE === 'undefined') {
+  window.SCENE_SCALE = (typeof sceneScale === 'number' && isFinite(sceneScale)) ? sceneScale : 1.0;
+}
+const SCENE_SCALE = window.SCENE_SCALE;
+
+// Math helpers and constants
+const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
+
+class WarpEngine {
+    static getOrCreate(canvas) {
+        const existing = canvas.__warpEngine;
+        if (existing && !existing._destroyed) return existing;
+        return new this(canvas);
+    }
+
     constructor(canvas) {
-        this.canvas = canvas;
-        this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
-        if (!this.gl) throw new Error("WebGL not supported");
+        // Per-canvas guard: allow multiple engines across different canvases
+        if (!window.__WARP_ENGINES) window.__WARP_ENGINES = new WeakSet();
+        if (window.__WARP_ENGINES.has(canvas) && !window.__WarpEngineAllowMulti) {
+            console.warn('Duplicate WarpEngine on the same canvas blocked.');
+            throw new Error('WarpEngine already attached to this canvas');
+        }
+        window.__WARP_ENGINES.add(canvas);
 
-        //   Enable derivatives in WebGL1 – they’re core in WebGL2
-        if (!this.gl.getExtension("OES_standard_derivatives")) {
-            console.warn("OES_standard_derivatives extension not available – grid lines will disappear in WebGL1");
+        this.canvas = canvas;
+        this.isLoaded = false;
+        this._destroyed = false;
+        this.debugTag = 'WarpEngine';
+        canvas.__warpEngine = this;
+        // Create WebGL context with comprehensive error handling
+        let gl = null;
+        const contextOptions = {
+            antialias: false,
+            alpha: false,
+            depth: true,
+            stencil: false,
+            preserveDrawingBuffer: false,
+            powerPreference: "default",
+            failIfMajorPerformanceCaveat: false
+        };
+
+        // Try different context creation strategies
+        try {
+            // First try WebGL2
+            gl = canvas.getContext('webgl2', contextOptions);
+            if (gl) {
+                console.log('✅ WebGL2 context created successfully');
+            }
+        } catch (e) {
+            console.warn('WebGL2 context creation failed:', e.message);
         }
 
-        //   Default UI values (same as Hover mode)
-        this.uniforms = {
-            dutyCycle:     0.14,
-            g_y:           26.0,
-            cavityQ:       1e9,
-            sagDepth_nm:   16.0,
-            tsRatio:       4102.74,
-            powerAvg_MW:   83.3,
+        if (!gl) {
+            try {
+                // Fallback to WebGL1
+                gl = canvas.getContext('webgl', contextOptions) || 
+                     canvas.getContext('experimental-webgl', contextOptions);
+                if (gl) {
+                    console.log('✅ WebGL1 context created successfully');
+                }
+            } catch (e) {
+                console.warn('WebGL1 context creation failed:', e.message);
+            }
+        }
+
+        // If still no context, try with different options
+        if (!gl) {
+            try {
+                const relaxedOptions = {
+                    antialias: false,
+                    alpha: true,
+                    depth: false,
+                    stencil: false,
+                    preserveDrawingBuffer: true,
+                    powerPreference: "high-performance",
+                    failIfMajorPerformanceCaveat: false
+                };
+                gl = canvas.getContext('webgl', relaxedOptions) || 
+                     canvas.getContext('experimental-webgl', relaxedOptions);
+                if (gl) {
+                    console.log('✅ WebGL context created with relaxed options');
+                }
+            } catch (e) {
+                console.warn('Relaxed WebGL context creation failed:', e.message);
+            }
+        }
+
+        this.gl = gl;
+        // Enable derivatives so we can do screen-space curvature (WebGL1 needs this; WebGL2 has dFdx/dFdy)
+        this._derivExt = this.gl.getExtension('OES_standard_derivatives');
+
+        if (!this.gl) {
+            console.error('🚨 WebGL Debug Info:');
+            console.error('  - Canvas:', canvas);
+            console.error('  - Canvas size:', canvas.width, 'x', canvas.height);
+            console.error('  - Canvas.getContext available:', typeof canvas.getContext === 'function');
+            console.error('  - Environment:', {
+                isHeadless: typeof window === 'undefined',
+                isWorker: typeof importScripts === 'function',
+                isNode: typeof process !== 'undefined' && process?.versions?.node,
+                isReplit: typeof window !== 'undefined' && window.location?.hostname?.includes('replit')
+            });
+
+            // Test basic WebGL availability
+            try {
+                const testCanvas = document.createElement('canvas');
+                testCanvas.width = 1;
+                testCanvas.height = 1;
+
+                const testGl2 = testCanvas.getContext('webgl2');
+                const testGl1 = testCanvas.getContext('webgl') || testCanvas.getContext('experimental-webgl');
+
+                console.error('  - WebGL2 available:', !!testGl2);
+                console.error('  - WebGL1 available:', !!testGl1);
+
+                if (testGl1 || testGl2) {
+                    const testGl = testGl2 || testGl1;
+                    console.error('  - WebGL Renderer:', testGl.getParameter(testGl.RENDERER));
+                    console.error('  - WebGL Vendor:', testGl.getParameter(testGl.VENDOR));
+                    console.error('  - WebGL Version:', testGl.getParameter(testGl.VERSION));
+                    console.error('  - Max Texture Size:', testGl.getParameter(testGl.MAX_TEXTURE_SIZE));
+                    console.error('  - Max Viewport Dims:', testGl.getParameter(testGl.MAX_VIEWPORT_DIMS));
+
+                    // Test basic shader compilation
+                    const vertexShader = testGl.createShader(testGl.VERTEX_SHADER);
+                    testGl.shaderSource(vertexShader, 'attribute vec4 a_position; void main() { gl_Position = a_position; }');
+                    testGl.compileShader(vertexShader);
+                    console.error('  - Vertex shader compilation:', testGl.getShaderParameter(vertexShader, testGl.COMPILE_STATUS));
+                }
+            } catch (e) {
+                console.error('  - WebGL detection error:', e.message);
+            }
+
+            console.error('  - System Info:', {
+                userAgent: navigator.userAgent.slice(0, 100) + '...',
+                hardwareConcurrency: navigator.hardwareConcurrency || 'Unknown',
+                platform: navigator.platform,
+                gpu: navigator.gpu ? 'Available' : 'Not available',
+                onLine: navigator.onLine
+            });
+
+            throw new Error('WebGL not supported in this environment');
+        }
+
+        console.log("🚨 ENHANCED 3D ELLIPSOIDAL SHELL v4.0 - PIPELINE-DRIVEN PHYSICS 🚨");
+
+        // Handle GL context loss/recovery internally
+        canvas.addEventListener('webglcontextlost', (e) => {
+            try { e.preventDefault(); } catch {}
+            this._setLoaded(false);
+            console.warn('[WarpEngine] WebGL context lost');
+        }, false);
+        canvas.addEventListener('webglcontextrestored', () => {
+            console.warn('[WarpEngine] WebGL context restored; rebuilding GL resources');
+            try { this._recreateGL(); } catch (e) { console.error(e); }
+        }, false);
+
+        // Check for non-blocking shader compilation support
+        this.parallelShaderExt = this.gl.getExtension('KHR_parallel_shader_compile');
+        if (this.parallelShaderExt) {
+            console.log("⚡ Non-blocking shader compilation available");
+        }
+
+        // Loading state management
+        this.isLoaded = false;
+        this.loadingState = 'idle';
+        this.onLoadingStateChange = null; // callback for loading progress
+        this._readyQueue = [];            // callbacks to run once shaders are linked
+
+        // Strobing state for sector sync
+        this.strobingState = {
+            sectorCount: 1,
+            currentSector: 0
+        };
+
+        // Initialize WebGL state
+        this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // Black background for visibility
+        this.gl.enable(this.gl.DEPTH_TEST);
+        this.gl.depthFunc(this.gl.LEQUAL);
+
+        // Initialize uniform dirty flag
+        this._uniformsDirty = false;
+
+        // Debug mode and performance tracking
+        this._debugMode = !!(location.search && /debug=1/.test(location.search));
+        this._lastDebugTime = 0;
+        this._lastRenderLog = 0;
+
+        // Cache for responsive camera
+        this._lastAxesScene = null;
+        this._gridSpan = null;
+
+        // Camera system
+        this.cameraMode = 'overhead';         // single source of truth for camera pose
+        this._lastFittedR = 1;                // cache last fit radius for stability
+
+        // Temporal smoothing for visual calm (canonical Natário)
+        this._dispAlpha = 0.25; // blend factor (0=no change, 1=instant)
+        this._prevDisp = [];     // per-vertex displacement history
+
+        // Grid rendering resources
+        this.gridVertices = null;
+        this.originalGridVertices = null; // Store original positions for warp calculations
+        this.gridVbo = null;
+        this.gridProgram = null;
+        this.program = null;      // normalized public handle
+        this.gridUniforms = null;
+        this.gridAttribs = null;
+        this._vboBytes = 0; // Track VBO buffer size for efficient updates
+        this._resizeRaf = 0; // Track resize throttling RAF ID
+        this._warnNoProgramOnce = false; // Warn-once flag for shader program availability
+
+        // Camera and projection
+        this.viewMatrix = new Float32Array(16);
+        this.projMatrix = new Float32Array(16);
+        this.mvpMatrix = new Float32Array(16);
+
+        // Current warp parameters (unchanged)
+        this.currentParams = {
+            dutyCycle: 0.14,
+            g_y: 26,
+            cavityQ: 1e9,
+            sagDepth_nm: 16,
+            tsRatio: 4102.74,
+            powerAvg_MW: 83.3,
             exoticMass_kg: 1405
         };
 
-        // Add thetaScale_actual as a computed property for diagnostics
-        Object.defineProperty(this.uniforms, 'thetaScale_actual', {
-            get: () => this._thetaScaleActual ?? NaN,
-            enumerable: true
-        });
+        // Initialize rendering pipeline
+        this._setupCamera();
+        this._initializeGrid();              // creates VBO & vertices
+        this._compileGridShaders();          // compiles & links program (async-safe)
 
-        this._compileShaders();
-        this._initQuad();
-        this._cacheUniformLocations();
-        this._resize();
-        window.addEventListener("resize", () => this._resize());
-        requestAnimationFrame(t => this._loop(t));
-    }
-
-    //----------------------------------------------------------------
-    //  2.  Shader compilation
-    //----------------------------------------------------------------
-    _compileShaders() {
-        const vs = `#version 300 es
-        in  vec2 a_position;   out vec2 v_uv;
-        void main(){
-            v_uv = a_position*0.5+0.5;
-            gl_Position = vec4(a_position,0.0,1.0);
-        }`;
-
-        const fs = `#version 300 es
-        precision highp float;  in vec2 v_uv;  out vec4 frag;
-
-        uniform float u_dutyCycle, u_g_y, u_cavityQ, u_sagDepth_nm,
-                      u_tsRatio, u_powerAvg_MW, u_exoticMass_kg, u_time;
-
-        // --- Natário β‑field --------------------------------------
-        vec3 betaField(vec3 x){
-            float R = u_sagDepth_nm*1e-9;      // nm → m
-            float r = length(x);
-            if(r<1e-9) return vec3(0.);
-            float beta0 = u_dutyCycle*u_g_y;
-            float prof  = (r/R)*exp(-(r*r)/(R*R));
-            return beta0*prof*(x/r);
-        }
-        // --- Colour mapping ---------------------------------------
-        vec3 warpColor(float b){
-            float it = clamp(b*100.0,0.0,1.0);
-            return mix(vec3(0.1,0.2,0.8), vec3(0.9,0.3,0.1), it);
-        }
-        // -----------------------------------------------------------
-        void main(){
-            vec2 c = v_uv-0.5;                       // centre at 0
-            vec3 pos = vec3(c*2.0e-8,0.0);           // 20 nm FOV → ±1e‑8 m
-            float bmag = length(betaField(pos));
-            // ripple for eye‑candy (scaled by duty‑cycle)
-            bmag += sin(u_time*2.0 + length(c)*20.0)*0.1*u_dutyCycle;
-            vec3 col = warpColor(bmag);
-
-            // grid overlay (fwidth needs derivatives ⇒ WebGL2 or ext)
-            vec2 g = abs(fract(c*50.0)-0.5)/fwidth(c*50.0);
-            float line = 1.0-min(min(g.x,g.y),1.0);
-            col = mix(col, vec3(0.5), line*0.2);
-            frag = vec4(col,1.0);
-        }`;
-
-        this.program = this._linkProgram(vs, fs);
-    }
-
-    _linkProgram(vsrc, fsrc) {
-        const gl = this.gl;
-        const vs = this._compile(gl.VERTEX_SHADER, vsrc);
-        const fs = this._compile(gl.FRAGMENT_SHADER, fsrc);
-        const prog = gl.createProgram();
-        gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-            throw new Error("Program link error: " + gl.getProgramInfoLog(prog));
-        }
-        gl.deleteShader(vs); gl.deleteShader(fs);
-        return prog;
-    }
-
-    _compile(type, src) {
-        const gl = this.gl;
-        const sh = gl.createShader(type);
-        gl.shaderSource(sh, src); gl.compileShader(sh);
-        if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
-            throw new Error("Shader compile error: "+ gl.getShaderInfoLog(sh));
-        }
-        return sh;
-    }
-
-    //----------------------------------------------------------------
-    //  3.  Geometry (single full‑screen quad)
-    //----------------------------------------------------------------
-    _initQuad(){
-        const gl = this.gl;
-        const vbo = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-            -1,-1,   1,-1,  -1, 1,   1, 1
-        ]), gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-        this.vbo = vbo;
-    }
-
-    //----------------------------------------------------------------
-    //  4.  Uniform reflection
-    //----------------------------------------------------------------
-    _cacheUniformLocations(){
-        const gl = this.gl;
-        gl.useProgram(this.program);
-        this.uLoc = {
-            dutyCycle:     gl.getUniformLocation(this.program,"u_dutyCycle"),
-            g_y:           gl.getUniformLocation(this.program,"u_g_y"),
-            cavityQ:       gl.getUniformLocation(this.program,"u_cavityQ"),
-            sagDepth_nm:   gl.getUniformLocation(this.program,"u_sagDepth_nm"),
-            tsRatio:       gl.getUniformLocation(this.program,"u_tsRatio"),
-            powerAvg_MW:   gl.getUniformLocation(this.program,"u_powerAvg_MW"),
-            exoticMass_kg: gl.getUniformLocation(this.program,"u_exoticMass_kg"),
-            time:          gl.getUniformLocation(this.program,"u_time")
+        const strobeHandler = ({ sectorCount, currentSector, split }) => {
+          try {
+            this.strobingState.sectorCount   = Math.max(1, sectorCount|0);
+            this.strobingState.currentSector = Math.max(0, currentSector|0) % this.strobingState.sectorCount;
+            this.updateUniforms({
+              sectorCount: this.strobingState.sectorCount, // TOTAL only
+              split: Number.isFinite(split)
+                ? Math.max(0, Math.min(this.strobingState.sectorCount - 1, split|0))
+                : this.strobingState.currentSector
+              // ❌ no `sectors` here — leave that to the LC loop (S_live)
+            });
+          } catch (e) { console.warn("WarpEngine strobe error:", e); }
         };
-    }
-
-    //----------------------------------------------------------------
-    //  5.  Physics Chain Computation
-    //----------------------------------------------------------------
-    // ---- Canonical physics θ (engine is the only authority) ----
-    _thetaCanonical(params) {
-        const {
-            gammaGeo, qSpoilingFactor,
-            gammaVanDenBroeck_mass, dutyLocal,
-            sectorsConcurrent, sectorsTotal,
-            viewAveraged = true, currentMode
-        } = params || {};
-
-        if (currentMode === 'standby') return 0;
-
-        const g = Math.max(1, Number(gammaGeo) || 26);
-        const q = Math.max(1e-12, Number(qSpoilingFactor) || 1);
-        // physics-only clamp on MASS pocket gamma (visual gamma never enters θ)
-        const v = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3));
-        const sC = Math.max(1, Number(sectorsConcurrent) || 1);
-        const sT = Math.max(1, Number(sectorsTotal) || 400);
-
-        // Ford–Roman effective duty: d_FR = dutyLocal * (sC / sT)
-        const dFR = Math.max(1e-12, Math.min(1, (Number(dutyLocal) || 0) * (sC / sT)));
-        const dutyFactor = viewAveraged ? Math.sqrt(dFR) : 1;
-
-        return (g * g * g) * q * v * dutyFactor;
-    }
-
-    _computeThetaScaleFromUniforms(u) {
-        // Derive inputs for canonical θ from uniforms (never accept a param thetaScale here)
-        const parityREAL = !!u.physicsParityMode;    // REAL physics pane?
-        const mode = u.currentMode || 'hover';
-
-        const theta = this._thetaCanonical({
-            gammaGeo: u.gammaGeo ?? u.g_y,
-            qSpoilingFactor: u.qSpoilingFactor ?? u.deltaAOverA,
-            gammaVanDenBroeck_mass: (u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck),
-            dutyLocal: (u.dutyCycle ?? 0.01),
-            sectorsConcurrent: (u.sectors ?? 1),
-            sectorsTotal: (u.sectorCount ?? 400),
-            viewAveraged: parityREAL,     // physics (REAL) averages, SHOW does not
-            currentMode: mode
-        });
-
-        return theta;
-    }
-
-    bootstrap(payload) {
-        // Ensure metric is set first if present
-        const m = {};
-        if ('useMetric' in (payload||{})) m.useMetric = payload.useMetric;
-        if ('metric'    in (payload||{})) m.metric    = payload.metric;
-        if ('metricInv' in (payload||{})) m.metricInv = payload.metricInv;
-        if (Object.keys(m).length) this.updateUniforms(m);
-        this.updateUniforms(payload);
-    }
-
-    //----------------------------------------------------------------
-    //  6.  Public API
-    //----------------------------------------------------------------
-    updateUniforms(obj){
-        const patch = obj || {};
-        const parameters = { ...this.uniforms, ...patch }; // Copy existing uniforms and apply patch
-        const nextUniforms = { ...parameters }; // Create a new object for modifications
-        const mode = parameters?.currentMode ?? this.uniforms?.currentMode ?? 'hover'; // Default to 'hover' if mode is not specified
-        const parity = !!parameters?.physicsParityMode; // Ensure parity is a boolean
-
-        // 1) Bind metric first (+ mirror to u_*)
-        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
-            const useMetric = !!patch.useMetric;
-            const I = [1,0,0, 0,1,0, 0,0,1];
-            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
-            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
-            nextUniforms.useMetric   = useMetric; nextUniforms.u_useMetric = useMetric;
-            nextUniforms.metric      = m;         nextUniforms.u_metric    = m;
-            nextUniforms.metricInv   = mi;        nextUniforms.u_metricInv = mi;
+        if (typeof window.__addStrobingListener === 'function') {
+          this._offStrobe = window.__addStrobingListener(strobeHandler);
+        } else {
+          // create a mux once
+          const listeners = (window.__strobeListeners = new Set());
+          window.setStrobingState = payload => { for (const fn of listeners) { try{ fn(payload); }catch{} } };
+          window.__addStrobingListener = fn => { listeners.add(fn); return () => listeners.delete(fn); };
+          this._offStrobe = window.__addStrobingListener(strobeHandler);
         }
-
-        // 2) Merge rest, but strip any external thetaScale
-        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
-        Object.assign(nextUniforms, safeParameters);
-
-        const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
-
-        // Canonical θ from uniforms (aliases resolved inside)
-        const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
-          ...nextUniforms,
-          // ensure raw inputs are present (avoid stale locals)
-          dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
-          dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
-          sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
-          sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
-          currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
-          u_physicsParityMode: nextUniforms.physicsParityMode
-        });
-        this.__lastThetaTerms = { // Store for potential debug logging
-            gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
-            qSpoilingFactor: nextUniforms.qSpoilingFactor ?? nextUniforms.deltaAOverA,
-            gammaVanDenBroeck_mass: nextUniforms.gammaVanDenBroeck_mass ?? nextUniforms.gammaVanDenBroeck,
-            dutyLocal: nextUniforms.dutyCycle ?? 0.01,
-            sectorsConcurrent: nextUniforms.sectors ?? 1,
-            sectorsTotal: nextUniforms.sectorCount ?? 400,
-            viewAveraged: parity,
-            currentMode: mode
+        // Expose curvature gain setter for the UI slider (0..8 decades)
+        this.__warp_setGainDec = (dec, max = 40) => {
+            try { this.setCurvatureGainDec(dec, max); } catch (e) { console.warn(e); }
         };
-        // Mirror canonical θ immediately for panels that read this field directly.
-        this.uniforms.thetaScale_actual = thetaScaleFromChain;
-        this.uniforms.thetaScale = thetaScaleFromChain;
-        this.uniforms.viewAvg = parity;
-        // If REAL+standby leaks non-zero θ, warn once with the input snapshot.
-        if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
-            console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
-            this.__warnStandbyLeakOnce = true;
-        }
+        window.__warp_setGainDec = this.__warp_setGainDec;
+
+        // Expose cosmetic curvature level API (1 = real physics, 10 = current visuals)
+        this.__warp_setCosmetic = (level /* 1..10 */) => {
+            try { this.setCosmeticLevel(level); } catch(e){ console.warn(e); }
+        };
+        window.__warp_setCosmetic = this.__warp_setCosmetic;
 
 
-        // Publish FR explicitly (use provided FR if present; else reconstruction)
-        const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
-          ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
-          : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
-                                   ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
-                                    Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
-        nextUniforms.dutyUsed        = dFRpub;
-        nextUniforms.dutyEffectiveFR = dFRpub;
 
-        // --- Neutralize visual boosts in standby (only for REAL parity) ---
-        if (mode === 'standby' && parity) {
-          nextUniforms.vizGain = 1;
-          nextUniforms.curvatureGainT = 0;
-          nextUniforms.curvatureBoostMax = 1;
-          nextUniforms.userGain = 1;
-          nextUniforms.vShip = 0;
-        }
+        // default to "current visuals" feel
+        this.setCosmeticLevel(10);
 
-        // 3) Warn if external thetaScale tried to override (once per instance)
-        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
-            const asked = +(u_thetaScale ?? thetaScale);
-            if (Number.isFinite(asked) && Math.abs(thetaScaleFromChain - asked) / Math.max(1, Math.abs(thetaScaleFromChain)) > 0.01) {
-                console.warn('[WarpEngine] Ignored external thetaScale override', {
-                    asked: asked.toExponential(2),
-                    engine: thetaScaleFromChain.toExponential(2),
-                    ratio: (thetaScaleFromChain/asked).toFixed(2)
-                });
-                this.__thetaWarned = true;
-            }
-        }
+        // Bind throttled resize handler
+        this._resize = () => {
+            if (this._resizeRaf) return;
+            this._resizeRaf = requestAnimationFrame(() => { 
+                this._resizeRaf = 0; 
+                this._resizeCanvasToDisplaySize(); 
+            });
+        };
+        window.addEventListener('resize', this._resize);
+        this._resizeCanvasToDisplaySize(); // Initial setup
 
-        // --- Metric tensor wiring --------------------------------------------
-        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
-        // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const prev = this.uniforms; // Store previous uniforms for comparison
+        // Prime the engine with initial visible curvature using T+boostMax pattern
+        this.updateUniforms({
+            curvatureGainT: 0.0,     // 0 → 1× (true-physics visual scale)
+            curvatureBoostMax: 40,   // same as SliceViewer
+            exposure: 6.0,
+            zeroStop: 1e-7,
+            wallWidth: 0.05,         // fatten the wall to catch more vertices
+        });
 
-        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
-        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
-        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
-        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
+        // Namespaced debug hooks for DevTools access
+        const id = canvas.id || `warp-${Math.random().toString(36).slice(2,8)}`;
+        this.__id = id;
+        window.__warp = window.__warp || {};
+        window.__warp[id] = this; // e.g. window.__warp['parity-canvas'].setPresetParity()
 
-        // Need axesScene for ellipsoid mode, fall back to default if not provided
-        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
-
-        if (!metric) {
-            if (metricMode === 'ellipsoid') {
-                // covariant g_ij in clip space, aligned to axesClip:
-                // g = diag(1/a^2, 1/b^2, 1/c^2)
-                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
-                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
-                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
-                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
-                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
-                useMetric = true;
-            } else {
-                // Identity (Euclidean)
-                metric    = [1,0,0, 0,1,0, 0,0,1];
-                metricInv = [1,0,0, 0,1,0, 0,0,1];
-            }
-        }
-        // Update uniforms object with metric information
-        nextUniforms.metricMode = metricMode;
-        nextUniforms.metric     = metric;
-        nextUniforms.metricInv  = metricInv;
-        nextUniforms.useMetric  = !!useMetric;
-
-
-        // --- decide if the CPU warp needs recompute ---
-        const geoChanged =
-          (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
-          (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
-          (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
-          (prev.gridSpan !== nextUniforms.gridSpan);
-
-        // Guardrail: if standby yet θ>0, log once with chain terms
-        if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
-          console.warn('[warp-engine] Standby θ non-zero — uniforms:', nextUniforms);
-        }
-
-        // Update core uniforms
-        Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
-
-        // Engine-authoritative θ only (ignore any incoming thetaScale)
-        this.uniforms.thetaScale_actual = thetaScaleFromChain; // telemetry
-        this.uniforms.thetaScale        = thetaScaleFromChain;
-
-        // Recompute warp geometry if necessary
-        if (geoChanged) {
-            this._updateWarpGeometry(this.uniforms);
-        }
+        // Start render loop
+        console.log('[WarpEngine] Starting render loop...');
+        this._renderLoop();
     }
 
-    //----------------------------------------------------------------
-    //  7.  Frame loop
-    //----------------------------------------------------------------
-    _loop(t){
-        this._draw(t*0.001);
-        requestAnimationFrame(tt => this._loop(tt));
+    setDebugTag(tag) {
+        this.debugTag = tag || 'WarpEngine';
     }
 
-    _draw(time){
-        const gl = this.gl;
-        gl.viewport(0,0, this.canvas.width, this.canvas.height);
-        gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
-
-        gl.useProgram(this.program);
-
-        // --- Standard uniforms ---------------------------------------
-        // dutyCycle, g_y, cavityQ, sagDepth_nm, tsRatio, powerAvg_MW, exoticMass_kg, time
-        for (const name in this.uLoc) {
-            const loc = this.uLoc[name];
-            const value = this.uniforms[name];
-            if (loc) {
-                if (typeof value === 'number') gl.uniform1f(loc, value);
-                else if (typeof value === 'boolean') gl.uniform1i(loc, value ? 1 : 0);
-                // Add more type checks if needed (e.g., vec3, mat3)
-            }
+    destroy() {
+        this._destroyed = true;
+        if (this._raf) {
+            cancelAnimationFrame(this._raf);
+            this._raf = null;
         }
-
-        // --- Purple shift uniforms ---------------------------------------
-        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, this.uniforms.epsilonTilt ?? 0.0);
-        if (this.gridUniforms.betaTiltVec) {
-            const betaTilt = this.uniforms.betaTiltVec || [0, -1, 0];
-            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
-        }
-
-        // --- Metric tensor uniforms (default to identity if not provided)
-        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
-        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
-        const useMetric = this.uniforms.useMetric || false;
-        if (this.gridUniforms.metric) {
-            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
-            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
-            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
-        }
-
-        // --- Grid-specific uniforms ----------------------------------
-        // (Assuming _cacheGridUniformLocations has been called)
-        if (this.gridUniforms) {
-            for (const name in this.gridUniforms) {
-                const loc = this.gridUniforms[name];
-                const value = this.uniforms[name];
-                if (loc && value !== undefined) {
-                    // Determine uniform type based on name or value structure
-                    if (name.includes('Matrix')) {
-                        gl.uniformMatrix3fv(loc, false, new Float32Array(value));
-                    } else if (name.includes('Color') || name.includes('Vec') || name.includes('Dir') || name.includes('Scene') || name.includes('axes')) {
-                        gl.uniform3fv(loc, new Float32Array(value));
-                    } else if (typeof value === 'number') {
-                        gl.uniform1f(loc, value);
-                    } else if (typeof value === 'boolean') {
-                        gl.uniform1i(loc, value ? 1 : 0);
-                    } else if (Array.isArray(value)) {
-                         // Handle arrays, e.g., for vec4, mat4 etc. if needed
-                        if (value.length === 3) gl.uniform3fv(loc, new Float32Array(value));
-                        else if (value.length === 4) gl.uniform4fv(loc, new Float32Array(value));
-                        // Add more array type handling if necessary
-                    }
+        if (this.gl && this.gl.getExtension) {
+            // Clean up WebGL resources
+            try {
+                const loseContext = this.gl.getExtension('WEBGL_lose_context');
+                if (loseContext) {
+                    loseContext.loseContext();
                 }
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        }
+    }
+
+    _recreateGL() {
+        // Reacquire context, rebuild buffers & shaders
+        // Mobile-optimized context recreation
+        const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+        const contextOptions = {
+            alpha: false,
+            antialias: false,
+            powerPreference: isMobile ? 'default' : 'high-performance',
+            desynchronized: !isMobile,
+            failIfMajorPerformanceCaveat: false
+        };
+
+        this.gl = this.canvas.getContext('webgl2', contextOptions) ||
+                  this.canvas.getContext('webgl', contextOptions) ||
+                  this.canvas.getContext('experimental-webgl', contextOptions);
+        if (!this.gl) throw new Error('WebGL not supported after restore');
+
+        // Clear old program/handles so panels don't read stale LINK_STATUS
+        this.gridProgram = null;
+        this.program = null;
+        this.gridUniforms = null;
+        this.gridAttribs = null;
+
+        this._initializeGrid();        // re-create VBO + compile shaders
+        this._setLoaded(false);        // will flip to true in _compileGridShaders on ready
+        this._setLoadingState('loading');
+        this._resizeCanvasToDisplaySize();
+    }
+
+    // --- central overhead camera (single place to change the pose) ---
+    _applyOverheadCamera(opts = {}) {
+        const gl = this.gl;
+        if (!gl) return;
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const fov = this._fitFovForAspect(aspect);      // existing helper
+
+        // bubble radius in scene units
+        const axes = this.uniforms?.axesScene || this._lastAxesScene || [1,1,1];
+        const axesMax = Math.max(axes[0], axes[1], axes[2]);
+        const hint = Math.max(1, opts.spanHint || 0);
+        const R = Math.min(hint, Math.max(axesMax, 1)); // never larger than hull radius
+        this._lastFittedR = R;
+
+        const baseMargin = 1.22;
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // ↑ raise camera; ↓ look slightly down so bubble isn't on the horizon
+        const eye    = [0, 0.62 * R, -dist];   // higher overhead
+        const center = [0, -0.12 * R, 0];      // look further down
+        const up     = [0, 1, 0];
+
+        this._perspective(this.projMatrix, fov, aspect, 0.08, 100.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+
+        console.log(`📷 Overhead fit: R=${R.toFixed(2)}, eye=[${eye.map(v=>v.toFixed(2)).join(',')}], center=[${center.map(v=>v.toFixed(2)).join(',')}]`);
+    }
+
+    _setupCamera() {
+        // always start in the overhead fitted view
+        this._applyOverheadCamera();
+    }
+
+    _resizeCanvasToDisplaySize() {
+        // Cap DPR on phones so we don't oversample and "zoom in"
+        const dprCap = (window.matchMedia && window.matchMedia("(max-width: 768px)").matches) ? 1.5 : 2.0;
+        const dpr = Math.min(dprCap, window.devicePixelRatio || 1);
+
+        const { clientWidth, clientHeight } = this.canvas;
+        const width  = Math.max(1, Math.floor(clientWidth  * dpr));
+        const height = Math.max(1, Math.floor(clientHeight * dpr));
+
+        if (this.canvas.width !== width || this.canvas.height !== height) {
+            this.canvas.width  = width;
+            this.canvas.height = height;
+            this.gl.viewport(0, 0, width, height);
+
+            // after resize, reapply overhead fit (no low pose flash)
+            this._applyOverheadCamera({ spanHint: this._gridSpan || 1.0 });
+        }
+    }
+
+    _adjustCameraForSpan(span) {
+        // prefer overhead fit unless the user explicitly set cameraZ
+        if (Number.isFinite(this.currentParams?.cameraZ)) {
+            const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+            const eye = [0, 0.50, -this.currentParams.cameraZ];
+            const center = [0, -0.08, 0];
+            const up = [0, 1, 0];
+            this._perspective(this.projMatrix, this._fitFovForAspect(aspect), aspect, 0.08, 100);
+            this._lookAt(this.viewMatrix, eye, center, up);
+            this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+            console.log(`📷 Camera override: z=${(-this.currentParams.cameraZ).toFixed(2)} (span=${span.toFixed(2)})`);
+        } else {
+            this._applyOverheadCamera({ spanHint: span });
+        }
+    }
+
+    _initializeGrid() {
+        const gl = this.gl;
+
+        // Create spacetime grid geometry
+        // Start with default span, will be adjusted when hull params are available
+        const initialSpan = GRID_DEFAULTS.minSpan;
+        const gridData = this._createGrid(initialSpan, GRID_DEFAULTS.divisions);
+        this.gridVertices = new Float32Array(gridData);
+
+        // Store original vertex positions for warp calculations
+        this.originalGridVertices = new Float32Array(gridData);
+        this.currentGridSpan = initialSpan;
+
+        // Create VBO for grid
+        this.gridVbo = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        this._vboBytes = this.gridVertices.byteLength;
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        // Compile grid shader program
+        this._compileGridShaders();
+    }
+
+    // Authentic spacetime grid from gravity_sim.cpp with proper normalization
+    _createGrid(span = 1.6, divisions = GRID_DEFAULTS.divisions) {
+        // ---- guards ----
+        const spanSafe = Number.isFinite(span) && span > 0 ? span : 1.6;
+        const divIn    = Number.isFinite(divisions) && divisions > 0 ? divisions : GRID_DEFAULTS.divisions || 160;
+
+        const baseDiv  = Math.max(divIn, 160);
+        const hullAxes = Array.isArray(this.currentParams?.hullAxes) ? this.currentParams.hullAxes : [503.5,132,86.5];
+        const wallWidth_m = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : 6.0;
+
+        const minAxis = Math.max(1e-6, Math.min(...hullAxes));
+        const span_rho = (3 * wallWidth_m) / minAxis;
+        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * baseDiv));
+
+        let div = Math.min(320, Math.floor(baseDiv * scale));
+        if (!Number.isFinite(div) || div < 1) div = baseDiv;   // final fallback
+
+        divisions = div;
+        const verts = [];
+        const step = (spanSafe * 2) / divisions;  // Full span width divided by divisions
+        const half = spanSafe;  // Half-extent
+
+        // Create a slight height variation across the grid for better 3D visualization
+        const yBase = -0.15;  // Base Y level
+        const yVariation = this.uniforms?.physicsParityMode ? 0 : 0.05;  // Small height variation
+
+        for (let z = 0; z <= divisions; ++z) {
+            const zPos = -half + z * step;
+            for (let x = 0; x < divisions; ++x) {
+                const x0 = -half + x * step;
+                const x1 = -half + (x + 1) * step;
+
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(x0 * 2) * Math.cos(zPos * 3);
+                const y1 = yBase + yVariation * * Math.sin(x1 * 2) * Math.cos(zPos * 3);
+
+                verts.push(x0, y0, zPos, x1, y1, zPos);      // x–lines with height variation
+            }
+        }
+        for (let x = 0; x <= divisions; ++x) {
+            const xPos = -half + x * step;
+            for (let z = 0; z < divisions; ++z) {
+                const z0 = -half + z * step;
+                const z1 = -half + (z + 1) * step;
+
+                // Add slight Y variation for better 3D visibility
+                const y0 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z0 * 3);
+                const y1 = yBase + yVariation * Math.sin(xPos * 2) * Math.cos(z1 * 3);
+
+                verts.push(xPos, y0, z0, xPos, y1, z1);     // z–lines with height variation
             }
         }
 
-        // --- Draw the full-screen quad ---
-        const posLoc = gl.getAttribLocation(this.program, "a_position");
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(posLoc);
-        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        console.log(`Spacetime grid: ${verts.length/6} lines, ${divisions}x${divisions} divisions`);
+        console.log(`Grid coordinate range: X=${-half} to ${half}, Z=${-half} to ${half} (span=${spanSafe*2})`);
+        return new Float32Array(verts);
     }
 
-    //----------------------------------------------------------------
-    //  8.  Responsive resize
-    //----------------------------------------------------------------
-    _resize(){
-        const dpr = window.devicePixelRatio || 1;
-        const bw  = this.canvas.clientWidth  * dpr;
-        const bh  = this.canvas.clientHeight * dpr;
-        if(this.canvas.width!==bw || this.canvas.height!==bh){
-            this.canvas.width  = bw;
-            this.canvas.height = bh;
-        }
-    }
-
-    //----------------------------------------------------------------
-    //  9.  Shader injection & uniforms
-    //----------------------------------------------------------------
     // Idempotent uniform injection helper
     _injectUniforms(src) {
         if (!/WARP_UNIFORMS_INCLUDED/.test(src)) {
@@ -499,11 +580,6 @@ uniform mat3 u_metric;
 uniform mat3 u_metricInv;
 uniform bool u_useMetric;
 
-// Metric-aware helper functions
-float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
-float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
-vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
-
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -511,26 +587,262 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         return src;
     }
 
-    _compileShadersWithInjection(vs_src, fs_src) {
-        const gl = this.gl;
-        // Inject uniforms into fragment shader
-        const injected_fs = this._injectUniforms(fs_src);
-        const vs = this._compile(gl.VERTEX_SHADER, vs_src);
-        const fs = this._compile(gl.FRAGMENT_SHADER, injected_fs);
-        const prog = gl.createProgram();
-        gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
-        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-            throw new Error("Program link error: " + gl.getProgramInfoLog(prog));
-        }
-        gl.deleteShader(vs); gl.deleteShader(fs);
-        return prog;
+    // Precision + profile-aware shader factory
+    _makeShaderSources(gl) {
+        const isGL2 = (typeof WebGL2RenderingContext !== 'undefined') && (gl instanceof WebGL2RenderingContext);
+
+        // precision probe for WebGL1 FS
+        const hi = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+        const med = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.MEDIUM_FLOAT);
+        const wantHighp = !!hi && hi.precision > 0;
+        const prec = wantHighp ? 'precision highp float;' : 'precision mediump float;';
+
+        // --- Vertex ---
+        const vs2 = `#version 300 es
+in vec3 a_position;
+uniform mat4 u_mvpMatrix;
+out vec3 v_pos;
+void main() {
+  v_pos = a_position;
+  gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+}`;
+
+        const vs1 = `
+attribute vec3 a_position;
+uniform mat4 u_mvpMatrix;
+varying vec3 v_pos;
+void main() {
+  v_pos = a_position;
+  gl_Position = u_mvpMatrix * vec4(a_position, 1.0);
+}`;
+
+        // --- Fragment (shared body with proper type handling) ---
+        const fsBody = `
+${prec}
+#ifdef GL_OES_standard_derivatives
+#extension GL_OES_standard_derivatives : enable
+#endif
+VARY_DECL vec3 v_pos;
+VEC4_DECL frag;
+
+// ───────── Metric helpers (g_ij and its inverse) ─────────
+uniform mat3  u_metric;     // g_ij
+uniform mat3  u_metricInv;  // g^{ij}
+uniform float u_metricOn;   // 0 = Euclidean, 1 = metric-enabled
+
+float dot_g(vec3 a, vec3 b){ return dot(a, u_metric * b); }
+float norm_g(vec3 v){ return sqrt(max(1e-12, dot_g(v,v))); }
+vec3  normalize_g(vec3 v){ float L = norm_g(v); return v / max(L, 1e-12); }
+
+vec3 diverge(float t) {
+  float x = clamp((t+1.0)*0.5, 0.0, 1.0);
+  vec3 c1 = vec3(0.15, 0.45, 1.0);
+  vec3 c2 = vec3(1.0);
+  vec3 c3 = vec3(1.0, 0.45, 0.0);
+  return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);
+}
+vec3 seqTealLime(float u) {
+  vec3 a = vec3(0.05, 0.30, 0.35);
+  vec3 b = vec3(0.00, 1.00, 0.60);
+  return mix(a,b, pow(u, 0.8));
+}
+
+// Enhanced metric-aware helper functions
+float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
+float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
+vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
+
+float purpleShiftWeight(vec3 normalWS) {
+  // signed tilt along β; clamp to avoid NaNs if ε=0
+  vec3 beta_normalized = u_useMetric ? normalizeG(u_betaTiltVec) : normalize(u_betaTiltVec);
+  vec3 normal_normalized = u_useMetric ? normalizeG(normalWS) : normalize(normalWS);
+  float proj = u_useMetric ? dotG(beta_normalized, normal_normalized) : dot(beta_normalized, normal_normalized);
+  return u_epsilonTilt * proj; // small signed number
+}
+void main() {
+  // Safe type conversions to avoid bool/int/float mixing
+  bool  isREAL    = u_physicsParityMode;
+  bool  isShowcase = !isREAL;
+  int   ridgeI    = clamp(u_ridgeMode, 0, 1);
+  float ridgeF    = float(ridgeI);
+  int   colorI    = clamp(u_colorMode, 0, 4);
+
+  if (colorI == 0) {
+    SET_FRAG(vec4(u_sheetColor, 0.85));
+    return;
+  }
+
+  vec3 axes = (u_axesScene.x + u_axesScene.y + u_axesScene.z) > 0.0 ? u_axesScene : u_axes;
+
+  // Use explicit boolean checks instead of direct float conversion
+  float showGain  = isREAL ? 1.0 : u_displayGain;
+  float vizSeason = isREAL ? 1.0 : u_vizGain;
+  float tBlend    = isREAL ? 0.0 : clamp(u_curvatureGainT, 0.0, 1.0);
+  float tBoost    = isREAL ? 1.0 : max(1.0, u_curvatureBoostMax);
+
+  vec3 pN = v_pos / axes;
+  float rs = (u_metricOn > 0.5 ? norm_g(pN) : length(pN)) + 1e-6;
+  vec3 dN = (u_metricOn > 0.5)
+          ? normalize_g(u_metricInv * (u_driveDir / axes))
+          : normalize(u_driveDir / axes);
+  float xs = (u_metricOn > 0.5) ? dot_g(pN, dN) : dot(pN, dN);
+  float w = max(1e-4, u_wallWidth);
+  float delta = (rs - 1.0) / w;
+  float f     = exp(-delta*delta);
+  float dfdrs = (-2.0*(rs - 1.0) / (w*w)) * f;
+
+  // Use ridge mode with explicit int comparison (ridgeI already computed above)
+  float thetaField = (ridgeI == 0)
+    ? u_vShip * (xs/rs) * dfdrs
+    : u_vShip * (xs/rs) * f;
+
+  float sinphi = sqrt(max(0.0, 1.0 - (xs/rs)*(xs/rs)));
+  float shearProxy = (ridgeI == 0)
+    ? abs(dfdrs) * sinphi * u_vShip
+    : f * sinphi * u_vShip;
+
+  // Calculate surface normal for Purple shift (metric-aware)
+  vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
+
+  // Metric-aware screen-space curvature (adds ridge accent when enabled)
+#ifdef GL_OES_standard_derivatives
+  vec3 Nm = normalWS;                        // already metric-aware above
+  float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
+#else
+  float kScreen = 0.0;
+#endif
+  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0);
+  float kval = shearProxy;
+  if (ridgeI > 0) {
+    // Blend some metric-aware curvature into the shear proxy when ridge overlay is active
+    kval = clamp(mix(kval, kval + curvVis, 0.5), 0.0, 1.0);
+  }
+
+  // Apply Purple shift modulation to theta field
+  float purpleWeight = purpleShiftWeight(normalWS);
+  float thetaWithPurple = thetaField * (1.0 + purpleWeight);
+
+  // --- Metric-aware screen-space curvature cue (adds soft ridge accent) ---
+#ifdef GL_OES_standard_derivatives
+  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, u_curvatureBoostMax);
+  if (ridgeI != 0) {
+    // when ridge overlay is on, blend in curvature to the shear proxy
+    shearProxy = clamp(shearProxy + 0.5 * curvVis, 0.0, 1.0);
+  }
+#endif
+
+  float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
+  amp *= (1.0 + tBlend * (tBoost - 1.0));
+  float valTheta  = thetaWithPurple * amp;
+  float valShear  = kval * amp;
+
+  float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
+  float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
+  float norm = log(1.0 + max(1.0, u_exposure));
+
+  float tVis = clamp((valTheta < 0.0 ? -1.0 : 1.0) * (magT / norm), -1.0, 1.0);
+  float sVis = clamp( magS / norm, 0.0, 1.0);
+
+  // color mode mux
+  vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
+  if (colorI == 6) {
+    col = seqTealLime(curvVis);
+    SET_FRAG(vec4(col, 1.0)); return;
+  }
+
+  // Add subtle Purple shift visualization
+  vec3 purple = vec3(0.62, 0.36, 0.85);
+  float pv = clamp(10.0 * abs(purpleShiftWeight(normalWS)), 0.0, 0.12);
+  col = mix(col, purple, pv);
+
+  // Interior tilt mode (3): purple visualization
+  if (colorI == 3) {
+    float tilt = abs(u_epsilonTilt);
+    vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
+    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
+                        smoothstep(0.0, 1.0, tilt * u_thetaScale));
+    col = baseColor;
+  }
+
+  // final color selection (add curvature debug slot = 6)
+  if (u_colorMode == 6) {
+#ifdef GL_OES_standard_derivatives
+    vec3 dbg = seqTealLime(clamp(u_curvatureGainT * (length(dFdx(normalWS)) + length(dFdy(normalWS))), 0.0, 1.0));
+#else
+    vec3 dbg = vec3(0.0);
+#endif
+    SET_FRAG(vec4(dbg, 1.0));
+    return;
+  }
+
+  // Debug modes (4+)
+  if (colorI >= 4) {
+    float debug = abs(thetaField) * u_thetaScale; // Use thetaField for debug based on context
+    vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
+    col = debugColor;
+  }
+  SET_FRAG(vec4(col, 0.9));
+}`;
+
+        // Apply idempotent uniform injection
+        const fs2 = this._injectUniforms(`#version 300 es
+${fsBody.replace('VARY_DECL', 'in').replace('VEC4_DECL frag;', 'out vec4 frag;').replace(/SET_FRAG/g,'frag=')}`);
+
+        const fs1 = this._injectUniforms(`
+${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(/SET_FRAG/g,'gl_FragColor=')}`);
+
+        return isGL2 ? { vs: vs2, fs: fs2, profile: 'webgl2', wantHighp }
+                     : { vs: vs1, fs: fs1, profile: 'webgl1', wantHighp };
     }
 
-    //----------------------------------------------------------------
-    //  10. Shader Uniforms & Grid Processing
-    //----------------------------------------------------------------
-    _cacheGridUniformLocations(program) {
+    _compileGridShaders() {
         const gl = this.gl;
+        if (!gl) return;
+        this._setLoaded(false);              // ← important: we're not ready *yet*
+
+        // Use new precision-aware shader factory
+        const src = this._makeShaderSources(this.gl);
+        this.shaderProfile = src.profile; // for DAG display/debug
+
+        const onReady = (program) => {
+            if (!program) {
+                console.error("CRITICAL: Failed to compile grid shaders!");
+                return;
+            }
+
+            this.gridProgram = program;
+            this._setupUniformLocations();
+            this._setLoaded(true);
+            console.log(`Grid shader program compiled successfully (${src.profile}, highp=${src.wantHighp})`);
+        };
+
+        if (this.parallelShaderExt) {
+            this.gridProgram = this._createShaderProgram(src.vs, src.fs, onReady);
+        } else {
+            this.gridProgram = this._createShaderProgram(src.vs, src.fs);
+            onReady(this.gridProgram);
+        }
+    }
+
+    _onProgramLinked(program) {
+        const gl = this.gl;
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const error = gl.getProgramInfoLog(program);
+            console.error(`[${this.debugTag}] Program linking failed:`, error);
+            throw new Error(`[${this.debugTag}] Program linking failed: ${error}`);
+        } else {
+            console.log(`[${this.debugTag}] Program linked successfully`);
+        }
+        // cache locations & mark ready
+        this._cacheGridLocations(program);
+        this._warnNoProgramOnce = false;
+        return true;
+    }
+
+    _cacheGridLocations(program) {
+        const gl = this.gl;
+        if (!gl || !program) return false;
+        this.gridProgram = program;
         this.gridUniforms = {
             // matrices / basics
             mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
@@ -577,76 +889,447 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             metric: gl.getUniformLocation(program, 'u_metric'),
             metricInv: gl.getUniformLocation(program, 'u_metricInv'),
             useMetric: gl.getUniformLocation(program, 'u_useMetric'),
+            metricOn: gl.getUniformLocation(program, 'u_metricOn'),
         };
+
+        // (Optional) quick sanity log once
+        if (!this._uniformAuditOnce) {
+            this._uniformAuditOnce = true;
+            for (const [k,v] of Object.entries(this.gridUniforms)) {
+                if (v == null) console.warn(`[${this.debugTag}] Missing uniform location:`, k);
+            }
+        }
+        this.gridAttribs = {
+            position: gl.getAttribLocation(program, 'a_position'),
+        };
+        this._setLoaded(true);
+        return true;
     }
 
-    updateUniforms(obj){
-        const patch = obj || {};
-        const parameters = { ...this.uniforms, ...patch }; // Copy existing uniforms and apply patch
-        const nextUniforms = { ...parameters }; // Create a new object for modifications
-        const mode = parameters?.currentMode ?? this.uniforms?.currentMode ?? 'hover'; // Default to 'hover' if mode is not specified
-        const parity = !!parameters?.physicsParityMode; // Ensure parity is a boolean
+    _setupUniformLocations() {
+        this._cacheGridLocations(this.gridProgram);
+    }
 
-        // 1) Bind metric first (+ mirror to u_*)
-        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
-            const useMetric = !!patch.useMetric;
-            const I = [1,0,0, 0,1,0, 0,0,1];
-            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
-            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
-            nextUniforms.useMetric   = useMetric; nextUniforms.u_useMetric = useMetric;
-            nextUniforms.metric      = m;         nextUniforms.u_metric    = m;
-            nextUniforms.metricInv   = mi;        nextUniforms.u_metricInv = mi;
+    _setLoaded(loaded) {
+        this.isLoaded = loaded;
+        if (this.onLoadingStateChange) {
+            this.onLoadingStateChange({ 
+                type: loaded ? 'ready' : 'loading',
+                message: loaded ? 'Warp engine ready' : 'Initializing...'
+            });
+        }
+        // Flush once-ready callbacks on first successful link
+        if (loaded && this._readyQueue && this._readyQueue.length) {
+            const q = this._readyQueue.splice(0);
+            for (const fn of q) { try { fn(this); } catch(e){ console.warn(e); } }
+            try { this._render(); } catch {}
+        }
+    }
+
+    // New: canonical loading state for DAG
+    // 'idle' | 'compiling' | 'linked' | 'failed' | 'loading'
+    _setLoadingState(state) {
+        this.loadingState = state;               // ← DAG reads this
+        this.isLoaded = (state === 'linked');    // ← keep boolean for legacy paths
+        // Keep compatibility with older boolean listeners but also pass richer object if supported
+        try {
+            this.onLoadingStateChange?.({
+              type: state,
+              isLoaded: this.isLoaded,
+              message:
+                state === 'compiling' ? 'Compiling shaders…' :
+                state === 'linked'    ? 'Shaders linked'     :
+                state === 'failed'    ? 'Link failed'        :
+                state === 'loading'   ? 'Initializing…'      :
+                'Idle'
+            });
+        } catch {}
+    }
+
+    // Enhanced diagnostics for shader compilation status
+    getLinkStatus() {
+        if (!this.gl || !this.gridProgram) return 'idle';
+
+        // Check for async compilation support
+        if (this.parallelShaderExt) {
+            const status = this.gl.getProgramParameter(this.gridProgram, this.gl.COMPLETION_STATUS_KHR);
+            if (status === false) return 'compiling';  // Still async compiling - show ⏳
         }
 
-        // 2) Merge rest, but strip any external thetaScale
-        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
-        Object.assign(nextUniforms, safeParameters);
+        // Check link status
+        const linked = this.gl.getProgramParameter(this.gridProgram, this.gl.LINK_STATUS);
+        return linked ? 'linked' : 'failed';
+    }
 
-        const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
+    // Get current shader profile for diagnostics
+    getShaderProfile() {
+        return this.shaderProfile || 'unknown';
+    }
 
-        // Canonical θ from uniforms (aliases resolved inside)
-        const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
-          ...nextUniforms,
-          // ensure raw inputs are present (avoid stale locals)
-          dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
-          dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
-          sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
-          sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
-          currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
-          u_physicsParityMode: nextUniforms.physicsParityMode
+    // Enhanced shader diagnostics for DAG panel
+    getShaderDiagnostics() {
+        if (!this.gl) return { status: 'no-context', message: 'No WebGL context' };
+        if (!this.gridProgram) return { status: 'no-program', message: 'No shader program' };
+
+        const linkStatus = this.getLinkStatus();
+        const profile = this.getShaderProfile();
+
+        if (linkStatus === 'compiling') {
+            return { status: 'compiling', message: '⏳ compiling shaders…', profile };
+        }
+
+        if (linkStatus === 'failed') {
+            const info = this.gl.getProgramInfoLog(this.gridProgram);
+            return { status: 'failed', message: `Shader link failed: ${info}`, profile };
+        }
+
+        if (linkStatus === 'linked') {
+            const vertexCount = this.gridVertices?.length / 3 || 0;
+            return { 
+                status: 'linked', 
+                message: `✅ ${profile} shaders ready (${vertexCount} vertices)`,
+                profile,
+                vertexCount
+            };
+        }
+
+        return { status: 'idle', message: 'Shader system idle', profile };
+    }
+
+    // === Patch C compatibility: simple driver-verified helpers ===
+    isShadersLinked() {
+        try {
+            return !!(this.gl && this.gridProgram && this.gl.getProgramParameter(this.gridProgram, this.gl.LINK_STATUS));
+        } catch { return false; }
+    }
+
+    getShaderHealth() {
+        const gl = this.gl;
+        const prog = this.gridProgram;
+        if (!gl) return {ok:false, reason:'no GL', status:this.loadingState, profile:this.getShaderProfile() };
+        if (!prog) return {ok:false, reason:'no program', status:this.loadingState, profile:this.getShaderProfile() };
+        let ok = false, reason = 'unknown';
+        try {
+            ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
+            reason = ok ? 'linked' : (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
+        } catch (e) {
+            reason = `exception: ${e?.message || e}`;
+        }
+        return { ok, reason, status: this.getLinkStatus(), profile: this.getShaderProfile(), async: !!this.parallelShaderExt };
+    }
+
+    // Run a callback when the engine is fully ready (shaders linked)
+    onceReady(fn) {
+        if (this.isLoaded && this.gridProgram) {
+            try { fn(this); } catch(e){ console.warn(e); }
+        } else {
+            this._readyQueue.push(fn);
+        }
+    }
+
+    // Public: force a geometry rebuild + immediate draw
+    forceRedraw() {
+        try { this._updateGrid(); this._render(); } catch(e){ console.warn('forceRedraw:', e); }
+    }
+
+    // Simple parameter API (so the React side can push values)
+    setParameters(next) { this.params = Object.assign(this.params || {}, next); }
+    resize(w, h) { this.gl.viewport(0, 0, w, h); }
+    start() { 
+        if (this._raf) return; 
+        const loop = () => { 
+            this._raf = requestAnimationFrame(loop); 
+            this._render(); 
+        }; 
+        loop(); 
+    }
+    stop() { 
+        if (this._raf) cancelAnimationFrame(this._raf); 
+        this._raf = null; 
+    }
+    dispose() { 
+        const gl = this.gl; 
+        if (this.gridVbo) gl.deleteBuffer(this.gridVbo); 
+        if (this.gridProgram) gl.deleteProgram(this.gridProgram); 
+    }
+
+    // --- Atomic uniform batching to avoid mid-frame bad states ---
+    _pendingUpdate = null;
+    _flushId = 0;
+
+    _enqueueUniforms(patch) {
+        // Merge patches until next frame, then apply once
+        this._pendingUpdate = Object.assign(this._pendingUpdate || {}, patch || {});
+        if (this._flushId) return;
+        this._flushId = requestAnimationFrame(() => {
+            const p = this._pendingUpdate || {};
+            this._pendingUpdate = null;
+            this._flushId = 0;
+
+            // Debug mode switch and operational state
+            const isModeSwitch = !!p.currentMode;
+            const isOperationalChange = !!(p.currentMode || p.physicsParityMode !== undefined || p.ridgeMode !== undefined);
+
+            if (isModeSwitch || isOperationalChange) {
+                console.log(`[WarpEngine] Operational change detected:`, {
+                    mode: p.currentMode,
+                    parity: p.physicsParityMode,
+                    ridge: p.ridgeMode,
+                    canvas: this.canvas?.id || 'unknown',
+                    isLoaded: this.isLoaded,
+                    hasProgram: !!this.gridProgram,
+                    thetaScale: p.thetaScale
+                });
+            }
+
+            try { 
+                this._applyUniformsNow(p); 
+                if (isModeSwitch) {
+                    console.log('[WarpEngine] Uniforms applied after mode switch');
+                }
+            } catch(e) { 
+                console.error("[WarpEngine] Uniform flush failed during mode switch:", e); 
+            }
+
+            // After big bursts ensure camera is sane — fit to hull, not grid
+            try {
+                this._resizeCanvasToDisplaySize();
+                const axesR = (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
+                    ? Math.max(this.uniforms.axesClip[0], this.uniforms.axesClip[1], this.uniforms.axesClip[2])
+                    : (this._lastFittedR || 1);
+                const hasCamZ = Number.isFinite(this.currentParams?.cameraZ);
+                // _adjustCameraForSpan respects cameraZ if present, otherwise overhead-fit
+                hasCamZ ? this._adjustCameraForSpan(axesR)
+                        : this._applyOverheadCamera({ spanHint: axesR });
+            } catch {}
+
+            // Always render immediately so we don't present a black frame
+            try { 
+                this._render(); 
+                if (isModeSwitch) {
+                    console.log('[WarpEngine] Render completed after mode switch');
+                }
+            } catch(e) {
+                console.error("[WarpEngine] Render failed after mode switch:", e);
+            }
         });
-        this.__lastThetaTerms = { // Store for potential debug logging
-            gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
-            qSpoilingFactor: nextUniforms.qSpoilingFactor ?? nextUniforms.deltaAOverA,
-            gammaVanDenBroeck_mass: nextUniforms.gammaVanDenBroeck_mass ?? nextUniforms.gammaVanDenBroeck,
-            dutyLocal: nextUniforms.dutyCycle ?? 0.01,
-            sectorsConcurrent: nextUniforms.sectors ?? 1,
-            sectorsTotal: nextUniforms.sectorCount ?? 400,
-            viewAveraged: parity,
-            currentMode: mode
+    }
+
+    updateUniforms(parameters) {
+        if (this._destroyed) return;
+        // If program isn't ready yet, queue and let _render() relink shaders
+        if (!this.gridProgram || !this.isLoaded) {
+            this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
+            // Kick the linker if needed; _render() will also call this.
+            if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
+            return;
+        }
+        this._enqueueUniforms(parameters);
+    }
+
+    /** Set/enable a 3×3 metric tensor (and its inverse). Pass `on=false` to revert to Euclidean. */
+    setMetric(g, gInv=null, on=true) {
+        if (!g) {
+            this.updateUniforms({
+                metric: ID3,
+                metricInv: ID3,
+                metricOn: 0.0,
+                useMetric: false
+            });
+            return this;
+        }
+        this.updateUniforms({
+            metric: (g instanceof Float32Array) ? g : new Float32Array(g),
+            metricInv: (gInv instanceof Float32Array) ? gInv : 
+                      (gInv ? new Float32Array(gInv) : ID3),
+            metricOn: on ? 1.0 : 0.0,
+            useMetric: on
+        });
+        return this;
+    }
+
+    // Keep original update logic but move it into _applyUniformsNow
+    _applyUniformsNow(parameters) {
+        if (!parameters) return;
+
+        // Helper functions
+        const N = (x, d=0) => (Number.isFinite(x) ? +x : d);
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+        // Store previous uniforms for comparison
+        const prev = { ...(this.uniforms || {}) };
+        this.currentParams = { ...this.currentParams, ...parameters };
+
+        // add mode detection after prev is defined
+        const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
+        const isStandby = modeStr === 'standby';
+
+        // --- Resolve hull + scene scaling ---
+        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? prev?.hullAxes?.[0], 503.5);
+        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? prev?.hullAxes?.[1], 132.0);
+        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? prev?.hullAxes?.[2], 86.5);
+        const s = 1 / Math.max(a, b, c, 1e-9);
+        const axesScene = [a*s, b*s, c*s];
+        const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
+
+        // --- Parity / visualization ---
+        // STRICT: accept ONLY physicsParityMode; ignore legacy aliases
+        const parity = (parameters?.physicsParityMode !== undefined)
+          ? !!parameters.physicsParityMode
+          : !!prev?.physicsParityMode;
+        const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
+        const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
+        const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4 }; // Added interiorTilt to CM
+        let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
+        const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
+                                                              : (colorModeRaw|0);
+        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (prev?.exposure ?? 6.0));
+        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (prev?.zeroStop ?? 1e-7));
+        const vizGain   = parity ? 1 : N(parameters?.vizGain, prev?.vizGain ?? 1);
+        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, prev?.curvatureGainT ?? 0));
+        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, prev?.curvatureBoostMax ?? 40));
+        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, prev?.cosmeticLevel ?? 10);
+
+        // camera framing lock
+        const lockFraming = parameters?.lockFraming ?? prev?.lockFraming ?? true;
+        const cameraZ = (parameters?.cameraZ != null)
+          ? +parameters.cameraZ
+          : (lockFraming ? (prev?.cameraZ ?? null) : prev?.cameraZ ?? null);
+
+        // --- inbound name normalization ---
+        const sectorsIn =
+          N(parameters?.sectors ?? parameters?.sectorCount ?? parameters?.sectorStrobing, prev?.sectors ?? 1);
+
+        const splitIn =
+          N(parameters?.split ?? parameters?.sectorSplit ?? parameters?.sectorIdx ?? this.strobingState?.currentSector, prev?.split ?? 0);
+
+        // Parity-aware clamp: REAL physics bounded (≤1e2), SHOW cosmetic can be larger (≤1e11)
+        const vdbRaw =
+          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
+        const gammaVdBIn = Math.max(1, Math.min(parity ? 1e2 : 1e11, vdbRaw));
+
+        const frFromParams =
+          parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff ??
+          prev?.dutyEffectiveFR      ?? prev?.dutyShip      ?? prev?.dutyEff;
+
+        // total sectors (ship-wide), concurrent sectors (pane)
+        const sectorsConcurrent =
+          Math.max(1, Math.floor(
+            Number(parameters?.sectors ?? prev?.sectors ?? 1)
+          ));
+        const sectorsTotal =
+          Math.max(1, Math.floor(
+            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
+          ));
+        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01));
+
+        // --- Parity-aware defaults ---
+        const isREAL = !!parity;
+        // SHOW should be "instantaneous" (no √(FR) averaging), REAL uses FR-averaged
+        const viewAvgResolved = (parameters?.viewAvg !== undefined) ? !!parameters.viewAvg : isREAL;
+        // What sectorCount should the pane *think* it sees
+        const sectorCountOut  = isREAL ? sectorsTotal : sectorsConcurrent;
+
+        // --- build next uniforms without mutating prev ---
+        const nextUniforms = {
+          ...prev,
+          // geometry (authoritative)
+          hullAxes: [a, b, c],
+          axesClip: axesScene,
+          gridSpan,
+          // camera/framing
+          lockFraming,
+          cameraZ,
+          // visualization / parity
+          physicsParityMode: parity,
+          ridgeMode,
+          colorMode, exposure, zeroStop,
+          vizGain,
+          curvatureGainT: curvT,
+          curvatureBoostMax: curvMax,
+          cosmeticLevel: cosmetic,
+          // existing fields
+          vShip: parameters.vShip || prev.vShip || 1,
+          wallWidth: parameters.wallWidth || prev.wallWidth || 0.06,
+          driveDir: parameters.driveDir || prev.driveDir || [1,0,0],
+          displayGain: N(parameters.displayGain, prev.displayGain ?? 1.0),
+          userGain: N(parameters.userGain, prev.userGain ?? 1.0),
+          // tilt
+          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || prev.epsilonTilt || 0),
+          betaTiltVec: (Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length===3)
+                       ? parameters.betaTiltVec
+                       : (prev.betaTiltVec || [0,-1,0]),
+          tiltGain: prev.tiltGain ?? 0.55,
+          // 🔗 physics chain fields used by CPU warp & shader
+          thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
+          dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.01),
+          // publish local burst duty so diagnostics can always reconstruct FR
+          dutyLocal: Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01)),
+          sectors: Math.max(1, Math.floor(sectorsConcurrent)),
+          sectorCount: Math.max(1, Math.floor(sectorCountOut)),
+          // clamp split against the *live* sectors for this pane
+          split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsConcurrent)) - 1, (splitIn|0))),
+          viewAvg: viewAvgResolved,
+          viewMassFraction: isREAL ? (1 / Math.max(1, sectorCountOut)) : 1.0,
+          gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
+          deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
+          gammaVdB: gammaVdBIn,
+          currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
         };
-        // Mirror canonical θ immediately for panels that read this field directly.
-        this.uniforms.thetaScale_actual = thetaScaleFromChain;
-        this.uniforms.thetaScale = thetaScaleFromChain;
-        this.uniforms.viewAvg = parity;
-        // If REAL+standby leaks non-zero θ, warn once with the input snapshot.
-        if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
-            console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
-            this.__warnStandbyLeakOnce = true;
+
+        // Duty used in the chain:
+        //  - REAL: Ford–Roman averaged (dutyLocal × S_live/S_total)
+        //  - SHOW: instantaneous local burst (≈ dutyLocal)
+        let dutyEffFR;
+        if (zeroStandby) {
+          dutyEffFR = 0;
+        } else if (frFromParams != null) {
+          dutyEffFR = Math.max(0, Math.min(1, +frFromParams));
+        } else {
+          dutyEffFR = isREAL
+            ? Math.max(0, Math.min(1, dutyLocal * (sectorsConcurrent / Math.max(1, sectorsTotal))))
+            : Math.max(0, Math.min(1, dutyLocal));
         }
 
+        // build theta scale (canonical chain) — ENGINE AUTHORITY
+        const thetaScaleFromChain = zeroStandby ? 0 :
+          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
-        // Publish FR explicitly (use provided FR if present; else reconstruction)
-        const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
-          ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
-          : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
-                                   ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
-                                    Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
-        nextUniforms.dutyUsed        = dFRpub;
-        nextUniforms.dutyEffectiveFR = dFRpub;
+        // Engine authority: never accept external θ; hard-zero REAL+standby
+        nextUniforms.thetaScale = zeroStandby ? 0 : thetaScaleFromChain;
+
+        // Debug operational mode theta calculation (fixed math chain)
+        this._dbgThetaTick = (this._dbgThetaTick || 0) + 1;
+        if (this._dbgThetaTick % 30 === 1) {
+          const gamma3 = Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3);
+          const qUsed = Math.max(1e-12, nextUniforms.deltaAOverA ?? 1);
+          const gammaVdBUsed = Math.max(1, nextUniforms.gammaVdB ?? 1);
+          const sqrtDuty = viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0;
+          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] Canonical Theta chain:`, {
+            'γ³': gamma3,
+            'q': qUsed,
+            'γ_VdB': gammaVdBUsed,
+            '√duty': sqrtDuty,
+            'chain=γ³×q×γ_VdB×√duty': thetaScaleFromChain,
+            actualTheta: nextUniforms.thetaScale,
+            dutyEffFR,
+            sectorsConcurrent,
+            sectorsTotal
+          });
+        }
+        nextUniforms.dutyUsed        = dutyEffFR;
+        nextUniforms.dutyEffectiveFR = dutyEffFR;   // expose single source of truth to UI
+
+        // --- If amplitude just went "off", restore the pristine grid ---
+        const wasActive = (prev.thetaScale ?? 0) > 1e-12;
+        const nowActive = (nextUniforms.thetaScale ?? 0) > 1e-12;
+        if (wasActive && !nowActive) this._restoreOriginalGrid?.();
 
         // --- Neutralize visual boosts in standby (only for REAL parity) ---
-        if (mode === 'standby' && parity) {
+        if (zeroStandby) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
           nextUniforms.curvatureBoostMax = 1;
@@ -654,54 +1337,16 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
           nextUniforms.vShip = 0;
         }
 
-        // 3) Warn if external thetaScale tried to override (once per instance)
-        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
-            const asked = +(u_thetaScale ?? thetaScale);
-            if (Number.isFinite(asked) && Math.abs(thetaScaleFromChain - asked) / Math.max(1, Math.abs(thetaScaleFromChain)) > 0.01) {
-                console.warn('[WarpEngine] Ignored external thetaScale override', {
-                    asked: asked.toExponential(2),
-                    engine: thetaScaleFromChain.toExponential(2),
-                    ratio: (thetaScaleFromChain/asked).toFixed(2)
-                });
-                this.__thetaWarned = true;
-            }
+        // --- Engine must not override UI parity/ridge settings ---
+        // Only log if parity/ridge are missing, but preserve what UI sends
+        if (typeof nextUniforms.physicsParityMode !== 'boolean') {
+          console.warn('[WarpEngine] Missing physicsParityMode from UI, using previous value');
+          nextUniforms.physicsParityMode = prev?.physicsParityMode ?? false;
         }
-
-        // --- Metric tensor wiring --------------------------------------------
-        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
-        // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const prev = this.uniforms; // Store previous uniforms for comparison
-
-        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
-        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
-        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
-        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
-
-        // Need axesScene for ellipsoid mode, fall back to default if not provided
-        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
-
-        if (!metric) {
-            if (metricMode === 'ellipsoid') {
-                // covariant g_ij in clip space, aligned to axesClip:
-                // g = diag(1/a^2, 1/b^2, 1/c^2)
-                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
-                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
-                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
-                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
-                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
-                useMetric = true;
-            } else {
-                // Identity (Euclidean)
-                metric    = [1,0,0, 0,1,0, 0,0,1];
-                metricInv = [1,0,0, 0,1,0, 0,0,1];
-            }
+        if (typeof nextUniforms.ridgeMode !== 'number') {
+          console.warn('[WarpEngine] Missing ridgeMode from UI, using previous value');
+          nextUniforms.ridgeMode = prev?.ridgeMode ?? 1;
         }
-        // Update uniforms object with metric information
-        nextUniforms.metricMode = metricMode;
-        nextUniforms.metric     = metric;
-        nextUniforms.metricInv  = metricInv;
-        nextUniforms.useMetric  = !!useMetric;
-
 
         // --- decide if the CPU warp needs recompute ---
         const geoChanged =
@@ -710,50 +1355,537 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
           (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
           (prev.gridSpan !== nextUniforms.gridSpan);
 
-        // Guardrail: if standby yet θ>0, log once with chain terms
-        if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
-          console.warn('[warp-engine] Standby θ non-zero — uniforms:', nextUniforms);
-        }
+        const warpKeys = [
+          'thetaScale','userGain','displayGain','curvatureGainT','curvatureBoostMax',
+          'exposure','zeroStop','physicsParityMode','ridgeMode',
+          'driveDir','wallWidth','epsilonTilt','betaTiltVec','tiltGain',
+          'dutyCycle','sectors','split','gammaGeo','deltaAOverA','gammaVdB',
+          'viewAvg','currentMode'
+        ];
+        const ampChanged = warpKeys.some(k => JSON.stringify(prev[k]) !== JSON.stringify(nextUniforms[k]));
 
-        // Update core uniforms
-        Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
-
-        // Engine-authoritative θ only (ignore any incoming thetaScale)
-        this.uniforms.thetaScale_actual = thetaScaleFromChain; // telemetry
-        this.uniforms.thetaScale        = thetaScaleFromChain;
-
-        // Recompute warp geometry if necessary
-        if (geoChanged) {
-            this._updateWarpGeometry(this.uniforms);
+        this.uniforms = nextUniforms;
+        if (geoChanged || ampChanged) {
+          this._updateGrid();
+        } else if (parameters.currentMode) {
+          console.log('[WarpEngine] Mode change applied (no warp needed)');
         }
     }
 
-    //----------------------------------------------------------------
-    //  11. Rendering
-    //----------------------------------------------------------------
-    _draw(time){
-        const gl = this.gl;
-        gl.viewport(0,0, this.canvas.width, this.canvas.height);
-        gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+    _calculateModeEffects(params) {
+        // visual-only seasoning; geometry ignores this
+        const mode = (params.currentMode || 'hover').toLowerCase();
+        const config = {
+            hover:     { baseScale: 1.0, strobingViz: 0.8 },
+            cruise:    { baseScale: 1.0, strobingViz: 0.6 },
+            emergency: { baseScale: 1.0, strobingViz: 1.0 },
+            standby:   { baseScale: 1.0, strobingViz: 0.3 }
+        }[mode] || { baseScale: 1.0, strobingViz: 0.8 };
 
-        gl.useProgram(this.program);
+        return {
+            visualScale: config.baseScale,
+            curvatureAmplifier: 1.0,   // <- neutralized for geometry
+            strobingFactor: config.strobingViz
+        };
+    }
 
-        // --- Standard uniforms ---------------------------------------
-        // dutyCycle, g_y, cavityQ, sagDepth_nm, tsRatio, powerAvg_MW, exoticMass_kg, time
-        for (const name in this.uLoc) {
-            const loc = this.uLoc[name];
-            const value = this.uniforms[name];
-            if (loc) {
-                if (typeof value === 'number') gl.uniform1f(loc, value);
-                else if (typeof value === 'boolean') gl.uniform1i(loc, value ? 1 : 0);
-                // Add more type checks if needed (e.g., vec3, mat3)
-            }
+    _updateGrid() {
+        if (!this.originalGridVertices) {
+            console.error("No original vertices stored!");
+            return;
         }
 
-        // --- Purple shift uniforms ---------------------------------------
-        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, this.uniforms.epsilonTilt ?? 0.0);
+        // Copy original vertices
+        this.gridVertices.set(this.originalGridVertices);
+
+        // Apply warp field deformation
+        this._warpGridVertices(this.gridVertices, this.currentParams);
+
+        // Upload updated vertices to GPU efficiently
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        if (this._vboBytes !== this.gridVertices.byteLength) {
+            // Buffer size changed, need full reallocation
+            gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+            this._vboBytes = this.gridVertices.byteLength;
+        } else {
+            // Buffer size unchanged, use cheaper subdata update
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    _restoreOriginalGrid() {
+        if (!this.originalGridVertices || !this.gridVertices || !this.gl || !this.gridVbo) return;
+        this.gridVertices.set(this.originalGridVertices);
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    // Authentic Natário spacetime curvature implementation
+    _warpGridVertices(vtx, bubbleParams) {
+        // Get hull axes from uniforms or use needle hull defaults (in meters)
+        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
+        // Clean wall thickness handling - use either meters or ρ-units
+        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
+        const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
+        const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m) ? bubbleParams.wallWidth_m : undefined;
+        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho :
+                              Number.isFinite(this.uniforms?.wallWidth)  ? this.uniforms.wallWidth    :
+                              undefined;
+        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
+
+        // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.
+        const axesScene =
+          (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
+            ? this.uniforms.axesClip
+            : (() => {
+                const aMax = Math.max(a, b, c);
+                const s    = 1.0 / Math.max(aMax, 1e-9);
+                return [a * s, b * s, c * s];
+              })();
+
+        // Use the computed w_rho from above
+
+        // Compute a grid span that comfortably contains the whole bubble
+        const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
+        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        let targetSpan = Math.max(
+          GRID_DEFAULTS.minSpan,
+          hullMaxClip * spanPadding
+        );
+
+        // --- Enhanced gain boost for BOTH color & geometry (decades slider support) ---
+        const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
+        // keep framing stable so exaggeration remains visible
+        const spanBoost =
+          (bubbleParams.lockFraming === false)
+            ? (1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5)
+            : 1.0;
+        targetSpan *= spanBoost;
+
+        // Higher resolution for smoother canonical curvature
+        const gridDivisions = 120; // increased from default for smoother profiles
+        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1,0,0];
+        const gridK = 0.10;                       // mild base (acts as unit scale)
+
+        // === Unified "SliceViewer-consistent" amplitude for geometry ===
+        // θ comes from engine uniforms; honor REAL+standby zero
+        let thetaScale = Number.isFinite(this.uniforms?.thetaScale) ? +this.uniforms.thetaScale : 0;
+        const modeNow = String(this.uniforms?.currentMode ?? 'hover').toLowerCase();
+        if ((this.uniforms?.physicsParityMode === true) && modeNow === 'standby') {
+          thetaScale = 0;
+        }
+        // prefer explicit payload, fall back to current uniforms
+        const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
+        const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
+        const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
+        // Small per-mode seasoning only, so we don't hide the physics
+        // Keep mode scale only for non-geometry uses (colors, display), not geometry amplitude
+        const modeScale =
+            mode === 'standby'   ? 0.95 :
+            mode === 'cruise'    ? 1.00 :
+            mode === 'hover'     ? 1.05 :
+            mode === 'emergency' ? 1.08 : 1.00;
+        // Enhanced amplitude compression for decades-scale gains: compress *after* boosting
+        const A_vis    = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
+
+        console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
+        console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
+        console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
+        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
+        console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${(thetaScale||0).toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
+        console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
+        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
+
+        // Ellipsoid utilities (using consistent scene-scaled axes)
+        const rhoEllipsoidal = (p) => {
+            return Math.hypot(p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]);
+        };
+
+        const sdEllipsoid = (p, axes) => {
+            return rhoEllipsoidal(p) - 1.0;
+        };
+
+        const nEllipsoid = (p, axes) => {
+            const qa = [p[0]/(axes[0]*axes[0]), p[1]/(axes[1]*axes[1]), p[2]/(axes[2]*axes[2])];
+            const rho = Math.max(1e-6, rhoEllipsoidal(p));
+            const n = [qa[0]/rho, qa[1]/rho, qa[2]/rho];
+            const m = Math.hypot(n[0], n[1], n[2]) || 1;
+            return [n[0]/m, n[1]/m, n[2]/m];
+        };
+
+        // Normalize drive direction (using scene-scaled axes)
+        const dN = (() => {
+            const t = [driveDir[0]/axesScene[0], driveDir[1]/axesScene[1], driveDir[2]/axesScene[2]];
+            const m = Math.hypot(...t) || 1;
+            return [t[0]/m, t[1]/m, t[2]/m];
+        })();
+
+        // Smooth helper functions for C²-continuous displacement
+        const clamp01 = (x) => Math.max(0, Math.min(1, x));
+        const smoothstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * (3 - 2 * t); 
+        }; // C¹
+        const smootherstep = (a, b, x) => { 
+            const t = clamp01((x - a) / (b - a)); 
+            return t * t * t * (t * (t * 6 - 15) + 10); 
+        }; // C²
+        const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
+
+        // Read mode uniforms with sane defaults (renamed to avoid conflicts)
+        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const sectorsUniform    = Math.max(1, Math.floor(this.uniforms?.sectors ?? 1));
+        const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
+        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
+
+        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
+        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
+        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
+
+        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
+        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
+
+        // ---- Existing physics chain (do not change) ----
+        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+        const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
+        const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
+        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
+
+        const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
+        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
+        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+
+        // Do NOT overwrite engine θ; engine is authoritative
+        // (No "last-resort sync" of thetaScale here)
+
+        // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
+        const betaVisUniform = betaUsedUniform;
+
+        // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
+        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
+            console.log("🧪 warp-mode", {
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                betaVis: betaVisUniform.toExponential(2),
+                cosmeticLevel: this.uniforms?.cosmeticLevel || 10
+            });
+        }
+
+        // Check for uniform updates
+        if (this._uniformsDirty) {
+            // (nothing special needed, just consume fresh uniforms)
+            this._uniformsDirty = false;
+        }
+
+        // Core displacement calculation loop (C²-smooth)
+        for (let i = 0; i < vtx.length; i += 3) {
+            const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
+
+            // --- Smooth strobing sign using uniform sectors/split (C¹) ---
+            const theta = Math.atan2(p[2], p[0]);
+            const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
+            const sectorIdx = Math.floor(u * sectorsUniform);
+
+            // Distance from the split boundary in sector units
+            const dist = (sectorIdx - splitUniform + 0.5);
+            const strobeWidth = 1.5; // wider for smoother canonical profile
+            const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
+
+            // --- Ellipsoidal signed distance ---
+            const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
+            const sd = rho - 1.0;                     // negative inside wall
+
+
+
+            // --- Surface normal ---
+            const n = nEllipsoid(p, axesScene);
+
+            // --- (B) Soft front/back polarity (C¹-continuous) ---
+            const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
+            const front = Math.tanh(dotND / 0.15);          // softer front polarity for canonical smoothness
+
+            // --- Mode gains removed (cosmetic slider controls all exaggeration) ---
+
+            // --- Local wall thickness in ellipsoidal ρ (correct units) ---
+            // Semi-axes in meters (not the clip-scaled ones)
+            const a_m = hullAxes[0]; // 503.5
+            const b_m = hullAxes[1]; // 132.0
+            const c_m = hullAxes[2]; // 86.5
+
+            // Direction-dependent mapping of meters → Δρ
+            const invR = Math.sqrt(
+                (n[0]/a_m)*(n[0]/a_m) +
+                (n[1]/b_m)*(n[1]/b_m) +
+                (n[2]/c_m)*(n[2]/c_m)
+            );
+            const R_eff = 1.0 / Math.max(invR, 1e-6);
+            // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
+            const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
+
+            // ---- Existing physics chain (do not change) ----
+            const A_geoUniform2 = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
+            const sectorsTotalU2 = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
+            const dutyFR_u2 = dutyCycleUniform * (sectorsUniform / sectorsTotalU2);
+            const effDutyUniform2 = viewAvgUniform ? Math.max(1e-12, dutyFR_u2) : 1.0;
+
+            const betaInstUniform2 = A_geoUniform2 * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
+            const betaAvgUniform2  = betaInstUniform2 * Math.sqrt(effDutyUniform2);
+            const betaUsedUniform2 = viewAvgUniform ? betaAvgUniform2 : betaInstUniform2;
+
+            // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
+            // For canonical Natário bubble, disable local gaussian bumps
+            const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
+
+            // --- (C) Gentler wall window for canonical smoothness ---
+            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
+            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
+                           : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
+
+            // Local θ proxy (same kernel as shader)
+            const rs = rho;
+            const w  = Math.max(1e-6, w_rho_local);
+            const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
+            const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
+
+            // ≈ cos between surface normal and drive direction
+            const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
+
+            // CPU shear proxy (for diagnostics/labels)
+            const sinphi = Math.sqrt(Math.max(0, 1 - xs_over_rs*xs_over_rs));
+            const shearProxy = Math.abs(df) * sinphi * (this.uniforms?.vShip ?? 1.0);
+            // Accumulate quick average for the proof panel
+            this._accumShear = (this._accumShear||0) + shearProxy;
+            this._accumShearN = (this._accumShearN||0) + 1;
+
+            // Same amplitude chain + user gain as the shader
+            const userGain2   = Math.max(1.0, this.uniforms?.userGain ?? 1.0);
+            const zeroStop2   = Math.max(1e-18, this.uniforms?.zeroStop ?? 1e-7);
+            const exposure2   = Math.max(1.0, this.uniforms?.exposure ?? 6.0);
+
+            // Geometry amplitude should be monotonic with the slider and not instantly saturate.
+            // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
+            const T_gain       = this.uniforms?.curvatureGainT ?? 0.375;
+            const REF_BOOSTMAX = 40.0;                                  // fixed reference for "max slider"
+            const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
+
+            // CPU-side parity protection (match shader's idea but keep it neutral by default)
+            const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
+
+            const useSingleRidge = ((this.uniforms?.ridgeMode|0) === 1);
+
+            // 🔑 this is the switch that removes the geometric double ridge
+            const baseMag = useSingleRidge
+              ? Math.abs(xs_over_rs) * f               // single crest at ρ=1
+              : Math.abs(xs_over_rs * df);             // physics double-lobe (current)
+
+            // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
+            // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
+            const magMax       = Math.log(1.0 + (baseMag * thetaScale * REF_BOOSTMAX) / zeroStop2);
+            const magNow       = Math.log(1.0 + (baseMag * thetaScale * userGain2 * boostNow) / zeroStop2);
+
+            // Normalized geometry amplitude (monotonic in userGain AND boostNow)
+            const A_geom       = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
+
+            // For color you already compute with the shader; keep a local A_vis consistent for geometry if desired:
+            const A_vis2    = Math.min(1.0, magNow / Math.log(1.0 + exposure2));
+
+            // Special case: make REAL standby perfectly flat if desired
+            let disp;
+            if (mode === 'standby' && physicsParityMode) {
+                disp = 0; // perfectly flat grid for REAL standby mode
+            } else {
+                // geometry should follow A_geom (independent of exposure tone-mapping)
+                disp = gridK * A_geom * wallWin * front * sgn * gaussian_local;
+
+                // No fixed bump; slider controls all visual scaling
+
+                // Let the displacement ceiling breathe a bit with gain so big boosts aren't visually identical
+                // Let exaggeration raise the ceiling too, but gently (log so it doesn't jump)
+                const exgLog  = Math.log10(Math.max(1, userGain2));
+                // use the actual max from uniforms (fall back to REF_BOOSTMAX)
+                const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
+                const maxPush = 0.12
+                  + 0.10 * (boostNow / Math.max(1, boostMax))
+                  + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
+                const softClamp = (x, m) => m * Math.tanh(x / m);
+                disp = softClamp(disp, maxPush);
+
+                // Optional temporal smoothing for canonical visual calm
+                const vertIndex = i / 3;
+                const prev = this._prevDisp[vertIndex] ?? disp;
+                const blended = prev + this._dispAlpha * (disp - prev);
+                this._prevDisp[vertIndex] = blended;
+                disp = blended;
+            }
+
+            // ----- Interior gravity (shift vector "tilt") -----
+            // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
+            const w_int = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // ~few cm in normalized space
+            const interior = (() => {
+              // 1 inside the cabin (rho <= 1 - w_int), 0 outside; smooth edge within w_int
+              const t = (1.0 - rho) / Math.max(w_int, 1e-6);
+              // smoothstep(0→1): 3t² − 2t³, clamped
+              const s = Math.max(0, Math.min(1, t));
+              return s * s * (3 - 2 * s);
+            })();
+
+            // NEW: interior tilt displacement — do NOT multiply by 'ring'
+            const epsTilt   = this.uniforms?.epsilonTilt ?? 0.0;
+            const tiltGain  = this.uniforms?.tiltGain ?? 0.25;     // gentle default
+            const betaTilt  = this.uniforms?.betaTiltVec || [0, -1, 0];
+            // project normal onto "down" and keep sign stable
+            const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
+            // scale small, interior-only, soft-clamped
+            let dispTilt = epsTilt * tiltGain * interior * downDot;
+            const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
+            dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
+            // ----- end interior gravity -----
+
+            // apply both curvature and tilt
+            vtx[i]     = p[0] - n[0] * (disp + dispTilt);
+            vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
+            vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
+        }
+
+        // Enhanced diagnostics - check for amplitude overflow
+        let maxRadius = 0, maxDisp = 0;
+        for (let i = 0; i < vtx.length; i += 3) {
+            const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
+            maxRadius = Math.max(maxRadius, r);
+            // Check displacement from original
+            if (this.originalGridVertices) {
+                const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
+                maxDisp = Math.max(maxDisp, Math.abs(r - origR));
+            }
+        }
+        console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
+        console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
+
+        let ymax = -1e9, ymin = 1e9;
+        for (let i = 1; i < vtx.length; i += 3) {
+            const y = vtx[i];
+            if (y > ymax) ymax = y;
+            if (y < ymin) ymin = y;
+        }
+        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
+        console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
+        console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
+
+        // Update uniforms for scientific consistency (using scene-scaled axes)
+        this.uniforms.axesClip = axesScene;
+        this.uniforms.wallWidth = w_rho;
+        this.uniforms.hullDimensions = { a, b, c, aH, SCENE_SCALE, wallWidth_m };
+
+        // Regenerate grid with proper span for hull size
+        if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
+            console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
+            this.currentGridSpan = targetSpan;
+            this._gridSpan = targetSpan; // keep camera resize hint fresh
+            const newGridData = this._createGrid(targetSpan, gridDivisions);
+
+            // Update both current and original vertices
+            this.gridVertices = newGridData;
+            this.originalGridVertices = new Float32Array(newGridData);
+
+            // Upload new geometry to GPU efficiently
+            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
+            if (this._vboBytes !== this.gridVertices.byteLength) {
+                // Buffer size changed, need full reallocation
+                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
+                this._vboBytes = this.gridVertices.byteLength;
+            } else {
+                // Buffer size unchanged, use cheaper subdata update
+                this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
+            }
+
+            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a}×${b}×${c}]m`);
+
+            // Adjust camera framing for larger grids
+            this._adjustCameraForSpan(targetSpan);
+        }
+    }
+
+    _renderGridPoints() {
+        const gl = this.gl;
+        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+            if (!this._warnNoProgramOnce) {
+                console.warn(`[${this.debugTag}] Grid program not ready yet; waiting for shader link…`);
+                this._warnNoProgramOnce = true;
+            }
+            return;
+        }
+
+        gl.useProgram(this.gridProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+        const loc = this.gridAttribs.position;
+        gl.enableVertexAttribArray(loc);
+        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+
+        const u = this.uniforms || {};
+
+        // --- names / helpers
+        const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
+        const F = (x, d)=> Number.isFinite(x) ? +x : d;
+        const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
+
+        // --- colors / matrices you already set:
+        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+        // --- modes / sectoring (use lowercase names in the shader)
+        if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(u.colorMode, 1));
+        if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(u.ridgeMode, 1));
+        if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
+        const sLive  = Math.max(1, (u.sectors|0)      || 1);
+        const sTotal = Math.max(1, (u.sectorCount|0)  || sLive);
+        if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
+        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(u.split,0))));
+
+        // --- axes (scene-normalized and legacy hull)
+        const axesScene = u.axesClip || u.axesScene || [1,1,1];
+        const hullAxes  = u.hullAxes || [503.5, 132.0, 86.5];
+        if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
+        if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
+
+        // --- drive + wall
+        const drive = V3(u.driveDir, [1,0,0]);
+        const wRho  = Number.isFinite(u.wallWidth_rho) ? u.wallWidth_rho : (Number.isFinite(u.wallWidth) ? u.wallWidth : 0.02);
+        if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
+        if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, F(wRho, 0.02));
+
+        // --- critical amplitude carrier INSIDE theta field:
+        const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
+        if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
+
+        // --- θ-scale: ensure REAL+standby → 0
+        let thetaUniform = Number.isFinite(u.thetaScale) ? +u.thetaScale : 0;
+        const modeNow2 = String(u.currentMode || 'hover').toLowerCase();
+        if (u.physicsParityMode === true && modeNow2 === 'standby') thetaUniform = 0;
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, thetaUniform);
+
+        // --- exposure / viz chain
+        if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
+        if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(u.zeroStop, u.physicsParityMode ? 1e-5 : 1e-7));
+        if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(u.userGain, 1.0));
+        if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(u.displayGain, 1.0));
+        if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(u.vizGain, 1.0));
+        if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(u.curvatureGainT, 0.0));
+        if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(u.curvatureBoostMax, 1.0));
+
+        // --- interior tilt (benign defaults)
+        if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
+        if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
+        if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
+
+        // --- Purple shift uniforms
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(u.epsilonTilt, 0.0));
         if (this.gridUniforms.betaTiltVec) {
-            const betaTilt = this.uniforms.betaTiltVec || [0, -1, 0];
+            const betaTilt = V3(u.betaTiltVec, [0, -1, 0]);
             gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
         }
 
@@ -761,88 +1893,679 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
         const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
         const useMetric = this.uniforms.useMetric || false;
+        const metricOn = this.uniforms.metricOn !== undefined ? this.uniforms.metricOn : (useMetric ? 1.0 : 0.0);
+
         if (this.gridUniforms.metric) {
             gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
             gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
             gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
         }
+        if (this.gridUniforms.metricOn) {
+            gl.uniform1f(this.gridUniforms.metricOn, metricOn);
+        }
 
-        // --- Grid-specific uniforms ----------------------------------
-        // (Assuming _cacheGridUniformLocations has been called)
-        if (this.gridUniforms) {
-            for (const name in this.gridUniforms) {
-                const loc = this.gridUniforms[name];
-                const value = this.uniforms[name];
-                if (loc && value !== undefined) {
-                    // Determine uniform type based on name or value structure
-                    if (name.includes('Matrix')) {
-                        gl.uniformMatrix3fv(loc, false, new Float32Array(value));
-                    } else if (name.includes('Color') || name.includes('Vec') || name.includes('Dir') || name.includes('Scene') || name.includes('axes')) {
-                        gl.uniform3fv(loc, new Float32Array(value));
-                    } else if (typeof value === 'number') {
-                        gl.uniform1f(loc, value);
-                    } else if (typeof value === 'boolean') {
-                        gl.uniform1i(loc, value ? 1 : 0);
-                    } else if (Array.isArray(value)) {
-                         // Handle arrays, e.g., for vec4, mat4 etc. if needed
-                        if (value.length === 3) gl.uniform3fv(loc, new Float32Array(value));
-                        else if (value.length === 4) gl.uniform4fv(loc, new Float32Array(value));
-                        // Add more array type handling if necessary
-                    }
-                }
+
+        const vertexCount = (this.gridVertices?.length || 0) / 3;
+        if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
+
+        gl.disableVertexAttribArray(loc);
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    }
+
+    _renderLoop() {
+        this._raf = requestAnimationFrame(() => this._renderLoop());
+        this._render();
+    }
+
+    _render() {
+        if (this._destroyed) return;
+        const gl = this.gl;
+        // Guard: if program got torn down, try to rebuild once
+        if (!this.gridProgram && gl) {
+            try { this._compileGridShaders(); } catch (e) { console.warn('Autorelink failed:', e); }
+            return; // wait for shaders to (a)synchronously link
+        }
+        // Apply any pending updates now that shaders are ready
+        if (this._pendingUpdate && this.isLoaded && this.gridProgram) {
+            this._enqueueUniforms(this._pendingUpdate);
+            this._pendingUpdate = null;
+        }
+        // Add safety checks to prevent "stuck black" state
+        if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+            console.warn('[WarpEngine] Render blocked - missing requirements:', {
+                gl: !!gl,
+                isLoaded: this.isLoaded,
+                gridProgram: !!this.gridProgram,
+                gridUniforms: !!this.gridUniforms,
+                gridAttribs: !!this.gridAttribs
+            });
+            return;
+        }
+        // Check for lost context and try to restore
+        if (gl.isContextLost && gl.isContextLost()) {
+            try { gl.getExtension('WEBGL_lose_context')?.restoreContext?.(); } catch {}
+            return;
+        }
+
+        try {
+            // Clear the frame and avoid "ghost layers" each draw
+            gl.disable(gl.BLEND);
+            gl.enable(gl.DEPTH_TEST);
+            gl.depthMask(true);
+            gl.colorMask(true, true, true, true);
+            gl.clearColor(0, 0, 0, 1);
+
+            // Clear the screen & enforce a single opaque pass
+            gl.disable(gl.BLEND);
+            gl.depthMask(true);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+            // Render the spacetime grid
+            this._renderGridPoints();
+        } catch (err) {
+            console.error('[WarpEngine] render error:', err);
+        }
+
+        // Emit diagnostics for proof panel
+        if (this.onDiagnostics) {
+            try { 
+                const diag = this.computeDiagnostics();
+                this.onDiagnostics(diag);
+            } catch(e){
+                console.warn('Diagnostics error:', e);
             }
         }
-
-        // --- Draw the full-screen quad ---
-        const posLoc = gl.getAttribLocation(this.program, "a_position");
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(posLoc);
-        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
-    //----------------------------------------------------------------
-    //  12. Utility Functions (for uniform processing)
-    //----------------------------------------------------------------
-    // Helper to get uniform location, caching results
-    _getUniformLocation(program, name) {
-        if (!this.uniformCache) this.uniformCache = {};
-        if (this.uniformCache[name] === undefined) {
-            this.uniformCache[name] = this.gl.getUniformLocation(program, name);
+
+
+    // Matrix math utilities
+    _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
+        const gl = this.gl;
+
+        const vertexShader   = this.compileShader(gl.VERTEX_SHADER,   vertexSource, 'vertex');
+        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentSource, 'fragment');
+        if (!vertexShader || !fragmentShader) return null;
+
+        const program = gl.createProgram();
+        gl.attachShader(program, vertexShader);
+        gl.attachShader(program, fragmentShader);
+        gl.linkProgram(program);
+
+        // record initial debug
+        this._glStatus = {
+            vertOK: !!gl.getShaderParameter(vertexShader,   gl.COMPILE_STATUS),
+            fragOK: !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS),
+            linkOK: !!gl.getProgramParameter(program,       gl.LINK_STATUS),
+            vertLog: (gl.getShaderInfoLog(vertexShader)   || '').trim(),
+            fragLog: (gl.getShaderInfoLog(fragmentShader) || '').trim(),
+            linkLog: (gl.getProgramInfoLog(program)       || '').trim(),
+        };
+        (window.__glDiag ||= {})[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
+
+        // expose a live program handle even during compile so panels can query status
+        this.program = this.gridProgram = program;
+
+        // --- Async path (KHR) ---
+        if (this.parallelShaderExt && onReady) {
+            this._setLoadingState('compiling');
+            this._pollShaderCompletion(program, (p) => {
+                if (!p) {
+                    this._setLoadingState('failed');
+                    onReady?.(null);
+                    return;
+                }
+                if (this._onProgramLinked(p)) {
+                    this.program = this.gridProgram = p;
+                    this._setLoadingState('linked');
+                    onReady?.(p);
+                } else {
+                    this._setLoadingState('failed');
+                    onReady?.(null);
+                }
+            });
+            return program;
         }
-        return this.uniformCache[name];
+
+        // --- Sync path ---
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
+            const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
+            const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
+            console.error(`[${this.debugTag}] Link error:`, { vsLog, fsLog, pgLog });
+            gl.deleteProgram(program);
+            this._setLoadingState('failed');
+            return null;
+        }
+
+        // success (sync)
+        if (this._onProgramLinked(program)) {
+            this.program = this.gridProgram = program;
+            this._setLoadingState('linked');
+            onReady?.(program);
+            return program;
+        }
+        this._setLoadingState('failed');
+        return null;
     }
 
-    // Update warp geometry based on uniforms
-    _updateWarpGeometry(uniforms) {
-        // This function would contain the logic to recalculate warp geometry
-        // based on the current uniforms, especially if metric-aware calculations
-        // require changes to the underlying grid or vertex data.
-        // For now, it's a placeholder.
-        console.log("Warp geometry update triggered (placeholder)");
+    _pollShaderCompletion(program, onReady) {
+        const gl = this.gl;
+        const ext = this.parallelShaderExt;
+
+        const poll = () => {
+            const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
+            if (done) {
+                const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
+                if (ok) {
+                    onReady(program);
+                    this._setLoadingState('linked');
+                } else {
+                    console.error(`[${this.debugTag}] Shader program link error:`, gl.getProgramInfoLog(program));
+                    gl.deleteProgram(program);
+                    onReady(null);
+                    this._setLoadingState('failed');
+                }
+            } else {
+                requestAnimationFrame(poll);
+                this._setLoadingState('compiling'); // keep telling the world we're compiling
+            }
+        };
+        poll();
     }
 
-    // Metric (covariant) for CPU-side ops (defaults to identity)
-    _getMetricHelpers() {
-        const uniforms = this.uniforms;
-        const G = (uniforms?.metric && uniforms.metric.length === 9)
-                    ? uniforms.metric
-                    : [1,0,0, 0,1,0, 0,0,1];
-        const dotG = (ax, ay, az, bx, by, bz) =>
-            ax*(G[0]*bx + G[3]*by + G[6]*bz) +
-            ay*(G[1]*bx + G[4]*by + G[7]*bz) +
-            az*(G[2]*bx + G[5]*by + G[8]*bz);
-        const normG = (x,y,z) => Math.sqrt(Math.max(1e-12, dotG(x,y,z, x,y,z)));
+    compileShader(type, source, shaderType = 'unknown') {
+        const shader = this.gl.createShader(type);
+        this.gl.shaderSource(shader, source);
+        this.gl.compileShader(shader);
 
-        return { G, dotG, normG };
+        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+            const error = this.gl.getShaderInfoLog(shader);
+            this.gl.deleteShader(shader);
+            console.error(`[${this.debugTag}] ${shaderType} shader compilation failed:`, error);
+            throw new Error(`[${this.debugTag}] ${shaderType} shader compilation failed: ${error}`);
+        } else {
+            console.log(`[${this.debugTag}] ${shaderType} shader compiled successfully`);
+        }
+
+        return shader;
     }
 
-    // Ellipsoid utilities (using consistent scene-scaled axes)
-    rhoEllipsoidal(p) {
-        const { axesScene, useMetric, metric } = this.uniforms;
-        const metricHelpers = this._getMetricHelpers(); // Get metric helpers
+    _perspective(out, fovy, aspect, near, far) {
+        const f = 1.0 / Math.tan(fovy / 2);
+        const nf = 1.0 / (near - far);
 
-        const pN = [p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]];
-        return useMetric ? metricHelpers.normG(pN[0], pN[1], pN[2]) : Math.hypot(pN[0], pN[1], pN[2]);
+        out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+        out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+        out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+        out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+    }
+
+    _lookAt(out, eye, center, up) {
+        const x0 = eye[0], x1 = eye[1], x2 = eye[2];
+        const y0 = center[0], y1 = center[1], y2 = center[2];
+        const u0 = up[0], u1 = up[1], u2 = up[2];
+
+        let z0 = x0 - y0, z1 = x1 - y1, z2 = x2 - y2;
+        let len = 1 / Math.hypot(z0, z1, z2);
+        z0 *= len; z1 *= len; z2 *= len;
+
+        let x0_ = u1 * z2 - u2 * z1;
+        let x1_ = u2 * z0 - u0 * z2;
+        let x2_ = u0 * z1 - u1 * z0;
+        len = Math.hypot(x0_, x1_, x2_);
+        if (!len) {
+            x0_ = 0; x1_ = 0; x2_ = 0;
+        } else {
+            len = 1 / len;
+            x0_ *= len; x1_ *= len; x2_ *= len;
+        }
+
+        let y0_ = z1 * x2_ - z2 * x1_;
+        let y1_ = z2 * x0_ - z0 * x2_;
+        let y2_ = z0 * x1_ - z1 * x0_;
+
+        out[0] = x0_; out[1] = y0_; out[2] = z0; out[3] = 0;
+        out[4] = x1_; out[5] = y1_; out[6] = z1; out[7] = 0;
+        out[8] = x2_; out[9] = y2_; out[10] = z2; out[11] = 0;
+        out[12] = -(x0_ * x0 + x1_ * x1 + x2_ * x2);
+        out[13] = -(y0_ * x0 + y1_ * x1 + y2_ * x2);
+        out[14] = -(z0 * x0 + z1 * x1 + z2 * x2);
+        out[15] = 1;
+    }
+
+    _multiply(out, a, b) {
+        const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+        const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+        const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+        const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+        let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+        out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+        out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+        out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+        b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+        out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+        out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+        out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+        out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+    }
+
+    // === Responsive camera helpers =============================================
+    _fitFovForAspect(aspect) {
+        // Wider FOV when the canvas is tall (phones/portrait)
+        // desktop ~55°, phone ~68°
+        const fovDesktop = Math.PI / 3.272;  // ~55°
+        const fovPortrait = Math.PI / 2.65;  // ~68°
+        const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
+        return fovDesktop * (1 - t) + fovPortrait * t;
+    }
+
+    // axesScene is the ellipsoid semi-axes in scene units (what the renderer already uses)
+    // spanHint is optional fallback (grid span in scene units)
+    _fitCameraToBubble(axesScene, spanHint) {
+        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+        const fov = this._fitFovForAspect(aspect);
+
+        // Bounding sphere radius of the ellipsoid (in scene units)
+        const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+        const baseMargin = 1.22;                        // a hair more breathing room
+        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+
+        // Distance along -Z so bubble fits vertically
+        const dist = (margin * R) / Math.tan(fov * 0.5);
+
+        // Higher overhead perspective for better visualization
+        const eye = [0, 0.62 * R, -dist];      // match overhead height
+        // look further down to clearly show deck plane and interior effects
+        const center = [0, -0.12 * R, 0];      // match overhead look-down
+        const up = [0, 1, 0];
+
+        // Update projection & view
+        this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
+        this._lookAt(this.viewMatrix, eye, center, up);
+        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+
+        console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
+    }
+
+    // --- Bootstrap: set uniforms & fit camera before first frame ---------------
+    bootstrap(initialParams = {}) {
+        this.currentParams = Object.assign({}, initialParams);
+        // Ensure canvas size is correct before we compute FOV/dist
+        this._resizeCanvasToDisplaySize();
+
+        // Let updateUniforms compute/remember axesScene & span, then fit
+        this.updateUniforms(initialParams);
+
+        // sets overhead once
+        this._setupCamera();
+        // only auto-fit if not explicitly locked
+        if (!this.uniforms.lockFraming) this._applyOverheadCamera();
+
+        // Mark so we don't rely on any legacy default camera
+        this._bootstrapped = true;
+    }
+
+    // --- Convenience method: Set curvature gain from 0-8 slider value --------
+    setCurvatureGainDec(slider0to8, boostMax = 40) {
+        const T = Math.max(0, Math.min(1, slider0to8 / 8));
+        this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
+    }
+
+    setCosmeticLevel(level /* 1..10 */) {
+        const L = Math.max(1, Math.min(10, level));
+        this.updateUniforms({ cosmeticLevel: L });
+    }
+
+    // === Natário Diagnostics (viewer-only, does not affect physics) ===
+    _computePipelineBetas(U){
+        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || U.sectors || 1);
+        const gammaGeo     = U.gammaGeo || 0;
+        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+        const gammaVdB     = U.gammaVdB || 1.0;
+
+        const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-12, (U.dutyCycle || 0) / sectors));
+        const phase    = (U.phaseSplit != null) ? U.phaseSplit :
+                        (U.currentMode === 'cruise' ? 0.65 : 0.50);
+        const betaNet  = betaAvg * (2*phase - 1);
+
+        return { betaInst, betaAvg, betaNet, sectors, phase };
+    }
+
+    _sampleYorkAndEnergy(U){
+        const axes  = U.axesClip || [0.40,0.22,0.22];
+        const w     = Math.max(1e-4, U.wallWidth || 0.06);   // shell width
+        const vShip = U.vShip || 1.0;
+        const d     = U.driveDir || [1,0,0];
+        const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
+                            const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
+
+        let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
+        const N=64;
+        for(let k=0;k<N;k++){
+            const ang=2*Math.PI*k/N;
+            const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
+            const rs=Math.hypot(...pN);
+            const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
+            const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
+            const dfdr=(-2.0*(rs-1)/(w*w))*f;
+
+            const theta = (U.ridgeMode===1)
+                ? vShip * (xs/rs) * f      // single crest
+                : vShip * (xs/rs) * dfdr;  // double-lobe
+            const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
+
+            if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
+            else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
+
+            eSum+=T00; n++;
+        }
+        return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
+                T00avg:(n?eSum/n:0) };
+    }
+
+    computeDiagnostics(){
+        const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+        const P=this._computePipelineBetas(U);
+        const Y=this._sampleYorkAndEnergy(U);
+        const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
+        const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+        // Calculate shear average proxy and reset accumulators
+        const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
+        this._accumShear = 0; 
+        this._accumShearN = 0;
+
+        // C) Additional physics values for CPU comparison
+        // Single source of truth for duty: what the engine actually used
+        let d_FR = U.dutyEffectiveFR;
+        if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
+        if (!Number.isFinite(d_FR)) {
+            // final fallback: duty_local × (S_concurrent / S_total)
+            const dutyLocal = Number.isFinite(U.dutyLocal) ? U.dutyLocal : 0.01; // 1% default
+            const S_total   = Math.max(1, U.sectorCount ?? 400);
+            const S_live    = Math.max(1, U.sectors ?? 1);
+            d_FR = dutyLocal * (S_live / S_total);
+        }
+        d_FR = Math.max(1e-12, d_FR);
+
+        // View mass fraction for displays (REAL shows ~1/sectorCount; SHOW uses 1.0)
+        const sectorFraction = Math.max(1, (U.sectors||1)) / Math.max(1, U.sectorCount||400);
+        const viewFraction = (U.viewAvg ?? true)
+            ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
+            : 1.0;
+
+        const f_view = Math.max(1e-12, U.viewMassFraction ?? 1.0);
+        return {
+            mode: U.currentMode||'hover',
+            duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+            sectors:P.sectors, phase:P.phase,
+            beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+            theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
+            theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
+            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+            shear_avg_proxy: shear_avg_proxy,
+            york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
+            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6),
+            // C) Additional physics values for CPU comparison
+            d_FR,
+            viewFraction,
+            sectorFraction,
+            frameHash8x8: this.sampleHash8x8(),
+
+            // pane-aware (display only)
+            theta_front_max_viewed: Y.thetaFrontMax * Math.sqrt(f_view),
+            theta_rear_min_viewed:  Y.thetaRearMin  * Math.sqrt(f_view),
+        };
+    }
+
+    setUniform(name, value) {
+        if (!this.gl || !this.gridProgram) return;
+
+        const gl = this.gl;
+        const location = gl.getUniformLocation(this.gridProgram, name);
+        if (location !== null) {
+            gl.useProgram(this.gridProgram);
+            if (typeof value === 'number') {
+                gl.uniform1f(location, value);
+            } else if (Array.isArray(value)) {
+                if (value.length === 2) gl.uniform2fv(location, value);
+                else if (value.length === 3) gl.uniform3fv(location, value);
+                else if (value.length === 4) gl.uniform4fv(location, value);
+            }
+            console.log(`🎛️ setUniform: ${name} = ${value}`);
+        }
+    }
+
+    setDisplayGain(gain) {
+        // strictly the shader's u_displayGain (used only when parity=false)
+        this.updateUniforms({ displayGain: Math.max(1, +gain) });
+    }
+
+    setUserGain(gain) {
+        // strictly the shader's u_userGain (multiplies both modes)
+        this.updateUniforms({ userGain: Math.max(1, +gain) });
+    }
+
+    // C) Frame hash for checkpoint validation
+    sampleHash8x8() {
+        if (!this.gl || !this.canvas) return 0;
+
+        try {
+            const gl = this.gl;
+            const w = this.canvas.width;
+            const h = this.canvas.height;
+
+            // Sample 8x8 grid across canvas
+            const pixels = new Uint8Array(64 * 4); // 8x8 RGBA
+            const stepX = Math.max(1, Math.floor(w / 8));
+            const stepY = Math.max(1, Math.floor(h / 8));
+
+            let hash = 0;
+            for (let y = 0; y < 8; y++) {
+                for (let x = 0; x < 8; x++) {
+                    const px = Math.min(w - 1, x * stepX);
+                    const py = Math.min(h - 1, y * stepY);
+
+                    const rgba = new Uint8Array(4);
+                    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+
+                    // XOR + simple hash
+                    const idx = (y * 8 + x) * 4;
+                    pixels[idx] = rgba[0];
+                    pixels[idx + 1] = rgba[1]; 
+                    pixels[idx + 2] = rgba[2];
+                    pixels[idx + 3] = rgba[3];
+
+                    hash ^= (rgba[0] << 24) | (rgba[1] << 16) | (rgba[2] << 8) | rgba[3];
+                    hash = ((hash << 1) | (hash >>> 31)) & 0xFFFFFFFF; // rotate left
+                }
+            }
+
+            return hash;
+        } catch (e) {
+            console.warn('sampleHash8x8 error:', e);
+            return 0;
+        }
+    }
+
+    setPresetParity() {
+        // Only call when explicitly requested by user, not auto-triggered
+        console.log('[WarpEngine] Manual preset: REAL/Parity mode');
+        this.updateUniforms({
+            physicsParityMode: true,
+            viewAvg: true,
+            ridgeMode: 0,              // show true physics double-lobe
+            curvatureGainT: 0.0,
+            curvatureBoostMax: 1.0,
+            exposure: 3.5,
+            zeroStop: 1e-5,
+            vizGain: 1.0,
+            userGain: 1.0
+        });
+    }
+
+    setPresetShowcase() {
+        // Only call when explicitly requested by user, not auto-triggered
+        console.log('[WarpEngine] Manual preset: SHOW/Showcase mode');
+        this.updateUniforms({
+            physicsParityMode: false,
+            viewAvg: false,
+            ridgeMode: 1,              // clean single crest at ρ=1
+            curvatureGainT: 0.6,       // slider blend → boost
+            curvatureBoostMax: 40.0,
+            exposure: 6.0,
+            zeroStop: 1e-7,
+            vizGain: 1.0,
+            userGain: 4.0
+        });
+    }
+
+    destroy() {
+        if (this._destroyed) return;
+        this._destroyed = true;
+        // Clean up per-canvas guard
+        if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
+            window.__WARP_ENGINES.delete(this.canvas);
+        }
+
+        // Cancel animation frame
+        if (this._raf) {
+            cancelAnimationFrame(this._raf);
+            this._raf = null;
+        }
+
+        // Clean up event listeners
+        window.removeEventListener('resize', this._resize);
+        // Remove globals we installed
+        if (window.__warp_setGainDec === this.__warp_setGainDec) {
+            delete window.__warp_setGainDec;
+        }
+        if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
+            delete window.__warp_setCosmetic;
+        }
+        try { this._offStrobe?.(); } catch {}
+
+        // Clean up WebGL resources
+        const gl = this.gl;
+        if (gl) {
+            if (this.gridProgram) {
+                gl.deleteProgram(this.gridProgram);
+                this.gridProgram = null;
+            }
+
+            if (this.gridVbo) {
+                gl.deleteBuffer(this.gridVbo);
+                this.gridVbo = null;
+            }
+        }
+        this.program = null;
+        this.gridUniforms = null;
+        this.gridAttribs = null;
+
+        // Clear callbacks
+        this.onDiagnostics = null;
+
+        // Clear vertex arrays
+        this.gridVertices = null;
+        this.originalGridVertices = null;
+
+        console.log("WarpEngine resources cleaned up");
     }
 }
+
+// Export for both ES modules and CommonJS
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = WarpEngine;
+} else {
+    // Keep BUILD token on the class
+    WarpEngine.BUILD = BUILD;
+    globalThis.__WarpEngineBuild = BUILD;
+    globalThis.WarpEngine = WarpEngine;
+    console.log("🔥 PATCHED ENGINE BODY RUNNING - Build:", BUILD, "Time:", Date.now());
+}
+
+// Build token already stamped in guard section above
+
+// ---------------------------------------------------------------------------
+// Helper init: one viewer in TRUTH mode, one in COSMETIC mode
+// Usage (page-side):
+//   __warpInitTruthCosmetic({
+//     truth:    '#viewer-truth',     // CSS selector or canvas element (optional; defaults provided)
+//     cosmetic: '#viewer-cosmetic',  // CSS selector or canvas element
+//     paramsTruth:    { /* optional bootstrap uniforms for truth */ },
+//     paramsCosmetic: { /* optional bootstrap uniforms for cosmetic */ }
+//   });
+//
+// If you don't pass selectors, it will look for #viewer-truth and #viewer-cosmetic.
+// Can be called after DOMContentLoaded.
+// ---------------------------------------------------------------------------
+globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
+  const q = (x) => (typeof x === 'string' ? document.querySelector(x) : x);
+  const truthEl    = q(opts.truth)    || document.getElementById('viewer-truth');
+  const cosmeticEl = q(opts.cosmetic) || document.getElementById('viewer-cosmetic');
+  if (!truthEl && !cosmeticEl) {
+    console.warn('[warp-engine] no truth/cosmetic canvases found');
+    return {};
+  }
+
+  const engines = {};
+  // Truth-only viewer (physics-faithful)
+  if (truthEl) {
+    const e = new WarpEngine(truthEl);
+    const id = truthEl.id || 'viewer-truth';
+    e.__id = id;
+    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+    e.bootstrap(opts.paramsTruth || {});
+    e.onceReady(() => {
+      e.setPresetParity();                                  // TRUTH MODE
+      // Make the difference obvious at a glance (optional, can remove):
+      e.updateUniforms({ colorMode: 2, ridgeMode: 0 });     // shear palette + physics double-lobe
+      e.forceRedraw();
+      console.log('[warp] truth ready');
+    });
+    engines.truth = e;
+  }
+
+  // Cosmetic/showcase viewer (visually exaggerated)
+  if (cosmeticEl) {
+    const e = new WarpEngine(cosmeticEl);
+    const id = cosmeticEl.id || 'viewer-cosmetic';
+    e.__id = id;
+    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+    e.bootstrap(opts.paramsCosmetic || {});
+    e.onceReady(() => {
+      e.setPresetShowcase();                               // COSMETIC MODE
+      e.updateUniforms({ colorMode: 1, ridgeMode: 1 });    // theta diverging + single crest
+      e.forceRedraw();
+      console.log('[warp] cosmetic ready');
+    });
+    engines.cosmetic = e;
+  }
+
+  // Keep both canvases sized if their containers change
+  const ro = new ResizeObserver(() => {
+    engines.truth?._resizeCanvasToDisplaySize?.();
+    engines.cosmetic?._resizeCanvasToDisplaySize?.();
+  });
+  truthEl    && ro.observe(truthEl.parentElement || truthEl);
+  cosmeticEl && ro.observe(cosmeticEl.parentElement || cosmeticEl);
+  return engines;
+};
+})();
