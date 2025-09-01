@@ -65,6 +65,33 @@ export function computeThetaScale(inp: ThetaInputs, opt: ThetaOptions = {}): num
   return Math.pow(g, 3) * q * vdb * Math.sqrt(d);
 }
 
+// ★ Canonical physics (engine-compatible)
+export function thetaCanonical(params: {
+  gammaGeo: number;
+  qSpoilingFactor: number;
+  gammaVanDenBroeck_mass: number;
+  dutyLocal: number;
+  sectorsConcurrent: number;
+  sectorsTotal: number;
+  viewAveraged?: boolean;
+  mode?: 'standby'|'hover'|'cruise';
+}): number {
+  const {
+    gammaGeo, qSpoilingFactor, gammaVanDenBroeck_mass,
+    dutyLocal, sectorsConcurrent, sectorsTotal,
+    viewAveraged = true, mode
+  } = params;
+  if (mode === 'standby') return 0;
+  const g = Math.max(1, Number(gammaGeo) || 26);
+  const q = Math.max(1e-12, Number(qSpoilingFactor) || 1);
+  const v = Math.max(1, Math.min(1e2, Number(gammaVanDenBroeck_mass) || 38.3));
+  const sC = Math.max(1, Number(sectorsConcurrent) || 1);
+  const sT = Math.max(1, Number(sectorsTotal) || 400);
+  const dFR = Math.max(1e-12, Math.min(1, (Number(dutyLocal) || 0) * (sC / sT)));
+  const dutyFactor = viewAveraged ? Math.sqrt(dFR) : 1;
+  return (g * g * g) * q * v * dutyFactor;
+}
+
 /**
  * Debug logging utility with environment detection
  */
