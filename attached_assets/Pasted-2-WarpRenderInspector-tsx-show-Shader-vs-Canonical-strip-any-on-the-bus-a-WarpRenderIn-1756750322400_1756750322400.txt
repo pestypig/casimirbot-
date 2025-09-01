@@ -1,0 +1,71 @@
+2) WarpRenderInspector.tsx — show Shader θ vs Canonical θ; strip any θ on the bus
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+-import React, { useEffect, useMemo, useRef, useState } from "react";
++import React, { useEffect, useMemo, useRef, useState } from "react";
++import { thetaCanonical } from "@/lib/warp-theta";
+@@
+-      // Make the overlay honest: show the two θ's explicitly
+-      const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
+-      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+-      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
++      // --- Shader vs Canonical ---
++      const thetaShader =
++        Number(+U.thetaScale_actual) ||
++        Number(+U.thetaScale) ||
++        Number(+U.u_thetaScale) || NaN;
++      const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
++      const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1));
++      const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
++      const thetaCanon = thetaCanonical({
++        gammaGeo:               +U.gammaGeo || 26,
++        qSpoilingFactor:        +U.qSpoilingFactor || +U.deltaAOverA || 1,
++        gammaVanDenBroeck_mass: +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3,
++        dutyLocal, sectorsConcurrent, sectorsTotal,
++        viewAveraged: !!U.physicsParityMode,
++        mode: (U.currentMode as any) || 'hover'
++      });
++      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
+@@
+-      setSnap({ a,b,c,aH, w_m, V,S, Vshell, thetaUniform, thetaPhys, thetaPaper, M_ship_kg, M_slice_kg,
++      setSnap({ a,b,c,aH, w_m, V,S, Vshell, thetaShader, thetaCanon, thetaPaper, M_ship_kg, M_slice_kg,
+                 frontMax, rearMin,
+                 sectors: Math.max(1,(U.sectorCount|0)||1),
+                 mDisplayText: (flavor==='REAL')
+                   ? `${Number.isFinite(M_slice_kg)? fmtSI(M_slice_kg,'kg'):'— kg'} (slice) · ${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total`
+                   : `${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total` });
+@@
+-          <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
+-          <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
++          <div>θ (shader): <b>{Number.isFinite(s.thetaShader)? s.thetaShader.toExponential(2):'—'}</b></div>
++          <div>θ (canonical): <b>{Number.isFinite(s.thetaCanon)? s.thetaCanon.toExponential(2):'—'}</b></div>
+           <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
+@@
+-      const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
++      const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
+         setHaveUniforms(true);
+-        // strip any external theta (engine computes it)
+-        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
++        // strip any external theta (engine computes it)
++        const { thetaScale, u_thetaScale, thetaScale_actual, ...uSafe } = u || {};
+@@
+-        if (leftEngine.current) {
++        if (leftEngine.current) {
+           applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+         }
+         if (rightEngine.current) {
+           applyToEngine(rightEngine.current, { ...uSafe, ...metricU, ...purple, physicsParityMode: false, ridgeMode: 1 });
+         }
+       });
+@@
+-    // Never publish any thetaScale fields downstream; engine is authoritative.
+-    const { thetaScale, u_thetaScale, ...clean } = sanitized as any;
++    // Never publish any thetaScale fields downstream; engine is authoritative.
++    const { thetaScale, u_thetaScale, thetaScale_actual, ...clean } = sanitized as any;
+     publish("warp:uniforms", { ...clean, __version: version });
+   }, [systemMetrics]);
+@@
+-// physics θ helper (no SHOW boosts)
+-function thetaPhysicsFromUniforms(U: any) { /* …remove… */ }
++// (removed) local physics helper — we rely on thetaCanonical()
