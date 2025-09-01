@@ -1099,7 +1099,7 @@ export default function WarpBubbleCompare({
         ...shared,
         ...show,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
-        curvatureGainT: 0.70,
+        curvatureGainT: 0,
         curvatureBoostMax: Math.max(1, Math.min(1000, +heroExaggeration || 82)),
         userGain: 4,
         displayGain: 1,
@@ -1121,11 +1121,6 @@ export default function WarpBubbleCompare({
       setLoadError(String(error));
     }
   }
-
-  const roRef = useRef<ResizeObserver | null>(null);
-  const busyRef = useRef<boolean>(false);
-  const lastModeRef = useRef<string | null>(null);
-  const lastTokenRef = useRef<any>(null);
 
   // Mode change effect: hard renderer reset on each mode change or reload token
   useEffect(() => {
