@@ -217,7 +217,142 @@ export default class WarpEngine {
     //  6.  Public API
     //----------------------------------------------------------------
     updateUniforms(obj){
-        Object.assign(this.uniforms, obj);
+        const patch = obj || {};
+        const parameters = { ...this.uniforms, ...patch }; // Copy existing uniforms and apply patch
+        const nextUniforms = { ...parameters }; // Create a new object for modifications
+        const mode = parameters?.currentMode ?? this.uniforms?.currentMode ?? 'hover'; // Default to 'hover' if mode is not specified
+        const parity = !!parameters?.physicsParityMode; // Ensure parity is a boolean
+
+        // 1) Bind metric first (+ mirror to u_*)
+        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
+            const useMetric = !!patch.useMetric;
+            const I = [1,0,0, 0,1,0, 0,0,1];
+            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
+            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
+            nextUniforms.useMetric   = useMetric; nextUniforms.u_useMetric = useMetric;
+            nextUniforms.metric      = m;         nextUniforms.u_metric    = m;
+            nextUniforms.metricInv   = mi;        nextUniforms.u_metricInv = mi;
+        }
+
+        // 2) Merge rest, but strip any external thetaScale
+        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
+        Object.assign(nextUniforms, safeParameters);
+
+        const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
+
+        // Canonical θ from uniforms (aliases resolved inside)
+        const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
+          ...nextUniforms,
+          // ensure raw inputs are present (avoid stale locals)
+          dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
+          dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
+          sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
+          sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
+          currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
+          u_physicsParityMode: nextUniforms.physicsParityMode
+        });
+        this.__lastThetaTerms = { // Store for potential debug logging
+            gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
+            qSpoilingFactor: nextUniforms.qSpoilingFactor ?? nextUniforms.deltaAOverA,
+            gammaVanDenBroeck_mass: nextUniforms.gammaVanDenBroeck_mass ?? nextUniforms.gammaVanDenBroeck,
+            dutyLocal: nextUniforms.dutyCycle ?? 0.01,
+            sectorsConcurrent: nextUniforms.sectors ?? 1,
+            sectorsTotal: nextUniforms.sectorCount ?? 400,
+            viewAveraged: parity,
+            currentMode: mode
+        };
+
+
+        // Publish FR explicitly (use provided FR if present; else reconstruction)
+        const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
+          ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
+          : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
+                                   ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
+                                    Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
+        nextUniforms.dutyUsed        = dFRpub;
+        nextUniforms.dutyEffectiveFR = dFRpub;
+
+        // --- Neutralize visual boosts in standby (only for REAL parity) ---
+        if (mode === 'standby' && parity) {
+          nextUniforms.vizGain = 1;
+          nextUniforms.curvatureGainT = 0;
+          nextUniforms.curvatureBoostMax = 1;
+          nextUniforms.userGain = 1;
+          nextUniforms.vShip = 0;
+        }
+
+        // 3) Warn if external thetaScale tried to override (once per instance)
+        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
+            const asked = +(u_thetaScale ?? thetaScale);
+            if (Number.isFinite(asked) && Math.abs(thetaScaleFromChain - asked) / Math.max(1, Math.abs(thetaScaleFromChain)) > 0.01) {
+                console.warn('[WarpEngine] Ignored external thetaScale override', {
+                    asked: asked.toExponential(2),
+                    engine: thetaScaleFromChain.toExponential(2),
+                    ratio: (thetaScaleFromChain/asked).toFixed(2)
+                });
+                this.__thetaWarned = true;
+            }
+        }
+
+        // --- Metric tensor wiring --------------------------------------------
+        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
+        // metricMode: 'identity' | 'ellipsoid' | 'custom'
+        const prev = this.uniforms; // Store previous uniforms for comparison
+
+        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
+        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
+        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
+        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
+
+        // Need axesScene for ellipsoid mode, fall back to default if not provided
+        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
+
+        if (!metric) {
+            if (metricMode === 'ellipsoid') {
+                // covariant g_ij in clip space, aligned to axesClip:
+                // g = diag(1/a^2, 1/b^2, 1/c^2)
+                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
+                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
+                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
+                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
+                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
+                useMetric = true;
+            } else {
+                // Identity (Euclidean)
+                metric    = [1,0,0, 0,1,0, 0,0,1];
+                metricInv = [1,0,0, 0,1,0, 0,0,1];
+            }
+        }
+        // Update uniforms object with metric information
+        nextUniforms.metricMode = metricMode;
+        nextUniforms.metric     = metric;
+        nextUniforms.metricInv  = metricInv;
+        nextUniforms.useMetric  = !!useMetric;
+
+
+        // --- decide if the CPU warp needs recompute ---
+        const geoChanged =
+          (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
+          (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
+          (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
+          (prev.gridSpan !== nextUniforms.gridSpan);
+
+        // Guardrail: if standby yet θ>0, log once with chain terms
+        if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
+          console.warn('[warp-engine] Standby θ non-zero — uniforms:', nextUniforms);
+        }
+
+        // Update core uniforms
+        Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
+
+        // Engine-authoritative θ only (ignore any incoming thetaScale)
+        this.uniforms.thetaScale_actual = thetaScaleFromChain; // telemetry
+        this.uniforms.thetaScale        = thetaScaleFromChain;
+
+        // Recompute warp geometry if necessary
+        if (geoChanged) {
+            this._updateWarpGeometry(this.uniforms);
+        }
     }
 
     //----------------------------------------------------------------
@@ -234,22 +369,67 @@ export default class WarpEngine {
         gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
 
         gl.useProgram(this.program);
-        //  push uniforms
-        gl.uniform1f(this.uLoc.dutyCycle,     this.uniforms.dutyCycle);
-        gl.uniform1f(this.uLoc.g_y,           this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.cavityQ,       this.uniforms.cavityQ);
-        gl.uniform1f(this.uLoc.sagDepth_nm,   this.uniforms.sagDepth_nm);
-        gl.uniform1f(this.uLoc.tsRatio,       this.uniforms.tsRatio);
-        gl.uniform1f(this.uLoc.powerAvg_MW,   this.uniforms.powerAvg_MW);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
-        gl.uniform1f(this.uLoc.time,          time);
 
-        //  full‑screen quad attrib
-        const loc = gl.getAttribLocation(this.program, "a_position");
+        // --- Standard uniforms ---------------------------------------
+        // dutyCycle, g_y, cavityQ, sagDepth_nm, tsRatio, powerAvg_MW, exoticMass_kg, time
+        for (const name in this.uLoc) {
+            const loc = this.uLoc[name];
+            const value = this.uniforms[name];
+            if (loc) {
+                if (typeof value === 'number') gl.uniform1f(loc, value);
+                else if (typeof value === 'boolean') gl.uniform1i(loc, value ? 1 : 0);
+                // Add more type checks if needed (e.g., vec3, mat3)
+            }
+        }
+
+        // --- Purple shift uniforms ---------------------------------------
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, this.uniforms.epsilonTilt ?? 0.0);
+        if (this.gridUniforms.betaTiltVec) {
+            const betaTilt = this.uniforms.betaTiltVec || [0, -1, 0];
+            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+        }
+
+        // --- Metric tensor uniforms (default to identity if not provided)
+        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = this.uniforms.useMetric || false;
+        if (this.gridUniforms.metric) {
+            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
+            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
+            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+        }
+
+        // --- Grid-specific uniforms ----------------------------------
+        // (Assuming _cacheGridUniformLocations has been called)
+        if (this.gridUniforms) {
+            for (const name in this.gridUniforms) {
+                const loc = this.gridUniforms[name];
+                const value = this.uniforms[name];
+                if (loc && value !== undefined) {
+                    // Determine uniform type based on name or value structure
+                    if (name.includes('Matrix')) {
+                        gl.uniformMatrix3fv(loc, false, new Float32Array(value));
+                    } else if (name.includes('Color') || name.includes('Vec') || name.includes('Dir') || name.includes('Scene') || name.includes('axes')) {
+                        gl.uniform3fv(loc, new Float32Array(value));
+                    } else if (typeof value === 'number') {
+                        gl.uniform1f(loc, value);
+                    } else if (typeof value === 'boolean') {
+                        gl.uniform1i(loc, value ? 1 : 0);
+                    } else if (Array.isArray(value)) {
+                         // Handle arrays, e.g., for vec4, mat4 etc. if needed
+                        if (value.length === 3) gl.uniform3fv(loc, new Float32Array(value));
+                        else if (value.length === 4) gl.uniform4fv(loc, new Float32Array(value));
+                        // Add more array type handling if necessary
+                    }
+                }
+            }
+        }
+
+        // --- Draw the full-screen quad ---
+        const posLoc = gl.getAttribLocation(this.program, "a_position");
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
@@ -414,16 +594,16 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
 
         const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
 
-        // build theta scale via canonical function; never trust incidental locals
+        // Canonical θ from uniforms (aliases resolved inside)
         const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
-            ...nextUniforms,
-            // Ensure the canonical has the raw inputs (avoid stale locals)
-            dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
-            dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
-            sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
-            sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
-            currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
-            u_physicsParityMode: nextUniforms.physicsParityMode
+          ...nextUniforms,
+          // ensure raw inputs are present (avoid stale locals)
+          dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
+          dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
+          sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
+          sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
+          currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
+          u_physicsParityMode: nextUniforms.physicsParityMode
         });
         this.__lastThetaTerms = { // Store for potential debug logging
             gammaGeo: nextUniforms.gammaGeo ?? nextUniforms.g_y,
@@ -437,15 +617,16 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         };
 
 
-        // Publish FR explicitly (if none was provided, publish the reconstructed FR)
-        const dFRpub = (Number.isFinite(+parameters?.dutyEffectiveFR) ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
-                        : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
-                                                ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
-                                                 Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400))))));
+        // Publish FR explicitly (use provided FR if present; else reconstruction)
+        const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
+          ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
+          : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
+                                   ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
+                                    Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
         nextUniforms.dutyUsed        = dFRpub;
         nextUniforms.dutyEffectiveFR = dFRpub;
 
-        // --- Neutralize visual boosts in standby (keep this REAL-only if desired) ---
+        // --- Neutralize visual boosts in standby (only for REAL parity) ---
         if (mode === 'standby' && parity) {
           nextUniforms.vizGain = 1;
           nextUniforms.curvatureGainT = 0;
@@ -510,16 +691,16 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
           (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
           (prev.gridSpan !== nextUniforms.gridSpan);
 
-        // Final guardrail: if standby and θ>0, log once for traceability
+        // Guardrail: if standby yet θ>0, log once with chain terms
         if ((parameters?.currentMode ?? nextUniforms.currentMode) === 'standby' && nextUniforms.thetaScale > 0) {
-            console.warn('[warp-engine] Standby θ non-zero — terms:', this.__lastThetaTerms);
+          console.warn('[warp-engine] Standby θ non-zero — uniforms:', nextUniforms);
         }
 
         // Update core uniforms
         Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
 
-        // Engine-authoritative θ
-        this.uniforms.thetaScale_actual = thetaScaleFromChain;
+        // Engine-authoritative θ only (ignore any incoming thetaScale)
+        this.uniforms.thetaScale_actual = thetaScaleFromChain; // telemetry
         this.uniforms.thetaScale        = thetaScaleFromChain;
 
         // Recompute warp geometry if necessary
