@@ -391,13 +391,10 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
         // Choose incoming param or internal chain, then HARD-CLAMP for standby
-        const preferParam = Number.isFinite(parameters?.thetaScale);
-        const incomingTheta = preferParam ? (+parameters.thetaScale) : thetaScaleFromChain;
-        // publish the internal (physics) value for debugging/inspection
+        // Engine-authoritative θ: publish actual + keep any param only for transparency
         nextUniforms.thetaScale_actual = thetaScaleFromChain;
-        // force BOTH panes to zero in standby regardless of parity or overrides
-        const isStandby = (mode === 'standby');
-        nextUniforms.thetaScale = isStandby ? 0 : incomingTheta;
+        nextUniforms.thetaScale_param  = Number.isFinite(parameters?.thetaScale) ? +parameters.thetaScale : undefined;
+        nextUniforms.thetaScale        = thetaScaleFromChain;
 
         // Report 0 duty in standby so θ(phys) = 0 in inspector/diagnostics
         nextUniforms.dutyUsed   = isStandby ? 0 : dutyEffFR;
