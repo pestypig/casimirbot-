@@ -408,7 +408,7 @@ function useCheckpointList(
     // === DAG Stage 2: EXPECTATIONS (Single Source of Truth) ===
     // Calculate the expected θ-scale using canonical formula (RAW, no tone-mapping)
     const dutyFR = Math.max(1e-12, duty / sectors);
-    const thetaExpected = thetaScaleExpected({
+    const thetaExpectedRaw = thetaScaleExpected({
       gammaGeo: Math.max(1, gammaGeo),
       q: Math.max(1e-12, deltaAOverA), 
       gammaVdB: Math.max(1, gammaVdB),
@@ -417,10 +417,10 @@ function useCheckpointList(
 
     checkpoint({
       id: 'expect.theta_scale', side, stage: 'expect',
-      pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
-      msg: `θ_expected=${thetaExpected.toExponential(2)}`,
-      expect: '>0', actual: thetaExpected,
-      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info',
+      pass: Number.isFinite(thetaExpectedRaw) && thetaExpectedRaw > 0,
+      msg: `θ_expected=${thetaExpectedRaw.toExponential(2)}`,
+      expect: '>0', actual: thetaExpectedRaw,
+      sev: !Number.isFinite(thetaExpectedRaw) || thetaExpectedRaw <= 0 ? 'error' : 'info',
       meta: { gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
     });
 
