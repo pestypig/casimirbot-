@@ -1203,8 +1203,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const splitIn =
           N(parameters?.split ?? parameters?.sectorSplit ?? parameters?.sectorIdx ?? this.strobingState?.currentSector, prev?.split ?? 0);
 
-        const gammaVdBIn =
-          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
+        const gammaVdBRaw =
+          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 1.4e5);
+        const gammaVdBIn = Math.max(1, Math.min(parity ? 1e2 : 1e11, gammaVdBRaw)); // REAL≤1e2, SHOW≤1e11
 
         const frFromParams =
           parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff ??
@@ -1217,7 +1218,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           ));
         const sectorsTotal =
           Math.max(1, Math.floor(
-            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? sectorsConcurrent)
+            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
           ));
         const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14));
 
@@ -1287,12 +1288,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             : Math.max(0, Math.min(1, dutyLocal));
         }
 
-        // build theta scale
-        const thetaScaleFromChain = zeroStandby ? 0 :
-          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
-          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB ?? 1) *
-          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
+        // build theta scale: CORRECT chain θ = γ³ × q × γ_VdB × √(duty)
+        const gamma3 = Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3);
+        const q = Math.max(1e-12, nextUniforms.deltaAOverA ?? 1);
+        const gammaVdB = Math.max(1, gammaVdBIn);
+        const sqrtDuty = viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0;
+        const thetaScaleFromChain = zeroStandby ? 0 : gamma3 * q * gammaVdB * sqrtDuty;
 
         // Apply mode-specific scaling for operational differentiation (disabled for pipeline compliance)
         if (!parity && !zeroStandby && false) { // DISABLED: always use pure physics theta scale
@@ -1307,17 +1308,20 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           ? +parameters.thetaScale
           : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback but don't amplify
 
-        // Debug operational mode theta calculation
-        if (this._dbgThetaTick !== (this._dbgThetaTick||0)+1 % 30) {
-          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] PATCHED Theta calculation:`, {
-            γ_geo: nextUniforms.gammaGeo,
-            q: nextUniforms.deltaAOverA,
-            γ_VdB: nextUniforms.gammaVdB,
-            d_FR: dutyEffFR,
-            viewAvg: nextUniforms.viewAvg,
-            calculated: thetaScaleFromChain,
+        // Debug operational mode theta calculation (fixed math chain)
+        this._dbgThetaTick = (this._dbgThetaTick || 0) + 1;
+        if (this._dbgThetaTick % 30 === 1) {
+          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] CORRECTED Theta chain:`, {
+            'γ³': gamma3,
+            'q': q,
+            'γ_VdB': gammaVdB,
+            '√duty': sqrtDuty,
+            'chain=γ³×q×γ_VdB×√duty': thetaScaleFromChain,
             actualTheta: nextUniforms.thetaScale,
-            parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'NONE'
+            dutyEffFR,
+            sectorsConcurrent,
+            sectorsTotal,
+            parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'ENGINE_CALC'
           });
         }
         nextUniforms.dutyUsed   = dutyEffFR;

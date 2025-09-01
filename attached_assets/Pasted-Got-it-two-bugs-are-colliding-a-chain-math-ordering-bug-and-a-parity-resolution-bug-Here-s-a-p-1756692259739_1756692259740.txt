@@ -1,0 +1,133 @@
+Got it — two bugs are colliding: a θ-chain math/ordering bug and a parity resolution bug. Here’s a precise, minimal patch-set to fix both (plus one small hygiene tweak), with pointers to the lines they touch.
+
+---
+
+# 1) θ is \~75× too big (wrong d\_FR + inconsistent γVdB fallback)
+
+### What’s happening
+
+* The engine builds `θ = γ_geo^3 · q · γVdB · (√d_FR if view-averaged)` correctly… **but** your `d_FR` is often computed with `sectorCount=1` because the fallback uses *concurrent* sectors when a total isn’t present, so $d_{FR} \approx \text{dutyLocal}$ instead of $\text{dutyLocal} \times \frac{1}{400}$. That makes √d\_FR ≈ √0.14 ≈ 0.374 instead of √2.5e-5 = 0.005 — i.e., \~75× larger θ. You can see the engine’s θ formula uses `sqrt(dutyEffFR)` (correct), so the bug is in how `dutyEffFR` is made and what `sectorCount` defaults to,.
+* The engine’s γVdB fallback is `2.86e5` and unclamped, which disagrees with the React-side expectations & clamps. That mismatch skews θ whenever the UI doesn’t pass a value.
+
+### Fix A — default sectorCount to ship-wide 400 (not to concurrent)
+
+Change the `sectorsTotal` fallback so it never collapses to the concurrent count; use a 400 hard default when nothing is present.
+
+```diff
+- const sectorsTotal =
+-   Math.max(1, Math.floor(
+-     Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? sectorsConcurrent)
+-   ));
++ const sectorsTotal =
++   Math.max(1, Math.floor(
++     Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
++   ));
+```
+
+(Apply where `sectorsTotal` is resolved in `updateUniforms`.)
+
+### Fix B — compute d\_FR from that total, then take √d\_FR in the θ chain (already correct)
+
+Right after resolving `sectorsConcurrent`/`sectorsTotal`, compute:
+
+```diff
++ const dutyEffFR = Math.max(0, Math.min(1,
++   (parity ? dutyLocal * (sectorsConcurrent / sectorsTotal) : dutyLocal)
++ ));
+```
+
+Then the already-present θ chain will multiply by `viewAvgResolved ? Math.sqrt(dutyEffFR) : 1`.
+
+### Fix C — clamp γVdB by mode so the engine matches the UI
+
+Replace the raw fallback with a mode-aware clamp:
+
+```diff
+- const gammaVdBIn = N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
++ const gammaVdBRaw = N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck,
++                       prev?.gammaVdB ?? 1.4e5);
++ const gammaVdB = Math.max(1, Math.min(parity ? 1e2 : 1e11, gammaVdBRaw)); // REAL≤1e2, SHOW≤1e11
+```
+
+Then use `gammaVdB` in `nextUniforms` and the θ chain. (Insert at the same place the current `gammaVdBIn` is resolved.)
+
+> Why this works: the checkpoint’s θ expectation explicitly applies √d\_FR (FR = ship-wide duty averaged over total sectors) and compares to your bound terms, so once `sectorCount` and γVdB agree, the “θ\_uniforms vs expected” warning collapses.
+
+---
+
+# 2) Parity mode keeps logging as wrong (REAL shows `false`)
+
+### What’s happening
+
+* Parity is resolved from incoming parameters/prev *before* any guardrail, and you only force it at the **end** (after θ is already computed). If the panel didn’t pass `physicsParityMode` in that tick, the chain runs as SHOW and the checkpoint prints `parity=false (exp: true)` for REAL.
+* Also the panel sometimes sends `uPhysicsParity`/`uRidgeMode` (legacy keys) from the “lock pane” helper; the engine only listens to `physicsParityMode`/`ridgeMode` uniforms, so the intent can be dropped.
+
+### Fix D — normalize incoming synonyms then resolve parity **up front**
+
+Do this at the very top of `updateUniforms(parameters)` (before reading `prev`-dependent parity):
+
+```diff
++ // Accept old prop names from UI
++ if (parameters?.uPhysicsParity !== undefined && parameters.physicsParityMode === undefined) {
++   parameters.physicsParityMode = !!parameters.uPhysicsParity;
++ }
++ if (parameters?.uRidgeMode !== undefined && parameters.ridgeMode === undefined) {
++   parameters.ridgeMode = parameters.uRidgeMode|0;
++ }
+```
+
+Now *resolve* parity once (and early), defaulting by tag if unset:
+
+```diff
+- const parity = (parameters?.physicsParityMode !== undefined)
+-   ? !!parameters.physicsParityMode
+-   : !!prev?.physicsParityMode;
++ const debugTag = this.debugTag || 'WarpEngine';
++ const parity = (parameters?.physicsParityMode !== undefined)
++   ? !!parameters.physicsParityMode
++   : (prev?.physicsParityMode !== undefined)
++     ? !!prev.physicsParityMode
++     : debugTag.includes('REAL'); // sensible default per pane
+```
+
+(Edits where parity is currently determined.)
+
+Because the GL upload already targets `u_physicsParityMode` (`gridUniforms.parity`), this makes the checkpoint “parity mode” row go green.
+
+---
+
+# 3) Hygiene: make the React θ helper obey √d\_FR too
+
+Your UI helper in `warp-theta.ts` is currently using a *linear* duty term `duty/sectors` (not √) for view-averaged mode, which disagrees with both the panel’s stated law and the engine chain. Change one line:
+
+```diff
+- const dutyTerm = viewAvg ? Math.max(1e-12, duty / sectors) : 1;
++ const dutyTerm = viewAvg ? Math.sqrt(Math.max(1e-12, duty / sectors)) : 1;
+```
+
+(Where θ is assembled in `warp-theta.ts`.)
+
+This aligns UI-computed `thetaScale` with the engine & the checkpoint’s expected formula.
+
+---
+
+# Quick sanity test (numbers from your snapshot)
+
+* Inputs: $γ_{geo}=26$, $q=1$, dutyLocal $=1\%$, $S_\text{concurrent}=1$, $S_\text{total}=400\Rightarrow d_{FR}=0.01\times\frac{1}{400}=2.5\times 10^{-5}$, so $ \sqrt{d_{FR}}=0.005$.
+* With $γ_{VdB}=2.86\times10^5$ (your “breakdown” line), base $=26^3·γ_{VdB}=17{,}576·286{,}000\approx 5.028\times10^9$.
+* Expected $θ= \text{base}·0.005 \approx 2.51\times10^7$ — exactly what your checkpoint printed as “θ expected”.
+  After Fixes A–D, the engine’s `θ_uniforms` should land within the panel’s ±10% window (severity “info”), and the REAL pane will show `parity=true`.
+
+---
+
+# Optional small cleanups (won’t change physics, do trim warnings)
+
+* **CameraZ default**: give `cameraZ` a simple, stable default when `lockFraming` is true, e.g. `cameraZ = prev?.cameraZ ?? gridSpan*1.75`, to silence “CameraZ unset” logs.
+* Keep **“React-preferred θ”**: you already prioritize `parameters.thetaScale` over your internal fallback; keep that precedence — the point is just to make your fallback numerically consistent when the param is missing.
+
+---
+
+If you want, I can turn the above into exact diff hunks for your `warp-engine.js` and `warp-theta.ts`, but the key lines referenced here are the only spots you need to touch. Once these land:
+
+* The huge θ discrepancy disappears (d\_FR & γVdB consistent with the panel).
+* The parity row stops spamming and matches REAL/SHOW expectations on every tick.
