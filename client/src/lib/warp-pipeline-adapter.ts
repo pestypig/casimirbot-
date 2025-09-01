@@ -57,7 +57,7 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const w_m = Math.max(1e-9, (s.sag_nm ?? 16) * 1e-9);
   const w_rho = Math.max(1e-6, w_m / aEff);
 
-  // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
+  // --- Sectoring (separate concurrent vs total) ---
   const sectorsTotal =
     Math.max(
       1,
@@ -67,22 +67,28 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
           400
       )
     );
+  // Prefer explicit concurrentSectors/sectorsConcurrent; fallback to sectorStrobing; else 1
+  const sectorsConc =
+    Math.max(1, Math.floor(
+      num((s as any).sectorsConcurrent) ??
+      num((s as any).concurrentSectors) ??
+      num(s.sectorStrobing) ?? 1
+    ));
+  const split = Math.floor(sectorsTotal / 2); // viz-only (+/–) split (kept for legacy UI)
 
-  const split = Math.floor(sectorsTotal / 2); // canonical (+/–) split
-
-  // --- Ship-wide effective duty (exactly HELIX's d_eff) ---
-  // Priority: precomputed FR → explicit ship duty → derive from UI dutyCycle & strobing
-  let d_ship =
+  // --- Duty resolution
+  // Local burst (sector-local on-fraction). Use explicit field if provided; else default to paper 1%.
+  const dutyLocal = clamp(
+    num((s as any).localBurstFrac) ?? num((s as any).burstLocal) ?? (s.dutyCycle ?? 0.01),
+    0, 1
+  );
+  // Ford–Roman (ship-wide): d_FR = dutyLocal × (S_concurrent / S_total)
+  const d_ship = clamp(
     num(s.dutyEffective_FR) ??
     num(s.dutyShip) ??
-    (() => {
-      const d_ui = clamp(s.dutyCycle ?? 0.14, 0, 1);
-      const strobe = Math.max(1, num(s.sectorStrobing) ?? sectorsTotal);
-      // FR duty is ship-wide time-average per total sectors (do NOT include q here)
-      return clamp(d_ui / strobe, 0, 1);
-    })();
-
-  d_ship = clamp(d_ship, 0, 1);
+    (dutyLocal * (sectorsConc / sectorsTotal)),
+    0, 1
+  );
 
   // --- Physics amplitude chain (renderer consumes this as u_thetaScale) ---
   // Include qSpoilingFactor in theta calculation for mode differences.
@@ -107,11 +113,11 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     {
       // Physics/ops - include qSpoilingFactor in physics chain
       currentMode: s.currentMode,
-      // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
-      dutyCycle: d_ship, // ship-wide effective duty
-      dutyEffectiveFR: d_ship, // FR duty for calculations
-      sectorCount: sectorsTotal, // total wedges
-      sectors: split, // +/- split for viz that expects half-count
+      // Do not set physicsParityMode/ridgeMode here; caller (REAL/SHOW) decides
+      dutyCycle: dutyLocal,            // ⟵ sector-local burst duty
+      dutyEffectiveFR: d_ship,         // ⟵ Ford–Roman duty (ship-wide)
+      sectorCount: sectorsTotal,       // ⟵ total wedges
+      sectors: sectorsConc,            // ⟵ concurrent/live sectors
       gammaGeo,
       gammaVanDenBroeck: gammaVdB,
       qSpoilingFactor: qSpoil,
@@ -124,7 +130,7 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Audit-only; do not override engine θ
       thetaScaleExpected,
 
-      // Visual defaults locked by gating system
+      // Visual defaults (safe)
       colorMode: "theta",
       viewAvg: true,
     },
