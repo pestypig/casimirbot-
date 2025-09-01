@@ -79,7 +79,7 @@ function enableLowFps(engine: any, fps = 12) {
 async function firstCorrectFrame({
   engine, canvas, sharedAxesScene, pane
 }: {
-  engine: any; canvas: HTMLCanvasElement; sharedAxesScene: [number,number,number]; pane: 'REAL'|'SHOW';
+  engine: any; canvas: HTMLCanvasElement | null; sharedAxesScene: [number,number,number]; pane: 'REAL'|'SHOW';
 }) {
   // wait for program + buffers
   await new Promise<void>(res => {
@@ -100,7 +100,8 @@ function safeCamZ(z: number): number {
   return Number.isFinite(z) ? Math.max(-10, Math.min(-0.1, z)) : -2.0;
 }
 
-function calculateCameraZ(canvas: HTMLCanvasElement, axes: [number,number,number]): number {
+function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number,number]): number {
+  if (!canvas) return -2.0; // safe fallback when canvas is null
   const w = canvas.clientWidth || canvas.width || 800;
   const h = canvas.clientHeight || canvas.height || 320;
   const aspect = w / h;
