@@ -33,6 +33,45 @@ import CheckpointViewer from "./CheckpointViewer";
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// ───────────────────────────────────────────────────────────────────────────────
+// Projection helpers: take a point on the ellipsoid shell and project to NDC/pixels
+// ───────────────────────────────────────────────────────────────────────────────
+type Vec3 = [number, number, number];
+type NDC = { x: number; y: number; z: number; w: number };
+
+function shellPointOnDir(axes: Vec3, dir: Vec3): Vec3 {
+  // Solve s so that ((s*dx)/ax)^2 + ((s*dy)/ay)^2 + ((s*dz)/az)^2 = 1  with p = s*dir
+  const [ax, ay, az] = axes.map(v => Math.max(1e-9, +v)) as Vec3;
+  const [dx, dy, dz] = dir as Vec3;
+  const denom = (dx*dx)/(ax*ax) + (dy*dy)/(ay*ay) + (dz*dz)/(az*az);
+  const s = (denom > 0) ? (1 / Math.sqrt(denom)) : 0;
+  return [s*dx, s*dy, s*dz];
+}
+
+function projectToNDC(mvp: Float32Array | number[], p: Vec3): NDC | null {
+  if (!mvp || (mvp as any).length !== 16) return null;
+  const m = mvp as any;
+  const x = p[0], y = p[1], z = p[2];
+  const X = m[0]*x + m[4]*y + m[8 ]*z + m[12];
+  const Y = m[1]*x + m[5]*y + m[9 ]*z + m[13];
+  const Z = m[2]*x + m[6]*y + m[10]*z + m[14];
+  const W = m[3]*x + m[7]*y + m[11]*z + m[15];
+  if (Math.abs(W) < 1e-9) return { x: 0, y: 0, z: Z, w: W };
+  return { x: X / W, y: Y / W, z: Z / W, w: W };
+}
+
+function ndcToPixels(ndc: NDC | null, canvas?: HTMLCanvasElement | null) {
+  if (!ndc || !canvas) return null;
+  const w = canvas.clientWidth || canvas.width || 0;
+  const h = canvas.clientHeight || canvas.height || 0;
+  if (!w || !h) return null;
+  // NDC (-1..1) → pixels
+  const px = Math.round((ndc.x * 0.5 + 0.5) * w);
+  const py = Math.round((1 - (ndc.y * 0.5 + 0.5)) * h); // invert Y for screen space
+  const onScreen = ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1 && ndc.w > 0;
+  return { px, py, onScreen };
+}
+
 // Enhanced canvas/GL inspection that works with both slice2d and grid3d engines
   const getCanvasEngine = (engineRef: React.MutableRefObject<any>, canvasRef: React.MutableRefObject<HTMLCanvasElement | null>) => {
     const engine = engineRef.current;
@@ -252,6 +291,26 @@ function useCheckpointList(
     // 👂 Publish the engine's current physics authority for other UI bits
     publishWarpEcho(e, side, liveSnap);
 
+    // ── Gather geometry & view for projection checks
+    const u = e?.uniforms || {};
+    const axesScene: Vec3 = (Array.isArray(u?.axesClip) && u.axesClip.length === 3)
+      ? [u.axesClip[0], u.axesClip[1], u.axesClip[2]]
+      : (Array.isArray(u?.axesScene) && u.axesScene.length === 3 ? [u.axesScene[0], u.axesScene[1], u.axesScene[2]] : [1,1,1]);
+    const driveRaw: Vec3 = (Array.isArray(u?.driveDir) && u.driveDir.length === 3) ? [u.driveDir[0], u.driveDir[1], u.driveDir[2]] : [1,0,0];
+    // normalize drive dir in scene-scaled space (same as engine)
+    const dN = (() => {
+      const t: Vec3 = [driveRaw[0] / axesScene[0], driveRaw[1] / axesScene[1], driveRaw[2] / axesScene[2]];
+      const m = Math.hypot(t[0], t[1], t[2]) || 1;
+      return [t[0]/m, t[1]/m, t[2]/m] as Vec3;
+    })();
+    // Points on the ellipsoid shell along ±drive direction
+    const pFront = shellPointOnDir(axesScene, dN);
+    const pRear  = shellPointOnDir(axesScene, [-dN[0], -dN[1], -dN[2]]);
+    const ndcF   = projectToNDC(e?.mvpMatrix, pFront);
+    const ndcR   = projectToNDC(e?.mvpMatrix, pRear);
+    const pixF   = ndcToPixels(ndcF as any, cv);
+    const pixR   = ndcToPixels(ndcR as any, cv);
+
     // === DAG Stage 1: INPUT CHECKPOINTS ===
     // Pipeline inputs validation
     const gammaGeo = N(liveSnap?.gammaGeo ?? liveSnap?.g_y, 26);
@@ -304,7 +363,7 @@ function useCheckpointList(
     });
 
     // === DAG Stage 3: UNIFORMS ===
-    const u = e?.uniforms || {};
+    // (u defined above)
     const ts = N(u?.thetaScale, NaN);
 
     // Expected uniforms θ from the same chain the engine uses (RAW)
@@ -372,6 +431,29 @@ function useCheckpointList(
         msg: `θ_display uniform=${Number.isFinite(thetaDisplayUniform) ? thetaDisplayUniform.toFixed(3) : '—'} vs exp=${Number.isFinite(thetaDisplayExpect) ? thetaDisplayExpect.toFixed(3) : '—'}`,
         expect: 'info-only',
         actual: { thetaDisplayUniform, thetaDisplayExpect, exposure, zeroStop, userGain, boostNow },
+        sev: 'info'
+      });
+    }
+
+    // ── NEW: Shader amplitude estimate (what the FS multiplies with)
+    // amp = u_thetaScale * max(1, u_userGain) * showGain * vizSeason * (1 + tBlend*(tBoost-1))
+    {
+      const parity = !!(u.physicsParityMode ?? u.parityMode);
+      const showGain  = parity ? 1.0 : Math.max(1, N(u?.displayGain, 1));
+      const vizSeason = parity ? 1.0 : Math.max(1, N(u?.vizGain, 1));
+      const tBlend    = parity ? 0.0 : clamp01(N(u?.curvatureGainT, 0));
+      const tBoostMax = parity ? 1.0 : Math.max(1, N(u?.curvatureBoostMax, 40));
+      const userGain  = Math.max(1, N(u?.userGain, 1));
+      const ampEst    = (Number.isFinite(ts) ? ts : 0) * userGain * showGain * vizSeason * (1 + tBlend * (tBoostMax - 1));
+
+      checkpoint({
+        id: 'uniforms.theta_shader_amp_est',
+        side,
+        stage: 'uniforms',
+        pass: Number.isFinite(ampEst) && ampEst >= 0,
+        msg: `θ(shader) amp≈${Number.isFinite(ampEst) ? ampEst.toExponential(2) : '—'} (parity=${parity})`,
+        expect: 'info-only',
+        actual: { ts, userGain, showGain, vizSeason, tBlend, tBoostMax },
         sev: 'info'
       });
     }
@@ -623,6 +705,36 @@ function useCheckpointList(
 
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
 
+    // ── NEW: WebGL projection rows (front/rear shell along drive direction)
+    if (ndcF && pixF) {
+      const detailF = `NDC=(${ndcF.x.toFixed(3)}, ${ndcF.y.toFixed(3)}, ${ndcF.z.toFixed(3)}) • px=(${pixF.px}, ${pixF.py}) ${pixF.onScreen ? '' : '• offscreen'}`;
+      rows.push({ label: "Front (ρ=1) projection", detail: detailF, state: pixF.onScreen ? "ok" : "warn" });
+      checkpoint({
+        id: 'gpu.mvp_front',
+        side,
+        stage: 'gpu',
+        pass: pixF.onScreen,
+        msg: detailF,
+        expect: 'inside frustum',
+        actual: detailF,
+        sev: pixF.onScreen ? 'info' : 'warn'
+      });
+    }
+    if (ndcR && pixR) {
+      const detailR = `NDC=(${ndcR.x.toFixed(3)}, ${ndcR.y.toFixed(3)}, ${ndcR.z.toFixed(3)}) • px=(${pixR.px}, ${pixR.py}) ${pixR.onScreen ? '' : '• offscreen'}`;
+      rows.push({ label: "Rear (ρ=1) projection", detail: detailR, state: pixR.onScreen ? "ok" : "warn" });
+      checkpoint({
+        id: 'gpu.mvp_rear',
+        side,
+        stage: 'gpu',
+        pass: pixR.onScreen,
+        msg: detailR,
+        expect: 'inside frustum',
+        actual: detailR,
+        sev: pixR.onScreen ? 'info' : 'warn'
+      });
+    }
+
     // Show detailed breakdown from bound uniforms if available
     if (echo && echo.terms) {
       const terms = echo.terms;
@@ -703,6 +815,29 @@ function useCheckpointList(
     // Render loop alive (RAF attached)
     const rafAlive = !!e?._raf;
     rows.push({ label: "Render loop", detail: rafAlive ? "active" : "stopped", state: rafAlive ? "ok" : "warn" });
+
+    // ── Frame console line for quick triage
+    try {
+      const parity = !!(u.physicsParityMode ?? u.parityMode);
+      const showGain  = parity ? 1.0 : Math.max(1, N(u?.displayGain, 1));
+      const vizSeason = parity ? 1.0 : Math.max(1, N(u?.vizGain, 1));
+      const tBlend    = parity ? 0.0 : clamp01(N(u?.curvatureGainT, 0));
+      const tBoostMax = parity ? 1.0 : Math.max(1, N(u?.curvatureBoostMax, 40));
+      const userGain  = Math.max(1, N(u?.userGain, 1));
+      const ampEst    = (Number.isFinite(ts) ? ts : 0) * userGain * showGain * vizSeason * (1 + tBlend * (tBoostMax - 1));
+
+      console.log(`[WRC θ] ${label}`, {
+        theta_uniform: ts,
+        theta_expected_chain: thetaUniformExpected,
+        shader_amp_est: ampEst,
+        parity,
+        viewAvg: (u?.viewAvg ?? true),
+        sectors: { live: u?.sectors, total: u?.sectorCount },
+        dutyUsed: u?.dutyUsed ?? u?.dutyEffectiveFR,
+        front_ndc: ndcF, rear_ndc: ndcR,
+        front_px: pixF, rear_px: pixR
+      });
+    } catch {}
 
     return rows;
   }, [engineRef.current, canvasRef.current, liveSnap, hb, label, dutyFR, thetaExpectedFn]);
