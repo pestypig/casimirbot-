@@ -165,7 +165,7 @@ export default class WarpEngine {
         // Clamp gamma VdB to physically reasonable range (1-100, default 38.3)
         const vRaw = +(u.gammaVanDenBroeck_mass ?? u.gammaVanDenBroeck_vis ?? u.gammaVanDenBroeck ?? u.gammaVdB ?? 38.3);
         const v    = Number.isFinite(vRaw) ? Math.max(1, Math.min(100, vRaw)) : 38.3;
-        const dRaw = +u.dutyEffectiveFR;
+        const dRaw = +u.dutyEffectiveFR; // This is the value we'll zero in standby
         const d    = Number.isFinite(dRaw) ? Math.max(1e-12, Math.min(1, dRaw)) : 2.5e-5;
         return Math.pow(g, 3) * q * v * Math.sqrt(d);
     }
@@ -359,6 +359,10 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
 
     updateUniforms(obj){
         const patch = obj || {};
+        const parameters = { ...this.uniforms, ...patch }; // Copy existing uniforms and apply patch
+        const nextUniforms = { ...parameters }; // Create a new object for modifications
+        const mode = parameters?.mode || 'hover'; // Default to 'hover' if mode is not specified
+        const parity = !!parameters?.physicsParityMode; // Ensure parity is a boolean
 
         // 1) Bind metric first (+ mirror to u_*)
         if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
@@ -366,29 +370,56 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             const I = [1,0,0, 0,1,0, 0,0,1];
             const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
             const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
-            this.uniforms.useMetric   = useMetric; this.uniforms.u_useMetric = useMetric;
-            this.uniforms.metric      = m;         this.uniforms.u_metric    = m;
-            this.uniforms.metricInv   = mi;        this.uniforms.u_metricInv = mi;
+            nextUniforms.useMetric   = useMetric; nextUniforms.u_useMetric = useMetric;
+            nextUniforms.metric      = m;         nextUniforms.u_metric    = m;
+            nextUniforms.metricInv   = mi;        nextUniforms.u_metricInv = mi;
         }
 
         // 2) Merge rest, but strip any external thetaScale
         const { thetaScale, u_thetaScale, ...safeParameters } = patch;
-        Object.assign(this.uniforms, safeParameters);
+        Object.assign(nextUniforms, safeParameters);
 
-        // 3) Recompute thetaScale from physics chain (engine is source of truth)
-        const theta = this._computeThetaScaleFromUniforms(this.uniforms);
-        this._thetaScaleActual = theta;
-        this.uniforms.thetaScale = theta;
-        this.uniforms.u_thetaScale = theta;
+        // --- Recalculate physics chain values ---
+        const dutyEffFR = Number.isFinite(nextUniforms.dutyEffectiveFR) ? nextUniforms.dutyEffectiveFR : 2.5e-5;
+        const viewAvgResolved = nextUniforms.viewAvgResolved ?? false;
 
-        // 4) Warn if external thetaScale tried to override (once per instance)
+        // build theta scale (keep actual chain value for telemetry)
+        const thetaScaleFromChain =
+          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
+
+        // Choose incoming param or internal chain, then HARD-CLAMP for standby
+        const preferParam = Number.isFinite(parameters?.thetaScale);
+        const incomingTheta = preferParam ? (+parameters.thetaScale) : thetaScaleFromChain;
+        // publish the internal (physics) value for debugging/inspection
+        nextUniforms.thetaScale_actual = thetaScaleFromChain;
+        // force BOTH panes to zero in standby regardless of parity or overrides
+        const isStandby = (mode === 'standby');
+        nextUniforms.thetaScale = isStandby ? 0 : incomingTheta;
+
+        // Report 0 duty in standby so θ(phys) = 0 in inspector/diagnostics
+        nextUniforms.dutyUsed   = isStandby ? 0 : dutyEffFR;
+        nextUniforms.dutyEffectiveFR = isStandby ? 0 : dutyEffFR;
+
+        // --- Neutralize visual boosts in standby (keep this REAL-only if desired) ---
+        if (isStandby && parity) {
+          nextUniforms.vizGain = 1;
+          nextUniforms.curvatureGainT = 0;
+          nextUniforms.curvatureBoostMax = 1;
+          nextUniforms.userGain = 1;
+          nextUniforms.vShip = 0;
+        }
+
+        // 3) Warn if external thetaScale tried to override (once per instance)
         if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
             const asked = +(u_thetaScale ?? thetaScale);
-            if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
-                console.warn('[WarpEngine] Ignored external thetaScale override', { 
-                    asked: asked.toExponential(2), 
-                    engine: theta.toExponential(2), 
-                    ratio: (theta/asked).toFixed(2) 
+            if (Number.isFinite(asked) && Math.abs(thetaScaleFromChain - asked) / Math.max(1, Math.abs(thetaScaleFromChain)) > 0.01) {
+                console.warn('[WarpEngine] Ignored external thetaScale override', {
+                    asked: asked.toExponential(2),
+                    engine: thetaScaleFromChain.toExponential(2),
+                    ratio: (thetaScaleFromChain/asked).toFixed(2)
                 });
                 this.__thetaWarned = true;
             }
@@ -397,7 +428,6 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         // --- Metric tensor wiring --------------------------------------------
         // Accept either explicit metric(s) or derive an ellipsoidal cometric.
         // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const parameters = safeParameters; // Use filtered parameters
         const prev = this.uniforms; // Store previous uniforms for comparison
 
         const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
@@ -425,23 +455,21 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             }
         }
         // Update uniforms object with metric information
-        parameters.metricMode = metricMode;
-        parameters.metric     = metric;
-        parameters.metricInv  = metricInv;
-        parameters.useMetric  = !!useMetric;
+        nextUniforms.metricMode = metricMode;
+        nextUniforms.metric     = metric;
+        nextUniforms.metricInv  = metricInv;
+        nextUniforms.useMetric  = !!useMetric;
 
 
         // --- decide if the CPU warp needs recompute ---
         const geoChanged =
-          (prev.hullAxes?.[0] !== parameters.hullAxes?.[0]) ||
-          (prev.hullAxes?.[1] !== parameters.hullAxes?.[1]) ||
-          (prev.hullAxes?.[2] !== parameters.hullAxes?.[2]) ||
-          (prev.gridSpan !== parameters.gridSpan);
+          (prev.hullAxes?.[0] !== nextUniforms.hullAxes?.[0]) ||
+          (prev.hullAxes?.[1] !== nextUniforms.hullAxes?.[1]) ||
+          (prev.hullAxes?.[2] !== nextUniforms.hullAxes?.[2]) ||
+          (prev.gridSpan !== nextUniforms.gridSpan);
 
         // Update core uniforms
-        Object.assign(this.uniforms, parameters);
-
-        // thetaScale is now computed in updateUniforms() using physics chain
+        Object.assign(this.uniforms, nextUniforms); // Assign the modified uniforms back
 
         // Recompute warp geometry if necessary
         if (geoChanged) {
