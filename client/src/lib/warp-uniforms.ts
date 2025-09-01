@@ -107,7 +107,8 @@ export function normalizeWU(raw:any): WarpUniforms {
       viewAvg: true,
       viewMassFraction: sectors / sectorCount,
       colorMode: 'theta',
-      thetaScale: Math.sqrt(dutyEffectiveFR) * Math.pow(gammaGeo,3) * q * gammaVdB,
+      // UI hint only; do NOT push a real thetaScale downstream
+      thetaScaleExpected: dutyEffectiveFR * Math.pow(gammaGeo,3) * q * gammaVdB,
       __src: 'legacy',
       __version: 1
     };
@@ -144,9 +145,10 @@ export function normalizeWU(raw:any): WarpUniforms {
   const qSpoil          = q_canonical;
 
   // --- γ_VdB visual with symmetric aliases ---------------------------------
+  // use a sane visual default consistent with panels and papers
   const gammaV_vis_src = N(
     raw.gammaVanDenBroeck_vis ?? raw.gammaVdB ?? raw.gammaVanDenBroeck,
-    1e11 // match PAPER_VDB.GAMMA_VDB from server
+    1.4e5
   );
   const gammaVdB              = Math.max(1, gammaV_vis_src);
   const gammaVanDenBroeck     = gammaVdB; // keep legacy alias in sync
@@ -166,9 +168,10 @@ export function normalizeWU(raw:any): WarpUniforms {
   const colorMode: 'theta'|'rho' = (raw.colorMode === 'rho' ? 'rho' : 'theta');
 
   // --- expected θ scale (derive if missing) ---------------------------------
-  const thetaScale = Number.isFinite(+raw.thetaScale)
-    ? +raw.thetaScale
-    : (Math.sqrt(dutyEffectiveFR) * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
+  // do not surface a real thetaScale here; only publish an expectation for UI
+  const thetaScaleExpected = Number.isFinite(+raw.thetaScaleExpected)
+    ? +raw.thetaScaleExpected
+    : (dutyEffectiveFR * Math.pow(gammaGeo,3) * q_canonical * gammaVdB);
 
   // --- Purple shift normalization ------------------------------------------
   const epsilonTilt = Number.isFinite(+raw.epsilonTilt) ? Math.max(0, +raw.epsilonTilt) : undefined;
@@ -213,8 +216,8 @@ export function normalizeWU(raw:any): WarpUniforms {
     qCav,
     qCavity: qCav,
 
-    // derived θ
-    thetaScale,
+    // expected θ (UI hint only)
+    thetaScaleExpected,
 
     // renderer helpers
     viewAvg,
