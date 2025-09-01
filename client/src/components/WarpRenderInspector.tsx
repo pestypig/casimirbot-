@@ -14,7 +14,80 @@ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
-import { thetaCanonical } from "@/lib/warp-theta";
+// NOTE: Do NOT compute or send theta from the UI. The engine is authoritative.
+
+// --- pane helpers -----------------------------------------------------------
+const sanitizeUniforms = (o: any) =>
+  Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
+
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  const p = { ...patch };
+  if (pane === 'REAL') {
+    p.physicsParityMode = true;  p.parityMode = true;
+    p.viewAvg = true;            p.ridgeMode = 0;
+  } else {
+    p.physicsParityMode = false; p.parityMode = false;
+    p.viewAvg = false;           p.ridgeMode = 1;
+  }
+  // Never allow UI to inject theta
+  delete (p as any).thetaScale;
+  delete (p as any).u_thetaScale;
+  return p;
+}
+
+function buildRealPacket(parameters: any, base: any = {}) {
+  const dutyFR =
+    Math.max(1e-9, Math.min(1,
+      (parameters?.dutyEffectiveFR ?? parameters?.dutyFR ?? 0.000025)));
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    physicsParityMode: true,
+    viewAvg: true,
+    // REAL must use FR duty directly → collapse sectors
+    dutyEffectiveFR: dutyFR,
+    dutyCycle: dutyFR,
+    sectors: 1,
+    sectorCount: 1,
+    vShip: 0,
+    ridgeMode: 0,
+    // Mass-pocket gamma only for REAL (clamped physical range)
+    gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
+      parameters?.gammaVanDenBroeck_mass ??
+      parameters?.gammaVanDenBroeck ??
+      38.3)),
+    // Visual gamma can be logged but is not used by REAL
+    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
+      parameters?.gammaVanDenBroeck_vis ??
+      parameters?.gammaVanDenBroeck ??
+      2.86e5)),
+    // Avoid UI theta
+    thetaScale: undefined,
+    u_thetaScale: undefined,
+  };
+}
+
+function buildShowPacket(parameters: any, base: any = {}) {
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    physicsParityMode: false,
+    viewAvg: false,
+    dutyCycle: Math.max(0, Math.min(1, parameters?.dutyCycle ?? 0.14)),
+    sectorCount: Math.max(1, Math.floor(parameters?.sectorCount ?? 400)),
+    sectors:     Math.max(1, Math.floor(parameters?.sectors     ?? 1)),
+    vShip: parameters?.currentMode === 'standby' ? 0 : 1,
+    ridgeMode: 1,
+    // SHOW uses the "visual" pocket factor
+    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
+      parameters?.gammaVanDenBroeck_vis ??
+      parameters?.gammaVanDenBroeck ??
+      2.86e5)),
+    // Avoid UI theta
+    thetaScale: undefined,
+    u_thetaScale: undefined,
+  };
+}
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -490,16 +563,11 @@ function PaneOverlay(props:{
         Number(+U.thetaScale) ||
         Number(+U.u_thetaScale) || NaN;
       const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
-      const sectorsConcurrent = Math.max(1, +(U.sectorCount ?? 1)); // FIX: Use sectorCount for CONCURRENT sectors for SHOW pane
+      const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1)); // Fixed: Use sectors for concurrent
       const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
-      const thetaCanon = thetaCanonical({
-        gammaGeo:               +U.gammaGeo || 26,
-        qSpoilingFactor:        +U.qSpoilingFactor || +U.deltaAOverA || 1,
-        gammaVanDenBroeck_mass: +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3,
-        dutyLocal, sectorsConcurrent, sectorsTotal,
-        viewAveraged: !!U.physicsParityMode,
-        mode: (U.currentMode as any) || 'hover'
-      });
+      
+      // Engine computes theta - we just report what it computed
+      const thetaCanon = thetaShader; // Engine is canonical now
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
 
       // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
@@ -1302,9 +1370,30 @@ export default function WarpRenderInspector(props: {
         }
       }
 
-      // Bootstrap both engines once they are ready
-      leftEngine.current?.bootstrap?.({ ...realPayload });
-      rightEngine.current?.bootstrap?.({ ...showPayload });
+      // Bootstrap both engines once they are ready (engine computes theta)
+      const realPacket = paneSanitize('REAL', sanitizeUniforms(realPayload));
+      const showPacket = paneSanitize('SHOW', sanitizeUniforms(showPayload));
+      
+      leftEngine.current?.bootstrap?.(realPacket);
+      rightEngine.current?.bootstrap?.(showPacket);
+
+      // Post-bootstrap theta debugging
+      requestAnimationFrame(() => {
+        try {
+          const Le = leftEngine.current, Re = rightEngine.current;
+          const Lθ = Number(Le?.uniforms?.thetaScale_actual ?? Le?.uniforms?.thetaScale);
+          const Rθ = Number(Re?.uniforms?.thetaScale_actual ?? Re?.uniforms?.thetaScale);
+          const parL = !!Le?.uniforms?.physicsParityMode, parR = !!Re?.uniforms?.physicsParityMode;
+          console.log('[WRI θ] REAL: θ(shader)=', Lθ, 'parity=', parL,
+            'dutyCycle=', Le?.uniforms?.dutyCycle, 'sectors=', Le?.uniforms?.sectors,
+            'sectorCount=', Le?.uniforms?.sectorCount, 'γ_VdB(mass)=', Le?.uniforms?.gammaVanDenBroeck_mass);
+          console.log('[WRI θ] SHOW: θ(shader)=', Rθ, 'parity=', parR,
+            'dutyCycle=', Re?.uniforms?.dutyCycle, 'sectors=', Re?.uniforms?.sectors,
+            'sectorCount=', Re?.uniforms?.sectorCount, 'γ_VdB(vis)=', Re?.uniforms?.gammaVanDenBroeck_vis);
+        } catch (e) {
+          console.warn('[WRI θ] Debug sampling failed:', e);
+        }
+      });
 
       // Build shared frame data once
       const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
@@ -1647,98 +1736,44 @@ export default function WarpRenderInspector(props: {
     console.log("---------------------------------");
   };
 
-  // Apply physics from props with comprehensive validation
-    const realPhys = props.parityPhys || {};
-    const showPhys = props.showPhys || {};
-    const baseShared = props.baseShared || {};
-
-    // Enhanced theta scale calculation with debugging
-    // const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
-    //   const gammaGeo = +phys.gammaGeo || 26;
-    //   const qSpoil   = +phys.qSpoilingFactor || 1;
-    //   // use explicit pocket factors
-    //   const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
-    //   const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
-    //   const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
-    //   const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
-
-    //   const calculated = computeThetaScale(phys);
-    //   const actualTheta = source === 'fr'
-    //     ? leftEngine.current?.uniforms?.thetaScale
-    //     : rightEngine.current?.uniforms?.thetaScale;
-
-    //   console.log(`[${label}] Theta calculation debug:`, {
-    //     gammaGeo,
-    //     qSpoil,
-    //     gammaVdB,
-    //     dutyFR,
-    //     viewAvg: true,
-    //     calculated,
-    //     actualTheta
-    //   });
-
-    //   return calculated;
-    // };
-
-    // Build REAL payload (physics pane) — provide canonical θ inputs only
-    const realPayload = {
-      ...baseShared,
-      physicsParityMode: true,
-      ridgeMode: 0,
-      ...realPhys,
+  // Build parameters object for the new packet builders
+    const parameters = {
+      ...props.parityPhys,
+      ...props.showPhys,
+      ...props.baseShared,
       currentMode: live?.currentMode,
-      // Canonical θ inputs:
-      gammaGeo: realPhys?.gammaGeo ?? 26,
-      qSpoilingFactor: realPhys?.qSpoilingFactor ?? 1,
-      gammaVanDenBroeck_mass:
-        realPhys?.gammaVanDenBroeck_mass ??
-        realPhys?.gammaVanDenBroeck ??
-        live?.gammaVanDenBroeck_mass ??
-        live?.gammaVanDenBroeck ?? 38.3,
+      dutyEffectiveFR,
+      dutyCycle: dutyLocal,
       sectorCount: sTotal,
-      sectors: sConcurrent,       // concurrent sectors
-      dutyCycle: dutyLocal,       // local burst duty
-      dutyEffectiveFR,            // ship-wide Ford–Roman duty
-      exposure: 5.0,
-      zeroStop: 1e-7,
-      colorMode: 2, // Shear proxy for truth view
-      lockFraming: true
+      sectors: sConcurrent,
+      gammaVanDenBroeck_mass: live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck ?? 38.3,
+      gammaVanDenBroeck_vis: live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck ?? 2.86e5,
     };
 
-    // Attach metric defaults to both panes (you can turn them off via useMetric=false)
-    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
-    (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
-    (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
-
-    // Build SHOW payload (visual pane) — still provide canonical inputs; engine will ignore √d in SHOW
-    const showPayload = {
-      ...baseShared,
-      physicsParityMode: false,
-      ridgeMode: 1,
-      ...showPhys,
-      currentMode: live?.currentMode,
-      // Canonical inputs mirrored for consistency/debug:
-      gammaGeo: showPhys?.gammaGeo ?? realPhys?.gammaGeo ?? 26,
-      qSpoilingFactor: showPhys?.qSpoilingFactor ?? realPhys?.qSpoilingFactor ?? 1,
-      gammaVanDenBroeck_vis:
-        showPhys?.gammaVanDenBroeck_vis ??
-        live?.gammaVanDenBroeck_vis ??
-        live?.gammaVanDenBroeck ?? 1.35e5,
-      sectorCount: sTotal,
-      sectors: 1,                 // SHOW is cosmetic; keep concurrent=1 to avoid accidental √d coupling
-      dutyCycle: dutyLocal,
-      dutyEffectiveFR,
-      exposure: 7.5,
+    // Shared base properties
+    const shared = {
+      hull: props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 },
+      axesScene: deriveAxesClip(hull, 1),
+      exposure: 5.0,
       zeroStop: 1e-7,
+      lockFraming: true,
+      useMetric: props.baseShared?.useMetric ?? false,
+      metric: props.baseShared?.metric ?? metricDiag.g,
+      metricInv: props.baseShared?.metricInv ?? metricDiag.inv,
+      epsilonTilt: epsilonTilt,
+      betaTiltVec: betaTiltVecN,
+    };
+
+    // Build REAL and SHOW payloads using the new builders
+    const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
+    const showPayload = buildShowPacket(parameters, { 
+      ...shared, 
+      exposure: 7.5,
+      colorMode: 1,
       curvatureGainT: 0.70,
       curvatureBoostMax: 40,
       userGain: 1.25,
-      colorMode: 1, // Theta mode for visual enhancement
-      lockFraming: true
-    };
-    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
-    (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
-    (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
+    });
 
 
 
@@ -1788,18 +1823,20 @@ export default function WarpRenderInspector(props: {
       const dutyFR_REAL = dutyLocal * (sConcL / s);
       const dutyUI_SHOW = dutyLocal * (1 / s);
 
-      // Temporarily use direct updates to debug syntax error
+      // Use new packet builders with proper pane sanitization
       if (leftEngine.current) {
-        gatedUpdateUniforms(leftEngine.current, sanitizeUniforms({
+        const realUpdate = paneSanitize('REAL', sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyFR_REAL,
-        }), 'client');
+        }));
+        gatedUpdateUniforms(leftEngine.current, realUpdate, 'client');
       }
       if (rightEngine.current) {
-        gatedUpdateUniforms(rightEngine.current, sanitizeUniforms({
+        const showUpdate = paneSanitize('SHOW', sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyUI_SHOW,
-        }), 'client');
+        }));
+        gatedUpdateUniforms(rightEngine.current, showUpdate, 'client');
       }
     });
     return () => { try { off?.(); } catch {} };
