@@ -6,7 +6,8 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
-import { computeThetaScale } from '@/lib/warp-theta';
+// ❌ Never compute θ on the client for the renderer – engine is the authority.
+// (removed stale import)
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -1224,7 +1225,7 @@ export default function WarpBubbleCompare({
       // Apply heroExaggeration to visual amplification (normalized heroBoost)
       curvatureGainT: Math.max(0, Math.min(1, 0.70)), // clamp gain T
       curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
-      userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
+      userGain: Math.max(1, Math.min(10, 4)), // clamp user gain
       displayGain: 1,
       // Do NOT supply thetaScale; engine computes θ. Standby is enforced by engine.
       physicsParityMode: false,
@@ -1269,18 +1270,27 @@ export default function WarpBubbleCompare({
     // Also push FR-window/light-crossing controls if present
     if (parameters.lightCrossing) {
       const lc = parameters.lightCrossing;
-      const s = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
-      const lcPayload = {
+      const total = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
+      const live  = Math.max(1, Number(parameters.sectors) || total);
+      const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
+      pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
         phase: lc.phase,
         onWindow: !!lc.onWindowDisplay,
-        split: Math.max(0, (lc.sectorIdx ?? 0) % s),
+        split: Math.max(0, (lc.sectorIdx ?? 0) % live),
         tauLC_ms: lc.tauLC_ms,
         dwell_ms: lc.dwell_ms,
         burst_ms: lc.burst_ms,
-        sectors: s
-      };
-      pushLeft.current(paneSanitize('REAL', sanitizeUniforms(lcPayload)), 'REAL');
-      pushRight.current(paneSanitize('SHOW', sanitizeUniforms(lcPayload)), 'SHOW');
+        sectors: total
+      })), 'REAL');
+      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
+        phase: lc.phase,
+        onWindow: !!lc.onWindowDisplay,
+        split: Math.max(0, (lc.sectorIdx ?? 0) % live),
+        tauLC_ms: lc.tauLC_ms,
+        dwell_ms: lc.dwell_ms,
+        burst_ms: lc.burst_ms,
+        sectors: total
+      })), 'SHOW');
     }
 
     // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
