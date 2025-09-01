@@ -14,7 +14,6 @@ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
-import Grid3DEngine from "@/components/engines/Grid3DEngine";
 import { thetaCanonical } from "@/lib/warp-theta";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
