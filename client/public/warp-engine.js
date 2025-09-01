@@ -1337,18 +1337,15 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           nextUniforms.vShip = 0;
         }
 
-        // --- Operational mode validation and enforcement ---
-        const debugTag = this.debugTag || 'WarpEngine';
-        if (debugTag.includes('REAL') || parity) {
-          // Enforce REAL mode constraints
-          nextUniforms.physicsParityMode = true;
-          nextUniforms.ridgeMode = 0; // physics double-lobe
-          if (nextUniforms.userGain > 10) nextUniforms.userGain = 1; // limit exaggeration
-        } else if (debugTag.includes('SHOW') || !parity) {
-          // Enforce SHOW mode enhancements
-          nextUniforms.physicsParityMode = false;
-          nextUniforms.ridgeMode = 1; // clean single crest
-          nextUniforms.curvatureGainT = Math.max(nextUniforms.curvatureGainT || 0, 0.3);
+        // --- Engine must not override UI parity/ridge settings ---
+        // Only log if parity/ridge are missing, but preserve what UI sends
+        if (typeof nextUniforms.physicsParityMode !== 'boolean') {
+          console.warn('[WarpEngine] Missing physicsParityMode from UI, using previous value');
+          nextUniforms.physicsParityMode = prev?.physicsParityMode ?? false;
+        }
+        if (typeof nextUniforms.ridgeMode !== 'number') {
+          console.warn('[WarpEngine] Missing ridgeMode from UI, using previous value');
+          nextUniforms.ridgeMode = prev?.ridgeMode ?? 1;
         }
 
         // --- decide if the CPU warp needs recompute ---
@@ -2409,6 +2406,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     }
 
     setPresetParity() {
+        // Only call when explicitly requested by user, not auto-triggered
+        console.log('[WarpEngine] Manual preset: REAL/Parity mode');
         this.updateUniforms({
             physicsParityMode: true,
             viewAvg: true,
@@ -2423,6 +2422,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     }
 
     setPresetShowcase() {
+        // Only call when explicitly requested by user, not auto-triggered
+        console.log('[WarpEngine] Manual preset: SHOW/Showcase mode');
         this.updateUniforms({
             physicsParityMode: false,
             viewAvg: false,
