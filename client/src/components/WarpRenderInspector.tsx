@@ -183,17 +183,11 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
-function computeViewMassFraction(u: any): number {
-  // Prefer engine-provided telemetry if it exists
-  const vmf = u?.viewMassFraction;
-  if (typeof vmf === 'number' && isFinite(vmf) && vmf > 0) return vmf;
-
-  // Otherwise reconstruct: REAL (parity=true) usually averages; SHOW does not
-  const parity = !!u?.physicsParityMode;                // REAL?
-  const viewAvg = u?.viewAvg ?? parity;                 // default: REAL averages, SHOW doesn't
-  const sTotal  = Math.max(1, Number(u?.sectorCount ?? 400));
-
-  return (parity && viewAvg) ? 1 / sTotal : 1.0;
+// Stable: REAL always shows a 1/sectorCount slice; SHOW is full bubble
+function computeViewMassFractionStable(u: any): number {
+  const sTotal = Math.max(1, Number(u?.sectorCount ?? 400));
+  const parity = !!u?.physicsParityMode;
+  return parity ? 1 / sTotal : 1.0;
 }
 
 function thetaGainExpected(bound: any): number {
@@ -1807,8 +1801,8 @@ export default function WarpRenderInspector(props: {
   const uLeft  = leftEngine.current?.uniforms  ?? {};
   const uRight = rightEngine.current?.uniforms ?? {};
 
-  const viewMassFracREAL = computeViewMassFraction(uLeft);
-  const viewMassFracSHOW = computeViewMassFraction(uRight);
+  const viewMassFracREAL = computeViewMassFractionStable(uLeft);
+  const viewMassFracSHOW = computeViewMassFractionStable(uRight);
 
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
