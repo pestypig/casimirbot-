@@ -1,0 +1,151 @@
+diff --git a/client/src/components/BridgeDerivationCards.tsx b/client/src/components/BridgeDerivationCards.tsx
+--- a/client/src/components/BridgeDerivationCards.tsx
++++ b/client/src/components/BridgeDerivationCards.tsx
+@@ -214,29 +214,73 @@ function GreensCard({ m }: { m: HelixMetrics }) {
+   const fmtSI = (ms?: number) => {
+     if (!isNum(ms)) return "—";
+     if (ms < 1) return `${(ms * 1000).toFixed(1)} µs`;
+     if (ms < 1000) return `${ms.toFixed(2)} ms`;
+     return `${(ms / 1000).toFixed(2)} s`;
+   };
+   const ratio = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
+ 
+-  // ρ-weighted mean of φ (optional): φ̄_weighted = (Σ ρᵢ φᵢ) / (Σ ρᵢ)
+-  const weightedMean = React.useMemo(() => {
+-    try {
+-      if (!greens?.phi) return undefined;
+-      const phi =
+-        greens.phi instanceof Float32Array
+-          ? greens.phi
+-          : new Float32Array(greens.phi as any);
+-      const tiles = ((m as any)?.tileData || (m as any)?.tiles) as
+-        | { t00: number }[]
+-        | undefined;
+-      if (!Array.isArray(tiles)) return undefined;
+-      const N = Math.min(phi.length, tiles.length);
+-      let wsum = 0, acc = 0;
+-      for (let i = 0; i < N; i++) {
+-        const w = Number(tiles[i]?.t00) || 0;
+-        wsum += w; acc += w * phi[i];
+-      }
+-      return wsum > 0 ? acc / wsum : undefined;
+-    } catch { return undefined; }
+-  }, [greens?.phi, m]);
++  // ----- Robust ρ extraction & weighted means -----
++  // Accept multiple field names for ρ/T00 coming from various backends.
++  const pickRho = (tile: any): number => {
++    const cand =
++      tile?.t00 ??
++      tile?.T00 ??
++      tile?.rho ??
++      tile?.density ??
++      tile?.energyDensity ??
++      tile?.T_00 ??
++      tile?.e00;
++    const v = Number(cand);
++    return Number.isFinite(v) ? v : 0;
++  };
++  // Try to record which key we actually used (first non-undefined wins)
++  const rhoKey = React.useMemo(() => {
++    const tiles = (m as any)?.tileData || (m as any)?.tiles;
++    if (!Array.isArray(tiles) || tiles.length === 0) return "—";
++    const sample = tiles.find(Boolean) || {};
++    if (sample?.t00 != null) return "t00";
++    if (sample?.T00 != null) return "T00";
++    if (sample?.rho != null) return "rho";
++    if (sample?.density != null) return "density";
++    if (sample?.energyDensity != null) return "energyDensity";
++    if (sample?.T_00 != null) return "T_00";
++    if (sample?.e00 != null) return "e00";
++    return "—";
++  }, [m]);
++
++  // Compute both signed-weighted and |ρ|-weighted means.
++  const {
++    weightedMeanSigned,
++    weightedMeanAbs,
++    sumRhoSigned,
++    sumRhoAbs
++  } = React.useMemo(() => {
++    const out = {
++      weightedMeanSigned: undefined as number | undefined,
++      weightedMeanAbs: undefined as number | undefined,
++      sumRhoSigned: undefined as number | undefined,
++      sumRhoAbs: undefined as number | undefined,
++    };
++    try {
++      if (!greens?.phi) return out;
++      const phi = greens.phi instanceof Float32Array ? greens.phi : new Float32Array(greens.phi as any);
++      const tiles = ((m as any)?.tileData || (m as any)?.tiles) as any[] | undefined;
++      if (!Array.isArray(tiles) || tiles.length === 0 || phi.length === 0) return out;
++      const N = Math.min(phi.length, tiles.length);
++      let W_signed = 0, W_abs = 0, acc_signed = 0, acc_abs = 0;
++      for (let i = 0; i < N; i++) {
++        const w = pickRho(tiles[i]);
++        W_signed += w;
++        W_abs += Math.abs(w);
++        acc_signed += w * phi[i];
++        acc_abs += Math.abs(w) * phi[i];
++      }
++      out.sumRhoSigned = W_signed;
++      out.sumRhoAbs = W_abs;
++      out.weightedMeanSigned = (W_signed !== 0) ? (acc_signed / W_signed) : undefined;
++      out.weightedMeanAbs = (W_abs > 0) ? (acc_abs / W_abs) : undefined;
++      return out;
++    } catch {
++      return out;
++    }
++  }, [greens?.phi, m]);
+ 
+   return (
+     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
+@@ -340,6 +384,48 @@ function GreensCard({ m }: { m: HelixMetrics }) {
+             </div>
+           </div>
+         )}
+ 
++        {/* Mean (unweighted) */}
++        <div className="space-y-0.5">
++          <div className="font-mono text-slate-400">
++            φ̄ = (1/N) · Σᵢ φᵢ{greens?.normalize === false ? " (raw)" : " (normalized)"}
++          </div>
++          <div className="font-mono">
++            {gstats?.N
++              ? `= (1/${gstats.N}) · Σᵢ φᵢ = ${fmtExp(gstats.mean)}`
++              : "—"}
++          </div>
++        </div>
++
++        {/* Means (ρ-weighted) */}
++        <div className="space-y-0.5">
++          <div className="font-mono text-slate-400">
++            ρ source = {rhoKey}
++          </div>
++          <div className="font-mono text-slate-400">
++            φ̄_weighted(signed) = (Σᵢ ρᵢ φᵢ) / (Σᵢ ρᵢ)
++          </div>
++          <div className="font-mono">
++            {sumRhoSigned != null
++              ? (sumRhoSigned === 0
++                  ? `Σρ = 0 → undefined`
++                  : `= (Σ ρᵢ φᵢ) / (Σ ρᵢ) with Σρ = ${fmtExp(sumRhoSigned)} → ${fmtExp(Number(weightedMeanSigned))}`)
++              : "—"}
++          </div>
++
++          <div className="font-mono text-slate-400">
++            φ̄_weighted(|ρ|) = (Σᵢ |ρᵢ| φᵢ) / (Σᵢ |ρᵢ|)
++          </div>
++          <div className="font-mono">
++            {sumRhoAbs != null
++              ? (sumRhoAbs === 0
++                  ? `Σ|ρ| = 0 → undefined`
++                  : `= (Σ |ρᵢ| φᵢ) / (Σ |ρᵢ|) with Σ|ρ| = ${fmtExp(sumRhoAbs)} → ${fmtExp(Number(weightedMeanAbs))}`)
++              : "—"}
++          </div>
++        </div>
++
+       </div>
+ 
+       <div className="text-[11px] text-slate-400 space-y-1">
+         <div><span className="font-medium">How it updates:</span> Energy Pipeline computes/publishes φ to the cache key <code>["helix:pipeline:greens"]</code> and broadcasts a <code>helix:greens</code> window event. This card listens to both.</div>
+         <div className="flex items-center gap-2">

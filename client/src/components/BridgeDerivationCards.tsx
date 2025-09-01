@@ -746,26 +746,70 @@ function GreensCard({ m }: { m: HelixMetrics }) {
   };
   const ratio = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
 
-  // ρ-weighted mean of φ (optional): φ̄_weighted = (Σ ρᵢ φᵢ) / (Σ ρᵢ)
-  const weightedMean = React.useMemo(() => {
+  // ----- Robust ρ extraction & weighted means -----
+  // Accept multiple field names for ρ/T00 coming from various backends.
+  const pickRho = (tile: any): number => {
+    const cand =
+      tile?.t00 ??
+      tile?.T00 ??
+      tile?.rho ??
+      tile?.density ??
+      tile?.energyDensity ??
+      tile?.T_00 ??
+      tile?.e00;
+    const v = Number(cand);
+    return Number.isFinite(v) ? v : 0;
+  };
+  // Try to record which key we actually used (first non-undefined wins)
+  const rhoKey = React.useMemo(() => {
+    const tiles = (m as any)?.tileData || (m as any)?.tiles;
+    if (!Array.isArray(tiles) || tiles.length === 0) return "—";
+    const sample = tiles.find(Boolean) || {};
+    if (sample?.t00 != null) return "t00";
+    if (sample?.T00 != null) return "T00";
+    if (sample?.rho != null) return "rho";
+    if (sample?.density != null) return "density";
+    if (sample?.energyDensity != null) return "energyDensity";
+    if (sample?.T_00 != null) return "T_00";
+    if (sample?.e00 != null) return "e00";
+    return "—";
+  }, [m]);
+
+  // Compute both signed-weighted and |ρ|-weighted means.
+  const {
+    weightedMeanSigned,
+    weightedMeanAbs,
+    sumRhoSigned,
+    sumRhoAbs
+  } = React.useMemo(() => {
+    const out = {
+      weightedMeanSigned: undefined as number | undefined,
+      weightedMeanAbs: undefined as number | undefined,
+      sumRhoSigned: undefined as number | undefined,
+      sumRhoAbs: undefined as number | undefined,
+    };
     try {
-      if (!greens?.phi) return undefined;
-      const phi =
-        greens.phi instanceof Float32Array
-          ? greens.phi
-          : new Float32Array(greens.phi as any);
-      const tiles = ((m as any)?.tileData || (m as any)?.tiles) as
-        | { t00: number }[]
-        | undefined;
-      if (!Array.isArray(tiles)) return undefined;
+      if (!greens?.phi) return out;
+      const phi = greens.phi instanceof Float32Array ? greens.phi : new Float32Array(greens.phi as any);
+      const tiles = ((m as any)?.tileData || (m as any)?.tiles) as any[] | undefined;
+      if (!Array.isArray(tiles) || tiles.length === 0 || phi.length === 0) return out;
       const N = Math.min(phi.length, tiles.length);
-      let wsum = 0, acc = 0;
+      let W_signed = 0, W_abs = 0, acc_signed = 0, acc_abs = 0;
       for (let i = 0; i < N; i++) {
-        const w = Number(tiles[i]?.t00) || 0;
-        wsum += w; acc += w * phi[i];
+        const w = pickRho(tiles[i]);
+        W_signed += w;
+        W_abs += Math.abs(w);
+        acc_signed += w * phi[i];
+        acc_abs += Math.abs(w) * phi[i];
       }
-      return wsum > 0 ? acc / wsum : undefined;
-    } catch { return undefined; }
+      out.sumRhoSigned = W_signed;
+      out.sumRhoAbs = W_abs;
+      out.weightedMeanSigned = (W_signed !== 0) ? (acc_signed / W_signed) : undefined;
+      out.weightedMeanAbs = (W_abs > 0) ? (acc_abs / W_abs) : undefined;
+      return out;
+    } catch {
+      return out;
+    }
   }, [greens?.phi, m]);
 
   return (
@@ -919,13 +963,31 @@ function GreensCard({ m }: { m: HelixMetrics }) {
           </div>
         </div>
 
-        {/* Mean (ρ-weighted, optional) */}
+        {/* Means (ρ-weighted) */}
         <div className="space-y-0.5">
           <div className="font-mono text-slate-400">
-            φ̄_weighted = (Σᵢ ρᵢ φᵢ) / (Σᵢ ρᵢ)
+            ρ source = {rhoKey}
+          </div>
+          <div className="font-mono text-slate-400">
+            φ̄_weighted(signed) = (Σᵢ ρᵢ φᵢ) / (Σᵢ ρᵢ)
           </div>
           <div className="font-mono">
-            {weightedMean != null ? `= ${fmtExp(weightedMean)}` : "—"}
+            {sumRhoSigned != null
+              ? (sumRhoSigned === 0
+                  ? `Σρ = 0 → undefined`
+                  : `= (Σ ρᵢ φᵢ) / (Σ ρᵢ) with Σρ = ${fmtExp(sumRhoSigned)} → ${fmtExp(Number(weightedMeanSigned))}`)
+              : "—"}
+          </div>
+
+          <div className="font-mono text-slate-400">
+            φ̄_weighted(|ρ|) = (Σᵢ |ρᵢ| φᵢ) / (Σᵢ |ρᵢ|)
+          </div>
+          <div className="font-mono">
+            {sumRhoAbs != null
+              ? (sumRhoAbs === 0
+                  ? `Σ|ρ| = 0 → undefined`
+                  : `= (Σ |ρᵢ| φᵢ) / (Σ |ρᵢ|) with Σ|ρ| = ${fmtExp(sumRhoAbs)} → ${fmtExp(Number(weightedMeanAbs))}`)
+              : "—"}
           </div>
         </div>
       </div>
