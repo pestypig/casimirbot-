@@ -67,26 +67,23 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
           400
       )
     );
-  // Prefer explicit concurrentSectors/sectorsConcurrent; fallback to sectorStrobing; else 1
-  const sectorsConc =
-    Math.max(1, Math.floor(
-      num((s as any).sectorsConcurrent) ??
-      num((s as any).concurrentSectors) ??
-      num(s.sectorStrobing) ?? 1
-    ));
-  const split = Math.floor(sectorsTotal / 2); // viz-only (+/–) split (kept for legacy UI)
+  // concurrent/live sectors (prefer explicit concurrent, else strobing, else 1)
+  const sectorsConc = Math.max(1, Math.floor(
+    num((s as any).sectorsConcurrent) ??
+    num((s as any).concurrentSectors) ??
+    num(s.sectorStrobing) ?? 1
+  ));
+  const split = Math.floor(sectorsTotal / 2); // viz-only legacy
 
-  // --- Duty resolution
-  // Local burst (sector-local on-fraction). Use explicit field if provided; else default to paper 1%.
+  // --- Duty resolution ---
+  // local burst duty (sector-local)
   const dutyLocal = clamp(
     num((s as any).localBurstFrac) ?? num((s as any).burstLocal) ?? (s.dutyCycle ?? 0.01),
     0, 1
   );
-  // Ford–Roman (ship-wide): d_FR = dutyLocal × (S_concurrent / S_total)
+  // Ford–Roman ship-wide duty: d_FR = dutyLocal × (S_concurrent / S_total)
   const d_ship = clamp(
-    num(s.dutyEffective_FR) ??
-    num(s.dutyShip) ??
-    (dutyLocal * (sectorsConc / sectorsTotal)),
+    num(s.dutyEffective_FR) ?? num(s.dutyShip) ?? (dutyLocal * (sectorsConc / sectorsTotal)),
     0, 1
   );
 
@@ -114,10 +111,10 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Physics/ops - include qSpoilingFactor in physics chain
       currentMode: s.currentMode,
       // Do not set physicsParityMode/ridgeMode here; caller (REAL/SHOW) decides
-      dutyCycle: dutyLocal,            // ⟵ sector-local burst duty
-      dutyEffectiveFR: d_ship,         // ⟵ Ford–Roman duty (ship-wide)
-      sectorCount: sectorsTotal,       // ⟵ total wedges
-      sectors: sectorsConc,            // ⟵ concurrent/live sectors
+      dutyCycle: dutyLocal,           // ✅ local burst duty
+      dutyEffectiveFR: d_ship,        // ✅ Ford–Roman ship duty
+      sectorCount: sectorsTotal,      // ✅ total sectors
+      sectors: sectorsConc,           // ✅ concurrent sectors
       gammaGeo,
       gammaVanDenBroeck: gammaVdB,
       qSpoilingFactor: qSpoil,
