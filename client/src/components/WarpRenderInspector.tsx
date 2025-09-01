@@ -1521,6 +1521,13 @@ export default function WarpRenderInspector(props: {
     initEngines();
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  // ---- FR duty derivation for payload/telemetry ----
+  const u = (leftEngine.current as any)?.uniforms ?? {};                 // if you don't already have it
+  const sLive      = Math.max(1, Number(u?.sectors ?? 1));          // concurrent sectors seen by this pane
+  const sTotal     = Math.max(1, Number(u?.sectorCount ?? 400));    // total ship sectors
+  const dutyLocal  = Math.max(0, Math.min(1, Number(u?.dutyCycle ?? 0.01))); // burst duty in [0,1]
+  const dutyEffectiveFR = Math.max(1e-12, dutyLocal * (sLive / sTotal));     // Ford–Roman averaged
+
   // Build parameters object for the new packet builders
     const parameters = {
       ...props.parityPhys,
@@ -1530,7 +1537,7 @@ export default function WarpRenderInspector(props: {
       dutyEffectiveFR,
       dutyCycle: dutyLocal,
       sectorCount: sTotal,
-      sectors: sConcurrent,
+      sectors: sLive,
       gammaVanDenBroeck_mass: live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck ?? 38.3,
       gammaVanDenBroeck_vis: live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck ?? 2.86e5,
     };
