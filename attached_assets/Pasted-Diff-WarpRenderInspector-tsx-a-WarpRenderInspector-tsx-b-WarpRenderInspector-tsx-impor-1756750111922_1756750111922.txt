@@ -1,0 +1,85 @@
+Diff — WarpRenderInspector.tsx
+*** a/WarpRenderInspector.tsx
+--- b/WarpRenderInspector.tsx
+@@
+-import React, { useEffect, useMemo, useRef, useState } from "react";
++import React, { useEffect, useMemo, useRef, useState } from "react";
++import { thetaCanonical } from "@/lib/warp-theta";
+@@
+-      // Make the overlay honest: show the two θ's explicitly
+-      const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
+-      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+-      // optional: keep your paper clamp, but show it as "θ_paper"
+-      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
++      // --- Canonical vs Shader ---
++      // Prefer the engine's canonical terms; show shader θ separately.
++      // Shader θ (whatever is actually bound to the uniform)
++      const thetaShader =
++        Number(+U.thetaScale_actual) || // if engine exposes this, prefer it
++        Number(+U.thetaScale)       ||
++        Number(+U.u_thetaScale)     || NaN;
++
++      // Inputs for canonical θ (mirror engine's chain)
++      const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
++      const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1));
++      // dutyLocal: prefer uniform; else derive from lightCrossing if available; else default
++      const dutyLocal =
++        Number.isFinite(+U.dutyCycle) ? +U.dutyCycle :
++        (Number.isFinite(props?.shipMassKg) && 0) || // (placeholder: keep order stable)
++        (Number.isFinite(+((props as any)?.lightCrossing?.burst_ms)) &&
++         Number.isFinite(+((props as any)?.lightCrossing?.dwell_ms)) &&
++         +((props as any)?.lightCrossing?.dwell_ms) > 0
++          ? Math.max(1e-12, +((props as any)?.lightCrossing?.burst_ms) / +((props as any)?.lightCrossing?.dwell_ms))
++          : 0.01);
++
++      const thetaCanon = thetaCanonical({
++        gammaGeo:               +U.gammaGeo || 26,
++        qSpoilingFactor:        +U.qSpoilingFactor || +U.deltaAOverA || 1,
++        gammaVanDenBroeck_mass: +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3,
++        dutyLocal,
++        sectorsConcurrent,
++        sectorsTotal,
++        viewAveraged: !!U.physicsParityMode,
++        mode: (U.currentMode as any) || 'hover'
++      });
++
++      // optional: keep your paper clamp, but show it as "θ_paper"
++      const thetaPaper = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
+@@
+-      setSnap({
++      setSnap({
+         a,b,c,aH, w_m, V,S, Vshell,
+-        thetaUniform, thetaPhys, thetaPaper,
++        thetaShader, thetaCanon, thetaPaper,
+         M_ship_kg, M_slice_kg,
+         frontMax, rearMin,
+         sectors: Math.max(1,(U.sectorCount|0)||1),
+         mDisplayText: (flavor === 'REAL')
+           ? `${Number.isFinite(M_slice_kg)? fmtSI(M_slice_kg,'kg'):'— kg'} (slice) · ${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total`
+           : `${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total`
+       });
+@@
+-        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
+-          <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
+-          <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
++        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
++          <div>θ (shader): <b>{Number.isFinite(s.thetaShader)? s.thetaShader.toExponential(2):'—'}</b></div>
++          <div>θ (canonical): <b>{Number.isFinite(s.thetaCanon)? s.thetaCanon.toExponential(2):'—'}</b></div>
+           <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
+           {/* keep slot if you later expose a metric-curvature scalar */}
+           <div>θ (metric): <b>—</b></div>
+           <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
+           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
+@@
+-// physics θ helper (no SHOW boosts)
+-function thetaPhysicsFromUniforms(U: any) {
+-  const gammaGeo = +U.gammaGeo || 26;
+-  const q        = +U.qSpoilingFactor || 1;
+-  // Use Ford-Roman mass gamma, not visual gamma for physics calculations
+-  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
+-  const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
+-  const dRaw     = Number(U.dutyEffectiveFR);
+-  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.000025; // Use Ford-Roman duty as fallback
+-  return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
+-}
++// (removed) local physics helper — we now rely on the shared thetaCanonical()
