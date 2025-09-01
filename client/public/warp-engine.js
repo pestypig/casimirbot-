@@ -1173,12 +1173,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
 
         // --- Parity / visualization ---
-        // let incoming value override; if missing, keep previous
-        const parity = (parameters?.physicsParityMode !== undefined)
-          ? !!parameters.physicsParityMode
+        // Accept legacy aliases from UI (uPhysicsParity/uRidgeMode) and keep previous if missing
+        const parity = ((parameters?.physicsParityMode ?? parameters?.uPhysicsParity) !== undefined)
+          ? !!(parameters?.physicsParityMode ?? parameters?.uPhysicsParity)
           : !!prev?.physicsParityMode;
         const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
-        const ridgeMode = (parameters?.ridgeMode ?? prev?.ridgeMode ?? 0)|0;
+        const ridgeMode = (parameters?.ridgeMode ?? parameters?.uRidgeMode ?? prev?.ridgeMode ?? 0)|0;
         const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4 }; // Added interiorTilt to CM
         let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
         const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
@@ -1203,9 +1203,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const splitIn =
           N(parameters?.split ?? parameters?.sectorSplit ?? parameters?.sectorIdx ?? this.strobingState?.currentSector, prev?.split ?? 0);
 
-        const gammaVdBRaw =
-          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 1.4e5);
-        const gammaVdBIn = Math.max(1, Math.min(parity ? 1e2 : 1e11, gammaVdBRaw)); // REAL≤1e2, SHOW≤1e11
+        // Parity-aware clamp: REAL physics bounded (≤1e2), SHOW cosmetic can be larger (≤1e11)
+        const vdbRaw =
+          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
+        const gammaVdBIn = Math.max(1, Math.min(parity ? 1e2 : 1e11, vdbRaw));
 
         const frFromParams =
           parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff ??
@@ -1262,6 +1263,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           // 🔗 physics chain fields used by CPU warp & shader
           thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
           dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.14),
+          // publish local burst duty so diagnostics can always reconstruct FR
+          dutyLocal: Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.14)),
           sectors: Math.max(1, Math.floor(sectorsConcurrent)),
           sectorCount: Math.max(1, Math.floor(sectorCountOut)),
           // clamp split against the *live* sectors for this pane
@@ -1288,12 +1291,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             : Math.max(0, Math.min(1, dutyLocal));
         }
 
-        // build theta scale: CORRECT chain θ = γ³ × q × γ_VdB × √(duty)
-        const gamma3 = Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3);
-        const q = Math.max(1e-12, nextUniforms.deltaAOverA ?? 1);
-        const gammaVdB = Math.max(1, gammaVdBIn);
-        const sqrtDuty = viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0;
-        const thetaScaleFromChain = zeroStandby ? 0 : gamma3 * q * gammaVdB * sqrtDuty;
+        // build theta scale (canonical chain)
+        const thetaScaleFromChain = zeroStandby ? 0 :
+          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
+          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
+          Math.max(1, nextUniforms.gammaVdB ?? 1) *
+          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
         // Apply mode-specific scaling for operational differentiation (disabled for pipeline compliance)
         if (!parity && !zeroStandby && false) { // DISABLED: always use pure physics theta scale
@@ -1324,8 +1327,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'ENGINE_CALC'
           });
         }
-        nextUniforms.dutyUsed   = dutyEffFR;
-        nextUniforms.dutyEffectiveFR = dutyEffFR;
+        nextUniforms.dutyUsed        = dutyEffFR;
+        nextUniforms.dutyEffectiveFR = dutyEffFR;   // expose single source of truth to UI
 
         // --- If amplitude just went "off", restore the pristine grid ---
         const wasActive = (prev.thetaScale ?? 0) > 1e-12;

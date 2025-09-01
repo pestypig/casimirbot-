@@ -4,6 +4,14 @@
  * Consolidates physics calculations between WarpVisualizer and WarpBubbleCompare
  */
 
+// Utility functions
+const toNum = (x: any): number | undefined => {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const isFin = (x: any): boolean => Number.isFinite(x);
+
 export type DutySource = 'fr' | 'ui';
 
 export type ThetaInputs = {
@@ -230,8 +238,9 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
 
   const viewAvg = (p?.viewAvg ?? true) ? 1 : 0;     // if you ever allow per-view toggles
   const A_geo = Math.pow(Math.max(1, gammaGeo), 3);
-  const dutyTerm = viewAvg ? Math.max(1e-12, duty / sectors) : 1;
-  const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * dutyTerm;
+  // Canonical: θ = γ_geo³ · q · γ_VdB · √(d_FR)  (only when averaging/view mass fraction applies)
+  const dFR = viewAvg ? Math.max(1e-12, duty / sectors) : 1;
+  const result = A_geo * Math.max(1e-12, qSpoil) * Math.max(1, gammaVdB) * (viewAvg ? Math.sqrt(dFR) : 1);
 
   // Validate result is finite and reasonable
   if (!Number.isFinite(result) || result < 0) {
@@ -242,9 +251,9 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
   debugLog('Calculation breakdown:', {
     viewAvg,
     A_geo: `${gammaGeo}^3 = ${A_geo}`,
-    dutyTerm: `${duty} / ${sectors} = ${dutyTerm}`,
+    dFR: `${duty} / ${sectors} = ${dFR}`,
     finalResult: result,
-    formula: `${A_geo} * ${qSpoil} * ${gammaVdB} * ${dutyTerm} = ${result}`
+    formula: `${A_geo} * ${qSpoil} * ${gammaVdB} * ${viewAvg ? '√' : ''}(${dFR}) = ${result}`
   });
 
   // Enhanced audit vs expected with better error handling
@@ -287,7 +296,7 @@ export function resolveThetaScale(p: any, dutySource: DutySource = 'fr') {
     A_geo_contribution: A_geo,
     qSpoil_contribution: qSpoil,
     gammaVdB_contribution: gammaVdB,
-    duty_contribution: dutyTerm,
+    duty_contribution: viewAvg ? Math.sqrt(dFR) : 1,
     final_product: result
   });
 
