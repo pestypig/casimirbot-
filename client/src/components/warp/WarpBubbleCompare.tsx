@@ -6,6 +6,8 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
+import Grid3DEngine from '@/components/engines/Grid3DEngine';
+import { getWarpEngineCtor } from '@/types/globals';
 // ❌ Never compute θ on the client for the renderer – engine is the authority.
 // (removed stale import)
 
@@ -749,12 +751,7 @@ export default function WarpBubbleCompare({
     return e && !e._destroyed;
   }
 
-  const makeEngine = useCallback(async (canvasId: string, label: string): Promise<any> => {
-    if (!window.WarpEngine) {
-      console.warn(`[${label}] WarpEngine class not loaded, waiting...`);
-      return null;
-    }
-
+  const makeEngine = useCallback(async (Ctor: new (c: HTMLCanvasElement) => any, canvasId: string, label: string): Promise<any> => {
     try {
       const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
       if (!canvas) {
@@ -806,7 +803,7 @@ export default function WarpBubbleCompare({
       // Create engine instance with enhanced timeout and error handling
       const enginePromise = new Promise((resolve, reject) => {
         try {
-          const engine = new window.WarpEngine(canvas);
+          const engine = new Ctor(canvas);
 
           // Immediate validation
           if (!engine) {
@@ -1191,7 +1188,7 @@ export default function WarpBubbleCompare({
       gammaGeo: real.gammaGeo,
       qSpoilingFactor: real.qSpoilingFactor,
       gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
-      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? 0.000025)),
+      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
       dutyCycle: real.dutyCycle,
       sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       sectorCount: Math.max(1, Math.min(1000, parameters.sectorCount || 400)),

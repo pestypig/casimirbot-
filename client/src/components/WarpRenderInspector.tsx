@@ -15,6 +15,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 import { thetaCanonical } from "@/lib/warp-theta";
+import { getWarpEngineCtor } from "@/types/globals";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 // Single-source pane sanitizer. If you have another copy further down, delete it.
@@ -1013,11 +1014,13 @@ export default function WarpRenderInspector(props: {
     return eng;
   }
 
-  // Create engine instance using the JS WarpEngine with Grid3D fallback
+  // Create engine instance using the global WarpEngine with Grid3D fallback
   function createEngine(canvas: HTMLCanvasElement): any {
-    const W: any = (window as any).WarpEngine;
-    if (!W) {
-      console.warn("WarpEngine not found, falling back to Grid3D engine");
+    try {
+      const WarpEngine = getWarpEngineCtor();
+      return getOrCreateEngine(WarpEngine, canvas);
+    } catch (error) {
+      console.warn("WarpEngine not found, falling back to Grid3D engine:", error);
       // Return a Grid3D engine wrapper with WebGL compatibility
       const grid3DWrapper = {
         canvas,
@@ -1054,7 +1057,6 @@ export default function WarpRenderInspector(props: {
       (canvas as any)[ENGINE_KEY] = grid3DWrapper;
       return grid3DWrapper;
     }
-    return getOrCreateEngine(W, canvas);
   }
 
   // Minimal parity lock function to prevent duplicate shader rebuilds
@@ -1100,28 +1102,13 @@ export default function WarpRenderInspector(props: {
         return;
       }
 
-      // Ensure WarpEngine script is loaded
-      if (!(window as any).WarpEngine) {
-        console.log("WarpEngine not found, loading script...");
-        try {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = (window as any).__WARP_ENGINE_SRC__;
-            script.onload = () => resolve();
-            script.onerror = () => reject(new Error(`Failed to load ${script.src}`));
-            document.head.appendChild(script);
-          });
-        } catch (error) {
-          console.error("Failed to load WarpEngine script:", error);
-          setLoadError("ENGINE_SCRIPT_MISSING: Failed to load warp-engine.js");
-          return;
-        }
-      }
-
-      const W = (window as any).WarpEngine;
-      if (!W) {
-        console.error("WarpEngine not found on window after script load.");
-        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded");
+      // WarpEngine should already be loaded globally from HTML script tag
+      try {
+        getWarpEngineCtor(); // Validate WarpEngine is available
+        console.log("✅ Global WarpEngine constructor found");
+      } catch (error) {
+        console.error("❌ Global WarpEngine not found:", error);
+        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded globally");
         return;
       }
 
