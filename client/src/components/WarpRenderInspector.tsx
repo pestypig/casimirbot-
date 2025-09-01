@@ -581,7 +581,7 @@ function PaneOverlay(props:{
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [engineRef, flavor, viewFraction]);
+  }, [engineRef, flavor, viewFraction, shipMassKg]);
 
   const s = snap || {};
   const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
