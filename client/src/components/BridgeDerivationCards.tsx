@@ -746,6 +746,19 @@ function GreensCard({ m }: { m: HelixMetrics }) {
   };
   const ratio = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
 
+  // Compute ρ-weighted mean once
+  const weightedMean = (() => {
+    const tiles = (m as any)?.tileData || (m as any)?.tiles;
+    if (!Array.isArray(tiles) || !greens?.phi) return undefined;
+    const phi = greens.phi instanceof Float32Array ? greens.phi : new Float32Array(greens.phi);
+    let wsum = 0, acc = 0;
+    for (let i = 0; i < phi.length && i < tiles.length; i++) {
+      const w = Number(tiles[i]?.t00) || 0;
+      wsum += w; acc += w * phi[i];
+    }
+    return wsum > 0 ? acc / wsum : undefined;
+  })();
+
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
       <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -884,6 +897,22 @@ function GreensCard({ m }: { m: HelixMetrics }) {
             </div>
           </div>
         )}
+
+        {/* Mean (unweighted) */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">φ̄ = (1/N) · Σᵢ φᵢ</div>
+          <div className="font-mono">
+            {gstats?.N
+              ? `= (1/${gstats.N}) · Σᵢ φᵢ ${greens?.normalize === false ? "(raw)" : "(normalized)"} = ${fmtExp(gstats.mean)}`
+              : "—"}
+          </div>
+        </div>
+
+        {/* ρ-weighted mean */}
+        <div className="space-y-0.5">
+          <div className="font-mono text-slate-400">φ̄_weighted = (Σᵢ ρᵢ φᵢ) / (Σᵢ ρᵢ)</div>
+          <div className="font-mono">{weightedMean != null ? `= ${fmtExp(weightedMean)}` : "—"}</div>
+        </div>
       </div>
 
       <div className="text-[11px] text-slate-400 space-y-1">
