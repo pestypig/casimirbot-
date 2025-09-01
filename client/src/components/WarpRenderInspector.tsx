@@ -31,6 +31,7 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
 }
 
 // --- pane helpers -----------------------------------------------------------
+// NOTE: Ensure there are no other definitions of paneSanitize/sanitizeUniforms below.
 const sanitizeUniforms = (o: any) =>
   Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
 
@@ -558,7 +559,8 @@ function PaneOverlay(props:{
       const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
       const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1)); // Fixed: Use sectors for concurrent
       const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
-      
+      const dutyEffectiveFR = Math.max(1e-12, Math.min(1, dutyLocal * (sectorsConcurrent / sectorsTotal)));
+
       // Engine computes theta - we just report what it computed
       const thetaCanon = thetaShader; // Engine is canonical now
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
@@ -1366,7 +1368,7 @@ export default function WarpRenderInspector(props: {
       // Bootstrap both engines once they are ready (engine computes theta)
       const realPacket = paneSanitize('REAL', sanitizeUniforms(realPayload));
       const showPacket = paneSanitize('SHOW', sanitizeUniforms(showPayload));
-      
+
       leftEngine.current?.bootstrap?.(realPacket);
       rightEngine.current?.bootstrap?.(showPacket);
 
@@ -1759,8 +1761,8 @@ export default function WarpRenderInspector(props: {
 
     // Build REAL and SHOW payloads using the new builders
     const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
-    const showPayload = buildShowPacket(parameters, { 
-      ...shared, 
+    const showPayload = buildShowPacket(parameters, {
+      ...shared,
       exposure: 7.5,
       colorMode: 1,
       curvatureGainT: 0.70,
@@ -1772,11 +1774,11 @@ export default function WarpRenderInspector(props: {
 
   // Physics bound for theta calculations
     const bound = useMemo(() => ({
-      gammaGeo: realPhys.gammaGeo || 26,
-      qSpoilingFactor: realPhys.qSpoilingFactor || 1,
-      gammaVdB: realPhys.gammaVanDenBroeck || realPhys.gammaVdB || 1,
-      dutyEffectiveFR: realPhys.dutyEffectiveFR || 0.000025
-    }), [realPhys]);
+      gammaGeo: realPayload.gammaGeo || 26,
+      qSpoilingFactor: realPayload.qSpoilingFactor || 1,
+      gammaVdB: realPayload.gammaVanDenBroeck_mass || realPayload.gammaVanDenBroeck || 1,
+      dutyEffectiveFR: realPayload.dutyEffectiveFR || 0.000025
+    }), [realPayload]);
 
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
