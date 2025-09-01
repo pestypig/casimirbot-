@@ -185,67 +185,7 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
 
 // [deleted duplicate paneSanitize]
 
-// Sanitize uniform values for safe WebGL consumption
-function sanitizeUniforms(u: any = {}) {
-  const s = { ...u };
 
-  // Numeric coercions + clamps
-  if ('cameraZ' in s) s.cameraZ = Number.isFinite(s.cameraZ) ? Math.max(-10, Math.min(-0.1, s.cameraZ)) : -2.0;
-  if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
-  if ('gammaGeo' in s) s.gammaGeo = Number.isFinite(s.gammaGeo) ? Math.max(1, s.gammaGeo) : 26;
-  if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
-  // preserve separate mass vs visual pocket amplifications
-  if ('gammaVanDenBroeck_mass' in s) {
-    s.gammaVanDenBroeck_mass = Number.isFinite(s.gammaVanDenBroeck_mass)
-      ? Math.max(1, s.gammaVanDenBroeck_mass)
-      : 1.35e5;
-  }
-  if ('gammaVanDenBroeck_vis' in s) {
-    s.gammaVanDenBroeck_vis = Number.isFinite(s.gammaVanDenBroeck_vis)
-      ? Math.max(1, s.gammaVanDenBroeck_vis)
-      : 1.35e5;
-  }
-  if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
-
-  // Boolean sanitization
-  if ('physicsParityMode' in s) s.physicsParityMode = !!s.physicsParityMode;
-  if ('parityMode' in s) s.parityMode = !!s.parityMode;
-  if ('lockFraming' in s) s.lockFraming = !!s.lockFraming;
-  if ('viewAvg' in s) s.viewAvg = !!s.viewAvg;
-
-  // Integer sanitization
-  if ('ridgeMode' in s) s.ridgeMode = Math.max(0, Math.min(1, Math.floor(s.ridgeMode || 0)));
-  if ('sectorCount' in s) s.sectorCount = Math.max(1, Math.floor(s.sectorCount || 400));
-  if ('split' in s) s.split = Math.max(0, Math.floor(s.split || 0));
-
-  // Purple shift vector sanitization
-  if ('epsilonTilt' in s) {
-    const v = +s.epsilonTilt;
-    s.epsilonTilt = Number.isFinite(v) ? Math.max(0, Math.min(5e-7, v)) : 0;
-  }
-  if ('betaTiltVec' in s && Array.isArray(s.betaTiltVec)) {
-    const v = s.betaTiltVec.map(Number);
-    const L = Math.hypot(v[0]||0,v[1]||0,v[2]||0) || 1;
-    s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L];
-  }
-
-  // Metric uniforms: defaults = identity and off
-  if (!('useMetric' in s)) s.useMetric = false;
-  s.useMetric = !!s.useMetric;
-  const I = [1,0,0, 0,1,0, 0,0,1];
-  const isMat3 = (m:any)=> Array.isArray(m) && m.length===9 && m.every((x:any)=>Number.isFinite(+x));
-  s.metric    = isMat3(s.metric)    ? s.metric.map(Number)    : I;
-  s.metricInv = isMat3(s.metricInv) ? s.metricInv.map(Number) : I;
-
-  // Also provide u_* aliases explicitly to match shader names
-  s.u_useMetric   = s.useMetric;
-  s.u_metric      = s.metric;
-  s.u_metricInv   = s.metricInv;
-  s.u_epsilonTilt = s.epsilonTilt ?? 0;
-  s.u_betaTiltVec = s.betaTiltVec ?? [0,-1,0];
-
-  return s;
-}
 
 /**
  * WarpRenderInspector
