@@ -665,6 +665,87 @@ function GreensCard({ m }: { m: HelixMetrics }) {
   // local helpers from this file
   const kindLabel = greensKindLabel(greens);
 
+  // ---------- timing + sectors (metrics-first) with provenance ----------
+  type Prov<T> = { val?: T; from: "metrics" | "derived" | "live" | "none" };
+  const prov = <T,>(val?: T, from: Prov<T>["from"] = "none"): Prov<T> => ({ val, from });
+  const isNum = (x: any): x is number => typeof x === "number" && Number.isFinite(x);
+  const toMs = (v?: number, unit: "ms" | "s" | "us" = "ms") =>
+    isNum(v) ? (unit === "s" ? v * 1000 : unit === "us" ? v / 1000 : v) : undefined;
+  const saneMs = (v?: number) => (isNum(v) && v > 0 ? v : undefined);
+
+  const pickTiming = () => {
+    const lcM = (m as any)?.lightCrossing ?? {};
+    const lcL = (m as any)?.pipeline?.lightCrossing ?? {};
+    // τ_LC
+    const tauFromMetrics = saneMs(toMs(lcM.tauLC_ms, "ms") ?? toMs(lcM.tau_ms, "ms") ?? toMs(lcM.tauLC_s, "s"));
+    const tauFromDerived = saneMs(derived?.τ_LC_ms);
+    const tauFromLive    = saneMs(toMs(lcL.tauLC_ms, "ms") ?? toMs(lcL.tau_ms, "ms") ?? toMs(lcL.tauLC_s, "s"));
+    const tauLC = tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics")
+                : tauFromDerived !== undefined ? prov(tauFromDerived, "derived")
+                : tauFromLive !== undefined ? prov(tauFromLive, "live") : prov(undefined, "none");
+    // burst
+    const burst = (() => {
+      const m1 = saneMs(toMs(lcM.burst_ms, "ms"));
+      const d1 = saneMs(derived?.burst_ms);
+      const l1 = saneMs(toMs(lcL.burst_ms, "ms"));
+      return m1 !== undefined ? prov(m1, "metrics") : d1 !== undefined ? prov(d1, "derived") : l1 !== undefined ? prov(l1, "live") : prov(undefined, "none");
+    })();
+    // dwell (accept sectorPeriod_ms alias)
+    const dwell = (() => {
+      const m1 = saneMs(toMs(lcM.dwell_ms, "ms") ?? toMs(lcM.sectorPeriod_ms, "ms"));
+      const d1 = saneMs(derived?.dwell_ms ?? derived?.sectorPeriod_ms);
+      const l1 = saneMs(toMs(lcL.dwell_ms, "ms") ?? toMs(lcL.sectorPeriod_ms, "ms"));
+      return m1 !== undefined ? prov(m1, "metrics") : d1 !== undefined ? prov(d1, "derived") : l1 !== undefined ? prov(l1, "live") : prov(undefined, "none");
+    })();
+    // sectors
+    const sectorsTotal =
+      isNum((m as any)?.totalSectors) ? prov((m as any).totalSectors, "metrics")
+      : isNum(derived?.sectorsTotal) ? prov(derived.sectorsTotal, "derived")
+      : isNum((m as any)?.pipeline?.sectorsTotal ?? (m as any)?.pipeline?.sectorCount) ? prov((m as any)?.pipeline?.sectorsTotal ?? (m as any)?.pipeline?.sectorCount, "live")
+      : prov(undefined, "none");
+    const sectorsConcurrent =
+      isNum((m as any)?.activeSectors) ? prov((m as any).activeSectors, "metrics")
+      : isNum(derived?.sectorsConcurrent) ? prov(derived.sectorsConcurrent, "derived")
+      : isNum((m as any)?.pipeline?.sectorsConcurrent ?? (m as any)?.pipeline?.concurrentSectors) ? prov((m as any)?.pipeline?.sectorsConcurrent ?? (m as any)?.pipeline?.concurrentSectors, "live")
+      : prov(undefined, "none");
+    return { tauLC, burst, dwell, sectorsTotal, sectorsConcurrent };
+  };
+
+  const T = pickTiming();
+  const τ_LC_ms = T.tauLC.val;
+  const burst_ms = T.burst.val;
+  const dwell_ms = T.dwell.val;
+  const S_total = T.sectorsTotal.val;
+  const S_live  = T.sectorsConcurrent.val;
+
+  // Duty (FR) local sanity (metrics-first). Falls back to dEff above if timing incomplete.
+  const duty_calc = (isNum(burst_ms) && isNum(dwell_ms) && dwell_ms! > 0 && isNum(S_total) && S_total! > 0 && isNum(S_live))
+    ? clamp01((burst_ms! / dwell_ms!) * (S_live! / S_total!))
+    : undefined;
+  const duty_display = isNum(duty_calc) ? duty_calc : dEff;
+
+  // Reciprocity: prefer greens.reciprocity; else compute here using ms-normalized timing
+  const reciprocityLive = (greens as any)?.reciprocity as
+    | { status: "BROKEN_INSTANT" | "PASS_AVG" | "UNKNOWN"; message?: string }
+    | undefined;
+  const reciprocity = reciprocityLive ?? (() => {
+    if (isNum(burst_ms) && isNum(τ_LC_ms)) {
+      return burst_ms < τ_LC_ms
+        ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
+        : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+    }
+    return { status: "UNKNOWN", message: "missing burst/τ_LC" };
+  })();
+
+  const fmtPct = (x: number) => `${(x * 100).toFixed(3)}%`;
+  const fmtSI = (ms?: number) => {
+    if (!isNum(ms)) return "—";
+    if (ms < 1) return `${(ms * 1000).toFixed(1)} µs`;
+    if (ms < 1000) return `${ms.toFixed(2)} ms`;
+    return `${(ms / 1000).toFixed(2)} s`;
+  };
+  const ratio = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
+
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
       <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -677,7 +758,16 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         ) : null}
       </h3>
 
-      <div className="grid grid-cols-2 gap-3 text-xs">
+      {/* Provenance chips (makes data path obvious) */}
+      <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_total: {T.sectorsTotal.from}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from}</span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-xs mt-1">
         <div className="text-muted-foreground">Kernel</div>
         <div className="font-mono">
           {kindLabel}
@@ -696,20 +786,42 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         <div className="text-muted-foreground">φ_mean</div>
         <div className="font-mono">{fmtExp(gstats.mean)}</div>
 
-        {/* Reciprocity status pulled from the same greens payload (if present) */}
+        {/* Duty + Light-crossing (metrics-first) */}
+        <div className="text-muted-foreground">Duty (FR)</div>
+        <div className="font-mono" title={
+          isNum(burst_ms)&&isNum(dwell_ms)&&isNum(S_total)&&isNum(S_live)
+            ? `(burst/dwell)*(S_live/S_total) = (${burst_ms!.toFixed(3)}ms/${dwell_ms!.toFixed(3)}ms)*(${S_live}/${S_total})`
+            : "missing timing/sectors"
+        }>
+          {isNum(duty_display) ? fmtPct(duty_display) : "—"}
+        </div>
+        <div className="text-muted-foreground">τ_LC / burst / dwell</div>
+        <div className="font-mono">{fmtSI(τ_LC_ms)} • {fmtSI(burst_ms)} • {fmtSI(dwell_ms)}</div>
+
+        {/* Reciprocity status (payload or local compute) */}
         <div className="text-muted-foreground">Reciprocity</div>
         <div className="font-mono">
-          {(() => {
-            const r = (greens as any)?.reciprocity as
-              | { status: "BROKEN_INSTANT" | "PASS_AVG" | "UNKNOWN"; message?: string }
-              | undefined;
-            if (!r) return "—";
-            if (r.status === "BROKEN_INSTANT") return "BROKEN (inst.)";
-            if (r.status === "PASS_AVG") return "PASS (avg.)";
-            return "—";
-          })()}
+          {reciprocity?.status === "PASS_AVG" ? "PASS (avg.)" :
+           reciprocity?.status === "BROKEN_INSTANT" ? "BROKEN (inst.)" :
+           "—"}
         </div>
       </div>
+
+      {/* Ratio bar: burst / τ_LC */}
+      {isNum(burst_ms) && isNum(τ_LC_ms) && (
+        <div className="mt-1">
+          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
+            <div
+              className={`h-full ${burst_ms! < τ_LC_ms! ? "bg-amber-400/80" : "bg-emerald-500/80"}`}
+              style={{ width: `${Math.max(0, Math.min(100, (burst_ms! / Math.max(1, τ_LC_ms!)) * 100))}%` }}
+              title={`burst / τ_LC = ${(burst_ms! / Math.max(1, τ_LC_ms!)).toFixed(3)}`}
+            />
+          </div>
+          <div className="mt-1 text-[11px] text-slate-400">
+            burst / τ_LC = {ratio ? `×${ratio.toFixed(1)}` : "—"}
+          </div>
+        </div>
+      )}
 
       <div className="text-[11px] text-slate-400 space-y-1">
         <div><span className="font-medium">How it updates:</span> Energy Pipeline computes/publishes φ to the cache key <code>["helix:pipeline:greens"]</code> and broadcasts a <code>helix:greens</code> window event. This card listens to both.</div>
@@ -743,13 +855,26 @@ function GreensCard({ m }: { m: HelixMetrics }) {
                     return out;
                   };
                   const phi = computePhi(positions, rho);
-                  const payload = { 
+                  // Attach reciprocity if timing is available
+                  const rcp = (() => {
+                    const lc = (m as any)?.lightCrossing ?? {};
+                    const tauLCms = saneMs(toMs(lc.tauLC_ms, "ms") ?? toMs(lc.tau_ms, "ms") ?? toMs(lc.tauLC_s, "s"));
+                    const burstms = saneMs(toMs(lc.burst_ms, "ms"));
+                    if (isNum(tauLCms) && isNum(burstms)) {
+                      return burstms < tauLCms
+                        ? { status: "BROKEN_INSTANT" as const, message: "burst < τ_LC → inst. non-reciprocal" }
+                        : { status: "PASS_AVG" as const,       message: "burst ≥ τ_LC → avg. reciprocal" };
+                    }
+                    return { status: "UNKNOWN" as const, message: "missing burst/τ_LC" };
+                  })();
+                  const payload = {
                     kind: "poisson" as const, 
                     m: 0, 
                     normalize: true, 
                     phi, 
                     size: phi.length, 
-                    source: "client" as const 
+                    source: "client" as const,
+                    reciprocity: rcp
                   };
                   qc.setQueryData(["helix:pipeline:greens"], payload);
                   setGreens(payload);
