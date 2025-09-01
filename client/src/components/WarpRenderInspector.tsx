@@ -113,7 +113,6 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   return {
     ...patch,
     physicsParityMode: pane === 'REAL',
-    parityMode: pane === 'REAL',
     ridgeMode: pane === 'REAL' ? 0 : 1
   };
 }
@@ -996,7 +995,6 @@ export default function WarpRenderInspector(props: {
             exposure: 5.0,
             zeroStop: 1e-7,
             physicsParityMode: true,
-            parityMode: true, // Explicit fallback
             ridgeMode: 0,
             colorMode: 2, // shear/"truth"
             lockFraming: true,
@@ -1010,7 +1008,6 @@ export default function WarpRenderInspector(props: {
           // CRITICAL: Force parity directly on uniforms object as backup
           if (leftEngine.current.uniforms) {
             leftEngine.current.uniforms.physicsParityMode = true;
-            leftEngine.current.uniforms.parityMode = true;
             leftEngine.current.uniforms.ridgeMode = 0;
           }
 
@@ -1097,7 +1094,6 @@ export default function WarpRenderInspector(props: {
             exposure: 7.5,
             zeroStop: 1e-7,
             physicsParityMode: false,
-            parityMode: false, // Explicit fallback
             ridgeMode: 1,
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
@@ -1326,10 +1322,12 @@ export default function WarpRenderInspector(props: {
     if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
 
     lastWUHashRef.current = sig;
-    publish("warp:uniforms", { ...sanitized, __version: version });
+    // Never publish any thetaScale fields downstream; engine is authoritative.
+    const { thetaScale, u_thetaScale, ...clean } = sanitized as any;
+    publish("warp:uniforms", { ...clean, __version: version });
   }, [systemMetrics]);
 
-  // Ford-Roman duty computation (outside useEffect for prop access)
+  // Ford–Roman duty inputs (compute BEFORE payloads so we can embed them)
   const dutyLocal = (() => {
     const b = Number(props.lightCrossing?.burst_ms);
     const d = Number(props.lightCrossing?.dwell_ms);
@@ -1337,6 +1335,7 @@ export default function WarpRenderInspector(props: {
   })();
   const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
   const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
+  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // canonical FR
 
   // after you compute sTotal etc.
   const wallWidth_m      = N(props.baseShared?.wallWidth_m ?? live?.hull?.wallThickness_m, 1.0);
@@ -1356,8 +1355,7 @@ export default function WarpRenderInspector(props: {
   const total = Math.max(1, Number(live?.sectorCount) || 400);
   const viewFracREAL = 1 / total;
 
-  // FR duty for both engines - let them derive thetaScale internally
-  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
+  // (kept) dutyEffectiveFR already computed above
 
   // Debug toggle: choose between mass-calibrated vs visual-only γ_VdB (outside useEffect for display access)
   const gammaVdB_vis = N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11);
@@ -1495,13 +1493,25 @@ export default function WarpRenderInspector(props: {
     //   return calculated;
     // };
 
-    // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
+    // Build REAL payload (physics pane) — provide canonical θ inputs only
     const realPayload = {
       ...baseShared,
       physicsParityMode: true,
       ridgeMode: 0,
       ...realPhys,
       currentMode: live?.currentMode,
+      // Canonical θ inputs:
+      gammaGeo: realPhys?.gammaGeo ?? 26,
+      qSpoilingFactor: realPhys?.qSpoilingFactor ?? 1,
+      gammaVanDenBroeck_mass:
+        realPhys?.gammaVanDenBroeck_mass ??
+        realPhys?.gammaVanDenBroeck ??
+        live?.gammaVanDenBroeck_mass ??
+        live?.gammaVanDenBroeck ?? 38.3,
+      sectorCount: sTotal,
+      sectors: sConcurrent,       // concurrent sectors
+      dutyCycle: dutyLocal,       // local burst duty
+      dutyEffectiveFR,            // ship-wide Ford–Roman duty
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 2, // Shear proxy for truth view
@@ -1513,13 +1523,24 @@ export default function WarpRenderInspector(props: {
     (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
-    // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
+    // Build SHOW payload (visual pane) — still provide canonical inputs; engine will ignore √d in SHOW
     const showPayload = {
       ...baseShared,
       physicsParityMode: false,
       ridgeMode: 1,
       ...showPhys,
       currentMode: live?.currentMode,
+      // Canonical inputs mirrored for consistency/debug:
+      gammaGeo: showPhys?.gammaGeo ?? realPhys?.gammaGeo ?? 26,
+      qSpoilingFactor: showPhys?.qSpoilingFactor ?? realPhys?.qSpoilingFactor ?? 1,
+      gammaVanDenBroeck_vis:
+        showPhys?.gammaVanDenBroeck_vis ??
+        live?.gammaVanDenBroeck_vis ??
+        live?.gammaVanDenBroeck ?? 1.35e5,
+      sectorCount: sTotal,
+      sectors: 1,                 // SHOW is cosmetic; keep concurrent=1 to avoid accidental √d coupling
+      dutyCycle: dutyLocal,
+      dutyEffectiveFR,
       exposure: 7.5,
       zeroStop: 1e-7,
       curvatureGainT: 0.70,
