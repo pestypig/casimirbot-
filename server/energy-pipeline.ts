@@ -375,21 +375,27 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
 
   // ── Sector & duty authority (server) ──────────────────────────────────────────
+  // Make standby detection explicit and reusable
+  const modeStr = String(state.mode ?? state.currentMode ?? '').toLowerCase();
+  const isStandby    = (modeStr === 'standby');
+  const zeroStandby  = isStandby;
+
   const S_total = Math.max(1, Number(state.sectorCount ?? PAPER_DUTY.TOTAL_SECTORS ?? 400));
-  const S_live  = Math.max(1, Number(state.concurrentSectors ?? resolveSLive(state.currentMode)));
+  const S_live  = Math.max(1, Number(state.concurrentSectors ?? state.sectors ?? 1));
   const dutyLocal = Math.max(0, Math.min(1, Number(state.dutyLocal ?? state.dutyCycle ?? 0.01)));
-  const zeroStandby = (state.currentMode === 'standby');
 
   // Ford–Roman effective duty (physics): d_FR = dutyLocal × (S_live / S_total)
-  const dutyEffective_FR = zeroStandby ? 0 : Math.max(0, Math.min(1, dutyLocal * (S_live / S_total)));
+  const dutyEffective_FR = zeroStandby
+    ? 0
+    : Math.max(0, Math.min(1, dutyLocal * (S_live / S_total)));
 
   // publish a deterministic view-mass fraction hint for clients
   const viewMassFractionHint = S_live / S_total;
 
-  state.sectorCount        = S_total;
-  state.concurrentSectors  = S_live;
-  state.dutyLocal          = dutyLocal;
-  state.dutyEffective_FR   = dutyEffective_FR;
+  state.sectorCount          = S_total;
+  state.concurrentSectors    = S_live;
+  state.dutyLocal            = dutyLocal;
+  state.dutyEffective_FR     = dutyEffective_FR;
   (state as any).viewMassFractionHint = viewMassFractionHint;
 
   state.activeSectors   = S_live;
