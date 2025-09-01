@@ -1,0 +1,91 @@
+@@
+- import CanvasFallback from '@/components/CanvasFallback';
+- import Grid3DEngine from '@/components/engines/Grid3DEngine';
+- import Grid3DEngine from "@/components/engines/Grid3DEngine";
+- import { thetaCanonical } from "@/lib/warp-theta";
++ import CanvasFallback from '@/components/CanvasFallback';
++ import Grid3DEngine from '@/components/engines/Grid3DEngine';
++ import { thetaCanonical } from "@/lib/warp-theta";
+
+@@
+-// --- FAST PATH HELPERS (drop-in) --------------------------------------------
+-// (possibly duplicated earlier in the file)
++// --- FAST PATH HELPERS (single source) --------------------------------------
++type Pane = 'REAL' | 'SHOW';
++
++// Force pane parity/ridge and block feedback flips
++function paneSanitize(pane: Pane, patch: any) {
++  const isREAL = pane === 'REAL';
++  return {
++    ...patch,
++    physicsParityMode: isREAL,
++    uPhysicsParity: isREAL,
++    ridgeMode: isREAL ? 0 : 1,
++    uRidgeMode: isREAL ? 0 : 1,
++  };
++}
++
++// Normalize & clamp inputs for canonical theta
++function sanitizeUniforms(u: any = {}) {
++  const s: any = { ...u };
++  s.gammaGeo = Number.isFinite(+s.gammaGeo) ? +s.gammaGeo : 26;
++  s.qSpoilingFactor = Number.isFinite(+s.qSpoilingFactor)
++    ? +s.qSpoilingFactor
++    : (Number.isFinite(+s.deltaAOverA) ? +s.deltaAOverA : 1);
++  s.gammaVanDenBroeck_mass = Number.isFinite(+s.gammaVanDenBroeck_mass)
++    ? Math.max(1, Math.min(1e2, +s.gammaVanDenBroeck_mass))
++    : Math.max(1, Math.min(1e2, Number(s.gammaVdB ?? 38.3)));
++  s.dutyCycle = Number.isFinite(+s.dutyCycle) ? Math.max(0, Math.min(1, +s.dutyCycle)) : 0.01;
++  s.sectors = Math.max(1, (s.sectors | 0) || 1);
++  s.sectorCount = Math.max(1, (s.sectorCount | 0) || 400);
++  s.currentMode = (s.currentMode || 'hover') as 'hover' | 'cruise' | 'emergency' | 'standby';
++  return s;
++}
+
+@@
+-// (remove any other duplicate definitions of paneSanitize or sanitizeUniforms below)
++// NOTE: Ensure there are no other definitions of paneSanitize/sanitizeUniforms below.
+
+@@
+-// wherever you derive the two panes' uniform payloads, lock parity with paneSanitize:
+-const realPayload = { ...someUniformsFromStateOrProps };
+-const showPayload = { ...someUniformsFromStateOrProps };
+-// (older code may have re-read engine parity and flipped it)
++// Lock pane parity/ridge and never re-read engine parity to decide these:
++const realPayload = paneSanitize('REAL', { ...someUniformsFromStateOrProps });
++const showPayload = paneSanitize('SHOW', { ...someUniformsFromStateOrProps });
+
+@@
+-// When displaying θ values in the inspector panel:
+-const thetaShaderREAL = realEngine?.uniforms?.thetaScale;
+-const thetaShaderSHOW = showEngine?.uniforms?.thetaScale;
+-// canonical (for display-only comparison)
+-const thetaCanonREAL = thetaCanonical({ /* ... */ });
+-const thetaCanonSHOW = thetaCanonical({ /* ... */ });
++// θ(shader): always read the engine’s authoritative θ (what the shader uses)
++const thetaShaderREAL = realEngine?.uniforms?.thetaScale ?? NaN;
++const thetaShaderSHOW = showEngine?.uniforms?.thetaScale ?? NaN;
++
++// θ(canonical): recompute from sanitized inputs (display only)
++const Ureal = sanitizeUniforms(realEngine?.uniforms ?? {});
++const Ushow = sanitizeUniforms(showEngine?.uniforms ?? {});
++const thetaCanonREAL = thetaCanonical({
++  gammaGeo: Ureal.gammaGeo,
++  qSpoilingFactor: Ureal.qSpoilingFactor,
++  gammaVanDenBroeck_mass: Ureal.gammaVanDenBroeck_mass,
++  dutyLocal: Ureal.dutyCycle,
++  sectorsConcurrent: Ureal.sectors,
++  sectorsTotal: Ureal.sectorCount,
++  viewAveraged: true,                // REAL
++  mode: Ureal.currentMode,
++});
++const thetaCanonSHOW = thetaCanonical({
++  gammaGeo: Ushow.gammaGeo,
++  qSpoilingFactor: Ushow.qSpoilingFactor,
++  gammaVanDenBroeck_mass: Ushow.gammaVanDenBroeck_mass,
++  dutyLocal: Ushow.dutyCycle,
++  sectorsConcurrent: Ushow.sectors,
++  sectorsTotal: Ushow.sectorCount,
++  viewAveraged: false,               // SHOW (instantaneous)
++  mode: Ushow.currentMode,
++});
