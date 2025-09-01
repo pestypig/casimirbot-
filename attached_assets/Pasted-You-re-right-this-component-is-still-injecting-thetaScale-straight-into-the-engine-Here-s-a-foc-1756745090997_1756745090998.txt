@@ -1,0 +1,163 @@
+You're right — this component is still injecting `thetaScale` straight into the engine. Here’s a focused patch to **stop WarpBubbleCompare from writing θ at all**, remove the legacy `parityMode` alias, and set `viewAvg` per pane. This lets your engine’s new `_thetaCanonical()` be the sole authority.
+
+```diff
+*** a/WarpBubbleCompare.tsx
+--- b/WarpBubbleCompare.tsx
+@@
+-import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
++import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
+ import { webglSupport } from '@/lib/gl/webgl-support';
+ import CanvasFallback from '@/components/CanvasFallback';
+-import { computeThetaScale } from '@/lib/warp-theta';
+@@
+ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+   const p = { ...patch };
+ 
+   // Force parity mode based on pane - this is critical for physics validation
+   if (pane === 'REAL') {
+     p.physicsParityMode = true;
+-    p.parityMode = true;  // Also set the fallback field
+     p.ridgeMode = 0;
++    p.viewAvg = true;     // physics view uses √(d_FR)
+     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
+   } else {
+     p.physicsParityMode = false;
+-    p.parityMode = false; // Also set the fallback field
+     p.ridgeMode = 1;
++    p.viewAvg = false;    // cosmetic view does NOT average duty
+     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
+   }
+   return p;
+ }
+ 
+ function sanitizeUniforms(u: any = {}) {
+   const s = { ...u };
+ 
++  // 🚫 Never forward theta to the engine; it computes canonical θ internally
++  delete (s as any).thetaScale;
++  delete (s as any).u_thetaScale;
++
+   // numeric coercions + clamps
+   // default missing γ_VdB to visual seed
+   if ('gammaVanDenBroeck' in s && !Number.isFinite(s.gammaVanDenBroeck)) {
+     s.gammaVanDenBroeck = 1.35e5;
+   }
+-  if ('thetaScale' in s) {
+-    // allow 0 (standby), clamp negatives to 0
+-    s.thetaScale = Math.max(0, finite(s.thetaScale, 0));
+-  }
+   s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
+   s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
+   s.wallWidth         = Math.max(1e-4,    finite(s.wallWidth,  0.016));
+   s.curvatureBoostMax = Math.max(1,       finite(s.curvatureBoostMax, 40));
+   s.curvatureGainT    = Math.max(0, Math.min(1, finite(s.curvatureGainT, 0)));
+@@
+   const realPacket = {
+     ...shared,
+     ...real,
+     currentMode: parameters.currentMode,
+     physicsParityMode: true,
++    viewAvg: true,
+     vShip: 0,
+     gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+     deltaAOverA: real.qSpoilingFactor,
+     dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
+     sectors: Math.max(1, parameters.sectors),
+     ridgeMode: 0,
+   };
+ 
+   // SHOW packet
+-  const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
+   const showPacket = {
+     ...shared,
+     ...show,
+     currentMode: parameters.currentMode,
+     physicsParityMode: false,
++    viewAvg: false,
+     vShip: parameters.currentMode === 'standby' ? 0 : 1,
+-    thetaScale: showTheta,
+     gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+     deltaAOverA: show.qSpoilingFactor,
+     sectors: Math.max(1, parameters.sectors),
+     ridgeMode: 1,
+   };
+@@
+-    const realPhysicsPayload = paneSanitize('REAL', {
++    const realPhysicsPayload = paneSanitize('REAL', {
+       ...shared,
+       gridSpan: gridSpanReal,            // tight framing around hull
+       ...real,
+       currentMode: parameters.currentMode,
+       vShip: 0,                          // never "fly" in REAL
+@@
+       cameraZ: camZ,                     // ⟵ key: to-scale camera
+       // Force parity mode explicitly
+       physicsParityMode: true,
+       ridgeMode: 0,
+-      // Use shared theta calculation with mass-focused gamma VdB
+-      thetaScale: computeThetaScale({
+-        gammaGeo: real.gammaGeo,
+-        qSpoilingFactor: real.qSpoilingFactor,
+-        gammaVanDenBroeck: real.gammaVanDenBroeck,
+-        gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+-        dutyEffectiveFR: real.dutyEffectiveFR
+-      }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
+     });
+@@
+-    const showPhysicsPayload = paneSanitize('SHOW', {
++    const showPhysicsPayload = paneSanitize('SHOW', {
+       ...shared,
+       ...show,
+       currentMode: parameters.currentMode,
+       vShip: parameters.currentMode === 'standby' ? 0 : 1,
+       gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
+@@
+       // Force non-parity mode explicitly
+       physicsParityMode: false,
+       ridgeMode: 1,
+-      // Use shared theta calculation with visual-focused gamma VdB, handle standby mode
+-      thetaScale: parameters.currentMode === 'standby' ? 0 : computeThetaScale({
+-        gammaGeo: show.gammaGeo,
+-        qSpoilingFactor: show.qSpoilingFactor,
+-        gammaVanDenBroeck: show.gammaVanDenBroeck,
+-        gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
+-        dutyEffectiveFR: show.dutyEffectiveFR
+-      }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 }),
+     });
+@@
+-    console.log('Applying physics to engines:', {
++    console.log('Applying physics to engines:', {
+       real: {
+         parity: realPhysicsPayload.physicsParityMode,
+         ridge: realPhysicsPayload.ridgeMode,
+-        theta: realPhysicsPayload.thetaScale,
++        theta: '(engine-authoritative)',
+         gammaVdB: realPhysicsPayload.gammaVdB,
+         qSpoil: realPhysicsPayload.deltaAOverA
+       },
+       show: {
+         parity: showPhysicsPayload.physicsParityMode,
+         ridge: showPhysicsPayload.ridgeMode,
+-        theta: showPhysicsPayload.thetaScale,
++        theta: '(engine-authoritative)',
+         gammaVdB: showPhysicsPayload.gammaVdB,
+         qSpoil: showPhysicsPayload.deltaAOverA
+       }
+     });
+```
+
+### Why this fixes your “1.88e+9 on standby”
+
+* This component was still forwarding `thetaScale` (both from `buildREAL()/buildSHOW()` and from `computeThetaScale(...)`) to the engines. Even with the engine patched, those direct writes can keep the shader’s uniform non-zero. The patch **deletes any theta fields before sending** and removes all local theta computations/usages here.
+* We also drop the legacy `parityMode` alias (which was known to cause flip-flops) and set `viewAvg` explicitly: REAL=`true`, SHOW=`false`.
+* With no client θ injection, the engine’s `_thetaCanonical()` is now the only source of truth, so in `standby` you’ll see θ(uniform) → **0** on both panes.
+
+If you still see a non-zero after this, run in the console:
+
+```js
+window.__debugWarpEngines?.();
+```
+
+and check each pane’s `uniforms` to confirm there’s **no `thetaScale` field coming from UI** (it should only appear after the engine computes and stores it internally).
