@@ -26,11 +26,10 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const sectorsTotalDerived = Number.isFinite(derived?.sectorsTotal) ? derived.sectorsTotal : undefined;
 
   // HUD model (source of truth with sensible fallbacks)
-  const wu  = metrics?.warpUniforms ?? pipeline?.warpUniforms ?? null;
   const hud = toHUDModel({
-    warpUniforms: wu || {},
-    viewerHints: metrics?.viewerHints || {},
-    lightCrossing: metrics?.lightCrossing || {},
+    warpUniforms: {},
+    viewerHints: {},
+    lightCrossing: (metrics as any)?.lightCrossing || {},
   });
 
   // Modulation period
@@ -69,8 +68,12 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
       (hud as any)?.sectorPeriod_ms ??
       (metrics as any)?.lightCrossing?.sectorPeriod_ms ??
       undefined;
-    return Number.isFinite(dwellMs) ? (dwellMs as number) / 1000 : Tm * 100; // benign fallback
-  }, [props.dwellMs, dwellDerived, hud, metrics, Tm]);
+    return Number.isFinite(dwellMs) ? (
+      (dwellMs as number) / 1000
+    ) : (
+      (Number.isFinite(sectorsTotalDerived) && sectorsTotalDerived! > 0 ? (sectorsTotalDerived as number) * Tm : Tm)
+    );
+  }, [props.dwellMs, dwellDerived, hud, metrics, Tm, sectorsTotalDerived]);
 
   // Duty (Ford–Roman, ship-avg) and burst window
   const dutyFR = Number.isFinite(dutyFRDerived) ? dutyFRDerived : (Number.isFinite((hud as any)?.dutyShip) ? (hud as any).dutyShip : 0);

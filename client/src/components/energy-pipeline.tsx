@@ -90,23 +90,43 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
   const dutyEffectiveFR: number = useMemo(() => {
+    // 0) explicit from pipeline
     const frFromPipeline =
       (live as any)?.dutyEffectiveFR ??
       (live as any)?.dutyShip ??
       (live as any)?.dutyEff;
-
     if (isFiniteNum(frFromPipeline)) return clamp01(frFromPipeline);
 
-    const burst = Number((live as any)?.burst_ms);
-    const dwell = Number((live as any)?.dwell_ms);
-    const dutyLocal = (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0)
-      ? burst / dwell : 0.01;
+    // 1) timing
+    const burst_ms = Number((live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms);
+    const dwell_ms = Number((live as any)?.dwell_ms ?? (systemMetrics as any)?.lightCrossing?.dwell_ms);
+    let dutyLocal: number | undefined =
+      (Number.isFinite(burst_ms) && Number.isFinite(dwell_ms) && dwell_ms > 0)
+        ? (burst_ms / dwell_ms)
+        : undefined;
 
-    const S_total = Math.max(1, Math.floor((systemMetrics as any)?.totalSectors ?? 400));
-    const concurrentSectors = Math.max(1, Math.min(S_total, Math.floor((live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors ?? 1)));
-    const S_live = Math.max(1, Math.min(S_total, Math.floor(concurrentSectors || 1)));
+    // 2) mode-local burst fraction as physics default
+    const localBurstFrac = Number((live as any)?.localBurstFrac ?? (live as any)?.dutyCycle);
+    if (!isFiniteNum(dutyLocal) && isFiniteNum(localBurstFrac)) dutyLocal = clamp01(localBurstFrac);
+    if (!isFiniteNum(dutyLocal)) dutyLocal = 0.01; // ultra-conservative fallback
 
-    return clamp01(dutyLocal * (S_live / S_total));
+    // 3) sectorization
+    const S_total =
+      Math.max(1, Math.floor(
+        Number((systemMetrics as any)?.lightCrossing?.sectorsTotal) ??
+        Number((systemMetrics as any)?.totalSectors) ??
+        Number((live as any)?.sectorsTotal) ??
+        Number((live as any)?.sectorCount) ?? 400
+      ));
+    const S_live =
+      Math.max(1, Math.min(S_total, Math.floor(
+        Number((live as any)?.sectorsConcurrent) ??
+        Number((systemMetrics as any)?.lightCrossing?.activeSectors) ??
+        Number((systemMetrics as any)?.activeSectors) ??
+        Number((live as any)?.concurrentSectors) ?? 1
+      )));
+
+    return clamp01((dutyLocal as number) * (S_live / S_total));
   }, [live, systemMetrics]);
 
   // UI duty (for display only)
@@ -181,7 +201,17 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // --- Share derived values globally for other panels (unchanged) ---
   useEffect(() => {
-    const tau_LC_ms = (live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms;
+    // Light-crossing: prefer server/metrics, else derive from geometry (≈ diameter/c)
+    const tau_LC_ms =
+      Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms) ??
+      Number((systemMetrics as any)?.lightCrossing?.tauLC_ms) ??
+      (Number.isFinite((live as any)?.shipRadius_m)
+        ? ms((2 * Number((live as any)?.shipRadius_m)) / C_M_PER_S)
+        : undefined);
+    const sectorPeriod_ms =
+      Number((live as any)?.sectorPeriod_ms) ??
+      Number((systemMetrics as any)?.lightCrossing?.sectorPeriod_ms);
+
     queryClient.setQueryData(["helix:pipeline:derived"], {
       mode,
       dutyUI,
@@ -198,6 +228,20 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       Q,
       sectorsTotal: (systemMetrics as any)?.totalSectors ?? (live as any)?.sectorCount,
       sectorsConcurrent: (live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors,
+      // timing mirror for HUDs
+      sectorPeriod_ms,
+      burst_ms: (live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms,
+      dwell_ms: (live as any)?.dwell_ms ?? (systemMetrics as any)?.lightCrossing?.dwell_ms,
+      localBurstFrac: (live as any)?.localBurstFrac ?? (live as any)?.dutyCycle,
+      // instantaneous reciprocity indicator for consumers
+      reciprocity: (() => {
+        const b = Number((live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms);
+        if (Number.isFinite(b) && Number.isFinite(tau_LC_ms))
+          return b < (tau_LC_ms as number)
+            ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
+            : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+        return { status: "UNKNOWN", message: "missing burst/τ_LC" };
+      })(),
     });
   }, [mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms, live, N, fGHz, γ_geo, Q, systemMetrics, queryClient]);
 
@@ -270,6 +314,8 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
             : { status: "PASS_AVG",       message: "burst ≥ τ_LC → avg. reciprocal" })
         : { status: "UNKNOWN", message: "missing burst/τ_LC" };
 
+    // If the derived cache has a fresher reciprocity, prefer it
+    const derived = queryClient.getQueryData(["helix:pipeline:derived"]) as any;
     const payload = {
       kind: greenKind,
       m: mHelm,
@@ -277,7 +323,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       phi: greenPhi.phi,     // Float32Array
       size: greenPhi.phi.length,
       source: greenPhi.source,
-      reciprocity
+      reciprocity: (derived?.reciprocity ?? reciprocity)
     };
     // cache it so any consumer (inspector/engine adapter) can grab it
     queryClient.setQueryData(["helix:pipeline:greens"], payload);

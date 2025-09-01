@@ -48,8 +48,6 @@ export interface EnergyPipelineState {
   // Scheduling truth
   sectorCount?: number;
   concurrentSectors?: number;
-  sectorsTotal?: number;
-  sectorsConcurrent?: number;
   
   // FR duty direct
   dutyEffectiveFR?: number;
@@ -243,7 +241,6 @@ export function useEnergyPipeline(options?: {
     refetchInterval: options?.refetchInterval ?? 1000, // Refresh every second
     staleTime: options?.staleTime,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
-    suspense: false,
   });
 }
 
