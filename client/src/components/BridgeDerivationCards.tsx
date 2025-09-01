@@ -846,7 +846,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
       )}
 
       {/* ---------- Method Verification: symbolic line + numeric substitution line ---------- */}
-      <div className="mt-3 rounded-xl border border-slate-800 bg-slate-900/40 p-3 text-xs space-y-3">
+      <div className="mt-3 rounded-xl border border-slate-700 bg-slate-800/60 p-3 text-xs space-y-3">
         <div className="font-semibold text-slate-200">Method Verification</div>
 
         {/* Duty (FR) */}
