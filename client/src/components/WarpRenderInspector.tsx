@@ -491,19 +491,19 @@ function PaneOverlay(props:{
       const S  = areaEllipsoid(a,b,c);
       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
 
-      // --- Shader vs Canonical ---
-      const thetaShader =
-        Number(+U.thetaScale_actual) ||
-        Number(+U.thetaScale) ||
-        Number(+U.u_thetaScale) || NaN;
-      const sectorsTotal      = Math.max(1, +(U.sectorCount ?? 400));
-      const sectorsConcurrent = Math.max(1, +(U.sectors ?? 1)); // Fixed: Use sectors for concurrent
-      const dutyLocal = Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0.01;
-      const dutyEffectiveFR = Math.max(1e-12, Math.min(1, dutyLocal * (sectorsConcurrent / sectorsTotal)));
+      // --- Operational-mode aware θ calculations ---
+      const parity = !!U.physicsParityMode;                     // REAL if true, SHOW otherwise
+      const mode = String(U.currentMode ?? 'hover');            // 'standby'|'hover'|'cruise'|'emergency'
+      const isREALStandby = parity && mode === 'standby';
 
-      // Engine computes theta - we just report what it computed
-      const thetaCanon = thetaShader; // Engine is canonical now
-      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
+      const thetaCanonical = Number(U.thetaScale_actual ?? U.thetaScale ?? NaN); // γ³·q·γVdB·√d_FR
+      const vShip = Number.isFinite(U.vShip) ? Number(U.vShip) : (parity ? 0 : 1);
+
+      // "θ (shader)" should reflect EFFECTIVE amplitude carried into the fragment math
+      const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaCanonical) ? thetaCanonical * vShip : NaN);
+      const thetaShader = thetaEffective;
+      const thetaCanon = thetaCanonical;
+      const thetaPaper = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
 
       // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
       const M_ship_kg  = Number.isFinite(shipMassKg as number) ? Number(shipMassKg) : NaN;
@@ -1331,7 +1331,7 @@ export default function WarpRenderInspector(props: {
       });
 
       // Build shared frame data once
-      const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
+      const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
       const shared = {
         axesScene: deriveAxesClip(hull, 1)
       };
@@ -1520,156 +1520,6 @@ export default function WarpRenderInspector(props: {
 
     initEngines();
   }, []); // Empty dependency array ensures this runs only once on mount
-
-  // De-spam the bus: publish only on real changes
-  useEffect(() => {
-    const wu = (systemMetrics as any)?.warpUniforms;
-    if (!wu) return;
-
-    const version = Number.isFinite(systemMetrics?.seq) ? systemMetrics.seq : Date.now();
-
-    const sanitized = sanitizeUniforms(wu);
-    const sig = JSON.stringify(stableWU(sanitized));
-    if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
-
-    lastWUHashRef.current = sig;
-    // Never publish any thetaScale fields downstream; engine is authoritative.
-    const { thetaScale, u_thetaScale, thetaScale_actual, ...clean } = sanitized as any;
-    publish("warp:uniforms", { ...clean, __version: version });
-  }, [systemMetrics]);
-
-  // Ford–Roman duty inputs (compute BEFORE payloads so we can embed them)
-  const dutyLocal = (() => {
-    const b = Number(props.lightCrossing?.burst_ms);
-    const d = Number(props.lightCrossing?.dwell_ms);
-    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
-  })();
-  const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
-  const sConcurrent = Math.max(1, +(wu.sectors ?? 1)); // Use sectorCount from wu for concurrent sectors
-  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // canonical FR
-
-  // after you compute sTotal etc.
-  const wallWidth_m      = N(props.baseShared?.wallWidth_m ?? live?.hull?.wallThickness_m, 1.0);
-  // let callers optionally provide a thinner analytical slice (else assume full wall)
-  const sliceThickness_m = N(props.baseShared?.sliceThickness_m, wallWidth_m);
-
-  // 0..1 of the wall band covered by the slice grid
-  const bandCover = Math.max(0, Math.min(1, sliceThickness_m / Math.max(1e-9, wallWidth_m)));
-
-  // sector (azimuthal) fraction already represented by REAL's "one pane"
-  const sectorFrac = 1 / Math.max(1, sTotal);
-
-  // final view mass fraction for REAL's diagnostics & proxies
-  const viewMassFracREAL = sectorFrac * bandCover;
-
-  // Visual-only mass fraction scaling
-  const total = Math.max(1, Number(live?.sectorCount) || 400);
-  const viewFracREAL = 1 / total;
-
-  // (kept) dutyEffectiveFR already computed above
-
-  // Debug toggle: choose between mass-calibrated vs visual-only γ_VdB (outside useEffect for display access)
-  const gammaVdB_vis = N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11);
-  const gammaVdB_mass = N(live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck, 1e11);
-  const gammaVdBBound = useMassGamma ? gammaVdB_mass : gammaVdB_vis;
-
-  // Theta consistency helper functions
-  function thetaGainExpected({
-    gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR
-  }: {gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number}) {
-    return Math.pow(Number(gammaGeo)||0, 3)
-         * (Number(qSpoilingFactor)||1)
-         * (Number(gammaVdB)||1)
-         * Math.sqrt(Math.max(1e-12, Number(dutyEffectiveFR)||0));
-  }
-
-  function pctDelta(a:number, b:number){
-    if (!isFinite(a) || !isFinite(b) || b === 0) return NaN;
-    return (a/b - 1) * 100;
-  }
-
-  // -- SHOW checkpoints binder: exports a full snapshot every frame
-  function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
-    const emitSnap = () => {
-      const u = engine?.uniforms || {};
-      const floats = (engine?.gridVertices?.length || 0);
-      const snap = {
-        // canvas / GL
-        canvasW: canvas?.width || 0,
-        canvasH: canvas?.height || 0,
-        hasGL: !!engine?.gl,
-
-        // readiness
-        programReady: !!engine?.gridProgram,
-        isLoaded: !!engine?.isLoaded,
-
-        // critical fields the panel cares about
-        cameraZSet: Number.isFinite(u?.cameraZ || null),
-        axesClipSet: Array.isArray(u?.axesClip) && u.axesClip.length === 3,
-        thetaValid: Number.isFinite(u?.thetaScale) && (u.thetaScale as number) > 0,
-
-        // runtime viz
-        parity: !!u?.physicsParityMode,
-        ridgeMode: (u?.ridgeMode ?? undefined),
-        toneExp: u?.exposure ?? 0,
-        toneZero: u?.zeroStop ?? 0,
-
-        // grid + sectoring
-        gridFloats: floats,                       // total vertex floats
-        sectors: Math.max(1, (u?.sectors|0) || 1),
-        sectorTotal: Math.max(1, (u?.sectorCount|0) || (u?.sectors|0) || 1),
-        split: Math.max(0, (u?.split|0) || 0),
-
-        // loop
-        running: !!engine?._raf,
-        ts: Date.now(),
-      };
-
-      // Expose to devtools and a UI listener (if the panel listens)
-      (window as any).__chkSHOW = snap;
-      try {
-        window.dispatchEvent(new CustomEvent('helix:show-checkpoints', { detail: snap }));
-      } catch {}
-      // Also ship full diagnostics if available
-      try {
-        (window as any).__diagSHOW = engine?.computeDiagnostics?.() || null;
-      } catch {}
-    };
-
-    // fire on every diagnostics beat & on loading state changes
-    engine.onDiagnostics = () => emitSnap();
-    engine.onLoadingStateChange = () => emitSnap();
-    emitSnap(); // kick once now
-  }
-
-  // Helper to dump uniforms and diagnostics for debugging
-  const dumpUniforms = (engine: any, label: string) => {
-    console.log(`--- Uniforms & Diagnostics for ${label} ---`);
-    if (!engine) {
-      console.log("Engine not available.");
-      return;
-    }
-    const u = engine.uniforms || {};
-    console.log("Uniforms:", Object.fromEntries(Object.entries(u).filter(([k]) => !k.startsWith('_')))); // Filter internal properties
-    try {
-      console.log("Diagnostics:", engine.computeDiagnostics?.() || "N/A");
-    } catch (e) {
-      console.log("Diagnostics error:", e);
-    }
-    console.log("---------------------------------------------");
-  };
-
-  // Debug button handler
-  const debugEngineStates = () => {
-    console.log("--- Debugging Inspector State ---");
-    console.log("REAL Engine:", leftEngine.current);
-    console.log("SHOW Engine:", rightEngine.current);
-    console.log("Grid3D Ref:", grid3dRef.current);
-    console.log("Have Uniforms:", haveUniforms);
-    console.log("Load Error:", loadError);
-    console.log("Current Mode:", mode);
-    console.log("---------------------------------");
-  };
 
   // Build parameters object for the new packet builders
     const parameters = {
