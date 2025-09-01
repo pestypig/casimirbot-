@@ -170,6 +170,10 @@ function GreensLivePanel() {
     Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
     undefined;
   const dutyFR_display = (isNum(dutyFR_calc) ? dutyFR_calc : dutyFR_fallback);
+  const dutyDelta = (isNum(dutyFR_calc) && Number.isFinite(dutyFR_fallback))
+    ? Math.abs(dutyFR_calc - (dutyFR_fallback as number))
+    : undefined;
+  const dutyConsistent = !isNum(dutyDelta) || dutyDelta < 5e-4; // <0.05% abs
   const r_b_over_tau = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
   const sectorsTotal = T.sectorsTotal.val;
   const sectorsConcurrent = T.sectorsConcurrent.val;
@@ -232,6 +236,9 @@ function GreensLivePanel() {
       {/* provenance row — makes it undeniable which path feeds the panel */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">Duty: {dutyFrom}</span>
+        <span className={`rounded-full px-2 py-0.5 ${dutyConsistent ? "bg-emerald-600/30 text-emerald-200" : "bg-amber-600/30 text-amber-200"}`}>
+          consistency: {isNum(dutyDelta) ? `${(dutyDelta*100).toFixed(3)}%` : "n/a"}
+        </span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from ?? "—"}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? "—"}</span>
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? "—"}</span>
@@ -270,7 +277,13 @@ function GreensLivePanel() {
           </div>
           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
             <div className="text-slate-400">Duty (FR)</div>
-            <div className="font-mono">{Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}</div>
+            <div className="font-mono" title={
+              isNum(burst_ms)&&isNum(dwell_ms)&&isNum(sectorsTotal)&&isNum(sectorsConcurrent)
+                ? `(burst/dwell)*(S_live/S_total) = (${burst_ms!.toFixed(3)}ms/${dwell_ms!.toFixed(3)}ms)*(${sectorsConcurrent}/${sectorsTotal})`
+                : "missing timing/sectors"
+            }>
+              {Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}
+            </div>
             <div className="text-slate-400">S_total</div>
             <div className="font-mono">{sectorsTotal ?? "—"}</div>
             <div className="text-slate-400">S_live</div>

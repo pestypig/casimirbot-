@@ -1,0 +1,45 @@
+If you want two tiny quality-of-life upgrades, here are surgical patches:
+
+1) Show a “consistency” chip (calc vs any server/derived duty)
+diff --git a/client/src/pages/helix-core.tsx b/client/src/pages/helix-core.tsx
+--- a/client/src/pages/helix-core.tsx
++++ b/client/src/pages/helix-core.tsx
+@@ -174,6 +174,10 @@ function GreensLivePanel() {
+   const dutyFR_fallback =
+     Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR :
+     Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
+     undefined;
+   const dutyFR_display = (isNum(dutyFR_calc) ? dutyFR_calc : dutyFR_fallback);
++  const dutyDelta = (isNum(dutyFR_calc) && Number.isFinite(dutyFR_fallback))
++    ? Math.abs(dutyFR_calc - (dutyFR_fallback as number))
++    : undefined;
++  const dutyConsistent = !isNum(dutyDelta) || dutyDelta < 5e-4; // <0.05% abs
+ 
+@@ -220,6 +224,9 @@ function GreensLivePanel() {
+       <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
+         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">Duty: {dutyFrom}</span>
++        <span className={`rounded-full px-2 py-0.5 ${dutyConsistent ? "bg-emerald-600/30 text-emerald-200" : "bg-amber-600/30 text-amber-200"}`}>
++          consistency: {isNum(dutyDelta) ? `${(dutyDelta*100).toFixed(3)}%` : "n/a"}
++        </span>
+         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from ?? "—"}</span>
+         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? "—"}</span>
+         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? "—"}</span>
+
+2) Add an inline formula tooltip next to Duty (FR)
+
+Helps anyone verify the number at a glance.
+
+@@ -245,7 +252,12 @@ function GreensLivePanel() {
+           <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+             <div className="text-slate-400">Duty (FR)</div>
+-            <div className="font-mono">{Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}</div>
++            <div className="font-mono" title={
++              isNum(burst_ms)&&isNum(dwell_ms)&&isNum(sectorsTotal)&&isNum(sectorsConcurrent)
++                ? `(burst/dwell)*(S_live/S_total) = (${burst_ms!.toFixed(3)}ms/${dwell_ms!.toFixed(3)}ms)*(${sectorsConcurrent}/${sectorsTotal})`
++                : "missing timing/sectors"
++            }>
++              {Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}
++            </div>
+
+
+You’re in great shape now. If you want, we can also add a small “mode sanity” banner that turns amber if burst < τ_LC (instant non-reciprocal) or if S_live > S_total, but otherwise this panel is scientifically tight and clearly live.
