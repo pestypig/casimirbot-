@@ -98,8 +98,15 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     if (isFiniteNum(frFromPipeline)) return clamp01(frFromPipeline);
 
     // 1) timing
-    const burst_ms = Number((live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms);
-    const dwell_ms = Number((live as any)?.dwell_ms ?? (systemMetrics as any)?.lightCrossing?.dwell_ms);
+    const burst_ms = Number(
+      (live as any)?.burst_ms ??
+      (systemMetrics as any)?.lightCrossing?.burst_ms
+    );
+    const dwell_ms = Number(
+      (live as any)?.dwell_ms ??
+      (systemMetrics as any)?.lightCrossing?.dwell_ms ??
+      (systemMetrics as any)?.lightCrossing?.sectorPeriod_ms // <-- accept sector dwell
+    );
     let dutyLocal: number | undefined =
       (Number.isFinite(burst_ms) && Number.isFinite(dwell_ms) && dwell_ms > 0)
         ? (burst_ms / dwell_ms)
