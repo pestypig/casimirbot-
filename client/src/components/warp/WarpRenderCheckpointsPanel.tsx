@@ -4,6 +4,53 @@ import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoin
 import { thetaScaleExpected } from "@/lib/expectations";
 import CheckpointViewer from "./CheckpointViewer";
 
+// Do NOT send theta from here. Engine computes canonical θ internally.
+
+const sanitizeUniforms = (o: any) =>
+  Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  const p = { ...patch };
+  if (pane === 'REAL') { p.physicsParityMode = true;  p.parityMode = true;  p.viewAvg = true;  p.ridgeMode = 0; }
+  else                 { p.physicsParityMode = false; p.parityMode = false; p.viewAvg = false; p.ridgeMode = 1; }
+  delete (p as any).thetaScale;
+  delete (p as any).u_thetaScale;
+  return p;
+}
+function buildRealPacket(parameters: any, base: any = {}) {
+  const dutyFR = Math.max(1e-9, Math.min(1, parameters?.dutyEffectiveFR ?? parameters?.dutyFR ?? 0.000025));
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    physicsParityMode: true,
+    viewAvg: true,
+    dutyEffectiveFR: dutyFR,
+    dutyCycle: dutyFR,
+    sectors: 1,
+    sectorCount: 1,
+    vShip: 0,
+    ridgeMode: 0,
+    gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
+      parameters?.gammaVanDenBroeck_mass ?? parameters?.gammaVanDenBroeck ?? 38.3)),
+    thetaScale: undefined, u_thetaScale: undefined,
+  };
+}
+function buildShowPacket(parameters: any, base: any = {}) {
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    physicsParityMode: false,
+    viewAvg: false,
+    dutyCycle: Math.max(0, Math.min(1, parameters?.dutyCycle ?? 0.14)),
+    sectorCount: Math.max(1, Math.floor(parameters?.sectorCount ?? 400)),
+    sectors:     Math.max(1, Math.floor(parameters?.sectors     ?? 1)),
+    vShip: parameters?.currentMode === 'standby' ? 0 : 1,
+    ridgeMode: 1,
+    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
+      parameters?.gammaVanDenBroeck_vis ?? parameters?.gammaVanDenBroeck ?? 2.86e5)),
+    thetaScale: undefined, u_thetaScale: undefined,
+  };
+}
+
 /*
   WarpRenderCheckpointsPanel
   --------------------------
@@ -181,6 +228,21 @@ function computeThetaScaleFromParams(v: any) {
   const averaging = (v.viewAvg ?? true);
 
   return averaging ? base * Math.sqrt(dFR) : base;
+}
+
+// If you display "expected/exp" θ, compute locally for display-only (never send)
+function expectedThetaForPanel(u: any, pane: 'REAL'|'SHOW') {
+  const g  = Math.max(1, Number(u?.gammaGeo ?? u?.g_y ?? 26));
+  const q  = Math.max(1e-12, Number(u?.deltaAOverA ?? u?.qSpoilingFactor ?? 1));
+  const vM = Math.max(1, Math.min(1e2, Number(u?.gammaVanDenBroeck_mass ?? 38.3)));
+  const vV = Math.max(1, Math.min(1e9, Number(u?.gammaVanDenBroeck_vis  ?? 2.86e5)));
+  const sectors   = Math.max(1, pane === 'REAL' ? 1 : (u?.sectors ?? 1));
+  const sectorCnt = Math.max(1, pane === 'REAL' ? 1 : (u?.sectorCount ?? 400));
+  const dutyLocal = Math.max(0, Number(u?.dutyCycle ?? 0.14));
+  const dFR = pane === 'REAL' ? dutyLocal : (dutyLocal * (sectors/sectorCnt));
+  const dutyFactor = pane === 'REAL' ? Math.sqrt(Math.max(1e-12, dFR)) : 1;
+  const v = pane === 'REAL' ? vM : vV;
+  return (g*g*g) * q * v * dutyFactor;
 }
 
 // ✅ Single-source expected θ; caller provides dutyFR for the pane
@@ -547,6 +609,13 @@ function useCheckpointList(
       });
     }
 
+    // θ readouts (prefer engine's telemetry "thetaScale_actual" when present)
+    const thetaShaderReal  = Number(e?.uniforms?.thetaScale_actual ?? e?.uniforms?.thetaScale ?? NaN);
+    const thetaExpected    = expectedThetaForPanel(u, side);
+    const thetaDelta       = Number.isFinite(thetaShaderReal) && Number.isFinite(thetaExpected) 
+      ? ((thetaShaderReal / thetaExpected - 1) * 100).toFixed(1) + '%'
+      : '—';
+
     // Grid buffers
     const verts = (e?.gridVertices?.length || 0);
     const orig = (e?.originalGridVertices?.length || 0);
@@ -702,6 +771,11 @@ function useCheckpointList(
         tsDetail += ` • used≈${inferredDutyPct}`;
       }
     }
+
+    // Updated theta scale row with engine telemetry
+    const tsOk = Number.isFinite(ts) && ts > 0;
+    let tsState: "ok" | "warn" | "fail" = tsOk ? "ok" : "fail";
+    let tsDetail = tsOk ? `${ts.toExponential(2)} • exp ${thetaExpected.toExponential(2)} (Δ ${thetaDelta})` : "invalid";
 
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
 
@@ -1093,6 +1167,18 @@ export default function WarpRenderCheckpointsPanel({
   const hardFailsRight = rightRows.filter(r => r.state === 'fail').map(r => r.label);
 
   // convenience actions
+  // Buttons that push presets / test writes (always go through builders)
+  const onPresetReal = () => {
+    if (!leftEngineRef.current) return;
+    const pkt = paneSanitize('REAL', sanitizeUniforms(buildRealPacket(parameters, {})));
+    leftEngineRef.current.updateUniforms(pkt);
+  };
+  const onPresetShow = () => {
+    if (!rightEngineRef.current) return;
+    const pkt = paneSanitize('SHOW', sanitizeUniforms(buildShowPacket(parameters, {})));
+    rightEngineRef.current.updateUniforms(pkt);
+  };
+
   const act = {
     forceResize: (e: any) => e?._resizeCanvasToDisplaySize?.(),
     fitCamera: (e: any) => {
@@ -1114,8 +1200,8 @@ export default function WarpRenderCheckpointsPanel({
     recompile: (e: any) => e?._compileGridShaders?.(),
     rewarp: (e: any) => (e?.forceRedraw?.(), e?._render?.()),
     presets: {
-      real:   (e: any) => e?.setPresetParity?.(),
-      show:   (e: any) => e?.setPresetShowcase?.(),
+      real:   onPresetReal,
+      show:   onPresetShow,
     }
   };
 
