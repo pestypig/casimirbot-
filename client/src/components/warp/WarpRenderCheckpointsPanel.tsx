@@ -610,10 +610,10 @@ function useCheckpointList(
     }
 
     // θ readouts (prefer engine's telemetry "thetaScale_actual" when present)
-    const thetaShaderReal  = Number(e?.uniforms?.thetaScale_actual ?? e?.uniforms?.thetaScale ?? NaN);
-    const thetaExpected    = expectedThetaForPanel(u, side);
-    const thetaDelta       = Number.isFinite(thetaShaderReal) && Number.isFinite(thetaExpected) 
-      ? ((thetaShaderReal / thetaExpected - 1) * 100).toFixed(1) + '%'
+    const thetaShaderReal   = Number(e?.uniforms?.thetaScale_actual ?? e?.uniforms?.thetaScale ?? NaN);
+    const thetaExpectedPane = expectedThetaForPane(liveSnap, e);
+    const thetaDelta        = Number.isFinite(thetaShaderReal) && Number.isFinite(thetaExpectedPane) 
+      ? ((thetaShaderReal / thetaExpectedPane - 1) * 100).toFixed(1) + '%'
       : '—';
 
     // Grid buffers
@@ -773,11 +773,13 @@ function useCheckpointList(
     }
 
     // Updated theta scale row with engine telemetry
-    const tsOk = Number.isFinite(ts) && ts > 0;
-    let tsState: "ok" | "warn" | "fail" = tsOk ? "ok" : "fail";
-    let tsDetail = tsOk ? `${ts.toExponential(2)} • exp ${thetaExpected.toExponential(2)} (Δ ${thetaDelta})` : "invalid";
+    const tsOkRow = Number.isFinite(ts) && ts > 0;
+    let tsStateRow: "ok" | "warn" | "fail" = tsOkRow ? "ok" : "fail";
+    let tsDetailRow = tsOkRow
+      ? `${ts.toExponential(2)} • exp ${thetaExpectedPane.toExponential(2)} (Δ ${thetaDelta})`
+      : "invalid";
 
-    rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
+    rows.push({ label: "θ-scale", detail: tsDetailRow, state: tsStateRow });
 
     // ── NEW: WebGL projection rows (front/rear shell along drive direction)
     if (ndcF && pixF) {
