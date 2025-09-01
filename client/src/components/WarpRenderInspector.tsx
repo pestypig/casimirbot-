@@ -612,25 +612,25 @@ export default function WarpRenderInspector(props: {
   debugTag?: string; // Debug tag for console logging
 }) {
   // ────────────────────────────────────────────────────────────────────────────
-  // θ DEBUG INSTRUMENTATION (shader vs JS uniform vs canonical)
-  // Paste once. Safe, side-effect-only, no external imports.
+  // [WRI θ] INSTRUMENTATION & PARITY LOCK
   // ────────────────────────────────────────────────────────────────────────────
-  const thetaShaderRef  = useRef<number | null>(null); // GL-latched u_thetaScale
-  const thetaJSRef      = useRef<number | null>(null); // engine.uniforms.thetaScale
-  const thetaCanonRef   = useRef<number | null>(null); // computed locally (physics chain)
-  const lastParityRef   = useRef<boolean | null>(null);
-  const lastLogAtRef    = useRef<number>(0);
-  const rafRef          = useRef<number | null>(null);
+  console.info('[WRI θ] instrumentation booted');
+  const thetaShaderRef = useRef<number | null>(null);
+  const thetaJSRef     = useRef<number | null>(null);
+  const thetaCanonRef  = useRef<number | null>(null);
+  const lastParityRef  = useRef<boolean | null>(null);
+  const lastLogAtRef   = useRef<number>(0);
+  const rafRef         = useRef<number | null>(null);
+  const parityLockedRef= useRef<boolean>(false);
 
-  // Local canonical θ (no imports; avoids duplicate-import crashes)
+  // local canonical θ (no imports to avoid duplicate import crashes)
   function thetaCanonicalLocal(U: any): number {
-    const parityREAL = !!U.physicsParityMode;
+    const isREAL = !!U.physicsParityMode;
     const mode = String(U.currentMode || 'hover').toLowerCase();
-    if (parityREAL && mode === 'standby') return 0;        // hard-zero for REAL standby
+    if (isREAL && mode === 'standby') return 0;
     const g = Math.max(1, +U.gammaGeo || 26);
     const q = Math.max(1e-12, +U.deltaAOverA || 1);
-    // physics clamp for mass-pocket γVdB (keep visuals out)
-    const v = Math.max(1, Math.min(1e2, +U.gammaVdB || 38.3));
+    const v = Math.max(1, Math.min(1e2, +U.gammaVdB || 38.3)); // physics clamp
     const sLive = Math.max(1, (U.sectors|0) || 1);
     const sTot  = Math.max(1, (U.sectorCount|0) || 400);
     const dLocal = Number.isFinite(+U.dutyLocal) ? +U.dutyLocal
@@ -641,150 +641,149 @@ export default function WarpRenderInspector(props: {
     return (g*g*g) * q * v * dutyFactor;
   }
 
-  // Find an engine instance we can sample
-  function resolveEngine(): any | null {
-    // Prefer an explicit engine prop/ref if your component passes one
-    // (adjust these names if your props differ)
+  // engine resolver: find left/right engines from registry or props
+  function resolveEngines(): {left?: any, right?: any} {
+    // prefer explicit refs if provided by parent
     // @ts-ignore
-    if ((props as any)?.engine) return (props as any).engine;
-    // @ts-ignore
-    if ((props as any)?.engineRef?.current) return (props as any).engineRef.current;
-    // Named canvas → window.__warp registry
-    // @ts-ignore
-    const canvasId = (props as any)?.canvasId || (props as any)?.paneId;
-    // @ts-ignore
-    if (canvasId && (window as any).__warp && (window as any).__warp[canvasId]) {
-      // @ts-ignore
-      return (window as any).__warp[canvasId];
-    }
-    // First registered WarpEngine
+    const engProp = (props as any)?.engine || (props as any)?.engineRef?.current;
+    if (engProp) return { left: engProp };
+    // global registry (WarpEngine registers windows.__warp[id] = engine)
     // @ts-ignore
     const reg = (window as any).__warp;
     if (reg && typeof reg === 'object') {
-      const firstKey = Object.keys(reg)[0];
-      if (firstKey) return reg[firstKey];
+      const keys = Object.keys(reg);
+      if (keys.length === 1) return { left: reg[keys[0]] };
+      if (keys.length >= 2)  return { left: reg[keys[0]], right: reg[keys[1]] };
     }
-    // Last-ditch: any canvas with an attached engine
-    const canv = document.querySelector('canvas') as any;
-    if (canv && canv.__warpEngine) return canv.__warpEngine;
-    return null;
+    // fallback: first canvas engine if attached
+    const canv = document.querySelectorAll('canvas');
+    for (const c of Array.from(canv) as any[]) {
+      if (c.__warpEngine) return { left: c.__warpEngine };
+    }
+    return {};
   }
 
-  // Format helper for logs
+  // sticky parity wrapper: blocks legacy aliases & θ injections
+  function lockParity(engine: any, forcedREAL: boolean) {
+    if (!engine || engine.__wriParityLocked) return;
+    engine.__wriParityLocked = true;
+    const orig = typeof engine.updateUniforms === 'function' ? engine.updateUniforms.bind(engine) : null;
+    engine.updateUniforms = function(u: any) {
+      const U = { ...(u||{}) };
+      // strip legacy alias writers that keep flipping parity / inflating θ
+      delete U.parityMode;
+      delete U.uPhysicsParity;
+      delete U.u_ridgeMode;
+      delete U.uThetaScale;
+      delete U.u_thetaScale;
+      delete U.thetaScale;
+      // enforce sticky REAL/SHOW + pane-specific averaging
+      U.physicsParityMode  = !!forcedREAL;
+      U.ridgeMode          = forcedREAL ? 0 : 1;
+      U.viewAvg            = !!forcedREAL;
+      // pass through canonical fields; engine computes θ itself
+      return orig ? orig(U) : undefined;
+    };
+  }
+
+  // pretty formatter
   const fmt = (x: any) => (typeof x === 'number' && isFinite(x))
     ? (Math.abs(x) >= 1e3 || Math.abs(x) < 1e-2 ? x.toExponential(3) : x.toFixed(3))
     : String(x);
 
-  // Start a lightweight sampler that compares θ (GL) vs θ (JS) vs θ (canonical)
+  // bootstrap parity locks + start θ sampler
   useEffect(() => {
-    const eng = resolveEngine();
-    if (!eng || !eng.gl || !eng.gridProgram) return;
-
     let alive = true;
-    const sample = () => {
+    let armed = false;
+    const start = () => {
       if (!alive) return;
-      try {
-        const U = { ...(eng.uniforms || {}), ...(eng.currentParams || {}) };
-        // JS value the engine believes it set
-        const thetaJS = (typeof U.thetaScale === 'number' && isFinite(U.thetaScale)) ? U.thetaScale : null;
-        thetaJSRef.current = thetaJS;
+      const { left, right } = resolveEngines();
+      if (!left) return; // try again next tick
 
-        // Shader-latched uniform (real value used by the fragment shader this frame)
-        let thetaGL: number | null = null;
+      // lock parity once (REAL on left, SHOW on right if present)
+      if (!parityLockedRef.current) {
+        lockParity(left, true);
+        if (right) lockParity(right, false);
+        parityLockedRef.current = true;
+        console.log('[WRI θ] parity locks engaged: left=REAL, right=SHOW');
+      }
+
+      // RAF sampler
+      const eng = left; // sample left (REAL). Duplicate block for right if needed.
+      const sample = () => {
+        if (!alive || !eng) return;
         try {
-          const loc = eng.gridUniforms?.thetaScale || null;
-          if (loc) {
-            // gl.getUniform does NOT need the program to be "in use"
-            const val = eng.gl.getUniform(eng.gridProgram, loc);
-            thetaGL = (typeof val === 'number') ? val
-                   : (Array.isArray(val) && typeof val[0] === 'number') ? val[0]
-                   : null;
-          }
-        } catch {}
-        thetaShaderRef.current = thetaGL;
-
-        // Canonical (local) physics chain for reference
-        const thetaCanon = thetaCanonicalLocal(U);
-        thetaCanonRef.current = thetaCanon;
-
-        // Parity + mode (to catch standby leaks)
-        const parity = !!U.physicsParityMode;
-        const mode = String(U.currentMode || 'hover');
-        const now = performance.now();
-
-        // Log once per second or on parity flip
-        const parityFlipped = (lastParityRef.current !== null && lastParityRef.current !== parity);
-        if (parityFlipped || now - lastLogAtRef.current > 1000) {
-          lastParityRef.current = parity;
-          lastLogAtRef.current = now;
-
-          // Publish a handy dump
-          (window as any).__warpEcho = {
-            ...(window as any).__warpEcho,
-            inspectorTheta: {
-              canvasId: eng.__id || '(unknown)',
-              parity: parity ? 'REAL' : 'SHOW',
-              mode,
-              theta_gl: thetaGL,
-              theta_js: thetaJS,
-              theta_canonical: thetaCanon,
-              gammaGeo: U.gammaGeo, q: U.deltaAOverA, gammaVdB: U.gammaVdB,
-              dutyLocal: U.dutyLocal ?? U.dutyCycle,
-              sectors: { live: U.sectors, total: U.sectorCount },
-              viewAvg: U.viewAvg, d_FR: U.dutyEffectiveFR
+          const U = { ...(eng.uniforms||{}), ...(eng.currentParams||{}) };
+          // JS θ the engine believes it set
+          const thetaJS = (typeof U.thetaScale === 'number' && isFinite(U.thetaScale)) ? U.thetaScale : null;
+          thetaJSRef.current = thetaJS;
+          // GL-latched θ (shader)
+          let thetaGL: number | null = null;
+          try {
+            const loc = eng.gridUniforms?.thetaScale || null;
+            if (loc) {
+              const val = eng.gl.getUniform(eng.gridProgram, loc);
+              thetaGL = (typeof val === 'number') ? val
+                     : (Array.isArray(val) && typeof val[0] === 'number') ? val[0]
+                     : null;
             }
-          };
+          } catch {}
+          thetaShaderRef.current = thetaGL;
+          // canonical reference
+          const thetaCanon = thetaCanonicalLocal(U);
+          thetaCanonRef.current = thetaCanon;
 
-          // Pretty console line
-          // eslint-disable-next-line no-console
-          console.log(
-            `[WRI θ] ${parity ? 'REAL' : 'SHOW'} mode=${mode}` +
-            ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}` +
-            ` | g=${fmt(U.gammaGeo)} q=${fmt(U.deltaAOverA)} vdb=${fmt(U.gammaVdB)}` +
-            ` | dLocal=${fmt(U.dutyLocal ?? U.dutyCycle)} S=${U.sectors}/${U.sectorCount}` +
-            ` | viewAvg=${!!U.viewAvg}`
-          );
-        }
-
-        // Leak detector: REAL + standby must be zero in GL and JS
-        if (parity && mode.toLowerCase() === 'standby') {
-          const leakGL = (thetaGL ?? 0) > 0;
-          const leakJS = (thetaJS ?? 0) > 0;
-          if (leakGL || leakJS) {
-            // eslint-disable-next-line no-console
-            console.warn(
-              `[WRI θ][LEAK] REAL standby shows non-zero θ` +
-              ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}`
+          const parity = !!U.physicsParityMode;
+          const mode = String(U.currentMode || 'hover');
+          const now = performance.now();
+          const parityFlipped = (lastParityRef.current !== null && lastParityRef.current !== parity);
+          if (parityFlipped || now - lastLogAtRef.current > 1000) {
+            lastParityRef.current = parity;
+            lastLogAtRef.current = now;
+            console.log(
+              `[WRI θ] ${parity ? 'REAL' : 'SHOW'} mode=${mode}` +
+              ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}` +
+              ` | g=${fmt(U.gammaGeo)} q=${fmt(U.deltaAOverA)} vdb=${fmt(U.gammaVdB)}` +
+              ` | dLocal=${fmt(U.dutyLocal ?? U.dutyCycle)} S=${U.sectors}/${U.sectorCount}` +
+              ` | viewAvg=${!!U.viewAvg}`
             );
           }
+          if (parity && mode.toLowerCase() === 'standby') {
+            const leakGL = (thetaGL ?? 0) > 0;
+            const leakJS = (thetaJS ?? 0) > 0;
+            if (leakGL || leakJS) {
+              console.warn(
+                `[WRI θ][LEAK] REAL standby shows non-zero θ` +
+                ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}`
+              );
+            }
+          }
+        } catch (e) {
+          console.error('[WRI θ] sampler error:', e);
         }
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('[WRI θ] sampler error:', e);
+        rafRef.current = requestAnimationFrame(sample);
+      };
+      if (!armed) {
+        armed = true;
+        rafRef.current = requestAnimationFrame(sample);
       }
-      rafRef.current = requestAnimationFrame(sample);
     };
 
-    rafRef.current = requestAnimationFrame(sample);
+    // try a few times while engines mount
+    const kick = () => {
+      start();
+      if (!parityLockedRef.current) requestAnimationFrame(kick);
+    };
+    kick();
+
     return () => {
       alive = false;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [
-    // re-run resolver if these props change in your app
-    // @ts-ignore
-    (props as any)?.engine,
-    // @ts-ignore
-    (props as any)?.engineRef?.current,
-    // @ts-ignore
-    (props as any)?.canvasId,
-    // @ts-ignore
-    (props as any)?.paneId
-  ]);
-
+  }, []);
   // ────────────────────────────────────────────────────────────────────────────
-  // (end θ DEBUG INSTRUMENTATION)
+  // end [WRI θ] INSTRUMENTATION
   // ────────────────────────────────────────────────────────────────────────────
 
   // Error boundary wrapper
