@@ -1,0 +1,170 @@
+--- a/WarpBubbleCompare.tsx
++++ b/WarpBubbleCompare.tsx
+@@
+-import { computeThetaScale } from "@/lib/warp-theta";
++// ❌ Never compute θ on the client for the renderer – engine is the authority.
++// (removed stale import)
+ 
+@@
+-// (removed unused import + helper; this component computes θ-scale inline)
++// (This component never computes or sends θ. The engine derives canonical θ.)
+ 
+@@
+ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+   const p = { ...patch };
+   // Force parity mode based on pane - this is critical for physics validation
+   if (pane === 'REAL') {
+     p.physicsParityMode = true;
+     p.parityMode = true;  // Also set the fallback field
+     p.ridgeMode = 0;
+-    p.viewAvg = true;     // REAL: average → √(d_FR)
++    p.viewAvg = true;     // REAL: average → √(d_FR)
+   } else {
+     p.physicsParityMode = false;
+     p.parityMode = false; // Also set the fallback field
+     p.ridgeMode = 1;
+-    p.viewAvg = false;    // SHOW: cosmetic, no averaging
++    p.viewAvg = false;    // SHOW: cosmetic, no averaging
+   }
+   return p;
+ }
+ 
+@@
+   async function reinitEnginesFromParams() {
+@@
+-      // 3) Build uniforms from parameters (single source of truth)
++      // 3) Build uniforms from parameters (single source of truth)
+       const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+       const { real, show } = buildPacketsFromParams(parameters);
+ 
+-      // REAL packet
++      // REAL packet — use FR duty *only*; force sC=sT=1 so engine consumes d_FR directly.
++      // Also pass mass-vs-visual γ seeds explicitly so REAL never sees the visual γ.
+       const realPacket = {
+         ...shared,
+         ...real,
+         currentMode: parameters.currentMode,
+-        physicsParityMode: true,
+-        viewAvg: true,
+-        vShip: 0,
+-        gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
+-        deltaAOverA: real.qSpoilingFactor,
+-        dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
+-        sectors: Math.max(1, parameters.sectors),
++        physicsParityMode: true,
++        viewAvg: true,
++        vShip: 0,
++        // θ inputs – mass pocket only for REAL
++        gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
++          (real as any).gammaVanDenBroeck_mass ?? (real as any).gammaVanDenBroeck ?? 38.3)),
++        // keep visual value alongside for telemetry, but engine won't use it in REAL:
++        gammaVanDenBroeck_vis:  Math.max(1, Math.min(1e9,
++          (show as any).gammaVanDenBroeck ?? (show as any).gammaVdB ?? 1.35e5)),
++        deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor)),
++        // Feed Ford–Roman duty directly by collapsing sectors
++        dutyEffectiveFR: Math.max(1e-9, Math.min(1,
++          real.dutyEffectiveFR ?? (parameters as any).dutyEffectiveFR ?? 0.000025)),
++        dutyCycle: Math.max(1e-9, Math.min(1,
++          real.dutyEffectiveFR ?? (parameters as any).dutyEffectiveFR ?? 0.000025)),
++        sectorCount: 1,
++        sectors: 1,
+         ridgeMode: 0,
+       };
+ 
+-      // SHOW packet
++      // SHOW packet — use UI duty/sectoring and the visual γ for cosmetics.
+       const showPacket = {
+         ...shared,
+         ...show,
+         currentMode: parameters.currentMode,
+         physicsParityMode: false,
+         viewAvg: false,
+-        vShip: parameters.currentMode === 'standby' ? 0 : 1,
+-        gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
+-        deltaAOverA: show.qSpoilingFactor,
+-        sectors: Math.max(1, parameters.sectors),
++        vShip: parameters.currentMode === 'standby' ? 0 : 1,
++        // θ inputs – visual pocket factor for SHOW
++        gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
++          (show as any).gammaVanDenBroeck ?? (show as any).gammaVdB ?? 1.35e5)),
++        deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor)),
++        dutyCycle: Math.max(0, Math.min(1, (parameters as any).dutyCycle ?? 0.14)),
++        sectorCount: Math.max(1, Math.floor((parameters as any).sectorCount ?? 400)),
++        sectors:     Math.max(1, Math.floor((parameters as any).sectors     ?? 1)),
+         ridgeMode: 1,
+       };
+@@
+-      leftEngine.current  = await initOne(leftRef.current,  {});
+-      rightEngine.current = await initOne(rightRef.current, {});
++      leftEngine.current  = await initOne(leftRef.current,  {});
++      rightEngine.current = await initOne(rightRef.current, {});
+ 
+@@
+-      // 6) Single combined uniforms write per pane using batchers
++      // 6) Single combined uniforms write per pane using batchers
+       const heroExaggeration = 82; // default visual boost
+ 
+       // REAL — physics truth
+       pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
+         ...shared,
+         ...real,
+         vShip: 0,
+         curvatureGainT: 0,
+         curvatureBoostMax: 1,
+         userGain: 1,
+         displayGain: 1,
+-        colorMode: 2, // shear for truth view
++        colorMode: 2, // shear proxy for truth view
+         physicsParityMode: true,
+         ridgeMode: 0,
++        // absolutely never send thetaScale from the client
++        thetaScale: undefined, u_thetaScale: undefined
+       })), 'REAL/combined');
+ 
+       // SHOW — boosted visuals
+       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
+         ...shared,
+         ...show,
+         vShip: parameters.currentMode === 'standby' ? 0 : 1,
+         curvatureGainT: 0,
+         curvatureBoostMax: Math.max(1, Math.min(1000, +heroExaggeration || 82)),
+         userGain: 4,
+         displayGain: 1,
+         physicsParityMode: false,
+         ridgeMode: 1,
++        // absolutely never send thetaScale from the client
++        thetaScale: undefined, u_thetaScale: undefined
+       })), 'SHOW/combined');
+@@
+   }, [parameters?.currentMode, parameters?.reloadToken]);
+ 
+@@
+   useEffect(() => {
+     if (!leftEngine.current || !rightEngine.current || !parameters) return;
+@@
+-    // REAL (parity / Ford–Roman)
++    // REAL (parity / Ford–Roman)
+     pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
+@@
+     pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
+@@
+-    // Force a draw so the user sees the change immediately
+-    leftEngine.current.forceRedraw?.();
+-    rightEngine.current.forceRedraw?.();
++    // Force a draw so the user sees the change immediately
++    leftEngine.current.forceRedraw?.();
++    rightEngine.current.forceRedraw?.();
++
++    // --- [WRI θ] ENGINE-DERIVED THETA SAMPLER (post-write) -------------
++    requestAnimationFrame(() => {
++      try {
++        const Le = leftEngine.current, Re = rightEngine.current;
++        const Lθ = Number(Le?.uniforms?.thetaScale_actual ?? Le?.uniforms?.thetaScale);
++        const Rθ = Number(Re?.uniforms?.thetaScale_actual ?? Re?.uniforms?.thetaScale);
++        const parL = !!Le?.uniforms?.physicsParityMode, parR = !!Re?.uniforms?.physicsParityMode;
++        console.log('[WRI θ] REAL: θ(shader)=', Lθ, 'parity=', parL, 'dutyCycle=', Le?.uniforms?.dutyCycle, 'sectors=', Le?.uniforms?.sectors, 'sectorCount=', Le?.uniforms?.sectorCount, 'γ_VdB(mass)=', Le?.uniforms?.gammaVanDenBroeck_mass);
++        console.log('[WRI θ] SHOW: θ(shader)=', Rθ, 'parity=', parR, 'dutyCycle=', Re?.uniforms?.dutyCycle, 'sectors=', Re?.uniforms?.sectors, 'sectorCount=', Re?.uniforms?.sectorCount, 'γ_VdB(vis)=', Re?.uniforms?.gammaVanDenBroeck_vis);
++        if (parL !== true) console.warn('❌ REAL engine parity enforcement FAILED - should be true, got:', parL);
++        if (parR !== false) console.warn('❌ SHOW engine parity enforcement FAILED - should be false, got:', parR);
++      } catch {}
++    });
