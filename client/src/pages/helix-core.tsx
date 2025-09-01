@@ -103,28 +103,31 @@ function GreensLivePanel() {
     undefined;
 
   const sectorsConcurrent =
-    Number.isFinite(derived?.sectorsConcurrent) ? derived.sectorsConcurrent :
-    Number.isFinite(metrics?.lightCrossing?.activeSectors) ? metrics!.lightCrossing!.activeSectors :
     Number.isFinite((metrics as any)?.activeSectors) ? (metrics as any).activeSectors :
+    Number.isFinite(metrics?.lightCrossing?.activeSectors) ? metrics!.lightCrossing!.activeSectors :
+    Number.isFinite(derived?.sectorsConcurrent) ? derived.sectorsConcurrent :
     Number.isFinite((live as any)?.sectorsConcurrent) ? (live as any).sectorsConcurrent :
     undefined;
 
   const τ_LC_ms =
-    Number.isFinite(derived?.τ_LC_ms) ? derived.τ_LC_ms :
-    Number.isFinite((live as any)?.tau_LC_ms) ? (live as any).tau_LC_ms :
     Number.isFinite(metrics?.lightCrossing?.tauLC_ms) ? metrics!.lightCrossing!.tauLC_ms :
+    Number.isFinite(derived?.τ_LC_ms) ? derived.τ_LC_ms :
+    Number.isFinite((live as any)?.lightCrossing?.tauLC_ms) ? (live as any).lightCrossing.tauLC_ms :
+    Number.isFinite((live as any)?.tau_LC_ms) ? (live as any).tau_LC_ms :
     undefined;
 
   const burst_ms =
-    Number.isFinite(derived?.burst_ms) ? derived.burst_ms :
-    Number.isFinite((live as any)?.burst_ms) ? (live as any).burst_ms :
     Number.isFinite(metrics?.lightCrossing?.burst_ms) ? metrics!.lightCrossing!.burst_ms :
+    Number.isFinite(derived?.burst_ms) ? derived.burst_ms :
+    Number.isFinite((live as any)?.lightCrossing?.burst_ms) ? (live as any).lightCrossing.burst_ms :
+    Number.isFinite((live as any)?.burst_ms) ? (live as any).burst_ms :
     undefined;
 
   const dwell_ms =
-    Number.isFinite(derived?.dwell_ms) ? derived.dwell_ms :
-    Number.isFinite((live as any)?.dwell_ms) ? (live as any).dwell_ms :
     Number.isFinite(metrics?.lightCrossing?.dwell_ms) ? metrics!.lightCrossing!.dwell_ms :
+    Number.isFinite(derived?.dwell_ms) ? derived.dwell_ms :
+    Number.isFinite((live as any)?.lightCrossing?.dwell_ms) ? (live as any).lightCrossing.dwell_ms :
+    Number.isFinite((live as any)?.dwell_ms) ? (live as any).dwell_ms :
     undefined;
 
   const reciprocity =
