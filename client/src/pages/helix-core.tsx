@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
 
 // Greens bridge: auto-publish φ from pipeline/metrics so the Greens cards populate
 type V3 = [number, number, number];
@@ -38,6 +38,227 @@ function computePhi(positions: V3[], rho: number[], kernel = poissonG, normalize
     for (let i = 0; i < N; i++) out[i] = (out[i] - mn) / span;
   }
   return out;
+}
+
+/**
+ * GreensLivePanel — proves we are rendering *live* values from the pipeline.
+ * - Shows kernel, normalization, φ stats, data source (CLIENT/SERVER)
+ * - Mirrors operational mode, FR duty, τ_LC, burst/dwell, sectorization
+ * - Flashes a LIVE badge and updates "updated X ms ago" timestamp on changes
+ */
+function GreensLivePanel() {
+  const qc = useQueryClient();
+  // 1) Live pipeline (mode, timing knobs, derived duty, τ_LC) — refetch 1s in hook
+  const { data: live } = useEnergyPipeline({ refetchInterval: 1000 });
+  // 2) System metrics (for LC/timing fallbacks) — refetch 1s
+  const { data: metrics } = useQuery({ queryKey: ["/api/helix/metrics"], refetchInterval: 1000 });
+  // 3) Green's potential payload (cache+event live feed)
+  const greens = useGreens();
+
+  // 4) Derived snapshot (single source of truth other panels share)
+  const derived = qc.getQueryData(["helix:pipeline:derived"]) as any | undefined;
+
+  // ---- helpers ----
+  const toF32 = (a: Float32Array | number[] | undefined) =>
+    !a ? undefined : (a instanceof Float32Array ? a : new Float32Array(a));
+  const fmtPct = (x: number) => `${(x * 100).toFixed(3)}%`;
+  const fexp = (x: number) => (Math.abs(x) < 1e-3 || Math.abs(x) > 1e3 ? x.toExponential(3) : x.toFixed(6));
+  const fmtSI = (ms?: number) => {
+    if (!Number.isFinite(ms)) return "—";
+    if (ms! < 1) return `${(ms! * 1000).toFixed(1)} µs`;
+    if (ms! < 1000) return `${ms!.toFixed(2)} ms`;
+    return `${(ms! / 1000).toFixed(2)} s`;
+  };
+  const stat = (arr: Float32Array) => {
+    let min = Infinity, max = -Infinity, sum = 0, sum2 = 0;
+    const N = arr.length;
+    for (let i = 0; i < N; i++) { const v = arr[i]; if (v < min) min = v; if (v > max) max = v; sum += v; sum2 += v*v; }
+    const mean = sum / Math.max(1, N);
+    const varPop = Math.max(0, (sum2 / Math.max(1, N)) - mean*mean);
+    const std = Math.sqrt(varPop);
+    return { N, min, max, mean, std };
+  };
+
+  // ---- stable, physics-grounded reads ----
+  const source = greens?.source ?? "none";
+  const kind = greens?.kind ?? "poisson";
+  const normalized = !!greens?.normalize;
+  const mHelm = Number(greens?.m ?? 0);
+  const phi = toF32(greens?.phi);
+  const phiStat = phi ? stat(phi) : undefined;
+
+  const mode =
+    (derived?.mode ?? live?.currentMode ?? metrics?.currentMode ?? "hover") as string;
+
+  const dutyFR =
+    Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR :
+    Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
+    undefined;
+
+  const sectorsTotal =
+    Number.isFinite(derived?.sectorsTotal) ? derived.sectorsTotal :
+    Number.isFinite(metrics?.lightCrossing?.sectorsTotal) ? metrics!.lightCrossing!.sectorsTotal :
+    Number.isFinite((metrics as any)?.totalSectors) ? (metrics as any).totalSectors :
+    Number.isFinite((live as any)?.sectorsTotal) ? (live as any).sectorsTotal :
+    undefined;
+
+  const sectorsConcurrent =
+    Number.isFinite(derived?.sectorsConcurrent) ? derived.sectorsConcurrent :
+    Number.isFinite(metrics?.lightCrossing?.activeSectors) ? metrics!.lightCrossing!.activeSectors :
+    Number.isFinite((metrics as any)?.activeSectors) ? (metrics as any).activeSectors :
+    Number.isFinite((live as any)?.sectorsConcurrent) ? (live as any).sectorsConcurrent :
+    undefined;
+
+  const τ_LC_ms =
+    Number.isFinite(derived?.τ_LC_ms) ? derived.τ_LC_ms :
+    Number.isFinite((live as any)?.tau_LC_ms) ? (live as any).tau_LC_ms :
+    Number.isFinite(metrics?.lightCrossing?.tauLC_ms) ? metrics!.lightCrossing!.tauLC_ms :
+    undefined;
+
+  const burst_ms =
+    Number.isFinite(derived?.burst_ms) ? derived.burst_ms :
+    Number.isFinite((live as any)?.burst_ms) ? (live as any).burst_ms :
+    Number.isFinite(metrics?.lightCrossing?.burst_ms) ? metrics!.lightCrossing!.burst_ms :
+    undefined;
+
+  const dwell_ms =
+    Number.isFinite(derived?.dwell_ms) ? derived.dwell_ms :
+    Number.isFinite((live as any)?.dwell_ms) ? (live as any).dwell_ms :
+    Number.isFinite(metrics?.lightCrossing?.dwell_ms) ? metrics!.lightCrossing!.dwell_ms :
+    undefined;
+
+  const reciprocity =
+    derived?.reciprocity ??
+    (() => {
+      if (Number.isFinite(burst_ms) && Number.isFinite(τ_LC_ms)) {
+        return burst_ms! < τ_LC_ms!
+          ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
+          : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+      }
+      return { status: "UNKNOWN", message: "missing burst/τ_LC" };
+    })();
+
+  // ---- undeniable liveness: flash + age counter ----
+  const [sig, setSig] = React.useState<string>("");
+  const [lastAt, setLastAt] = React.useState<number>(0);
+  const [flash, setFlash] = React.useState<boolean>(false);
+  React.useEffect(() => {
+    const N = phiStat?.N ?? 0;
+    const mean = phiStat?.mean ?? NaN;
+    const min = phiStat?.min ?? NaN;
+    const max = phiStat?.max ?? NaN;
+    const src = source ?? "none";
+    const k = kind ?? "poisson";
+    const newSig = `${src}|${k}|${normalized?'1':'0'}|N=${N}|μ=${mean.toFixed(6)}|${min.toFixed(6)}..${max.toFixed(6)}`;
+    if (newSig && newSig !== sig) {
+      setSig(newSig);
+      setLastAt(Date.now());
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 350);
+      return () => clearTimeout(t);
+    }
+  }, [source, kind, normalized, phiStat?.N, phiStat?.mean, phiStat?.min, phiStat?.max]);
+  const ageMs = Math.max(0, Date.now() - (lastAt || Date.now()));
+
+  if (!phi || (phi.length ?? 0) === 0) {
+    return (
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-slate-400">
+        No Green's data available
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full ${flash ? "bg-emerald-400 shadow-[0_0_0_3px] shadow-emerald-400/40" : "bg-emerald-600/70"}`} />
+          <span className="text-xs font-semibold tracking-wide uppercase text-emerald-300/90">
+            LIVE • {source === "server" ? "SERVER" : source === "client" ? "CLIENT" : "UNKNOWN"} SOURCE
+          </span>
+        </div>
+        <div className="text-xs tabular-nums text-slate-400">
+          updated {ageMs.toFixed(0)} ms ago
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Physics + kernel */}
+        <div className="rounded-xl bg-slate-800/40 p-4">
+          <div className="text-xs uppercase tracking-wide text-slate-400">Kernel</div>
+          <div className="font-mono text-sm">
+            {kind === "helmholtz" ? `Helmholtz (m=${mHelm})` : "Poisson"}
+            {normalized ? " · norm" : ""}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="text-slate-400">N (tiles)</div>
+            <div className="font-mono">{phiStat?.N ?? 0}</div>
+            <div className="text-slate-400">φ_min</div>
+            <div className="font-mono">{fexp(phiStat!.min)}</div>
+            <div className="text-slate-400">φ_max</div>
+            <div className="font-mono">{fexp(phiStat!.max)}</div>
+            <div className="text-slate-400">φ_mean</div>
+            <div className="font-mono">{fexp(phiStat!.mean)}</div>
+            <div className="text-slate-400">φ_std</div>
+            <div className="font-mono">{fexp(phiStat!.std)}</div>
+          </div>
+        </div>
+
+        {/* Operational mode + duty */}
+        <div className="rounded-xl bg-slate-800/40 p-4">
+          <div className="text-xs uppercase tracking-wide text-slate-400">Operational</div>
+          <div className="flex items-center justify-between">
+            <div className="font-mono text-sm">{mode}</div>
+            <div className="text-xs text-slate-400">sectors</div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="text-slate-400">Duty (FR)</div>
+            <div className="font-mono">{Number.isFinite(dutyFR) ? fmtPct(dutyFR!) : "—"}</div>
+            <div className="text-slate-400">S_total</div>
+            <div className="font-mono">{sectorsTotal ?? "—"}</div>
+            <div className="text-slate-400">S_live</div>
+            <div className="font-mono">{sectorsConcurrent ?? "—"}</div>
+          </div>
+          {/* duty bar */}
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
+            <div
+              className="h-full bg-emerald-500/80 transition-[width] duration-300"
+              style={{ width: `${Math.max(0, Math.min(100, (Number.isFinite(dutyFR) ? dutyFR! : 0) * 100))}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Light-crossing & reciprocity */}
+        <div className="rounded-xl bg-slate-800/40 p-4">
+          <div className="text-xs uppercase tracking-wide text-slate-400">Light-Crossing</div>
+          <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="text-slate-400">τ_LC</div>
+            <div className="font-mono">{fmtSI(τ_LC_ms)}</div>
+            <div className="text-slate-400">burst</div>
+            <div className="font-mono">{fmtSI(burst_ms)}</div>
+            <div className="text-slate-400">dwell</div>
+            <div className="font-mono">{fmtSI(dwell_ms)}</div>
+            <div className="text-slate-400">reciprocity</div>
+            <div className={`font-mono ${reciprocity?.status === "PASS_AVG" ? "text-emerald-300" : reciprocity?.status === "BROKEN_INSTANT" ? "text-amber-300" : "text-slate-300"}`}>
+              {reciprocity?.status ?? "UNKNOWN"}
+            </div>
+          </div>
+          {Number.isFinite(burst_ms) && Number.isFinite(τ_LC_ms) && (
+            <div className="mt-3">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
+                <div
+                  className={`h-full ${burst_ms! < τ_LC_ms! ? "bg-amber-400/80" : "bg-emerald-500/80"}`}
+                  style={{ width: `${Math.max(0, Math.min(100, (burst_ms! / Math.max(1, τ_LC_ms!)) * 100))}%` }}
+                  title={`burst / τ_LC = ${(burst_ms! / Math.max(1, τ_LC_ms!)).toFixed(3)}`}
+                />
+              </div>
+              <div className="mt-1 text-xs text-slate-400">burst / τ_LC</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function useGreensBridge() {
@@ -1841,65 +2062,7 @@ export default function HelixCore() {
             {/* Right Column - Terminal & Inspector */}
             <div className="space-y-4">
               {/* ===== Green's Potential (φ = G * ρ) — Live Panel ===== */}
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-cyan-300" />
-                    Green's Potential (φ = G · ρ)
-                  </CardTitle>
-                  <CardDescription>
-                    Live convolution stage published by Energy Pipeline
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {greens?.phi && (greens.size ?? greens.phi.length) > 0 ? (
-                    (() => {
-                      const phiArr = greens.phi instanceof Float32Array ? greens.phi : new Float32Array(greens.phi);
-                      const s = stats(phiArr);
-                      return (
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div className="text-slate-400">Kernel</div>
-                          <div className="font-mono">
-                            {greens.kind === "helmholtz" ? `Helmholtz (m=${greens.m ?? 0})` : "Poisson"}
-                            {greens.normalize !== false ? " · norm" : ""}
-                          </div>
-                          <div className="text-slate-400">Source</div>
-                          <div className="font-mono">{(greens.source ?? "client").toUpperCase()}</div>
-                          <div className="text-slate-400">N (tiles)</div>
-                          <div className="font-mono">{s.N.toLocaleString()}</div>
-                          <div className="text-slate-400">φ_min</div>
-                          <div className="font-mono">{fmtExp(s.min, 3)}</div>
-                          <div className="text-slate-400">φ_max</div>
-                          <div className="font-mono">{fmtExp(s.max, 3)}</div>
-                          <div className="text-slate-400">φ_mean</div>
-                          <div className="font-mono">{fmtExp(s.mean, 3)}</div>
-                        </div>
-                      );
-                    })()
-                  ) : (
-                    <div className="text-sm text-slate-400">
-                      Waiting for <code>helix:greens</code>… Open Energy Pipeline and click
-                      <span className="ml-1 font-mono">Publish to renderer</span>.
-                    </div>
-                  )}
-
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      className="px-2 py-1 text-xs rounded bg-slate-900 border border-slate-700"
-                      onClick={() => {
-                        // manual refresh from cache if something else published
-                        const cached = queryClient.getQueryData<GreensPayload>(["helix:pipeline:greens"]);
-                        if (cached) setGreens(cached);
-                      }}
-                    >
-                      Refresh
-                    </button>
-                    <span className="text-xs text-slate-400 self-center">
-                      Cache key: <code>["helix:pipeline:greens"]</code>
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
+              <GreensLivePanel />
               {/* Log + Document Terminal */}
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader>
