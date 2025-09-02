@@ -92,37 +92,43 @@ export function viewMassFractionForPane(wu: WarpUniforms, pane: 'REAL'|'SHOW') {
   return pane === 'REAL' ? (1 / Math.max(1, wu.sectorCount)) : 1.0;
 }
 
-// Pane builders (parity/ridge decided here; theta never shipped from UI)
+/** Pane builders — single source of truth (θ never shipped from UI) */
 export function buildREAL(wu: WarpUniforms) {
   return {
     ...wu,
     physicsParityMode: true,
     ridgeMode: 0,
     viewAvg: true,
-    // REAL visuals use FR directly; collapse sectors so engine sees the averaged duty:
+    // REAL visuals use FR directly; collapse sectors so engine sees the averaged duty
     dutyEffectiveFR: wu.dutyEffectiveFR,
     dutyCycle: wu.dutyEffectiveFR,
     sectors: 1,
     sectorCount: 1,
     vShip: 0,
-    // Mass-pocket γ (clamped physical range); visual γ is logged only
+    // Mass-pocket γ (physical), visual γ kept only for logging/UI
     gammaVanDenBroeck_mass: wu.gammaVanDenBroeck_mass,
     gammaVanDenBroeck_vis: wu.gammaVanDenBroeck_vis,
+    // safe tonemap defaults for REAL
+    exposure: wu.exposure ?? 3.5,
+    zeroStop: wu.zeroStop ?? 1e-6,
     // never ship UI theta
     thetaScale: undefined,
     u_thetaScale: undefined,
   };
 }
 
-export function buildSHOW(wu: WarpUniforms, opts?: { T?: number; boost?: number; userGain?: number }) {
+export function buildSHOW(
+  wu: WarpUniforms,
+  opts?: { T?: number; boost?: number; userGain?: number }
+) {
   const T = clamp(N(opts?.T, 0.70), 0, 1);
   const boost = Math.max(1, N(opts?.boost, 40));
   return {
     ...wu,
     physicsParityMode: false,
     ridgeMode: 1,
-    viewAvg: true,          // SHOW is non-FR; averaging state shouldn't affect pane mass=1.0
-    // SHOW displays instantaneous local view (sectors/sectors don't downscale display mass)
+    viewAvg: true,               // SHOW's display mass = 1.0, averaging state not downscaling mass
+    // SHOW uses the local duty/sectors from the pipeline (no FR collapse)
     dutyCycle: wu.dutyCycle,
     sectors: wu.sectors,
     sectorCount: wu.sectorCount,
@@ -131,6 +137,9 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?: number; boost?: number;
     curvatureGainT: T,
     curvatureBoostMax: boost,
     userGain: Math.max(1, N(opts?.userGain, 2)),
+    // safe tonemap defaults for SHOW
+    exposure: wu.exposure ?? 6,
+    zeroStop: wu.zeroStop ?? 1e-7,
     // never ship UI theta
     thetaScale: undefined,
     u_thetaScale: undefined,
@@ -140,6 +149,3 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?: number; boost?: number;
 // --- compatibility aliases for existing call-sites ---
 export const buildRealPacket = buildREAL;
 export const buildShowPacket = buildSHOW;
-
-// ---- Legacy shims (keep until every call-site is migrated) ----
-export { buildREAL, buildSHOW };

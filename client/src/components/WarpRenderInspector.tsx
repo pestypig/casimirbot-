@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState, startTransition} from "reac
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
-import { normalizeWU, buildRealPacket, buildShowPacket } from "@/lib/warp-uniforms";
+import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
@@ -1340,8 +1340,8 @@ export default function WarpRenderInspector(props: {
       };
 
       // Bootstrap both engines once they are ready (engine computes theta)
-      const realPayload = buildRealPacket(shared, { colorMode: 2 });
-      const showPayload = buildShowPacket(shared, {
+      const realPayload = buildREAL(shared, { colorMode: 2 });
+      const showPayload = buildSHOW(shared, {
         exposure: 7.5,
         colorMode: 1,
         curvatureGainT: 0.70,
@@ -1575,8 +1575,8 @@ export default function WarpRenderInspector(props: {
     });
 
     // Build REAL and SHOW payloads using the imported builders
-    const realPayload = buildRealPacket(sharedBase, { colorMode: 2 });
-    const showPayload = buildShowPacket(sharedBase, {
+    const realPayload = buildREAL(sharedBase, { colorMode: 2 });
+    const showPayload = buildSHOW(sharedBase, {
       exposure: 7.5,
       colorMode: 1,
       curvatureGainT: 0.70,
@@ -1777,8 +1777,8 @@ export default function WarpRenderInspector(props: {
   // Missing variables for new layout
   const realRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
   const showRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
-  const realUniforms = useMemo(() => buildRealPacket(live || {}), [live]);
-  const showUniforms = useMemo(() => buildShowPacket(live || {}), [live]);
+  const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
+  const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
   const grid3dRef = useRef<any>(null);
 
   // Define view mass fractions for checkpoint panels
