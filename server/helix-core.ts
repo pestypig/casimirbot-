@@ -580,8 +580,19 @@ export function getSystemMetrics(req: Request, res: Response) {
   const s = getGlobalPipelineState();
 
   const totalSectors = Math.max(1, s.sectorCount);
-  const concurrent = Math.max(1, s.concurrentSectors || 1); // must be ≥1 to allocate buffers
-  const activeFraction = concurrent / totalSectors;
+  const concurrentReq = Math.max(1, s.concurrentSectors || 1); // must be ≥1 to allocate buffers
+  // --- Ford–Roman safety clamp (revert to solved baseline) ---
+  // Local on-window burst (default 1%) and FR baseline = 1% × (1/totalSectors)
+  const dutyLocalRaw = Number.isFinite((s as any).localBurstFrac)
+    ? Math.max(1e-12, (s as any).localBurstFrac as number)
+    : Math.max(1e-12, s.dutyCycle ?? 0.01);
+  const FR_DUTY_MAX = 0.01 * (1 / totalSectors);
+  const requestedDutyFR = dutyLocalRaw * (concurrentReq / totalSectors);
+  // Reduce live sectors if requested FR duty would violate the solved window
+  const concurrentFR = (requestedDutyFR > FR_DUTY_MAX)
+    ? Math.max(1, Math.floor((FR_DUTY_MAX * totalSectors) / dutyLocalRaw))
+    : concurrentReq;
+  const activeFraction = concurrentFR / totalSectors;
 
   const strobeHz = Number(s.strobeHz ?? 1000);
   const sectorPeriod_ms = Number(s.sectorPeriod_ms ?? (1000 / Math.max(1, strobeHz)));
@@ -590,7 +601,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sweepIdx = Math.floor(now * strobeHz) % totalSectors;
 
   const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
-  const activeTiles = tilesPerSector * concurrent;
+  const activeTiles = tilesPerSector * concurrentFR;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
@@ -627,10 +638,10 @@ export function getSystemMetrics(req: Request, res: Response) {
   // UI duty (per-sector knob, averaged by UI over all sectors)
   const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
 
-  // Ford–Roman ship-wide duty (used for REAL)
+  // Ford–Roman ship-wide duty (used for REAL) - use clamped sectors
   const dutyFR = Math.max(1e-12, (s as any).dutyEffectiveFR ??
                                      (s as any).dutyEffective_FR ??
-                                     (dutyLocal * (concurrent / totalSectors)));
+                                     (dutyLocalRaw * (concurrentFR / totalSectors)));
 
   const γg   = s.gammaGeo ?? 26;
   const qsp  = s.qSpoilingFactor ?? 1;
@@ -652,7 +663,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     // sectors & duties
     sectorCount: totalSectors,    // total
-    sectors: concurrent,          // concurrent
+    sectors: concurrentFR,        // concurrent (clamped)
     dutyCycle: dutyUI,            // UI knob
     dutyEffectiveFR: dutyFR,      // REAL θ uses this
 
@@ -710,9 +721,9 @@ export function getSystemMetrics(req: Request, res: Response) {
     totalTiles: Math.floor(s.N_tiles),
     activeTiles, tilesPerSector,
     totalSectors,
-    activeSectors: concurrent,
+    activeSectors: concurrentFR,
     activeFraction,
-    sectorStrobing: concurrent,   // concurrent (live) sectors
+    sectorStrobing: concurrentFR,   // concurrent (live) sectors
     currentSector: sweepIdx,
 
     // make mode & inputs visible to UI
@@ -743,7 +754,9 @@ export function getSystemMetrics(req: Request, res: Response) {
     },
 
     dutyGlobal_UI: s.dutyCycle,
-    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
+    // Canonical FR duty with server clamp applied
+    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR
+                     ?? Math.max(1e-12, dutyLocalRaw * (concurrentFR / totalSectors)),
 
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     gammaGeo: s.gammaGeo,
