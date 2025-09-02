@@ -136,3 +136,7 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?: number; boost?: number;
     u_thetaScale: undefined,
   };
 }
+
+// --- compatibility aliases for existing call-sites ---
+export const buildRealPacket = buildREAL;
+export const buildShowPacket = buildSHOW;
