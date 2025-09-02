@@ -8,7 +8,6 @@ import { WarpDiagnostics } from './WarpDiagnostics';
 import { zenLongToast } from '@/lib/zen-long-toasts';
 import * as VIS from '@/constants/VIS';
 import { driveWarpFromPipeline } from '@/lib/warp-pipeline-adapter';
-import { getWarpEngineCtor } from '@/types/globals';
 
 // ---- Visualization & Physics-Bridge Constants (no hidden magic) ----
 const VIS_LOCAL = {
@@ -430,7 +429,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       colorModeIndex: cmIndex,
       colorModeName: typeof cmRaw === 'string' ? cmRaw : (['solid','theta','shear'][cmIndex] ?? 'theta'),
       curvatureGainT: parity ? 0 : (parameters.viz?.curvatureGainT ?? parameters.curvatureGainT ?? 0),
-      curvatureBoostMax: parity ? 1 : (parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax ?? 40),
+      curvatureBoostMax: parity ? 1 : (parameters.viz?.curvatureBoostMax ?? parameters.curvatureBoostMax),
       exposure: parameters.viz?.exposure ?? undefined,
       zeroStop: parameters.viz?.zeroStop ?? undefined,
       cosmeticLevel: parameters.viz?.cosmeticLevel ?? undefined
@@ -511,43 +510,101 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
       }, 6000) as any;
 
       try {
-        const WarpEngine = getWarpEngineCtor();
-        if (!cancelled) {
-          engineRef.current = makeEngine(WarpEngine);
-          ensureStrobeMux();
+        if ((window as any).WarpEngine) {
+          if (!cancelled) {
+            engineRef.current = makeEngine((window as any).WarpEngine);
+            ensureStrobeMux();
 
-          // Add ResizeObserver
-          const resizeObserver = new ResizeObserver(() => {
-            if (engineRef.current?._resizeCanvasToDisplaySize) {
-              engineRef.current._resizeCanvasToDisplaySize();
-            }
-            try {
-              const u = engineRef.current?.uniforms;
-              if (u && Array.isArray(u.axesClip) && canvasRef.current) {
-                const cam = computeCameraZ(u.axesClip || [1,1,1], canvasRef.current);
-                gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
+            // Add ResizeObserver
+            const resizeObserver = new ResizeObserver(() => {
+              if (engineRef.current?._resizeCanvasToDisplaySize) {
+                engineRef.current._resizeCanvasToDisplaySize();
               }
-            } catch {}
-          });
-          if (canvasRef.current?.parentElement) {
-            resizeObserver.observe(canvasRef.current.parentElement);
-          }
-          (engineRef.current as any).__resizeObserver = resizeObserver;
+              try {
+                const u = engineRef.current?.uniforms;
+                if (u && Array.isArray(u.axesClip) && canvasRef.current) {
+                  const cam = computeCameraZ(u.axesClip || [1,1,1], canvasRef.current);
+                  gatedUpdateUniforms(engineRef.current, { cameraZ: cam, lockFraming: true }, 'client');
+                }
+              } catch {}
+            });
+            if (canvasRef.current?.parentElement) {
+              resizeObserver.observe(canvasRef.current.parentElement);
+            }
+            (engineRef.current as any).__resizeObserver = resizeObserver;
 
-          // Register with strobing multiplexer
-          const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
-            if (!engineRef.current) return;
-            const s = Math.max(1, Math.floor(sectorCount||1));
-            gatedUpdateUniforms(engineRef.current, {
-              sectors: s,
-              split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
-              sectorIdx: Math.max(0, currentSector % s)
-            }, 'client');
-            engineRef.current.requestRewarp?.();
-          });
-          (engineRef.current as any).__strobingCleanup = off;
+            // Register with strobing multiplexer
+            const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+              if (!engineRef.current) return;
+              const s = Math.max(1, Math.floor(sectorCount||1));
+              gatedUpdateUniforms(engineRef.current, {
+                sectors: s,
+                split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
+                sectorIdx: Math.max(0, currentSector % s)
+              }, 'client');
+              engineRef.current.requestRewarp?.();
+            });
+            (engineRef.current as any).__strobingCleanup = off;
+          }
+          return;
         }
-        return;
+
+        // Load engine script
+        const resolveAssetBase = () => {
+          const w: any = window;
+          if (w.__ASSET_BASE__) return String(w.__ASSET_BASE__);
+          if (import.meta?.env?.BASE_URL) return String(import.meta.env.BASE_URL);
+          if (typeof (w.__webpack_public_path__) === 'string') return w.__webpack_public_path__;
+          if (typeof (w.__NEXT_DATA__)?.assetPrefix === 'string') return w.__NEXT_DATA__.assetPrefix || '/';
+          const baseEl = document.querySelector('base[href]');
+          if (baseEl) return (baseEl as HTMLBaseElement).href;
+          return '/';
+        };
+
+        const assetBase = resolveAssetBase();
+        const stamp = (window as any).__APP_WARP_BUILD || 'dev';
+        const mk = (p: string) => {
+          try { return new URL(p, assetBase).toString(); } catch { return p; }
+        };
+
+        const trySrcs = [
+          (window as any).__WARP_ENGINE_SRC__,
+          mk(`warp-engine.js?v=${encodeURIComponent(stamp)}`),
+          'warp-engine.js',
+          '/warp-engine.js?v=canonical'
+        ].filter(Boolean) as string[];
+
+        for (const src of trySrcs) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.head.appendChild(script);
+          }).catch((e) => { console.warn(e.message); });
+
+          if ((window as any).WarpEngine && !cancelled) {
+            engineRef.current = makeEngine((window as any).WarpEngine);
+            ensureStrobeMux();
+
+            const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
+              if (!engineRef.current) return;
+              const s = Math.max(1, Math.floor(sectorCount||1));
+              gatedUpdateUniforms(engineRef.current, {
+                sectors: s,
+                split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
+                sectorIdx: Math.max(0, currentSector % s)
+              }, 'client');
+              engineRef.current.requestRewarp?.();
+            });
+            (engineRef.current as any).__strobingCleanup = off;
+
+            return;
+          }
+        }
+
+        throw new Error("WarpEngine not found on window after script load (check public path / base URL)");
       } catch (err: any) {
         console.error('WarpEngine init error:', err);
         if (!cancelled) {
@@ -1187,7 +1244,7 @@ export function WarpVisualizer({ parameters }: WarpVisualizerProps) {
 
             {/* Live β Sampling */}
             <div className="space-y-2">
-              <div className="text-cyan-300 font-semibold mb-2">Live β Field Samples:</div>
+              <div className="text-cyan-300 font-semibold">Live β Field Samples:</div>
               {(() => {
                 const mode = parameters.currentMode ?? "hover";
                 const epsFromPanel = Number(parameters.shift?.epsilonTilt ?? parameters.epsilonTilt ?? 0);

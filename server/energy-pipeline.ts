@@ -374,32 +374,24 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.qSpoilingFactor = ui.qSpoilingFactor;
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
 
-  // ── Sector & duty authority (server) ──────────────────────────────────────────
-  // Make standby detection explicit and reusable
-  const modeStr = String(state.mode ?? state.currentMode ?? '').toLowerCase();
-  const isStandby    = (modeStr === 'standby');
-  const zeroStandby  = isStandby;
+  // 4) Sector scheduling — per-mode policy
+  state.sectorCount = Math.max(1, state.sectorCount || PAPER_DUTY.TOTAL_SECTORS); // respect override; else default to 400
+  state.concurrentSectors = resolveSLive(state.currentMode); // ✅ Concurrent live sectors (emergency=2, others=1)
+  const S_total = state.sectorCount;
+  const S_live = state.concurrentSectors;
 
-  const S_total = Math.max(1, Number(state.sectorCount ?? PAPER_DUTY.TOTAL_SECTORS ?? 400));
-  const S_live  = Math.max(1, Number(state.concurrentSectors ?? state.sectors ?? 1));
-  const dutyLocal = Math.max(0, Math.min(1, Number(state.dutyLocal ?? state.dutyCycle ?? 0.01)));
-
-  // Ford–Roman effective duty (physics): d_FR = dutyLocal × (S_live / S_total)
-  const dutyEffective_FR = zeroStandby
+  // if standby, FR duty must be exactly zero for viewers/clients
+  const isStandby = String(state.currentMode || '').toLowerCase() === 'standby';
+  const d_eff = isStandby
     ? 0
-    : Math.max(0, Math.min(1, dutyLocal * (S_live / S_total)));
-
-  // publish a deterministic view-mass fraction hint for clients
-  const viewMassFractionHint = S_live / S_total;
-
-  state.sectorCount          = S_total;
-  state.concurrentSectors    = S_live;
-  state.dutyLocal            = dutyLocal;
-  state.dutyEffective_FR     = dutyEffective_FR;
-  (state as any).viewMassFractionHint = viewMassFractionHint;
+    : PAPER_DUTY.BURST_DUTY_LOCAL * (S_live / Math.max(1, S_total)); // existing calc
 
   state.activeSectors   = S_live;
   state.activeFraction  = S_live / S_total;
+
+  // 🔎 HINT for clients: fraction of the bubble "visible" from a single concurrent pane.
+  // The REAL pane can multiply this with its band/slice coverage to scale extrema and mass proxy.
+  (state as any).viewMassFractionHint = S_live / Math.max(1, S_total);
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
   state.activeTiles     = state.tilesPerSector * S_live;
 
@@ -408,15 +400,13 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 
   // 🔧 expose both duties explicitly and consistently
   state.dutyBurst        = PAPER_DUTY.BURST_DUTY_LOCAL;  // keep as *local* ON-window = 0.01
-  (state as any).dutyEffectiveFR = dutyEffective_FR; // legacy/camel alias
+  state.dutyEffective_FR = d_eff;             // ship-wide effective duty (for ζ & audits)
+  (state as any).dutyEffectiveFR = d_eff; // legacy/camel alias
   // (dutyCycle already set from MODE_CONFIGS above)
 
   // ✅ First-class fields for UI display
-  state.dutyShip = dutyEffective_FR;          // Ship-wide effective duty (promoted from any)
-  (state as any).dutyEff = dutyEffective_FR;  // Legacy alias
-
-  // Use the authoritative Ford-Roman duty for all downstream calculations
-  const d_eff = dutyEffective_FR;
+  state.dutyShip = d_eff;          // Ship-wide effective duty (promoted from any)
+  (state as any).dutyEff = d_eff;  // Legacy alias
 
   // 5) Stored energy (raw core): ensure valid input values
   // ⚠️ Fix: ensure qMechanical is never 0 unless standby mode
@@ -879,26 +869,25 @@ export async function computeEnergySnapshot(sim: any) {
   const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
 
   const warpUniforms = {
-    // ── UI-facing snapshot (no θ here; engine computes it) ───────────────────────
-    sectorCount:        result.sectorCount,
-    sectors:            result.concurrentSectors,
-    dutyLocal:          (result as any).dutyLocal ?? result.dutyCycle,
-    dutyCycle:          (result as any).dutyLocal ?? result.dutyCycle,
-    dutyEffectiveFR:    result.dutyEffective_FR,    // FR authority
-    gammaGeo:           result.gammaGeo,
-    deltaAOverA:        result.qSpoilingFactor,
-    qSpoilingFactor:    result.qSpoilingFactor,
-    gammaVanDenBroeck:  (result as any).gammaVanDenBroeck_vis,
-    gammaVanDenBroeck_vis:  (result as any).gammaVanDenBroeck_vis,
+    // physics (visual) — mass stays split and separate
+    gammaGeo: result.gammaGeo,
+    qSpoilingFactor: result.qSpoilingFactor,
+    gammaVanDenBroeck: (result as any).gammaVanDenBroeck_vis,   // visual gamma
+    gammaVanDenBroeck_vis: (result as any).gammaVanDenBroeck_vis,
     gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
-    
-    // client can use this as the pane's REAL fraction
-    viewMassFraction:   (result as any).viewMassFractionHint,
-    viewAvg:            true,
-    colorMode:          'theta',
-    
-    // UI-only hint; engine ignores for θ
-    thetaScaleExpected: (result as any).thetaScaleExpected,
+
+    // Ford–Roman duty (ship-wide, sector-averaged)
+    dutyEffectiveFR,
+
+    // UI label fields (harmless to include)
+    dutyCycle: result.dutyCycle,
+    sectorCount: result.sectorCount,
+    sectors: result.concurrentSectors,   // concurrent/live
+    currentMode: result.currentMode,
+
+    // viewer defaults — visual policy only; parity/ridge set client-side
+    viewAvg: true,
+    colorMode: 'theta',
 
     // optional: hull/wall for overlays
     hull: result.hull,

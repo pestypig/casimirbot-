@@ -6,11 +6,7 @@ import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
-import Grid3DEngine from '@/components/engines/Grid3DEngine';
-import { getWarpEngineCtor } from '@/types/globals';
-import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
-// ❌ Never compute θ on the client for the renderer – engine is the authority.
-// (removed stale import)
+import { computeThetaScale } from '@/lib/warp-theta';
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -122,7 +118,7 @@ const validatePhysicsParams = (params: any, label: string) => {
     validated.gammaGeo = Math.max(1, Math.min(1000, validated.gammaGeo || 26));
   }
   // default missing γ_VdB to the visual seed and allow large values
-  if ('gammaVanDenBroeck' in validated || 'gammaVdB' in validated) {
+  if ('gammaVdB' in validated || 'gammaVanDenBroeck' in validated) {
     const raw = validated.gammaVanDenBroeck ?? validated.gammaVdB;
     const vis = Number.isFinite(raw) ? raw : 1.35e5;
     // assign separate visual and mass seeds
@@ -235,19 +231,13 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   // Force parity mode based on pane - this is critical for physics validation
   if (pane === 'REAL') {
     p.physicsParityMode = true;
+    p.parityMode = true;  // Also set the fallback field
     p.ridgeMode = 0;
-    p.viewAvg = true;     // REAL: average → √(d_FR)
-    // Remove legacy fields to avoid conflicts
-    p.parityMode = undefined;
-    p.uPhysicsParity = undefined;
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
     p.physicsParityMode = false;
+    p.parityMode = false; // Also set the fallback field
     p.ridgeMode = 1;
-    p.viewAvg = false;    // SHOW: cosmetic, no averaging
-    // Remove legacy fields to avoid conflicts
-    p.parityMode = undefined;
-    p.uPhysicsParity = undefined;
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
@@ -390,6 +380,7 @@ export function buildEngineUniforms(base: BaseInputs) {
   const common = buildCommonUniforms(base);
   const real = {
     ...common,
+    thetaScale: buildThetaScale(base, 'fr'),
     physicsParityMode: true,
     ridgeMode: TONEMAP_LOCK.ridgeMode,
     exposure: TONEMAP_LOCK.exp,
@@ -403,6 +394,7 @@ export function buildEngineUniforms(base: BaseInputs) {
   };
   const show = {
     ...common,
+    thetaScale: buildThetaScale(base, 'ui'),
     physicsParityMode: false,
     ridgeMode: TONEMAP_LOCK.ridgeMode,
     exposure: TONEMAP_LOCK.exp,
@@ -598,6 +590,7 @@ const applyReal = (
     exposure: 4.2,      // slightly up from 3.8 but not blinding
     zeroStop: 1e-6,     // restore parity default
     cosmeticLevel: 0,
+    curvatureGainDec: 0,
     curvatureGainT: 0,
     curvatureBoostMax: 1,
     // ⚠ don't override tilt here; let upstream params decide
@@ -756,7 +749,12 @@ export default function WarpBubbleCompare({
     return e && !e._destroyed;
   }
 
-  const makeEngine = useCallback(async (Ctor: new (c: HTMLCanvasElement) => any, canvasId: string, label: string): Promise<any> => {
+  const makeEngine = useCallback(async (canvasId: string, label: string): Promise<any> => {
+    if (!window.WarpEngine) {
+      console.warn(`[${label}] WarpEngine class not loaded, waiting...`);
+      return null;
+    }
+
     try {
       const canvas = document.getElementById(canvasId) as HTMLCanvasElement;
       if (!canvas) {
@@ -808,7 +806,7 @@ export default function WarpBubbleCompare({
       // Create engine instance with enhanced timeout and error handling
       const enginePromise = new Promise((resolve, reject) => {
         try {
-          const engine = new Ctor(canvas);
+          const engine = new window.WarpEngine(canvas);
 
           // Immediate validation
           if (!engine) {
@@ -986,7 +984,7 @@ export default function WarpBubbleCompare({
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
     try {
-      // Strong detection up-front (DOM-probe for mobile webviews)
+      // Strong detection up-front (DOM-mounted probe for mobile webviews)
       const support = webglSupport(undefined, { mountProbeCanvas: true });
       if (!support.ok) {
         console.warn("[init] Preflight failed; attempting lazy init anyway");
@@ -1037,24 +1035,23 @@ export default function WarpBubbleCompare({
         ...real,
         currentMode: parameters.currentMode,
         physicsParityMode: true,
-        viewAvg: true,
         vShip: 0,
         gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
         deltaAOverA: real.qSpoilingFactor,
         dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
         sectors: Math.max(1, parameters.sectors),
-        sectorCount: Math.max(1, parameters.sectorCount),
         ridgeMode: 0,
       };
 
       // SHOW packet
+      const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
       const showPacket = {
         ...shared,
         ...show,
         currentMode: parameters.currentMode,
         physicsParityMode: false,
-        viewAvg: false,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
+        thetaScale: showTheta,
         gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
         deltaAOverA: show.qSpoilingFactor,
         sectors: Math.max(1, parameters.sectors),
@@ -1105,8 +1102,8 @@ export default function WarpBubbleCompare({
         ...shared,
         ...show,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
-        curvatureGainT: 0,
-        curvatureBoostMax: Math.max(1, Math.min(1000, heroExaggeration)),
+        curvatureGainT: 0.70,
+        curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
         userGain: 4,
         displayGain: 1,
         physicsParityMode: false,
@@ -1128,24 +1125,19 @@ export default function WarpBubbleCompare({
     }
   }
 
-  // Use energy pipeline for mode tracking
-  const { data: pipelineState } = useEnergyPipeline();
-  const switchMode = useSwitchMode();
-
-  // Track mode changes with refs
-  const lastModeRef = useRef<string>('');
+  const roRef = useRef<ResizeObserver | null>(null);
+  const busyRef = useRef<boolean>(false);
+  const lastModeRef = useRef<string | null>(null);
   const lastTokenRef = useRef<any>(null);
 
-  // Mode change effect: use pipeline state for operational mode changes
+  // Mode change effect: hard renderer reset on each mode change or reload token
   useEffect(() => {
-    const mode = String(pipelineState?.currentMode || parameters?.currentMode || '');
-    const token = parameters?.reloadToken || pipelineState?.dutyEffectiveFR || pipelineState?.currentMode;
+    const mode = String(parameters?.currentMode || '');
+    const token = parameters?.reloadToken;
     if (!mode) return;
     if (lastModeRef.current === mode && lastTokenRef.current === token) return; // no-op if same
     lastModeRef.current = mode;
     lastTokenRef.current = token;
-
-    console.log('[WarpBubbleCompare] Mode change detected:', { mode, token, source: pipelineState?.currentMode ? 'pipeline' : 'parameters' });
 
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
@@ -1153,12 +1145,12 @@ export default function WarpBubbleCompare({
         finally { reinitInFlight.current = null; }
       })();
     }
-  }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.dutyEffectiveFR]);
+  }, [parameters?.currentMode, parameters?.reloadToken]);
 
-  // Allow initial mount when either parameters or pipeline mode is available
+  // Mount-only effect: guarantee initial attach
   useEffect(() => {
-    if (!parameters?.currentMode && !pipelineState?.currentMode) return;
     if (leftEngine.current || rightEngine.current) return;
+    if (!parameters?.currentMode) return; // need at least the mode
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
         try { await reinitEnginesFromParams(); } finally { reinitInFlight.current = null; }
@@ -1166,40 +1158,12 @@ export default function WarpBubbleCompare({
     }
   }, []); // mount only
 
-  // Use pipeline state and parameters together for physics updates
+  // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current) return;
+    if (!leftEngine.current || !rightEngine.current || !parameters) return;
 
-    // Merge pipeline state with parameters for complete physics data
-    const mergedState = {
-      ...parameters,
-      ...pipelineState,
-      currentMode: pipelineState?.currentMode || parameters?.currentMode || 'hover',
-      // Canonical physics (short keys) with fallbacks from long keys
-      gammaGeo: pipelineState?.gammaGeo ?? parameters?.gammaGeo ?? 26,
-      deltaAOverA: pipelineState?.deltaAOverA ?? parameters?.deltaAOverA
-                   ?? pipelineState?.qSpoilingFactor ?? parameters?.qSpoilingFactor ?? 1,
-      gammaVdB: pipelineState?.gammaVdB ?? parameters?.gammaVdB
-                ?? pipelineState?.gammaVanDenBroeck ?? parameters?.gammaVanDenBroeck ?? 1,
-      dutyCycle: pipelineState?.dutyCycle ?? parameters?.dutyCycle ?? 0.14,
-      dutyEffectiveFR: pipelineState?.dutyEffectiveFR ?? parameters?.dutyEffectiveFR ?? 0.000025,
-      sectors: pipelineState?.sectors ?? parameters?.sectors ?? 1,
-      sectorCount: pipelineState?.sectorCount ?? parameters?.sectorCount ?? 400,
-    };
-
-    console.log('[WarpBubbleCompare] State changed, updating engines:', {
-      mode: mergedState.currentMode,
-      source: pipelineState?.currentMode ? 'pipeline' : 'parameters',
-      hasEngines: !!(leftEngine.current && rightEngine.current),
-      physics: {
-        gammaGeo: mergedState.gammaGeo,
-        qSpoil: mergedState.deltaAOverA,
-        dutyFR: mergedState.dutyEffectiveFR
-      }
-    });
-
-    // build both payloads from the merged source of truth
-    const wu = normalizeWU(mergedState?.warpUniforms || mergedState);
+    // build both payloads from the SAME source of truth
+    const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
     let real = buildREAL(wu);
     let show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
 
@@ -1229,14 +1193,8 @@ export default function WarpBubbleCompare({
     const realPhysicsPayload = paneSanitize('REAL', {
       ...shared,
       gridSpan: gridSpanReal,            // tight framing around hull
-      gammaGeo: real.gammaGeo,
-      deltaAOverA: real.qSpoilingFactor,
-      gammaVdB: (real.gammaVdB ?? real.gammaVanDenBroeck ?? real.gammaVanDenBroeck_mass),
-      dutyEffectiveFR: real.dutyEffectiveFR ?? mergedState.dutyEffectiveFR ?? 0.000025,
-      dutyCycle: real.dutyCycle,
-      sectors: Math.max(1, Math.min(1000, mergedState.sectors || 400)),
-      sectorCount: Math.max(1, Math.min(1000, mergedState.sectorCount || 400)),
-      currentMode: mergedState.currentMode,
+      ...real,
+      currentMode: parameters.currentMode,
       vShip: 0,                          // never "fly" in REAL
       // strictly physical: no boosts, no gains, wall to ρ-units
       userGain: Math.max(0.1, Math.min(10, parityExaggeration || 1)), // clamp exaggeration
@@ -1244,41 +1202,76 @@ export default function WarpBubbleCompare({
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
+      gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
+      deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
+      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
+      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-      // ❌ Do NOT supply thetaScale; engine computes canonical θ from inputs
+      // Force parity mode explicitly
       physicsParityMode: true,
       ridgeMode: 0,
+      // Use shared theta calculation with mass-focused gamma VdB
+      thetaScale: computeThetaScale({
+        gammaGeo: real.gammaGeo,
+        qSpoilingFactor: real.qSpoilingFactor,
+        gammaVanDenBroeck: real.gammaVanDenBroeck,
+        gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+        dutyEffectiveFR: real.dutyEffectiveFR
+      }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     // REAL (parity / Ford–Roman)
     pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
 
     // SHOW (UI) with heroExaggeration applied
+    const showTheta = parameters.currentMode === 'standby'
+      ? 0
+      : Math.max(1e-6, show.thetaScale || 0);
+
     const showPhysicsPayload = paneSanitize('SHOW', {
       ...shared,
       ...show,
-      currentMode: mergedState.currentMode,
-      vShip: mergedState.currentMode === 'standby' ? 0 : 1,
+      currentMode: parameters.currentMode,
+      vShip: parameters.currentMode === 'standby' ? 0 : 1,
       gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
       deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor ?? 1)), // clamp q-spoiling
-      sectors: Math.max(1, Math.min(1000, mergedState.sectors || 400)),
+      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ,
       // Apply heroExaggeration to visual amplification (normalized heroBoost)
       curvatureGainT: Math.max(0, Math.min(1, 0.70)), // clamp gain T
       curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
-      userGain: Math.max(1, Math.min(10, 4)), // clamp user gain
+      userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
       displayGain: 1,
-      // Do NOT supply thetaScale; engine computes θ. Standby is enforced by engine.
+      // Force non-parity mode explicitly
       physicsParityMode: false,
       ridgeMode: 1,
+      // Use shared theta calculation with visual-focused gamma VdB, handle standby mode
+      thetaScale: parameters.currentMode === 'standby' ? 0 : computeThetaScale({
+        gammaGeo: show.gammaGeo,
+        qSpoilingFactor: show.qSpoilingFactor,
+        gammaVanDenBroeck: show.gammaVanDenBroeck,
+        gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
+        dutyEffectiveFR: show.dutyEffectiveFR
+      }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
-    console.log('Applying physics to engines (engine computes θ):', {
-      mode: mergedState.currentMode,
-      real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
-      show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
+    console.log('Applying physics to engines:', {
+      real: {
+        parity: realPhysicsPayload.physicsParityMode,
+        ridge: realPhysicsPayload.ridgeMode,
+        theta: realPhysicsPayload.thetaScale,
+        gammaVdB: realPhysicsPayload.gammaVdB,
+        qSpoil: realPhysicsPayload.deltaAOverA
+      },
+      show: {
+        parity: showPhysicsPayload.physicsParityMode,
+        ridge: showPhysicsPayload.ridgeMode,
+        theta: showPhysicsPayload.thetaScale,
+        gammaVdB: showPhysicsPayload.gammaVdB,
+        qSpoil: showPhysicsPayload.deltaAOverA
+      }
     });
 
     pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
@@ -1299,8 +1292,6 @@ export default function WarpBubbleCompare({
     leftEngine.current.forceRedraw?.();
     rightEngine.current.forceRedraw?.();
 
-    // (removed direct updateUniforms calls - batchers already applied with proper parity enforcement)
-
     // optional: quick console check
     if (DEBUG) console.log('[WBC] uniforms applied', {
       real_thetaScale: real.thetaScale,
@@ -1316,27 +1307,18 @@ export default function WarpBubbleCompare({
     // Also push FR-window/light-crossing controls if present
     if (parameters.lightCrossing) {
       const lc = parameters.lightCrossing;
-      const total = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
-      const live  = Math.max(1, Number(parameters.sectors) || total);
-      const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
-      pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
+      const s = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
+      const lcPayload = {
         phase: lc.phase,
         onWindow: !!lc.onWindowDisplay,
-        split: Math.max(0, (lc.sectorIdx ?? 0) % live),
+        split: Math.max(0, (lc.sectorIdx ?? 0) % s),
         tauLC_ms: lc.tauLC_ms,
         dwell_ms: lc.dwell_ms,
         burst_ms: lc.burst_ms,
-        sectors: total
-      })), 'REAL');
-      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
-        phase: lc.phase,
-        onWindow: !!lc.onWindowDisplay,
-        split: Math.max(0, (lc.sectorIdx ?? 0) % live),
-        tauLC_ms: lc.tauLC_ms,
-        dwell_ms: lc.dwell_ms,
-        burst_ms: lc.burst_ms,
-        sectors: total
-      })), 'SHOW');
+        sectors: s
+      };
+      pushLeft.current(paneSanitize('REAL', sanitizeUniforms(lcPayload)), 'REAL');
+      pushRight.current(paneSanitize('SHOW', sanitizeUniforms(lcPayload)), 'SHOW');
     }
 
     // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
@@ -1352,7 +1334,7 @@ export default function WarpBubbleCompare({
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: fixedCamZ, lockFraming: true })), 'SHOW');
     }
-  }, [parameters, pipelineState, colorMode, lockFraming, heroBoost, pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken]);
+  }, [parameters, colorMode, lockFraming, heroBoost]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {

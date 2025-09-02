@@ -4,53 +4,6 @@ import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoin
 import { thetaScaleExpected } from "@/lib/expectations";
 import CheckpointViewer from "./CheckpointViewer";
 
-// Do NOT send theta from here. Engine computes canonical θ internally.
-
-const sanitizeUniforms = (o: any) =>
-  Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  const p = { ...patch };
-  if (pane === 'REAL') { p.physicsParityMode = true;  p.parityMode = true;  p.viewAvg = true;  p.ridgeMode = 0; }
-  else                 { p.physicsParityMode = false; p.parityMode = false; p.viewAvg = false; p.ridgeMode = 1; }
-  delete (p as any).thetaScale;
-  delete (p as any).u_thetaScale;
-  return p;
-}
-function buildRealPacket(parameters: any, base: any = {}) {
-  const dutyFR = Math.max(1e-9, Math.min(1, parameters?.dutyEffectiveFR ?? parameters?.dutyFR ?? 0.000025));
-  return {
-    ...base,
-    currentMode: parameters?.currentMode,
-    physicsParityMode: true,
-    viewAvg: true,
-    dutyEffectiveFR: dutyFR,
-    dutyCycle: dutyFR,
-    sectors: 1,
-    sectorCount: 1,
-    vShip: 0,
-    ridgeMode: 0,
-    gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
-      parameters?.gammaVanDenBroeck_mass ?? parameters?.gammaVanDenBroeck ?? 38.3)),
-    thetaScale: undefined, u_thetaScale: undefined,
-  };
-}
-function buildShowPacket(parameters: any, base: any = {}) {
-  return {
-    ...base,
-    currentMode: parameters?.currentMode,
-    physicsParityMode: false,
-    viewAvg: false,
-    dutyCycle: Math.max(0, Math.min(1, parameters?.dutyCycle ?? 0.14)),
-    sectorCount: Math.max(1, Math.floor(parameters?.sectorCount ?? 400)),
-    sectors:     Math.max(1, Math.floor(parameters?.sectors     ?? 1)),
-    vShip: parameters?.currentMode === 'standby' ? 0 : 1,
-    ridgeMode: 1,
-    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
-      parameters?.gammaVanDenBroeck_vis ?? parameters?.gammaVanDenBroeck ?? 2.86e5)),
-    thetaScale: undefined, u_thetaScale: undefined,
-  };
-}
-
 /*
   WarpRenderCheckpointsPanel
   --------------------------
@@ -79,45 +32,6 @@ function buildShowPacket(parameters: any, base: any = {}) {
 // tiny helpers
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-
-// ───────────────────────────────────────────────────────────────────────────────
-// Projection helpers: take a point on the ellipsoid shell and project to NDC/pixels
-// ───────────────────────────────────────────────────────────────────────────────
-type Vec3 = [number, number, number];
-type NDC = { x: number; y: number; z: number; w: number };
-
-function shellPointOnDir(axes: Vec3, dir: Vec3): Vec3 {
-  // Solve s so that ((s*dx)/ax)^2 + ((s*dy)/ay)^2 + ((s*dz)/az)^2 = 1  with p = s*dir
-  const [ax, ay, az] = axes.map(v => Math.max(1e-9, +v)) as Vec3;
-  const [dx, dy, dz] = dir as Vec3;
-  const denom = (dx*dx)/(ax*ax) + (dy*dy)/(ay*ay) + (dz*dz)/(az*az);
-  const s = (denom > 0) ? (1 / Math.sqrt(denom)) : 0;
-  return [s*dx, s*dy, s*dz];
-}
-
-function projectToNDC(mvp: Float32Array | number[], p: Vec3): NDC | null {
-  if (!mvp || (mvp as any).length !== 16) return null;
-  const m = mvp as any;
-  const x = p[0], y = p[1], z = p[2];
-  const X = m[0]*x + m[4]*y + m[8 ]*z + m[12];
-  const Y = m[1]*x + m[5]*y + m[9 ]*z + m[13];
-  const Z = m[2]*x + m[6]*y + m[10]*z + m[14];
-  const W = m[3]*x + m[7]*y + m[11]*z + m[15];
-  if (Math.abs(W) < 1e-9) return { x: 0, y: 0, z: Z, w: W };
-  return { x: X / W, y: Y / W, z: Z / W, w: W };
-}
-
-function ndcToPixels(ndc: NDC | null, canvas?: HTMLCanvasElement | null) {
-  if (!ndc || !canvas) return null;
-  const w = canvas.clientWidth || canvas.width || 0;
-  const h = canvas.clientHeight || canvas.height || 0;
-  if (!w || !h) return null;
-  // NDC (-1..1) → pixels
-  const px = Math.round((ndc.x * 0.5 + 0.5) * w);
-  const py = Math.round((1 - (ndc.y * 0.5 + 0.5)) * h); // invert Y for screen space
-  const onScreen = ndc.x >= -1 && ndc.x <= 1 && ndc.y >= -1 && ndc.y <= 1 && ndc.w > 0;
-  return { px, py, onScreen };
-}
 
 // Enhanced canvas/GL inspection that works with both slice2d and grid3d engines
   const getCanvasEngine = (engineRef: React.MutableRefObject<any>, canvasRef: React.MutableRefObject<HTMLCanvasElement | null>) => {
@@ -230,21 +144,6 @@ function computeThetaScaleFromParams(v: any) {
   return averaging ? base * Math.sqrt(dFR) : base;
 }
 
-// If you display "expected/exp" θ, compute locally for display-only (never send)
-function expectedThetaForPanel(u: any, pane: 'REAL'|'SHOW') {
-  const g  = Math.max(1, Number(u?.gammaGeo ?? u?.g_y ?? 26));
-  const q  = Math.max(1e-12, Number(u?.deltaAOverA ?? u?.qSpoilingFactor ?? 1));
-  const vM = Math.max(1, Math.min(1e2, Number(u?.gammaVanDenBroeck_mass ?? 38.3)));
-  const vV = Math.max(1, Math.min(1e9, Number(u?.gammaVanDenBroeck_vis  ?? 2.86e5)));
-  const sectors   = Math.max(1, pane === 'REAL' ? 1 : (u?.sectors ?? 1));
-  const sectorCnt = Math.max(1, pane === 'REAL' ? 1 : (u?.sectorCount ?? 400));
-  const dutyLocal = Math.max(0, Number(u?.dutyCycle ?? 0.14));
-  const dFR = pane === 'REAL' ? dutyLocal : (dutyLocal * (sectors/sectorCnt));
-  const dutyFactor = pane === 'REAL' ? Math.sqrt(Math.max(1e-12, dFR)) : 1;
-  const v = pane === 'REAL' ? vM : vV;
-  return (g*g*g) * q * v * dutyFactor;
-}
-
 // ✅ Single-source expected θ; caller provides dutyFR for the pane
 function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
@@ -353,26 +252,6 @@ function useCheckpointList(
     // 👂 Publish the engine's current physics authority for other UI bits
     publishWarpEcho(e, side, liveSnap);
 
-    // ── Gather geometry & view for projection checks
-    const u = e?.uniforms || {};
-    const axesScene: Vec3 = (Array.isArray(u?.axesClip) && u.axesClip.length === 3)
-      ? [u.axesClip[0], u.axesClip[1], u.axesClip[2]]
-      : (Array.isArray(u?.axesScene) && u.axesScene.length === 3 ? [u.axesScene[0], u.axesScene[1], u.axesScene[2]] : [1,1,1]);
-    const driveRaw: Vec3 = (Array.isArray(u?.driveDir) && u.driveDir.length === 3) ? [u.driveDir[0], u.driveDir[1], u.driveDir[2]] : [1,0,0];
-    // normalize drive dir in scene-scaled space (same as engine)
-    const dN = (() => {
-      const t: Vec3 = [driveRaw[0] / axesScene[0], driveRaw[1] / axesScene[1], driveRaw[2] / axesScene[2]];
-      const m = Math.hypot(t[0], t[1], t[2]) || 1;
-      return [t[0]/m, t[1]/m, t[2]/m] as Vec3;
-    })();
-    // Points on the ellipsoid shell along ±drive direction
-    const pFront = shellPointOnDir(axesScene, dN);
-    const pRear  = shellPointOnDir(axesScene, [-dN[0], -dN[1], -dN[2]]);
-    const ndcF   = projectToNDC(e?.mvpMatrix, pFront);
-    const ndcR   = projectToNDC(e?.mvpMatrix, pRear);
-    const pixF   = ndcToPixels(ndcF as any, cv);
-    const pixR   = ndcToPixels(ndcR as any, cv);
-
     // === DAG Stage 1: INPUT CHECKPOINTS ===
     // Pipeline inputs validation
     const gammaGeo = N(liveSnap?.gammaGeo ?? liveSnap?.g_y, 26);
@@ -408,7 +287,7 @@ function useCheckpointList(
     // === DAG Stage 2: EXPECTATIONS (Single Source of Truth) ===
     // Calculate the expected θ-scale using canonical formula (RAW, no tone-mapping)
     const dutyFR = Math.max(1e-12, duty / sectors);
-    const thetaExpectedRaw = thetaScaleExpected({
+    const thetaExpected = thetaScaleExpected({
       gammaGeo: Math.max(1, gammaGeo),
       q: Math.max(1e-12, deltaAOverA), 
       gammaVdB: Math.max(1, gammaVdB),
@@ -417,15 +296,15 @@ function useCheckpointList(
 
     checkpoint({
       id: 'expect.theta_scale', side, stage: 'expect',
-      pass: Number.isFinite(thetaExpectedRaw) && thetaExpectedRaw > 0,
-      msg: `θ_expected=${thetaExpectedRaw.toExponential(2)}`,
-      expect: '>0', actual: thetaExpectedRaw,
-      sev: !Number.isFinite(thetaExpectedRaw) || thetaExpectedRaw <= 0 ? 'error' : 'info',
+      pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
+      msg: `θ_expected=${thetaExpected.toExponential(2)}`,
+      expect: '>0', actual: thetaExpected,
+      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info',
       meta: { gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
     });
 
     // === DAG Stage 3: UNIFORMS ===
-    // (u defined above)
+    const u = e?.uniforms || {};
     const ts = N(u?.thetaScale, NaN);
 
     // Expected uniforms θ from the same chain the engine uses (RAW)
@@ -493,29 +372,6 @@ function useCheckpointList(
         msg: `θ_display uniform=${Number.isFinite(thetaDisplayUniform) ? thetaDisplayUniform.toFixed(3) : '—'} vs exp=${Number.isFinite(thetaDisplayExpect) ? thetaDisplayExpect.toFixed(3) : '—'}`,
         expect: 'info-only',
         actual: { thetaDisplayUniform, thetaDisplayExpect, exposure, zeroStop, userGain, boostNow },
-        sev: 'info'
-      });
-    }
-
-    // ── NEW: Shader amplitude estimate (what the FS multiplies with)
-    // amp = u_thetaScale * max(1, u_userGain) * showGain * vizSeason * (1 + tBlend*(tBoost-1))
-    {
-      const parity = !!(u.physicsParityMode ?? u.parityMode);
-      const showGain  = parity ? 1.0 : Math.max(1, N(u?.displayGain, 1));
-      const vizSeason = parity ? 1.0 : Math.max(1, N(u?.vizGain, 1));
-      const tBlend    = parity ? 0.0 : clamp01(N(u?.curvatureGainT, 0));
-      const tBoostMax = parity ? 1.0 : Math.max(1, N(u?.curvatureBoostMax, 40));
-      const userGain  = Math.max(1, N(u?.userGain, 1));
-      const ampEst    = (Number.isFinite(ts) ? ts : 0) * userGain * showGain * vizSeason * (1 + tBlend * (tBoostMax - 1));
-
-      checkpoint({
-        id: 'uniforms.theta_shader_amp_est',
-        side,
-        stage: 'uniforms',
-        pass: Number.isFinite(ampEst) && ampEst >= 0,
-        msg: `θ(shader) amp≈${Number.isFinite(ampEst) ? ampEst.toExponential(2) : '—'} (parity=${parity})`,
-        expect: 'info-only',
-        actual: { ts, userGain, showGain, vizSeason, tBlend, tBoostMax },
         sev: 'info'
       });
     }
@@ -608,18 +464,6 @@ function useCheckpointList(
         state: progOk ? 'ok' : (compiling ? 'warn' : 'fail'),
       });
     }
-
-    // θ readouts (prefer engine's telemetry "thetaScale_actual" when present)
-    const parity = !!u.physicsParityMode;
-    const mode = String(u.currentMode ?? 'hover');
-    const isREALStandby = parity && mode === 'standby';
-
-    const thetaUniformRaw = Number(u?.thetaScale_actual ?? u?.thetaScale ?? NaN);
-    const vShip = Number.isFinite(u.vShip) ? Number(u.vShip) : (parity ? 0 : 1);
-    const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaUniformRaw) ? thetaUniformRaw * vShip : NaN);
-
-    // expected canonical (what your energy panel computes)
-    const thetaExpected = expectedThetaForPane(liveSnap, e);
 
     // Grid buffers
     const verts = (e?.gridVertices?.length || 0);
@@ -777,63 +621,7 @@ function useCheckpointList(
       }
     }
 
-    // Theta scale rows - separate raw and effective for like-for-like comparison
-    const fmt = (n: number) => Number.isFinite(n) ? (Math.abs(n) >= 1e3 ? n.toExponential(2) : n.toPrecision(3)) : '—';
-
-    // Raw theta (what engine computed from physics chain)
-    const rawOk = Number.isFinite(thetaUniformRaw) && thetaUniformRaw > 0;
-    const rawDelta = (Number.isFinite(thetaUniformRaw) && Number.isFinite(thetaExpected))
-      ? `${((thetaUniformRaw/thetaExpected - 1) * 100).toFixed(1)}%` : '—';
-    const rawDetail = `raw=${fmt(thetaUniformRaw)} • exp=${fmt(thetaExpected)} (Δ ${rawDelta})`;
-
-    rows.push({ 
-      label: "θ-scale (raw)", 
-      detail: rawDetail, 
-      state: rawOk ? "ok" : "fail" 
-    });
-
-    // Effective theta (what fragments actually see)
-    const effOk = Number.isFinite(thetaEffective);
-    const expectedEffective = (mode === 'standby' && parity) ? 0 : thetaExpected * vShip;
-    const effDelta = (Number.isFinite(thetaEffective) && Number.isFinite(expectedEffective))
-      ? `${((thetaEffective/(expectedEffective || 1) - 1) * 100).toFixed(1)}%` : '—';
-    const effDetail = `eff = raw × vShip = ${fmt(thetaUniformRaw)} × ${fmt(vShip)} (Δ ${effDelta})`;
-
-    rows.push({ 
-      label: "θ-scale (effective)", 
-      detail: effDetail, 
-      state: effOk ? "ok" : "fail" 
-    });
-
-    // ── NEW: WebGL projection rows (front/rear shell along drive direction)
-    if (ndcF && pixF) {
-      const detailF = `NDC=(${ndcF.x.toFixed(3)}, ${ndcF.y.toFixed(3)}, ${ndcF.z.toFixed(3)}) • px=(${pixF.px}, ${pixF.py}) ${pixF.onScreen ? '' : '• offscreen'}`;
-      rows.push({ label: "Front (ρ=1) projection", detail: detailF, state: pixF.onScreen ? "ok" : "warn" });
-      checkpoint({
-        id: 'gpu.mvp_front',
-        side,
-        stage: 'gpu',
-        pass: pixF.onScreen,
-        msg: detailF,
-        expect: 'inside frustum',
-        actual: detailF,
-        sev: pixF.onScreen ? 'info' : 'warn'
-      });
-    }
-    if (ndcR && pixR) {
-      const detailR = `NDC=(${ndcR.x.toFixed(3)}, ${ndcR.y.toFixed(3)}, ${ndcR.z.toFixed(3)}) • px=(${pixR.px}, ${pixR.py}) ${pixR.onScreen ? '' : '• offscreen'}`;
-      rows.push({ label: "Rear (ρ=1) projection", detail: detailR, state: pixR.onScreen ? "ok" : "warn" });
-      checkpoint({
-        id: 'gpu.mvp_rear',
-        side,
-        stage: 'gpu',
-        pass: pixR.onScreen,
-        msg: detailR,
-        expect: 'inside frustum',
-        actual: detailR,
-        sev: pixR.onScreen ? 'info' : 'warn'
-      });
-    }
+    rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
 
     // Show detailed breakdown from bound uniforms if available
     if (echo && echo.terms) {
@@ -915,29 +703,6 @@ function useCheckpointList(
     // Render loop alive (RAF attached)
     const rafAlive = !!e?._raf;
     rows.push({ label: "Render loop", detail: rafAlive ? "active" : "stopped", state: rafAlive ? "ok" : "warn" });
-
-    // ── Frame console line for quick triage
-    try {
-      const parity = !!(u.physicsParityMode ?? u.parityMode);
-      const showGain  = parity ? 1.0 : Math.max(1, N(u?.displayGain, 1));
-      const vizSeason = parity ? 1.0 : Math.max(1, N(u?.vizGain, 1));
-      const tBlend    = parity ? 0.0 : clamp01(N(u?.curvatureGainT, 0));
-      const tBoostMax = parity ? 1.0 : Math.max(1, N(u?.curvatureBoostMax, 40));
-      const userGain  = Math.max(1, N(u?.userGain, 1));
-      const ampEst    = (Number.isFinite(ts) ? ts : 0) * userGain * showGain * vizSeason * (1 + tBlend * (tBoostMax - 1));
-
-      console.log(`[WRC θ] ${label}`, {
-        theta_uniform: ts,
-        theta_expected_chain: thetaUniformExpected,
-        shader_amp_est: ampEst,
-        parity,
-        viewAvg: (u?.viewAvg ?? true),
-        sectors: { live: u?.sectors, total: u?.sectorCount },
-        dutyUsed: u?.dutyUsed ?? u?.dutyEffectiveFR,
-        front_ndc: ndcF, rear_ndc: ndcR,
-        front_px: pixF, rear_px: pixR
-      });
-    } catch {}
 
     return rows;
   }, [engineRef.current, canvasRef.current, liveSnap, hb, label, dutyFR, thetaExpectedFn]);
@@ -1193,18 +958,6 @@ export default function WarpRenderCheckpointsPanel({
   const hardFailsRight = rightRows.filter(r => r.state === 'fail').map(r => r.label);
 
   // convenience actions
-  // Buttons that push presets / test writes (always go through builders)
-  const onPresetReal = () => {
-    if (!leftEngineRef.current) return;
-    const pkt = paneSanitize('REAL', sanitizeUniforms(buildRealPacket(parameters, {})));
-    leftEngineRef.current.updateUniforms(pkt);
-  };
-  const onPresetShow = () => {
-    if (!rightEngineRef.current) return;
-    const pkt = paneSanitize('SHOW', sanitizeUniforms(buildShowPacket(parameters, {})));
-    rightEngineRef.current.updateUniforms(pkt);
-  };
-
   const act = {
     forceResize: (e: any) => e?._resizeCanvasToDisplaySize?.(),
     fitCamera: (e: any) => {
@@ -1226,8 +979,8 @@ export default function WarpRenderCheckpointsPanel({
     recompile: (e: any) => e?._compileGridShaders?.(),
     rewarp: (e: any) => (e?.forceRedraw?.(), e?._render?.()),
     presets: {
-      real:   onPresetReal,
-      show:   onPresetShow,
+      real:   (e: any) => e?.setPresetParity?.(),
+      show:   (e: any) => e?.setPresetShowcase?.(),
     }
   };
 

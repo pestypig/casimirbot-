@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { thetaCanonical } from "@/lib/warp-theta";
 
 // Add near other helpers
 async function waitForNonZeroSize(cv: HTMLCanvasElement, timeoutMs = 3000) {
@@ -105,54 +104,29 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
       return points;
     };
 
-    // Sample displacement field using canonical theta calculation
-    const sampleDisplacementField = (x: number, y: number, z: number, u: any) => {
-      // sane defaults that match physics path
-      const hullAxes = Array.isArray(u.hullAxes) ? u.hullAxes : [1, 0.26, 0.17];
-      const wallWidth = Number.isFinite(u.wallWidth) ? u.wallWidth : 0.06;
-
-      // sectoring + duty
-      const sectorsConcurrent = Math.max(1, (u.sectors ?? 1)|0);
-      const sectorsTotal      = Math.max(1, (u.sectorCount ?? 400)|0);
-      const dutyLocal         = Math.max(0, Number(u.dutyCycle ?? 0.01));
-
-      // canonical θ (engine authority)
-      const thetaScale = thetaCanonical({
-        gammaGeo: Number(u.gammaGeo ?? 26),
-        qSpoilingFactor: Number(u.qSpoilingFactor ?? u.deltaAOverA ?? 1),
-        gammaVanDenBroeck_mass: Math.max(1, Math.min(1e2, Number(u.gammaVanDenBroeck_mass ?? u.gammaVdB ?? 38.3))),
-        dutyLocal,
-        sectorsConcurrent,
-        sectorsTotal,
-        viewAveraged: !!u.physicsParityMode,                      // REAL averages
-        mode: (u.currentMode ?? 'hover') as 'standby'|'hover'|'cruise'|'emergency'
-      });
-
-      // make this visible to the inspector (so θ(shader) shows the same thing)
-      u.thetaScale = thetaScale;
-
-      // ellipsoidal radius (clip-space axes)
+    // Sample displacement field using Natário bell math
+    const sampleDisplacementField = (x: number, y: number, z: number, uniforms: any) => {
+      const { hullAxes = [1, 0.26, 0.17], wallWidth = 0.06, gammaVdB = 1e11, gammaGeo = 26, qSpoilingFactor = 1, dutyEffectiveFR = 0.000025, viewMassFraction = 1.0 } = uniforms;
+      
+      // Ellipsoidal radius calculation
       const rho = Math.sqrt(
-        (x / hullAxes[0]) ** 2 +
-        (y / hullAxes[1]) ** 2 +
-        (z / hullAxes[2]) ** 2
+        Math.pow(x / hullAxes[0], 2) + 
+        Math.pow(y / hullAxes[1], 2) + 
+        Math.pow(z / hullAxes[2], 2)
       );
-
-      // canonical bell around ρ=1 with C² width ~wallWidth
-      const sigma = Math.max(1e-6, wallWidth * 0.5);
-      const bell  = Math.exp(-((rho - 1) ** 2) / (sigma * sigma));
-
-      // REAL+standby must be flat
-      if ((u.currentMode ?? 'hover') === 'standby' && !!u.physicsParityMode) {
-        return { theta: 0, sign: 0, rho, displacement: 0 };
-      }
-
-      // local θ on the shell
-      const theta = bell * thetaScale;
-
-      // sign convention (compress inside vs expand outside is purely cosmetic here)
+      
+      // Natário bell function
+      const sigma = wallWidth / 2;
+      const bell = Math.exp(-Math.pow((rho - 1) / sigma, 2));
+      
+      // Theta calculation with physics chain
+      const thetaScaleCanonical = Math.pow(gammaGeo, 3) * qSpoilingFactor * gammaVdB * dutyEffectiveFR;
+      const thetaScaleUsed = thetaScaleCanonical * viewMassFraction; // Apply view mass fraction
+      const theta = bell * thetaScaleUsed;
+      
+      // Sign based on compression/expansion regions
       const sign = rho < 1 ? -1 : 1;
-
+      
       return { theta, sign, rho, displacement: theta * sign };
     };
 
@@ -262,12 +236,14 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     engineRef.current = {
       canvas,
       isLoaded: true,
+      gridProgram: true,
+      gridUniforms: true,
+      gridAttribs: true,
       setVisible: (visible: boolean) => {
         canvas.style.visibility = visible ? 'visible' : 'hidden';
       },
       updateUniforms: (newUniforms: any) => {
         Object.assign(uniforms, newUniforms);
-        // force recomputation of thetaScale on next frame by touching a flag if you like
       },
       bootstrap: (payload: any) => {
         Object.assign(uniforms, payload);

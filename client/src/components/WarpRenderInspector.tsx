@@ -14,93 +14,6 @@ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
-import { thetaCanonical } from "@/lib/warp-theta";
-import { getWarpEngineCtor } from "@/types/globals";
-
-// --- FAST PATH HELPERS (drop-in) --------------------------------------------
-// Helper to sanitize uniforms per pane - ensure ALL required fields are set
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  const isREAL = pane === 'REAL';
-
-  // Create sanitized patch that rejects any incoming thetaScale
-  const sanitized = { ...patch };
-
-  // Engine authority: never accept external thetaScale
-  delete sanitized.thetaScale;
-  delete sanitized.u_thetaScale;
-
-  return {
-    ...sanitized,
-    // Force parity modes - never allow override
-    physicsParityMode: isREAL,
-    ridgeMode: isREAL ? 0 : 1,
-    viewAvg: isREAL,      // lock view averaging for REAL
-  };
-}
-
-// Batched update functions to prevent racing
-let rafL = 0, rafR = 0;
-function pushLeft(patch: any) {
-  if (rafL) cancelAnimationFrame(rafL);
-  rafL = requestAnimationFrame(() => {
-    rafL = 0;
-    leftEngine.current?.updateUniforms(paneSanitize('REAL', patch));
-  });
-}
-function pushRight(patch: any) {
-  if (rafR) cancelAnimationFrame(rafR);
-  rafR = requestAnimationFrame(() => {
-    rafR = 0;
-    rightEngine.current?.updateUniforms(paneSanitize('SHOW', patch));
-  });
-}
-
-// --- pane helpers -----------------------------------------------------------
-// NOTE: Ensure there are no other definitions of paneSanitize/sanitizeUniforms below.
-const sanitizeUniforms = (o: any) =>
-  Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
-
-// ---- Packet Builders with enforced parity ----
-const buildREALPacket = (base: any) => {
-    const packet = {
-      ...base,
-      physicsParityMode: true,
-      ridgeMode: 0,
-      viewAvg: true,
-      vShip: 0,
-      exposure: 4.2,
-      zeroStop: 1e-6,
-      cosmeticLevel: 0,
-      curvatureGainT: 0,
-      curvatureBoostMax: 1,
-      userGain: 1,
-      displayGain: 1,
-    };
-    // Force parity mode - remove any conflicting fields
-    delete packet.parityMode;
-    delete packet.uPhysicsParity;
-    return paneSanitize('REAL', packet);
-  };
-
-const buildSHOWPacket = (base: any, opts: { T?: number; boost?: number } = {}) => {
-    const packet = {
-      ...base,
-      physicsParityMode: false,
-      ridgeMode: 1,
-      viewAvg: false,
-      vShip: 1,
-      curvatureGainT: clamp01(opts.T ?? 0.70),
-      curvatureBoostMax: Math.max(1, opts.boost ?? 40),
-      cosmeticLevel: 10,
-      exposure: 7.5,
-      zeroStop: 1e-7,
-      userGain: 2,
-    };
-    // Force non-parity mode - remove any conflicting fields
-    delete packet.parityMode;
-    delete packet.uPhysicsParity;
-    return paneSanitize('SHOW', packet);
-  };
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -125,7 +38,7 @@ const IS_COARSE =
   (matchMedia('(pointer:coarse)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || ''));
 
 // Batches many uniform patches into ONE engine write + ONE forceRedraw per rAF
-function makeUniformBatcher(engineRef: React.MutableRefObject<any>, pane: 'REAL'|'SHOW') {
+function makeUniformBatcher(engineRef: React.MutableRefObject<any>) {
   let pending: any = null;
   let scheduled = false;
   return (patch: any, tag = 'batched') => {
@@ -136,8 +49,7 @@ function makeUniformBatcher(engineRef: React.MutableRefObject<any>, pane: 'REAL'
       scheduled = false;
       const e = engineRef.current;
       if (!e || !pending) return;
-      const toSend = paneSanitize(pane, pending); // <- ensure all updates go through sanitizer
-      pending = null;
+      const toSend = pending; pending = null;
       try {
         if (e.isLoaded && e.gridProgram) {
           gatedUpdateUniforms(e, toSend, 'client');
@@ -163,7 +75,7 @@ function enableLowFps(engine: any, fps = 12) {
   }, Math.max(30, Math.floor(1000 / Math.max(1, fps))));
 }
 
-// Wait for program + buffers, then compute camera once and draw once
+// Wait until the engine is really ready, then compute camera once and draw once
 async function firstCorrectFrame({
   engine, canvas, sharedAxesScene, pane
 }: {
@@ -197,68 +109,98 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
-// Deterministic view fraction - never depends on transient engine parity state
-function viewMassFractionLocked(u: any, flavor: 'REAL'|'SHOW'): number {
-  const total = Math.max(1, Number(u?.sectorCount ?? 400));
-  return flavor === 'REAL' ? 1 / total : 1.0;
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+  return {
+    ...patch,
+    physicsParityMode: pane === 'REAL',
+    parityMode: pane === 'REAL',
+    ridgeMode: pane === 'REAL' ? 0 : 1
+  };
 }
 
+// Sanitize uniform values for safe WebGL consumption
+function sanitizeUniforms(u: any = {}) {
+  const s = { ...u };
 
-function thetaGainExpected(b: ThetaBound, dutyEff = 0, viewAvg = true) {
-  const g3 = Math.pow(Math.max(1, b.gammaGeo), 3);
-  const q  = Math.max(1e-12, b.qSpoilingFactor);
-  const v  = Math.max(1, b.gammaVdB);
-  const fr = viewAvg ? Math.sqrt(Math.max(1e-12, dutyEff)) : 1;
-  return g3 * q * v * fr;
+  // Numeric coercions + clamps
+  if ('cameraZ' in s) s.cameraZ = Number.isFinite(s.cameraZ) ? Math.max(-10, Math.min(-0.1, s.cameraZ)) : -2.0;
+  if ('exposure' in s) s.exposure = Number.isFinite(s.exposure) ? Math.max(0.1, Math.min(20, s.exposure)) : 6.0;
+  if ('gammaGeo' in s) s.gammaGeo = Number.isFinite(s.gammaGeo) ? Math.max(1, s.gammaGeo) : 26;
+  if ('qSpoilingFactor' in s) s.qSpoilingFactor = Number.isFinite(s.qSpoilingFactor) ? Math.max(0.1, s.qSpoilingFactor) : 1;
+  // preserve separate mass vs visual pocket amplifications
+  if ('gammaVanDenBroeck_mass' in s) {
+    s.gammaVanDenBroeck_mass = Number.isFinite(s.gammaVanDenBroeck_mass)
+      ? Math.max(1, s.gammaVanDenBroeck_mass)
+      : 1.35e5;
+  }
+  if ('gammaVanDenBroeck_vis' in s) {
+    s.gammaVanDenBroeck_vis = Number.isFinite(s.gammaVanDenBroeck_vis)
+      ? Math.max(1, s.gammaVanDenBroeck_vis)
+      : 1.35e5;
+  }
+  if ('dutyEffectiveFR' in s) s.dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? Math.max(1e-9, Math.min(1, s.dutyEffectiveFR)) : 0.01;
+
+  // Boolean sanitization
+  if ('physicsParityMode' in s) s.physicsParityMode = !!s.physicsParityMode;
+  if ('parityMode' in s) s.parityMode = !!s.parityMode;
+  if ('lockFraming' in s) s.lockFraming = !!s.lockFraming;
+  if ('viewAvg' in s) s.viewAvg = !!s.viewAvg;
+
+  // Integer sanitization
+  if ('ridgeMode' in s) s.ridgeMode = Math.max(0, Math.min(1, Math.floor(s.ridgeMode || 0)));
+  if ('sectorCount' in s) s.sectorCount = Math.max(1, Math.floor(s.sectorCount || 400));
+  if ('split' in s) s.split = Math.max(0, Math.floor(s.split || 0));
+
+  // Purple shift vector sanitization
+  if ('epsilonTilt' in s) {
+    const v = +s.epsilonTilt;
+    s.epsilonTilt = Number.isFinite(v) ? Math.max(0, Math.min(5e-7, v)) : 0;
+  }
+  if ('betaTiltVec' in s && Array.isArray(s.betaTiltVec)) {
+    const v = s.betaTiltVec.map(Number);
+    const L = Math.hypot(v[0]||0,v[1]||0,v[2]||0) || 1;
+    s.betaTiltVec = [v[0]/L, v[1]/L, v[2]/L];
+  }
+
+  // Metric uniforms: defaults = identity and off
+  if (!('useMetric' in s)) s.useMetric = false;
+  s.useMetric = !!s.useMetric;
+  const I = [1,0,0, 0,1,0, 0,0,1];
+  const isMat3 = (m:any)=> Array.isArray(m) && m.length===9 && m.every((x:any)=>Number.isFinite(+x));
+  s.metric    = isMat3(s.metric)    ? s.metric.map(Number)    : I;
+  s.metricInv = isMat3(s.metricInv) ? s.metricInv.map(Number) : I;
+
+  // Also provide u_* aliases explicitly to match shader names
+  s.u_useMetric   = s.useMetric;
+  s.u_metric      = s.metric;
+  s.u_metricInv   = s.metricInv;
+  s.u_epsilonTilt = s.epsilonTilt ?? 0;
+  s.u_betaTiltVec = s.betaTiltVec ?? [0,-1,0];
+
+  return s;
 }
+
+/**
+ * WarpRenderInspector
+ *
+ * A focused panel to verify that operational-mode + calculator payloads are
+ * actually reaching WarpEngine, using the same dual-instance pattern as
+ * WarpBubbleCompare. It mounts two canvases (REAL/SHOW), pushes calculator
+ * outputs through the exact keys WarpEngine consumes, and exposes quick
+ * controls to exaggerate differences so they are visually undeniable.
+ *
+ * Requirements: `warp-engine.js` must already be loaded and expose
+ *   `window.WarpEngine`.
+ */
 
 // ---- Utility: type-light helpers -------------------------------------------
 type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-// Helper to format numbers for display
-const formatNumber = (num: number | undefined) => {
-  if (num === undefined || num === null || !Number.isFinite(num)) return 'N/A';
-  if (Math.abs(num) < 1e-6) return num.toExponential(2);
-  if (Math.abs(num) > 1e6) return num.toExponential(2);
-  return num.toFixed(3);
-};
-
-// Helper to build shared base uniforms (prevents TDZ bug)
-function makeSharedBase(parameters: any, live: any, baseShared: any = {}) {
-  const sectorCount = Math.max(1, Number(parameters?.sectorCount ?? live?.sectorCount ?? 400));
-  const sectors = Math.max(1, Number(parameters?.sectors ?? live?.sectors ?? 1));
-  const dutyCycle = Number(parameters?.dutyCycle ?? live?.dutyCycle ?? 0.01);
-  const dutyEffectiveFR = dutyCycle * (sectors / sectorCount);
-
-  return {
-    ...baseShared,
-    // authoritative, engine-friendly fields:
-    sectorCount,
-    sectors,
-    dutyCycle,
-    dutyEffectiveFR,
-    currentMode: live?.currentMode ?? parameters?.currentMode ?? "hover",
-
-    // aliases the engine expects (present if you have them):
-    axesScene: parameters?.axesScene ?? live?.axesScene,
-    hullAxes: parameters?.hullAxes ?? live?.hullAxes,
-
-    // θ chain raw inputs (prefer explicit names, then UI aliases):
-    gammaGeo: parameters?.gammaGeo ?? parameters?.g_y ?? live?.gammaGeo,
-    deltaAOverA: parameters?.deltaAOverA ?? parameters?.qSpoilingFactor ?? live?.deltaAOverA,
-    gammaVanDenBroeck_mass:
-      parameters?.gammaVanDenBroeck_mass ??
-      parameters?.gammaVanDenBroeck ??
-      live?.gammaVanDenBroeck_mass ??
-      live?.gammaVanDenBroeck,
-  };
-}
-
 
 // Push only after shaders are ready - now with enhanced gating and diagnostics
-  function pushUniformsWhenReady(engine: any, patch: Record<string, any>, pane: 'REAL'|'SHOW', source: string = 'inspector') {
+  function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
     if (!engine) {
       console.warn(`[${source}] Cannot push uniforms - engine is null`);
       return;
@@ -266,9 +208,8 @@ function makeSharedBase(parameters: any, live: any, baseShared: any = {}) {
 
     const push = () => {
       try {
-        const sanitizedPatch = paneSanitize(pane, patch);
-        gatedUpdateUniforms(engine, sanitizedPatch, 'client');
-        if (DEBUG) console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(sanitizedPatch));
+        gatedUpdateUniforms(engine, patch, 'client');
+        if (DEBUG) console.log(`[${source}] Successfully pushed uniforms:`, Object.keys(patch));
       } catch (error) {
         console.error(`[${source}] Failed to push uniforms:`, error);
       }
@@ -543,24 +484,11 @@ function PaneOverlay(props:{
       const S  = areaEllipsoid(a,b,c);
       const Vshell = Math.max(0, w_m) * Math.max(0, S); // thin-shell approx
 
-      // --- Operational-mode aware θ calculations ---
-      const parity = !!U.physicsParityMode;                     // REAL if true, SHOW otherwise
-      const mode = String(U.currentMode ?? 'hover');            // 'standby'|'hover'|'cruise'|'emergency'
-      const isREALStandby = parity && mode === 'standby';
-
-      const thetaCanonical = Number(U.thetaScale_actual ?? U.thetaScale ?? NaN); // γ³·q·γVdB·√d_FR
-      const vShip = Number.isFinite(U.vShip) ? Number(U.vShip) : (parity ? 0 : 1);
-
-      // "θ (shader)" should reflect EFFECTIVE amplitude carried into the fragment math
-      const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaCanonical) ? thetaCanonical * vShip : NaN);
-
-      // Presentational clamp: show 0 for REAL + standby regardless of internal calculations
-      let thetaShader = Number(U.thetaScale_actual ?? U.thetaScale ?? NaN);
-      const isREAL = !!U.physicsParityMode;
-      const isStandby = (U.currentMode === 'standby');
-      if (isREAL && isStandby) thetaShader = 0;  // presentational clamp
-      const thetaCanon = thetaCanonical;
-      const thetaPaper = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5);
+      // Make the overlay honest: show the two θ's explicitly
+      const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
+      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+      // optional: keep your paper clamp, but show it as "θ_paper"
+      const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
 
       // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
       const M_ship_kg  = Number.isFinite(shipMassKg as number) ? Number(shipMassKg) : NaN;
@@ -574,7 +502,10 @@ function PaneOverlay(props:{
       const frontMax  = diag.theta_front_max_viewed ?? (Number.isFinite(frontRaw) ? frontRaw * Math.sqrt(f) : frontRaw);
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
-      setSnap({ a,b,c,aH, w_m, V,S, Vshell, thetaShader, thetaCanon, thetaPaper, M_ship_kg, M_slice_kg,
+      setSnap({
+        a,b,c,aH, w_m, V,S, Vshell,
+        thetaUniform, thetaPhys, thetaPaper,
+        M_ship_kg, M_slice_kg,
         frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
         mDisplayText: (flavor === 'REAL')
@@ -585,7 +516,7 @@ function PaneOverlay(props:{
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [engineRef, flavor, viewFraction, shipMassKg]);
+  }, [engineRef, flavor, viewFraction]);
 
   const s = snap || {};
   const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
@@ -603,8 +534,8 @@ function PaneOverlay(props:{
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
-          <div>θ (shader): <b>{Number.isFinite(s.thetaShader)? s.thetaShader.toExponential(2):'—'}</b></div>
-          <div>θ (canonical): <b>{Number.isFinite(s.thetaCanon)? s.thetaCanon.toExponential(2):'—'}</b></div>
+          <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
+          <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
           <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
           {/* keep slot if you later expose a metric-curvature scalar */}
           <div>θ (metric): <b>—</b></div>
@@ -633,7 +564,7 @@ function PaneOverlay(props:{
             <div>
               <div className="opacity-80">Curvature (York-time proxy</div>
               <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
-              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaCanon)? s.thetaCanon.toExponential(2):'—'}</b></div>
+              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
             </div>
             <div>
               <div className="opacity-80">Exotic mass proxy (display-only</div>
@@ -671,175 +602,6 @@ export default function WarpRenderInspector(props: {
   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
   debugTag?: string; // Debug tag for console logging
 }) {
-  // ────────────────────────────────────────────────────────────────────────────
-  // [WRI θ] INSTRUMENTATION & PARITY LOCK
-  // ────────────────────────────────────────────────────────────────────────────
-  const thetaShaderRef = useRef<number | null>(null);
-  const thetaJSRef     = useRef<number | null>(null);
-  const thetaCanonRef  = useRef<number | null>(null);
-  const lastParityRef  = useRef<boolean | null>(null);
-  const lastLogAtRef   = useRef<number>(0);
-  const rafRef         = useRef<number | null>(null);
-  const parityLockedRef= useRef<boolean>(false);
-
-  // local canonical θ (no imports to avoid duplicate import crashes)
-  function thetaCanonicalLocal(U: any): number {
-    const isREAL = !!U.physicsParityMode;
-    const mode = String(U.currentMode || 'hover').toLowerCase();
-    if (isREAL && mode === 'standby') return 0;
-    const g = Math.max(1, +U.gammaGeo || 26);
-    const q = Math.max(1e-12, +U.deltaAOverA || 1);
-    const v = Math.max(1, Math.min(1e2, +U.gammaVdB || 38.3)); // physics clamp
-    const sLive = Math.max(1, (U.sectors|0) || 1);
-    const sTot  = Math.max(1, (U.sectorCount|0) || 400);
-    const dLocal = Number.isFinite(+U.dutyLocal) ? +U.dutyLocal
-                  : Number.isFinite(+U.dutyCycle) ? +U.dutyCycle : 0;
-    const dFR = Math.max(1e-12, Math.min(1, dLocal * (sLive / sTot)));
-    const viewAvg = (U.viewAvg ?? true) ? true : false;
-    const dutyFactor = viewAvg ? Math.sqrt(dFR) : 1;
-    return (g*g*g) * q * v * dutyFactor;
-  }
-
-  // engine resolver: find left/right engines from registry or props
-  function resolveEngines(): {left?: any, right?: any} {
-    // prefer explicit refs if provided by parent
-    // @ts-ignore
-    const engProp = (props as any)?.engine || (props as any)?.engineRef?.current;
-    if (engProp) return { left: engProp };
-    // global registry (WarpEngine registers windows.__warp[id] = engine)
-    // @ts-ignore
-    const reg = (window as any).__warp;
-    if (reg && typeof reg === 'object') {
-      const keys = Object.keys(reg);
-      if (keys.length === 1) return { left: reg[keys[0]] };
-      if (keys.length >= 2)  return { left: reg[keys[0]], right: reg[keys[1]] };
-    }
-    // fallback: first canvas engine if attached
-    const canv = document.querySelectorAll('canvas');
-    for (const c of Array.from(canv) as any[]) {
-      if (c.__warpEngine) return { left: c.__warpEngine };
-    }
-    return {};
-  }
-
-  // sticky parity wrapper: blocks legacy aliases & θ injections
-  function lockParity(engine: any, forcedREAL: boolean) {
-    if (!engine || engine.__wriParityLocked) return;
-    engine.__wriParityLocked = true;
-    const orig = typeof engine.updateUniforms === 'function' ? engine.updateUniforms.bind(engine) : null;
-    engine.updateUniforms = function(u: any) {
-      const U = { ...(u||{}) };
-      // strip legacy alias writers that keep flipping parity / inflating θ
-      delete U.parityMode;
-      delete U.uPhysicsParity;
-      delete U.u_ridgeMode;
-      delete U.uThetaScale;
-      delete U.u_thetaScale;
-      delete U.thetaScale;
-      // enforce sticky REAL/SHOW + pane-specific averaging
-      U.physicsParityMode  = !!forcedREAL;
-      U.ridgeMode          = forcedREAL ? 0 : 1;
-      U.viewAvg            = !!forcedREAL;
-      // pass through canonical fields; engine computes θ itself
-      return orig ? orig(U) : undefined;
-    };
-  }
-
-  // bootstrap parity locks + start θ sampler
-  useEffect(() => {
-    let alive = true;
-    let armed = false;
-    const start = () => {
-      if (!alive) return;
-      const { left, right } = resolveEngines();
-      if (!left) return; // try again next tick
-
-      // lock parity once (REAL on left, SHOW on right if present)
-      if (!parityLockedRef.current) {
-        lockParity(left, true);
-        if (right) lockParity(right, false);
-        parityLockedRef.current = true;
-        console.log('[WRI θ] parity locks engaged: left=REAL, right=SHOW');
-      }
-
-      // RAF sampler
-      const eng = left; // sample left (REAL). Duplicate block for right if needed.
-      const sample = () => {
-        if (!alive || !eng) return;
-        try {
-          const U = { ...(eng.uniforms||{}), ...(eng.currentParams||{}) };
-          // JS θ the engine believes it set
-          const thetaJS = (typeof U.thetaScale === 'number' && isFinite(U.thetaScale)) ? U.thetaScale : null;
-          thetaJSRef.current = thetaJS;
-          // GL-latched θ (shader)
-          let thetaGL: number | null = null;
-          try {
-            const loc = eng.gridUniforms?.thetaScale || null;
-            if (loc) {
-              const val = eng.gl.getUniform(eng.gridProgram, loc);
-              thetaGL = (typeof val === 'number') ? val
-                     : (Array.isArray(val) && typeof val[0] === 'number') ? val[0]
-                     : null;
-            }
-          } catch {}
-          thetaShaderRef.current = thetaGL;
-          // canonical reference
-          const thetaCanon = thetaCanonicalLocal(U);
-          thetaCanonRef.current = thetaCanon;
-
-          const parity = !!U.physicsParityMode;
-          const mode = String(U.currentMode || 'hover');
-          const now = performance.now();
-          const parityFlipped = (lastParityRef.current !== null && lastParityRef.current !== parity);
-          if (parityFlipped || now - lastLogAtRef.current > 1000) {
-            lastParityRef.current = parity;
-            lastLogAtRef.current = now;
-            console.log(
-              `[WRI θ] ${parity ? 'REAL' : 'SHOW'} mode=${mode}` +
-              ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}` +
-              ` | g=${fmt(U.gammaGeo)} q=${fmt(U.deltaAOverA)} vdb=${fmt(U.gammaVdB)}` +
-              ` | dLocal=${fmt(U.dutyLocal ?? U.dutyCycle)} S=${U.sectors}/${U.sectorCount}` +
-              ` | viewAvg=${!!U.viewAvg}`
-            );
-          }
-          if (parity && mode.toLowerCase() === 'standby') {
-            const leakGL = (thetaGL ?? 0) > 0;
-            const leakJS = (thetaJS ?? 0) > 0;
-            if (leakGL || leakJS) {
-              console.warn(
-                `[WRI θ][LEAK] REAL standby shows non-zero θ` +
-                ` | θ_gl=${fmt(thetaGL)} θ_js=${fmt(thetaJS)} θ_canon=${fmt(thetaCanon)}`
-              );
-            }
-          }
-        } catch (e) {
-          console.error('[WRI θ] sampler error:', e);
-        }
-        rafRef.current = requestAnimationFrame(sample);
-      };
-      if (!armed) {
-        armed = true;
-        rafRef.current = requestAnimationFrame(sample);
-      }
-    };
-
-    // try a few times while engines mount
-    const kick = () => {
-      start();
-      if (!parityLockedRef.current) requestAnimationFrame(kick);
-    };
-    kick();
-
-    return () => {
-      alive = false;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    };
-  }, []);
-  // ────────────────────────────────────────────────────────────────────────────
-  // end [WRI θ] INSTRUMENTATION
-  // ────────────────────────────────────────────────────────────────────────────
-
   // Error boundary wrapper
   const [componentError, setComponentError] = React.useState<string | null>(null);
 
@@ -962,7 +724,7 @@ export default function WarpRenderInspector(props: {
   function computeThetaScale(phys: any) {
     const g    = +phys.gammaGeo || 26;
     const q    = +phys.qSpoilingFactor || 1;
-    const v    = +phys.gammaVanDenBroeck_mass ?? +phys.gammaVanDenBroeck ?? 1;
+    const v    = +phys.gammaVanDenBroeck_mass || +phys.gammaVanDenBroeck || 1;
     const duty = Math.max(
       1e-12,
       Math.min(1, Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0))
@@ -1015,6 +777,50 @@ export default function WarpRenderInspector(props: {
     return eng;
   }
 
+  // Create engine instance using the JS WarpEngine with Grid3D fallback
+  function createEngine(canvas: HTMLCanvasElement): any {
+    const W: any = (window as any).WarpEngine;
+    if (!W) {
+      console.warn("WarpEngine not found, falling back to Grid3D engine");
+      // Return a Grid3D engine wrapper with WebGL compatibility
+      const grid3DWrapper = {
+        canvas,
+        isLoaded: true,
+        gridProgram: true,
+        gridUniforms: true,
+        gridAttribs: true,
+        gl: { isContextLost: () => false },
+        uniforms: {
+          physicsParityMode: true,
+          parityMode: true,
+          ridgeMode: 0
+        },
+        updateUniforms: (patch: any) => {
+          Object.assign(grid3DWrapper.uniforms, patch);
+        },
+        bootstrap: (payload: any) => {
+          Object.assign(grid3DWrapper.uniforms, payload);
+        },
+        setDebugTag: (tag: string) => {
+          console.log(`[${tag}] Grid3D fallback engine initialized`);
+        },
+        setVisible: (visible: boolean) => {
+          canvas.style.visibility = visible ? 'visible' : 'hidden';
+        },
+        forceRedraw: () => {
+          // Grid3D handles its own rendering
+        },
+        destroy: () => {
+          // Grid3D cleanup handled elsewhere
+        }
+      };
+
+      (canvas as any)[ENGINE_KEY] = grid3DWrapper;
+      return grid3DWrapper;
+    }
+    return getOrCreateEngine(W, canvas);
+  }
+
   // Minimal parity lock function to prevent duplicate shader rebuilds
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
@@ -1058,13 +864,28 @@ export default function WarpRenderInspector(props: {
         return;
       }
 
-      // WarpEngine should already be loaded globally from HTML script tag
-      try {
-        getWarpEngineCtor(); // Validate WarpEngine is available
-        console.log("✅ Global WarpEngine constructor found");
-      } catch (error) {
-        console.error("❌ Global WarpEngine not found:", error);
-        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded globally");
+      // Ensure WarpEngine script is loaded
+      if (!(window as any).WarpEngine) {
+        console.log("WarpEngine not found, loading script...");
+        try {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = (window as any).__WARP_ENGINE_SRC__;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${script.src}`));
+            document.head.appendChild(script);
+          });
+        } catch (error) {
+          console.error("Failed to load WarpEngine script:", error);
+          setLoadError("ENGINE_SCRIPT_MISSING: Failed to load warp-engine.js");
+          return;
+        }
+      }
+
+      const W = (window as any).WarpEngine;
+      if (!W) {
+        console.error("WarpEngine not found on window after script load.");
+        setLoadError("ENGINE_SCRIPT_MISSING: WarpEngine not loaded");
         return;
       }
 
@@ -1132,51 +953,6 @@ export default function WarpRenderInspector(props: {
         });
       };
 
-      // WarpEngine constructor with Grid3D fallback
-      function createEngine(canvas: HTMLCanvasElement): any {
-        try {
-          const WarpEngine = getWarpEngineCtor();
-          return getOrCreateEngine(WarpEngine, canvas);
-        } catch (error) {
-          console.warn("WarpEngine not found, falling back to Grid3D engine:", error);
-          // Return a Grid3D engine wrapper with WebGL compatibility
-          const grid3DWrapper = {
-            canvas,
-            isLoaded: true,
-            gridProgram: true,
-            gridUniforms: true,
-            gridAttribs: true,
-            gl: { isContextLost: () => false },
-            uniforms: {
-              physicsParityMode: true,
-              parityMode: true,
-              ridgeMode: 0
-            },
-            updateUniforms: (patch: any) => {
-              Object.assign(grid3DWrapper.uniforms, patch);
-            },
-            bootstrap: (payload: any) => {
-              Object.assign(grid3DWrapper.uniforms, payload);
-            },
-            setDebugTag: (tag: string) => {
-              console.log(`[${tag}] Grid3D fallback engine initialized`);
-            },
-            setVisible: (visible: boolean) => {
-              canvas.style.visibility = visible ? 'visible' : 'hidden';
-            },
-            forceRedraw: () => {
-              // Grid3D handles its own rendering
-            },
-            destroy: () => {
-              // Grid3D cleanup handled elsewhere
-            }
-          };
-
-          (canvas as any)[ENGINE_KEY] = grid3DWrapper;
-          return grid3DWrapper;
-        }
-      }
-
       // REAL engine
       if (leftRef.current && !leftEngine.current && mounted) {
         try {
@@ -1220,6 +996,7 @@ export default function WarpRenderInspector(props: {
             exposure: 5.0,
             zeroStop: 1e-7,
             physicsParityMode: true,
+            parityMode: true, // Explicit fallback
             ridgeMode: 0,
             colorMode: 2, // shear/"truth"
             lockFraming: true,
@@ -1233,6 +1010,7 @@ export default function WarpRenderInspector(props: {
           // CRITICAL: Force parity directly on uniforms object as backup
           if (leftEngine.current.uniforms) {
             leftEngine.current.uniforms.physicsParityMode = true;
+            leftEngine.current.uniforms.parityMode = true;
             leftEngine.current.uniforms.ridgeMode = 0;
           }
 
@@ -1245,7 +1023,7 @@ export default function WarpRenderInspector(props: {
             const now = Date.now();
             if (now - lastParityCheck < 1000) return; // Check max once per second
             lastParityCheck = now;
-
+            
             const U = leftEngine.current?.uniforms;
             if (U && U.physicsParityMode !== true) {
               console.warn("🔧 REAL parity drift detected - applying gentle correction");
@@ -1319,6 +1097,7 @@ export default function WarpRenderInspector(props: {
             exposure: 7.5,
             zeroStop: 1e-7,
             physicsParityMode: false,
+            parityMode: false, // Explicit fallback
             ridgeMode: 1,
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
@@ -1348,47 +1127,35 @@ export default function WarpRenderInspector(props: {
         }
       }
 
-      // Build shared base first (prevents TDZ bug)
-      const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
+      // Bootstrap both engines once they are ready
+      leftEngine.current?.bootstrap?.({ ...realPayload });
+      rightEngine.current?.bootstrap?.({ ...showPayload });
+
+      // Build shared frame data once
+      const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
       const shared = {
         axesScene: deriveAxesClip(hull, 1)
       };
 
-      // Bootstrap both engines once they are ready (engine computes theta)
-      const realPayload = buildREAL(shared, { colorMode: 2 });
-      const showPayload = buildSHOW(shared, {
-        exposure: 7.5,
-        colorMode: 1,
-        curvatureGainT: 0.70,
-        curvatureBoostMax: 40,
-        userGain: 1.25,
-      });
+      // After creating both engines and building `shared` once:
+      (async () => {
+        await firstCorrectFrame({
+          engine: leftEngine.current,
+          canvas: leftRef.current!,
+          sharedAxesScene: shared.axesScene,
+          pane: 'REAL'
+        });
+        await firstCorrectFrame({
+          engine: rightEngine.current,
+          canvas: rightRef.current!,
+          sharedAxesScene: shared.axesScene,
+          pane: 'SHOW'
+        });
 
-
-      leftEngine.current?.bootstrap?.(realPayload);
-      rightEngine.current?.bootstrap?.(showPayload);
-
-      // Post-bootstrap theta debugging
-      requestAnimationFrame(() => {
-        try {
-          const Le = leftEngine.current, Re = rightEngine.current;
-          const Lθ = Number(Le?.uniforms?.thetaScale_actual ?? Le?.uniforms?.thetaScale);
-          const Rθ = Number(Re?.uniforms?.thetaScale_actual ?? Re?.uniforms?.thetaScale);
-          const parL = !!Le?.uniforms?.physicsParityMode, parR = !!Re?.uniforms?.physicsParityMode;
-          console.log('[WRI θ] REAL: θ(shader)=', Lθ, 'parity=', parL,
-            'dutyCycle=', Le?.uniforms?.dutyCycle, 'sectors=', Le?.uniforms?.sectors,
-            'sectorCount=', Le?.uniforms?.sectorCount, 'γ_VdB(mass)=', Le?.uniforms?.gammaVanDenBroeck_mass);
-          console.log('[WRI θ] SHOW: θ(shader)=', Rθ, 'parity=', parR,
-            'dutyCycle=', Re?.uniforms?.dutyCycle, 'sectors=', Re?.uniforms?.sectors,
-            'sectorCount=', Re?.uniforms?.sectorCount, 'γ_VdB(vis)=', Re?.uniforms?.gammaVanDenBroeck_vis);
-        } catch (e) {
-          console.warn('[WRI θ] Debug sampling failed:', e);
-        }
-      });
-
-      // Enable low-FPS mode for mobile after first correct frame
-      enableLowFps(leftEngine.current, 12);
-      enableLowFps(rightEngine.current, 12);
+        // Enable low-FPS mode for mobile after first correct frame
+        enableLowFps(leftEngine.current, 12);
+        enableLowFps(rightEngine.current, 12);
+      })();
 
       // Setup engine checkpoints after first frame is guaranteed correct
       setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
@@ -1421,7 +1188,8 @@ export default function WarpRenderInspector(props: {
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true);
         // strip any external theta (engine computes it)
-        const { thetaScale, u_thetaScale, thetaScale_actual, ...uSafe } = u || {};
+        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
+
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
@@ -1434,16 +1202,10 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          const leftUpdate = paneSanitize('REAL', sanitizeUniforms({
-            ...uSafe, ...purple, ...metricU
-          }));
-          applyToEngine(leftEngine.current, leftUpdate);
+          applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          const rightUpdate = paneSanitize('SHOW', sanitizeUniforms({
-            ...uSafe, ...purple, ...metricU
-          }));
-          applyToEngine(rightEngine.current, rightUpdate);
+          applyToEngine(rightEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
         }
       });
 
@@ -1552,75 +1314,231 @@ export default function WarpRenderInspector(props: {
     initEngines();
   }, []); // Empty dependency array ensures this runs only once on mount
 
-  // ---- FR duty derivation for payload/telemetry ----
-  const u = (leftEngine.current as any)?.uniforms ?? {};                 // if you don't already have it
-  const sLive      = Math.max(1, Number(u?.sectors ?? 1));          // concurrent sectors seen by this pane
-  const sTotal     = Math.max(1, Number(u?.sectorCount ?? 400));    // total ship sectors
-  const dutyLocal  = Math.max(0, Math.min(1, Number(u?.dutyCycle ?? 0.01))); // burst duty in [0,1]
-  const dutyEffectiveFR = Math.max(1e-12, dutyLocal * (sLive / sTotal));     // Ford–Roman averaged
+  // De-spam the bus: publish only on real changes
+  useEffect(() => {
+    const wu = (systemMetrics as any)?.warpUniforms;
+    if (!wu) return;
 
-  // Build parameters object for the new packet builders
-    const parameters = {
-      ...props.parityPhys,
-      ...props.showPhys,
-      ...props.baseShared,
-      currentMode: live?.currentMode,
-      dutyEffectiveFR,
-      dutyCycle: dutyLocal,
-      sectorCount: sTotal,
-      sectors: sLive,
-      gammaVanDenBroeck_mass: live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck ?? 38.3,
-      gammaVanDenBroeck_vis: live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck ?? 2.86e5,
+    const version = Number.isFinite(systemMetrics?.seq) ? systemMetrics.seq : Date.now();
+
+    const sanitized = sanitizeUniforms(wu);
+    const sig = JSON.stringify(stableWU(sanitized));
+    if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+
+    lastWUHashRef.current = sig;
+    publish("warp:uniforms", { ...sanitized, __version: version });
+  }, [systemMetrics]);
+
+  // Ford-Roman duty computation (outside useEffect for prop access)
+  const dutyLocal = (() => {
+    const b = Number(props.lightCrossing?.burst_ms);
+    const d = Number(props.lightCrossing?.dwell_ms);
+    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
+  })();
+  const sTotal = Math.max(1, +(live?.sectorCount ?? 400));
+  const sConcurrent = Math.max(1, +(wu.sectors ?? 1));
+
+  // after you compute sTotal etc.
+  const wallWidth_m      = N(props.baseShared?.wallWidth_m ?? live?.hull?.wallThickness_m, 1.0);
+  // let callers optionally provide a thinner analytical slice (else assume full wall)
+  const sliceThickness_m = N(props.baseShared?.sliceThickness_m, wallWidth_m);
+
+  // 0..1 of the wall band covered by the slice grid
+  const bandCover = Math.max(0, Math.min(1, sliceThickness_m / Math.max(1e-9, wallWidth_m)));
+
+  // sector (azimuthal) fraction already represented by REAL's "one pane"
+  const sectorFrac = 1 / Math.max(1, sTotal);
+
+  // final view mass fraction for REAL's diagnostics & proxies
+  const viewMassFracREAL = sectorFrac * bandCover;
+
+  // Visual-only mass fraction scaling
+  const total = Math.max(1, Number(live?.sectorCount) || 400);
+  const viewFracREAL = 1 / total;
+
+  // FR duty for both engines - let them derive thetaScale internally
+  const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
+
+  // Debug toggle: choose between mass-calibrated vs visual-only γ_VdB (outside useEffect for display access)
+  const gammaVdB_vis = N(live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck, 1e11);
+  const gammaVdB_mass = N(live?.gammaVanDenBroeck_mass ?? live?.gammaVanDenBroeck, 1e11);
+  const gammaVdBBound = useMassGamma ? gammaVdB_mass : gammaVdB_vis;
+
+  // Theta consistency helper functions
+  function thetaGainExpected({
+    gammaGeo, qSpoilingFactor, gammaVdB, dutyEffectiveFR
+  }: {gammaGeo:number; qSpoilingFactor:number; gammaVdB:number; dutyEffectiveFR:number}) {
+    return Math.pow(Number(gammaGeo)||0, 3)
+         * (Number(qSpoilingFactor)||1)
+         * (Number(gammaVdB)||1)
+         * Math.sqrt(Math.max(1e-12, Number(dutyEffectiveFR)||0));
+  }
+
+  function pctDelta(a:number, b:number){
+    if (!isFinite(a) || !isFinite(b) || b === 0) return NaN;
+    return (a/b - 1) * 100;
+  }
+
+  // -- SHOW checkpoints binder: exports a full snapshot every frame
+  function bindShowCheckpoints(engine: any, canvas: HTMLCanvasElement) {
+    const emitSnap = () => {
+      const u = engine?.uniforms || {};
+      const floats = (engine?.gridVertices?.length || 0);
+      const snap = {
+        // canvas / GL
+        canvasW: canvas?.width || 0,
+        canvasH: canvas?.height || 0,
+        hasGL: !!engine?.gl,
+
+        // readiness
+        programReady: !!engine?.gridProgram,
+        isLoaded: !!engine?.isLoaded,
+
+        // critical fields the panel cares about
+        cameraZSet: Number.isFinite(u?.cameraZ || null),
+        axesClipSet: Array.isArray(u?.axesClip) && u.axesClip.length === 3,
+        thetaValid: Number.isFinite(u?.thetaScale) && (u.thetaScale as number) > 0,
+
+        // runtime viz
+        parity: !!u?.physicsParityMode,
+        ridgeMode: (u?.ridgeMode ?? undefined),
+        toneExp: u?.exposure ?? 0,
+        toneZero: u?.zeroStop ?? 0,
+
+        // grid + sectoring
+        gridFloats: floats,                       // total vertex floats
+        sectors: Math.max(1, (u?.sectors|0) || 1),
+        sectorTotal: Math.max(1, (u?.sectorCount|0) || (u?.sectors|0) || 1),
+        split: Math.max(0, (u?.split|0) || 0),
+
+        // loop
+        running: !!engine?._raf,
+        ts: Date.now(),
+      };
+
+      // Expose to devtools and a UI listener (if the panel listens)
+      (window as any).__chkSHOW = snap;
+      try {
+        window.dispatchEvent(new CustomEvent('helix:show-checkpoints', { detail: snap }));
+      } catch {}
+      // Also ship full diagnostics if available
+      try {
+        (window as any).__diagSHOW = engine?.computeDiagnostics?.() || null;
+      } catch {}
     };
 
-    // Build shared base first (prevents TDZ bug)
-    const sharedBase = makeSharedBase(parameters, live, {
-      hull: props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 },
-      axesScene: deriveAxesClip(hull, 1),
+    // fire on every diagnostics beat & on loading state changes
+    engine.onDiagnostics = () => emitSnap();
+    engine.onLoadingStateChange = () => emitSnap();
+    emitSnap(); // kick once now
+  }
+
+  // Helper to dump uniforms and diagnostics for debugging
+  const dumpUniforms = (engine: any, label: string) => {
+    console.log(`--- Uniforms & Diagnostics for ${label} ---`);
+    if (!engine) {
+      console.log("Engine not available.");
+      return;
+    }
+    const u = engine.uniforms || {};
+    console.log("Uniforms:", Object.fromEntries(Object.entries(u).filter(([k]) => !k.startsWith('_')))); // Filter internal properties
+    try {
+      console.log("Diagnostics:", engine.computeDiagnostics?.() || "N/A");
+    } catch (e) {
+      console.log("Diagnostics error:", e);
+    }
+    console.log("---------------------------------------------");
+  };
+
+  // Debug button handler
+  const debugEngineStates = () => {
+    console.log("--- Debugging Inspector State ---");
+    console.log("REAL Engine:", leftEngine.current);
+    console.log("SHOW Engine:", rightEngine.current);
+    console.log("Grid3D Ref:", grid3dRef.current);
+    console.log("Have Uniforms:", haveUniforms);
+    console.log("Load Error:", loadError);
+    console.log("Current Mode:", mode);
+    console.log("---------------------------------");
+  };
+
+  // Apply physics from props with comprehensive validation
+    const realPhys = props.parityPhys || {};
+    const showPhys = props.showPhys || {};
+    const baseShared = props.baseShared || {};
+
+    // Enhanced theta scale calculation with debugging
+    // const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
+    //   const gammaGeo = +phys.gammaGeo || 26;
+    //   const qSpoil   = +phys.qSpoilingFactor || 1;
+    //   // use explicit pocket factors
+    //   const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
+    //   const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
+    //   const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
+    //   const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
+
+    //   const calculated = computeThetaScale(phys);
+    //   const actualTheta = source === 'fr'
+    //     ? leftEngine.current?.uniforms?.thetaScale
+    //     : rightEngine.current?.uniforms?.thetaScale;
+
+    //   console.log(`[${label}] Theta calculation debug:`, {
+    //     gammaGeo,
+    //     qSpoil,
+    //     gammaVdB,
+    //     dutyFR,
+    //     viewAvg: true,
+    //     calculated,
+    //     actualTheta
+    //   });
+
+    //   return calculated;
+    // };
+
+    // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
+    const realPayload = {
+      ...baseShared,
+      physicsParityMode: true,
+      ridgeMode: 0,
+      ...realPhys,
       exposure: 5.0,
       zeroStop: 1e-7,
-      lockFraming: true,
-      useMetric: props.baseShared?.useMetric ?? false,
-      metric: props.baseShared?.metric ?? metricDiag.g,
-      metricInv: props.baseShared?.metricInv ?? metricDiag.inv,
-      epsilonTilt: epsilonTilt,
-      betaTiltVec: betaTiltVecN,
-      ...props.baseShared
-    });
+      colorMode: 2, // Shear proxy for truth view
+      lockFraming: true
+    };
 
-    // Build REAL and SHOW payloads using the imported builders
-    const realPayload = buildREAL(sharedBase, { colorMode: 2 });
-    const showPayload = buildSHOW(sharedBase, {
+    // Attach metric defaults to both panes (you can turn them off via useMetric=false)
+    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
+    (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
+
+    // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
+    const showPayload = {
+      ...baseShared,
+      physicsParityMode: false,
+      ridgeMode: 1,
+      ...showPhys,
       exposure: 7.5,
-      colorMode: 1,
+      zeroStop: 1e-7,
       curvatureGainT: 0.70,
       curvatureBoostMax: 40,
       userGain: 1.25,
-    });
+      colorMode: 1, // Theta mode for visual enhancement
+      lockFraming: true
+    };
+    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
+    (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
 
 
-  // Physics bound for theta calculations (single source of truth)
-  type ThetaBound = {
-    gammaGeo: number;
-    qSpoilingFactor: number;
-    gammaVdB: number;
-  };
-
-  const thetaBound = useMemo<ThetaBound>(() => ({
-    gammaGeo: Number(realPayload?.gammaGeo ?? 26),
-    qSpoilingFactor: Number(realPayload?.qSpoilingFactor ?? 1),
-    gammaVdB: Number(
-      realPayload?.gammaVanDenBroeck_mass ??
-      realPayload?.gammaVanDenBroeck ??
-      1
-    ),
-  }), [
-    realPayload?.gammaGeo,
-    realPayload?.qSpoilingFactor,
-    realPayload?.gammaVanDenBroeck_mass,
-    realPayload?.gammaVanDenBroeck,
-  ]);
+  // Physics bound for theta calculations
+    const bound = useMemo(() => ({
+      gammaGeo: realPhys.gammaGeo || 26,
+      qSpoilingFactor: realPhys.qSpoilingFactor || 1,
+      gammaVdB: realPhys.gammaVanDenBroeck || realPhys.gammaVdB || 1,
+      dutyEffectiveFR: realPhys.dutyEffectiveFR || 0.000025
+    }), [realPhys]);
 
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
@@ -1660,20 +1578,18 @@ export default function WarpRenderInspector(props: {
       const dutyFR_REAL = dutyLocal * (sConcL / s);
       const dutyUI_SHOW = dutyLocal * (1 / s);
 
-      // Use new packet builders with proper pane sanitization
+      // Temporarily use direct updates to debug syntax error
       if (leftEngine.current) {
-        const realUpdate = paneSanitize('REAL', sanitizeUniforms({
+        gatedUpdateUniforms(leftEngine.current, sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyFR_REAL,
-        }));
-        gatedUpdateUniforms(leftEngine.current, realUpdate, 'client');
+        }), 'client');
       }
       if (rightEngine.current) {
-        const showUpdate = paneSanitize('SHOW', sanitizeUniforms({
+        gatedUpdateUniforms(rightEngine.current, sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyUI_SHOW,
-        }));
-        gatedUpdateUniforms(rightEngine.current, showUpdate, 'client');
+        }), 'client');
       }
     });
     return () => { try { off?.(); } catch {} };
@@ -1681,8 +1597,8 @@ export default function WarpRenderInspector(props: {
 
   // Initialize batched push functions for performance optimization
   useEffect(() => {
-    pushLeft.current = makeUniformBatcher(leftEngine, 'REAL');
-    pushRight.current = makeUniformBatcher(rightEngine, 'SHOW');
+    pushLeft.current = makeUniformBatcher(leftEngine);
+    pushRight.current = makeUniformBatcher(rightEngine);
   }, []);
 
   // Mobile DPR clamping and canvas sizing
@@ -1743,41 +1659,6 @@ export default function WarpRenderInspector(props: {
     }
   };
 
-  // --- Dev: dump current engines & θ to console --------------------------------
-  const debugEngineStates = () => {
-    try {
-      // Find any WarpEngine instances attached to canvases
-      const canvases = Array.from(document.querySelectorAll('canvas')) as HTMLCanvasElement[];
-      const engines = canvases
-        .map(c => ({ id: c.id || '(no id)', engine: (c as any).__warpEngine }))
-        .filter(x => !!x.engine);
-
-      const compact = engines.map(({ id, engine }: any) => ({
-        id,
-        isLoaded: !!engine.isLoaded,
-        parity: !!engine.uniforms?.physicsParityMode,
-        ridge: engine.uniforms?.ridgeMode,
-        theta_uniform: engine.uniforms?.thetaScale,
-        theta_actual: engine.uniforms?.thetaScale_actual,
-        gammaGeo: engine.uniforms?.gammaGeo ?? engine.uniforms?.g_y,
-        q: engine.uniforms?.deltaAOverA ?? engine.uniforms?.qSpoilingFactor,
-        gammaVdB: engine.uniforms?.gammaVdB ?? engine.uniforms?.gammaVanDenBroeck ?? engine.uniforms?.gammaVanDenBroeck_mass,
-        dutyLocal: engine.uniforms?.dutyCycle,
-        sectors: engine.uniforms?.sectors,
-        sectorCount: engine.uniforms?.sectorCount,
-        dutyFR: engine.uniforms?.dutyEffectiveFR ?? engine.uniforms?.dutyUsed,
-      }));
-
-      console.group('[WRI] Engine snapshot');
-      console.table(compact);
-      console.log('Full engines:', engines);
-      console.log('window.__warpEcho:', (window as any).__warpEcho);
-      console.groupEnd();
-    } catch (e) {
-      console.warn('[WRI] debugEngineStates failed:', e);
-    }
-  };
-
   // Run verification less frequently and expose to window for debugging
   useEffect(() => {
     const interval = setInterval(verifyEngineStates, 5000); // Reduce from 2s to 5s
@@ -1794,14 +1675,6 @@ export default function WarpRenderInspector(props: {
   const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
   const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
   const grid3dRef = useRef<any>(null);
-
-  // Define view mass fractions for checkpoint panels
-  const uLeft  = leftEngine.current?.uniforms  ?? {};
-  const uRight = rightEngine.current?.uniforms ?? {};
-
-  const viewMassFracREAL = viewMassFractionLocked(uLeft, 'REAL');
-  const viewMassFracSHOW = viewMassFractionLocked(uRight, 'SHOW');
-
 
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
@@ -1843,7 +1716,7 @@ export default function WarpRenderInspector(props: {
           const report = webglSupport(undefined);
           return (
             <pre className="text-xs p-2 rounded bg-black/70 text-green-200 overflow-auto">
-              GL Debug: {JSON.JSON.stringify(report, null, 2)}
+              GL Debug: {JSON.stringify(report, null, 2)}
             </pre>
           );
         } catch { return null; }
@@ -1893,7 +1766,7 @@ export default function WarpRenderInspector(props: {
                   title="REAL · per-pane slice"
                   flavor="REAL"
                   engineRef={leftEngine}
-                  viewFraction={viewMassFractionLocked(uLeft, 'REAL')}
+                  viewFraction={viewMassFracREAL}
                   shipMassKg={live?.M_exotic}
                 />
               )}
@@ -1923,7 +1796,7 @@ export default function WarpRenderInspector(props: {
                   title="SHOW · cosmetic ampl"
                   flavor="SHOW"
                   engineRef={rightEngine}
-                  viewFraction={viewMassFractionLocked(uRight, 'SHOW')}
+                  viewFraction={1.0}
                   shipMassKg={live?.M_exotic}
                 />
               )}
@@ -1995,15 +1868,11 @@ export default function WarpRenderInspector(props: {
           {/* θ-scale verification display */}
           <div className="text-xs text-neutral-600 mb-3 space-y-1">
             <div>θ-scale expected: {(live?.thetaScaleExpected ?? 0).toExponential(2)}</div>
-            <div>θ-scale (physics-only): {(thetaBound?.gammaGeo ? thetaGainExpected(thetaBound) : 0).toExponential(3)} • Current status: READY</div>
+            <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
-            <div className="text-yellow-600">
-              γ_VdB bound: {(useMassGamma ? 1e2 : 1e11).toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}
-            </div>
-            <div>
-              view mass fraction (REAL): {(viewMassFractionLocked(uLeft, 'REAL') * 100).toFixed(3)}% (1/{Math.max(1, (live?.sectorCount ?? 400))})
-            </div>
-            <div>view mass fraction (SHOW): {(viewMassFractionLocked(uRight, 'SHOW') * 100).toFixed(3)}% (full bubble)</div>
+            <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
+            <div>view mass fraction (REAL): {(viewMassFracREAL * 100).toFixed(3)}% (1/{total})</div>
+            <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
             onClick={() => {
@@ -2060,4 +1929,14 @@ export default function WarpRenderInspector(props: {
   );
 }
 
-// (removed) local physics helper — we rely on thetaCanonical()
+// physics θ helper (no SHOW boosts)
+function thetaPhysicsFromUniforms(U: any) {
+  const gammaGeo = +U.gammaGeo || 26;
+  const q        = +U.qSpoilingFactor || 1;
+  // Use Ford-Roman mass gamma, not visual gamma for physics calculations
+  const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
+  const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
+  const dRaw     = Number(U.dutyEffectiveFR);
+  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.000025; // Use Ford-Roman duty as fallback
+  return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
+}

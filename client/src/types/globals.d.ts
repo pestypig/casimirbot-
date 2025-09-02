@@ -9,12 +9,3 @@ declare global {
     __warp_setCosmetic?: (level: number) => void;
   }
 }
-
-// Global WarpEngine constructor helper
-export function getWarpEngineCtor() {
-  const WE = (window as any).WarpEngine;
-  if (!WE) {
-    throw new Error('WarpEngine not present — check that /warp-engine.js is served and loaded before React.');
-  }
-  return WE;
-}

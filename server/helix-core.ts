@@ -552,23 +552,23 @@ export function getTileStatus(req: Request, res: Response) {
 function generateSampleTiles(count: number): Array<{ pos: [number, number, number]; t00: number }> {
   const tiles = [];
   const hullA = 503.5, hullB = 132, hullC = 86.5; // Half-dimensions in meters
-
+  
   for (let i = 0; i < count; i++) {
     // Generate random positions on ellipsoid surface
     const theta = Math.random() * 2 * Math.PI;
     const phi = Math.acos(2 * Math.random() - 1);
-
+    
     const x = hullA * Math.sin(phi) * Math.cos(theta);
     const y = hullB * Math.sin(phi) * Math.sin(theta);
     const z = hullC * Math.cos(phi);
-
+    
     // Generate T00 values with realistic stress-energy distribution
     const r = Math.hypot(x / hullA, y / hullB, z / hullC);
     const t00 = -2.568e13 * (1 + 0.1 * Math.sin(5 * theta) * Math.cos(3 * phi)) * (1 - 0.5 * r);
-
+    
     tiles.push({ pos: [x, y, z] as [number, number, number], t00 });
   }
-
+  
   return tiles;
 }
 
@@ -580,19 +580,8 @@ export function getSystemMetrics(req: Request, res: Response) {
   const s = getGlobalPipelineState();
 
   const totalSectors = Math.max(1, s.sectorCount);
-  const concurrentReq = Math.max(1, s.concurrentSectors || 1); // must be ≥1 to allocate buffers
-  // --- Ford–Roman safety clamp (revert to solved baseline) ---
-  // Local on-window burst (default 1%) and FR baseline = 1% × (1/totalSectors)
-  const dutyLocalRaw = Number.isFinite((s as any).localBurstFrac)
-    ? Math.max(1e-12, (s as any).localBurstFrac as number)
-    : Math.max(1e-12, s.dutyCycle ?? 0.01);
-  const FR_DUTY_MAX = 0.01 * (1 / totalSectors);
-  const requestedDutyFR = dutyLocalRaw * (concurrentReq / totalSectors);
-  // Reduce live sectors if requested FR duty would violate the solved window
-  const concurrentFR = (requestedDutyFR > FR_DUTY_MAX)
-    ? Math.max(1, Math.floor((FR_DUTY_MAX * totalSectors) / dutyLocalRaw))
-    : concurrentReq;
-  const activeFraction = concurrentFR / totalSectors;
+  const concurrent = Math.max(1, s.concurrentSectors || 1); // must be ≥1 to allocate buffers
+  const activeFraction = concurrent / totalSectors;
 
   const strobeHz = Number(s.strobeHz ?? 1000);
   const sectorPeriod_ms = Number(s.sectorPeriod_ms ?? (1000 / Math.max(1, strobeHz)));
@@ -601,12 +590,12 @@ export function getSystemMetrics(req: Request, res: Response) {
   const sweepIdx = Math.floor(now * strobeHz) % totalSectors;
 
   const tilesPerSector = Math.floor(s.N_tiles / totalSectors);
-  const activeTiles = tilesPerSector * concurrentFR;
+  const activeTiles = tilesPerSector * concurrent;
 
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
   // Canonical geometry fields for visualizer
-  let a, b, c;
+  let a: number, b: number, c: number;
   if (hull) {
     a = hull.Lx_m / 2;
     b = hull.Ly_m / 2;
@@ -638,10 +627,10 @@ export function getSystemMetrics(req: Request, res: Response) {
   // UI duty (per-sector knob, averaged by UI over all sectors)
   const dutyUI = Math.max(1e-12, s.dutyCycle ?? dutyLocal);
 
-  // Ford–Roman ship-wide duty (used for REAL) - use clamped sectors
+  // Ford–Roman ship-wide duty (used for REAL)
   const dutyFR = Math.max(1e-12, (s as any).dutyEffectiveFR ??
                                      (s as any).dutyEffective_FR ??
-                                     (dutyLocalRaw * (concurrentFR / totalSectors)));
+                                     (dutyLocal * (concurrent / totalSectors)));
 
   const γg   = s.gammaGeo ?? 26;
   const qsp  = s.qSpoilingFactor ?? 1;
@@ -663,7 +652,7 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     // sectors & duties
     sectorCount: totalSectors,    // total
-    sectors: concurrentFR,        // concurrent (clamped)
+    sectors: concurrent,          // concurrent
     dutyCycle: dutyUI,            // UI knob
     dutyEffectiveFR: dutyFR,      // REAL θ uses this
 
@@ -696,7 +685,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     dutyEffectiveFR: dutyFR,
     sectorCount: totalSectors,
-    sectors: concurrentFR,
+    sectors: concurrent,
     colorMode: "theta" as const,
     physicsParityMode: false,   // REAL should flip to true at callsite
     ridgeMode: 1,
@@ -717,17 +706,13 @@ export function getSystemMetrics(req: Request, res: Response) {
   const burst_ms = dutyLocal * sectorPeriod_ms;
   const cyclesPerBurst = (burst_ms / 1000) * f_m_Hz; // ✅ tell client exactly how many carrier cycles fit
 
-  // Temporary variables for viewerHints that were missing in original code
-  const powerActual = s.P_avg * 1e6; // Example value, replace with actual calculation if available
-  const M_exotic_kg = Math.round(s.M_exotic); // Example value
-
   res.json({
     totalTiles: Math.floor(s.N_tiles),
     activeTiles, tilesPerSector,
     totalSectors,
-    activeSectors: concurrentFR,
+    activeSectors: concurrent,
     activeFraction,
-    sectorStrobing: concurrentFR,   // concurrent (live) sectors
+    sectorStrobing: concurrent,   // concurrent (live) sectors
     currentSector: sweepIdx,
 
     // make mode & inputs visible to UI
@@ -758,9 +743,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     },
 
     dutyGlobal_UI: s.dutyCycle,
-    // Canonical FR duty with server clamp applied
-    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR
-                     ?? Math.max(1e-12, dutyLocalRaw * (concurrentFR / totalSectors)),
+    dutyEffectiveFR: (s as any).dutyEffectiveFR ?? (s as any).dutyEffective_FR,
 
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     gammaGeo: s.gammaGeo,
@@ -773,7 +756,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
-
+    
     // Add tile data with positions and T00 values for Green's Potential computation
     tileData: generateSampleTiles(Math.min(100, activeTiles)), // Generate sample tiles for φ computation
 
@@ -788,16 +771,16 @@ export function getSystemMetrics(req: Request, res: Response) {
     aEff_geo_m: aEff_geo,
     aEff_harm_m: aEff_harm,
 
-    // ✅ canonical short-key packet the engine consumes
-    warpUniforms: warpUniforms,
+    // ✅ canonical packet the renderer consumes
+    warpUniforms: canonicalWarpUniforms,
     thetaAudit,
 
     // ✅ hint-only values (never applied as uniforms)
     viewerHints: {
-      theta_FR: theta_FR,
-      thetaScaleExpected: thetaFR, // Assuming thetaFR is defined and correct
-      powerDraw_MW: powerActual,
-      M_exotic_kg: M_exotic_kg,
+      theta_FR_like: theta_FR,
+      theta_UI_like: theta_UI,
+      ridgeMode: 1,
+      colorMode: 'theta'
     },
 
     // ✅ strobe/time window (for dutyLocal provenance)

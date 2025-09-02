@@ -202,8 +202,11 @@ export function applyToEngine(
   // Fallback chain matches backend physics by default (exp=1). Viz may compress range with exp=0.5.
   const thetaFromChain = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.pow(dutyFR, dutyExp);
 
-  // Always use chain; never adopt a raw thetaScale from payloads
-  const thetaUsed = thetaFromChain;
+  // If server provided a θ, it wins; otherwise use chain
+  const thetaUsed =
+    (u.thetaScale != null && Number.isFinite(+u.thetaScale))
+      ? +u.thetaScale
+      : thetaFromChain;
 
   // Optional audit vs expected
   if (Number.isFinite(+u.thetaScaleExpected) && Number.isFinite(+thetaUsed)) {
@@ -306,16 +309,8 @@ export function gatedUpdateUniforms(
     const u: Record<string, any> = {...patch};
 
     // sanitize + rename to prevent shader header duplication
-    if ('physicsParityMode' in u) {
-      u[CANON.physicsParityMode] = !!u.physicsParityMode;
-      // Keep both forms for compatibility
-      u.physicsParityMode = !!u.physicsParityMode;
-    }
-    if ('ridgeMode' in u) {
-      u[CANON.ridgeMode] = (u.ridgeMode|0) ? 1 : 0;
-      // Keep both forms for compatibility  
-      u.ridgeMode = (u.ridgeMode|0) ? 1 : 0;
-    }
+    if ('physicsParityMode' in u) u[CANON.physicsParityMode] = !!u.physicsParityMode;
+    if ('ridgeMode' in u)         u[CANON.ridgeMode]         = (u.ridgeMode|0) ? 1 : 0;
 
     if ('epsilonTilt' in u)       u[CANON.epsilonTilt]       = Math.max(0, +u.epsilonTilt || 0);
     if ('betaTiltVec' in u && Array.isArray(u.betaTiltVec)) {
@@ -324,7 +319,8 @@ export function gatedUpdateUniforms(
       u[CANON.betaTiltVec] = [x/n, y/n, z/n];
     }
 
-    // Only strip the tilt params, keep parity/ridge for engine compatibility
+    // strip legacy keys so we never double-write engine params
+    delete u.physicsParityMode; delete u.ridgeMode;
     delete u.epsilonTilt; delete u.betaTiltVec;
 
     const debouncedUpdate = getDebouncedUpdate(engine);

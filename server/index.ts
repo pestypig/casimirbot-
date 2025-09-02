@@ -9,18 +9,9 @@ app.use(express.urlencoded({ extended: false }));
 // Serve PDF files from attached_assets folder
 app.use('/attached_assets', express.static('attached_assets'));
 
-// Cache headers for warp engine bundle
-// IMPORTANT: don't hard-cache the engine in dev or for unhashed filenames.
+// Cache headers for warp engine bundles
 app.use('/warp-engine*.js', (req, res, next) => {
-  const isDev = app.get('env') === 'development';
-  const isHashed = /warp-engine-[0-9a-f]{8,}\.js$/i.test(req.path); // e.g. warp-engine-a1b2c3d4.js
-  if (isDev || !isHashed) {
-    // ensure fresh engine (θ fixes) reach the browser immediately
-    res.setHeader('Cache-Control', 'no-store');
-  } else {
-    // OK to cache long-term only when filename is content-hashed
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-  }
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
   next();
 });
 
