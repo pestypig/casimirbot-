@@ -1289,6 +1289,11 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           dutyEffFR = isREAL
             ? Math.max(0, Math.min(1, dutyLocal * (sectorsConcurrent / Math.max(1, sectorsTotal))))
             : Math.max(0, Math.min(1, dutyLocal));
+          // --- FR safety clamp mirrors server baseline (revert to solved duty) ---
+          if (isREAL) {
+            const frDutyMax = 0.01 * (1 / Math.max(1, sectorsTotal)); // 1% × 1/totalSectors
+            if (dutyEffFR > frDutyMax) dutyEffFR = frDutyMax;
+          }
         }
 
         // build theta scale (canonical chain) — ENGINE AUTHORITY
