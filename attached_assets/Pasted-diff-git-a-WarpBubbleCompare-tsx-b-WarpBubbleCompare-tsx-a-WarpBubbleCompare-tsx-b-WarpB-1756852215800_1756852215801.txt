@@ -1,0 +1,57 @@
+diff --git a/WarpBubbleCompare.tsx b/WarpBubbleCompare.tsx
+--- a/WarpBubbleCompare.tsx
++++ b/WarpBubbleCompare.tsx
+@@ -1,6 +1,7 @@
+ import React, { useEffect, useMemo } from "react";
+ // …existing imports…
+ 
++function aHarmonic(ax?: number, ay?: number, az?: number){ const a=+ax||0,b=+ay||0,c=+az||0; const d=(a>0?1/a:0)+(b>0?1/b:0)+(c>0?1/c:0); return d>0?3/d:NaN; }
+ export function WarpBubbleCompare(props: CompareProps) {
+   const { leftEngine, rightEngine, parameters, real, show } = props;
+ 
+@@ -12,33 +13,46 @@ export function WarpBubbleCompare(props: CompareProps) {
+-  // PREVIOUS: per-pane wall width recompute/fallbacks
+-  const aH_real = aHarmonic(real.axesHull?.[0], real.axesHull?.[1], real.axesHull?.[2]);
+-  const wallWidth_rho_real = Number.isFinite(real.wallWidth_rho) ? +real.wallWidth_rho
+-    : (Number.isFinite(real.wallWidth_m) && Number.isFinite(aH_real)) ? (+real.wallWidth_m / aH_real) : undefined;
+-  const aH_show = aHarmonic(show.axesHull?.[0], show.axesHull?.[1], show.axesHull?.[2]);
+-  const wallWidth_rho_show = Number.isFinite(show.wallWidth_rho) ? +show.wallWidth_rho
+-    : (Number.isFinite(show.wallWidth_m) && Number.isFinite(aH_show)) ? (+show.wallWidth_m / aH_show) : undefined;
++  // NEW: single source of truth from adapter/pipeline (no per-pane recompute)
++  const aH = aHarmonic(parameters.axesHull?.[0], parameters.axesHull?.[1], parameters.axesHull?.[2]);
++  const unifiedWallRho = Number.isFinite(parameters.wallWidth_rho) ? +parameters.wallWidth_rho
++                        : (Number.isFinite(parameters.wallWidth_m) && Number.isFinite(aH)) ? (+parameters.wallWidth_m / aH)
++                        : undefined;
++  const unifiedWallM   = Number.isFinite(parameters.wallWidth_m) ? +parameters.wallWidth_m
++                        : (Number.isFinite(parameters.wallWidth_rho) && Number.isFinite(aH)) ? (+parameters.wallWidth_rho * aH)
++                        : undefined;
+ 
+-  const realPayload = useMemo(() => ({
+-    ...real,
+-    wallWidth: wallWidth_rho_real,
+-  }), [real, wallWidth_rho_real]);
+-  const showPayload = useMemo(() => ({
+-    ...show,
+-    wallWidth: wallWidth_rho_show,
+-  }), [show, wallWidth_rho_show]);
++  const realPayload = useMemo(() => ({
++    ...real,
++    wallWidth: unifiedWallRho,
++    wallWidth_rho: unifiedWallRho,
++    wallWidth_m: unifiedWallM,
++  }), [real, unifiedWallRho, unifiedWallM]);
++
++  const showPayload = useMemo(() => ({
++    ...show,
++    wallWidth: unifiedWallRho,
++    wallWidth_rho: unifiedWallRho,
++    wallWidth_m: unifiedWallM,
++  }), [show, unifiedWallRho, unifiedWallM]);
+ 
+   useEffect(() => {
+     leftEngine?.current?.updateUniforms(realPayload);
+     rightEngine?.current?.updateUniforms(showPayload);
+   }, [leftEngine, rightEngine, realPayload, showPayload]);
+ 
+   return <div className="compare-grid">{/* … */}</div>;
+ }
