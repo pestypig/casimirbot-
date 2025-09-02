@@ -84,6 +84,45 @@ function _req(cond, name, U) {
   }
 }
 
+// ---- metric helpers ---------------------------------------------------------
+function _metricFromUniforms(U) {
+  // Prefer full symmetric (gxx,gyy,gzz,gxy,gyz,gzx), else diag, else identity.
+  if (Array.isArray(U.gSpatialSym) && U.gSpatialSym.length >= 6) {
+    const [gxx,gyy,gzz,gxy,gyz,gzx] = U.gSpatialSym.map(Number);
+    return { g:[[gxx,gxy,gzx],[gxy,gyy,gyz],[gzx,gyz,gzz]], diag:false };
+  }
+  if (Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length >= 3) {
+    const [gx,gy,gz] = U.gSpatialDiag.map(Number);
+    return { g:[[gx,0,0],[0,gy,0],[0,0,gz]], diag:true };
+  }
+  return { g:[[1,0,0],[0,1,0],[0,0,1]], diag:true };
+}
+function _dotG(v, w, U) {
+  const { g } = _metricFromUniforms(U);
+  return v[0]*(g[0][0]*w[0] + g[0][1]*w[1] + g[0][2]*w[2]) +
+         v[1]*(g[1][0]*w[0] + g[1][1]*w[1] + g[1][2]*w[2]) +
+         v[2]*(g[2][0]*w[0] + g[2][1]*w[1] + g[2][2]*w[2]);
+}
+function _normG(v, U) {
+  const d = Math.sqrt(Math.max(1e-18, _dotG(v,v,U)));
+  return [ (v[0]||0)/d, (v[1]||0)/d, (v[2]||0)/d ];
+}
+function _thetaFromMetric(U) {
+  // θ̂_metric ~ ||g - I||_F  (Frobenius norm deviation from identity)
+  const { g } = _metricFromUniforms(U);
+  const m00=g[0][0]-1, m11=g[1][1]-1, m22=g[2][2]-1;
+  const m01=g[0][1],  m02=g[0][2],  m12=g[1][2];
+  const f = m00*m00 + m11*m11 + m22*m22 + 2*(m01*m01 + m02*m02 + m12*m12);
+  return Math.sqrt(Math.max(0, f));
+}
+function _redshiftProxy(U, viewN) {
+  // ẑ ≈ N^{-1} - 1 + (β·n)   (very crude proxy: lapse + shift along view)
+  const N = Number.isFinite(U.lapseN) ? Math.max(1e-6, +U.lapseN) : 1.0;
+  const b = Array.isArray(U.shiftBeta) ? U.shiftBeta.map(Number) : [0,0,0];
+  const n = viewN || [0,0,1];
+  return (1.0/N) - 1.0 + (b[0]*n[0] + b[1]*n[1] + b[2]*n[2]);
+}
+
 // WarpEngine (WebGL runtime)
 // ------------------------------------------------------------
 
@@ -416,7 +455,7 @@ class WarpEngine {
                 // Ignore cleanup errors
             }
         }
-        
+
         // Clean up instance tracking
         try {
             for (const [key, val] of __ENGINE_INSTANCES) {
@@ -727,7 +766,7 @@ float dotG(vec3 a, vec3 b) { return dot(a, u_metric * b); }
 float normG(vec3 v) { return sqrt(max(1e-12, dotG(v, v))); }
 vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
 
-float purpleShiftWeight(vec3 normalWS) {
+vec3 purpleShiftWeight(vec3 normalWS) {
   // signed tilt along β; clamp to avoid NaNs if ε=0
   vec3 beta_normalized = u_useMetric ? normalizeG(u_betaTiltVec) : normalize(u_betaTiltVec);
   vec3 normal_normalized = u_useMetric ? normalizeG(normalWS) : normalize(normalWS);
@@ -1285,6 +1324,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         // ---- Metric uniforms (optional for now) --------------------------------
         if (typeof parameters.metricMode === "boolean") U.metricMode = !!parameters.metricMode;
         if (Array.isArray(parameters.gSpatialDiag)) U.gSpatialDiag = parameters.gSpatialDiag.slice(0,3).map(Number);
+        if (Array.isArray(parameters.gSpatialSym)) U.gSpatialSym = parameters.gSpatialSym.slice(0,6).map(Number);
 
         // ---- Physics uniforms (no defaults when strict) -------------------------
         if (Number.isFinite(parameters.gammaGeo))           U.gammaGeo = N(parameters.gammaGeo);
@@ -1335,9 +1375,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // --- Axes setup (derive scene-normalized if hull-only provided) -----------
         if (!Array.isArray(U.axesScene) && Array.isArray(U.hullAxes)) {
-          const a = U.hullAxes;
-          const aMax = Math.max(1e-6, a[0], a[1], a[2]);
-          U.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
+            const a = U.hullAxes;
+            const aMax = Math.max(1e-6, a[0], a[1], a[2]);
+            U.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
         } else if (Array.isArray(U.axesScene)) {
             U.axesScene = U.axesScene.slice(0,3); // Ensure it's a clean copy
         }
