@@ -60,6 +60,48 @@ function pushRight(patch: any) {
 const sanitizeUniforms = (o: any) =>
   Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
 
+// ---- Packet Builders with enforced parity ----
+const buildREALPacket = (base: any) => {
+    const packet = {
+      ...base,
+      physicsParityMode: true,
+      ridgeMode: 0,
+      viewAvg: true,
+      vShip: 0,
+      exposure: 4.2,
+      zeroStop: 1e-6,
+      cosmeticLevel: 0,
+      curvatureGainT: 0,
+      curvatureBoostMax: 1,
+      userGain: 1,
+      displayGain: 1,
+    };
+    // Force parity mode - remove any conflicting fields
+    delete packet.parityMode;
+    delete packet.uPhysicsParity;
+    return paneSanitize('REAL', packet);
+  };
+
+const buildSHOWPacket = (base: any, opts: { T?: number; boost?: number } = {}) => {
+    const packet = {
+      ...base,
+      physicsParityMode: false,
+      ridgeMode: 1,
+      viewAvg: false,
+      vShip: 1,
+      curvatureGainT: clamp01(opts.T ?? 0.70),
+      curvatureBoostMax: Math.max(1, opts.boost ?? 40),
+      cosmeticLevel: 10,
+      exposure: 7.5,
+      zeroStop: 1e-7,
+      userGain: 2,
+    };
+    // Force non-parity mode - remove any conflicting fields
+    delete packet.parityMode;
+    delete packet.uPhysicsParity;
+    return paneSanitize('SHOW', packet);
+  };
+
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
 // Add near other helpers
@@ -121,7 +163,7 @@ function enableLowFps(engine: any, fps = 12) {
   }, Math.max(30, Math.floor(1000 / Math.max(1, fps))));
 }
 
-// Wait until the engine is really ready, then compute camera once and draw once
+// Wait for program + buffers, then compute camera once and draw once
 async function firstCorrectFrame({
   engine, canvas, sharedAxesScene, pane
 }: {
@@ -169,23 +211,6 @@ function thetaGainExpected(b: ThetaBound, dutyEff = 0, viewAvg = true) {
   const fr = viewAvg ? Math.sqrt(Math.max(1e-12, dutyEff)) : 1;
   return g3 * q * v * fr;
 }
-
-// [deleted duplicate paneSanitize]
-
-
-
-/**
- * WarpRenderInspector
- *
- * A focused panel to verify that operational-mode + calculator payloads are
- * actually reaching WarpEngine, using the same dual-instance pattern as
- * WarpBubbleCompare. It mounts two canvases (REAL/SHOW), pushes calculator
- * outputs through the exact keys WarpEngine consumes, and exposes quick
- * controls to exaggerate differences so they are visually undeniable.
- *
- * Requirements: `warp-engine.js` must already be loaded and expose
- *   `window.WarpEngine`.
- */
 
 // ---- Utility: type-light helpers -------------------------------------------
 type Num = number | undefined | null;
@@ -937,7 +962,7 @@ export default function WarpRenderInspector(props: {
   function computeThetaScale(phys: any) {
     const g    = +phys.gammaGeo || 26;
     const q    = +phys.qSpoilingFactor || 1;
-    const v    = +phys.gammaVanDenBroeck_mass || +phys.gammaVanDenBroeck || 1;
+    const v    = +phys.gammaVanDenBroeck_mass ?? +phys.gammaVanDenBroeck ?? 1;
     const duty = Math.max(
       1e-12,
       Math.min(1, Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0))

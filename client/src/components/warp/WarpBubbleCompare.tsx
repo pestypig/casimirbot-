@@ -1126,6 +1126,10 @@ export default function WarpBubbleCompare({
     }
   }
 
+  // Track mode changes with refs
+  const lastModeRef = useRef<string>('');
+  const lastTokenRef = useRef<any>(null);
+
   // Mode change effect: hard renderer reset on each mode change or reload token
   useEffect(() => {
     const mode = String(parameters?.currentMode || '');
@@ -1157,6 +1161,11 @@ export default function WarpBubbleCompare({
   // Use props.parameters directly instead of re-deriving from stale snapshots
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !parameters) return;
+
+    console.log('[WarpBubbleCompare] Parameters changed, updating engines:', {
+      mode: parameters.currentMode,
+      hasEngines: !!(leftEngine.current && rightEngine.current)
+    });
 
     // build both payloads from the SAME source of truth
     const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
@@ -1236,6 +1245,7 @@ export default function WarpBubbleCompare({
     });
 
     console.log('Applying physics to engines (engine computes θ):', {
+      mode: parameters.currentMode,
       real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
       show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
     });
@@ -1257,6 +1267,14 @@ export default function WarpBubbleCompare({
     // Force a draw so the user sees the change immediately
     leftEngine.current.forceRedraw?.();
     rightEngine.current.forceRedraw?.();
+
+    // Force engine updates to apply new uniforms immediately
+    if (leftEngine.current.updateUniforms) {
+      leftEngine.current.updateUniforms(realPhysicsPayload);
+    }
+    if (rightEngine.current.updateUniforms) {
+      rightEngine.current.updateUniforms(showPhysicsPayload);
+    }
 
     // optional: quick console check
     if (DEBUG) console.log('[WBC] uniforms applied', {
@@ -1309,7 +1327,7 @@ export default function WarpBubbleCompare({
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: fixedCamZ, lockFraming: true })), 'SHOW');
     }
-  }, [parameters, colorMode, lockFraming, heroBoost]);
+  }, [parameters, colorMode, lockFraming, heroBoost, parameters?.currentMode, parameters?.reloadToken]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {
