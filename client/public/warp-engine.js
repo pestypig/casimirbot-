@@ -50,10 +50,12 @@ function _aHarmonic(ax, ay, az) {
   const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
   return d > 0 ? 3 / d : NaN;
 }
-function _guessAH(U) {
+function _guessAH(U, parameters) {
   const H = U.axesHull, S = U.axesScene;
   if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
   if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
+  // Fallback if U is not yet initialized, but parameters might contain hull info
+  if (parameters && Array.isArray(parameters.hullAxes)) return _aHarmonic(parameters.hullAxes[0], parameters.hullAxes[1], parameters.hullAxes[2]);
   return NaN;
 }
 function _req(cond, name, U) {
@@ -1324,7 +1326,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (Array.isArray(parameters.shiftBeta) && parameters.shiftBeta.length >= 3) U.shiftBeta = parameters.shiftBeta.slice(0,3).map(Number);
 
         // --- Metric bridging (enable GPU metric when CPU metricMode is on) ---
-        if (typeof U.metricMode === 'boolean') U.useMetric = !!U.metricMode;
+        // Keep shader toggle in lockstep with CPU flag
+        if (typeof U.metricMode === 'boolean') {
+          U.useMetric = !!U.metricMode;
+        }
 
         function _metricFromDiag(d) {
           const gx = +d[0] || 1, gy = +d[1] || 1, gz = +d[2] || 1;
@@ -1690,7 +1695,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
-    // Natário spacetime curvature implementation
+    // === Natário spacetime curvature implementation ===
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
@@ -2040,17 +2045,17 @@ _renderGridPoints() {
     }
 
     // --- New tensor uniforms ---
-    // NEW: upload camera forward (world/scene) every frame
-    if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
-      gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
+    // upload camera forward every frame (if present)
+    if (loc.viewForward && Array.isArray(u.viewForward)) {
+      gl.uniform3f(loc.viewForward, u.viewForward[0], u.viewForward[1], u.viewForward[2]);
     }
-    // NEW: upload lowered shift g0i = β_i (ADM)
-    if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
-      gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
+    // upload lowered shift g0i = β_i (if present)
+    if (loc.g0i && Array.isArray(u.g0i)) {
+      gl.uniform3f(loc.g0i, u.g0i[0], u.g0i[1], u.g0i[2]);
     }
-    // Keep legacy float toggle in sync if shader still reads it
-    if (this.gridUniforms.metricOn && typeof U.useMetric === 'boolean') {
-      gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
+    // keep legacy float toggle in sync
+    if (loc.metricOn && typeof u.useMetric === 'boolean') {
+      gl.uniform1f(loc.metricOn, u.useMetric ? 1.0 : 0.0);
     }
 
     const vertexCount = (this.gridVertices?.length || 0) / 3;
