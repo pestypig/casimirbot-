@@ -1,0 +1,34 @@
+diff --git a/WarpRenderInspector.tsx b/WarpRenderInspector.tsx
+--- a/WarpRenderInspector.tsx
++++ b/WarpRenderInspector.tsx
+@@ -510,6 +510,14 @@ export default function WarpRenderInspector(props: {
+   const s = snap || {};
+   const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
+ 
++  // --- Engine refs (support both legacy and new prop names) ------------------
++  // Prefer engineLeft/engineRight; fall back to leftEngine/rightEngine.
++  const engineLeft  = (props as any).engineLeft  ?? (props as any).leftEngine;
++  const engineRight = (props as any).engineRight ?? (props as any).rightEngine;
++  // Guard: if neither provided, keep UL/UR empty to avoid crashes.
++  const UL: any = engineLeft?.current?.uniforms  || {};
++  const UR: any = engineRight?.current?.uniforms || {};
++
+   // --- Derive wall widths for REAL/SHOW from live engine uniforms (safe) ---
+   // Use harmonic-mean radius to convert ρ → meters (matches engine/adapter).
+-  const UL: any = leftEngine?.current?.uniforms || {};
+-  const UR: any = rightEngine?.current?.uniforms || {};
+   const aHL = aHarmonic(
+     UL.hullAxes?.[0] ?? UL.axesHull?.[0],
+     UL.hullAxes?.[1] ?? UL.axesHull?.[1],
+@@ -536,10 +544,10 @@ export default function WarpRenderInspector(props: {
+       <div>θ (SHOW, pipeline): {Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</div>
+       <div>θ̂ (REAL, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
+       <div>θ̂ (SHOW, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
+       <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
+-      { (leftEngine?.current?.uniforms?.__error || rightEngine?.current?.uniforms?.__error) &&
+-        <div style={{color:'#f55'}}>Engine error: {leftEngine?.current?.uniforms?.__error || rightEngine?.current?.uniforms?.__error}</div>
++      { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
++        <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
+       }
+     </div>
+   );
