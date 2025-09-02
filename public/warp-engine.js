@@ -50,7 +50,26 @@ function _normG(invG, v) {
   globalThis.__WarpEngineBuild = BUILD;
 })()
 
-export default class WarpEngine {
+// WarpEngine (WebGL runtime)
+// ------------------------------------------------------------
+// Radius helpers (use harmonic mean for meters↔ρ)
+function _aHarmonic(ax, ay, az) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return denom > 0 ? 3/denom : NaN;
+}
+function _guessAH(U, p) {
+  // prefer hull axes from parameters or uniforms; fall back to scene axes
+  const H = (p && p.axesHull) || U?.axesHull;
+  const S = (p && p.axesScene) || U?.axesScene;
+  if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
+  if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
+  return NaN;
+}
+// single default for ρ-thickness everywhere (previously 0.016/0.02/0.06)
+const WALL_RHO_DEFAULT = 0.016;
+
+class WarpEngine {
     //----------------------------------------------------------------
     //  1.  Boiler‑plate
     //----------------------------------------------------------------
@@ -261,10 +280,10 @@ export default class WarpEngine {
         if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
             const asked = +(u_thetaScale ?? thetaScale);
             if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
-                console.warn('[WarpEngine] Ignored external thetaScale override', { 
-                    asked: asked.toExponential(2), 
-                    engine: theta.toExponential(2), 
-                    ratio: (theta/asked).toFixed(2) 
+                console.warn('[WarpEngine] Ignored external thetaScale override', {
+                    asked: asked.toExponential(2),
+                    engine: theta.toExponential(2),
+                    ratio: (theta/asked).toFixed(2)
                 });
                 this.__thetaWarned = true;
             }
@@ -346,6 +365,23 @@ export default class WarpEngine {
         if (geoChanged) {
             this._updateWarpGeometry(this.uniforms);
         }
+
+        // --- Wall width ingestion (unify aliases) --------------------------------
+        // Accept: wallWidth (rho), wallWidth_rho (rho), hullDimensions.wallWidth_m (meters)
+        // Keep shader-facing alias "wallWidth" in rho units.
+        const aH = _guessAH(U, parameters);
+        let w_rho = Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined;
+        if (Number.isFinite(parameters.wallWidth_rho)) w_rho = +parameters.wallWidth_rho;
+        const w_m_in = Number.isFinite(parameters?.hullDimensions?.wallWidth_m)
+          ? +parameters.hullDimensions.wallWidth_m : undefined;
+        if (!Number.isFinite(w_rho) && Number.isFinite(w_m_in) && Number.isFinite(aH)) {
+          w_rho = w_m_in / aH;
+        }
+        if (Number.isFinite(w_rho)) U.wallWidth = w_rho;
+        if (!Number.isFinite(U.wallWidth)) U.wallWidth = U.wallWidth ?? 0.06; // preserve existing default
+        // Echo helpful aliases for UIs
+        U.wallWidth_rho = U.wallWidth;
+        if (Number.isFinite(aH)) U.wallWidth_m = U.wallWidth * aH;
     }
 
     //----------------------------------------------------------------
