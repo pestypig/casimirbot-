@@ -8,6 +8,17 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import { computeThetaScale } from '@/lib/warp-theta';
 
+// Use harmonic mean for meters↔ρ conversions (match engine)
+function aHarmonic(ax: number, ay: number, az: number) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return denom > 0 ? 3/denom : NaN;
+}
+function toWallRhoFromMeters(w_m: number, axes: [number,number,number]) {
+  const aH = aHarmonic(axes[0], axes[1], axes[2]);
+  return Number.isFinite(aH) ? (w_m / aH) : undefined;
+}
+
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
 // Add near other helpers
@@ -1167,11 +1178,14 @@ export default function WarpBubbleCompare({
     const a = Number(parameters?.hull?.a) ?? 503.5;
     const b = Number(parameters?.hull?.b) ?? 132.0;
     const c = Number(parameters?.hull?.c) ?? 86.5;
-    // effective radius: geometric mean maps meters → ρ-units
-    const aEff = Math.cbrt(a * b * c);
+    // effective radius: harmonic mean maps meters → ρ-units (match engine)
+    const aH = aHarmonic(a, b, c);
     // convert meters to ρ (shader's wall pulse uses ρ)
     const wallWidth_m = Number(parameters?.wallWidth_m ?? 6.0);
-    const wallWidth_rho = Math.max(1e-6, wallWidth_m / Math.max(1e-6, aEff));
+    const wallWidth_rho = (() => {
+      if (!Number.isFinite(aH)) return undefined;
+      return Math.max(1e-6, wallWidth_m / aH);
+    })();
     // compact camera exactly to hull scale
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene || [1,1,1]));
     // make the grid span just outside the hull so the ridge is readable
@@ -1191,6 +1205,10 @@ export default function WarpBubbleCompare({
       curvatureGainT: 0,
       curvatureBoostMax: 1,
       wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
+      wallWidth_m: (() => {
+        const w_m = +(parameters.wallWidth_m ?? NaN);
+        return Number.isFinite(w_m) ? w_m : (Number.isFinite(aH) && Number.isFinite(wallWidth_rho!) ? wallWidth_rho! * aH : undefined);
+      })(),
       gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
       deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
       dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
