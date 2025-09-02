@@ -1192,6 +1192,12 @@ export default function WarpBubbleCompare({
     const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene || [1,1,1])) * 1.10);
     // -------------------------------------- //
 
+    // Compute a_H and a consistent wall width in rho + meters
+    const axes = parameters.axesHull || parameters.axesScene || [a, b, c];
+    const aH_local = aHarmonic(axes[0], axes[1], axes[2]);
+    const w_m = Number.isFinite(parameters?.wallWidth_m) ? +parameters.wallWidth_m : 6; // keep prior UI default
+    const w_rho = Number.isFinite(aH_local) ? (w_m / aH_local) : undefined;
+
     // Build physics payload for REAL engine (no enforced parity)
     const realPhysicsPayload = paneSanitize('REAL', {
       ...shared,
@@ -1204,11 +1210,8 @@ export default function WarpBubbleCompare({
       displayGain: 1,
       curvatureGainT: 0,
       curvatureBoostMax: 1,
-      wallWidth_rho: wallWidth_rho,      // ⟵ key: ρ-units for shader pulse
-      wallWidth_m: (() => {
-        const w_m = +(parameters.wallWidth_m ?? NaN);
-        return Number.isFinite(w_m) ? w_m : (Number.isFinite(aH) && Number.isFinite(wallWidth_rho!) ? wallWidth_rho! * aH : undefined);
-      })(),
+      wallWidth: w_rho,                  // shader-facing rho width
+      hullDimensions: { wallWidth_m: w_m }, // helper for inspector overlays
       gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
       deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
       dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
@@ -1258,6 +1261,9 @@ export default function WarpBubbleCompare({
       physicsParityMode: false,
       parityMode: false,
       ridgeMode: 1,
+      // Use consistent wall width handling
+      wallWidth: w_rho,
+      hullDimensions: { wallWidth_m: w_m },
       // θ: prefer pipeline (verbatim), else handle standby/compute fallback
       thetaScale: (Number.isFinite(Number((parameters as any)?.thetaScale)))
         ? Number((parameters as any).thetaScale)
