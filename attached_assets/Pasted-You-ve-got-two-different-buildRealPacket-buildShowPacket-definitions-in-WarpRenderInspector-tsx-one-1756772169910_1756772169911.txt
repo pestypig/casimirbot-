@@ -1,0 +1,70 @@
+You’ve got two different buildRealPacket/buildShowPacket definitions in WarpRenderInspector.tsx: one imported from @/lib/warp-uniforms and another declared locally. Kill the local copies and call the imported ones.
+
+Here’s a surgical fix you can paste in (and nothing else):
+
+Keep exactly one import for the builders (near the top). If you see duplicates, delete extras.
+
+// ✅ keep this single import
+import { buildRealPacket, buildShowPacket } from "@/lib/warp-uniforms";
+
+
+Delete any local definitions in this file named buildRealPacket or buildShowPacket. They look like:
+
+// ❌ DELETE these if present anywhere in WarpRenderInspector.tsx
+function buildRealPacket(/* ... */) { /* ... */ }
+function buildShowPacket(/* ... */) { /* ... */ }
+// or: const buildRealPacket = (...) => { ... }
+// or: const buildShowPacket = (...) => { ... }
+
+
+Define a single shared-base helper before you use it, then call the imported builders with it. Replace the block that was doing:
+
+// ❌ old (also caused TDZ with shared/shared2)
+const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
+const showPayload = buildShowPacket(parameters, { ...shared, colorMode: 1 });
+
+
+with this:
+
+// ✅ add this tiny helper once (place near other small helpers in the file)
+function makeSharedBase(parameters: any, live: any, baseShared: any = {}) {
+  const sectorCount = Math.max(1, Number(parameters?.sectorCount ?? live?.sectorCount ?? 400));
+  const sectors     = Math.max(1, Number(parameters?.sectors ?? live?.sectors ?? 1));
+  const dutyCycle   = Number(parameters?.dutyCycle ?? live?.dutyCycle ?? 0.01);
+  const dutyEffectiveFR = dutyCycle * (sectors / sectorCount);
+
+  return {
+    ...baseShared,
+    sectorCount,
+    sectors,
+    dutyCycle,
+    dutyEffectiveFR,
+    currentMode: live?.currentMode ?? parameters?.currentMode ?? "hover",
+
+    // names the engine uses
+    axesScene: parameters?.axesScene ?? live?.axesScene,
+    hullAxes:  parameters?.hullAxes  ?? live?.hullAxes,
+
+    // θ-chain raw inputs
+    gammaGeo:    parameters?.gammaGeo ?? parameters?.g_y ?? live?.gammaGeo,
+    deltaAOverA: parameters?.deltaAOverA ?? parameters?.qSpoilingFactor ?? live?.deltaAOverA,
+    gammaVanDenBroeck_mass:
+      parameters?.gammaVanDenBroeck_mass ??
+      parameters?.gammaVanDenBroeck ??
+      live?.gammaVanDenBroeck_mass ??
+      live?.gammaVanDenBroeck,
+  };
+}
+
+
+…and when you bootstrap/update the engines:
+
+// ✅ build a single base first; no TDZ
+const sharedBase = makeSharedBase(parameters, live, props.baseShared);
+
+// Pane-specific packets (imported builders set parity/ridge/viewAvg correctly)
+const realPayload = buildRealPacket(sharedBase, { colorMode: 2 }); // REAL: ridge=0
+const showPayload = buildShowPacket(sharedBase, { colorMode: 1 }); // SHOW: ridge=1
+
+leftEngine?.updateUniforms(realPayload);
+rightEngine?.updateUniforms(showPayload);
