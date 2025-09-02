@@ -472,6 +472,16 @@ function PaneOverlay(props:{
 
   // Local alias for convenient, safe access in JSX
   const s = snap ?? {};
+
+  // Tensor diagnostics (published by engine)
+  const thetaPipe = Number.isFinite(+s.thetaScale) ? +s.thetaScale
+                   : Number.isFinite(+s.thetaUniform) ? +s.thetaUniform : NaN;
+  const thetaMetric = Number.isFinite(+s.thetaScale_metric) ? +s.thetaScale_metric : NaN;
+  const thetaInconsistency = Number.isFinite(+s.thetaInconsistency) ? +s.thetaInconsistency : NaN;
+  const tensorMismatch = !!s.tensorMismatch;
+  const vf = Array.isArray(s.viewForward) ? s.viewForward : undefined;
+  const g0i = Array.isArray(s.g0i) ? s.g0i : undefined;
+
   // live pull from the engine every frame
   useEffect(() => {
     let raf = 0;
@@ -555,8 +565,10 @@ function PaneOverlay(props:{
   return (
     <div className="inspector">
       <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m</div>
-      <div>θ (REAL, pipeline): {Number.isFinite(thetaPipeline)? thetaPipeline.toExponential(2):'—'}</div>
-      <div>θ̂ (metric): {Number.isFinite(thetaMetric)? thetaMetric.toExponential(2) : '—'}</div>
+      <div>θ (pipeline): {Number.isFinite(thetaPipe) ? thetaPipe.toExponential(3) : '—'}</div>
+      <div>θ̂ (metric): {Number.isFinite(thetaMetric) ? thetaMetric.toExponential(3) : '—'}</div>
+      <div>θ ratio |θ̂−θ|/|θ|: {Number.isFinite(thetaInconsistency) ? thetaInconsistency.toFixed(3) : '—'} {tensorMismatch ? <span style={{color:'#e66'}}>⚠ tensor mismatch</span> : null}</div>
+      <div>view fwd: {vf ? `[${vf.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}  g₀ᵢ: {g0i ? `[${g0i.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
       <div>ẑ (N,β proxy): {Number.isFinite(zProxy)? zProxy.toExponential(2) : '—'}</div>
       <div>metric: {metricMode ? 'ON' : 'off'}</div>
       <div>N: {Number.isFinite(lapseN) ? lapseN.toFixed(4) : '—'} β: {shiftBeta ? `[${shiftBeta.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
