@@ -13,8 +13,8 @@ export default function Home() {
   const updatePipeline = useUpdatePipeline();
 
   // Shared phase diagram state - Needle Hull Mk 1 defaults
-  const [tileArea, setTileArea] = useState(5); // cm² (Needle Hull: 5 cm²)
-  const [shipRadius, setShipRadius] = useState(82.0); // m (Needle Hull: 82.0 m ellipsoid scale)
+  const [tileArea, setTileArea] = useState(25); // cm² (Needle Hull: 25 cm²)
+  const [shipRadius, setShipRadius] = useState(503.5); // m (Needle Hull: 503.5 m ellipsoid scale)
 
   // Constraint configuration state (exact Needle Hull defaults)
   const [massTolPct, setMassTolPct] = useState(5); // ±5% mass tolerance (1340-1470 kg range)
@@ -24,7 +24,7 @@ export default function Home() {
 
   // Dynamic simulation parameters - Needle Hull Mk 1 defaults
   const [gammaGeo, setGammaGeo] = useState(26); // γ_geo = 26 (Needle Hull research value)
-  const [qFactor, setQFactor] = useState(1.6e6); // Q_cavity default for research sketch
+  const [qFactor, setQFactor] = useState(1e9); // Q_cavity default for research sketch
   const [duty, setDuty] = useState(0.14); // 14% burst duty cycle (HOVER MODE default)
   const [sagDepth, setSagDepth] = useState(16); // 16 nm sag depth for Ω profiling
   const [temperature, setTemperature] = useState(20);
