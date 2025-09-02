@@ -262,9 +262,6 @@ const Grid3DEngine = forwardRef<Grid3DHandle, { uniforms: any; className?: strin
     engineRef.current = {
       canvas,
       isLoaded: true,
-      gridProgram: true,
-      gridUniforms: true,
-      gridAttribs: true,
       setVisible: (visible: boolean) => {
         canvas.style.visibility = visible ? 'visible' : 'hidden';
       },
