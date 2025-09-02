@@ -228,18 +228,7 @@ function sizeCanvas(cv: HTMLCanvasElement) {
 function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const p = { ...patch };
 
-  // Force parity mode based on pane - this is critical for physics validation
-  if (pane === 'REAL') {
-    p.physicsParityMode = true;
-    p.parityMode = true;  // Also set the fallback field
-    p.ridgeMode = 0;
-    if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
-  } else {
-    p.physicsParityMode = false;
-    p.parityMode = false; // Also set the fallback field
-    p.ridgeMode = 1;
-    if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
-  }
+  // Enforcement disabled: leave parity/ridge untouched (pass-through)
   return p;
 }
 
@@ -1189,7 +1178,7 @@ export default function WarpBubbleCompare({
     const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene || [1,1,1])) * 1.10);
     // -------------------------------------- //
 
-    // Build physics payload for REAL engine with enforced parity
+    // Build physics payload for REAL engine (no enforced parity)
     const realPhysicsPayload = paneSanitize('REAL', {
       ...shared,
       gridSpan: gridSpanReal,            // tight framing around hull
@@ -1208,17 +1197,20 @@ export default function WarpBubbleCompare({
       sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
       colorMode: 2,                      // shear proxy is a clear "truth" view
       cameraZ: camZ,                     // ⟵ key: to-scale camera
-      // Force parity mode explicitly
+      // Force parity mode explicitly (direct assignment, not via paneSanitize)
       physicsParityMode: true,
+      parityMode: true,
       ridgeMode: 0,
-      // Use shared theta calculation with mass-focused gamma VdB
-      thetaScale: computeThetaScale({
-        gammaGeo: real.gammaGeo,
-        qSpoilingFactor: real.qSpoilingFactor,
-        gammaVanDenBroeck: real.gammaVanDenBroeck,
-        gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
-        dutyEffectiveFR: real.dutyEffectiveFR
-      }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
+      // θ: prefer pipeline (verbatim), else fallback to previous compute
+      thetaScale: (Number.isFinite(Number((parameters as any)?.thetaScale)))
+        ? Number((parameters as any).thetaScale)
+        : computeThetaScale({
+            gammaGeo: real.gammaGeo,
+            qSpoilingFactor: real.qSpoilingFactor,
+            gammaVanDenBroeck: real.gammaVanDenBroeck,
+            gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+            dutyEffectiveFR: real.dutyEffectiveFR
+          }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
     });
 
     // REAL (parity / Ford–Roman)
@@ -1244,17 +1236,20 @@ export default function WarpBubbleCompare({
       curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
       userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
       displayGain: 1,
-      // Force non-parity mode explicitly
+      // Force non-parity mode explicitly (direct assignment, not via paneSanitize)
       physicsParityMode: false,
+      parityMode: false,
       ridgeMode: 1,
-      // Use shared theta calculation with visual-focused gamma VdB, handle standby mode
-      thetaScale: parameters.currentMode === 'standby' ? 0 : computeThetaScale({
-        gammaGeo: show.gammaGeo,
-        qSpoilingFactor: show.qSpoilingFactor,
-        gammaVanDenBroeck: show.gammaVanDenBroeck,
-        gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
-        dutyEffectiveFR: show.dutyEffectiveFR
-      }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 }),
+      // θ: prefer pipeline (verbatim), else handle standby/compute fallback
+      thetaScale: (Number.isFinite(Number((parameters as any)?.thetaScale)))
+        ? Number((parameters as any).thetaScale)
+        : (parameters.currentMode === 'standby' ? 0 : computeThetaScale({
+            gammaGeo: show.gammaGeo,
+            qSpoilingFactor: show.qSpoilingFactor,
+            gammaVanDenBroeck: show.gammaVanDenBroeck,
+            gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
+            dutyEffectiveFR: show.dutyEffectiveFR
+          }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 })),
     });
 
     console.log('Applying physics to engines:', {
@@ -1321,12 +1316,11 @@ export default function WarpBubbleCompare({
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms(lcPayload)), 'SHOW');
     }
 
-    // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp)
+    // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp); no ridge lock
     pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
       exposure: real.exposure,
       zeroStop: real.zeroStop,
-      colorMode: 2,             // pin shear proxy permanently for REAL
-      ridgeMode: 0              // pin double-lobe physics mode
+      colorMode: 2
     })), 'REAL');
 
     // SHOW: can have live camera and display adjustments
