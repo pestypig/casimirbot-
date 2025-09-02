@@ -93,11 +93,17 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   // Optional authoritative theta
   const thetaScale = Number.isFinite(s.thetaScale) ? +s.thetaScale : undefined;
 
+  // Optional metric scaffolding (pass-through if present)
+  const metricMode   = !!(s as any).metricMode;
+  const gSpatialDiag = Array.isArray((s as any).gSpatialDiag) ? (s as any).gSpatialDiag.map(Number) : undefined;
+
   // Burst Q for visuals
   const Qburst = +(s.qCavity ?? 1e9);
 
   gatedUpdateUniforms(engine, {
     strictPhysics: true,
+    metricMode,
+    ...(gSpatialDiag ? { gSpatialDiag } : {}),
     axesHull,
     // keep axesScene derived in engine
     wallWidth: w_rho,
