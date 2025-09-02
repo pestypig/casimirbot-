@@ -7,6 +7,13 @@
 import { gatedUpdateUniforms } from "./warp-uniforms-gate";
 import type { GreensPayload, HelixMetrics, EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 
+// Optional Natário-esque tensor inputs (pass-through; no defaults here)
+export type NatarioTensorOpts = {
+  lapseN?: number;                           // N
+  shiftBeta?: [number,number,number];        // β^i
+  gSpatialSym?: [number,number,number,number,number,number]; // gxx,gyy,gzz,gxy,gyz,gzx
+};
+
 function aHarmonic(ax: number, ay: number, az: number) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
   const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
@@ -21,6 +28,7 @@ export type DriveMetricOpts = {
   // Optional conformal metric inputs (Commit B)
   greens?: GreensPayload;   // φ samples; when present with kappa → metricMode
   metricKappa?: number;     // required to enable metric
+  natario?: NatarioTensorOpts; // optional 3+1 tensors (pass-through)
   // Hooks-fed helpers (no defaults in adapter)
   metrics?: HelixMetrics;   // from use-metrics (for hull)
   wallWidth_m?: number;     // from useLightCrossingLoop or explicit UI
@@ -92,6 +100,16 @@ export function driveWarpFromPipeline(
     }
   }
 
+  // Optional: full symmetric spatial metric, lapse, shift (wins over diag if provided)
+  let gSpatialSym: [number,number,number,number,number,number] | undefined;
+  let lapseN: number | undefined;
+  let shiftBeta: [number,number,number] | undefined;
+  if (opts?.natario) {
+    if (Array.isArray(opts.natario.gSpatialSym) && opts.natario.gSpatialSym.length>=6) gSpatialSym = opts.natario.gSpatialSym.map(Number) as any;
+    if (Number.isFinite(opts.natario.lapseN)) lapseN = Number(opts.natario.lapseN);
+    if (Array.isArray(opts.natario.shiftBeta) && opts.natario.shiftBeta.length>=3) shiftBeta = opts.natario.shiftBeta.map(Number) as any;
+  }
+
   gatedUpdateUniforms(engine, {
     strictPhysics: true,
     axesHull,
@@ -108,5 +126,8 @@ export function driveWarpFromPipeline(
     ...(typeof thetaScale === "number" ? { thetaScale } : {}),
     ...(metricMode ? { metricMode: true } : {}),
     ...(gSpatialDiag ? { gSpatialDiag } : {}),
+    ...(gSpatialSym ?  { gSpatialSym }  : {}),
+    ...(Number.isFinite(lapseN) ? { lapseN } : {}),
+    ...(shiftBeta ? { shiftBeta } : {}),
   }, "server");
 }
