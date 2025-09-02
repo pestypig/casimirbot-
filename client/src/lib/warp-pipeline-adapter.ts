@@ -6,6 +6,13 @@
  */
 import { gatedUpdateUniforms } from "./warp-uniforms-gate";
 
+// Harmonic-mean radius for meters↔ρ conversion (match engine)
+function aHarmonic(ax: number, ay: number, az: number) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return denom > 0 ? 3/denom : NaN;
+}
+
 export interface EnergyPipelineState {
   // Hull geometry
   hull?: {
@@ -55,9 +62,11 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const c = num(s.hull?.Lz_m) ?? s.shipRadius_m;
 
   // --- Canonical wall width in ρ-units (matches HELIX sampler) ---
-  const aEff = Math.max(1e-6, Math.cbrt(Math.max(1e-12, a * b * c))); // guard zero/NaN
+  const aH = aHarmonic(a, b, c);
   const w_m = Math.max(1e-9, (s.sag_nm ?? 16) * 1e-9);
-  const w_rho = Math.max(1e-6, w_m / aEff);
+  const w_rho = (Number.isFinite(s.wallWidth_rho) ? +s.wallWidth_rho! :
+                 Number.isFinite(s.wallWidth_m) && Number.isFinite(aH) ? (+s.wallWidth_m! / aH) :
+                 Number.isFinite(aH) ? Math.max(1e-6, w_m / aH) : undefined);
 
   // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
   // Keep total tiling vs concurrent strobing distinct
@@ -115,6 +124,7 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Geometry
       hullAxes: [a, b, c],
       wallWidth_rho: w_rho,
+      wallWidth_m: (Number.isFinite(w_rho) && Number.isFinite(aH)) ? (w_rho! * aH) : w_m,
 
       // Audit-only; do not override engine θ
       thetaScaleExpected,
