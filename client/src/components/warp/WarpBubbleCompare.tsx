@@ -1277,7 +1277,7 @@ export default function WarpBubbleCompare({
     });
 
     console.log('Applying physics to engines (engine computes θ):', {
-      mode: parameters.currentMode,
+      mode: mergedState.currentMode,
       real: { parity: realPhysicsPayload.physicsParityMode, ridge: realPhysicsPayload.ridgeMode, gammaVdB: realPhysicsPayload.gammaVdB, qSpoil: realPhysicsPayload.deltaAOverA },
       show: { parity: showPhysicsPayload.physicsParityMode, ridge: showPhysicsPayload.ridgeMode, gammaVdB: showPhysicsPayload.gammaVdB, qSpoil: showPhysicsPayload.deltaAOverA }
     });
