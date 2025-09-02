@@ -49,11 +49,10 @@ function _aHarmonic(ax, ay, az) {
   const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
   return d > 0 ? 3 / d : NaN;
 }
-function _guessAH(U, p) {
-  const H = (p && p.axesHull) || U.axesHull;
-  const S = (p && p.axesScene) || U.axesScene;
-  if (Array.isArray(H) && H.length >= 3) return _aHarmonic(H[0], H[1], H[2]);
-  if (Array.isArray(S) && S.length >= 3) return _aHarmonic(S[0], S[1], S[2]);
+function _guessAH(U) {
+  const H = U.axesHull, S = U.axesScene;
+  if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
+  if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
   return NaN;
 }
 function _req(cond, name, U) {
@@ -694,6 +693,11 @@ uniform mat3 u_metric;
 uniform mat3 u_metricInv;
 uniform bool u_useMetric;
 
+// Metric diagnostics
+uniform float u_lapseN;
+uniform vec3  u_shiftBeta;
+uniform float u_redshiftProxy; // Derived diagnostic
+
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -1325,6 +1329,67 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         if (typeof parameters.metricMode === "boolean") U.metricMode = !!parameters.metricMode;
         if (Array.isArray(parameters.gSpatialDiag)) U.gSpatialDiag = parameters.gSpatialDiag.slice(0,3).map(Number);
         if (Array.isArray(parameters.gSpatialSym)) U.gSpatialSym = parameters.gSpatialSym.slice(0,6).map(Number);
+        if (Number.isFinite(parameters.lapseN)) U.lapseN = Number(parameters.lapseN);
+        if (Array.isArray(parameters.shiftBeta) && parameters.shiftBeta.length >= 3) U.shiftBeta = parameters.shiftBeta.slice(0,3).map(Number);
+
+        // --- Metric bridging (enable GPU metric when CPU metricMode is on) ---
+        if (typeof U.metricMode === 'boolean') U.useMetric = !!U.metricMode;
+
+        function _metricFromDiag(d) {
+          const gx = +d[0] || 1, gy = +d[1] || 1, gz = +d[2] || 1;
+          // row-major 3x3
+          return new Float32Array([gx,0,0, 0,gy,0, 0,0,gz]);
+        }
+
+        function _metricFromSym(s) {
+          // s: [gxx,gyy,gzz,gxy,gyz,gzx]
+          const gxx=+s[0]||1, gyy=+s[1]||1, gzz=+s[2]||1;
+          const gxy=+s[3]||0, gyz=+s[4]||0, gzx=+s[5]||0;
+          return new Float32Array([
+            gxx, gxy, gzx,
+            gxy, gyy, gyz,
+            gzx, gyz, gzz
+          ]);
+        }
+
+        function _inv3(m){ // tiny robust 3×3 inverse
+          const [a,b,c, d,e,f, g,h,i] = m;
+          const A = (e*i - f*h), B = -(d*i - f*g), C = (d*h - e*g);
+          const det = a*A + b*B + c*C;
+          if (!isFinite(det) || Math.abs(det) < 1e-18) return null;
+          const inv = new Float32Array([
+             A, -(b*i - c*h),  (b*f - c*e),
+             B,  (a*i - c*g), -(a*f - c*d),
+             C, -(a*h - b*g),  (a*e - b*d)
+          ]);
+          for (let k=0;k<9;k++) inv[k] /= det;
+          return inv;
+        }
+
+        // If metric is ON, synthesize full matrices so shaders can use them.
+        if (U.useMetric) {
+          let G = null;
+          if (Array.isArray(U.gSpatialSym) && U.gSpatialSym.length >= 6) {
+            G = _metricFromSym(U.gSpatialSym);
+          } else if (Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length >= 3) {
+            G = _metricFromDiag(U.gSpatialDiag);
+          }
+          if (G) {
+            U.metric = G;
+            U.metricInv = _inv3(G) || U.metricInv || ID3;  // don't crash on near-singular
+          }
+        }
+
+        if (U.useMetric) {
+          if (Number.isFinite(U.lapseN)) {
+            const N = +U.lapseN;
+            const beta = Array.isArray(U.shiftBeta) ? U.shiftBeta : [0,0,0];
+            const b2 = beta[0]*beta[0] + beta[1]*beta[1] + beta[2]*beta[2];
+            U.redshiftProxy = 1/Math.max(1e-6, N) * Math.sqrt(1 + b2); // quick diagnostic
+          } else {
+            U.redshiftProxy = undefined;
+          }
+        }
 
         // ---- Physics uniforms (no defaults when strict) -------------------------
         if (Number.isFinite(parameters.gammaGeo))           U.gammaGeo = N(parameters.gammaGeo);
@@ -1551,6 +1616,17 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         U.useMetric = useMetric;
         U.metricOn = metricOn;
 
+        // --- Process derived metric values ---
+        if (U.useMetric && Number.isFinite(U.lapseN)) {
+          const N = +U.lapseN;
+          const beta = U.shiftBeta || [0,0,0];
+          const b2 = beta[0]*beta[0] + beta[1]*beta[1] + beta[2]*beta[2];
+          // Crude redshift proxy: sqrt(1 + |β|^2) / N
+          U.redshiftProxy = Math.sqrt(1 + b2) / Math.max(1e-6, N);
+        } else {
+          U.redshiftProxy = undefined;
+        }
+
         // --- Trigger grid rebuild if geometry parameters changed ----
         const geoChanged =
             (prev?.hullAxes?.[0] !== U.hullAxes?.[0]) || (prev?.hullAxes?.[1] !== U.hullAxes?.[1]) || (prev?.hullAxes?.[2] !== U.hullAxes?.[2]) ||
@@ -1624,7 +1700,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
 
-    // Authentic Natário spacetime curvature implementation
+    // Natário spacetime curvature implementation
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
         const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
@@ -1729,7 +1805,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
         // Read mode uniforms with sane defaults (renamed to avoid conflicts)
-        const dutyCycleUniform = this.uniforms?.dutyCycle ?? 0.14;
+        const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
         const sectorsUniform    = Math.max(1, (this.uniforms?.sectors ?? 1)|0);
         const splitUniform      = Math.max(0, Math.min(sectorsUniform - 1, this.uniforms?.split ?? 0));
         const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
@@ -1747,10 +1823,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-
-        if (!Number.isFinite(this.uniforms.thetaScale) || this.uniforms.thetaScale <= 0) {
-          this.uniforms.thetaScale = betaUsedUniform; // last-resort sync
-        }
 
         // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
