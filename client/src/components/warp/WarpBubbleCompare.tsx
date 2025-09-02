@@ -1043,6 +1043,7 @@ export default function WarpBubbleCompare({
         deltaAOverA: real.qSpoilingFactor,
         dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
         sectors: Math.max(1, parameters.sectors),
+        sectorCount: Math.max(1, parameters.sectorCount),
         ridgeMode: 0,
       };
 
@@ -1154,12 +1155,10 @@ export default function WarpBubbleCompare({
     }
   }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.dutyEffectiveFR]);
 
-  // (removed duplicate early mount effect)
-
-  // Mount-only effect: guarantee initial attach from either source
+  // Allow initial mount when either parameters or pipeline mode is available
   useEffect(() => {
+    if (!parameters?.currentMode && !pipelineState?.currentMode) return;
     if (leftEngine.current || rightEngine.current) return;
-    if (!(parameters?.currentMode || pipelineState?.currentMode)) return; // accept either source
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
         try { await reinitEnginesFromParams(); } finally { reinitInFlight.current = null; }

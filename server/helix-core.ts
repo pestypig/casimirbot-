@@ -552,23 +552,23 @@ export function getTileStatus(req: Request, res: Response) {
 function generateSampleTiles(count: number): Array<{ pos: [number, number, number]; t00: number }> {
   const tiles = [];
   const hullA = 503.5, hullB = 132, hullC = 86.5; // Half-dimensions in meters
-  
+
   for (let i = 0; i < count; i++) {
     // Generate random positions on ellipsoid surface
     const theta = Math.random() * 2 * Math.PI;
     const phi = Math.acos(2 * Math.random() - 1);
-    
+
     const x = hullA * Math.sin(phi) * Math.cos(theta);
     const y = hullB * Math.sin(phi) * Math.sin(theta);
     const z = hullC * Math.cos(phi);
-    
+
     // Generate T00 values with realistic stress-energy distribution
     const r = Math.hypot(x / hullA, y / hullB, z / hullC);
     const t00 = -2.568e13 * (1 + 0.1 * Math.sin(5 * theta) * Math.cos(3 * phi)) * (1 - 0.5 * r);
-    
+
     tiles.push({ pos: [x, y, z] as [number, number, number], t00 });
   }
-  
+
   return tiles;
 }
 
@@ -595,7 +595,7 @@ export function getSystemMetrics(req: Request, res: Response) {
   const hull = s.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173 };
 
   // Canonical geometry fields for visualizer
-  let a: number, b: number, c: number;
+  let a, b, c;
   if (hull) {
     a = hull.Lx_m / 2;
     b = hull.Ly_m / 2;
@@ -756,7 +756,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     overallStatus: s.overallStatus ?? (s.fordRomanCompliance ? "NOMINAL" : "CRITICAL"),
 
     tiles: { tileArea_cm2: s.tileArea_cm2, hullArea_m2: s.hullArea_m2 ?? null, N_tiles: s.N_tiles },
-    
+
     // Add tile data with positions and T00 values for Green's Potential computation
     tileData: generateSampleTiles(Math.min(100, activeTiles)), // Generate sample tiles for φ computation
 
@@ -777,10 +777,10 @@ export function getSystemMetrics(req: Request, res: Response) {
 
     // ✅ hint-only values (never applied as uniforms)
     viewerHints: {
-      theta_FR_like: theta_FR,
-      theta_UI_like: theta_UI,
-      ridgeMode: 1,
-      colorMode: 'theta'
+      theta_FR: theta_FR,
+      thetaScaleExpected: thetaFR,
+      powerDraw_MW: powerActual,
+      M_exotic_kg: M_exotic_kg,
     },
 
     // ✅ strobe/time window (for dutyLocal provenance)
