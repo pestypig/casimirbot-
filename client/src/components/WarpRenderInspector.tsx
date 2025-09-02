@@ -5,6 +5,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
+
+// Harmonic-mean radius for display conversions (match engine)
+function aHarmonic(ax: number, ay: number, az: number) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return denom > 0 ? 3/denom : NaN;
+}
 import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
 import MarginHunterPanel from "./MarginHunterPanel";
 import { checkpoint, within } from "@/lib/checkpoints";
@@ -469,12 +476,12 @@ function PaneOverlay(props:{
       const U = e?.uniforms || {};
       const H = U.hullAxes || [503.5,132,86.5];
       const a = +H[0]||503.5, b = +H[1]||132.0, c = +H[2]||86.5;
-      const aH = harmonicMean3(a,b,c);
+      const aH = aHarmonic(a,b,c);
 
       // prefer explicit meters if present, else convert ρ→m using aH
-      const w_m = (U.hullDimensions?.wallWidth_m != null)
-        ? +U.hullDimensions.wallWidth_m
-        : (Number.isFinite(U.wallWidth) ? (+U.wallWidth) * aH : 0.016*aH);
+      const w_rho = (Number.isFinite(U.wallWidth_rho) ? +U.wallWidth_rho :
+                     Number.isFinite(U.wallWidth)     ? +U.wallWidth : undefined);
+      const w_m = (Number.isFinite(w_rho) && Number.isFinite(aH)) ? (w_rho * aH) : (0.016 * aH);
 
       const V  = volEllipsoid(a,b,c);
       const S  = areaEllipsoid(a,b,c);
