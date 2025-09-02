@@ -8,6 +8,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 import { getWarpEngineCtor } from '@/types/globals';
+import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 // ❌ Never compute θ on the client for the renderer – engine is the authority.
 // (removed stale import)
 
@@ -1126,18 +1127,24 @@ export default function WarpBubbleCompare({
     }
   }
 
+  // Use energy pipeline for mode tracking
+  const { data: pipelineState } = useEnergyPipeline();
+  const switchMode = useSwitchMode();
+  
   // Track mode changes with refs
   const lastModeRef = useRef<string>('');
   const lastTokenRef = useRef<any>(null);
 
-  // Mode change effect: hard renderer reset on each mode change or reload token
+  // Mode change effect: use pipeline state for operational mode changes
   useEffect(() => {
-    const mode = String(parameters?.currentMode || '');
-    const token = parameters?.reloadToken;
+    const mode = String(pipelineState?.currentMode || parameters?.currentMode || '');
+    const token = parameters?.reloadToken || pipelineState?.seq;
     if (!mode) return;
     if (lastModeRef.current === mode && lastTokenRef.current === token) return; // no-op if same
     lastModeRef.current = mode;
     lastTokenRef.current = token;
+
+    console.log('[WarpBubbleCompare] Mode change detected:', { mode, token, source: pipelineState?.currentMode ? 'pipeline' : 'parameters' });
 
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
@@ -1145,7 +1152,7 @@ export default function WarpBubbleCompare({
         finally { reinitInFlight.current = null; }
       })();
     }
-  }, [parameters?.currentMode, parameters?.reloadToken]);
+  }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.seq]);
 
   // Mount-only effect: guarantee initial attach
   useEffect(() => {
@@ -1158,17 +1165,38 @@ export default function WarpBubbleCompare({
     }
   }, []); // mount only
 
-  // Use props.parameters directly instead of re-deriving from stale snapshots
+  // Use pipeline state and parameters together for physics updates
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current || !parameters) return;
+    if (!leftEngine.current || !rightEngine.current) return;
 
-    console.log('[WarpBubbleCompare] Parameters changed, updating engines:', {
-      mode: parameters.currentMode,
-      hasEngines: !!(leftEngine.current && rightEngine.current)
+    // Merge pipeline state with parameters for complete physics data
+    const mergedState = {
+      ...parameters,
+      ...pipelineState,
+      currentMode: pipelineState?.currentMode || parameters?.currentMode || 'hover',
+      // Ensure we have all physics parameters
+      gammaGeo: pipelineState?.gammaGeo || parameters?.gammaGeo || 26,
+      qSpoilingFactor: pipelineState?.qSpoilingFactor || parameters?.qSpoilingFactor || 1,
+      gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || parameters?.gammaVanDenBroeck || 38.3,
+      dutyCycle: pipelineState?.dutyCycle || parameters?.dutyCycle || 0.14,
+      dutyEffectiveFR: pipelineState?.dutyEffectiveFR || parameters?.dutyEffectiveFR || 0.000025,
+      sectors: pipelineState?.sectors || parameters?.sectors || 1,
+      sectorCount: pipelineState?.sectorCount || parameters?.sectorCount || 400
+    };
+
+    console.log('[WarpBubbleCompare] State changed, updating engines:', {
+      mode: mergedState.currentMode,
+      source: pipelineState?.currentMode ? 'pipeline' : 'parameters',
+      hasEngines: !!(leftEngine.current && rightEngine.current),
+      physics: {
+        gammaGeo: mergedState.gammaGeo,
+        qSpoil: mergedState.qSpoilingFactor,
+        dutyFR: mergedState.dutyEffectiveFR
+      }
     });
 
-    // build both payloads from the SAME source of truth
-    const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
+    // build both payloads from the merged source of truth
+    const wu = normalizeWU(mergedState?.warpUniforms || mergedState);
     let real = buildREAL(wu);
     let show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
 
@@ -1201,11 +1229,11 @@ export default function WarpBubbleCompare({
       gammaGeo: real.gammaGeo,
       qSpoilingFactor: real.qSpoilingFactor,
       gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
-      dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
+      dutyEffectiveFR: real.dutyEffectiveFR ?? mergedState.dutyEffectiveFR ?? 0.000025,
       dutyCycle: real.dutyCycle,
-      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
-      sectorCount: Math.max(1, Math.min(1000, parameters.sectorCount || 400)),
-      currentMode: parameters.currentMode,
+      sectors: Math.max(1, Math.min(1000, mergedState.sectors || 400)),
+      sectorCount: Math.max(1, Math.min(1000, mergedState.sectorCount || 400)),
+      currentMode: mergedState.currentMode,
       vShip: 0,                          // never "fly" in REAL
       // strictly physical: no boosts, no gains, wall to ρ-units
       userGain: Math.max(0.1, Math.min(10, parityExaggeration || 1)), // clamp exaggeration
@@ -1227,11 +1255,11 @@ export default function WarpBubbleCompare({
     const showPhysicsPayload = paneSanitize('SHOW', {
       ...shared,
       ...show,
-      currentMode: parameters.currentMode,
-      vShip: parameters.currentMode === 'standby' ? 0 : 1,
+      currentMode: mergedState.currentMode,
+      vShip: mergedState.currentMode === 'standby' ? 0 : 1,
       gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
       deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor ?? 1)), // clamp q-spoiling
-      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
+      sectors: Math.max(1, Math.min(1000, mergedState.sectors || 400)),
       // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ,
       // Apply heroExaggeration to visual amplification (normalized heroBoost)
@@ -1327,7 +1355,7 @@ export default function WarpBubbleCompare({
       const fixedCamZ = 1.8; // Fixed camera for SHOW only
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: fixedCamZ, lockFraming: true })), 'SHOW');
     }
-  }, [parameters, colorMode, lockFraming, heroBoost, parameters?.currentMode, parameters?.reloadToken]);
+  }, [parameters, pipelineState, colorMode, lockFraming, heroBoost, pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {
