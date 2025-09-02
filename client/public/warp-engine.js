@@ -15,6 +15,8 @@
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
+// (commit B additions below build on strict engine)
+
 
 // --- Grid defaults (scientifically scaled for needle hull) ---
 if (typeof window.GRID_DEFAULTS === 'undefined') {
@@ -1208,6 +1210,14 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         // ---- Accept strict mode toggle up front --------------------------------
         if (typeof parameters.strictPhysics === "boolean") this.strictPhysics = !!parameters.strictPhysics;
 
+        // ---- Axes setup (strict mode will require these) -----------------------
+        if (Array.isArray(parameters.axesHull))  this.uniforms.axesHull  = parameters.axesHull.slice(0,3);
+        if (Array.isArray(parameters.axesScene)) this.uniforms.axesScene = parameters.axesScene.slice(0,3);
+
+        // ---- Metric uniforms (optional for now) --------------------------------
+        if (typeof parameters.metricMode === "boolean") this.uniforms.metricMode = !!parameters.metricMode;
+        if (Array.isArray(parameters.gSpatialDiag)) this.uniforms.gSpatialDiag = parameters.gSpatialDiag.slice(0,3).map(Number);
+
         // ---- Physics uniforms (no defaults when strict) -------------------------
         if (Number.isFinite(parameters.gammaGeo))           this.uniforms.gammaGeo = +parameters.gammaGeo;
         if (Number.isFinite(parameters.gammaVanDenBroeck))  this.uniforms.gammaVanDenBroeck = +parameters.gammaVanDenBroeck;
@@ -1354,6 +1364,21 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         U.deltaAOverA = deltaAOverA;
         U.gammaVanDenBroeck = gammaVdB;
         U.thetaScale = thetaScaleFinal;
+
+        // Store actual computed theta for diagnostics
+        this.uniforms.thetaScale_actual = thetaScaleFinal;
+
+        // ---- Metric-diagnostic theta (derived) ----------------------------------
+        // If metricMode + gSpatialDiag present, derive a simple scalar proxy for audit:
+        // theta_metric ≈ sqrt( max( |g_xx-1|, |g_yy-1|, |g_zz-1| ) )
+        if (U.metricMode && Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length>=3) {
+          const gx = +U.gSpatialDiag[0] || 1, gy = +U.gSpatialDiag[1] || 1, gz = +U.gSpatialDiag[2] || 1;
+          const dx = Math.abs(gx-1), dy = Math.abs(gy-1), dz = Math.abs(gz-1);
+          const dev = Math.max(dx,dy,dz);
+          U.thetaScale_metric = Math.sqrt(Math.max(0, dev));
+        } else {
+          U.thetaScale_metric = undefined;
+        }
 
         // Apply mode specific overrides to visual parameters
         if (isREAL) {
