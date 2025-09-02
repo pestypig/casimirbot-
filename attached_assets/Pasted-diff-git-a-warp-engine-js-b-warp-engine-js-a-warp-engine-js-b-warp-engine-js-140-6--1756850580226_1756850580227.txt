@@ -1,0 +1,225 @@
+diff --git a/warp-engine.js b/warp-engine.js
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@ -140,6 +140,38 @@ function _redshiftProxy(U, viewN) {
+   return (1.0/N) - 1.0 + (b[0]*n[0] + b[1]*n[1] + b[2]*n[2]);
+ }
+ 
++// Lower index shift: β_i = γ_ij β^j  (ADM: g_{0i} = β_i)
++function _lowerShift_g0i(U) {
++  // build g_ij from symmetric or diag, else identity
++  let g;
++  if (Array.isArray(U.gSpatialSym) && U.gSpatialSym.length >= 6) {
++    const s = U.gSpatialSym.map(Number);
++    g = [
++      [s[0], s[3], s[5]],
++      [s[3], s[1], s[4]],
++      [s[5], s[4], s[2]]
++    ];
++  } else if (Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length >= 3) {
++    const d = U.gSpatialDiag.map(Number);
++    g = [
++      [d[0], 0, 0],
++      [0, d[1], 0],
++      [0, 0, d[2]]
++    ];
++  } else {
++    g = [[1,0,0],[0,1,0],[0,0,1]];
++  }
++  const b = Array.isArray(U.shiftBeta) ? U.shiftBeta.map(Number) : [0,0,0]; // β^j
++  // β_i = g_ij β^j
++  return [
++    g[0][0]*b[0] + g[0][1]*b[1] + g[0][2]*b[2],
++    g[1][0]*b[0] + g[1][1]*b[1] + g[1][2]*b[2],
++    g[2][0]*b[0] + g[2][1]*b[1] + g[2][2]*b[2],
++  ];
++}
++
++// Camera forward (world): derive from inverse of view matrix (row-major arrays)
++function _cameraForwardFromView(viewMat /* 4x4 Float32Array */) {
++  // In eye space, forward = -Z = (0,0,-1); transform by inverse(view) (rotation only)
++  // For our lookAt matrix, the third column of view^-1 is camera forward in world.
++  // Extract from view matrix columns (assuming orthonormal view).
++  const m = viewMat;
++  // view^-1 upper 3x3 is the transpose of view upper 3x3
++  const fwd = [ -m[2], -m[6], -m[10] ]; // minus third column of (view) transpose
++  const len = Math.hypot(fwd[0], fwd[1], fwd[2]) || 1;
++  return [fwd[0]/len, fwd[1]/len, fwd[2]/len];
++}
++
+ // WarpEngine (WebGL runtime)
+ // ------------------------------------------------------------
+@@ -534,6 +566,7 @@ function buildFragmentShaderSource(opts) {
+ uniform mat3 u_metric;
+ uniform mat3 u_metricInv;
+ uniform bool u_useMetric;
++uniform vec3 u_viewForward;  // camera forward (world→scene basis already applied)
+ 
+ // Metric diagnostics
+ uniform float u_lapseN;
+@@ -541,6 +574,7 @@ uniform vec3  u_shiftBeta;
+ uniform float u_redshiftProxy; // Derived diagnostic
++uniform vec3  u_g0i;           // Lowered shift (g_{0i} = β_i)
+ 
+ #endif
+ `;
+@@ -622,6 +656,34 @@ void main() {
+   vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
+ 
+   // Metric-aware screen-space curvature (adds ridge accent when enabled)
+ #ifdef GL_OES_standard_derivatives
+   vec3 Nm = normalWS;                        // already metric-aware above
+   float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
+ #else
+   float kScreen = 0.0;
+ #endif
+@@ -677,6 +739,41 @@ void main() {
+     return;
+   }
+ 
++  // ---- New: Optical scalars (proxy) color mode (7) -------------------------
++  // We approximate expansion θ_opt by the divergence of (normalized metric-normal),
++  // and shear magnitude σ_opt by the anisotropy of the gradient. This is a proxy,
++  // using screen-space derivatives (valid when TS ≫ 1 and fields vary slowly).
++  // If metric is off, we fall back to Euclidean normal derivatives.
++  if (colorI == 7) {
++    vec3 n = (u_metricOn > 0.5) ? normalize(u_metric * normalWS) : normalize(normalWS);
++    // finite differences in screen space
++    vec3 nx = dFdx(n), ny = dFdy(n);
++    // expansion proxy: divergence (trace)
++    float theta_opt = nx.x + ny.y + (nx.z + ny.z)*0.0; // z in screen not well-defined; keep 2D trace
++    // shear proxy: anisotropy of gradient (difference of principal components)
++    float sx = length(nx), sy = length(ny);
++    float sigma_opt = abs(sx - sy);
++    // blend a tiny lapse/shift cue via projection of g0i along view
++    float g0i_view = dot(normalize(u_g0i), normalize(u_viewForward));
++    float zCue = clamp(0.5 + 0.5 * g0i_view, 0.0, 1.0);
++    float eVis = clamp(0.5 + 0.5 * theta_opt, 0.0, 1.0);
++    float sVis = clamp(sigma_opt, 0.0, 1.0);
++    // map: shear → green channel, expansion → red/blue split, zCue modulates brightness
++    vec3 col7 = vec3(eVis, sVis, 1.0 - eVis);
++    col7 = mix(col7, col7 * (0.65 + 0.35*zCue), 0.5);
++    SET_FRAG(vec4(col7, 1.0));
++    return;
++  }
++
+   // Debug modes (4+)
+   if (colorI >= 4) {
+     float debug = abs(thetaField) * u_thetaScale; // Use thetaField for debug based on context
+     vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
+     col = debugColor;
+   }
+   SET_FRAG(vec4(col, 0.9));
+ }`;
+@@ -774,6 +863,8 @@ class WarpEngine {
+             // matrices / basics
+             mvpMatrix: gl.getUniformLocation(program, 'u_mvpMatrix'),
+             sheetColor: gl.getUniformLocation(program, 'u_sheetColor'),
++            viewForward: gl.getUniformLocation(program, 'u_viewForward'),
++            g0i: gl.getUniformLocation(program, 'u_g0i'),
+ 
+             // core physics chain
+             thetaScale: gl.getUniformLocation(program, 'u_thetaScale'),
+@@ -939,6 +1030,13 @@ class WarpEngine {
+     // Enhanced shader diagnostics for DAG panel
+     getShaderDiagnostics() {
+         if (!this.gl) return { status: 'no-context', message: 'No WebGL context' };
+@@ -1101,6 +1199,18 @@ class WarpEngine {
+         if (!this.gridProgram || !this.isLoaded) {
+             this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
+             return;
+         }
+         this._enqueueUniforms(parameters);
+     }
+ 
+@@ -1249,6 +1359,44 @@ class WarpEngine {
+         if (U.useMetric) {
+           if (Number.isFinite(U.lapseN)) {
+             const N = +U.lapseN;
+             const beta = Array.isArray(U.shiftBeta) ? U.shiftBeta : [0,0,0];
+             const b2 = beta[0]*beta[0] + beta[1]*beta[1] + beta[2]*beta[2];
+             U.redshiftProxy = 1/Math.max(1e-6, N) * Math.sqrt(1 + b2); // quick diagnostic
+           } else {
+             U.redshiftProxy = undefined;
+           }
++          // New: compute lowered shift g0i = β_i (ADM), expose to shader
++          U.g0i = _lowerShift_g0i(U);
++        }
++
++        // --- Camera forward (world) → shader uniform --------------------------
++        try {
++          const fwd = _cameraForwardFromView(this.viewMatrix);
++          U.viewForward = fwd;
++        } catch {}
++
++        // --- Tensor consistency diagnostic (θ vs θ̂_metric) -------------------
++        if (U.metricMode && (U.metric || U.gSpatialSym || U.gSpatialDiag)) {
++          const thetahat = _thetaFromMetric(U);
++          U.thetaScale_metric = thetahat;
++          if (Number.isFinite(U.thetaScale)) {
++            const eps = 1e-18;
++            const denom = Math.max(eps, Math.abs(U.thetaScale));
++            const mismatch = Math.abs(thetahat - U.thetaScale) / denom;
++            U.thetaInconsistency = mismatch;     // publish exact ratio
++            const tol = Number.isFinite(U.thetaTolerance) ? U.thetaTolerance : 0.25;
++            const flag = mismatch > tol;
++            U.tensorMismatch = !!flag;
++            if (flag && !this._warnedThetaOnce) {
++              console.warn(`[WarpEngine] θ inconsistency: metric θ̂=${thetahat.toExponential(3)} vs pipeline θ=${U.thetaScale.toExponential(3)} (ratio=${mismatch.toFixed(3)} > tol=${tol})`);
++              this._warnedThetaOnce = true;
++            }
++          }
++        } else {
++          U.thetaScale_metric = undefined;
++          U.thetaInconsistency = undefined;
++          U.tensorMismatch = false;
+         }
+ 
+         // ---- Physics uniforms (no defaults when strict) -------------------------
+         if (Number.isFinite(parameters.gammaGeo))           U.gammaGeo = N(parameters.gammaGeo);
+@@ -1462,6 +1600,24 @@ class WarpEngine {
+         // Ensure axesScene is defined for camera fitting
+         if (!U.axesScene) U.axesScene = [1,1,1];
+ 
++        // Upload view-forward & g0i now if program/locations are ready
++        try {
++          const gl = this.gl, prog = this.gridProgram, loc = this.gridUniforms;
++          if (gl && prog && loc) {
++            if (Array.isArray(U.viewForward) && loc.viewForward) {
++              gl.useProgram(prog);
++              gl.uniform3f(loc.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
++            }
++            if (Array.isArray(U.g0i) && loc.g0i) {
++              gl.useProgram(prog);
++              gl.uniform3f(loc.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
++            }
++          }
++        } catch (e) {
++          // non-fatal: uniforms will re-upload on next render
++        }
++
+         // Grid span for framing (derived or explicit)
+         let gridSpan = P.gridSpan ?? prev?.gridSpan;
+         if (!Number.isFinite(gridSpan) && U.axesScene) {
+             const hullMaxClip = Math.max(1e-6, U.axesScene[0], U.axesScene[1], U.axesScene[2]);
+             const spanPadding = P.gridSpanPadding ?? GRID_DEFAULTS.spanPadding;
+             gridSpan = Math.max(GRID_DEFAULTS.minSpan, hullMaxClip * spanPadding);
+         }
+         if (Number.isFinite(gridSpan)) U.gridSpan = gridSpan;
+@@ -2015,6 +2171,15 @@ class WarpEngine {
+       // core physics
+       if (loc.thetaScale && Number.isFinite(u.thetaScale)) gl.uniform1f(loc.thetaScale, u.thetaScale);
+       if (loc.colorMode)  gl.uniform1i(loc.colorMode,  u.colorMode|0);
+       if (loc.ridgeMode)  gl.uniform1i(loc.ridgeMode,  u.ridgeMode|0);
++      // tensor extras (uploaded every frame to stay in sync with camera)
++      if (loc.viewForward && Array.isArray(u.viewForward)) {
++        gl.uniform3f(loc.viewForward, u.viewForward[0], u.viewForward[1], u.viewForward[2]);
++      }
++      if (loc.g0i && Array.isArray(u.g0i)) {
++        gl.uniform3f(loc.g0i, u.g0i[0], u.g0i[1], u.g0i[2]);
++      }
++      if (loc.metricOn) gl.uniform1f(loc.metricOn, u.useMetric ? 1.0 : 0.0);
++
+       // sectoring
+       if (loc.sectorCount && Number.isFinite(u.sectorCount)) gl.uniform1i(loc.sectorCount, u.sectorCount|0);
+       if (loc.split       && Number.isFinite(u.split))       gl.uniform1i(loc.split,       u.split|0);
