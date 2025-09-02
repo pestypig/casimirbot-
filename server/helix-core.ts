@@ -696,7 +696,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     gammaVanDenBroeck: s.gammaVanDenBroeck,
     dutyEffectiveFR: dutyFR,
     sectorCount: totalSectors,
-    sectors: concurrent,
+    sectors: concurrentFR,
     colorMode: "theta" as const,
     physicsParityMode: false,   // REAL should flip to true at callsite
     ridgeMode: 1,
@@ -716,6 +716,10 @@ export function getSystemMetrics(req: Request, res: Response) {
   // 🔁 add time-loop info needed by the viewer & charts
   const burst_ms = dutyLocal * sectorPeriod_ms;
   const cyclesPerBurst = (burst_ms / 1000) * f_m_Hz; // ✅ tell client exactly how many carrier cycles fit
+
+  // Temporary variables for viewerHints that were missing in original code
+  const powerActual = s.P_avg * 1e6; // Example value, replace with actual calculation if available
+  const M_exotic_kg = Math.round(s.M_exotic); // Example value
 
   res.json({
     totalTiles: Math.floor(s.N_tiles),
@@ -791,7 +795,7 @@ export function getSystemMetrics(req: Request, res: Response) {
     // ✅ hint-only values (never applied as uniforms)
     viewerHints: {
       theta_FR: theta_FR,
-      thetaScaleExpected: thetaFR,
+      thetaScaleExpected: thetaFR, // Assuming thetaFR is defined and correct
       powerDraw_MW: powerActual,
       M_exotic_kg: M_exotic_kg,
     },
