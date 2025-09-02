@@ -470,6 +470,8 @@ function PaneOverlay(props:{
   const { engineRef, flavor, viewFraction, title, shipMassKg } = props;
   const [snap, setSnap] = useState<any>(null);
 
+  // Local alias for convenient, safe access in JSX
+  const s = snap ?? {};
   // live pull from the engine every frame
   useEffect(() => {
     let raf = 0;
@@ -555,10 +557,10 @@ function PaneOverlay(props:{
     <div className="inspector">
       <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m</div>
       <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m.toFixed(3) : '—'} m</div>
-      <div>θ (REAL, pipeline): {Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</div>
-      <div>θ (SHOW, pipeline): {Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</div>
-      <div>θ̂ (REAL, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
-      <div>θ̂ (SHOW, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
+      <div>θ (REAL, pipeline): {Number.isFinite(+s.thetaUniform) ? (+s.thetaUniform).toExponential(2) : '—'}</div>
+      <div>θ (SHOW, pipeline): {Number.isFinite(+s.thetaPhys)    ? (+s.thetaPhys).toExponential(2)    : '—'}</div>
+      <div>θ̂ (REAL, metric): {Number.isFinite(+s.thetaMetric)   ? (+s.thetaMetric).toExponential(2)   : '—'}</div>
+      <div>θ̂ (SHOW, metric): {Number.isFinite(+s.thetaMetric)   ? (+s.thetaMetric).toExponential(2)   : '—'}</div>
       <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
       { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
         <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
