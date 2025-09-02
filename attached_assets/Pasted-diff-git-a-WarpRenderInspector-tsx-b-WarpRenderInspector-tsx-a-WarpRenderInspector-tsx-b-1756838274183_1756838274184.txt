@@ -1,0 +1,67 @@
+diff --git a/WarpRenderInspector.tsx b/WarpRenderInspector.tsx
+--- a/WarpRenderInspector.tsx
++++ b/WarpRenderInspector.tsx
+@@ -1,6 +1,14 @@
+-import React, { useMemo } from "react";
++import React, { useMemo } from "react";
+ // …existing imports…
+ 
++// Harmonic-mean radius helper (meters ↔ ρ)
++function aHarmonic(ax?: number, ay?: number, az?: number) {
++  const a = +ax! || 0, b = +ay! || 0, c = +az! || 0;
++  const d = (a>0 ? 1/a : 0) + (b>0 ? 1/b : 0) + (c>0 ? 1/c : 0);
++  return d > 0 ? 3 / d : NaN;
++}
++
+ export function WarpRenderInspector(props: InspectorProps) {
+   const { engineLeft, engineRight } = props;
+-  const U = engineLeft?.current?.uniforms || {};
+-  const UR = engineRight?.current?.uniforms || {};
+-  // meters = wallWidth (rho) × harmonic-mean radius; no silent fallback
+-  const aHL = aHarmonic(UL.axesHull?.[0], UL.axesHull?.[1], UL.axesHull?.[2]);
+-  const aHR = aHarmonic(UR.axesHull?.[0], UR.axesHull?.[1], UR.axesHull?.[2]);
+-  const wL_m = (Number.isFinite(UL.wallWidth) && Number.isFinite(aHL)) ? UL.wallWidth*aHL : undefined;
+-  const wR_m = (Number.isFinite(UR.wallWidth) && Number.isFinite(aHR)) ? UR.wallWidth*aHR : undefined;
++  const UL: any = engineLeft?.current?.uniforms ?? {};
++  const UR: any = engineRight?.current?.uniforms ?? {};
++
++  // Prefer hull axes; fall back to scene axes
++  const aHL = aHarmonic(UL.axesHull?.[0] ?? UL.axesScene?.[0],
++                        UL.axesHull?.[1] ?? UL.axesScene?.[1],
++                        UL.axesHull?.[2] ?? UL.axesScene?.[2]);
++  const aHR = aHarmonic(UR.axesHull?.[0] ?? UR.axesScene?.[0],
++                        UR.axesHull?.[1] ?? UR.axesScene?.[1],
++                        UR.axesHull?.[2] ?? UR.axesScene?.[2]);
++
++  // Wall widths in ρ (engine uses `wallWidth`), and meters (no hidden defaults)
++  const wL_rho = Number.isFinite(+UL.wallWidth) ? +UL.wallWidth
++                 : (Number.isFinite(+UL.wallWidth_rho) ? +UL.wallWidth_rho : NaN);
++  const wR_rho = Number.isFinite(+UR.wallWidth) ? +UR.wallWidth
++                 : (Number.isFinite(+UR.wallWidth_rho) ? +UR.wallWidth_rho : NaN);
++  const wL_m = (Number.isFinite(wL_rho) && Number.isFinite(aHL)) ? wL_rho * aHL : undefined;
++  const wR_m = (Number.isFinite(wR_rho) && Number.isFinite(aHR)) ? wR_rho * aHR : undefined;
++
++  // Theta readouts (support both pipeline field names)
++  const thetaL = +(
++    UL.thetaScale ?? UL.thetaUniform ?? UL.thetaScale_actual ?? NaN
++  );
++  const thetaR = +(
++    UR.thetaScale ?? UR.thetaUniform ?? UR.thetaScale_actual ?? NaN
++  );
+ 
+   return (
+     <div className="inspector">
+-      <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m!.toFixed(3) : '—'} m</div>
+-      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m!.toFixed(3) : '—'} m</div>
+-      <div>θ (REAL, pipeline): {Number.isFinite(UL.thetaScale) ? UL.thetaScale.toExponential(3) : '—'}</div>
+-      <div>θ (SHOW, pipeline): {Number.isFinite(UR.thetaScale) ? UR.thetaScale.toExponential(3) : '—'}</div>
++      <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m ({Number.isFinite(wL_rho) ? wL_rho.toFixed(6) : '—'} ρ)</div>
++      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m.toFixed(3) : '—'} m ({Number.isFinite(wR_rho) ? wR_rho.toFixed(6) : '—'} ρ)</div>
++      <div>θ (REAL, pipeline): {Number.isFinite(thetaL) ? thetaL.toExponential(3) : '—'}</div>
++      <div>θ (SHOW, pipeline): {Number.isFinite(thetaR) ? thetaR.toExponential(3) : '—'}</div>
+       { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
+         <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
+       }
+     </div>
+   );
+ }
