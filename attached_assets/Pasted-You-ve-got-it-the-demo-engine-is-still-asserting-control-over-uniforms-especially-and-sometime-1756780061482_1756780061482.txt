@@ -1,0 +1,101 @@
+You’ve got it—the “demo” engine is still asserting control over uniforms (especially θ) and sometimes parity, which fights the authoritative engine. Here’s exactly what you can safely cut from public/warp-engine.demo.js, and what the big engine will handle instead.
+
+What to strip from the demo (safe to remove)
+
+θ authority (all computation + writes)
+Delete the whole block where the demo computes θ and then writes both thetaScale_actual and thetaScale back into uniforms. That’s the root cause of the drift/flicker. In your demo file this is the block that calls _computeThetaScaleFromUniforms(…) and then mirrors the result into uniforms.thetaScale_actual and uniforms.thetaScale. Remove it entirely.
+
+Parity & ridge “enforcement”
+If the demo contains any logic that forces physicsParityMode or ridgeMode, remove it. The authoritative engine already enforces REAL vs SHOW and ridge shape correctly inside its update path; letting the demo touch those flags creates races. (The big engine does the enforcement here, so the demo shouldn’t.)
+
+“Standby neutralization” tweaks
+If the demo sets visualization gains to 1, zeroes curvature etc. during standby, remove these lines. Those belong to the single engine in charge (the authoritative one) and can cause interleaved state if the demo also applies them. (This block appears right after the θ write in the demo—delete it with the θ block.)
+
+Any θ helpers in the demo
+Remove helpers like _thetaCanonical or _computeThetaScaleFromUniforms from the demo file. They’re no longer used once the demo stops owning θ. (They’re only there to feed the deleted block above.)
+
+Any grid/metric/shader “injection” that duplicates the big engine
+If the demo injects uniforms (metric, parity, ridge, display gains, etc.) or grid settings that the main engine already sets, delete those lines. The authoritative engine should be the single source of truth for render-state uniforms.
+
+What the authoritative engine will own after this
+
+Canonical θ chain (γ³ × q × γ_VdB × √duty) and exposure to UI via thetaScale_actual (no writes from the client or the demo).
+
+Parity & ridge enforcement for REAL vs SHOW.
+
+Grid deformation, metric handling, and shader/state pipeline (single place).
+
+Minimal patch you can apply to the demo
+
+Goal: demo becomes a thin, non-authoritative shim (or gracefully “goes dormant” if the big engine is present). It must not compute or write θ, must not enforce parity/ridge, and must not run a competing RAF if the big engine is loaded globally.
+
+--- a/public/warp-engine.demo.js
++++ b/public/warp-engine.demo.js
+@@
+- // Canonical θ from uniforms (aliases resolved inside)
+- const thetaScaleFromChain = this._computeThetaScaleFromUniforms({
+-   ...nextUniforms,
+-   dutyCycle: parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01,
+-   dutyEffectiveFR: parameters?.dutyEffectiveFR ?? nextUniforms.dutyEffectiveFR,
+-   sectors: parameters?.sectors ?? nextUniforms.sectors ?? 1,
+-   sectorCount: parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400,
+-   currentMode: parameters?.currentMode ?? nextUniforms.currentMode ?? 'hover',
+-   u_physicsParityMode: nextUniforms.physicsParityMode
+- });
+- this.__lastThetaTerms = { /* …debug snapshot… */ };
+- // ❌ demo must not write θ back into uniforms
+- this.uniforms.thetaScale_actual = thetaScaleFromChain;
+- this.uniforms.thetaScale        = thetaScaleFromChain;
+- this.uniforms.viewAvg           = parity;
+- if (mode === 'standby' && parity && thetaScaleFromChain > 0 && !this.__warnStandbyLeakOnce){
+-   console.warn('[warp-engine] Standby (REAL) θ non-zero', this.__lastThetaTerms);
+-   this.__warnStandbyLeakOnce = true;
+- }
++ // Demo no longer computes θ or writes it into uniforms.
++ // Authoritative engine owns thetaScale & thetaScale_actual.
+
+@@
+- // Publish FR explicitly (ok to leave if you still want to surface dFR to UI)
+  const dFRpub = Number.isFinite(+parameters?.dutyEffectiveFR)
+    ? Math.max(0, Math.min(1, +parameters.dutyEffectiveFR))
+    : Math.max(0, Math.min(1, (parameters?.dutyCycle ?? nextUniforms.dutyCycle ?? 0.01) *
+                             ((parameters?.sectors ?? nextUniforms.sectors ?? 1) /
+                              Math.max(1, (parameters?.sectorCount ?? nextUniforms.sectorCount ?? 400)))));
+  nextUniforms.dutyUsed        = dFRpub;
+  nextUniforms.dutyEffectiveFR = dFRpub;
+
+@@
+- // --- Neutralize visual boosts in standby (only for REAL parity) ---
+- if (mode === 'standby' && parity) {
+-   nextUniforms.vizGain = 1;
+-   nextUniforms.curvatureGainT = 0;
+-   nextUniforms.curvatureBoostMax = 1;
+-   nextUniforms.userGain = 1;
+-   nextUniforms.vShip = 0;
+- }
++ // Demo no longer changes gains in standby. Leave that to the main engine.
+
+@@
+- // (If present) remove any block that forces physicsParityMode/ridgeMode
+- // nextUniforms.physicsParityMode = true/false;
+- // nextUniforms.ridgeMode = 0/1;
++ // Demo does not enforce parity/ridge; authoritative engine does.
+
+@@
+- function _thetaCanonical(params) { /* … */ }
+- function _computeThetaScaleFromUniforms(u) { /* … */ }
++ // Remove unused θ helpers completely.
+
+
+Optional (but recommended) guard at the top of the demo:
+
+(function (g) {
+  // If the authoritative engine is already loaded, keep the demo dormant.
+  if (g.WarpEngine && !g.__ALLOW_WARP_DEMO__) {
+    console.info('[warp-engine.demo] dormant (authoritative WarpEngine present)');
+    // Provide a tiny shim so imports don’t crash:
+    g.WarpEngineDemo = function(canvas){ this.canvas = canvas; this.uniforms = {}; this.isLoaded = true; };
+    g.WarpEngineDemo.prototype.updateUniforms = function(){};
+    return;
+  }
+})(window);
