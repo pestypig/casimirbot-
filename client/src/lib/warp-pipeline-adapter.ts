@@ -34,6 +34,7 @@ export interface EnergyPipelineState {
   // Optional for fallbacks
   dutyEffective_FR?: number;
   thetaScaleExpected?: number;           // precomputed server value for verification
+  thetaScale?: number;                   // NEW: authoritative θ from pipeline (if provided)
 }
 
 /**
@@ -98,6 +99,12 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     gammaVdB *
     Math.sqrt(Math.max(1e-12, d_ship));
 
+  // Prefer a server-provided θ; else fall back to server audit; else local calc
+  const thetaForEngine =
+    num(s.thetaScale) ??
+    num(s.thetaScaleExpected) ??
+    thetaScaleExpected;
+
   // --- Burst Q for visuals (matches HELIX Q_BURST semantics) ---
   const Qburst = num(s.qCavity) ?? 1e9;
 
@@ -108,8 +115,9 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Physics/ops - include qSpoilingFactor in physics chain
       currentMode: s.currentMode,
       // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
-      dutyCycle: d_ship, // ship-wide effective duty
-      dutyEffectiveFR: d_ship, // FR duty for calculations
+      dutyCycle: d_ship,          // ship-wide effective duty
+      dutyEffectiveFR: d_ship,    // FR duty for calculations (explicit)
+      thetaScale: thetaForEngine, // NEW: explicit θ for renderer (authoritative when present)
       sectorCount: sectorsTotal, // total wedges
       sectors: split, // +/- split for viz that expects half-count
       gammaGeo,
