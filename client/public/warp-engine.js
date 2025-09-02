@@ -21,7 +21,7 @@
 // --- Grid defaults (scientifically scaled for needle hull) ---
 if (typeof window.GRID_DEFAULTS === 'undefined') {
   const isMobile = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchSupports > 0;
 
   window.GRID_DEFAULTS = {
     spanPadding: isMobile
@@ -750,19 +750,24 @@ uniform float u_metricOn;   // 0 = Euclidean, 1 = metric-enabled
 
 float dot_g(vec3 a, vec3 b){ return dot(a, u_metric * b); }
 float norm_g(vec3 v){ return sqrt(max(1e-12, dot_g(v,v))); }
-vec3  normalize_g(vec3 v){ float L = norm_g(v); return v / max(L, 1e-12); }
+vec3  normalize_g(vec3 v){ return v / max(L, 1e-12); }
 
-vec3 diverge(float t) {
-  float x = clamp((t+1.0)*0.5, 0.0, 1.0);
-  vec3 c1 = vec3(0.15, 0.45, 1.0);
-  vec3 c2 = vec3(1.0);
-  vec3 c3 = vec3(1.0, 0.45, 0.0);
-  return x < 0.5 ? mix(c1,c2, x/0.5) : mix(c2,c3,(x-0.5)/0.5);
+vec3 diverge(float u) {
+  // Linear interpolation between colors based on u in [0, 1]
+  vec3 c1 = vec3(0.15, 0.45, 1.0); // Blueish
+  vec3 c2 = vec3(1.0, 1.0, 0.0);  // Yellowish
+  vec3 c3 = vec3(1.0, 0.45, 0.0); // Reddish
+  u = clamp(u, 0.0, 1.0); // Ensure u is in [0, 1]
+  if (u < 0.5) {
+    return mix(c1, c2, u / 0.5);
+  } else {
+    return mix(c2, c3, (u - 0.5) / 0.5);
+  }
 }
 vec3 seqTealLime(float u) {
-  vec3 a = vec3(0.05, 0.30, 0.35);
-  vec3 b = vec3(0.00, 1.00, 0.60);
-  return mix(a,b, pow(u, 0.8));
+  vec3 a = vec3(0.05, 0.30, 0.35); // Dark Teal
+  vec3 b = vec3(0.00, 1.00, 0.60); // Bright Lime Green
+  return mix(a, b, pow(u, 0.8));
 }
 
 // Enhanced metric-aware helper functions
@@ -783,7 +788,7 @@ void main() {
   bool  isShowcase = !isREAL;
   int   ridgeI    = clamp(u_ridgeMode, 0, 1);
   float ridgeF    = float(ridgeI);
-  int   colorI    = clamp(u_colorMode, 0, 4);
+  int   colorI    = clamp(u_colorMode, 0, 6); // Allow 6 for curvature debug
 
   if (colorI == 0) {
     SET_FRAG(vec4(u_sheetColor, 0.85));
@@ -842,17 +847,20 @@ void main() {
 
   // --- Metric-aware screen-space curvature cue (adds soft ridge accent) ---
 #ifdef GL_OES_standard_derivatives
-  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, u_curvatureBoostMax);
-  if (ridgeI != 0) {
-    // when ridge overlay is on, blend in curvature to the shear proxy
-    shearProxy = clamp(shearProxy + 0.5 * curvVis, 0.0, 1.0);
-  }
+  // NOTE: kScreen is correctly declared and computed above. curvVis is also computed.
+  // No redeclaration needed here.
 #endif
+  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0); // Use computed values
+  float kval = shearProxy;
+  if (ridgeI > 0) {
+    // when ridge overlay is on, blend in curvature to the shear proxy
+    kval = clamp(mix(kval, kval + curvVis, 0.5), 0.0, 1.0);
+  }
 
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
   float valTheta  = thetaWithPurple * amp;
-  float valShear  = shearProxy * amp; // Apply amplitude to shear proxy as well
+  float valShear  = kval * amp; // Apply amplitude to the potentially modified shear proxy
 
   float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
   float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
@@ -863,8 +871,8 @@ void main() {
 
   // color mode mux
   vec3 col = (colorI == 1) ? diverge(tVis) : seqTealLime(sVis);
-  if (colorI == 6) {
-    col = seqTealLime(curvVis);
+  if (colorI == 6) { // Curvature debug mode
+    col = seqTealLime(curvVis); // Use the already computed curvature visibility
     SET_FRAG(vec4(col, 1.0)); return;
   }
 
@@ -1537,7 +1545,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             } else {
                 const A_geo = Math.pow(Math.max(1, gammaGeo), 3);
                 const beta_inst = A_geo * Math.max(1e-12, deltaAOverA) * Math.max(1, gammaVdB);
-                const beta_avg = beta_inst * Math.sqrt(Math.max(1e-12, dutyEffFR));
+                const beta_avg  = beta_inst * Math.sqrt(Math.max(1e-12, dutyEffFR));
                 // viewAvg determines if we use average beta or instantaneous
                 const viewAvg = (P.viewAvg ?? U.viewAvg ?? true);
                 thetaScaleFinal = viewAvg ? beta_avg : beta_inst;
@@ -1824,897 +1832,823 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
         const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
 
-        // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
-        if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
-            console.log("🧪 warp-mode", {
-                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, gammaGeo: gammaGeoUniform, Q: this.uniforms?.cavityQ,
-                dA_over_A: (this.uniforms?.deltaAOverA??this.uniforms?.qSpoilingFactor), gammaVdB: gammaVdBUniform,
-                sectors:sectorsUniform, phase: (this.uniforms?.phaseSplit ?? 0.5),
-                beta_inst:betaInstUniform.toExponential(2), beta_avg:betaAvgUniform.toExponential(2),
-                beta_net: (betaAvgUniform * (2*(this.uniforms?.phaseSplit??0.5) - 1)).toExponential(2),
-                theta_front_max:this.uniforms.thetaFrontMax, theta_rear_min:this.uniforms.thetaRearMin,
-                T00_avg_proxy:this.uniforms.T00avg, sigma_eff:1/Math.max(1e-4, this.uniforms.wallWidth_rho),
-                shear_avg_proxy: (this._accumShearN ? this._accumShear / this._accumShearN : 0),
-                york_sign_ok: (this.uniforms.thetaFrontMin<0 && this.uniforms.thetaRearMax>0),
-                hover_sym_ok: (Math.abs((this.uniforms?.phaseSplit??0.5)-0.5)<1e-3) && (Math.abs(this.uniforms.thetaFrontMax-this.uniforms.thetaRearMin)<0.1*this.uniforms.thetaFrontMax+1e-6),
-                // C) Additional physics values for CPU comparison
-                d_FR: dutyEffFR,
-                viewFraction: this.uniforms.viewFraction,
-                sectorFraction: this.uniforms.sectorFraction,
-                frameHash8x8: this.sampleHash8x8(),
+        // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
+        const betaVisUniform = betaUsedUniform;
 
-                // pane-aware (display only)
-                theta_front_max_viewed: this.uniforms.thetaFrontMax * Math.sqrt(this.uniforms.viewFraction),
-                theta_rear_min_viewed:  this.uniforms.thetaRearMin  * Math.sqrt(this.uniforms.viewFraction),
-            });
-        }
+        // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
+        // For canonical Natário bubble, disable local gaussian bumps
+        const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
 
-        // Check for uniform updates
-        if (this._uniformsDirty) {
-            // (nothing special needed, just consume fresh uniforms)
-            this._uniformsDirty = false;
-        }
+        // --- (C) Gentler wall window for canonical smoothness ---
+        const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
+        const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
+                       : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
 
-        // Core displacement calculation loop (C²-smooth)
-        for (let i = 0; i < vtx.length; i += 3) {
-            const p = [vtx[i], vtx[i + 1], vtx[i + 2]];
+        // Local θ proxy (same kernel as shader)
+        const rs = rho;
+        const w  = Math.max(1e-6, w_rho_local);
+        const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
+        const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
 
-            // --- Smooth strobing sign using uniform sectors/split (C¹) ---
-            const theta = Math.atan2(p[2], p[0]);
-            const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
-            const sectorIdx = Math.floor(u * sectorsUniform);
+        // ≈ cos between surface normal and drive direction
+        const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
 
-            // Distance from the split boundary in sector units
-            const dist = (sectorIdx - splitUniform + 0.5);
-            const strobeWidth = 1.5; // wider for smoother canonical profile
-            const sgn = Math.tanh(-dist / strobeWidth); // smooth ±1
+        // Geometry amplitude should be monotonic with the slider and not instantly saturate.
+        // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
+        const T_gain       = this.uniforms?.curvatureGainT ?? 0.375;
+        const REF_BOOSTMAX = 40.0;                                  // fixed reference for "max slider"
+        const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
 
-            // --- Ellipsoidal signed distance ---
-            const rho = rhoEllipsoidal(p);            // ≈ |p| in ellipsoid coords
-            const sd = rho - 1.0;                     // negative inside wall
+        // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
+        // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
+        const exgLog  = Math.log10(Math.max(1, userGain));
+        // use the actual max from uniforms (fall back to REF_BOOSTMAX)
+        const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
+        const maxPush = 0.12
+          + 0.10 * (boostNow / Math.max(1, boostMax))
+          + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
+        const softClamp = (x, m) => m * Math.tanh(x / m);
 
+        // disp calculation for geometry
+        let disp = gridK * Math.min(1.0, Math.log10(1.0 + betaUsedUniform * userGain * modeScale)) * wallWin * front * sgn * gaussian_local;
+        disp = softClamp(disp, maxPush);
 
+        // ----- Interior gravity (shift vector "tilt") -----
+        // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
+        // CPU interior window width: derive from the unified rho width
+        const w_int = Number.isFinite(this.uniforms?.intWidth)
+          ? Math.max(0.002, +this.uniforms.intWidth)
+          : Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.06), 0.02);
+        // --- end interior gravity -----
+        // Project normal onto "down" and keep sign stable
+        const epsTilt = this.uniforms?.epsilonTilt ?? 0.0;
+        const tiltGain = this.uniforms?.tiltGain ?? 0.55;
+        const betaTilt = this.uniforms?.betaTiltVec || [0,-1,0];
+        const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
+        // scale small, interior-only, soft-clamped
+        let dispTilt = epsTilt * tiltGain * Math.max(0,sd) * downDot; // only interior gravity
+        const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
+        dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
+        // ----- end interior gravity -----
 
-            // --- Surface normal ---
-            const n = nEllipsoid(p, axesScene);
-
-            // --- (B) Soft front/back polarity (C¹-continuous) ---
-            const dotND = n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2];
-            const front = Math.tanh(dotND / 0.15);          // softer front polarity for canonical smoothness
-
-            // --- Mode gains removed (cosmetic slider controls all exaggeration) ---
-
-            // --- Local wall thickness in ellipsoidal ρ (correct units) ---
-            // Use ρ-units directly. If meters were provided, we already converted to wallWidth_rho above.
-            const w_rho_local = Math.max(1e-4, wallWidth_rho);
-
-            // ---- Existing physics chain (do not change) ----
-            const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
-            const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
-            const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
-            const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
-
-            const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
-            const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-            const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
-
-            // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
-            const betaVisUniform = betaUsedUniform;
-
-            // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
-            // For canonical Natário bubble, disable local gaussian bumps
-            const gaussian_local = 1.0; // smooth canonical profile (no organ-pipe bumps)
-
-            // --- (C) Gentler wall window for canonical smoothness ---
-            const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
-            const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0
-                           : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin))); // gentle falloff
-
-            // Local θ proxy (same kernel as shader)
-            const rs = rho;
-            const w  = Math.max(1e-6, w_rho_local);
-            const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
-            const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
-
-            // ≈ cos between surface normal and drive direction
-            const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
-
-            // Geometry amplitude should be monotonic with the slider and not instantly saturate.
-            // A_geom is normalized so that T=0 -> ~0, T=1 -> ~1, regardless of absolute physics magnitude.
-            const T_gain       = this.uniforms?.curvatureGainT ?? 0.375;
-            const REF_BOOSTMAX = 40.0;                                  // fixed reference for "max slider"
-            const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
-
-            // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
-            // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
-            const exgLog  = Math.log10(Math.max(1, userGain));
-            // use the actual max from uniforms (fall back to REF_BOOSTMAX)
-            const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
-            const maxPush = 0.12
-              + 0.10 * (boostNow / Math.max(1, boostMax))
-              + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
-            const softClamp = (x, m) => m * Math.tanh(x / m);
-
-            // disp calculation for geometry
-            let disp = gridK * Math.min(1.0, Math.log10(1.0 + betaUsedUniform * userGain * modeScale)) * wallWin * front * sgn * gaussian_local;
-            disp = softClamp(disp, maxPush);
-
-            // ----- Interior gravity (shift vector "tilt") -----
-            // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
-            // CPU interior window width: derive from the unified rho width
-            const w_int = Number.isFinite(this.uniforms?.intWidth)
-              ? Math.max(0.002, +this.uniforms.intWidth)
-              : Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.06), 0.02);
-            // --- end interior gravity -----
-            // Project normal onto "down" and keep sign stable
-            const epsTilt = this.uniforms?.epsilonTilt ?? 0.0;
-            const tiltGain = this.uniforms?.tiltGain ?? 0.55;
-            const betaTilt = this.uniforms?.betaTiltVec || [0,-1,0];
-            const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
-            // scale small, interior-only, soft-clamped
-            let dispTilt = epsTilt * tiltGain * Math.max(0,sd) * downDot; // only interior gravity
-            const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
-            dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
-            // ----- end interior gravity -----
-
-            // apply both curvature and tilt
-            vtx[i]     = p[0] - n[0] * (disp + dispTilt);
-            vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
-            vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
-        }
-
-        // Enhanced diagnostics - check for amplitude overflow
-        let maxRadius = 0, maxDisp = 0;
-        for (let i = 0; i < vtx.length; i += 3) {
-            const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
-            maxRadius = Math.max(maxRadius, r);
-            // Check displacement from original
-            if (this.originalGridVertices) {
-                const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
-                maxDisp = Math.max(maxDisp, Math.abs(r - origR));
-            }
-        }
-        console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
-        console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
-
-        let ymax = -1e9, ymin = 1e9;
-        for (let i = 1; i < vtx.length; i += 3) {
-            const y = vtx[i];
-            if (y > ymax) ymax = y;
-            if (y < ymin) ymin = y;
-        }
-        console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
-        console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
-        console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
-
-        // Update uniforms for scientific consistency (using scene-scaled axes)
-        this.uniforms.axesClip = axesScene;
-        this.uniforms.wallWidth = wallWidth_rho; // Alias for shader
-        this.uniforms.hullDimensions = { a: a_m, b: b_m, c: c_m, aH, SCENE_SCALE, wallWidth_m };
-
-        // Regenerate grid with proper span for hull size
-        if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
-            console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
-            this.currentGridSpan = targetSpan;
-            this._gridSpan = targetSpan; // keep camera resize hint fresh
-            const newGridData = this._createGrid(targetSpan, gridDivisions);
-
-            // Update both current and original vertices
-            this.gridVertices = newGridData;
-            this.originalGridVertices = new Float32Array(newGridData);
-
-            // Upload new geometry to GPU efficiently
-            this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
-            if (this._vboBytes !== this.gridVertices.byteLength) {
-                // Buffer size changed, need full reallocation
-                this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
-                this._vboBytes = this.gridVertices.byteLength;
-            } else {
-                // Buffer size unchanged, use cheaper subdata update
-                this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
-            }
-
-            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a_m}×${b_m}×${c_m}]m`);
-
-            // Adjust camera framing for larger grids
-            this._adjustCameraForSpan(targetSpan);
-        }
+        // apply both curvature and tilt
+        vtx[i]     = p[0] - n[0] * (disp + dispTilt);
+        vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
+        vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
     }
 
-    _renderGridPoints() {
-        const gl = this.gl;
-        if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-            if (!this._warnNoProgramOnce) {
-                console.warn(`[${this.debugTag}] Grid program not ready yet; waiting for shader link…`);
-                this._warnNoProgramOnce = true;
-            }
-            return;
+    // Enhanced diagnostics - check for amplitude overflow
+    maxRadius = 0, maxDisp = 0;
+    for (let i = 0; i < vtx.length; i += 3) {
+        const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
+        maxRadius = Math.max(maxRadius, r);
+        // Check displacement from original
+        if (this.originalGridVertices) {
+            const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
+            maxDisp = Math.max(maxDisp, Math.abs(r - origR));
+        }
+    }
+    console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
+    console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
+
+    let ymax = -1e9, ymin = 1e9;
+    for (let i = 1; i < vtx.length; i += 3) {
+        const y = vtx[i];
+        if (y > ymax) ymax = y;
+        if (y < ymin) ymin = y;
+    }
+    console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
+    console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
+    console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
+
+    // Update uniforms for scientific consistency (using scene-scaled axes)
+    this.uniforms.axesClip = axesScene;
+    this.uniforms.wallWidth = wallWidth_rho; // Alias for shader
+    this.uniforms.hullDimensions = { a: a_m, b: b_m, c: c_m, aH, SCENE_SCALE, wallWidth_m };
+
+    // Regenerate grid with proper span for hull size
+    if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
+        console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
+        this.currentGridSpan = targetSpan;
+        this._gridSpan = targetSpan; // keep camera resize hint fresh
+        const newGridData = this._createGrid(targetSpan, gridDivisions);
+
+        // Update both current and original vertices
+        this.gridVertices = newGridData;
+        this.originalGridVertices = new Float32Array(newGridData);
+
+        // Upload new geometry to GPU efficiently
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
+        if (this._vboBytes !== this.gridVertices.byteLength) {
+            // Buffer size changed, need full reallocation
+            this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
+            this._vboBytes = this.gridVertices.byteLength;
+        } else {
+            // Buffer size unchanged, use cheaper subdata update
+            this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
         }
 
-        // Show diagnostics if strict is missing inputs
-        if (this.strictPhysics && this.uniforms?.__error) {
-          gl.clearColor(0.2, 0.0, 0.0, 1.0);
-          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-          return;
+        console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a_m}×${b_m}×${c_m}]m`);
+
+        // Adjust camera framing for larger grids
+        this._adjustCameraForSpan(targetSpan);
+    }
+}
+
+_renderGridPoints() {
+    const gl = this.gl;
+    if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+        if (!this._warnNoProgramOnce) {
+            console.warn(`[${this.debugTag}] Grid program not ready yet; waiting for shader link…`);
+            this._warnNoProgramOnce = true;
         }
-
-        gl.useProgram(this.gridProgram);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        const loc = this.gridAttribs.position;
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
-
-        const U = this.uniforms || {};
-
-        // --- names / helpers
-        const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
-        const F = (x, d)=> Number.isFinite(x) ? +x : d;
-        const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
-
-        // --- colors / matrices you already set:
-        gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
-        gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
-
-        // --- modes / sectoring (use lowercase names in the shader)
-        if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(U.colorMode, 1));
-        if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(U.ridgeMode, 1));
-        if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     U.physicsParityMode ? 1 : 0);
-        const sLive  = Math.max(1, (U.sectors|0)      || 1);
-        const sTotal = Math.max(1, (U.sectorCount|0)  || sLive);
-        if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
-        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(U.split,0))));
-
-        // --- axes (scene-normalized and legacy hull)
-        const axesScene = U.axesClip || U.axesScene || [1,1,1];
-        const hullAxes  = U.hullAxes || [503.5, 132.0, 86.5];
-        if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
-        if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
-
-        // --- drive + wall
-        const drive = V3(U.driveDir, [1,0,0]);
-        // Use unified wallWidth_rho, aliased as wallWidth for the shader
-        const wRho  = F(U.wallWidth, WALL_RHO_DEFAULT);
-        if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
-        if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
-
-        // --- critical amplitude carrier INSIDE theta field:
-        const vShip = Number.isFinite(U.vShip) ? U.vShip : (U.physicsParityMode ? 0.0 : 1.0);
-        if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
-
-        // --- θ-scale (you already set a fallback in JS if missing)
-        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0); // Direct pipeline value, no fallback amplification
-
-        // --- exposure / viz chain
-        if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(U.exposure, U.physicsParityMode ? 3.5 : 6.0));
-        if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(U.zeroStop, U.physicsParityMode ? 1e-5 : 1e-7));
-        if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(U.userGain, 1.0));
-        if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(U.displayGain, 1.0));
-        if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(U.vizGain, 1.0));
-        if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(U.curvatureGainT, 0.0));
-        if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(U.curvatureBoostMax, 1.0));
-
-        // --- interior tilt (benign defaults)
-        if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(U.intWidth, 0.25));
-        if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(U.epsTilt,  0.0));
-        if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(U.tiltViz,  0.0));
-
-        // --- Purple shift uniforms
-        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(U.epsilonTilt, 0.0));
-        if (this.gridUniforms.betaTiltVec) {
-            const betaTilt = V3(U.betaTiltVec, [0, -1, 0]);
-            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
-        }
-
-        // --- Metric tensor uniforms (default to identity if not provided)
-        const metric = U.metric || [1,0,0, 0,1,0, 0,0,1];
-        const metricInv = U.metricInv || [1,0,0, 0,1,0, 0,0,1];
-        const useMetric = U.useMetric || false;
-        const metricOn = U.metricOn !== undefined ? U.metricOn : (useMetric ? 1.0 : 0.0);
-
-        if (this.gridUniforms.metric) {
-            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
-            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
-            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
-        }
-        if (this.gridUniforms.metricOn) {
-            gl.uniform1f(this.gridUniforms.metricOn, metricOn);
-        }
-
-
-        const vertexCount = (this.gridVertices?.length || 0) / 3;
-        if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
-
-        gl.disableVertexAttribArray(loc);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+        return;
     }
 
-    _renderLoop() {
-        this._raf = requestAnimationFrame(() => this._renderLoop());
-        this._render();
+    // Show diagnostics if strict is missing inputs
+    if (this.strictPhysics && this.uniforms?.__error) {
+      gl.clearColor(0.2, 0.0, 0.0, 1.0);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      return;
     }
 
-    _render() {
-        if (this._destroyed) return;
-        const gl = this.gl;
-        // Guard: if program got torn down, try to rebuild once
-        if (!this.gridProgram && gl) {
-            try { this._compileGridShaders(); } catch (e) { console.warn('Autorelink failed:', e); }
-            return; // wait for shaders to (a)synchronously link
-        }
-        // Apply any pending updates now that shaders are ready
-        if (this._pendingUpdate && this.isLoaded && this.gridProgram) {
-            this._enqueueUniforms(this._pendingUpdate);
-            this._pendingUpdate = null;
-        }
-        // Add safety checks to prevent "stuck black" state
-        if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-            console.warn('[WarpEngine] Render blocked - missing requirements:', {
-                gl: !!gl,
-                isLoaded: this.isLoaded,
-                gridProgram: !!this.gridProgram,
-                gridUniforms: !!this.gridUniforms,
-                gridAttribs: !!this.gridAttribs
-            });
-            return;
-        }
-        // Check for lost context and try to restore
-        if (gl.isContextLost && gl.isContextLost()) {
-            try { gl.getExtension('WEBGL_lose_context')?.restoreContext?.(); } catch {}
-            return;
-        }
+    gl.useProgram(this.gridProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
+    const loc = this.gridAttribs.position;
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
 
+    const U = this.uniforms || {};
+
+    // --- names / helpers
+    const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
+    const F = (x, d)=> Number.isFinite(x) ? +x : d;
+    const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
+
+    // --- colors / matrices you already set:
+    gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
+    gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+    // --- modes / sectoring (use lowercase names in the shader)
+    if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(U.colorMode, 1));
+    if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(U.ridgeMode, 1));
+    if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     U.physicsParityMode ? 1 : 0);
+    const sLive  = Math.max(1, (U.sectors|0)      || 1);
+    const sTotal = Math.max(1, (U.sectorCount|0)  || sLive);
+    if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
+    if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(U.split,0))));
+
+    // --- axes (scene-normalized and legacy hull)
+    const axesScene = U.axesClip || U.axesScene || [1,1,1];
+    const hullAxes  = U.hullAxes || [503.5, 132.0, 86.5];
+    if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
+    if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
+
+    // --- drive + wall
+    const drive = V3(U.driveDir, [1,0,0]);
+    // Use unified wallWidth_rho, aliased as wallWidth for the shader
+    const wRho  = F(U.wallWidth, WALL_RHO_DEFAULT);
+    if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
+    if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
+
+    // --- critical amplitude carrier INSIDE theta field:
+    const vShip = Number.isFinite(U.vShip) ? U.vShip : (U.physicsParityMode ? 0.0 : 1.0);
+    if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
+
+    // --- θ-scale (you already set a fallback in JS if missing)
+    if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0); // Direct pipeline value, no fallback amplification
+
+    // --- exposure / viz chain
+    if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(U.exposure, U.physicsParityMode ? 3.5 : 6.0));
+    if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(U.zeroStop, U.physicsParityMode ? 1e-5 : 1e-7));
+    if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(U.userGain, 1.0));
+    if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(U.displayGain, 1.0));
+    if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(U.vizGain, 1.0));
+    if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(U.curvatureGainT, 0.0));
+    if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(U.curvatureBoostMax, 1.0));
+
+    // --- interior tilt (benign defaults)
+    if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(U.intWidth, 0.25));
+    if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(U.epsTilt,  0.0));
+    if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(U.tiltViz,  0.0));
+
+    // --- Purple shift uniforms
+    if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(U.epsilonTilt, 0.0));
+    if (this.gridUniforms.betaTiltVec) {
+        const betaTilt = V3(U.betaTiltVec, [0, -1, 0]);
+        gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+    }
+
+    // --- Metric tensor uniforms (default to identity if not provided)
+    const metric = U.metric || [1,0,0, 0,1,0, 0,0,1];
+    const metricInv = U.metricInv || [1,0,0, 0,1,0, 0,0,1];
+    const useMetric = U.useMetric || false;
+    const metricOn = U.metricOn !== undefined ? U.metricOn : (useMetric ? 1.0 : 0.0);
+
+    if (this.gridUniforms.metric) {
+        gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
+        gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
+        gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+    }
+    if (this.gridUniforms.metricOn) {
+        gl.uniform1f(this.gridUniforms.metricOn, metricOn);
+    }
+
+
+    const vertexCount = (this.gridVertices?.length || 0) / 3;
+    if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
+
+    gl.disableVertexAttribArray(loc);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+}
+
+_renderLoop() {
+    this._raf = requestAnimationFrame(() => this._renderLoop());
+    this._render();
+}
+
+_render() {
+    if (this._destroyed) return;
+    const gl = this.gl;
+    // Guard: if program got torn down, try to rebuild once
+    if (!this.gridProgram && gl) {
+        try { this._compileGridShaders(); } catch (e) { console.warn('Autorelink failed:', e); }
+        return; // wait for shaders to (a)synchronously link
+    }
+    // Apply any pending updates now that shaders are ready
+    if (this._pendingUpdate && this.isLoaded && this.gridProgram) {
+        this._enqueueUniforms(this._pendingUpdate);
+        this._pendingUpdate = null;
+    }
+    // Add safety checks to prevent "stuck black" state
+    if (!gl || !this.isLoaded || !this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
+        console.warn('[WarpEngine] Render blocked - missing requirements:', {
+            gl: !!gl,
+            isLoaded: this.isLoaded,
+            gridProgram: !!this.gridProgram,
+            gridUniforms: !!this.gridUniforms,
+            gridAttribs: !!this.gridAttribs
+        });
+        return;
+    }
+    // Check for lost context and try to restore
+    if (gl.isContextLost && gl.isContextLost()) {
+        try { gl.getExtension('WEBGL_lose_context')?.restoreContext?.(); } catch {}
+        return;
+    }
+
+    try {
+        // Clear the frame and enforce a single opaque pass
+        gl.disable(gl.BLEND);
+        gl.depthMask(true);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Render the spacetime grid
+        this._renderGridPoints();
+    } catch (err) {
+        console.error('[WarpEngine] render error:', err);
+    }
+
+    // Emit diagnostics for proof panel
+    if (this.onDiagnostics) {
         try {
-            // Clear the frame and enforce a single opaque pass
-            gl.disable(gl.BLEND);
-            gl.depthMask(true);
-            gl.clearColor(0, 0, 0, 1);
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-            // Render the spacetime grid
-            this._renderGridPoints();
-        } catch (err) {
-            console.error('[WarpEngine] render error:', err);
-        }
-
-        // Emit diagnostics for proof panel
-        if (this.onDiagnostics) {
-            try {
-                const diag = this.computeDiagnostics();
-                this.onDiagnostics(diag);
-            } catch(e){
-                console.warn('Diagnostics error:', e);
-            }
+            const diag = this.computeDiagnostics();
+            this.onDiagnostics(diag);
+        } catch(e){
+            console.warn('Diagnostics error:', e);
         }
     }
+}
 
 
 
-    // Matrix math utilities
-    _createShaderProgram(vertexSource, fragmentSource, onReady = null) {
-        const gl = this.gl;
+// Matrix math utilities
+_createShaderProgram(vertexSource, fragmentSource, onReady = null) {
+    const gl = this.gl;
 
-        const vertexShader   = this.compileShader(gl.VERTEX_SHADER,   vertexSource, 'vertex');
-        const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentSource, 'fragment');
-        if (!vertexShader || !fragmentShader) return null;
+    const vertexShader   = this.compileShader(gl.VERTEX_SHADER,   vertexSource, 'vertex');
+    const fragmentShader = this.compileShader(gl.FRAGMENT_SHADER, fragmentSource, 'fragment');
+    if (!vertexShader || !fragmentShader) return null;
 
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
 
-        // record initial debug
-        this._glStatus = {
-            vertOK: !!gl.getShaderParameter(vertexShader,   gl.COMPILE_STATUS),
-            fragOK: !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS),
-            linkOK: !!gl.getProgramParameter(program,       gl.LINK_STATUS),
-            vertLog: (gl.getShaderInfoLog(vertexShader)   || '').trim(),
-            fragLog: (gl.getShaderInfoLog(fragmentShader) || '').trim(),
-            linkLog: (gl.getProgramInfoLog(program)       || '').trim(),
-        };
-        (window.__glDiag ||= {})[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
+    // record initial debug
+    this._glStatus = {
+        vertOK: !!gl.getShaderParameter(vertexShader,   gl.COMPILE_STATUS),
+        fragOK: !!gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS),
+        linkOK: !!gl.getProgramParameter(program,       gl.LINK_STATUS),
+        vertLog: (gl.getShaderInfoLog(vertexShader)   || '').trim(),
+        fragLog: (gl.getShaderInfoLog(fragmentShader) || '').trim(),
+        linkLog: (gl.getProgramInfoLog(program)       || '').trim(),
+    };
+    (window.__glDiag ||= {})[this.canvas?.id || `engine_${Date.now()}`] = this._glStatus;
 
-        // expose a live program handle even during compile so panels can query status
-        this.program = this.gridProgram = program;
+    // expose a live program handle even during compile so panels can query status
+    this.program = this.gridProgram = program;
 
-        // --- Async path (KHR) ---
-        if (this.parallelShaderExt && onReady) {
-            this._setLoadingState('compiling');
-            this._pollShaderCompletion(program, (p) => {
-                if (!p) {
-                    this._setLoadingState('failed');
-                    onReady?.(null);
-                    return;
-                }
-                if (this._onProgramLinked(p)) {
-                    this.program = this.gridProgram = p;
-                    this._setLoadingState('linked');
-                    onReady?.(p);
-                } else {
-                    this._setLoadingState('failed');
-                    onReady?.(null);
-                }
-            });
-            return program;
-        }
+    // --- Async path (KHR) ---
+    if (this.parallelShaderExt && onReady) {
+        this._setLoadingState('compiling');
+        this._pollShaderCompletion(program, (p) => {
+            if (!p) {
+                this._setLoadingState('failed');
+                onReady?.(null);
+                return;
+            }
+            if (this._onProgramLinked(p)) {
+                this.program = this.gridProgram = p;
+                this._setLoadingState('linked');
+                onReady?.(p);
+            } else {
+                this._setLoadingState('failed');
+                onReady?.(null);
+            }
+        });
+        return program;
+    }
 
-        // --- Sync path ---
-        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-            const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
-            const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
-            const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
-            console.error(`[${this.debugTag}] Link error:`, { vsLog, fsLog, pgLog });
-            gl.deleteProgram(program);
-            this._setLoadingState('failed');
-            return null;
-        }
-
-        // success (sync)
-        if (this._onProgramLinked(program)) {
-            this.program = this.gridProgram = program;
-            this._setLoadingState('linked');
-            onReady?.(program);
-            return program;
-        }
+    // --- Sync path ---
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        const vsLog = gl.getShaderInfoLog(vertexShader) || '(vs ok)';
+        const fsLog = gl.getShaderInfoLog(fragmentShader) || '(fs ok)';
+        const pgLog = gl.getProgramInfoLog(program) || '(program no log)';
+        console.error(`[${this.debugTag}] Link error:`, { vsLog, fsLog, pgLog });
+        gl.deleteProgram(program);
         this._setLoadingState('failed');
         return null;
     }
 
-    _pollShaderCompletion(program, onReady) {
-        const gl = this.gl;
-        const ext = this.parallelShaderExt;
+    // success (sync)
+    if (this._onProgramLinked(program)) {
+        this.program = this.gridProgram = program;
+        this._setLoadingState('linked');
+        onReady?.(program);
+        return program;
+    }
+    this._setLoadingState('failed');
+    return null;
+}
 
-        const poll = () => {
-            const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
-            if (done) {
-                const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
-                if (ok) {
-                    onReady(program);
-                    this._setLoadingState('linked');
-                } else {
-                    console.error(`[${this.debugTag}] Shader program link error:`, gl.getProgramInfoLog(program));
-                    gl.deleteProgram(program);
-                    onReady(null);
-                    this._setLoadingState('failed');
-                }
+_pollShaderCompletion(program, onReady) {
+    const gl = this.gl;
+    const ext = this.parallelShaderExt;
+
+    const poll = () => {
+        const done = gl.getProgramParameter(program, ext.COMPLETION_STATUS_KHR);
+        if (done) {
+            const ok = gl.getProgramParameter(program, gl.LINK_STATUS);
+            if (ok) {
+                onReady(program);
+                this._setLoadingState('linked');
             } else {
-                requestAnimationFrame(poll);
-                this._setLoadingState('compiling'); // keep telling the world we're compiling
+                console.error(`[${this.debugTag}] Shader program link error:`, gl.getProgramInfoLog(program));
+                gl.deleteProgram(program);
+                onReady(null);
+                this._setLoadingState('failed');
             }
-        };
-        poll();
-    }
-
-    compileShader(type, source, shaderType = 'unknown') {
-        const shader = this.gl.createShader(type);
-        this.gl.shaderSource(shader, source);
-        this.gl.compileShader(shader);
-
-        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-            const error = this.gl.getShaderInfoLog(shader);
-            this.gl.deleteShader(shader);
-            console.error(`[${this.debugTag}] ${shaderType} shader compilation failed:`, error);
-            throw new Error(`[${this.debugTag}] ${shaderType} shader compilation failed: ${error}`);
         } else {
-            console.log(`[${this.debugTag}] ${shaderType} shader compiled successfully`);
+            requestAnimationFrame(poll);
+            this._setLoadingState('compiling'); // keep telling the world we're compiling
         }
+    };
+    poll();
+}
 
-        return shader;
+compileShader(type, source, shaderType = 'unknown') {
+    const shader = this.gl.createShader(type);
+    this.gl.shaderSource(shader, source);
+    this.gl.compileShader(shader);
+
+    if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
+        const error = this.gl.getShaderInfoLog(shader);
+        this.gl.deleteShader(shader);
+        console.error(`[${this.debugTag}] ${shaderType} shader compilation failed:`, error);
+        throw new Error(`[${this.debugTag}] ${shaderType} shader compilation failed: ${error}`);
+    } else {
+        console.log(`[${this.debugTag}] ${shaderType} shader compiled successfully`);
     }
 
-    _perspective(out, fovy, aspect, near, far) {
-        const f = 1.0 / Math.tan(fovy / 2);
-        const nf = 1.0 / (near - far);
+    return shader;
+}
 
-        out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
-        out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
-        out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
-        out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+_perspective(out, fovy, aspect, near, far) {
+    const f = 1.0 / Math.tan(fovy / 2);
+    const nf = 1.0 / (near - far);
+
+    out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+    out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+}
+
+_lookAt(out, eye, center, up) {
+    const x0 = eye[0], x1 = eye[1], x2 = eye[2];
+    const y0 = center[0], y1 = center[1], y2 = center[2];
+    const u0 = up[0], u1 = up[1], u2 = up[2];
+
+    let z0 = x0 - y0, z1 = x1 - y1, z2 = x2 - y2;
+    let len = 1 / Math.hypot(z0, z1, z2);
+    z0 *= len; z1 *= len; z2 *= len;
+
+    let x0_ = u1 * z2 - u2 * z1;
+    let x1_ = u2 * z0 - u0 * z2;
+    let x2_ = u0 * z1 - u1 * z0;
+    len = Math.hypot(x0_, x1_, x2_);
+    if (!len) {
+        x0_ = 0; x1_ = 0; x2_ = 0;
+    } else {
+        len = 1 / len;
+        x0_ *= len; x1_ *= len; x2_ *= len;
     }
 
-    _lookAt(out, eye, center, up) {
-        const x0 = eye[0], x1 = eye[1], x2 = eye[2];
-        const y0 = center[0], y1 = center[1], y2 = center[2];
-        const u0 = up[0], u1 = up[1], u2 = up[2];
+    let y0_ = z1 * x2_ - z2 * x1_;
+    let y1_ = z2 * x0_ - z0 * x2_;
+    let y2_ = z0 * x1_ - z1 * x0_;
 
-        let z0 = x0 - y0, z1 = x1 - y1, z2 = x2 - y2;
-        let len = 1 / Math.hypot(z0, z1, z2);
-        z0 *= len; z1 *= len; z2 *= len;
+    out[0] = x0_; out[1] = y0_; out[2] = z0; out[3] = 0;
+    out[4] = x1_; out[5] = y1_; out[6] = z1; out[7] = 0;
+    out[8] = x2_; out[9] = y2_; out[10] = z2; out[11] = 0;
+    out[12] = -(x0_ * x0 + x1_ * x1 + x2_ * x2);
+    out[13] = -(y0_ * x0 + y1_ * x1 + y2_ * x2);
+    out[14] = -(z0 * x0 + z1 * x1 + z2 * x2);
+    out[15] = 1;
+}
 
-        let x0_ = u1 * z2 - u2 * z1;
-        let x1_ = u2 * z0 - u0 * z2;
-        let x2_ = u0 * z1 - u1 * z0;
-        len = Math.hypot(x0_, x1_, x2_);
-        if (!len) {
-            x0_ = 0; x1_ = 0; x2_ = 0;
-        } else {
-            len = 1 / len;
-            x0_ *= len; x1_ *= len; x2_ *= len;
-        }
+_perspective(out, fovy, aspect, near, far) {
+    const f = 1.0 / Math.tan(fovy / 2);
+    const nf = 1.0 / (near - far);
 
-        let y0_ = z1 * x2_ - z2 * x1_;
-        let y1_ = z2 * x0_ - z0 * x2_;
-        let y2_ = z0 * x1_ - z1 * x0_;
+    out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+    out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+    out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+    out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+}
 
-        out[0] = x0_; out[1] = y0_; out[2] = z0; out[3] = 0;
-        out[4] = x1_; out[5] = y1_; out[6] = z1; out[7] = 0;
-        out[8] = x2_; out[9] = y2_; out[10] = z2; out[11] = 0;
-        out[12] = -(x0_ * x0 + x1_ * x1 + x2_ * x2);
-        out[13] = -(y0_ * x0 + y1_ * x1 + y2_ * x2);
-        out[14] = -(z0 * x0 + z1 * x1 + z2 * x2);
-        out[15] = 1;
+_multiply(out, a, b) {
+    const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+    const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+    const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+    const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+    let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+    out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+    b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+    out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+    b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+    out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+    b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+    out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+    out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+    out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+    out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+}
+
+// === Responsive camera helpers =============================================
+_fitFovForAspect(aspect) {
+    // Wider FOV when the canvas is tall (phones/portrait)
+    // desktop ~55°, phone ~68°
+    const fovDesktop = Math.PI / 3.272;  // ~55°
+    const fovPortrait = Math.PI / 2.65;  // ~68°
+    const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
+    return fovDesktop * (1 - t) + fovPortrait * t;
+}
+
+// axesScene is the ellipsoid semi-axes in scene units (what the renderer already uses)
+// spanHint is optional fallback (grid span in scene units)
+_fitCameraToBubble(axesScene, spanHint) {
+    const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+    const fov = this._fitFovForAspect(aspect);
+
+    // Bounding sphere radius of the ellipsoid (in scene units)
+    const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
+    const baseMargin = 1.22;                        // a hair more breathing room
+    const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
+
+    // Distance along -Z so bubble fits vertically
+    const dist = (margin * R) / Math.tan(fov * 0.5);
+
+    // Higher overhead perspective for better visualization
+    const eye = [0, 0.62 * R, -dist];      // match overhead height
+    // look further down to clearly show deck plane and interior effects
+    const center = [0, -0.12 * R, 0];      // match overhead look-down
+    const up = [0, 1, 0];
+
+    // Update projection & view
+    this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
+    this._lookAt(this.viewMatrix, eye, center, up);
+    this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
+
+    console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
+}
+
+// --- Bootstrap: set uniforms & fit camera before first frame ---------------
+bootstrap(initialParams = {}) {
+    this.currentParams = Object.assign({}, initialParams);
+    // Ensure canvas size is correct before we compute FOV/dist
+    this._resizeCanvasToDisplaySize();
+
+    // Let updateUniforms compute/remember axesScene & span, then fit
+    this.updateUniforms(initialParams);
+
+    // sets overhead once
+    this._setupCamera();
+    // only auto-fit if not explicitly locked
+    if (!this.uniforms.lockFraming) this._applyOverheadCamera();
+
+    // Mark so we don't rely on any legacy default camera
+    this._bootstrapped = true;
+}
+
+// --- Convenience method: Set curvature gain from 0-8 slider value --------
+setCurvatureGainDec(slider0to8, boostMax = 40) {
+    const T = Math.max(0, Math.min(1, slider0to8 / 8));
+    this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
+}
+
+setCosmeticLevel(level /* 1..10 */) {
+    const L = Math.max(1, Math.min(10, level));
+    this.updateUniforms({ cosmeticLevel: L });
+}
+
+// === Natário Diagnostics (viewer-only, does not affect physics) ===
+_computePipelineBetas(U){
+    const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || U.sectors || 1);
+    const gammaGeo     = U.gammaGeo || 0;
+    const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
+    const gammaVdB     = U.gammaVdB || 1.0;
+
+    const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
+    const betaAvg  = betaInst * Math.sqrt(Math.max(1e-12, (U.dutyCycle || 0) / sectors));
+    const phase    = (U.phaseSplit != null) ? U.phaseSplit :
+                    (U.currentMode === 'cruise' ? 0.65 : 0.50);
+    const betaNet  = betaAvg * (2*phase - 1);
+
+    return { betaInst, betaAvg, betaNet, sectors, phase };
+}
+
+_sampleYorkAndEnergy(U){
+    const axes  = U.axesClip || [0.40,0.22,0.22];
+    const w     = Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT);   // shell width in rho
+    const vShip = U.vShip || 1.0;
+    const d     = U.driveDir || [1,0,0];
+    const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
+                        const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
+
+    let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
+    const N=64;
+    for(let k=0;k<N;k++){
+        const ang=2*Math.PI*k/N;
+        const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
+        const rs=Math.hypot(...pN);
+        const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
+        const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
+        const dfdr=(-2.0*(rs-1)/(w*w))*f;
+
+        const theta = (U.ridgeMode===1)
+            ? vShip * (xs/rs) * f      // single crest
+            : vShip * (xs/rs) * dfdr;  // double-lobe
+        const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
+
+        if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
+        else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
+
+        eSum+=T00; n++;
     }
+    return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
+            T00avg:(n?eSum/n:0) };
+}
 
-    _perspective(out, fovy, aspect, near, far) {
-        const f = 1.0 / Math.tan(fovy / 2);
-        const nf = 1.0 / (near - far);
+computeDiagnostics(){
+    const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
+    const P=this._computePipelineBetas(U);
+    const Y=this._sampleYorkAndEnergy(U);
+    const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
+    const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
+    // Calculate shear average proxy and reset accumulators
+    const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
+    this._accumShear = 0;
+    this._accumShearN = 0;
 
-        out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
-        out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
-        out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
-        out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+    // C) Additional physics values for CPU comparison
+    // Single source of truth for duty: what the engine actually used
+    let d_FR = U.dutyEffectiveFR;
+    if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
+    if (!Number.isFinite(d_FR)) {
+        // final fallback: duty_local × (S_concurrent / S_total)
+        const dutyLocal = Number.isFinite(U.dutyLocal) ? U.dutyLocal : 0.01; // 1% default
+        const S_total   = Math.max(1, U.sectorCount ?? 400);
+        const S_live    = Math.max(1, U.sectors ?? 1);
+        d_FR = dutyLocal * (S_live / S_total);
     }
+    d_FR = Math.max(1e-12, d_FR);
 
-    _multiply(out, a, b) {
-        const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
-        const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
-        const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
-        const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+    // View mass fraction for displays (REAL shows ~1/sectorCount; SHOW uses 1.0)
+    const sectorFraction = Math.max(1, (U.sectors||1)) / Math.max(1, U.sectorCount||400);
+    const viewFraction = (U.viewAvg ?? true)
+        ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
+        : 1.0;
 
-        let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
-        out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-        out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-        out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-        out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
-
-        b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
-        out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-        out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-        out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-        out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
-
-        b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
-        out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-        out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-        out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-        out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
-
-        b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
-        out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
-        out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
-        out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
-        out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
-    }
-
-    // === Responsive camera helpers =============================================
-    _fitFovForAspect(aspect) {
-        // Wider FOV when the canvas is tall (phones/portrait)
-        // desktop ~55°, phone ~68°
-        const fovDesktop = Math.PI / 3.272;  // ~55°
-        const fovPortrait = Math.PI / 2.65;  // ~68°
-        const t = Math.min(1, Math.max(0, (1.2 - aspect) / 0.6)); // aspect<1.2 => more portrait
-        return fovDesktop * (1 - t) + fovPortrait * t;
-    }
-
-    // axesScene is the ellipsoid semi-axes in scene units (what the renderer already uses)
-    // spanHint is optional fallback (grid span in scene units)
-    _fitCameraToBubble(axesScene, spanHint) {
-        const aspect = this.canvas.width / Math.max(1, this.canvas.height);
-        const fov = this._fitFovForAspect(aspect);
-
-        // Bounding sphere radius of the ellipsoid (in scene units)
-        const R = axesScene ? Math.max(axesScene[0], axesScene[1], axesScene[2]) : (spanHint || 1);
-        const baseMargin = 1.22;                        // a hair more breathing room
-        const margin = baseMargin * (aspect < 1 ? 1.12 : 1.00);
-
-        // Distance along -Z so bubble fits vertically
-        const dist = (margin * R) / Math.tan(fov * 0.5);
-
-        // Higher overhead perspective for better visualization
-        const eye = [0, 0.62 * R, -dist];      // match overhead height
-        // look further down to clearly show deck plane and interior effects
-        const center = [0, -0.12 * R, 0];      // match overhead look-down
-        const up = [0, 1, 0];
-
-        // Update projection & view
-        this._perspective(this.projMatrix, fov, aspect, 0.1, 200.0);
-        this._lookAt(this.viewMatrix, eye, center, up);
-        this._multiply(this.mvpMatrix, this.projMatrix, this.viewMatrix);
-
-        console.log(`📷 Auto-frame: aspect=${aspect.toFixed(2)}, FOV=${(fov*180/Math.PI).toFixed(1)}°, dist=${dist.toFixed(2)}`);
-    }
-
-    // --- Bootstrap: set uniforms & fit camera before first frame ---------------
-    bootstrap(initialParams = {}) {
-        this.currentParams = Object.assign({}, initialParams);
-        // Ensure canvas size is correct before we compute FOV/dist
-        this._resizeCanvasToDisplaySize();
-
-        // Let updateUniforms compute/remember axesScene & span, then fit
-        this.updateUniforms(initialParams);
-
-        // sets overhead once
-        this._setupCamera();
-        // only auto-fit if not explicitly locked
-        if (!this.uniforms.lockFraming) this._applyOverheadCamera();
-
-        // Mark so we don't rely on any legacy default camera
-        this._bootstrapped = true;
-    }
-
-    // --- Convenience method: Set curvature gain from 0-8 slider value --------
-    setCurvatureGainDec(slider0to8, boostMax = 40) {
-        const T = Math.max(0, Math.min(1, slider0to8 / 8));
-        this.updateUniforms({ curvatureGainT: T, curvatureBoostMax: boostMax });
-    }
-
-    setCosmeticLevel(level /* 1..10 */) {
-        const L = Math.max(1, Math.min(10, level));
-        this.updateUniforms({ cosmeticLevel: L });
-    }
-
-    // === Natário Diagnostics (viewer-only, does not affect physics) ===
-    _computePipelineBetas(U){
-        const sectors      = Math.max(1, U.sectorCount || U.sectorStrobing || U.sectors || 1);
-        const gammaGeo     = U.gammaGeo || 0;
-        const dAa          = (U.deltaAOverA ?? U.qSpoilingFactor ?? 1.0);
-        const gammaVdB     = U.gammaVdB || 1.0;
-
-        const betaInst = Math.pow(Math.max(1, gammaGeo), 3) * Math.max(1e-12, dAa) * Math.max(1, gammaVdB);
-        const betaAvg  = betaInst * Math.sqrt(Math.max(1e-12, (U.dutyCycle || 0) / sectors));
-        const phase    = (U.phaseSplit != null) ? U.phaseSplit :
-                        (U.currentMode === 'cruise' ? 0.65 : 0.50);
-        const betaNet  = betaAvg * (2*phase - 1);
-
-        return { betaInst, betaAvg, betaNet, sectors, phase };
-    }
-
-    _sampleYorkAndEnergy(U){
-        const axes  = U.axesClip || [0.40,0.22,0.22];
-        const w     = Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT);   // shell width in rho
-        const vShip = U.vShip || 1.0;
-        const d     = U.driveDir || [1,0,0];
-        const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
-                            const m=Math.hypot(...t)||1; return [t[0]/m,t[1]/m,t[2]/m]; })();
-
-        let tfMax=-1e9, tfMin=1e9, trMax=-1e9, trMin=1e9, eSum=0, n=0;
-        const N=64;
-        for(let k=0;k<N;k++){
-            const ang=2*Math.PI*k/N;
-            const pN=[Math.cos(ang)*1.01, 0.0, Math.sin(ang)*1.01]; // ~on shell
-            const rs=Math.hypot(...pN);
-            const xs=pN[0]*dN[0]+pN[1]*dN[1]+pN[2]*dN[2];
-            const f=Math.exp(-((rs-1)*(rs-1))/(w*w));
-            const dfdr=(-2.0*(rs-1)/(w*w))*f;
-
-            const theta = (U.ridgeMode===1)
-                ? vShip * (xs/rs) * f      // single crest
-                : vShip * (xs/rs) * dfdr;  // double-lobe
-            const T00   = - (vShip*vShip) * (dfdr*dfdr) / (rs*rs+1e-6); // energy density proxy
-
-            if(xs>=0){ tfMax=Math.max(tfMax,theta); tfMin=Math.min(tfMin,theta); }
-            else     { trMax=Math.max(trMax,theta); trMin=Math.min(trMin,theta); }
-
-            eSum+=T00; n++;
-        }
-        return { thetaFrontMax:tfMax, thetaFrontMin:tfMin, thetaRearMax:trMax, thetaRearMin:trMin,
-                T00avg:(n?eSum/n:0) };
-    }
-
-    computeDiagnostics(){
-        const U = { ...(this.currentParams||{}), ...(this.uniforms||{}) };
-        const P=this._computePipelineBetas(U);
-        const Y=this._sampleYorkAndEnergy(U);
-        const frontAbs=Math.max(Math.abs(Y.thetaFrontMax),Math.abs(Y.thetaFrontMin));
-        const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
-        // Calculate shear average proxy and reset accumulators
-        const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
-        this._accumShear = 0;
-        this._accumShearN = 0;
-
+    const f_view = Math.max(1e-12, U.viewMassFraction ?? 1.0);
+    return {
+        mode: U.currentMode||'hover',
+        duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
+        dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
+        sectors:P.sectors, phase:P.phase,
+        beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
+        theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
+        theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
+        T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT),
+        shear_avg_proxy: shear_avg_proxy,
+        york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
+        hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(Y.thetaFrontMax-Y.thetaRearMin)<0.1*Y.thetaFrontMax+1e-6),
         // C) Additional physics values for CPU comparison
-        // Single source of truth for duty: what the engine actually used
-        let d_FR = U.dutyEffectiveFR;
-        if (!Number.isFinite(d_FR)) d_FR = U.dutyUsed;
-        if (!Number.isFinite(d_FR)) {
-            // final fallback: duty_local × (S_concurrent / S_total)
-            const dutyLocal = Number.isFinite(U.dutyLocal) ? U.dutyLocal : 0.01; // 1% default
-            const S_total   = Math.max(1, U.sectorCount ?? 400);
-            const S_live    = Math.max(1, U.sectors ?? 1);
-            d_FR = dutyLocal * (S_live / S_total);
+        d_FR,
+        viewFraction,
+        sectorFraction,
+        frameHash8x8: this.sampleHash8x8(),
+
+        // pane-aware (display only)
+        theta_front_max_viewed: Y.thetaFrontMax * Math.sqrt(f_view),
+        theta_rear_min_viewed:  Y.thetaRearMin  * Math.sqrt(f_view),
+    };
+}
+
+setUniform(name, value) {
+    if (!this.gl || !this.gridProgram) return;
+
+    const gl = this.gl;
+    const location = gl.getUniformLocation(this.gridProgram, name);
+    if (location !== null) {
+        gl.useProgram(this.gridProgram);
+        if (typeof value === 'number') {
+            gl.uniform1f(location, value);
+        } else if (Array.isArray(value)) {
+            if (value.length === 2) gl.uniform2fv(location, value);
+            else if (value.length === 3) gl.uniform3fv(location, value);
+            else if (value.length === 4) gl.uniform4fv(location, value);
         }
-        d_FR = Math.max(1e-12, d_FR);
-
-        // View mass fraction for displays (REAL shows ~1/sectorCount; SHOW uses 1.0)
-        const sectorFraction = Math.max(1, (U.sectors||1)) / Math.max(1, U.sectorCount||400);
-        const viewFraction = (U.viewAvg ?? true)
-            ? (U.viewMassFraction ?? (U.physicsParityMode ? 1/Math.max(1, U.sectorCount||400) : 1.0))
-            : 1.0;
-
-        const f_view = Math.max(1e-12, U.viewMassFraction ?? 1.0);
-        return {
-            mode: U.currentMode||'hover',
-            duty: U.dutyCycle, gammaGeo: U.gammaGeo, Q: (U.Qburst??U.cavityQ),
-            dA_over_A:(U.deltaAOverA??U.qSpoilingFactor), gammaVdB:(U.gammaVdB||1),
-            sectors:P.sectors, phase:P.phase,
-            beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
-            theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
-            theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
-            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT),
-            shear_avg_proxy: shear_avg_proxy,
-            york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
-            hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(Y.thetaFrontMax-Y.thetaRearMin)<0.1*Y.thetaFrontMax+1e-6),
-            // C) Additional physics values for CPU comparison
-            d_FR,
-            viewFraction,
-            sectorFraction,
-            frameHash8x8: this.sampleHash8x8(),
-
-            // pane-aware (display only)
-            theta_front_max_viewed: Y.thetaFrontMax * Math.sqrt(f_view),
-            theta_rear_min_viewed:  Y.thetaRearMin  * Math.sqrt(f_view),
-        };
+        console.log(`🎛️ setUniform: ${name} = ${value}`);
     }
+}
 
-    setUniform(name, value) {
-        if (!this.gl || !this.gridProgram) return;
+setDisplayGain(gain) {
+    // strictly the shader's u_displayGain (used only when parity=false)
+    this.updateUniforms({ displayGain: Math.max(1, +gain) });
+}
 
+setUserGain(gain) {
+    // strictly the shader's u_userGain (multiplies both modes)
+    this.updateUniforms({ userGain: Math.max(1, +gain) });
+}
+
+// === C) Frame hash for checkpoint validation ===
+sampleHash8x8() {
+    if (!this.gl || !this.canvas) return 0;
+
+    try {
         const gl = this.gl;
-        const location = gl.getUniformLocation(this.gridProgram, name);
-        if (location !== null) {
-            gl.useProgram(this.gridProgram);
-            if (typeof value === 'number') {
-                gl.uniform1f(location, value);
-            } else if (Array.isArray(value)) {
-                if (value.length === 2) gl.uniform2fv(location, value);
-                else if (value.length === 3) gl.uniform3fv(location, value);
-                else if (value.length === 4) gl.uniform4fv(location, value);
-            }
-            console.log(`🎛️ setUniform: ${name} = ${value}`);
-        }
-    }
+        const w = this.canvas.width;
+        const h = this.canvas.height;
 
-    setDisplayGain(gain) {
-        // strictly the shader's u_displayGain (used only when parity=false)
-        this.updateUniforms({ displayGain: Math.max(1, +gain) });
-    }
+        // Sample 8x8 grid across canvas
+        const pixels = new Uint8Array(64 * 4); // 8x8 RGBA
+        const stepX = Math.max(1, Math.floor(w / 8));
+        const stepY = Math.max(1, Math.floor(h / 8));
 
-    setUserGain(gain) {
-        // strictly the shader's u_userGain (multiplies both modes)
-        this.updateUniforms({ userGain: Math.max(1, +gain) });
-    }
+        let hash = 0;
+        for (let y = 0; y < 8; y++) {
+            for (let x = 0; x < 8; x++) {
+                const px = Math.min(w - 1, x * stepX);
+                const py = Math.min(h - 1, y * stepY);
 
-    // === C) Frame hash for checkpoint validation ===
-    sampleHash8x8() {
-        if (!this.gl || !this.canvas) return 0;
+                const rgba = new Uint8Array(4);
+                gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
 
-        try {
-            const gl = this.gl;
-            const w = this.canvas.width;
-            const h = this.canvas.height;
+                // XOR + simple hash
+                const idx = (y * 8 + x) * 4;
+                pixels[idx] = rgba[0];
+                pixels[idx + 1] = rgba[1];
+                pixels[idx + 2] = rgba[2];
+                pixels[idx + 3] = rgba[3];
 
-            // Sample 8x8 grid across canvas
-            const pixels = new Uint8Array(64 * 4); // 8x8 RGBA
-            const stepX = Math.max(1, Math.floor(w / 8));
-            const stepY = Math.max(1, Math.floor(h / 8));
-
-            let hash = 0;
-            for (let y = 0; y < 8; y++) {
-                for (let x = 0; x < 8; x++) {
-                    const px = Math.min(w - 1, x * stepX);
-                    const py = Math.min(h - 1, y * stepY);
-
-                    const rgba = new Uint8Array(4);
-                    gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
-
-                    // XOR + simple hash
-                    const idx = (y * 8 + x) * 4;
-                    pixels[idx] = rgba[0];
-                    pixels[idx + 1] = rgba[1];
-                    pixels[idx + 2] = rgba[2];
-                    pixels[idx + 3] = rgba[3];
-
-                    hash ^= (rgba[0] << 24) | (rgba[1] << 16) | (rgba[2] << 8) | rgba[3];
-                    hash = ((hash << 1) | (hash >>> 31)) & 0xFFFFFFFF; // rotate left
-                }
-            }
-
-            return hash;
-        } catch (e) {
-            console.warn('sampleHash8x8 error:', e);
-            return 0;
-        }
-    }
-
-    setPresetParity() {
-        this.updateUniforms({
-            physicsParityMode: true,
-            viewAvg: true,
-            ridgeMode: 0,              // show true physics double-lobe
-            curvatureGainT: 0.0,
-            curvatureBoostMax: 1.0,
-            exposure: 3.5,
-            zeroStop: 1e-5,
-            vizGain: 1.0,
-            userGain: 1.0
-        });
-    }
-
-    setPresetShowcase() {
-        this.updateUniforms({
-            physicsParityMode: false,
-            viewAvg: false,
-            ridgeMode: 1,              // clean single crest at ρ=1
-            curvatureGainT: 0.6,       // slider blend → boost
-            curvatureBoostMax: 40.0,
-            exposure: 6.0,
-            zeroStop: 1e-7,
-            vizGain: 1.0,
-            userGain: 4.0
-        });
-    }
-
-    destroy() {
-        if (this._destroyed) return;
-        this._destroyed = true;
-        // Clean up per-canvas guard
-        if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
-            window.__WARP_ENGINES.delete(this.canvas);
-        }
-
-        // Cancel animation frame
-        if (this._raf) {
-            cancelAnimationFrame(this._raf);
-            this._raf = null;
-        }
-
-        // Clean up event listeners
-        window.removeEventListener('resize', this._resize);
-        // Remove globals we installed
-        if (window.__warp_setGainDec === this.__warp_setGainDec) {
-            delete window.__warp_setGainDec;
-        }
-        if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
-            delete window.__warp_setCosmetic;
-        }
-        try { this._offStrobe?.(); } catch {}
-
-        // Clean up WebGL resources
-        const gl = this.gl;
-        if (gl) {
-            if (this.gridProgram) {
-                gl.deleteProgram(this.gridProgram);
-                this.gridProgram = null;
-            }
-
-            if (this.gridVbo) {
-                gl.deleteBuffer(this.gridVbo);
-                this.gridVbo = null;
+                hash ^= (rgba[0] << 24) | (rgba[1] << 16) | (rgba[2] << 8) | rgba[3];
+                hash = ((hash << 1) | (hash >>> 31)) & 0xFFFFFFFF; // rotate left
             }
         }
-        this.program = null;
-        this.gridUniforms = null;
-        this.gridAttribs = null;
 
-        // Clear callbacks
-        this.onDiagnostics = null;
-
-        // Clear vertex arrays
-        this.gridVertices = null;
-        this.originalGridVertices = null;
-
-        console.log("WarpEngine resources cleaned up");
+        return hash;
+    } catch (e) {
+        console.warn('sampleHash8x8 error:', e);
+        return 0;
     }
+}
+
+setPresetParity() {
+    this.updateUniforms({
+        physicsParityMode: true,
+        viewAvg: true,
+        ridgeMode: 0,              // show true physics double-lobe
+        curvatureGainT: 0.0,
+        curvatureBoostMax: 1.0,
+        exposure: 3.5,
+        zeroStop: 1e-5,
+        vizGain: 1.0,
+        userGain: 1.0
+    });
+}
+
+setPresetShowcase() {
+    this.updateUniforms({
+        physicsParityMode: false,
+        viewAvg: false,
+        ridgeMode: 1,              // clean single crest at ρ=1
+        curvatureGainT: 0.6,       // slider blend → boost
+        curvatureBoostMax: 40.0,
+        exposure: 6.0,
+        zeroStop: 1e-7,
+        vizGain: 1.0,
+        userGain: 4.0
+    });
+}
+
+destroy() {
+    if (this._destroyed) return;
+    this._destroyed = true;
+    // Clean up per-canvas guard
+    if (window.__WARP_ENGINES && this.canvas && window.__WARP_ENGINES.delete) {
+        window.__WARP_ENGINES.delete(this.canvas);
+    }
+
+    // Cancel animation frame
+    if (this._raf) {
+        cancelAnimationFrame(this._raf);
+        this._raf = null;
+    }
+
+    // Clean up event listeners
+    window.removeEventListener('resize', this._resize);
+    // Remove globals we installed
+    if (window.__warp_setGainDec === this.__warp_setGainDec) {
+        delete window.__warp_setGainDec;
+    }
+    if (window.__warp_setCosmetic === this.__warp_setCosmetic) {
+        delete window.__warp_setCosmetic;
+    }
+    try { this._offStrobe?.(); } catch {}
+
+    // Clean up WebGL resources
+    const gl = this.gl;
+    if (gl) {
+        if (this.gridProgram) {
+            gl.deleteProgram(this.gridProgram);
+            this.gridProgram = null;
+        }
+
+        if (this.gridVbo) {
+            gl.deleteBuffer(this.gridVbo);
+            this.gridVbo = null;
+        }
+    }
+    this.program = null;
+    this.gridUniforms = null;
+    this.gridAttribs = null;
+
+    // Clear callbacks
+    this.onDiagnostics = null;
+
+    // Clear vertex arrays
+    this.gridVertices = null;
+    this.originalGridVertices = null;
+
+    console.log("WarpEngine resources cleaned up");
+}
 }
 
 // Export for both ES modules and CommonJS
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WarpEngine;
+module.exports = WarpEngine;
 } else {
-    // Keep BUILD token on the class
-    WarpEngine.BUILD = BUILD;
-    globalThis.__WarpEngineBuild = BUILD;
-    globalThis.WarpEngine = WarpEngine;
-    console.log("🔥 PATCHED ENGINE BODY RUNNING - Build:", BUILD, "Time:", Date.now());
+// Keep BUILD token on the class
+WarpEngine.BUILD = BUILD;
+globalThis.__WarpEngineBuild = BUILD;
+globalThis.WarpEngine = WarpEngine;
+console.log("🔥 PATCHED ENGINE BODY RUNNING - Build:", BUILD, "Time:", Date.now());
 }
 
 // Build token already stamped in guard section above
@@ -2733,55 +2667,55 @@ if (typeof module !== 'undefined' && module.exports) {
 // Can be called after DOMContentLoaded.
 // ---------------------------------------------------------------------------
 globalThis.__warpInitTruthCosmetic = function initPair(opts = {}) {
-  const q = (x) => (typeof x === 'string' ? document.querySelector(x) : x);
-  const truthEl    = q(opts.truth)    || document.getElementById('viewer-truth');
-  const cosmeticEl = q(opts.cosmetic) || document.getElementById('viewer-cosmetic');
-  if (!truthEl && !cosmeticEl) {
-    console.warn('[warp-engine] no truth/cosmetic canvases found');
-    return {};
-  }
+const q = (x) => (typeof x === 'string' ? document.querySelector(x) : x);
+const truthEl    = q(opts.truth)    || document.getElementById('viewer-truth');
+const cosmeticEl = q(opts.cosmetic) || document.getElementById('viewer-cosmetic');
+if (!truthEl && !cosmeticEl) {
+console.warn('[warp-engine] no truth/cosmetic canvases found');
+return {};
+}
 
-  const engines = {};
-  // Truth-only viewer (physics-faithful)
-  if (truthEl) {
-    const e = new WarpEngine(truthEl);
-    const id = truthEl.id || 'viewer-truth';
-    e.__id = id;
-    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
-    e.bootstrap(opts.paramsTruth || {});
-    e.onceReady(() => {
-      e.setPresetParity();                                  // TRUTH MODE
-      // Make the difference obvious at a glance (optional, can remove):
-      e.updateUniforms({ colorMode: 2, ridgeMode: 0 });     // shear palette + physics double-lobe
-      e.forceRedraw();
-      console.log('[warp] truth ready');
-    });
-    engines.truth = e;
-  }
+const engines = {};
+// Truth-only viewer (physics-faithful)
+if (truthEl) {
+const e = new WarpEngine(truthEl);
+const id = truthEl.id || 'viewer-truth';
+e.__id = id;
+(globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+e.bootstrap(opts.paramsTruth || {});
+e.onceReady(() => {
+  e.setPresetParity();                                  // TRUTH MODE
+  // Make the difference obvious at a glance (optional, can remove):
+  e.updateUniforms({ colorMode: 2, ridgeMode: 0 });     // shear palette + physics double-lobe
+  e.forceRedraw();
+  console.log('[warp] truth ready');
+});
+engines.truth = e;
+}
 
-  // Cosmetic/showcase viewer (visually exaggerated)
-  if (cosmeticEl) {
-    const e = new WarpEngine(cosmeticEl);
-    const id = cosmeticEl.id || 'viewer-cosmetic';
-    e.__id = id;
-    (globalThis.__warp || (globalThis.__warp = {}))[id] = e;
-    e.bootstrap(opts.paramsCosmetic || {});
-    e.onceReady(() => {
-      e.setPresetShowcase();                               // COSMETIC MODE
-      e.updateUniforms({ colorMode: 1, ridgeMode: 1 });    // theta diverging + single crest
-      e.forceRedraw();
-      console.log('[warp] cosmetic ready');
-    });
-    engines.cosmetic = e;
-  }
+// Cosmetic/showcase viewer (visually exaggerated)
+if (cosmeticEl) {
+const e = new WarpEngine(cosmeticEl);
+const id = cosmeticEl.id || 'viewer-cosmetic';
+e.__id = id;
+(globalThis.__warp || (globalThis.__warp = {}))[id] = e;
+e.bootstrap(opts.paramsCosmetic || {});
+e.onceReady(() => {
+  e.setPresetShowcase();                               // COSMETIC MODE
+  e.updateUniforms({ colorMode: 1, ridgeMode: 1 });    // theta diverging + single crest
+  e.forceRedraw();
+  console.log('[warp] cosmetic ready');
+});
+engines.cosmetic = e;
+}
 
-  // Keep both canvases sized if their containers change
-  const ro = new ResizeObserver(() => {
-    engines.truth?._resizeCanvasToDisplaySize?.();
-    engines.cosmetic?._resizeCanvasToDisplaySize?.();
-  });
-  truthEl    && ro.observe(truthEl.parentElement || truthEl);
-  cosmeticEl && ro.observe(cosmeticEl.parentElement || cosmeticEl);
-  return engines;
+// Keep both canvases sized if their containers change
+const ro = new ResizeObserver(() => {
+  engines.truth?._resizeCanvasToDisplaySize?.();
+  engines.cosmetic?._resizeCanvasToDisplaySize?.();
+});
+truthEl    && ro.observe(truthEl.parentElement || truthEl);
+cosmeticEl && ro.observe(cosmeticEl.parentElement || cosmeticEl);
+return engines;
 };
 })();
