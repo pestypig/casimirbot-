@@ -358,7 +358,19 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
     }
 
     updateUniforms(obj){
+        // Helper to clamp values based on physicsParityMode
+        const clampByParity = (value, parityMode) => {
+            if (parityMode) {
+                // If parity mode is on, clamp between 0 and 1
+                return Math.max(0, Math.min(1, value));
+            } else {
+                // Otherwise, use the original value
+                return value;
+            }
+        };
+
         const patch = obj || {};
+        const parameters = { ...this.uniforms, ...patch }; // Merge new and existing uniforms
 
         // 1) Bind metric first (+ mirror to u_*)
         if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
@@ -366,20 +378,20 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             const I = [1,0,0, 0,1,0, 0,0,1];
             const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
             const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
-            this.uniforms.useMetric   = useMetric; this.uniforms.u_useMetric = useMetric;
-            this.uniforms.metric      = m;         this.uniforms.u_metric    = m;
-            this.uniforms.metricInv   = mi;        this.uniforms.u_metricInv = mi;
+            parameters.useMetric   = useMetric; parameters.u_useMetric = useMetric;
+            parameters.metric      = m;         parameters.u_metric    = m;
+            parameters.metricInv   = mi;        parameters.u_metricInv = mi;
         }
 
         // 2) Merge rest, but strip any external thetaScale
         const { thetaScale, u_thetaScale, ...safeParameters } = patch;
-        Object.assign(this.uniforms, safeParameters);
+        Object.assign(parameters, safeParameters);
 
         // 3) Recompute thetaScale from physics chain (engine is source of truth)
-        const theta = this._computeThetaScaleFromUniforms(this.uniforms);
+        const theta = this._computeThetaScaleFromUniforms(parameters);
         this._thetaScaleActual = theta;
-        this.uniforms.thetaScale = theta;
-        this.uniforms.u_thetaScale = theta;
+        parameters.thetaScale = theta;
+        parameters.u_thetaScale = theta;
 
         // 4) Warn if external thetaScale tried to override (once per instance)
         if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
@@ -397,7 +409,6 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
         // --- Metric tensor wiring --------------------------------------------
         // Accept either explicit metric(s) or derive an ellipsoidal cometric.
         // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const parameters = safeParameters; // Use filtered parameters
         const prev = this.uniforms; // Store previous uniforms for comparison
 
         const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
