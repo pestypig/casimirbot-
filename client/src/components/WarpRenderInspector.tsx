@@ -557,9 +557,11 @@ function PaneOverlay(props:{
   const shiftBeta     = Array.isArray(UL.shiftBeta) ? UL.shiftBeta : undefined;
   const gDiag         = Array.isArray(UL.gSpatialDiag) ? UL.gSpatialDiag : undefined;
   const gSym          = Array.isArray(UL.gSpatialSym) && UL.gSpatialSym.length>=6 ? UL.gSpatialSym : undefined; // [gxx,gyy,gzz,gxy,gyz,gzx]
-  const thetaMetric   = Number.isFinite(+UL.thetaScale_metric) ? +UL.thetaScale_metric : undefined;
+  // NOTE: avoid name collision with snapshot-level `thetaMetric` above
+  const thetaMetricUL = Number.isFinite(+UL.thetaScale_metric) ? +UL.thetaScale_metric : undefined;
   const zProxy        = Number.isFinite(+UL.redshiftProxy) ? +UL.redshiftProxy : undefined;
-  const thetaPipeline = Number.isFinite(+UL.thetaScale) ? +UL.thetaScale
+  // Keep a UL-side pipeline theta if you need to compare engine uniforms directly:
+  const thetaPipeUL   = Number.isFinite(+UL.thetaScale) ? +UL.thetaScale
                         : (Number.isFinite(+UL.thetaUniform) ? +UL.thetaUniform : undefined);
 
   return (
