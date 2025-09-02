@@ -156,6 +156,22 @@ function computeViewMassFractionStable(u: any): number {
   return parity ? 1 / sTotal : 1.0;
 }
 
+// Locked view fraction calculation, accounting for different physics pane logic
+function viewMassFractionLocked(u: any, pane: 'REAL' | 'SHOW'): number {
+  const sTotal = Math.max(1, Number(u?.sectorCount ?? 400));
+  const isREAL = pane === 'REAL';
+  const parity = !!u?.physicsParityMode;
+
+  // If the engine's parity state matches the pane's expectation, use the standard calculation
+  if (isREAL && parity) return 1 / sTotal;
+  if (!isREAL && !parity) return 1.0;
+
+  // Fallback/warning: If the parity state is mismatched, default to 1.0, or calculate based on actual parity
+  console.warn(`[viewMassFractionLocked] Mismatch for pane '${pane}': engine parity is ${parity}`);
+  return parity ? 1 / sTotal : 1.0;
+}
+
+
 function thetaGainExpected(bound: any): number {
   try {
     const g  = Number(bound?.gammaGeo ?? bound?.gamma_geo ?? 26);
@@ -1349,16 +1365,22 @@ export default function WarpRenderInspector(props: {
         }
       }
 
+      // Build shared base first (prevents TDZ bug)
+      const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
+      const shared = {
+        axesScene: deriveAxesClip(hull, 1)
+      };
+
       // Bootstrap both engines once they are ready (engine computes theta)
-      const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
-      const showPayload = buildShowPacket(parameters, {
-        ...shared,
+      const realPayload = buildRealPacket(shared, { colorMode: 2 });
+      const showPayload = buildShowPacket(shared, {
         exposure: 7.5,
         colorMode: 1,
         curvatureGainT: 0.70,
         curvatureBoostMax: 40,
         userGain: 1.25,
       });
+
 
       leftEngine.current?.bootstrap?.(realPayload);
       rightEngine.current?.bootstrap?.(showPayload);
@@ -1380,12 +1402,6 @@ export default function WarpRenderInspector(props: {
           console.warn('[WRI θ] Debug sampling failed:', e);
         }
       });
-
-      // Build shared frame data once
-      const hull = props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 };
-      const shared = {
-        axesScene: deriveAxesClip(hull, 1)
-      };
 
       // After creating both engines and building `shared` once:
       (async () => {
@@ -1795,16 +1811,26 @@ export default function WarpRenderInspector(props: {
   // Missing variables for new layout
   const realRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
   const showRendererType: 'canvas' | 'grid3d' = 'canvas'; // Default to canvas for now
-  const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
-  const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
+  const realUniforms = useMemo(() => buildRealPacket(live || {}), [live]);
+  const showUniforms = useMemo(() => buildShowPacket(live || {}), [live]);
   const grid3dRef = useRef<any>(null);
 
   // Define view mass fractions for checkpoint panels
   const uLeft  = leftEngine.current?.uniforms  ?? {};
   const uRight = rightEngine.current?.uniforms ?? {};
 
-  const viewMassFracREAL = computeViewMassFractionStable(uLeft);
-  const viewMassFracSHOW = computeViewMassFractionStable(uRight);
+  const viewMassFracREAL = viewMassFractionLocked(uLeft, 'REAL');
+  const viewMassFracSHOW = viewMassFractionLocked(uRight, 'SHOW');
+
+
+  // Physics bound for theta calculations
+  const bound = useMemo(() => ({
+    gammaGeo: realPayload.gammaGeo || 26,
+    qSpoilingFactor: realPayload.qSpoilingFactor || 1,
+    gammaVdB: realPayload.gammaVanDenBroeck_mass || realPayload.gammaVanDenBroeck || 1,
+    dutyEffectiveFR: realPayload.dutyEffectiveFR || 0.000025
+  }), [realPayload]);
+
 
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {

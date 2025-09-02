@@ -140,3 +140,6 @@ export function buildSHOW(wu: WarpUniforms, opts?: { T?: number; boost?: number;
 // --- compatibility aliases for existing call-sites ---
 export const buildRealPacket = buildREAL;
 export const buildShowPacket = buildSHOW;
+
+// ---- Legacy shims (keep until every call-site is migrated) ----
+export { buildREAL, buildSHOW };
