@@ -4,6 +4,7 @@
  * Drives renderer uniforms from pipeline state (single source of truth, strict)
  */
 import { gatedUpdateUniforms } from "./warp-uniforms-gate";
+import type { GreensPayload } from "@/hooks/use-energy-pipeline";
 
 function aHarmonic(ax: number, ay: number, az: number) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
@@ -53,17 +54,22 @@ export interface EnergyPipelineState {
   dutyEffectiveFR?: number;
 }
 
+export type DriveMetricOpts = {
+  greens?: GreensPayload;   // φ samples (normalized or raw; we use as-is)
+  metricKappa?: number;     // required to enable metric mode; no default
+};
+
 /**
  * Drop-in adapter: pipeline → WarpEngine (single source of truth, strict)
  * Call this every time the pipeline state changes (or on a fixed tick)
  */
-export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void {
+export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState, opts?: DriveMetricOpts): void {
   if (!engine || !s) return;
 
   // Resolve axes
-  const ax = +(s.axesHull?.[0] ?? s.hull?.Lx_m ?? s.shipRadius_m);
-  const ay = +(s.axesHull?.[1] ?? s.hull?.Ly_m ?? s.shipRadius_m);
-  const az = +(s.axesHull?.[2] ?? s.hull?.Lz_m ?? s.shipRadius_m);
+  const ax = +(s.axesHull?.[0] ?? s.hull?.a ?? s.hull?.Lx_m ?? NaN);
+  const ay = +(s.axesHull?.[1] ?? s.hull?.b ?? s.hull?.Ly_m ?? NaN);
+  const az = +(s.axesHull?.[2] ?? s.hull?.c ?? s.hull?.Lz_m ?? NaN);
   req(Number.isFinite(ax)&&Number.isFinite(ay)&&Number.isFinite(az), 'missing axesHull[a,b,c]');
   const axesHull: [number,number,number] = [ax,ay,az];
   const aH = aHarmonic(ax,ay,az);
@@ -93,16 +99,30 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   // Optional authoritative theta
   const thetaScale = Number.isFinite(s.thetaScale) ? +s.thetaScale : undefined;
 
-  // Optional metric scaffolding (pass-through if present)
-  const metricMode   = !!(s as any).metricMode;
-  const gSpatialDiag = Array.isArray((s as any).gSpatialDiag) ? (s as any).gSpatialDiag.map(Number) : undefined;
+  // --- Optional: conformal metric from Greens φ --------------------------------
+  // Enable metric only if BOTH greens and kappa are provided.
+  let metricMode = false;
+  let gSpatialDiag: [number, number, number] | undefined;
+  if (opts?.greens && Number.isFinite(opts?.metricKappa)) {
+    const phi = opts.greens.phi;
+    if (phi && phi.length > 0) {
+      // Simple mean as a first diagnostic scalar (no hidden normalization here)
+      let sum = 0;
+      for (let i = 0; i < phi.length; i++) sum += phi[i];
+      const phiMean = sum / phi.length;
+      const kappa = Number(opts.metricKappa);
+      const conformal = 1 + kappa * phiMean;
+      gSpatialDiag = [conformal, conformal, conformal];
+      metricMode = true;
+    }
+  }
 
   // Burst Q for visuals
   const Qburst = +(s.qCavity ?? 1e9);
 
   gatedUpdateUniforms(engine, {
     strictPhysics: true,
-    metricMode,
+    ...(metricMode ? { metricMode: true } : {}),
     ...(gSpatialDiag ? { gSpatialDiag } : {}),
     axesHull,
     // keep axesScene derived in engine
