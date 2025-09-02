@@ -59,10 +59,11 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const w_rho = Math.max(1e-6, w_m / aEff);
 
   // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
+  // Keep concurrent vs total distinct
   const S_total = Math.max(1, Math.floor(num(s.sectorCount) ?? 400));
   const S_live  = Math.max(1, Math.floor(num(s.sectorStrobing) ?? 1));
-  const sectorsTotal = S_total;                  // for renderer geometry
-  const split = Math.floor(S_total / 2); // canonical (+/–) split
+  const sectorsTotal = S_total;                 // what the renderer expects for geometry
+  const split        = Math.floor(S_total / 2); // canonical (+/–) split
 
   // --- Ship-wide effective duty (exactly HELIX's d_eff) ---
   // Priority: precomputed FR → explicit ship duty → derive from UI dutyCycle & strobing
@@ -70,9 +71,8 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     num(s.dutyEffective_FR) ??
     num(s.dutyShip) ??
     (() => {
-      const d_ui = clamp(s.dutyCycle ?? 0.14, 0, 1);
-      // FR duty is ship-wide time-average: d_eff = burstLocal × (S_live/S_total)
-      const d_eff = d_ui * (S_live / S_total);
+      const d_local = clamp(s.dutyCycle ?? 0.01, 0, 1); // local burst fraction
+      const d_eff   = d_local * (S_live / S_total);     // Ford–Roman ship-average
       return clamp(d_eff, 0, 1);
     })();
 
