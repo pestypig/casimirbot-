@@ -1,0 +1,109 @@
+You’ve got two things crossing-wires:
+
+WarpRenderInspector uses buildREAL / buildSHOW, but your warp-uniforms.ts doesn’t export them (or you’ve got mixed names like buildRealPacket). That’s what’s throwing buildREAL is not defined (and earlier the “does not provide an export named buildRealPacket” error). You can see WRI importing/using these right here: the import on top, and the memo usage later on.
+
+WRI still contains local packet builders in some copies/merges, which caused the “Duplicate declaration ‘buildRealPacket’” earlier. Those local helpers start around the “pane helpers” block.
+
+Here’s the clean, no-surprises way to fix both and also cut off a source of flicker:
+
+Step 1 — Make warp-uniforms.ts the single source of truth
+
+Add (or replace) these named exports in client/src/lib/warp-uniforms.ts:
+
+// client/src/lib/warp-uniforms.ts
+export function buildREAL(parameters: any, base: any = {}) {
+  const dutyFR = Math.max(1e-9, Math.min(1,
+    parameters?.dutyEffectiveFR ?? parameters?.dutyFR ?? 0.000025));
+
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    // REAL = Ford–Roman averaged, conservative
+    physicsParityMode: true,
+    viewAvg: true,
+    ridgeMode: 0,
+    // REAL must use FR duty directly → collapse sectors
+    dutyEffectiveFR: dutyFR,
+    dutyCycle: dutyFR,
+    sectors: 1,
+    sectorCount: 1,
+    vShip: 0,
+    // Physical (mass-pocket) gamma only for REAL
+    gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
+      parameters?.gammaVanDenBroeck_mass ??
+      parameters?.gammaVanDenBroeck ?? 38.3)),
+    // Visual gamma can be kept for logging but ignored by REAL theta
+    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
+      parameters?.gammaVanDenBroeck_vis ??
+      parameters?.gammaVanDenBroeck ?? 2.86e5)),
+    // Never accept UI theta
+    thetaScale: undefined,
+    u_thetaScale: undefined,
+  };
+}
+
+export function buildSHOW(parameters: any, base: any = {}) {
+  return {
+    ...base,
+    currentMode: parameters?.currentMode,
+    // SHOW = visual, instantaneous (no FR averaging)
+    physicsParityMode: false,
+    viewAvg: false,
+    ridgeMode: 1,
+    dutyCycle: Math.max(0, Math.min(1, parameters?.dutyCycle ?? 0.14)),
+    sectorCount: Math.max(1, Math.floor(parameters?.sectorCount ?? 400)),
+    sectors:     Math.max(1, Math.floor(parameters?.sectors ?? 1)),
+    vShip: parameters?.currentMode === 'standby' ? 0 : 1,
+    // SHOW uses the “visual” pocket factor
+    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
+      parameters?.gammaVanDenBroeck_vis ??
+      parameters?.gammaVanDenBroeck ?? 2.86e5)),
+    // Never accept UI theta
+    thetaScale: undefined,
+    u_thetaScale: undefined,
+  };
+}
+
+// Optional convenience aliases so old imports keep working
+export const buildRealPacket = buildREAL;
+export const buildShowPacket = buildSHOW;
+
+// If you’re normalizing elsewhere, keep exporting normalizeWU
+export function normalizeWU(o: any) {
+  // tiny helper — ensure no undefineds (good for hashing / diffs)
+  return Object.fromEntries(Object.entries(o ?? {}).filter(([,v]) => v !== undefined));
+}
+
+
+This gives WRI exactly what it’s asking for (buildREAL, buildSHOW) and also leaves compat aliases (buildRealPacket, buildShowPacket) so older imports won’t crash.
+
+Step 2 — Make WarpRenderInspector import only from warp-uniforms.ts
+
+In WarpRenderInspector.tsx:
+
+Keep this import (do not also declare local builders):
+import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+
+Delete any locally defined buildRealPacket / buildShowPacket functions in the file (they’re the ones that triggered the duplicate declaration earlier). The block begins like this; remove it entirely if it still exists anywhere in the file:
+
+Leave the places that use the library builders as-is:
+const realUniforms = useMemo(() => buildREAL(live || {}), [live]);
+const showUniforms = useMemo(() => buildSHOW(live || {}), [live]);
+
+That resolves buildREAL is not defined.
+
+Step 3 — Remove remaining “racing” writers that cause flicker
+
+From your current WRI, parity verification is fine for guardrails, but avoid writing uniforms from multiple places per frame. Use a single batched writer (e.g., your gatedUpdateUniforms/batcher) and do not call engine.updateUniforms directly except during bootstrap. (Your current batcher already does this correctly.)
+
+Also ensure you don’t still have two different packet sources in WRI:
+
+a) the imported buildREAL/buildSHOW (keep these), and
+
+b) any inline paneSanitize + ad-hoc objects sent to the engines (remove those, or have them only adjust visual-only fields).
+
+If you keep a local paneSanitize, make sure it only sets parity/ridge/viewAvg and never touches θ or FR duty (leave that to the packet builders). The good one looks like:
+
+Step 4 — Confirm the demo engine no longer computes or writes θ
+
+You already started this, but double-check the demo script (public/warp-engine.demo.js) is not computing or assigning uniforms.thetaScale anywhere. All θ must come from the authoritative engine. (This was a source of parity conflicts and flicker.)
