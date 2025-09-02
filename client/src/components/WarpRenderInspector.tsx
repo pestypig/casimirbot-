@@ -9,8 +9,8 @@ import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 // Harmonic-mean radius for display conversions (match engine)
 function aHarmonic(ax: number, ay: number, az: number) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
-  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
-  return denom > 0 ? 3/denom : NaN;
+  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return d > 0 ? 3 / d : NaN;
 }
 import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
 import MarginHunterPanel from "./MarginHunterPanel";
@@ -478,7 +478,7 @@ function PaneOverlay(props:{
       const a = +H[0]||503.5, b = +H[1]||132.0, c = +H[2]||86.5;
       const aH = aHarmonic(a,b,c);
 
-      // New: prefer explicit meters; else wallWidth (rho) × a_H; no hidden 0.016 fallback
+      // meters = wallWidth (rho) × harmonic-mean radius; no silent fallback
       const ax = U.axesHull?.[0] ?? U.axesScene?.[0] ?? a;
       const ay = U.axesHull?.[1] ?? U.axesScene?.[1] ?? b;
       const az = U.axesHull?.[2] ?? U.axesScene?.[2] ?? c;
@@ -548,6 +548,13 @@ function PaneOverlay(props:{
           <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
           <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
         </div>
+
+        {/* Display engine errors if present */}
+        {((engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) && flavor === 'REAL') && (
+          <div className="mt-2 p-2 bg-red-900/50 border border-red-500/50 rounded text-red-300 text-xs">
+            Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}
+          </div>
+        )}
 
         {/* dropdown with filled equations */}
         <details className="mt-2">
