@@ -96,6 +96,7 @@ export function viewMassFractionForPane(wu: WarpUniforms, pane: 'REAL'|'SHOW') {
 export function buildREAL(wu: WarpUniforms) {
   return {
     ...wu,
+    // Force REAL parity mode - never allow override
     physicsParityMode: true,
     ridgeMode: 0,
     viewAvg: true,
@@ -111,7 +112,7 @@ export function buildREAL(wu: WarpUniforms) {
     // safe tonemap defaults for REAL
     exposure: wu.exposure ?? 3.5,
     zeroStop: wu.zeroStop ?? 1e-6,
-    // never ship UI theta
+    // Engine authority: never ship UI theta - engine computes θ from physics chain
     thetaScale: undefined,
     u_thetaScale: undefined,
   };
@@ -125,6 +126,7 @@ export function buildSHOW(
   const boost = Math.max(1, N(opts?.boost, 40));
   return {
     ...wu,
+    // Force SHOW showcase mode - never allow override
     physicsParityMode: false,
     ridgeMode: 1,
     viewAvg: true,               // SHOW's display mass = 1.0, averaging state not downscaling mass
@@ -140,7 +142,7 @@ export function buildSHOW(
     // safe tonemap defaults for SHOW
     exposure: wu.exposure ?? 6,
     zeroStop: wu.zeroStop ?? 1e-7,
-    // never ship UI theta
+    // Engine authority: never ship UI theta - engine computes θ from physics chain
     thetaScale: undefined,
     u_thetaScale: undefined,
   };

@@ -19,16 +19,22 @@ import { getWarpEngineCtor } from "@/types/globals";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 // Helper to sanitize uniforms per pane - ensure ALL required fields are set
-function paneSanitize(pane: 'REAL' | 'SHOW', patch: any) {
+function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const isREAL = pane === 'REAL';
+
+  // Create sanitized patch that rejects any incoming thetaScale
+  const sanitized = { ...patch };
+
+  // Engine authority: never accept external thetaScale
+  delete sanitized.thetaScale;
+  delete sanitized.u_thetaScale;
+
   return {
-    ...patch,
+    ...sanitized,
+    // Force parity modes - never allow override
     physicsParityMode: isREAL,
     ridgeMode: isREAL ? 0 : 1,
-    viewAvg: isREAL ? true : false,
-    // Remove legacy parityMode to avoid conflicts
-    parityMode: undefined,
-    uPhysicsParity: undefined,
+    viewAvg: isREAL,      // lock view averaging for REAL
   };
 }
 
@@ -1391,7 +1397,6 @@ export default function WarpRenderInspector(props: {
         setHaveUniforms(true);
         // strip any external theta (engine computes it)
         const { thetaScale, u_thetaScale, thetaScale_actual, ...uSafe } = u || {};
-
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
