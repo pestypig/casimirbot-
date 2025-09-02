@@ -550,9 +550,9 @@ function PaneOverlay(props:{
         </div>
 
         {/* Display engine errors if present */}
-        {((engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) && flavor === 'REAL') && (
+        {(engineRef?.current?.uniforms?.__error && flavor === 'REAL') && (
           <div className="mt-2 p-2 bg-red-900/50 border border-red-500/50 rounded text-red-300 text-xs">
-            Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}
+            Engine error: {engineRef.current.uniforms.__error}
           </div>
         )}
 
