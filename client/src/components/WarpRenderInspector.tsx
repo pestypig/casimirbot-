@@ -524,18 +524,42 @@ function PaneOverlay(props:{
     return () => cancelAnimationFrame(raf);
   }, [engineRef, flavor, viewFraction]);
 
-  const s = snap || {};
-  const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
+  const UL: any = engineLeft?.current?.uniforms ?? {};
+  const UR: any = engineRight?.current?.uniforms ?? {};
+
+  // Prefer hull axes; fall back to scene axes
+  const aHL = aHarmonic(UL.axesHull?.[0] ?? UL.axesScene?.[0],
+                        UL.axesHull?.[1] ?? UL.axesScene?.[1],
+                        UL.axesHull?.[2] ?? UL.axesScene?.[2]);
+  const aHR = aHarmonic(UR.axesHull?.[0] ?? UR.axesScene?.[0],
+                        UR.axesHull?.[1] ?? UR.axesScene?.[1],
+                        UR.axesHull?.[2] ?? UR.axesScene?.[2]);
+
+  // Wall widths in ρ (engine uses `wallWidth`), and meters (no hidden defaults)
+  const wL_rho = Number.isFinite(+UL.wallWidth) ? +UL.wallWidth
+                 : (Number.isFinite(+UL.wallWidth_rho) ? +UL.wallWidth_rho : NaN);
+  const wR_rho = Number.isFinite(+UR.wallWidth) ? +UR.wallWidth
+                 : (Number.isFinite(+UR.wallWidth_rho) ? +UR.wallWidth_rho : NaN);
+  const wL_m = (Number.isFinite(wL_rho) && Number.isFinite(aHL)) ? wL_rho * aHL : undefined;
+  const wR_m = (Number.isFinite(wR_rho) && Number.isFinite(aHR)) ? wR_rho * aHR : undefined;
+
+  // Theta readouts (support both pipeline field names)
+  const thetaL = +(
+    UL.thetaScale ?? UL.thetaUniform ?? UL.thetaScale_actual ?? NaN
+  );
+  const thetaR = +(
+    UR.thetaScale ?? UR.thetaUniform ?? UR.thetaScale_actual ?? NaN
+  );
 
   return (
     <div className="inspector">
-      <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m!.toFixed(3) : '—'} m</div>
-      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m!.toFixed(3) : '—'} m</div>
-      <div>θ (REAL, pipeline): {Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</div>
-      <div>θ (SHOW, pipeline): {Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</div>
-      <div>θ̂ (REAL, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
-      <div>θ̂ (SHOW, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
-      <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
+      <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m ({Number.isFinite(wL_rho) ? wL_rho.toFixed(6) : '—'} ρ)</div>
+      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m.toFixed(3) : '—'} m ({Number.isFinite(wR_rho) ? wR_rho.toFixed(6) : '—'} ρ)</div>
+      <div>θ (REAL, pipeline): {Number.isFinite(thetaL) ? thetaL.toExponential(3) : '—'}</div>
+      <div>θ (SHOW, pipeline): {Number.isFinite(thetaR) ? thetaR.toExponential(3) : '—'}</div>
+      <div>θ̂ (REAL, metric): {Number.isFinite(UL.thetaScale_metric) ? UL.thetaScale_metric.toExponential(3) : '—'}</div>
+      <div>θ̂ (SHOW, metric): {Number.isFinite(UR.thetaScale_metric) ? UR.thetaScale_metric.toExponential(3) : '—'}</div>
+      <div>metric mode: {UL.metricMode ? 'ON' : 'off'}</div>
       { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
         <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
       }
