@@ -1265,7 +1265,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const isREAL = U.physicsParityMode;
         const zeroStandby = isREAL && isStandby;
 
-        // Use explicit assignments to allow overriding default calculation logic
         // Hull axes (also used for grid generation)
         const hullAxesMeters = P.hullAxesMeters ?? P.hull?.a ?? prev?.hullAxesMeters;
         if (hullAxesMeters) {
@@ -1611,7 +1610,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
         const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
 
-        // ---- Existing physics chain (do not change) ----
+        // Calculate canonical thetaScale for REAL mode, use provided for SHOW
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
         const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
         const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
@@ -2361,7 +2360,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
             theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
             theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
-            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth_rho ?? WALL_RHO_DEFAULT),
+            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT),
             shear_avg_proxy: shear_avg_proxy,
             york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
             hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6),
@@ -2405,7 +2404,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         this.updateUniforms({ userGain: Math.max(1, +gain) });
     }
 
-    // C) Frame hash for checkpoint validation
+    // === C) Frame hash for checkpoint validation ===
     sampleHash8x8() {
         if (!this.gl || !this.canvas) return 0;
 
