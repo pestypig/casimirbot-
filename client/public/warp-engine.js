@@ -43,6 +43,27 @@ const SCENE_SCALE = window.SCENE_SCALE;
 // Math helpers and constants
 const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
 
+// ---- helpers for meters ↔ rho thickness ------------------------------------
+function _aHarmonic(ax, ay, az) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return d > 0 ? 3 / d : NaN;
+}
+function _guessAH(U, p) {
+  const H = (p && p.axesHull) || U.axesHull;
+  const S = (p && p.axesScene) || U.axesScene;
+  if (Array.isArray(H) && H.length >= 3) return _aHarmonic(H[0], H[1], H[2]);
+  if (Array.isArray(S) && S.length >= 3) return _aHarmonic(S[0], S[1], S[2]);
+  return NaN;
+}
+function _req(cond, name, U) {
+  if (!cond) {
+    const msg = `warp-engine: missing required uniform "${name}"`;
+    U.__error = msg;
+    throw new Error(msg);
+  }
+}
+
 // ---- helpers for meters ↔ rho thickness and validation ----------------------
 function _aHarmonic(ax, ay, az) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
@@ -1177,6 +1198,22 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         return this;
     }
 
+    /** Metric-aware dot product: v · w using spatial metric */
+    _dot(v, w) {
+        if (!this.uniforms?.metricMode || !Array.isArray(this.uniforms?.gSpatialDiag)) {
+            return v[0]*w[0] + v[1]*w[1] + v[2]*w[2]; // Euclidean fallback
+        }
+        const g = this.uniforms.gSpatialDiag;
+        return g[0]*v[0]*w[0] + g[1]*v[1]*w[1] + g[2]*v[2]*w[2];
+    }
+
+    /** Metric-aware normalization: v/|v|_g */
+    _norm(v) {
+        const dot = this._dot(v, v);
+        const len = Math.sqrt(Math.max(1e-12, dot));
+        return [v[0]/len, v[1]/len, v[2]/len];
+    }
+
     // Keep original update logic but move it into _applyUniformsNow
     _applyUniformsNow(parameters) {
         if (!parameters) return;
@@ -1193,15 +1230,22 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
         const isStandby = modeStr === 'standby';
 
-        // ---- Unify wall-width ingestion (no hidden defaults in strict) ----------
-        let w_rho = (Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined);
+        // ---- wall width ingestion (unify aliases) --------------------------------
+        // Accept: wallWidth (rho), wallWidth_rho (rho), hullDimensions.wallWidth_m (meters)
+        // Keep shader-facing alias "wallWidth" in rho units.
+        const aH = _guessAH(U, parameters);
+        let w_rho = Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined;
         if (Number.isFinite(parameters.wallWidth_rho)) w_rho = +parameters.wallWidth_rho;
-        if (!Number.isFinite(w_rho) && Number.isFinite(parameters.wallWidth_m)) {
-          const aH = _guessAH(this.uniforms); // Use existing uniforms for context
-          if (Number.isFinite(aH)) w_rho = (+parameters.wallWidth_m) / aH;
+        const w_m_in = Number.isFinite(parameters?.hullDimensions?.wallWidth_m)
+          ? +parameters.hullDimensions.wallWidth_m : undefined;
+        if (!Number.isFinite(w_rho) && Number.isFinite(w_m_in) && Number.isFinite(aH)) {
+          w_rho = w_m_in / aH;
         }
-        if (this.strictPhysics) _req(Number.isFinite(w_rho), "wallWidth (rho) or wallWidth_m", this.uniforms);
-        if (Number.isFinite(w_rho)) this.uniforms.wallWidth = w_rho;
+        if (Number.isFinite(w_rho)) U.wallWidth = w_rho;
+        if (!Number.isFinite(U.wallWidth)) U.wallWidth = U.wallWidth ?? 0.06; // preserve existing default
+        // Echo helpful aliases for UIs
+        U.wallWidth_rho = U.wallWidth;
+        if (Number.isFinite(aH)) U.wallWidth_m = U.wallWidth * aH;
 
         // ---- Axes setup (strict mode will require these) -----------------------
         if (Array.isArray(parameters.axesHull))  this.uniforms.axesHull  = parameters.axesHull.slice(0,3);
@@ -1220,9 +1264,16 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // ---- Physics uniforms (no defaults when strict) -------------------------
         if (Number.isFinite(parameters.gammaGeo))           this.uniforms.gammaGeo = +parameters.gammaGeo;
-        if (Number.isFinite(parameters.gammaVanDenBroeck))  this.uniforms.gammaVanDenBroeck = +parameters.gammaVanDenBroeck;
-        if (Number.isFinite(parameters.qSpoilingFactor))    this.uniforms.deltaAOverA = +parameters.qSpoilingFactor;
-        if (Number.isFinite(parameters.deltaAOverA))        this.uniforms.deltaAOverA = +parameters.deltaAOverA;
+        // γ_VdB with parity clamp; also expose raw for inspector diagnostics
+        const gammaVdB_raw = Number.isFinite(parameters.gammaVanDenBroeck) ? parameters.gammaVanDenBroeck : (this.uniforms.gammaVanDenBroeck ?? 1);
+        this.uniforms.gammaVdBRaw = gammaVdB_raw;
+        this.uniforms.gammaVanDenBroeck = +gammaVdB_raw;
+        // Accept either alias for q; keep both set for UI parity
+        const qIn = Number.isFinite(parameters.qSpoilingFactor) ? parameters.qSpoilingFactor
+                  : Number.isFinite(parameters.deltaAOverA)    ? parameters.deltaAOverA
+                  : (this.uniforms.deltaAOverA ?? 1);
+        this.uniforms.deltaAOverA    = qIn;
+        this.uniforms.qSpoilingFactor = qIn;
         if (Number.isFinite(parameters.dutyEffectiveFR))    this.uniforms.dutyEffectiveFR = +parameters.dutyEffectiveFR;
         if (Number.isFinite(parameters.sectorCount))        this.uniforms.sectorCount = parameters.sectorCount|0;
         if (Number.isFinite(parameters.sectorStrobing))     this.uniforms.sectorStrobing = parameters.sectorStrobing|0;
@@ -1765,10 +1816,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
             // ----- Interior gravity (shift vector "tilt") -----
             // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
-            // CPU interior window width uses wallWidth_rho (unified)
+            // CPU interior window width: derive from the unified rho width
             const w_int = Number.isFinite(this.uniforms?.intWidth)
               ? Math.max(0.002, +this.uniforms.intWidth)
-              : Math.max(3.0 * (this.uniforms?.wallWidth_rho ?? WALL_RHO_DEFAULT), 0.02);
+              : Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.06), 0.02);
             // --- end interior gravity -----
             // Project normal onto "down" and keep sign stable
             const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
