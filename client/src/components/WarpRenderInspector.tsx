@@ -1761,7 +1761,7 @@ export default function WarpRenderInspector(props: {
         theta_actual: engine.uniforms?.thetaScale_actual,
         gammaGeo: engine.uniforms?.gammaGeo ?? engine.uniforms?.g_y,
         q: engine.uniforms?.deltaAOverA ?? engine.uniforms?.qSpoilingFactor,
-        gammaVdB: engine.uniforms?.gammaVanDenBroeck_mass ?? engine.uniforms?.gammaVanDenBroeck,
+        gammaVdB: engine.uniforms?.gammaVdB ?? engine.uniforms?.gammaVanDenBroeck ?? engine.uniforms?.gammaVanDenBroeck_mass,
         dutyLocal: engine.uniforms?.dutyCycle,
         sectors: engine.uniforms?.sectors,
         sectorCount: engine.uniforms?.sectorCount,
