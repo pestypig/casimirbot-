@@ -507,11 +507,17 @@ function PaneOverlay(props:{
       const frontMax  = diag.theta_front_max_viewed ?? (Number.isFinite(frontRaw) ? frontRaw * Math.sqrt(f) : frontRaw);
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
+      // Get metric scale and mode
+      const thetaMetric = U.thetaScale_metric;
+      const metricMode = U.useMetric;
+
       setSnap({
         a,b,c,aH: aH_updated, w_m, w_rho, V,S, Vshell,
         thetaUniform, thetaPhys, thetaPaper,
         frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
+        thetaMetric,
+        metricMode
       });
     };
     raf = requestAnimationFrame(tick);
@@ -522,72 +528,17 @@ function PaneOverlay(props:{
   const widthNm = Number.isFinite(s.w_m) ? s.w_m*1e9 : NaN;
 
   return (
-    <div className="pointer-events-none absolute left-2 top-2 z-[5]">
-      <div className="pointer-events-auto rounded-xl bg-black/65 border border-white/10 text-white px-3 py-2 shadow-lg max-w-[92%]">
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wide px-2 py-0.5 rounded bg-blue-600/80">
-            {title}
-          </span>
-          <span className="text-xs text-white/80">
-            Wall: {s.w_m?.toFixed?.(3) ?? '—'} m  ({(s.w_rho ?? NaN).toFixed?.(3) ?? '—'} ρ)
-          </span>
-        </div>
-
-        <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-white/85">
-          <div>θ (uniform): <b>{Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</b></div>
-          <div>θ (phys): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
-          <div className="text-white/60">θ (paper): <b>{Number.isFinite(s.thetaPaper)? s.thetaPaper.toExponential(2):'—'}</b></div>
-          {/* keep slot if you later expose a metric-curvature scalar */}
-          <div>θ (metric): <b>—</b></div>
-          <div>view fraction: <b>{(flavor==='REAL'? props.viewFraction : 1).toFixed(4)}</b></div>
-          <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
-          {/* Show kilograms sourced from pipeline */}
-          <div>
-            exotic mass: <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg,'kg'):'— kg'}</b>
-          </div>
-          <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
-          <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
-        </div>
-
-        {/* Display engine errors if present */}
-        {(engineRef?.current?.uniforms?.__error && flavor === 'REAL') && (
-          <div className="mt-2 p-2 bg-red-900/50 border border-red-500/50 rounded text-red-300 text-xs">
-            Engine error: {engineRef.current.uniforms.__error}
-          </div>
-        )}
-
-        {/* dropdown with filled equations */}
-        <details className="mt-2">
-          <summary className="text-xs text-white/70 hover:text-white cursor-pointer">equations & filled values</summary>
-          <div className="mt-2 text-[11px] leading-5 text-white/85 space-y-2">
-            <div>
-              <div className="opacity-80">Ellipsoid geometry</div>
-              <div><code>V = 4/3 · π · a · b · c</code> = <b>{Number.isFinite(s.V)? fmtSI(s.V,'m³'):'—'}</b></div>
-              <div><code>S ≈ 4π · ((a^p b^p + a^p c^p + b^p c^p)/3)^(1/p)</code>, <i>p</i>=1.6075 → <b>{Number.isFinite(s.S)? fmtSI(s.S,'m²'):'—'}</b></div>
-              <div><code>a_H = 3 / (1/a + 1/b + 1/c)</code> = <b>{Number.isFinite(s.aH)? fmtSI(s.aH,'m'):'—'}</b></div>
-              <div><code>w_m = wallWidth_m ⟂</code> (or <code>w_ρ · a_H</code>) → <b>{fmtSI(s.w_m,'m')}</b></div>
-              <div><code>V_shell ≈ S · w_m</code> → <b>{Number.isFinite(s.Vshell)? fmtSI(s.Vshell,'m³'):'—'}</b></div>
-            </div>
-            <div>
-              <div className="opacity-80">Curvature (York-time proxy</div>
-              <div><code>θ ∝ v_ship · (x_s/r_s) · (−2(rs−1)/w²) · exp(−((rs−1)/w)²)</code></div>
-              <div>engine θ-scale (γ_geo³ · q · γ_VdB · √d_eff): <b>{Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</b></div>
-            </div>
-            <div>
-              <div className="opacity-80">Exotic mass proxy (display-only</div>
-              <div className="space-y-1">
-                <div>
-                  <code>M<sub>ship</sub> (kg)</code> → <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg,'kg'):'— kg'}</b>
-                </div>
-                <div>
-                  <code>M<sub>slice</sub> = M<sub>ship</sub> · viewFraction</code> →{' '}
-                  <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg * viewFraction,'kg'):'— kg'}</b>
-                </div>
-              </div>
-            </div>
-          </div>
-        </details>
-      </div>
+    <div className="inspector">
+      <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m!.toFixed(3) : '—'} m</div>
+      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m!.toFixed(3) : '—'} m</div>
+      <div>θ (REAL, pipeline): {Number.isFinite(s.thetaUniform)? s.thetaUniform.toExponential(2):'—'}</div>
+      <div>θ (SHOW, pipeline): {Number.isFinite(s.thetaPhys)? s.thetaPhys.toExponential(2):'—'}</div>
+      <div>θ̂ (REAL, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
+      <div>θ̂ (SHOW, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
+      <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
+      { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
+        <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
+      }
     </div>
   );
 }
@@ -1133,17 +1084,17 @@ export default function WarpRenderInspector(props: {
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true);
         // strip any external theta (engine computes it)
-        const { thetaScale, u_thetaScale, ...uSafe } = u || {};
-
+        const { thetaScale, u_thetaScale, thetaScale_metric, u_thetaScale_metric, useMetric, ...uSafe } = u || {};
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
           betaTiltVec: props.baseShared?.betaTiltVec ?? leftEngine.current?.uniforms?.betaTiltVec ?? [0,-1,0],
         };
         const metricU = {
-          useMetric:  props.baseShared?.useMetric  ?? uSafe?.useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
-          metric:     props.baseShared?.metric     ?? uSafe?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
-          metricInv:  props.baseShared?.metricInv  ?? uSafe?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
+          useMetric:  props.baseShared?.useMetric  ?? useMetric  ?? leftEngine.current?.uniforms?.useMetric  ?? false,
+          metric:     props.baseShared?.metric     ?? leftEngine.current?.uniforms?.metric     ?? metricDiag.g,
+          metricInv:  props.baseShared?.metricInv  ?? leftEngine.current?.uniforms?.metricInv  ?? metricDiag.inv,
+          thetaScale_metric: props.baseShared?.thetaScale_metric ?? thetaScale_metric ?? leftEngine.current?.uniforms?.thetaScale_metric ?? NaN,
         };
 
         if (leftEngine.current) {
@@ -1452,11 +1403,13 @@ export default function WarpRenderInspector(props: {
       colorMode: 2, // Shear proxy for truth view
       lockFraming: true,
       thetaScale: (pipelineTheta ?? realPhys.thetaScale ??
-        computeThetaScale(realPhys))
+        computeThetaScale(realPhys)),
+      thetaScale_metric: computeThetaScale({ ...realPhys, gammaVanDenBroeck: realPhys.gammaVanDenBroeck_mass ?? realPhys.gammaVanDenBroeck }),
+      useMetric: useMetric
     };
 
     // Attach metric defaults to both panes (you can turn them off via useMetric=false)
-    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? useMetric;
     (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
@@ -1474,10 +1427,10 @@ export default function WarpRenderInspector(props: {
       thetaScale: (pipelineTheta ?? showPhys.thetaScale ??
         computeThetaScale({ ...showPhys, gammaVanDenBroeck: showPhys.gammaVanDenBroeck_vis ?? showPhys.gammaVanDenBroeck }))
     };
-    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
+    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? useMetric;
     (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
-
+    (showPayload as any).thetaScale_metric = computeThetaScale({ ...showPhys, gammaVanDenBroeck: showPhys.gammaVanDenBroeck_vis ?? showPhys.gammaVanDenBroeck });
 
 
   // Physics bound for theta calculations
