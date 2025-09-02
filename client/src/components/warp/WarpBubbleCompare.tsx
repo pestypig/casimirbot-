@@ -986,15 +986,27 @@ export default function WarpBubbleCompare({
                           : (Number.isFinite(p.wallWidth_rho) && Number.isFinite(aH)) ? (+p.wallWidth_rho * aH)
                           : undefined;
 
+    // Forward Natário tensors and toggle if present (pass-through, no defaults)
+    const natarioFields: any = {};
+    if (p.metricMode === true || p.useMetric === true) {
+      natarioFields.metricMode = true;
+      natarioFields.useMetric  = true;
+    }
+    if (Array.isArray((p as any).gSpatialSym))  natarioFields.gSpatialSym  = (p as any).gSpatialSym;
+    if (Array.isArray((p as any).gSpatialDiag)) natarioFields.gSpatialDiag = (p as any).gSpatialDiag;
+    if (Number.isFinite((p as any).lapseN))     natarioFields.lapseN       = +(p as any).lapseN;
+    if (Array.isArray((p as any).shiftBeta))    natarioFields.shiftBeta    = (p as any).shiftBeta;
+
     const real = buildREAL(wu);
     const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
     
-    // Apply unified wall width to both payloads
+    // Apply unified wall width and Natário fields to both payloads
     const realWithWall = {
       ...real,
       wallWidth: unifiedWallRho,
       wallWidth_rho: unifiedWallRho,
       wallWidth_m: unifiedWallM,
+      ...natarioFields,
     };
     
     const showWithWall = {
@@ -1002,6 +1014,7 @@ export default function WarpBubbleCompare({
       wallWidth: unifiedWallRho,
       wallWidth_rho: unifiedWallRho,
       wallWidth_m: unifiedWallM,
+      ...natarioFields,
     };
     
     return { real: realWithWall, show: showWithWall };
