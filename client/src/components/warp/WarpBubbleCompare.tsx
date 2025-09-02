@@ -1227,8 +1227,8 @@ export default function WarpBubbleCompare({
       ...shared,
       gridSpan: gridSpanReal,            // tight framing around hull
       gammaGeo: real.gammaGeo,
-      qSpoilingFactor: real.qSpoilingFactor,
-      gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
+      deltaAOverA: real.qSpoilingFactor,
+      gammaVdB: (real.gammaVdB ?? real.gammaVanDenBroeck ?? real.gammaVanDenBroeck_mass),
       dutyEffectiveFR: real.dutyEffectiveFR ?? mergedState.dutyEffectiveFR ?? 0.000025,
       dutyCycle: real.dutyCycle,
       sectors: Math.max(1, Math.min(1000, mergedState.sectors || 400)),
