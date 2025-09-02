@@ -41,23 +41,28 @@ const SCENE_SCALE = window.SCENE_SCALE;
 // Math helpers and constants
 const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
 
-// WarpEngine (WebGL runtime)
-// ------------------------------------------------------------
-// Radius helpers (use harmonic mean for meters↔ρ)
+// ---- helpers for meters ↔ rho thickness and validation ----------------------
 function _aHarmonic(ax, ay, az) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
-  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
-  return denom > 0 ? 3/denom : NaN;
+  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return d > 0 ? 3 / d : NaN;
 }
 function _guessAH(U) {
-  // prefer hull axes; fall back to scene axes
-  const H = U?.axesHull, S = U?.axesScene;
+  const H = U.axesHull, S = U.axesScene;
   if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
   if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
   return NaN;
 }
-// single default for ρ-thickness everywhere (previously 0.016/0.02/0.06)
-const WALL_RHO_DEFAULT = 0.016;
+function _req(cond, name, U) {
+  if (!cond) {
+    const msg = `warp-engine: missing required uniform "${name}"`;
+    U.__error = msg;
+    throw new Error(msg);
+  }
+}
+
+// WarpEngine (WebGL runtime)
+// ------------------------------------------------------------
 
 class WarpEngine {
     static getOrCreate(canvas) {
@@ -219,6 +224,7 @@ class WarpEngine {
         this.loadingState = 'idle';
         this.onLoadingStateChange = null; // callback for loading progress
         this._readyQueue = [];            // callbacks to run once shaders are linked
+        this.strictPhysics = false; // can be enabled via uniforms
 
         // Strobing state for sector sync
         this.strobingState = {
@@ -756,7 +762,7 @@ void main() {
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
   float valTheta  = thetaWithPurple * amp;
-  float valShear  = kval * amp;
+  float valShear  = shearProxy * amp; // Apply amplitude to shear proxy as well
 
   float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
   float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
@@ -1140,10 +1146,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     updateUniforms(parameters) {
         if (this._destroyed) return;
         // If program isn't ready yet, queue and let _render() relink shaders
+        if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
         if (!this.gridProgram || !this.isLoaded) {
             this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
-            // Kick the linker if needed; _render() will also call this.
-            if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
             return;
         }
         this._enqueueUniforms(parameters);
@@ -1186,261 +1191,232 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
         const isStandby = modeStr === 'standby';
 
-        // --- Wall width ingestion (meters & ρ with harmonic mean) ----------------
-        // Accept wallWidth_rho and/or wallWidth_m; derive the other using a_H.
-        // Keep "wallWidth" as an alias of wallWidth_rho for shader use.
-        // 1) stash axes first so a_H can be computed
-        if (Array.isArray(parameters.axesHull))  U.axesHull  = parameters.axesHull.slice(0,3);
-        if (Array.isArray(parameters.axesScene)) U.axesScene = parameters.axesScene.slice(0,3);
-        let aH = _guessAH(U);
+        // ---- Unify wall-width ingestion (no hidden defaults in strict) ----------
+        let w_rho = (Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined);
+        if (Number.isFinite(parameters.wallWidth_rho)) w_rho = +parameters.wallWidth_rho;
+        if (!Number.isFinite(w_rho) && Number.isFinite(parameters.wallWidth_m)) {
+          const aH = _guessAH(this.uniforms); // Use existing uniforms for context
+          if (Number.isFinite(aH)) w_rho = (+parameters.wallWidth_m) / aH;
+        }
+        if (this.strictPhysics) _req(Number.isFinite(w_rho), "wallWidth (rho) or wallWidth_m", this.uniforms);
+        if (Number.isFinite(w_rho)) this.uniforms.wallWidth = w_rho;
 
-        // 2) accept explicit wall inputs
-        const hasWrho = Number.isFinite(parameters.wallWidth_rho);
-        const hasWm   = Number.isFinite(parameters.wallWidth_m);
-        if (hasWrho) U.wallWidth_rho = +parameters.wallWidth_rho;
-        if (hasWm)   U.wallWidth_m   = +parameters.wallWidth_m;
+        // ---- Axes setup (strict mode will require these) -----------------------
+        if (Array.isArray(parameters.axesHull))  this.uniforms.axesHull  = parameters.axesHull.slice(0,3);
+        if (Array.isArray(parameters.axesScene)) this.uniforms.axesScene = parameters.axesScene.slice(0,3);
 
-        // 3) alias legacy "wallWidth" to ρ-units if present
-        if (Number.isFinite(parameters.wallWidth)) {
-          U.wallWidth_rho = +parameters.wallWidth;
+        // ---- Accept strict mode toggle up front --------------------------------
+        if (typeof parameters.strictPhysics === "boolean") this.strictPhysics = !!parameters.strictPhysics;
+
+        // ---- Physics uniforms (no defaults when strict) -------------------------
+        if (Number.isFinite(parameters.gammaGeo))           this.uniforms.gammaGeo = +parameters.gammaGeo;
+        if (Number.isFinite(parameters.gammaVanDenBroeck))  this.uniforms.gammaVanDenBroeck = +parameters.gammaVanDenBroeck;
+        if (Number.isFinite(parameters.qSpoilingFactor))    this.uniforms.deltaAOverA = +parameters.qSpoilingFactor;
+        if (Number.isFinite(parameters.deltaAOverA))        this.uniforms.deltaAOverA = +parameters.deltaAOverA;
+        if (Number.isFinite(parameters.dutyEffectiveFR))    this.uniforms.dutyEffectiveFR = +parameters.dutyEffectiveFR;
+        if (Number.isFinite(parameters.sectorCount))        this.uniforms.sectorCount = parameters.sectorCount|0;
+        if (Number.isFinite(parameters.sectorStrobing))     this.uniforms.sectorStrobing = parameters.sectorStrobing|0;
+        if (typeof parameters.lockFraming === "boolean")    this.uniforms.lockFraming = !!parameters.lockFraming;
+        if (Number.isFinite(parameters.thetaScale))         this.uniforms.thetaScale = +parameters.thetaScale;
+
+        if (this.strictPhysics) {
+          this._req(Array.isArray(this.uniforms.axesHull) && this.uniforms.axesHull.length===3, "axesHull[a,b,c]", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.wallWidth), "wallWidth (rho)", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.gammaGeo), "gammaGeo", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.deltaAOverA), "qSpoilingFactor/deltaAOverA", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.gammaVanDenBroeck), "gammaVanDenBroeck", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.sectorCount) && this.uniforms.sectorCount>=1, "sectorCount", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.sectorStrobing) && this.uniforms.sectorStrobing>=1, "sectorStrobing", this.uniforms);
+          this._req(Number.isFinite(this.uniforms.dutyEffectiveFR), "dutyEffectiveFR", this.uniforms);
+          // Either authoritative theta OR all factors to recompute are present
+          if (!Number.isFinite(this.uniforms.thetaScale)) {
+            this._req(true, "thetaScale (pipeline) — required in strict mode for now", this.uniforms);
+          }
+          // Lock framing while validating strict 1:1
+          this.uniforms.lockFraming = true;
         }
 
-        // 4) derive missing counterpart via a_H (if available)
-        aH = _guessAH(U);
-        if (!Number.isFinite(U.wallWidth_rho) && Number.isFinite(U.wallWidth_m) && Number.isFinite(aH)) {
-          U.wallWidth_rho = U.wallWidth_m / aH;
-        }
-        if (!Number.isFinite(U.wallWidth_m) && Number.isFinite(U.wallWidth_rho) && Number.isFinite(aH)) {
-          U.wallWidth_m = U.wallWidth_rho * aH;
+        // --- Axes setup (derive scene-normalized if hull-only provided) -----------
+        if (!Array.isArray(this.uniforms.axesScene) && Array.isArray(this.uniforms.axesHull)) {
+          const a = this.uniforms.axesHull;
+          const aMax = Math.max(1e-6, a[0], a[1], a[2]);
+          this.uniforms.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
         }
 
-        // 5) final defaults + alias for shader
-        if (!Number.isFinite(U.wallWidth_rho)) U.wallWidth_rho = WALL_RHO_DEFAULT;
-        U.wallWidth = U.wallWidth_rho;
+        // In strict mode: no span/userGain seasoning
+        if (this.strictPhysics) {
+          this.uniforms.userGain = 1.0;
+          this.uniforms.displayGain = 1.0;
+        }
 
-        // ------------------------------------------------------------------------
+        // --- Parse other parameters (mostly visual/cosmetic) --------------------
+        const P = parameters; // alias for brevity
+        const U = this.uniforms; // alias for brevity
+        const isREAL = U.physicsParityMode;
+        const zeroStandby = isREAL && isStandby;
 
-        // --- Resolve hull + scene scaling ---
-        const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? prev?.hullAxes?.[0], 503.5);
-        const b = N(parameters?.hull?.b ?? parameters?.hullAxes?.[1] ?? prev?.hullAxes?.[1], 132.0);
-        const c = N(parameters?.hull?.c ?? parameters?.hullAxes?.[2] ?? prev?.hullAxes?.[2], 86.5);
-        const s = 1 / Math.max(a, b, c, 1e-9);
-        const axesScene = [a*s, b*s, c*s];
-        const gridSpan = Number.isFinite(parameters?.gridSpan) ? +parameters.gridSpan : Math.max(2.6, Math.max(...axesScene) * 1.35);
+        // Use explicit assignments to allow overriding default calculation logic
+        // Hull axes (also used for grid generation)
+        const hullAxesMeters = P.hullAxesMeters ?? P.hull?.a ?? prev?.hullAxesMeters;
+        if (hullAxesMeters) {
+            const a = hullAxesMeters[0] ?? prev?.hullAxesMeters?.[0] ?? 503.5;
+            const b = hullAxesMeters[1] ?? prev?.hullAxesMeters?.[1] ?? 132.0;
+            const c = hullAxesMeters[2] ?? prev?.hullAxesMeters?.[2] ?? 86.5;
+            U.hullAxes = [a, b, c];
+        }
 
-        // --- Parity / visualization ---
-        // Accept legacy aliases from UI (uPhysicsParity/uRidgeMode) and keep previous if missing
-        const parity = ((parameters?.physicsParityMode ?? parameters?.uPhysicsParity) !== undefined)
-          ? !!(parameters?.physicsParityMode ?? parameters?.uPhysicsParity)
-          : !!prev?.physicsParityMode;
-        const zeroStandby = parity && isStandby;  // only REAL gets hard-zero in standby
-        const ridgeMode = (parameters?.ridgeMode ?? parameters?.uRidgeMode ?? prev?.ridgeMode ?? 0)|0;
-        const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4 }; // Added interiorTilt to CM
-        let colorModeRaw = parameters?.colorMode ?? prev?.colorMode ?? 'theta';
-        const colorMode  = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw] ?? 1)
-                                                              : (colorModeRaw|0);
-        const exposure  = N(parameters?.exposure ?? parameters?.viz?.exposure, parity ? 3.5 : (prev?.exposure ?? 6.0));
-        const zeroStop  = N(parameters?.zeroStop ?? parameters?.viz?.zeroStop, parity ? 1e-5 : (prev?.zeroStop ?? 1e-7));
-        const vizGain   = parity ? 1 : N(parameters?.vizGain, prev?.vizGain ?? 1);
-        const curvT     = parity ? 0 : clamp01(N(parameters?.curvatureGainT ?? parameters?.viz?.curvatureGainT, prev?.curvatureGainT ?? 0));
-        const curvMax   = parity ? 1 : Math.max(1, N(parameters?.curvatureBoostMax ?? parameters?.viz?.curvatureBoostMax, prev?.curvatureBoostMax ?? 40));
-        const cosmetic  = parity ? 1 : N(parameters?.cosmeticLevel ?? parameters?.viz?.cosmeticLevel, prev?.cosmeticLevel ?? 10);
+        // Wall thickness (meters)
+        const wallWidthMeters = P.wallWidth_m ?? P.hull?.wallWidthMeters ?? prev?.wallWidth_m;
+        if (Number.isFinite(wallWidthMeters)) U.wallWidth_m = +wallWidthMeters;
 
-        // camera framing lock
-        const lockFraming = parameters?.lockFraming ?? prev?.lockFraming ?? true;
-        const cameraZ = (parameters?.cameraZ != null)
-          ? +parameters.cameraZ
-          : (lockFraming ? (prev?.cameraZ ?? null) : prev?.cameraZ ?? null);
+        // Hull scaling and clipping axes (used for camera fit)
+        const axesScene = P.axesScene ?? U.axesScene; // Prefer explicit scene axes
+        if (!Array.isArray(axesScene) && Array.isArray(U.hullAxes)) {
+            const aH = _guessAH(U); // Harmonic mean in meters
+            const hullMax = Math.max(1e-6, U.hullAxes[0], U.hullAxes[1], U.hullAxes[2]);
+            const clipScale = Math.max(1e-9, hullMax, aH || 1); // use largest dimension OR harmonic mean
+            U.axesScene = U.hullAxes.map(x => x / clipScale);
+        } else if (Array.isArray(axesScene)) {
+            U.axesScene = axesScene.slice(0,3); // Ensure it's a clean copy
+        }
 
-        // --- inbound name normalization ---
-        const sectorsIn =
-          N(parameters?.sectors ?? parameters?.sectorCount ?? parameters?.sectorStrobing, prev?.sectors ?? 1);
+        // Grid span for framing (derived or explicit)
+        let gridSpan = P.gridSpan ?? prev?.gridSpan;
+        if (!Number.isFinite(gridSpan) && U.axesScene) {
+            const hullMaxClip = Math.max(1e-6, U.axesScene[0], U.axesScene[1], U.axesScene[2]);
+            const spanPadding = P.gridSpanPadding ?? GRID_DEFAULTS.spanPadding;
+            gridSpan = Math.max(GRID_DEFAULTS.minSpan, hullMaxClip * spanPadding);
+        }
+        if (Number.isFinite(gridSpan)) U.gridSpan = gridSpan;
 
-        const splitIn =
-          N(parameters?.split ?? parameters?.sectorSplit ?? parameters?.sectorIdx ?? this.strobingState?.currentSector, prev?.split ?? 0);
+        // --- Camera explicit Z override -----------------------------------------
+        // Lock framing if strictly physics or explicitly requested
+        const lockFraming = P.lockFraming ?? U.lockFraming ?? this.strictPhysics;
+        if (P.cameraZ != null) U.cameraZ = +P.cameraZ;
+        else if (!lockFraming && prev?.cameraZ != null) U.cameraZ = prev.cameraZ; // maintain if unlocked
 
-        // Parity-aware clamp: REAL physics bounded (≤1e2), SHOW cosmetic can be larger (≤1e11)
-        const vdbRaw =
-          N(parameters?.gammaVdB ?? parameters?.gammaVanDenBroeck, prev?.gammaVdB ?? 2.86e5);
-        const gammaVdBIn = Math.max(1, Math.min(parity ? 1e2 : 1e11, vdbRaw));
+        // Visualization parameters
+        const exposure       = N(P.exposure, prev?.exposure ?? (isREAL ? 3.5 : 6.0));
+        const zeroStop       = N(P.zeroStop, prev?.zeroStop ?? (isREAL ? 1e-5 : 1e-7));
+        const vizGain        = isREAL ? 1.0 : N(P.vizGain, prev?.vizGain ?? 1.0);
+        const curvatureGainT = isREAL ? 0.0 : clamp01(N(P.curvatureGainT, prev?.curvatureGainT ?? 0.0));
+        const curvatureBoostMax = isREAL ? 1.0 : Math.max(1.0, N(P.curvatureBoostMax, prev?.curvatureBoostMax ?? 40.0));
+        const cosmeticLevel  = isREAL ? 1.0 : N(P.cosmeticLevel ?? P.viz?.cosmeticLevel, prev?.cosmeticLevel ?? 10.0);
 
-        const frFromParams =
-          parameters?.dutyEffectiveFR ?? parameters?.dutyShip ?? parameters?.dutyEff ??
-          prev?.dutyEffectiveFR      ?? prev?.dutyShip      ?? prev?.dutyEff;
+        // Apply overrides
+        U.exposure = exposure;
+        U.zeroStop = zeroStop;
+        U.vizGain = vizGain;
+        U.curvatureGainT = curvatureGainT;
+        U.curvatureBoostMax = curvatureBoostMax;
+        U.cosmeticLevel = cosmeticLevel; // Affects geometry gain/boost
 
-        // total sectors (ship-wide), concurrent sectors (pane)
-        const sectorsConcurrent =
-          Math.max(1, Math.floor(
-            Number(parameters?.sectors ?? prev?.sectors ?? 1)
-          ));
-        const sectorsTotal =
-          Math.max(1, Math.floor(
-            Number(parameters?.sectorCount ?? prev?.sectorCount ?? this.strobingState?.sectorCount ?? 400)
-          ));
-        const dutyLocal = Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01));
+        // --- Physics chain parameters -------------------------------------------
+        const sectorsTotal = Math.max(1, (P.sectorCount ?? U.sectorCount ?? this.strobingState?.sectorCount ?? 400)|0);
+        const sectorsLive  = Math.max(1, (P.sectors ?? U.sectors ?? this.strobingState?.currentSector ?? 1)|0);
+        const dutyCycle    = N(P.dutyCycle, U.dutyCycle ?? 0.01);
 
-        // --- Parity-aware defaults ---
-        const isREAL = !!parity;
-        // SHOW should be "instantaneous" (no √(FR) averaging), REAL uses FR-averaged
-        const viewAvgResolved = (parameters?.viewAvg !== undefined) ? !!parameters.viewAvg : isREAL;
-        // What sectorCount should the pane *think* it sees
-        const sectorCountOut  = isREAL ? sectorsTotal : sectorsConcurrent;
+        // Use provided `dutyEffectiveFR` if available, otherwise compute from dutyCycle and sectors
+        let dutyEffFR = Number.isFinite(P.dutyEffectiveFR) ? +P.dutyEffectiveFR
+                      : (isREAL && !zeroStandby)
+                        ? dutyCycle * (sectorsLive / sectorsTotal)
+                        : dutyCycle;
+        dutyEffFR = Math.max(1e-12, Math.min(1.0, dutyEffFR)); // Clamp to [0,1]
 
-        // --- build next uniforms without mutating prev ---
-        const nextUniforms = {
-          ...prev,
-          // geometry (authoritative)
-          hullAxes: [a, b, c],
-          axesClip: axesScene,
-          gridSpan,
-          // camera/framing
-          lockFraming,
-          cameraZ,
-          // visualization / parity
-          physicsParityMode: parity,
-          ridgeMode,
-          colorMode, exposure, zeroStop,
-          vizGain,
-          curvatureGainT: curvT,
-          curvatureBoostMax: curvMax,
-          cosmeticLevel: cosmetic,
-          // existing fields
-          vShip: parameters.vShip || prev.vShip || 1,
-          wallWidth: parameters.wallWidth || prev.wallWidth || 0.06, // This is alias for wallWidth_rho for shader
-          driveDir: parameters.driveDir || prev.driveDir || [1,0,0],
-          displayGain: N(parameters.displayGain, prev.displayGain ?? 1.0),
-          userGain: N(parameters.userGain, prev.userGain ?? 1.0),
-          // tilt
-          epsilonTilt: parity ? 0 : N(parameters.epsilonTilt || prev.epsilonTilt || 0),
-          betaTiltVec: (Array.isArray(parameters.betaTiltVec) && parameters.betaTiltVec.length===3)
-                       ? parameters.betaTiltVec
-                       : (prev.betaTiltVec || [0,-1,0]),
-          tiltGain: prev.tiltGain ?? 0.55,
-          // 🔗 physics chain fields used by CPU warp & shader
-          thetaScale: N(parameters.thetaScale, prev.thetaScale ?? 1.0),
-          dutyCycle: N(parameters.dutyCycle, prev.dutyCycle ?? 0.01),
-          // publish local burst duty so diagnostics can always reconstruct FR
-          dutyLocal: Math.max(0, Number(parameters?.dutyCycle ?? prev?.dutyCycle ?? 0.01)),
-          sectors: Math.max(1, Math.floor(sectorsConcurrent)),
-          sectorCount: Math.max(1, Math.floor(sectorCountOut)),
-          // clamp split against the *live* sectors for this pane
-          split: Math.max(0, Math.min(Math.max(1, Math.floor(sectorsConcurrent)) - 1, (splitIn|0))),
-          viewAvg: viewAvgResolved,
-          viewMassFraction: isREAL ? (1 / Math.max(1, sectorCountOut)) : 1.0,
-          gammaGeo: N(parameters.gammaGeo ?? parameters.g_y, prev.gammaGeo ?? 26),
-          deltaAOverA: N(parameters.deltaAOverA ?? parameters.qSpoilingFactor, prev.deltaAOverA ?? 1),
-          gammaVdB: gammaVdBIn,
-          currentMode: parameters.currentMode ?? prev.currentMode ?? 'hover',
-        };
+        const gammaGeo = N(P.gammaGeo ?? P.g_y, U.gammaGeo ?? 26);
+        const deltaAOverA = N(P.deltaAOverA ?? P.qSpoilingFactor, U.deltaAOverA ?? 1.0);
+        const gammaVdB = N(P.gammaVanDenBroeck, U.gammaVanDenBroeck ?? 2.86e5);
 
-        // Duty used in the chain:
-        //  - REAL: Ford–Roman averaged (dutyLocal × S_live/S_total)
-        //  - SHOW: instantaneous local burst (≈ dutyLocal)
-        let dutyEffFR;
-        if (zeroStandby) {
-          dutyEffFR = 0;
-        } else if (frFromParams != null) {
-          dutyEffFR = Math.max(0, Math.min(1, +frFromParams));
+        // Calculate canonical thetaScale for REAL mode, use provided for SHOW
+        let thetaScaleFinal;
+        if (isREAL) {
+            if (zeroStandby) {
+                thetaScaleFinal = 0; // Flat in standby
+            } else {
+                const A_geo = Math.pow(Math.max(1, gammaGeo), 3);
+                const beta_inst = A_geo * Math.max(1e-12, deltaAOverA) * Math.max(1, gammaVdB);
+                const beta_avg = beta_inst * Math.sqrt(Math.max(1e-12, dutyEffFR));
+                // viewAvg determines if we use average beta or instantaneous
+                const viewAvg = (P.viewAvg ?? U.viewAvg ?? true);
+                thetaScaleFinal = viewAvg ? beta_avg : beta_inst;
+            }
         } else {
-          dutyEffFR = isREAL
-            ? Math.max(0, Math.min(1, dutyLocal * (sectorsConcurrent / Math.max(1, sectorsTotal))))
-            : Math.max(0, Math.min(1, dutyLocal));
+            // SHOW mode: use provided scale, or default to a reasonable value
+            thetaScaleFinal = Number.isFinite(P.thetaScale) ? +P.thetaScale : (thetaScaleFinal || 1.0);
         }
 
-        // build theta scale (canonical chain)
-        const thetaScaleFromChain = zeroStandby ? 0 :
-          Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3) *
-          Math.max(1e-12, nextUniforms.deltaAOverA ?? 1) *
-          Math.max(1, nextUniforms.gammaVdB ?? 1) *
-          (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
+        // Re-apply computed values to uniforms
+        U.sectors = sectorsLive;
+        U.sectorCount = sectorsTotal;
+        U.dutyCycle = dutyCycle;
+        U.dutyEffectiveFR = dutyEffFR; // Store the effective duty factor used
+        U.gammaGeo = gammaGeo;
+        U.deltaAOverA = deltaAOverA;
+        U.gammaVanDenBroeck = gammaVdB;
+        U.thetaScale = thetaScaleFinal;
 
-        // Apply mode-specific scaling for demonstration purposes (cosmetic only)
-        if (!parity && !zeroStandby) {
-          const mode = nextUniforms.currentMode?.toLowerCase();
-          const modeAmplifier =
-              mode === 'emergency' ? 1.08 : // higher contrast for emergency
-              mode === 'cruise'    ? 1.00 : // standard cruise
-              mode === 'hover'     ? 1.05 : // slightly more sensitive hover
-              mode === 'standby'   ? 0.95 : // reduced sensitivity for standby
-              1.0; // default
-          // Scale the *final* visualization theta, NOT the physics-derived scale
-          // This is cosmetic exaggeration, separate from the physics baseline.
-          // This is now handled by `userGain` and `cosmeticLevel` more directly.
+        // Apply mode specific overrides to visual parameters
+        if (isREAL) {
+            // REAL physics: use defaults, clamp exaggeration
+            U.ridgeMode = 0; // Physics double-lobe
+            U.curvatureGainT = 0.0;
+            U.curvatureBoostMax = 1.0;
+            U.userGain = 1.0;
+        } else {
+            // SHOW mode: allow visual seasoning
+            U.ridgeMode = P.ridgeMode ?? U.ridgeMode ?? 1; // Show single crest
+            U.curvatureGainT = curvatureGainT;
+            U.curvatureBoostMax = curvatureBoostMax;
+            U.userGain = N(P.userGain, U.userGain ?? 1.0); // Apply user gain for visual scaling
         }
 
-        // Always prefer React-computed thetaScale for pipeline compliance
-        nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
-          ? +parameters.thetaScale
-          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback
+        // --- Set drive direction and interior tilt ----
+        const driveDir = P.driveDir ?? U.driveDir ?? [1,0,0];
+        U.driveDir = Array.isArray(driveDir) ? driveDir.slice(0,3) : [1,0,0];
+        const epsilonTilt = N(P.epsilonTilt, U.epsilonTilt ?? 0.0);
+        const betaTiltVec = P.betaTiltVec ?? U.betaTiltVec ?? [0,-1,0];
+        const tiltGain = N(P.tiltGain, U.tiltGain ?? 0.55);
+        U.epsilonTilt = epsilonTilt;
+        U.betaTiltVec = Array.isArray(betaTiltVec) ? betaTiltVec.slice(0,3) : [0,-1,0];
+        U.tiltGain = tiltGain;
 
-        // Debug calculation: Use the physics-derived scale for diagnostics
-        this._dbgThetaTick = (this._dbgThetaTick || 0) + 1;
-        if (this._dbgThetaTick % 60 === 1) {
-          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] Theta chain:`, {
-            gamma3: Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3),
-            q: nextUniforms.deltaAOverA ?? 1,
-            gamma_VdB: nextUniforms.gammaVdB ?? 1,
-            sqrtDuty: Math.sqrt(Math.max(0, dutyEffFR)),
-            chain: thetaScaleFromChain.toExponential(2),
-            actualTheta: nextUniforms.thetaScale,
-            dutyEffFR,
-            sectorsConcurrent,
-            sectorsTotal,
-            parametersPassed: Number.isFinite(parameters?.thetaScale) ? parameters.thetaScale : 'ENGINE_CALC'
-          });
-        }
-        nextUniforms.dutyUsed        = dutyEffFR;
-        nextUniforms.dutyEffectiveFR = dutyEffFR;   // expose single source of truth to UI
+        // --- Set interior parameters ----
+        const intWidth = N(P.intWidth, U.intWidth ?? 0.25);
+        U.intWidth = intWidth;
 
-        // --- If amplitude just went "off", restore the pristine grid ---
-        const wasActive = (prev.thetaScale ?? 0) > 1e-12;
-        const nowActive = (nextUniforms.thetaScale ?? 0) > 1e-12;
-        if (wasActive && !nowActive) this._restoreOriginalGrid?.();
+        // --- Set color mode ----
+        let colorModeRaw = P.colorMode ?? U.colorMode ?? 'theta';
+        const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4, custom:5, curvature:6 };
+        U.colorMode = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw.toLowerCase()] ?? 1) : (colorModeRaw|0);
 
-        // --- Neutralize visual boosts in standby (only for REAL parity) ---
-        if (zeroStandby) {
-          nextUniforms.vizGain = 1;
-          nextUniforms.curvatureGainT = 0;
-          nextUniforms.curvatureBoostMax = 1;
-          nextUniforms.userGain = 1;
-          nextUniforms.vShip = 0;
-        }
+        // --- Metric tensor uniforms ----
+        const metric = P.metric ?? U.metric ?? ID3;
+        const metricInv = P.metricInv ?? U.metricInv ?? ID3;
+        const useMetric = P.useMetric ?? U.useMetric ?? false;
+        const metricOn = P.metricOn ?? (useMetric ? 1.0 : 0.0);
+        U.metric = metric;
+        U.metricInv = metricInv;
+        U.useMetric = useMetric;
+        U.metricOn = metricOn;
 
-        // --- Operational mode validation and enforcement ---
-        const debugTag = this.debugTag || 'WarpEngine';
-        if (debugTag.includes('REAL') || parity) {
-          // Enforce REAL mode constraints
-          nextUniforms.physicsParityMode = true;
-          nextUniforms.ridgeMode = 0; // physics double-lobe
-          if (nextUniforms.userGain > 10) nextUniforms.userGain = 1; // limit exaggeration
-        } else if (debugTag.includes('SHOW') || !parity) {
-          // Enforce SHOW mode enhancements
-          nextUniforms.physicsParityMode = false;
-          nextUniforms.ridgeMode = 1; // clean single crest
-          nextUniforms.curvatureGainT = Math.max(nextUniforms.curvatureGainT || 0, 0.3);
-        }
-
-        // --- decide if the CPU warp needs recompute ---
+        // --- Trigger grid rebuild if geometry parameters changed ----
         const geoChanged =
-          (prev.hullAxes?.[0] !== nextUniforms.hullAxes[0]) ||
-          (prev.hullAxes?.[1] !== nextUniforms.hullAxes[1]) ||
-          (prev.hullAxes?.[2] !== nextUniforms.hullAxes[2]) ||
-          (prev.gridSpan !== nextUniforms.gridSpan);
+            (prev?.hullAxes?.[0] !== U.hullAxes?.[0]) || (prev?.hullAxes?.[1] !== U.hullAxes?.[1]) || (prev?.hullAxes?.[2] !== U.hullAxes?.[2]) ||
+            (prev?.wallWidth_m !== U.wallWidth_m) || (prev?.wallWidth_rho !== U.wallWidth_rho) ||
+            (prev?.gridSpan !== U.gridSpan);
 
-        const warpKeys = [
-          'thetaScale','userGain','displayGain','curvatureGainT','curvatureBoostMax',
-          'exposure','zeroStop','physicsParityMode','ridgeMode',
-          'driveDir','wallWidth','epsilonTilt','betaTiltVec','tiltGain',
-          'dutyCycle','sectors','split','gammaGeo','deltaAOverA','gammaVdB',
-          'viewAvg','currentMode'
-        ];
-        const ampChanged = warpKeys.some(k => JSON.stringify(prev[k]) !== JSON.stringify(nextUniforms[k]));
+        // Also recompute if amplitude changed, as it affects geometry
+        const ampChanged =
+            (prev?.thetaScale !== U.thetaScale) || (prev?.userGain !== U.userGain) ||
+            (prev?.cosmeticLevel !== U.cosmeticLevel) || (prev?.curvatureGainT !== U.curvatureGainT) ||
+            (prev?.curvatureBoostMax !== U.curvatureBoostMax) || (prev?.physicsParityMode !== U.physicsParityMode) ||
+            (prev?.ridgeMode !== U.ridgeMode);
 
-        this.uniforms = nextUniforms;
         if (geoChanged || ampChanged) {
-          this._updateGrid();
-        } else if (parameters.currentMode) {
-          console.log('[WarpEngine] Mode change applied (no warp needed)');
+            this._updateGrid();
+        } else if (parameters.currentMode || P.lockFraming || P.cameraZ) {
+            // Just update camera if mode/framing/Z changed without geometry/amplitude
+            this._adjustCameraForSpan(U.gridSpan || 1.0);
         }
     }
 
@@ -1456,7 +1432,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         return {
             visualScale: config.baseScale,
-            curvatureAmplifier: 1.0,   // <- neutralized for geometry
+            curvatureAmplifier: 1.0,   // ← neutralized for geometry
             strobingFactor: config.strobingViz
         };
     }
@@ -1499,17 +1475,17 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
-        const hullAxes = (this.uniforms?.axesHull || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
+        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
         // Unified wall thickness handling - use either meters or ρ-units
         const a_m = hullAxes[0], b_m = hullAxes[1], c_m = hullAxes[2];
         const aH = _guessAH(this.uniforms) || 1; // harmonic mean, meters
-        const wallWidth_rho = this.uniforms?.wallWidth_rho ?? WALL_RHO_DEFAULT;
+        const wallWidth_rho = this.uniforms?.wallWidth_rho ?? this.uniforms?.wallWidth ?? WALL_RHO_DEFAULT;
         const wallWidth_m   = this.uniforms?.wallWidth_m ?? wallWidth_rho * aH; // meters
 
         // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.
         const axesScene =
-          (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
-            ? this.uniforms.axesClip
+          (this.uniforms?.axesScene && this.uniforms.axesScene.length === 3)
+            ? this.uniforms.axesScene
             : (() => {
                 const aMax = Math.max(a_m, b_m, c_m);
                 const s    = 1.0 / Math.max(aMax, 1e-9);
@@ -1520,7 +1496,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
-        const spanPadding = bubbleParams.gridScale || GRID_DEFAULTS.spanPadding;
+        const spanPadding = bubbleParams.gridSpanPadding ?? GRID_DEFAULTS.spanPadding;
         let targetSpan = Math.max(
           GRID_DEFAULTS.minSpan,
           hullMaxClip * spanPadding
@@ -1624,16 +1600,13 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           this.uniforms.thetaScale = betaUsedUniform; // last-resort sync
         }
 
-        // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
-        const betaVisUniform = betaUsedUniform;
-
         // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
             console.log("🧪 warp-mode", {
                 mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform,
                 split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform,
                 betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2),
-                betaVis: betaVisUniform.toExponential(2),
+                betaVis: betaUsedUniform.toExponential(2), // Show the base physics value
                 cosmeticLevel: this.uniforms?.cosmeticLevel || 10
             });
         }
@@ -1726,20 +1699,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             const REF_BOOSTMAX = 40.0;                                  // fixed reference for "max slider"
             const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
 
-            // CPU-side parity protection (match shader's idea but keep it neutral by default)
-            const physicsParityMode = this.uniforms?.physicsParityMode ?? false;
-
-            const useSingleRidge = ((this.uniforms?.ridgeMode|0) === 1);
-
-            // 🔑 this is the switch that removes the geometric double ridge
-            const baseMag = useSingleRidge
-              ? Math.abs(xs_over_rs) * f               // single crest at ρ=1
-              : Math.abs(xs_over_rs * df);             // physics double-lobe (current)
-
             // IMPORTANT: include userGain in the *current* magnitude but NOT in the "max slider" denominator.
             // That way, increasing exaggeration makes geometry visibly grow instead of canceling out.
-            const magMax       = Math.log(1.0 + (baseMag * thetaScale * REF_BOOSTMAX) / zeroStop);
-            const magNow       = Math.log(1.0 + (baseMag * thetaScale * userGain * boostNow) / zeroStop);
+            const magMax       = Math.log(1.0 + (thetaScale * REF_BOOSTMAX) / zeroStop);
+            const magNow       = Math.log(1.0 + (thetaScale * userGain * boostNow) / zeroStop);
 
             // Normalized geometry amplitude (monotonic in userGain AND boostNow)
             const A_geom       = Math.pow(Math.min(1.0, magNow / Math.max(1e-12, magMax)), 0.85);
@@ -1749,7 +1712,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
             // Special case: make REAL standby perfectly flat if desired
             let disp;
-            if (mode === 'standby' && parity) {
+            if (mode === 'standby' && this.strictPhysics && this.uniforms?.physicsParityMode) {
                 disp = 0; // perfectly flat grid for REAL standby mode
             } else {
                 // geometry should follow A_geom (independent of exposure tone-mapping)
@@ -1865,13 +1828,20 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             return;
         }
 
+        // Show diagnostics if strict is missing inputs
+        if (this.strictPhysics && this.uniforms?.__error) {
+          gl.clearColor(0.2, 0.0, 0.0, 1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+          return;
+        }
+
         gl.useProgram(this.gridProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         const loc = this.gridAttribs.position;
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
 
-        const u = this.uniforms || {};
+        const U = this.uniforms || {};
 
         // --- names / helpers
         const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
@@ -1883,60 +1853,60 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
 
         // --- modes / sectoring (use lowercase names in the shader)
-        if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(u.colorMode, 1));
-        if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(u.ridgeMode, 1));
-        if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     u.physicsParityMode ? 1 : 0);
-        const sLive  = Math.max(1, (u.sectors|0)      || 1);
-        const sTotal = Math.max(1, (u.sectorCount|0)  || sLive);
+        if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(U.colorMode, 1));
+        if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(U.ridgeMode, 1));
+        if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     U.physicsParityMode ? 1 : 0);
+        const sLive  = Math.max(1, (U.sectors|0)      || 1);
+        const sTotal = Math.max(1, (U.sectorCount|0)  || sLive);
         if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
-        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(u.split,0))));
+        if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(U.split,0))));
 
         // --- axes (scene-normalized and legacy hull)
-        const axesScene = u.axesClip || u.axesScene || [1,1,1];
-        const hullAxes  = u.hullAxes || [503.5, 132.0, 86.5];
+        const axesScene = U.axesClip || U.axesScene || [1,1,1];
+        const hullAxes  = U.hullAxes || [503.5, 132.0, 86.5];
         if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
         if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
 
         // --- drive + wall
-        const drive = V3(u.driveDir, [1,0,0]);
+        const drive = V3(U.driveDir, [1,0,0]);
         // Use unified wallWidth_rho, aliased as wallWidth for the shader
-        const wRho  = F(u.wallWidth_rho ?? u.wallWidth ?? WALL_RHO_DEFAULT, WALL_RHO_DEFAULT);
+        const wRho  = F(U.wallWidth, WALL_RHO_DEFAULT);
         if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
         if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
 
         // --- critical amplitude carrier INSIDE theta field:
-        const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
+        const vShip = Number.isFinite(U.vShip) ? U.vShip : (U.physicsParityMode ? 0.0 : 1.0);
         if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
 
         // --- θ-scale (you already set a fallback in JS if missing)
-        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, u.thetaScale || 0); // Direct pipeline value, no fallback amplification
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0); // Direct pipeline value, no fallback amplification
 
         // --- exposure / viz chain
-        if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(u.exposure, u.physicsParityMode ? 3.5 : 6.0));
-        if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(u.zeroStop, u.physicsParityMode ? 1e-5 : 1e-7));
-        if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(u.userGain, 1.0));
-        if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(u.displayGain, 1.0));
-        if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(u.vizGain, 1.0));
-        if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(u.curvatureGainT, 0.0));
-        if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(u.curvatureBoostMax, 1.0));
+        if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(U.exposure, U.physicsParityMode ? 3.5 : 6.0));
+        if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(U.zeroStop, U.physicsParityMode ? 1e-5 : 1e-7));
+        if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(U.userGain, 1.0));
+        if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(U.displayGain, 1.0));
+        if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(U.vizGain, 1.0));
+        if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(U.curvatureGainT, 0.0));
+        if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(U.curvatureBoostMax, 1.0));
 
         // --- interior tilt (benign defaults)
-        if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(u.intWidth, 0.25));
-        if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(u.epsTilt,  0.0));
-        if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(u.tiltViz,  0.0));
+        if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(U.intWidth, 0.25));
+        if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(U.epsTilt,  0.0));
+        if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(U.tiltViz,  0.0));
 
         // --- Purple shift uniforms
-        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(u.epsilonTilt, 0.0));
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(U.epsilonTilt, 0.0));
         if (this.gridUniforms.betaTiltVec) {
-            const betaTilt = V3(u.betaTiltVec, [0, -1, 0]);
+            const betaTilt = V3(U.betaTiltVec, [0, -1, 0]);
             gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
         }
 
         // --- Metric tensor uniforms (default to identity if not provided)
-        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
-        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
-        const useMetric = this.uniforms.useMetric || false;
-        const metricOn = this.uniforms.metricOn !== undefined ? this.uniforms.metricOn : (useMetric ? 1.0 : 0.0);
+        const metric = U.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = U.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = U.useMetric || false;
+        const metricOn = U.metricOn !== undefined ? U.metricOn : (useMetric ? 1.0 : 0.0);
 
         if (this.gridUniforms.metric) {
             gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
@@ -1991,16 +1961,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         }
 
         try {
-            // Clear the frame and avoid "ghost layers" each draw
+            // Clear the frame and enforce a single opaque pass
             gl.disable(gl.BLEND);
-            gl.enable(gl.DEPTH_TEST);
             gl.depthMask(true);
-            gl.colorMask(true, true, true, true);
             gl.clearColor(0, 0, 0, 1);
-
-            // Clear the screen & enforce a single opaque pass
-            gl.disable(gl.BLEND);
-            gl.depthMask(true);
             gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
             // Render the spacetime grid
@@ -2177,6 +2141,16 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         out[15] = 1;
     }
 
+    _perspective(out, fovy, aspect, near, far) {
+        const f = 1.0 / Math.tan(fovy / 2);
+        const nf = 1.0 / (near - far);
+
+        out[0] = f / aspect; out[1] = 0; out[2] = 0; out[3] = 0;
+        out[4] = 0; out[5] = f; out[6] = 0; out[7] = 0;
+        out[8] = 0; out[9] = 0; out[10] = (far + near) * nf; out[11] = -1;
+        out[12] = 0; out[13] = 0; out[14] = 2 * far * near * nf; out[15] = 0;
+    }
+
     _multiply(out, a, b) {
         const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
         const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
@@ -2293,7 +2267,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
     _sampleYorkAndEnergy(U){
         const axes  = U.axesClip || [0.40,0.22,0.22];
-        const w     = Math.max(1e-4, U.wallWidth_rho ?? WALL_RHO_DEFAULT);   // shell width in rho
+        const w     = Math.max(1e-4, U.wallWidth_rho ?? U.wallWidth ?? WALL_RHO_DEFAULT);   // shell width in rho
         const vShip = U.vShip || 1.0;
         const d     = U.driveDir || [1,0,0];
         const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
