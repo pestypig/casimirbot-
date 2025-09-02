@@ -1154,10 +1154,12 @@ export default function WarpBubbleCompare({
     }
   }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.seq]);
 
-  // Mount-only effect: guarantee initial attach
+  // (removed duplicate early mount effect)
+
+  // Mount-only effect: guarantee initial attach from either source
   useEffect(() => {
     if (leftEngine.current || rightEngine.current) return;
-    if (!parameters?.currentMode) return; // need at least the mode
+    if (!(parameters?.currentMode || pipelineState?.currentMode)) return; // accept either source
     if (!reinitInFlight.current) {
       reinitInFlight.current = (async () => {
         try { await reinitEnginesFromParams(); } finally { reinitInFlight.current = null; }
