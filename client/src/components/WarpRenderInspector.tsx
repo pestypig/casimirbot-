@@ -499,7 +499,7 @@ function PaneOverlay(props:{
 
       // Make the overlay honest: show the two θ's explicitly
       const thetaUniform = +U.thetaScale || NaN;          // what the shader is using
-      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass·√d_eff
+      const thetaPhys    = thetaPhysicsFromUniforms(U);    // γ_geo³·q·γ_VdB_mass · √d_eff
       // optional: keep your paper clamp, but show it as "θ_paper"
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
 
@@ -528,42 +528,42 @@ function PaneOverlay(props:{
     return () => cancelAnimationFrame(raf);
   }, [engineRef, flavor, viewFraction]);
 
-  // --- Engine refs (support both legacy and new prop names) ------------------
-  // Prefer engineLeft/engineRight; fall back to leftEngine/rightEngine.
-  const engineLeft  = (props as any).engineLeft  ?? (props as any).leftEngine;
-  const engineRight = (props as any).engineRight ?? (props as any).rightEngine;
-  // Guard: if neither provided, keep UL/UR empty to avoid crashes.
-  const UL: any = engineLeft?.current?.uniforms  || {};
-  const UR: any = engineRight?.current?.uniforms || {};
+  // ---- metric readouts (optional) ------------------------------------------
+  // Engine refs (support engineLeft/engineRight and leftEngine/rightEngine)
+  const engineLeft  = (props as any).engineRef || (props as any).engineLeft || (props as any).leftEngine;
+  const UL: any = engineLeft?.current?.uniforms || {};
 
-  // --- Derive wall widths for REAL/SHOW from live engine uniforms (safe) ---
-  // Use harmonic-mean radius to convert ρ → meters (matches engine/adapter).
+  // Derive wall widths for REAL from live engine uniforms (safe)
   const aHL = aHarmonic(
     UL.hullAxes?.[0] ?? UL.axesHull?.[0],
     UL.hullAxes?.[1] ?? UL.axesHull?.[1],
     UL.hullAxes?.[2] ?? UL.axesHull?.[2]
   );
-  const aHR = aHarmonic(
-    UR.hullAxes?.[0] ?? UR.axesHull?.[0],
-    UR.hullAxes?.[1] ?? UR.axesHull?.[1],
-    UR.hullAxes?.[2] ?? UR.axesHull?.[2]
-  );
   const wL_rho = Number.isFinite(+UL.wallWidth_rho) ? +UL.wallWidth_rho : (Number.isFinite(+UL.wallWidth) ? +UL.wallWidth : NaN);
-  const wR_rho = Number.isFinite(+UR.wallWidth_rho) ? +UR.wallWidth_rho : (Number.isFinite(+UR.wallWidth) ? +UR.wallWidth : NaN);
   const wL_m = (Number.isFinite(aHL) && Number.isFinite(wL_rho)) ? wL_rho * aHL : undefined;
-  const wR_m = (Number.isFinite(aHR) && Number.isFinite(wR_rho)) ? wR_rho * aHR : undefined;
+
+  const metricMode    = !!UL.metricMode;
+  const lapseN        = Number.isFinite(+UL.lapseN) ? +UL.lapseN : undefined;
+  const shiftBeta     = Array.isArray(UL.shiftBeta) ? UL.shiftBeta : undefined;
+  const gDiag         = Array.isArray(UL.gSpatialDiag) ? UL.gSpatialDiag : undefined;
+  const gSym          = Array.isArray(UL.gSpatialSym) && UL.gSpatialSym.length>=6 ? UL.gSpatialSym : undefined; // [gxx,gyy,gzz,gxy,gyz,gzx]
+  const thetaMetric   = Number.isFinite(+UL.thetaScale_metric) ? +UL.thetaScale_metric : undefined;
+  const zProxy        = Number.isFinite(+UL.redshiftProxy) ? +UL.redshiftProxy : undefined;
+  const thetaPipeline = Number.isFinite(+UL.thetaScale) ? +UL.thetaScale
+                        : (Number.isFinite(+UL.thetaUniform) ? +UL.thetaUniform : undefined);
 
   return (
     <div className="inspector">
       <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m</div>
-      <div>Wall (SHOW): {Number.isFinite(wR_m) ? wR_m.toFixed(3) : '—'} m</div>
-      <div>θ (REAL, pipeline): {Number.isFinite(+s.thetaUniform) ? (+s.thetaUniform).toExponential(2) : '—'}</div>
-      <div>θ (SHOW, pipeline): {Number.isFinite(+s.thetaPhys)    ? (+s.thetaPhys).toExponential(2)    : '—'}</div>
-      <div>θ̂ (REAL, metric): {Number.isFinite(+s.thetaMetric)   ? (+s.thetaMetric).toExponential(2)   : '—'}</div>
-      <div>θ̂ (SHOW, metric): {Number.isFinite(+s.thetaMetric)   ? (+s.thetaMetric).toExponential(2)   : '—'}</div>
-      <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
-      { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
-        <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
+      <div>θ (REAL, pipeline): {Number.isFinite(thetaPipeline)? thetaPipeline.toExponential(2):'—'}</div>
+      <div>θ̂ (metric): {Number.isFinite(thetaMetric)? thetaMetric.toExponential(2) : '—'}</div>
+      <div>ẑ (N,β proxy): {Number.isFinite(zProxy)? zProxy.toExponential(2) : '—'}</div>
+      <div>metric: {metricMode ? 'ON' : 'off'}</div>
+      <div>N: {Number.isFinite(lapseN) ? lapseN.toFixed(4) : '—'} β: {shiftBeta ? `[${shiftBeta.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
+      <div>g_diag: {gDiag ? `[${gDiag.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
+      <div>g_sym: {gSym ? `[${gSym.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
+      { (engineLeft?.current?.uniforms?.__error) &&
+        <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error}</div>
       }
     </div>
   );
