@@ -54,60 +54,6 @@ function pushRight(patch: any) {
 const sanitizeUniforms = (o: any) =>
   Object.fromEntries(Object.entries(o ?? {}).filter(([_, v]) => v !== undefined));
 
-function buildRealPacket(parameters: any, base: any = {}) {
-  const dutyFR =
-    Math.max(1e-9, Math.min(1,
-      (parameters?.dutyEffectiveFR ?? parameters?.dutyFR ?? 0.000025)));
-  return {
-    ...base,
-    currentMode: parameters?.currentMode,
-    physicsParityMode: true,
-    viewAvg: true,
-    // REAL must use FR duty directly → collapse sectors
-    dutyEffectiveFR: dutyFR,
-    dutyCycle: dutyFR,
-    sectors: 1,
-    sectorCount: 1,
-    vShip: 0,
-    ridgeMode: 0,
-    // Mass-pocket gamma only for REAL (clamped physical range)
-    gammaVanDenBroeck_mass: Math.max(1, Math.min(1000,
-      parameters?.gammaVanDenBroeck_mass ??
-      parameters?.gammaVanDenBroeck ??
-      38.3)),
-    // Visual gamma can be logged but is not used by REAL
-    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
-      parameters?.gammaVanDenBroeck_vis ??
-      parameters?.gammaVanDenBroeck ??
-      2.86e5)),
-    // Avoid UI theta
-    thetaScale: undefined,
-    u_thetaScale: undefined,
-  };
-}
-
-function buildShowPacket(parameters: any, base: any = {}) {
-  return {
-    ...base,
-    currentMode: parameters?.currentMode,
-    physicsParityMode: false,
-    viewAvg: false,
-    dutyCycle: Math.max(0, Math.min(1, parameters?.dutyCycle ?? 0.14)),
-    sectorCount: Math.max(1, Math.floor(parameters?.sectorCount ?? 400)),
-    sectors:     Math.max(1, Math.floor(parameters?.sectors     ?? 1)),
-    vShip: parameters?.currentMode === 'standby' ? 0 : 1,
-    ridgeMode: 1,
-    // SHOW uses the "visual" pocket factor
-    gammaVanDenBroeck_vis: Math.max(1, Math.min(1e9,
-      parameters?.gammaVanDenBroeck_vis ??
-      parameters?.gammaVanDenBroeck ??
-      2.86e5)),
-    // Avoid UI theta
-    thetaScale: undefined,
-    u_thetaScale: undefined,
-  };
-}
-
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
 // Add near other helpers
@@ -1645,8 +1591,8 @@ export default function WarpRenderInspector(props: {
       gammaVanDenBroeck_vis: live?.gammaVanDenBroeck_vis ?? live?.gammaVanDenBroeck ?? 2.86e5,
     };
 
-    // Shared base properties
-    const shared = {
+    // Build shared base first (prevents TDZ bug)
+    const sharedBase = makeSharedBase(parameters, live, {
       hull: props.baseShared?.hull ?? { a: 503.5, b: 132, c: 86.5 },
       axesScene: deriveAxesClip(hull, 1),
       exposure: 5.0,
@@ -1657,12 +1603,12 @@ export default function WarpRenderInspector(props: {
       metricInv: props.baseShared?.metricInv ?? metricDiag.inv,
       epsilonTilt: epsilonTilt,
       betaTiltVec: betaTiltVecN,
-    };
+      ...props.baseShared
+    });
 
-    // Build REAL and SHOW payloads using the new builders
-    const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
-    const showPayload = buildShowPacket(parameters, {
-      ...shared,
+    // Build REAL and SHOW payloads using the imported builders
+    const realPayload = buildRealPacket(sharedBase, { colorMode: 2 });
+    const showPayload = buildShowPacket(sharedBase, {
       exposure: 7.5,
       colorMode: 1,
       curvatureGainT: 0.70,
