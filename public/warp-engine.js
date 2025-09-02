@@ -1339,7 +1339,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // --- Operational mode validation and enforcement ---
         // ⛔️ Do not let the engine change parity/ridge — the pane is the authority.
-        // (Old code that forced REAL/SHOW based on debugTag was here; delete it.)
+        // React components have full control over physicsParityMode and ridgeMode.
         console.log(`[WarpEngine] Pane authority - parity: ${nextUniforms.physicsParityMode}, ridge: ${nextUniforms.ridgeMode}`);
 
         // --- decide if the CPU warp needs recompute ---

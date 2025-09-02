@@ -26,6 +26,9 @@ function paneSanitize(pane: 'REAL' | 'SHOW', patch: any) {
     physicsParityMode: isREAL,
     ridgeMode: isREAL ? 0 : 1,
     viewAvg: isREAL ? true : false,
+    // Remove legacy parityMode to avoid conflicts
+    parityMode: undefined,
+    uPhysicsParity: undefined,
   };
 }
 

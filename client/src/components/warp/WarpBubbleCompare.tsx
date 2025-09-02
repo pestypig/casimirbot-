@@ -234,15 +234,19 @@ function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   // Force parity mode based on pane - this is critical for physics validation
   if (pane === 'REAL') {
     p.physicsParityMode = true;
-    p.parityMode = true;  // Also set the fallback field
     p.ridgeMode = 0;
     p.viewAvg = true;     // REAL: average → √(d_FR)
+    // Remove legacy fields to avoid conflicts
+    p.parityMode = undefined;
+    p.uPhysicsParity = undefined;
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=true, ridgeMode=0`);
   } else {
     p.physicsParityMode = false;
-    p.parityMode = false; // Also set the fallback field
     p.ridgeMode = 1;
     p.viewAvg = false;    // SHOW: cosmetic, no averaging
+    // Remove legacy fields to avoid conflicts
+    p.parityMode = undefined;
+    p.uPhysicsParity = undefined;
     if (DEBUG) console.log(`[${pane}] Parity lock: physicsParityMode=false, ridgeMode=1`);
   }
   return p;
