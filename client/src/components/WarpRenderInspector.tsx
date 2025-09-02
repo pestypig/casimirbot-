@@ -464,6 +464,8 @@ function PaneOverlay(props:{
   engineRef: React.MutableRefObject<any>;
   viewFraction: number; // fraction of ship total mass visually represented in this pane
   shipMassKg?: number;  // ship-wide exotic mass from pipeline (kg)
+  engineLeft?: React.MutableRefObject<any>; // Optional: legacy engineLeft prop
+  engineRight?: React.MutableRefObject<any>; // Optional: legacy engineRight prop
 }){
   const { engineRef, flavor, viewFraction, title, shipMassKg } = props;
   const [snap, setSnap] = useState<any>(null);
@@ -524,10 +526,16 @@ function PaneOverlay(props:{
     return () => cancelAnimationFrame(raf);
   }, [engineRef, flavor, viewFraction]);
 
+  // --- Engine refs (support both legacy and new prop names) ------------------
+  // Prefer engineLeft/engineRight; fall back to leftEngine/rightEngine.
+  const engineLeft  = (props as any).engineLeft  ?? (props as any).leftEngine;
+  const engineRight = (props as any).engineRight ?? (props as any).rightEngine;
+  // Guard: if neither provided, keep UL/UR empty to avoid crashes.
+  const UL: any = engineLeft?.current?.uniforms  || {};
+  const UR: any = engineRight?.current?.uniforms || {};
+
   // --- Derive wall widths for REAL/SHOW from live engine uniforms (safe) ---
   // Use harmonic-mean radius to convert ρ → meters (matches engine/adapter).
-  const UL: any = leftEngine?.current?.uniforms || {};
-  const UR: any = rightEngine?.current?.uniforms || {};
   const aHL = aHarmonic(
     UL.hullAxes?.[0] ?? UL.axesHull?.[0],
     UL.hullAxes?.[1] ?? UL.axesHull?.[1],
@@ -552,8 +560,8 @@ function PaneOverlay(props:{
       <div>θ̂ (REAL, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
       <div>θ̂ (SHOW, metric): {Number.isFinite(s.thetaMetric)? s.thetaMetric.toExponential(2):'—'}</div>
       <div>metric mode: {s.metricMode ? 'ON' : 'off'}</div>
-      { (leftEngine?.current?.uniforms?.__error || rightEngine?.current?.uniforms?.__error) &&
-        <div style={{color:'#f55'}}>Engine error: {leftEngine?.current?.uniforms?.__error || rightEngine?.current?.uniforms?.__error}</div>
+      { (engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error) &&
+        <div style={{color:'#f55'}}>Engine error: {engineLeft?.current?.uniforms?.__error || engineRight?.current?.uniforms?.__error}</div>
       }
     </div>
   );
@@ -1038,6 +1046,10 @@ export default function WarpRenderInspector(props: {
           return; // Stop initialization if SHOW engine fails
         }
       }
+
+      // Bootstrap both engines once they are ready
+      // Need to define realPayload and showPayload before this point.
+      // Moved definitions up.
 
       // Bootstrap both engines once they are ready
       leftEngine.current?.bootstrap?.({ ...realPayload });
