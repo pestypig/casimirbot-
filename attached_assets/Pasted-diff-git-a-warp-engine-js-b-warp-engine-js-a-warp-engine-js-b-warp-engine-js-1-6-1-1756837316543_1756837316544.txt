@@ -1,0 +1,61 @@
+diff --git a/warp-engine.js b/warp-engine.js
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@ -1,6 +1,30 @@
+ // WarpEngine (WebGL runtime)
+ // ------------------------------------------------------------
+ 
++// ---- helpers for meters ↔ rho thickness ------------------------------------
++function _aHarmonic(ax, ay, az) {
++  const a = +ax || 0, b = +ay || 0, c = +az || 0;
++  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
++  return d > 0 ? 3 / d : NaN;
++}
++function _guessAH(U, p) {
++  const H = (p && p.axesHull) || U.axesHull;
++  const S = (p && p.axesScene) || U.axesScene;
++  if (Array.isArray(H) && H.length >= 3) return _aHarmonic(H[0], H[1], H[2]);
++  if (Array.isArray(S) && S.length >= 3) return _aHarmonic(S[0], S[1], S[2]);
++  return NaN;
++}
++
+ class WarpEngine {
+   // ...
+   updateUniforms(parameters) {
+-    const U = this.uniforms || (this.uniforms = {});
++    const U = this.uniforms || (this.uniforms = {});
++
++    // ---- wall width ingestion (unify aliases) --------------------------------
++    // Accept: wallWidth (rho), wallWidth_rho (rho), hullDimensions.wallWidth_m (meters)
++    // Keep shader-facing alias "wallWidth" in rho units.
++    const aH = _guessAH(U, parameters);
++    let w_rho = Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined;
++    if (Number.isFinite(parameters.wallWidth_rho)) w_rho = +parameters.wallWidth_rho;
++    const w_m_in = Number.isFinite(parameters?.hullDimensions?.wallWidth_m)
++      ? +parameters.hullDimensions.wallWidth_m : undefined;
++    if (!Number.isFinite(w_rho) && Number.isFinite(w_m_in) && Number.isFinite(aH)) {
++      w_rho = w_m_in / aH;
++    }
++    if (Number.isFinite(w_rho)) U.wallWidth = w_rho;
++    if (!Number.isFinite(U.wallWidth)) U.wallWidth = U.wallWidth ?? 0.06; // preserve existing default
++    // Echo helpful aliases for UIs
++    U.wallWidth_rho = U.wallWidth;
++    if (Number.isFinite(aH)) U.wallWidth_m = U.wallWidth * aH;
+ 
+     // ... rest of your uniform ingestion (q, gamma, duty, etc.) ...
+   }
+@@ -60,12 +84,12 @@ class WarpEngine {
+   _render() {
+     const U = this.uniforms || {};
+     // ...
+-    // CPU interior window width (previously used U.wallWidth with mixed defaults)
+-    const w_int = Number.isFinite(this.uniforms?.intWidth)
+-      ? Math.max(0.002, +this.uniforms.intWidth)
+-      : Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02);
++    // CPU interior window width: derive from the unified rho width
++    const w_int = Number.isFinite(this.uniforms?.intWidth)
++      ? Math.max(0.002, +this.uniforms.intWidth)
++      : Math.max(3.0 * (this.uniforms?.wallWidth ?? 0.06), 0.02);
+     // ...
+   }
+ }
