@@ -149,26 +149,10 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
-// Stable: REAL always shows a 1/sectorCount slice; SHOW is full bubble
-function computeViewMassFractionStable(u: any): number {
-  const sTotal = Math.max(1, Number(u?.sectorCount ?? 400));
-  const parity = !!u?.physicsParityMode;
-  return parity ? 1 / sTotal : 1.0;
-}
-
-// Locked view fraction calculation, accounting for different physics pane logic
-function viewMassFractionLocked(u: any, pane: 'REAL' | 'SHOW'): number {
-  const sTotal = Math.max(1, Number(u?.sectorCount ?? 400));
-  const isREAL = pane === 'REAL';
-  const parity = !!u?.physicsParityMode;
-
-  // If the engine's parity state matches the pane's expectation, use the standard calculation
-  if (isREAL && parity) return 1 / sTotal;
-  if (!isREAL && !parity) return 1.0;
-
-  // Fallback/warning: If the parity state is mismatched, default to 1.0, or calculate based on actual parity
-  console.warn(`[viewMassFractionLocked] Mismatch for pane '${pane}': engine parity is ${parity}`);
-  return parity ? 1 / sTotal : 1.0;
+// Deterministic view fraction - never depends on transient engine parity state
+function viewMassFractionLocked(u: any, flavor: 'REAL'|'SHOW'): number {
+  const total = Math.max(1, Number(u?.sectorCount ?? 400));
+  return flavor === 'REAL' ? 1 / total : 1.0;
 }
 
 
@@ -1879,7 +1863,7 @@ export default function WarpRenderInspector(props: {
                   title="REAL · per-pane slice"
                   flavor="REAL"
                   engineRef={leftEngine}
-                  viewFraction={viewMassFracREAL}
+                  viewFraction={viewMassFractionLocked(uLeft, 'REAL')}
                   shipMassKg={live?.M_exotic}
                 />
               )}
@@ -1909,7 +1893,7 @@ export default function WarpRenderInspector(props: {
                   title="SHOW · cosmetic ampl"
                   flavor="SHOW"
                   engineRef={rightEngine}
-                  viewFraction={1.0}
+                  viewFraction={viewMassFractionLocked(uRight, 'SHOW')}
                   shipMassKg={live?.M_exotic}
                 />
               )}
@@ -1987,9 +1971,9 @@ export default function WarpRenderInspector(props: {
               γ_VdB bound: {(useMassGamma ? 1e2 : 1e11).toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}
             </div>
             <div>
-              view mass fraction (REAL): {(viewMassFracREAL * 100).toFixed(3)}% (1/{Math.max(1, (live?.sectorCount ?? 400))})
+              view mass fraction (REAL): {(viewMassFractionLocked(uLeft, 'REAL') * 100).toFixed(3)}% (1/{Math.max(1, (live?.sectorCount ?? 400))})
             </div>
-            <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
+            <div>view mass fraction (SHOW): {(viewMassFractionLocked(uRight, 'SHOW') * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
             onClick={() => {
