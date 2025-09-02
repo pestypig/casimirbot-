@@ -1,0 +1,76 @@
+diff --git a/client/src/components/WarpEngineContainer.tsx b/client/src/components/WarpEngineContainer.tsx
+--- a/client/src/components/WarpEngineContainer.tsx
++++ b/client/src/components/WarpEngineContainer.tsx
+@@
+-import React, { useEffect, useRef } from "react";
++import React, { useEffect, useRef, useState } from "react";
+@@
+-export default function WarpEngineContainer(props: { className?: string }) {
+-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+-  const engineRef = useRef<any>(null);
+-  useEffect(() => {
+-    const canvas = canvasRef.current!;
+-    const eng = (window as any).WarpEngine.getOrCreate(canvas);
+-    engineRef.current = eng;
+-    return () => { eng?.destroy?.(); };
+-  }, []);
+-  return <canvas ref={canvasRef} className={props.className} />;
+-}
++export default function WarpEngineContainer(props: { className?: string }) {
++  const canvasRef = useRef<HTMLCanvasElement | null>(null);
++  const engineRef = useRef<any>(null);
++  const [status, setStatus] = useState<"idle"|"loading"|"ready"|"error">("idle");
++  const [err, setErr] = useState<string | null>(null);
++
++  useEffect(() => {
++    let cancelled = false;
++    let retries = 0;
++    let timer: any = null;
++
++    function step() {
++      if (cancelled) return;
++      const W: any = (window as any).WarpEngine;
++      const cvs = canvasRef.current;
++      if (!cvs) { timer = setTimeout(step, 50); return; }
++      if (!W || typeof W.getOrCreate !== "function") {
++        // Wait for script load; retry a bit longer on cold loads
++        if (retries++ < 200) { setStatus("loading"); timer = setTimeout(step, 50); return; }
++        setStatus("error"); setErr("WarpEngine script not loaded"); return;
++      }
++      try {
++        const eng = W.getOrCreate(cvs);
++        engineRef.current = eng;
++        setStatus(eng.isLoaded?.() ? "ready" : "loading");
++        // Subscribe to ready
++        const unsub = eng.onceReady?.(() => {
++          if (cancelled) return;
++          setStatus("ready");
++          try { eng.requestRewarp?.(); } catch(_) {}
++        });
++        // Initial draw attempt
++        try { eng.requestRewarp?.(); } catch(_) {}
++        // Cleanup
++        return () => { unsub && unsub(); };
++      } catch (e: any) {
++        setStatus("error"); setErr(e?.message || String(e));
++      }
++    }
++    const cleanup = step();
++    return () => {
++      cancelled = true;
++      if (timer) clearTimeout(timer);
++      try { engineRef.current?.destroy?.(); } catch(_) {}
++    };
++  }, []);
++
++  if (status === "error") {
++    return (
++      <div className={"flex items-center justify-center " + (props.className||"")}>
++        <div className="text-red-400 text-sm font-mono">
++          WarpEngine error: {err}
++        </div>
++      </div>
++    );
++  }
++  return <canvas ref={canvasRef} className={props.className} />;
++}
