@@ -490,10 +490,6 @@ function PaneOverlay(props:{
       // optional: keep your paper clamp, but show it as "θ_paper"
       const thetaPaper   = Math.pow(26, 3) * 1 * 38.3 * Math.sqrt(2.5e-5); // ≈ 3.366e3
 
-      // Use pipeline exotic mass directly (kg). Slice mass = ship mass × viewFraction.
-      const M_ship_kg  = Number.isFinite(shipMassKg as number) ? Number(shipMassKg) : NaN;
-      const M_slice_kg = Number.isFinite(M_ship_kg) ? M_ship_kg * (flavor === 'REAL' ? viewFraction : 1.0) : NaN;
-
       // pull contraction/expansion from diagnostics if available
       const diag = (e?.computeDiagnostics?.() || {}) as any;
       const frontRaw  = diag.theta_front_max;
@@ -505,14 +501,9 @@ function PaneOverlay(props:{
       setSnap({
         a,b,c,aH, w_m, V,S, Vshell,
         thetaUniform, thetaPhys, thetaPaper,
-        M_ship_kg, M_slice_kg,
         frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
-        mDisplayText: (flavor === 'REAL')
-          ? `${Number.isFinite(M_slice_kg)? fmtSI(M_slice_kg,'kg'):'— kg'} (slice) · ${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total`
-          : `${Number.isFinite(M_ship_kg)? fmtSI(M_ship_kg,'kg'):'— kg'} total`
       });
-      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -543,7 +534,7 @@ function PaneOverlay(props:{
           <div>shell volume: <b>{fmtSI(s.Vshell,'m³')}</b></div>
           {/* Show kilograms sourced from pipeline */}
           <div>
-            exotic mass: <b>{s.mDisplayText}</b>
+            exotic mass: <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg,'kg'):'— kg'}</b>
           </div>
           <div>front(+): <b>{Number.isFinite(s.frontMax)? s.frontMax.toExponential(2):'—'}</b></div>
           <div>rear(−): <b>{Number.isFinite(s.rearMin)? s.rearMin.toExponential(2):'—'}</b></div>
@@ -570,11 +561,11 @@ function PaneOverlay(props:{
               <div className="opacity-80">Exotic mass proxy (display-only</div>
               <div className="space-y-1">
                 <div>
-                  <code>M<sub>ship</sub> (kg)</code> → <b>{Number.isFinite(s.M_ship_kg)? fmtSI(s.M_ship_kg,'kg'):'— kg'}</b>
+                  <code>M<sub>ship</sub> (kg)</code> → <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg,'kg'):'— kg'}</b>
                 </div>
                 <div>
                   <code>M<sub>slice</sub> = M<sub>ship</sub> · viewFraction</code> →{' '}
-                  <b>{Number.isFinite(s.M_slice_kg)? fmtSI(s.M_slice_kg,'kg'):'— kg'}</b>
+                  <b>{Number.isFinite(shipMassKg)? fmtSI(shipMassKg * viewFraction,'kg'):'— kg'}</b>
                 </div>
               </div>
             </div>
@@ -729,7 +720,7 @@ export default function WarpRenderInspector(props: {
       1e-12,
       Math.min(1, Number(phys.dutyEffectiveFR ?? live?.dutyEffectiveFR ?? 0))
     );
-    return Math.pow(g, 3) * q * v * Math.sqrt(duty);
+    return Math.pow(g, 3) * q * v * Math.sqrt(Math.max(1e-12, duty));
   }
 
 
@@ -998,7 +989,7 @@ export default function WarpRenderInspector(props: {
             physicsParityMode: true,
             parityMode: true, // Explicit fallback
             ridgeMode: 0,
-            colorMode: 2, // shear/"truth"
+            colorMode: 2, // Shear proxy for truth view
             lockFraming: true,
             epsilonTilt: epsilonTilt,
             betaTiltVec: betaTiltVecN,
@@ -1023,7 +1014,7 @@ export default function WarpRenderInspector(props: {
             const now = Date.now();
             if (now - lastParityCheck < 1000) return; // Check max once per second
             lastParityCheck = now;
-            
+
             const U = leftEngine.current?.uniforms;
             if (U && U.physicsParityMode !== true) {
               console.warn("🔧 REAL parity drift detected - applying gentle correction");
@@ -1102,7 +1093,7 @@ export default function WarpRenderInspector(props: {
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
             userGain: 1.25,
-            colorMode: 1, // theta/cosmetic
+            colorMode: 1, // Theta mode for visual enhancement
             lockFraming: true,
             epsilonTilt: epsilonTilt,
             betaTiltVec: betaTiltVecN,
@@ -1937,15 +1928,15 @@ function thetaPhysicsFromUniforms(U: any) {
   // Use Ford-Roman mass gamma, not visual gamma for physics calculations
   const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
   const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
-  
+
   // Prefer FR duty; otherwise derive from local × S_live/S_total
   const S_total = Math.max(1, +(U.sectorCount ?? 1));
   const S_live  = Math.max(1, +(U.sectorStrobing ?? 1));
   const d_eff = +(U.dutyEffectiveFR ?? ((+(U.dutyLocal ?? 0)) * (S_live / S_total))) || 0;
-  
+
   const theta_phys = Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(Math.max(1e-12, d_eff));
   // Optional: display raw vs clamped γVdB if available to explain variance
   const gammaVdB_raw = U.gammaVdBRaw ?? vdb;
-  
+
   return theta_phys;
 }
