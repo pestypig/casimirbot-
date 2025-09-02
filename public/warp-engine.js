@@ -12,6 +12,44 @@
 //  field in real‑time.
 //====================================================================
 
+// --- helpers (local) ---------------------------------------------------------
+function _norm3(v) {
+  const x = +v[0] || 0, y = +v[1] || 0, z = +v[2] || 0;
+  const m = Math.hypot(x, y, z) || 1;
+  return [x / m, y / m, z / m];
+}
+function _dotE(a, b) {
+  return (a[0] || 0) * (b[0] || 0) + (a[1] || 0) * (b[1] || 0) + (a[2] || 0) * (b[2] || 0);
+}
+function _dotG_diag(invG, a, b) {
+  // Fast path for diagonal metric inverse (3x3 stored as 9 numbers or [gxx,gyy,gzz])
+  // Accepts [gxx,0,0, 0,gyy,0, 0,0,gzz] or [gxx, gyy, gzz]
+  const gxx = invG?.[0] ?? invG?.[0] ?? 1;
+  const gyy = invG?.[4] ?? invG?.[1] ?? 1;
+  const gzz = invG?.[8] ?? invG?.[2] ?? 1;
+  return gxx * (a[0] || 0) * (b[0] || 0) + gyy * (a[1] || 0) * (b[1] || 0) + gzz * (a[2] || 0) * (b[2] || 0);
+}
+function _normG(invG, v) {
+  const d = Math.sqrt(Math.max(1e-18, _dotG_diag(invG, v, v)));
+  return [(v[0] || 0) / d, (v[1] || 0) / d, (v[2] || 0) / d];
+}
+// -----------------------------------------------------------------------------
+
+;(() => {
+  // Prevent duplicate loads (HMR, script re-inject, etc.)
+  const BUILD = globalThis.__APP_WARP_BUILD || 'dev-2';
+  // Only skip if we've *already* executed this exact build.
+  if (globalThis.__WARP_ENGINE_LOADED__ === BUILD) {
+    console.warn('[warp-engine] duplicate load detected — same build; skipping body');
+    return;
+  }
+  // Mark which build is loaded
+  globalThis.__WARP_ENGINE_LOADED__ = BUILD;
+  globalThis.WarpEngine = globalThis.WarpEngine || {};
+  globalThis.WarpEngine.BUILD = BUILD;
+  globalThis.__WarpEngineBuild = BUILD;
+})()
+
 export default class WarpEngine {
     //----------------------------------------------------------------
     //  1.  Boiler‑plate
@@ -184,7 +222,130 @@ export default class WarpEngine {
     //  6.  Public API
     //----------------------------------------------------------------
     updateUniforms(obj){
-        Object.assign(this.uniforms, obj);
+        // Helper to clamp values based on physicsParityMode
+        const clampByParity = (value, parityMode) => {
+            if (parityMode) {
+                // If parity mode is on, clamp between 0 and 1
+                return Math.max(0, Math.min(1, value));
+            } else {
+                // Otherwise, use the original value
+                return value;
+            }
+        };
+
+        const patch = obj || {};
+        const parameters = { ...this.uniforms, ...patch }; // Merge new and existing uniforms
+
+        // 1) Bind metric first (+ mirror to u_*)
+        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
+            const useMetric = !!patch.useMetric;
+            const I = [1,0,0, 0,1,0, 0,0,1];
+            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
+            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
+            parameters.useMetric   = useMetric; parameters.u_useMetric = useMetric;
+            parameters.metric      = m;         parameters.u_metric    = m;
+            parameters.metricInv   = mi;        parameters.u_metricInv = mi;
+        }
+
+        // 2) Merge rest, but strip any external thetaScale
+        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
+        Object.assign(parameters, safeParameters);
+
+        // 3) Recompute thetaScale from physics chain (engine is source of truth)
+        const theta = this._computeThetaScaleFromUniforms(parameters);
+        this._thetaScaleActual = theta;
+        parameters.thetaScale = theta;
+        parameters.u_thetaScale = theta;
+
+        // 4) Warn if external thetaScale tried to override (once per instance)
+        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
+            const asked = +(u_thetaScale ?? thetaScale);
+            if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
+                console.warn('[WarpEngine] Ignored external thetaScale override', { 
+                    asked: asked.toExponential(2), 
+                    engine: theta.toExponential(2), 
+                    ratio: (theta/asked).toFixed(2) 
+                });
+                this.__thetaWarned = true;
+            }
+        }
+
+        // --- Metric tensor wiring --------------------------------------------
+        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
+        // metricMode: 'identity' | 'ellipsoid' | 'custom'
+        const prev = this.uniforms; // Store previous uniforms for comparison
+
+        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
+        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
+        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
+        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
+
+        // Need axesScene for ellipsoid mode, fall back to default if not provided
+        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
+
+        if (!metric) {
+            if (metricMode === 'ellipsoid') {
+                // covariant g_ij in clip space, aligned to axesClip:
+                // g = diag(1/a^2, 1/b^2, 1/c^2)
+                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
+                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
+                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
+                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
+                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
+                useMetric = true;
+            } else {
+                // Identity (Euclidean)
+                metric    = [1,0,0, 0,1,0, 0,0,1];
+                metricInv = [1,0,0, 0,1,0, 0,0,1];
+            }
+        }
+        // Update uniforms object with metric information
+        parameters.metricMode = metricMode;
+        parameters.metric     = metric;
+        parameters.metricInv  = metricInv;
+        parameters.useMetric  = !!useMetric;
+
+        // Ingest parameters → uniforms
+        const U = this.uniforms || (this.uniforms = {});
+        // Accept either alias for q; keep both set for UI parity
+        const qIn = Number.isFinite(parameters.qSpoilingFactor) ? parameters.qSpoilingFactor
+                  : Number.isFinite(parameters.deltaAOverA)    ? parameters.deltaAOverA
+                  : (U.deltaAOverA ?? 1);
+        U.deltaAOverA    = qIn;
+        U.qSpoilingFactor = qIn;
+
+        // Duty: prefer FR if provided, else derive from local × S_live/S_total
+        const FR = Number.isFinite(parameters.dutyEffectiveFR) ? parameters.dutyEffectiveFR : null;
+        const local = clamp(parameters.dutyCycle, 0, 1);
+        const S_total = Math.max(1, parameters.sectorCount|0);
+        const S_live  = Math.max(1, (parameters.sectorStrobing|0) || 1);
+
+        // Interior gravity uniforms
+        if (Array.isArray(parameters.betaTiltVec)) U.betaTiltVec = parameters.betaTiltVec.slice(0,3);
+        if (Number.isFinite(parameters.epsilonTilt)) U.epsilonTilt = parameters.epsilonTilt;
+        if (Number.isFinite(parameters.intWidth)) U.intWidth = parameters.intWidth;
+
+        // γ_VdB with parity clamp; also expose raw for inspector diagnostics
+        const gammaVdB_raw = Number.isFinite(parameters.gammaVanDenBroeck) ? parameters.gammaVanDenBroeck : (U.gammaVanDenBroeck ?? 1);
+        U.gammaVdBRaw = gammaVdB_raw;
+        U.gammaVanDenBroeck = clampByParity(gammaVdB_raw, this.physicsParityMode);
+
+        // --- decide if the CPU warp needs recompute ---
+        const geoChanged =
+          (prev.hullAxes?.[0] !== parameters.hullAxes?.[0]) ||
+          (prev.hullAxes?.[1] !== parameters.hullAxes?.[1]) ||
+          (prev.hullAxes?.[2] !== parameters.hullAxes?.[2]) ||
+          (prev.gridSpan !== parameters.gridSpan);
+
+        // Update core uniforms
+        Object.assign(this.uniforms, parameters);
+
+        // thetaScale is now computed in updateUniforms() using physics chain
+
+        // Recompute warp geometry if necessary
+        if (geoChanged) {
+            this._updateWarpGeometry(this.uniforms);
+        }
     }
 
     //----------------------------------------------------------------
@@ -201,22 +362,67 @@ export default class WarpEngine {
         gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
 
         gl.useProgram(this.program);
-        //  push uniforms
-        gl.uniform1f(this.uLoc.dutyCycle,     this.uniforms.dutyCycle);
-        gl.uniform1f(this.uLoc.g_y,           this.uniforms.g_y);
-        gl.uniform1f(this.uLoc.cavityQ,       this.uniforms.cavityQ);
-        gl.uniform1f(this.uLoc.sagDepth_nm,   this.uniforms.sagDepth_nm);
-        gl.uniform1f(this.uLoc.tsRatio,       this.uniforms.tsRatio);
-        gl.uniform1f(this.uLoc.powerAvg_MW,   this.uniforms.powerAvg_MW);
-        gl.uniform1f(this.uLoc.exoticMass_kg, this.uniforms.exoticMass_kg);
-        gl.uniform1f(this.uLoc.time,          time);
 
-        //  full‑screen quad attrib
-        const loc = gl.getAttribLocation(this.program, "a_position");
+        // --- Standard uniforms ---------------------------------------
+        // dutyCycle, g_y, cavityQ, sagDepth_nm, tsRatio, powerAvg_MW, exoticMass_kg, time
+        for (const name in this.uLoc) {
+            const loc = this.uLoc[name];
+            const value = this.uniforms[name];
+            if (loc) {
+                if (typeof value === 'number') gl.uniform1f(loc, value);
+                else if (typeof value === 'boolean') gl.uniform1i(loc, value ? 1 : 0);
+                // Add more type checks if needed (e.g., vec3, mat3)
+            }
+        }
+
+        // --- Purple shift uniforms ---------------------------------------
+        if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, this.uniforms.epsilonTilt ?? 0.0);
+        if (this.gridUniforms.betaTiltVec) {
+            const betaTilt = this.uniforms.betaTiltVec || [0, -1, 0];
+            gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
+        }
+
+        // --- Metric tensor uniforms (default to identity if not provided)
+        const metric = this.uniforms.metric || [1,0,0, 0,1,0, 0,0,1];
+        const metricInv = this.uniforms.metricInv || [1,0,0, 0,1,0, 0,0,1];
+        const useMetric = this.uniforms.useMetric || false;
+        if (this.gridUniforms.metric) {
+            gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
+            gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
+            gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
+        }
+
+        // --- Grid-specific uniforms ----------------------------------
+        // (Assuming _cacheGridUniformLocations has been called)
+        if (this.gridUniforms) {
+            for (const name in this.gridUniforms) {
+                const loc = this.gridUniforms[name];
+                const value = this.uniforms[name];
+                if (loc && value !== undefined) {
+                    // Determine uniform type based on name or value structure
+                    if (name.includes('Matrix')) {
+                        gl.uniformMatrix3fv(loc, false, new Float32Array(value));
+                    } else if (name.includes('Color') || name.includes('Vec') || name.includes('Dir') || name.includes('Scene') || name.includes('axes')) {
+                        gl.uniform3fv(loc, new Float32Array(value));
+                    } else if (typeof value === 'number') {
+                        gl.uniform1f(loc, value);
+                    } else if (typeof value === 'boolean') {
+                        gl.uniform1i(loc, value ? 1 : 0);
+                    } else if (Array.isArray(value)) {
+                         // Handle arrays, e.g., for vec4, mat4 etc. if needed
+                        if (value.length === 3) gl.uniform3fv(loc, new Float32Array(value));
+                        else if (value.length === 4) gl.uniform4fv(loc, new Float32Array(value));
+                        // Add more array type handling if necessary
+                    }
+                }
+            }
+        }
+
+        // --- Draw the full-screen quad ---
+        const posLoc = gl.getAttribLocation(this.program, "a_position");
         gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
-
+        gl.enableVertexAttribArray(posLoc);
+        gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
 
@@ -355,109 +561,6 @@ vec3 normalizeG(vec3 v) { return v / max(1e-12, normG(v)); }
             metricInv: gl.getUniformLocation(program, 'u_metricInv'),
             useMetric: gl.getUniformLocation(program, 'u_useMetric'),
         };
-    }
-
-    updateUniforms(obj){
-        // Helper to clamp values based on physicsParityMode
-        const clampByParity = (value, parityMode) => {
-            if (parityMode) {
-                // If parity mode is on, clamp between 0 and 1
-                return Math.max(0, Math.min(1, value));
-            } else {
-                // Otherwise, use the original value
-                return value;
-            }
-        };
-
-        const patch = obj || {};
-        const parameters = { ...this.uniforms, ...patch }; // Merge new and existing uniforms
-
-        // 1) Bind metric first (+ mirror to u_*)
-        if ('useMetric' in patch || 'metric' in patch || 'metricInv' in patch) {
-            const useMetric = !!patch.useMetric;
-            const I = [1,0,0, 0,1,0, 0,0,1];
-            const m  = Array.isArray(patch.metric) && patch.metric.length === 9 ? patch.metric.map(Number) : I;
-            const mi = Array.isArray(patch.metricInv) && patch.metricInv.length === 9 ? patch.metricInv.map(Number) : I;
-            parameters.useMetric   = useMetric; parameters.u_useMetric = useMetric;
-            parameters.metric      = m;         parameters.u_metric    = m;
-            parameters.metricInv   = mi;        parameters.u_metricInv = mi;
-        }
-
-        // 2) Merge rest, but strip any external thetaScale
-        const { thetaScale, u_thetaScale, ...safeParameters } = patch;
-        Object.assign(parameters, safeParameters);
-
-        // 3) Recompute thetaScale from physics chain (engine is source of truth)
-        const theta = this._computeThetaScaleFromUniforms(parameters);
-        this._thetaScaleActual = theta;
-        parameters.thetaScale = theta;
-        parameters.u_thetaScale = theta;
-
-        // 4) Warn if external thetaScale tried to override (once per instance)
-        if ((thetaScale !== undefined || u_thetaScale !== undefined) && !this.__thetaWarned) {
-            const asked = +(u_thetaScale ?? thetaScale);
-            if (Number.isFinite(asked) && Math.abs(theta - asked) / Math.max(1, Math.abs(theta)) > 0.01) {
-                console.warn('[WarpEngine] Ignored external thetaScale override', { 
-                    asked: asked.toExponential(2), 
-                    engine: theta.toExponential(2), 
-                    ratio: (theta/asked).toFixed(2) 
-                });
-                this.__thetaWarned = true;
-            }
-        }
-
-        // --- Metric tensor wiring --------------------------------------------
-        // Accept either explicit metric(s) or derive an ellipsoidal cometric.
-        // metricMode: 'identity' | 'ellipsoid' | 'custom'
-        const prev = this.uniforms; // Store previous uniforms for comparison
-
-        const metricMode = String(parameters?.metricMode ?? prev?.metricMode ?? 'identity');
-        let metric    = parameters?.metric    ?? prev?.metric    ?? null;
-        let metricInv = parameters?.metricInv ?? prev?.metricInv ?? null;
-        let useMetric = (parameters?.useMetric ?? prev?.useMetric ?? false) ? true : false;
-
-        // Need axesScene for ellipsoid mode, fall back to default if not provided
-        const axesScene = parameters?.axesScene ?? prev?.axesScene ?? [1, 1, 1];
-
-        if (!metric) {
-            if (metricMode === 'ellipsoid') {
-                // covariant g_ij in clip space, aligned to axesClip:
-                // g = diag(1/a^2, 1/b^2, 1/c^2)
-                const ga = 1.0 / Math.max(axesScene[0], 1e-9);
-                const gb = 1.0 / Math.max(axesScene[1], 1e-9);
-                const gc = 1.0 / Math.max(axesScene[2], 1e-9);
-                metric    = [ga*ga,0,0, 0,gb*gb,0, 0,0,gc*gc];
-                metricInv = [1.0/(ga*ga),0,0, 0,1.0/(gb*gb),0, 0,0,1.0/(gc*gc)];
-                useMetric = true;
-            } else {
-                // Identity (Euclidean)
-                metric    = [1,0,0, 0,1,0, 0,0,1];
-                metricInv = [1,0,0, 0,1,0, 0,0,1];
-            }
-        }
-        // Update uniforms object with metric information
-        parameters.metricMode = metricMode;
-        parameters.metric     = metric;
-        parameters.metricInv  = metricInv;
-        parameters.useMetric  = !!useMetric;
-
-
-        // --- decide if the CPU warp needs recompute ---
-        const geoChanged =
-          (prev.hullAxes?.[0] !== parameters.hullAxes?.[0]) ||
-          (prev.hullAxes?.[1] !== parameters.hullAxes?.[1]) ||
-          (prev.hullAxes?.[2] !== parameters.hullAxes?.[2]) ||
-          (prev.gridSpan !== parameters.gridSpan);
-
-        // Update core uniforms
-        Object.assign(this.uniforms, parameters);
-
-        // thetaScale is now computed in updateUniforms() using physics chain
-
-        // Recompute warp geometry if necessary
-        if (geoChanged) {
-            this._updateWarpGeometry(this.uniforms);
-        }
     }
 
     //----------------------------------------------------------------
