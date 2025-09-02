@@ -22,7 +22,7 @@ if (typeof window.GRID_DEFAULTS === 'undefined') {
   const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
   window.GRID_DEFAULTS = {
-    spanPadding: isMobile 
+    spanPadding: isMobile
       ? 1.55   // extra padding on phones for better visibility and touch interaction
       : 1.35,  // tighter framing for closer view on desktop
     minSpan: isMobile ? 2.8 : 2.6,  // slightly larger minimum on mobile for performance
@@ -40,6 +40,24 @@ const SCENE_SCALE = window.SCENE_SCALE;
 
 // Math helpers and constants
 const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
+
+// WarpEngine (WebGL runtime)
+// ------------------------------------------------------------
+// Radius helpers (use harmonic mean for meters↔ρ)
+function _aHarmonic(ax, ay, az) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return denom > 0 ? 3/denom : NaN;
+}
+function _guessAH(U) {
+  // prefer hull axes; fall back to scene axes
+  const H = U?.axesHull, S = U?.axesScene;
+  if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
+  if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
+  return NaN;
+}
+// single default for ρ-thickness everywhere (previously 0.016/0.02/0.06)
+const WALL_RHO_DEFAULT = 0.016;
 
 class WarpEngine {
     static getOrCreate(canvas) {
@@ -88,7 +106,7 @@ class WarpEngine {
         if (!gl) {
             try {
                 // Fallback to WebGL1
-                gl = canvas.getContext('webgl', contextOptions) || 
+                gl = canvas.getContext('webgl', contextOptions) ||
                      canvas.getContext('experimental-webgl', contextOptions);
                 if (gl) {
                     console.log('✅ WebGL1 context created successfully');
@@ -110,7 +128,7 @@ class WarpEngine {
                     powerPreference: "high-performance",
                     failIfMajorPerformanceCaveat: false
                 };
-                gl = canvas.getContext('webgl', relaxedOptions) || 
+                gl = canvas.getContext('webgl', relaxedOptions) ||
                      canvas.getContext('experimental-webgl', relaxedOptions);
                 if (gl) {
                     console.log('✅ WebGL context created with relaxed options');
@@ -308,9 +326,9 @@ class WarpEngine {
         // Bind throttled resize handler
         this._resize = () => {
             if (this._resizeRaf) return;
-            this._resizeRaf = requestAnimationFrame(() => { 
-                this._resizeRaf = 0; 
-                this._resizeCanvasToDisplaySize(); 
+            this._resizeRaf = requestAnimationFrame(() => {
+                this._resizeRaf = 0;
+                this._resizeCanvasToDisplaySize();
             });
         };
         window.addEventListener('resize', this._resize);
@@ -490,11 +508,15 @@ class WarpEngine {
 
         const baseDiv  = Math.max(divIn, 160);
         const hullAxes = Array.isArray(this.currentParams?.hullAxes) ? this.currentParams.hullAxes : [503.5,132,86.5];
-        const wallWidth_m = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : 6.0;
+        // Use unified wall thickness handling
+        const wallWidth_m   = Number.isFinite(this.currentParams?.wallWidth_m) ? this.currentParams.wallWidth_m : undefined;
+        const wallWidth_rho = Number.isFinite(this.currentParams?.wallWidth_rho) ? this.currentParams.wallWidth_rho :
+                              Number.isFinite(this.uniforms?.wallWidth_rho)  ? this.uniforms.wallWidth_rho    :
+                              WALL_RHO_DEFAULT;
 
-        const minAxis = Math.max(1e-6, Math.min(...hullAxes));
-        const span_rho = (3 * wallWidth_m) / minAxis;
-        const scale = Math.max(1.0, 12 / (Math.max(1e-6, span_rho) * baseDiv));
+        const minAxis = Math.max(1e-3, Math.min(hullAxes[0], hullAxes[1], hullAxes[2]));
+        const span_rho = (3 * (wallWidth_m ?? wallWidth_rho * minAxis)) / minAxis;
+        const scale = Math.max(1.0, 12 / (Math.max(1e-3, span_rho) * baseDiv));
 
         let div = Math.min(320, Math.floor(baseDiv * scale));
         if (!Number.isFinite(div) || div < 1) div = baseDiv;   // final fallback
@@ -759,7 +781,7 @@ void main() {
   if (colorI == 3) {
     float tilt = abs(u_epsilonTilt);
     vec3 purpleTilt = vec3(0.678, 0.267, 0.678);  // violet-400 equivalent
-    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt, 
+    vec3 baseColor = mix(vec3(0.1, 0.1, 0.2), purpleTilt,
                         smoothstep(0.0, 1.0, tilt * u_thetaScale));
     col = baseColor;
   }
@@ -864,7 +886,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
             // drive + wall
             driveDir:  gl.getUniformLocation(program, 'u_driveDir'),
-            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'),
+            wallWidth: gl.getUniformLocation(program, 'u_wallWidth'), // Alias for wallWidth_rho
             vShip:     gl.getUniformLocation(program, 'u_vShip'),
 
             // viz / exposure chain
@@ -913,7 +935,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     _setLoaded(loaded) {
         this.isLoaded = loaded;
         if (this.onLoadingStateChange) {
-            this.onLoadingStateChange({ 
+            this.onLoadingStateChange({
                 type: loaded ? 'ready' : 'loading',
                 message: loaded ? 'Warp engine ready' : 'Initializing...'
             });
@@ -985,8 +1007,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         if (linkStatus === 'linked') {
             const vertexCount = this.gridVertices?.length / 3 || 0;
-            return { 
-                status: 'linked', 
+            return {
+                status: 'linked',
                 message: `✅ ${profile} shaders ready (${vertexCount} vertices)`,
                 profile,
                 vertexCount
@@ -1035,22 +1057,22 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     // Simple parameter API (so the React side can push values)
     setParameters(next) { this.params = Object.assign(this.params || {}, next); }
     resize(w, h) { this.gl.viewport(0, 0, w, h); }
-    start() { 
-        if (this._raf) return; 
-        const loop = () => { 
-            this._raf = requestAnimationFrame(loop); 
-            this._render(); 
-        }; 
-        loop(); 
+    start() {
+        if (this._raf) return;
+        const loop = () => {
+            this._raf = requestAnimationFrame(loop);
+            this._render();
+        };
+        loop();
     }
-    stop() { 
-        if (this._raf) cancelAnimationFrame(this._raf); 
-        this._raf = null; 
+    stop() {
+        if (this._raf) cancelAnimationFrame(this._raf);
+        this._raf = null;
     }
-    dispose() { 
-        const gl = this.gl; 
-        if (this.gridVbo) gl.deleteBuffer(this.gridVbo); 
-        if (this.gridProgram) gl.deleteProgram(this.gridProgram); 
+    dispose() {
+        const gl = this.gl;
+        if (this.gridVbo) gl.deleteBuffer(this.gridVbo);
+        if (this.gridProgram) gl.deleteProgram(this.gridProgram);
     }
 
     // --- Atomic uniform batching to avoid mid-frame bad states ---
@@ -1082,13 +1104,13 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
                 });
             }
 
-            try { 
-                this._applyUniformsNow(p); 
+            try {
+                this._applyUniformsNow(p);
                 if (isModeSwitch) {
                     console.log('[WarpEngine] Uniforms applied after mode switch');
                 }
-            } catch(e) { 
-                console.error("[WarpEngine] Uniform flush failed during mode switch:", e); 
+            } catch(e) {
+                console.error("[WarpEngine] Uniform flush failed during mode switch:", e);
             }
 
             // After big bursts ensure camera is sane — fit to hull, not grid
@@ -1104,8 +1126,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             } catch {}
 
             // Always render immediately so we don't present a black frame
-            try { 
-                this._render(); 
+            try {
+                this._render();
                 if (isModeSwitch) {
                     console.log('[WarpEngine] Render completed after mode switch');
                 }
@@ -1140,7 +1162,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         }
         this.updateUniforms({
             metric: (g instanceof Float32Array) ? g : new Float32Array(g),
-            metricInv: (gInv instanceof Float32Array) ? gInv : 
+            metricInv: (gInv instanceof Float32Array) ? gInv :
                       (gInv ? new Float32Array(gInv) : ID3),
             metricOn: on ? 1.0 : 0.0,
             useMetric: on
@@ -1163,6 +1185,40 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         // add mode detection after prev is defined
         const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
         const isStandby = modeStr === 'standby';
+
+        // --- Wall width ingestion (meters & ρ with harmonic mean) ----------------
+        // Accept wallWidth_rho and/or wallWidth_m; derive the other using a_H.
+        // Keep "wallWidth" as an alias of wallWidth_rho for shader use.
+        // 1) stash axes first so a_H can be computed
+        if (Array.isArray(parameters.axesHull))  U.axesHull  = parameters.axesHull.slice(0,3);
+        if (Array.isArray(parameters.axesScene)) U.axesScene = parameters.axesScene.slice(0,3);
+        let aH = _guessAH(U);
+
+        // 2) accept explicit wall inputs
+        const hasWrho = Number.isFinite(parameters.wallWidth_rho);
+        const hasWm   = Number.isFinite(parameters.wallWidth_m);
+        if (hasWrho) U.wallWidth_rho = +parameters.wallWidth_rho;
+        if (hasWm)   U.wallWidth_m   = +parameters.wallWidth_m;
+
+        // 3) alias legacy "wallWidth" to ρ-units if present
+        if (Number.isFinite(parameters.wallWidth)) {
+          U.wallWidth_rho = +parameters.wallWidth;
+        }
+
+        // 4) derive missing counterpart via a_H (if available)
+        aH = _guessAH(U);
+        if (!Number.isFinite(U.wallWidth_rho) && Number.isFinite(U.wallWidth_m) && Number.isFinite(aH)) {
+          U.wallWidth_rho = U.wallWidth_m / aH;
+        }
+        if (!Number.isFinite(U.wallWidth_m) && Number.isFinite(U.wallWidth_rho) && Number.isFinite(aH)) {
+          U.wallWidth_m = U.wallWidth_rho * aH;
+        }
+
+        // 5) final defaults + alias for shader
+        if (!Number.isFinite(U.wallWidth_rho)) U.wallWidth_rho = WALL_RHO_DEFAULT;
+        U.wallWidth = U.wallWidth_rho;
+
+        // ------------------------------------------------------------------------
 
         // --- Resolve hull + scene scaling ---
         const a = N(parameters?.hull?.a ?? parameters?.hullAxes?.[0] ?? prev?.hullAxes?.[0], 503.5);
@@ -1250,7 +1306,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           cosmeticLevel: cosmetic,
           // existing fields
           vShip: parameters.vShip || prev.vShip || 1,
-          wallWidth: parameters.wallWidth || prev.wallWidth || 0.06,
+          wallWidth: parameters.wallWidth || prev.wallWidth || 0.06, // This is alias for wallWidth_rho for shader
           driveDir: parameters.driveDir || prev.driveDir || [1,0,0],
           displayGain: N(parameters.displayGain, prev.displayGain ?? 1.0),
           userGain: N(parameters.userGain, prev.userGain ?? 1.0),
@@ -1298,28 +1354,34 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           Math.max(1, nextUniforms.gammaVdB ?? 1) *
           (viewAvgResolved ? Math.sqrt(Math.max(0, dutyEffFR)) : 1.0);
 
-        // Apply mode-specific scaling for operational differentiation (disabled for pipeline compliance)
-        if (!parity && !zeroStandby && false) { // DISABLED: always use pure physics theta scale
-          // SHOW mode: apply visual amplification for demonstration
-          const modeAmplifier = mode === 'emergency' ? 2.0 : 
-                               mode === 'cruise' ? 0.8 : 1.2; // hover default
-          thetaScaleFromChain *= modeAmplifier;
+        // Apply mode-specific scaling for demonstration purposes (cosmetic only)
+        if (!parity && !zeroStandby) {
+          const mode = nextUniforms.currentMode?.toLowerCase();
+          const modeAmplifier =
+              mode === 'emergency' ? 1.08 : // higher contrast for emergency
+              mode === 'cruise'    ? 1.00 : // standard cruise
+              mode === 'hover'     ? 1.05 : // slightly more sensitive hover
+              mode === 'standby'   ? 0.95 : // reduced sensitivity for standby
+              1.0; // default
+          // Scale the *final* visualization theta, NOT the physics-derived scale
+          // This is cosmetic exaggeration, separate from the physics baseline.
+          // This is now handled by `userGain` and `cosmeticLevel` more directly.
         }
 
         // Always prefer React-computed thetaScale for pipeline compliance
         nextUniforms.thetaScale = Number.isFinite(parameters?.thetaScale)
           ? +parameters.thetaScale
-          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback but don't amplify
+          : (parity ? thetaScaleFromChain : thetaScaleFromChain); // Keep internal calc as fallback
 
-        // Debug operational mode theta calculation (fixed math chain)
+        // Debug calculation: Use the physics-derived scale for diagnostics
         this._dbgThetaTick = (this._dbgThetaTick || 0) + 1;
-        if (this._dbgThetaTick % 30 === 1) {
-          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] CORRECTED Theta chain:`, {
-            'γ³': gamma3,
-            'q': q,
-            'γ_VdB': gammaVdB,
-            '√duty': sqrtDuty,
-            'chain=γ³×q×γ_VdB×√duty': thetaScaleFromChain,
+        if (this._dbgThetaTick % 60 === 1) {
+          console.log(`🔧 [${parity ? 'REAL' : 'SHOW'}] Theta chain:`, {
+            gamma3: Math.pow(Math.max(1, nextUniforms.gammaGeo ?? 1), 3),
+            q: nextUniforms.deltaAOverA ?? 1,
+            gamma_VdB: nextUniforms.gammaVdB ?? 1,
+            sqrtDuty: Math.sqrt(Math.max(0, dutyEffFR)),
+            chain: thetaScaleFromChain.toExponential(2),
             actualTheta: nextUniforms.thetaScale,
             dutyEffFR,
             sectorsConcurrent,
@@ -1437,27 +1499,24 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
     // Authentic Natário spacetime curvature implementation
     _warpGridVertices(vtx, bubbleParams) {
         // Get hull axes from uniforms or use needle hull defaults (in meters)
-        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
-        // Clean wall thickness handling - use either meters or ρ-units
-        const a = hullAxes[0], b = hullAxes[1], c = hullAxes[2];
-        const aH = 3 / (1/a + 1/b + 1/c); // harmonic mean, meters
-        const wallWidth_m   = Number.isFinite(bubbleParams.wallWidth_m) ? bubbleParams.wallWidth_m : undefined;
-        const wallWidth_rho = Number.isFinite(bubbleParams.wallWidth_rho) ? bubbleParams.wallWidth_rho :
-                              Number.isFinite(this.uniforms?.wallWidth)  ? this.uniforms.wallWidth    :
-                              undefined;
-        const w_rho = wallWidth_rho ?? (wallWidth_m != null ? wallWidth_m / aH : 0.016); // default in ρ-units
+        const hullAxes = (this.uniforms?.axesHull || bubbleParams.hullAxes) || [503.5,132,86.5]; // semi-axes [a,b,c] in meters
+        // Unified wall thickness handling - use either meters or ρ-units
+        const a_m = hullAxes[0], b_m = hullAxes[1], c_m = hullAxes[2];
+        const aH = _guessAH(this.uniforms) || 1; // harmonic mean, meters
+        const wallWidth_rho = this.uniforms?.wallWidth_rho ?? WALL_RHO_DEFAULT;
+        const wallWidth_m   = this.uniforms?.wallWidth_m ?? wallWidth_rho * aH; // meters
 
         // Prefer server-provided clip axes; otherwise scale by the *true* long semi-axis.
         const axesScene =
           (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
             ? this.uniforms.axesClip
             : (() => {
-                const aMax = Math.max(a, b, c);
+                const aMax = Math.max(a_m, b_m, c_m);
                 const s    = 1.0 / Math.max(aMax, 1e-9);
-                return [a * s, b * s, c * s];
+                return [a_m * s, b_m * s, c_m * s];
               })();
 
-        // Use the computed w_rho from above
+        // Use the computed wallWidth_rho from above
 
         // Compute a grid span that comfortably contains the whole bubble
         const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]); // half-extent in clip space
@@ -1481,15 +1540,14 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1,0,0];
         const gridK = 0.10;                       // mild base (acts as unit scale)
 
-        // === Unified "SliceViewer-consistent" amplitude for geometry ===
-        // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors)  (already computed in updateUniforms)
+        // === UNIFIED "SliceViewer-consistent" AMPLITUDE for geometry ===
+        // thetaScale = γ^3 · (ΔA/A) · γ_VdB · √(duty/sectors) (already computed in updateUniforms)
         const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
         // prefer explicit payload, fall back to current uniforms
         const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
         const A_base = thetaScale;          // physics, averaged if viewAvg was true upstream
         const boost = userGain;             // 1..max (same number sent to shader as u_userGain)
         // Small per-mode seasoning only, so we don't hide the physics
-        // Keep mode scale only for non-geometry uses (colors, display), not geometry amplitude
         const modeScale =
             mode === 'standby'   ? 0.95 :
             mode === 'cruise'    ? 1.00 :
@@ -1499,8 +1557,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const A_vis    = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
 
         console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
-        console.log(`  Hull: [${a.toFixed(1)}, ${b.toFixed(1)}, ${c.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
-        console.log(`  Wall: ${wallWidth_m ?? w_rho * aH} m → ρ-space: ${w_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
+        console.log(`  Hull: [${a_m.toFixed(1)}, ${b_m.toFixed(1)}, ${c_m.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
+        console.log(`  Wall: ${wallWidth_m.toFixed(3)} m → ρ-space: ${wallWidth_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
         console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
         console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${thetaScale.toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
         console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
@@ -1532,13 +1590,13 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Smooth helper functions for C²-continuous displacement
         const clamp01 = (x) => Math.max(0, Math.min(1, x));
-        const smoothstep = (a, b, x) => { 
-            const t = clamp01((x - a) / (b - a)); 
-            return t * t * (3 - 2 * t); 
+        const smoothstep = (a, b, x) => {
+            const t = clamp01((x - a) / (b - a));
+            return t * t * (3 - 2 * t);
         }; // C¹
-        const smootherstep = (a, b, x) => { 
-            const t = clamp01((x - a) / (b - a)); 
-            return t * t * t * (t * (t * 6 - 15) + 10); 
+        const smootherstep = (a, b, x) => {
+            const t = clamp01((x - a) / (b - a));
+            return t * t * t * (t * (t * 6 - 15) + 10);
         }; // C²
         const softSign = (x) => Math.tanh(x); // smooth odd sign in (-1,1)
 
@@ -1551,9 +1609,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
         const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
         const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
-
-        const hullAxesUniform = this.uniforms?.hullAxes ?? [503.5,132,86.5];
-        const wallWidthUniform = this.uniforms?.wallWidth ?? 0.016;  // 16 nm default
 
         // ---- Existing physics chain (do not change) ----
         const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
@@ -1575,9 +1630,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         // Debug per mode (once per 60 frames) - cosmetic controls all exaggeration now
         if ((this._dbgTick = (this._dbgTick||0)+1) % 60 === 0) {
             console.log("🧪 warp-mode", {
-                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform, 
-                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform, 
-                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2), 
+                mode: this.uniforms?.currentMode, duty: dutyCycleUniform, sectors: sectorsUniform,
+                split: splitUniform, viewAvg: viewAvgUniform, A_geo: A_geoUniform, effDuty: effDutyUniform,
+                betaInst: betaInstUniform.toExponential(2), betaAvg: betaAvgUniform.toExponential(2),
                 betaVis: betaVisUniform.toExponential(2),
                 cosmeticLevel: this.uniforms?.cosmeticLevel || 10
             });
@@ -1619,20 +1674,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // --- Mode gains removed (cosmetic slider controls all exaggeration) ---
 
             // --- Local wall thickness in ellipsoidal ρ (correct units) ---
-            // Semi-axes in meters (not the clip-scaled ones)
-            const a_m = hullAxes[0]; // 503.5
-            const b_m = hullAxes[1]; // 132.0
-            const c_m = hullAxes[2]; // 86.5
-
-            // Direction-dependent mapping of meters → Δρ
-            const invR = Math.sqrt(
-                (n[0]/a_m)*(n[0]/a_m) +
-                (n[1]/b_m)*(n[1]/b_m) +
-                (n[2]/c_m)*(n[2]/c_m)
-            );
-            const R_eff = 1.0 / Math.max(invR, 1e-6);
-            // Use ρ-units directly. If meters were provided, we already converted to w_rho above.
-            const w_rho_local = Math.max(1e-4, (wallWidth_m != null) ? (wallWidth_m / R_eff) : w_rho);
+            // Use ρ-units directly. If meters were provided, we already converted to wallWidth_rho above.
+            const w_rho_local = Math.max(1e-4, wallWidth_rho);
 
             // ---- Existing physics chain (do not change) ----
             const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform; // γ_geo^3 amplification
@@ -1735,20 +1778,12 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
             // ----- Interior gravity (shift vector "tilt") -----
             // NEW: interior-only smooth window (C¹), wider and independent of 'ring'
-            const w_int = Math.max(3.0 * (this.uniforms?.wallWidth || 0.016), 0.02); // ~few cm in normalized space
-            const interior = (() => {
-              // 1 inside the cabin (rho <= 1 - w_int), 0 outside; smooth edge within w_int
-              const t = (1.0 - rho) / Math.max(w_int, 1e-6);
-              // smoothstep(0→1): 3t² − 2t³, clamped
-              const s = Math.max(0, Math.min(1, t));
-              return s * s * (3 - 2 * s);
-            })();
-
-            // NEW: interior tilt displacement — do NOT multiply by 'ring'
-            const epsTilt   = this.uniforms?.epsilonTilt ?? 0.0;
-            const tiltGain  = this.uniforms?.tiltGain ?? 0.25;     // gentle default
-            const betaTilt  = this.uniforms?.betaTiltVec || [0, -1, 0];
-            // project normal onto "down" and keep sign stable
+            // CPU interior window width uses wallWidth_rho (unified)
+            const w_int = Number.isFinite(this.uniforms?.intWidth)
+              ? Math.max(0.002, +this.uniforms.intWidth)
+              : Math.max(3.0 * (this.uniforms?.wallWidth_rho ?? WALL_RHO_DEFAULT), 0.02);
+            // --- end interior gravity -----
+            // Project normal onto "down" and keep sign stable
             const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
             // scale small, interior-only, soft-clamped
             let dispTilt = epsTilt * tiltGain * interior * downDot;
@@ -1788,8 +1823,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Update uniforms for scientific consistency (using scene-scaled axes)
         this.uniforms.axesClip = axesScene;
-        this.uniforms.wallWidth = w_rho;
-        this.uniforms.hullDimensions = { a, b, c, aH, SCENE_SCALE, wallWidth_m };
+        this.uniforms.wallWidth = wallWidth_rho; // Alias for shader
+        this.uniforms.hullDimensions = { a: a_m, b: b_m, c: c_m, aH, SCENE_SCALE, wallWidth_m };
 
         // Regenerate grid with proper span for hull size
         if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
@@ -1813,7 +1848,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
                 this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
             }
 
-            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a}×${b}×${c}]m`);
+            console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a_m}×${b_m}×${c_m}]m`);
 
             // Adjust camera framing for larger grids
             this._adjustCameraForSpan(targetSpan);
@@ -1864,9 +1899,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // --- drive + wall
         const drive = V3(u.driveDir, [1,0,0]);
-        const wRho  = Number.isFinite(u.wallWidth_rho) ? u.wallWidth_rho : (Number.isFinite(u.wallWidth) ? u.wallWidth : 0.02);
+        // Use unified wallWidth_rho, aliased as wallWidth for the shader
+        const wRho  = F(u.wallWidth_rho ?? u.wallWidth ?? WALL_RHO_DEFAULT, WALL_RHO_DEFAULT);
         if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
-        if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, F(wRho, 0.02));
+        if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
 
         // --- critical amplitude carrier INSIDE theta field:
         const vShip = Number.isFinite(u.vShip) ? u.vShip : (u.physicsParityMode ? 0.0 : 1.0);
@@ -1975,7 +2011,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // Emit diagnostics for proof panel
         if (this.onDiagnostics) {
-            try { 
+            try {
                 const diag = this.computeDiagnostics();
                 this.onDiagnostics(diag);
             } catch(e){
@@ -2257,7 +2293,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
     _sampleYorkAndEnergy(U){
         const axes  = U.axesClip || [0.40,0.22,0.22];
-        const w     = Math.max(1e-4, U.wallWidth || 0.06);   // shell width
+        const w     = Math.max(1e-4, U.wallWidth_rho ?? WALL_RHO_DEFAULT);   // shell width in rho
         const vShip = U.vShip || 1.0;
         const d     = U.driveDir || [1,0,0];
         const dN    = (()=>{ const t=[d[0]/axes[0], d[1]/axes[1], d[2]/axes[2]];
@@ -2295,7 +2331,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const rearAbs =Math.max(Math.abs(Y.thetaRearMax), Math.abs(Y.thetaRearMin));
         // Calculate shear average proxy and reset accumulators
         const shear_avg_proxy = (this._accumShearN ? this._accumShear / this._accumShearN : 0);
-        this._accumShear = 0; 
+        this._accumShear = 0;
         this._accumShearN = 0;
 
         // C) Additional physics values for CPU comparison
@@ -2326,7 +2362,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             beta_inst:P.betaInst, beta_avg:P.betaAvg, beta_net:P.betaNet,
             theta_front_max:Y.thetaFrontMax, theta_front_min:Y.thetaFrontMin,
             theta_rear_max:Y.thetaRearMax,   theta_rear_min:Y.thetaRearMin,
-            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth||0.06),
+            T00_avg_proxy:Y.T00avg, sigma_eff:1/Math.max(1e-4, U.wallWidth_rho ?? WALL_RHO_DEFAULT),
             shear_avg_proxy: shear_avg_proxy,
             york_sign_ok: (Y.thetaFrontMin<0 && Y.thetaRearMax>0),
             hover_sym_ok: (Math.abs(P.phase-0.5)<1e-3) && (Math.abs(frontAbs-rearAbs)<0.1*frontAbs+1e-6),
@@ -2396,7 +2432,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
                     // XOR + simple hash
                     const idx = (y * 8 + x) * 4;
                     pixels[idx] = rgba[0];
-                    pixels[idx + 1] = rgba[1]; 
+                    pixels[idx + 1] = rgba[1];
                     pixels[idx + 2] = rgba[2];
                     pixels[idx + 3] = rgba[3];
 
