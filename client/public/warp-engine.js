@@ -87,11 +87,23 @@ function _req(cond, name, U) {
 // WarpEngine (WebGL runtime)
 // ------------------------------------------------------------
 
+// Maintain one engine per <canvas>
+// NOTE: Keep this at top-level so it exists before class is used anywhere.
+const __ENGINE_INSTANCES = new WeakMap();
+
 class WarpEngine {
+    /**
+     * Create a (or return the existing) WarpEngine bound to the given canvas.
+     * @param {HTMLCanvasElement} canvas
+     */
     static getOrCreate(canvas) {
-        const existing = canvas.__warpEngine;
-        if (existing && !existing._destroyed) return existing;
-        return new this(canvas);
+        if (!canvas) throw new Error("WarpEngine.getOrCreate: canvas is required");
+        let eng = __ENGINE_INSTANCES.get(canvas);
+        if (!eng) {
+            eng = new WarpEngine(canvas);
+            __ENGINE_INSTANCES.set(canvas, eng);
+        }
+        return eng;
     }
 
     constructor(canvas) {
@@ -403,6 +415,18 @@ class WarpEngine {
             } catch (e) {
                 // Ignore cleanup errors
             }
+        }
+        
+        // Clean up instance tracking
+        try {
+            for (const [key, val] of __ENGINE_INSTANCES) {
+                if (val === this) {
+                    __ENGINE_INSTANCES.delete(key);
+                    break;
+                }
+            }
+        } catch (e) {
+            // Ignore cleanup errors
         }
     }
 
