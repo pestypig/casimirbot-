@@ -35,6 +35,7 @@ export interface EnergyPipelineState {
   dutyEffective_FR?: number;
   thetaScaleExpected?: number;           // precomputed server value for verification
   thetaScale?: number;                   // NEW: authoritative θ from pipeline (if provided)
+  thetaScale?: number;                   // NEW: authoritative θ from pipeline (if provided)
 }
 
 /**
@@ -59,11 +60,11 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const w_rho = Math.max(1e-6, w_m / aEff);
 
   // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
-  // Keep concurrent vs total distinct
+  // Keep total tiling vs concurrent strobing distinct
   const S_total = Math.max(1, Math.floor(num(s.sectorCount) ?? 400));
   const S_live  = Math.max(1, Math.floor(num(s.sectorStrobing) ?? 1));
-  const sectorsTotal = S_total;                 // what the renderer expects for geometry
-  const split        = Math.floor(S_total / 2); // canonical (+/–) split
+  const sectorsTotal = S_total;
+  const split        = Math.floor(S_total / 2);
 
   // --- Ship-wide effective duty (exactly HELIX's d_eff) ---
   // Priority: precomputed FR → explicit ship duty → derive from UI dutyCycle & strobing
@@ -71,8 +72,8 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     num(s.dutyEffective_FR) ??
     num(s.dutyShip) ??
     (() => {
-      const d_local = clamp(s.dutyCycle ?? 0.01, 0, 1); // local burst fraction
-      const d_eff   = d_local * (S_live / S_total);     // Ford–Roman ship-average
+      const d_local = clamp(s.dutyCycle ?? 0.01, 0, 1); // local ON fraction
+      const d_eff   = d_local * (S_live / S_total);     // Ford–Roman average
       return clamp(d_eff, 0, 1);
     })();
 
@@ -83,20 +84,12 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   // Use visual-only γ_VdB to keep mass calibration away from renderer.
   const gammaGeo = Math.max(1, num(s.gammaGeo) ?? 26);
   const gammaVdB = Math.max(0, num(s.gammaVanDenBroeck_vis) ?? num(s.gammaVanDenBroeck) ?? 0);
-  const qSpoil = Math.max(1e-12, num(s.qSpoilingFactor) ?? 1);
+  const qSpoil   = Math.max(1e-12, num(s.qSpoilingFactor) ?? num((s as any).deltaAOverA) ?? 1);
 
-  // Let the gate/engine compute authoritative θ. Provide only an audit value.
   const thetaScaleExpected =
-    Math.pow(gammaGeo, 3) *
-    qSpoil *
-    gammaVdB *
-    Math.sqrt(Math.max(1e-12, d_ship));
-
-  // Prefer a server-provided θ; else fall back to server audit; else local calc
+    Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(Math.max(1e-12, d_ship));
   const thetaForEngine =
-    num(s.thetaScale) ??
-    num(s.thetaScaleExpected) ??
-    thetaScaleExpected;
+    num(s.thetaScale) ?? num(s.thetaScaleExpected) ?? thetaScaleExpected;
 
   // --- Burst Q for visuals (matches HELIX Q_BURST semantics) ---
   const Qburst = num(s.qCavity) ?? 1e9;
@@ -108,14 +101,15 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Physics/ops - include qSpoilingFactor in physics chain
       currentMode: s.currentMode,
       // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
-      dutyCycle: clamp(s.dutyCycle ?? 0.01, 0, 1), // local burst (semantic)
-      dutyEffectiveFR: d_ship,                    // ship-averaged FR duty
-      thetaScale: thetaForEngine, // NEW: explicit θ for renderer (authoritative when present)
+      dutyCycle: clamp(s.dutyCycle ?? 0.01, 0, 1), // semantic: local burst
+      dutyEffectiveFR: d_ship,                     // explicit FR duty
+      thetaScale: thetaForEngine,                  // authoritative when present
       sectorCount: sectorsTotal, // total wedges
       sectors: split, // +/- split for viz that expects half-count
       gammaGeo,
       gammaVanDenBroeck: gammaVdB,
       qSpoilingFactor: qSpoil,
+      deltaAOverA: qSpoil,                         // alias for inspector parity
       qBurst: Qburst,
 
       // Geometry
