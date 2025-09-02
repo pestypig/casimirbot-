@@ -1300,13 +1300,7 @@ export default function WarpBubbleCompare({
     leftEngine.current.forceRedraw?.();
     rightEngine.current.forceRedraw?.();
 
-    // Force engine updates to apply new uniforms immediately
-    if (leftEngine.current.updateUniforms) {
-      leftEngine.current.updateUniforms(realPhysicsPayload);
-    }
-    if (rightEngine.current.updateUniforms) {
-      rightEngine.current.updateUniforms(showPhysicsPayload);
-    }
+    // (removed direct updateUniforms calls - batchers already applied with proper parity enforcement)
 
     // optional: quick console check
     if (DEBUG) console.log('[WBC] uniforms applied', {
