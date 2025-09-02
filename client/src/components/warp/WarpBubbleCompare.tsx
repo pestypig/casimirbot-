@@ -9,7 +9,7 @@ import CanvasFallback from '@/components/CanvasFallback';
 import { computeThetaScale } from '@/lib/warp-theta';
 
 // Use harmonic mean for meters↔ρ conversions (match engine)
-function aHarmonic(ax: number, ay: number, az: number) {
+function aHarmonic(ax?: number, ay?: number, az?: number) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
   const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
   return denom > 0 ? 3/denom : NaN;
@@ -973,12 +973,38 @@ export default function WarpBubbleCompare({
     if (cv) (cv as any).__warpEngine = undefined;
   }
 
-  // Build REAL/SHOW packets from parameters (your existing code)
+  // Build REAL/SHOW packets from parameters with unified wall width calculations
   function buildPacketsFromParams(p: any) {
     const wu = normalizeWU(p?.warpUniforms || (p as any));
+    
+    // NEW: single source of truth from adapter/pipeline (no per-pane recompute)
+    const aH = aHarmonic(p.axesHull?.[0], p.axesHull?.[1], p.axesHull?.[2]);
+    const unifiedWallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho
+                          : (Number.isFinite(p.wallWidth_m) && Number.isFinite(aH)) ? (+p.wallWidth_m / aH)
+                          : undefined;
+    const unifiedWallM   = Number.isFinite(p.wallWidth_m) ? +p.wallWidth_m
+                          : (Number.isFinite(p.wallWidth_rho) && Number.isFinite(aH)) ? (+p.wallWidth_rho * aH)
+                          : undefined;
+
     const real = buildREAL(wu);
     const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
-    return { real, show };
+    
+    // Apply unified wall width to both payloads
+    const realWithWall = {
+      ...real,
+      wallWidth: unifiedWallRho,
+      wallWidth_rho: unifiedWallRho,
+      wallWidth_m: unifiedWallM,
+    };
+    
+    const showWithWall = {
+      ...show,
+      wallWidth: unifiedWallRho,
+      wallWidth_rho: unifiedWallRho,
+      wallWidth_m: unifiedWallM,
+    };
+    
+    return { real: realWithWall, show: showWithWall };
   }
 
   // Full re-init using current parameters + camera + strobing
