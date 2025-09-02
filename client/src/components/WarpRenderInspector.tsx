@@ -1932,11 +1932,20 @@ export default function WarpRenderInspector(props: {
 // physics θ helper (no SHOW boosts)
 function thetaPhysicsFromUniforms(U: any) {
   const gammaGeo = +U.gammaGeo || 26;
-  const q        = +U.qSpoilingFactor || 1;
+  // Accept either alias — engine maintains both
+  const q = +(U.deltaAOverA ?? U.qSpoilingFactor ?? 1) || 1;
   // Use Ford-Roman mass gamma, not visual gamma for physics calculations
   const vdb_raw  = +U.gammaVanDenBroeck_mass || +U.gammaVanDenBroeck || 38.3; // Use paper value as fallback
   const vdb      = Math.min(vdb_raw, 1e6); // Clamp to reasonable physics range
-  const dRaw     = Number(U.dutyEffectiveFR);
-  const dFR      = Number.isFinite(dRaw) ? Math.max(0, dRaw) : 0.000025; // Use Ford-Roman duty as fallback
-  return Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(dFR);
+  
+  // Prefer FR duty; otherwise derive from local × S_live/S_total
+  const S_total = Math.max(1, +(U.sectorCount ?? 1));
+  const S_live  = Math.max(1, +(U.sectorStrobing ?? 1));
+  const d_eff = +(U.dutyEffectiveFR ?? ((+(U.dutyLocal ?? 0)) * (S_live / S_total))) || 0;
+  
+  const theta_phys = Math.pow(gammaGeo, 3) * q * vdb * Math.sqrt(Math.max(1e-12, d_eff));
+  // Optional: display raw vs clamped γVdB if available to explain variance
+  const gammaVdB_raw = U.gammaVdBRaw ?? vdb;
+  
+  return theta_phys;
 }
