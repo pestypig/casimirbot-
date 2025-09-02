@@ -1,10 +1,28 @@
 
+
 //====================================================================
 //  Natário Warp‑Bubble Visualiser (NEUTERED DEMO VERSION)
 //  ------------------------------------------------------------------
 //  This demo engine now defers all critical operations to the
 //  authoritative public/warp-engine.js to prevent conflicts.
 //====================================================================
+
+// Guard: If authoritative engine is present, keep demo dormant
+(function (g) {
+  if (g.WarpEngine && !g.__ALLOW_WARP_DEMO__) {
+    console.info('[warp-engine.demo] dormant (authoritative WarpEngine present)');
+    // Provide a tiny shim so imports don't crash:
+    g.WarpEngineDemo = function(canvas){ this.canvas = canvas; this.uniforms = {}; this.isLoaded = true; };
+    g.WarpEngineDemo.prototype.updateUniforms = function(){};
+    g.WarpEngineDemo.prototype.bootstrap = function(){};
+    g.WarpEngineDemo.prototype.destroy = function(){};
+    g.WarpEngineDemo.prototype.onceReady = function(cb){ if(cb) setTimeout(cb, 0); };
+    g.WarpEngineDemo.prototype.forceRedraw = function(){};
+    g.WarpEngineDemo.prototype.setDisplayGain = function(){};
+    g.WarpEngineDemo.prototype._resize = function(){};
+    return;
+  }
+})(window);
 
 export default class WarpEngine {
     constructor(canvas) {
@@ -69,3 +87,4 @@ export default class WarpEngine {
         // No-op
     }
 }
+
