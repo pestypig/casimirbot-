@@ -1,0 +1,156 @@
+diff --git a/warp-engine.js b/warp-engine.js
+index 2a1e4f1..6c3a7db 100644
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@ -1,9 +1,43 @@
+ // WarpEngine (WebGL runtime)
+ // ------------------------------------------------------------
+ 
++// ---- helpers for meters ↔ rho thickness and validation ----------------------
++function _aHarmonic(ax, ay, az) {
++  const a = +ax || 0, b = +ay || 0, c = +az || 0;
++  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
++  return d > 0 ? 3 / d : NaN;
++}
++function _guessAH(U) {
++  const H = U.axesHull, S = U.axesScene;
++  if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
++  if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
++  return NaN;
++}
++function _req(cond, name, U) {
++  if (!cond) {
++    const msg = `warp-engine: missing required uniform "${name}"`;
++    U.__error = msg;
++    throw new Error(msg);
++  }
++}
++
+ class WarpEngine {
+   constructor(canvas) {
+     // ... existing init ...
++    this.strictPhysics = false; // can be enabled via uniforms
+   }
+ 
+   updateUniforms(parameters) {
+     const U = this.uniforms || (this.uniforms = {});
++    // Accept strict mode toggle up front
++    if (typeof parameters.strictPhysics === "boolean") this.strictPhysics = !!parameters.strictPhysics;
++
++    // Axes first (strict mode will *require* these)
++    if (Array.isArray(parameters.axesHull))  U.axesHull  = parameters.axesHull.slice(0,3);
++    if (Array.isArray(parameters.axesScene)) U.axesScene = parameters.axesScene.slice(0,3);
+ 
+-    // legacy wallWidth (rho) path
+-    U.wallWidth = parameters.wallWidth ?? U.wallWidth ?? 0.06;
++    // ---- Unify wall-width ingestion (no hidden defaults in strict) ----------
++    let w_rho = (Number.isFinite(parameters.wallWidth) ? +parameters.wallWidth : undefined);
++    if (Number.isFinite(parameters.wallWidth_rho)) w_rho = +parameters.wallWidth_rho;
++    if (!Number.isFinite(w_rho) && Number.isFinite(parameters.wallWidth_m)) {
++      const aH = _guessAH(U);
++      if (Number.isFinite(aH)) w_rho = (+parameters.wallWidth_m) / aH;
++    }
++    if (this.strictPhysics) _req(Number.isFinite(w_rho), "wallWidth (rho) or wallWidth_m", U);
++    if (Number.isFinite(w_rho)) U.wallWidth = w_rho;
+ 
+     // physics uniforms (no defaults when strict)
+     if (Number.isFinite(parameters.gammaGeo))           U.gammaGeo = +parameters.gammaGeo;
+@@ -13,27 +47,76 @@ class WarpEngine {
+     if (Number.isFinite(parameters.qSpoilingFactor))    U.deltaAOverA = +parameters.qSpoilingFactor;
+     if (Number.isFinite(parameters.deltaAOverA))        U.deltaAOverA = +parameters.deltaAOverA;
+     if (Number.isFinite(parameters.dutyEffectiveFR))    U.dutyEffectiveFR = +parameters.dutyEffectiveFR;
+-    if (Number.isFinite(parameters.sectorCount))        U.sectorCount = parameters.sectorCount|0;
+-    if (Number.isFinite(parameters.sectorStrobing))     U.sectorStrobing = parameters.sectorStrobing|0;
++    if (Number.isFinite(parameters.sectorCount))        U.sectorCount = parameters.sectorCount|0;
++    if (Number.isFinite(parameters.sectorStrobing))     U.sectorStrobing = parameters.sectorStrobing|0;
+     if (typeof parameters.lockFraming === "boolean")    U.lockFraming = !!parameters.lockFraming;
+-    if (Number.isFinite(parameters.thetaScale))         U.thetaScale = +parameters.thetaScale;
++    if (Number.isFinite(parameters.thetaScale))         U.thetaScale = +parameters.thetaScale;
+ 
++    if (this.strictPhysics) {
++      _req(Array.isArray(U.axesHull) && U.axesHull.length===3, "axesHull[a,b,c]", U);
++      _req(Number.isFinite(U.wallWidth), "wallWidth (rho)", U);
++      _req(Number.isFinite(U.gammaGeo), "gammaGeo", U);
++      _req(Number.isFinite(U.deltaAOverA), "qSpoilingFactor/deltaAOverA", U);
++      _req(Number.isFinite(U.gammaVanDenBroeck), "gammaVanDenBroeck", U);
++      _req(Number.isFinite(U.sectorCount) && U.sectorCount>=1, "sectorCount", U);
++      _req(Number.isFinite(U.sectorStrobing) && U.sectorStrobing>=1, "sectorStrobing", U);
++      _req(Number.isFinite(U.dutyEffectiveFR), "dutyEffectiveFR", U);
++      // Either authoritative theta OR all factors to recompute are present
++      if (!Number.isFinite(U.thetaScale)) {
++        _req(true, "thetaScale (pipeline) — required in strict mode for now", U);
++      }
++      // Lock framing while validating strict 1:1
++      U.lockFraming = true;
++    }
++
+     // ... any remaining uniforms/cosmetics ...
+   }
+ 
+   _render() {
+     const U = this.uniforms || {};
++    // Show diagnostics if strict is missing inputs
++    if (this.strictPhysics && U.__error) {
++      const gl = this.gl;
++      gl.clearColor(0.2, 0.0, 0.0, 1.0);
++      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
++      // (Optional) draw a small red banner via 2D overlay; omitted for brevity
++      return;
++    }
+ 
+     // --- camera & framing (lock to hull when strict) -------------------------
+-    const lock = !!U.lockFraming;
++    const lock = this.strictPhysics ? true : !!U.lockFraming;
+     // derive axesScene from axesHull if not supplied
+     if (!Array.isArray(U.axesScene) && Array.isArray(U.axesHull)) {
+       const a = U.axesHull;
+       const aMax = Math.max(1e-6, a[0], a[1], a[2]);
+       this.uniforms.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
+     }
+-    // ... existing span boost / user gain logic ...
++    // In strict mode: no span/userGain seasoning
++    if (this.strictPhysics) {
++      this.uniforms.userGain = 1.0;
++      this.uniforms.displayGain = 1.0;
++    }
+ 
+     // --- grid & shell geometry ----------------------------------------------
+-    const w_rho = Number.isFinite(U.wallWidth) ? U.wallWidth : 0.06;
++    const w_rho = U.wallWidth;
++    if (this.strictPhysics) {
++      if (!Number.isFinite(w_rho)) {
++        U.__error = "warp-engine: wallWidth (rho) missing at render";
++        return;
++      }
++    }
+     // build/refresh grid using w_rho divisions (no fallback in strict)
+     this._ensureGridBuilt(w_rho);
+ 
+     // --- amplitude (theta) ---------------------------------------------------
+-    const theta = Number.isFinite(U.thetaScale) ? U.thetaScale : (
+-      Math.pow(U.gammaGeo||1,3)*(U.deltaAOverA||1)*(U.gammaVanDenBroeck||1)*Math.sqrt(Math.max(1e-12, U.dutyEffectiveFR||0))
+-    );
++    let theta = U.thetaScale;
++    if (!Number.isFinite(theta)) {
++      // in non-strict mode we may recompute; in strict we refuse
++      if (this.strictPhysics) {
++        U.__error = "warp-engine: thetaScale missing in strict mode";
++        return;
++      } else {
++        theta = Math.pow(U.gammaGeo||1,3) * (U.deltaAOverA||1) * (U.gammaVanDenBroeck||1) * Math.sqrt(Math.max(1e-12, U.dutyEffectiveFR||0));
++      }
++    }
+     this.uniforms.thetaScale_actual = theta;
+ 
+     // draw...
+   }
+@@ -46,11 +129,18 @@ class WarpEngine {
+   _ensureGridBuilt(w_rho) {
+     // (re)build grid VBOs if divisions changed materially
+-    const span = Math.max(0.01, 3 * (Number.isFinite(w_rho) ? w_rho : 0.06));
++    const span = Math.max(0.01, 3 * w_rho);
+     if (this._gridSpan === span) return;
+     this._gridSpan = span;
+     // ... build grid lines with span in rho-units ...
+   }
+ }
