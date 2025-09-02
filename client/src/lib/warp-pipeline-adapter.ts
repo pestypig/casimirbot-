@@ -1,16 +1,18 @@
 /**
  * Pipeline → WarpEngine Adapter
  *
- * Eliminates "secret defaults" by driving WarpEngine directly from EnergyPipelineState.
- * Single source of truth for all physics parameters.
+ * Drives renderer uniforms from pipeline state (single source of truth, strict)
  */
 import { gatedUpdateUniforms } from "./warp-uniforms-gate";
 
-// Harmonic-mean radius for meters↔ρ conversion (match engine)
 function aHarmonic(ax: number, ay: number, az: number) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
-  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
-  return denom > 0 ? 3/denom : NaN;
+  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return d > 0 ? 3 / d : NaN;
+}
+
+function req(cond: any, msg: string) {
+  if (!cond) throw new Error(`adapter: ${msg}`);
 }
 
 export interface EnergyPipelineState {
@@ -26,13 +28,13 @@ export interface EnergyPipelineState {
   // Physics parameters
   sag_nm?: number;
   dutyCycle: number;
-  dutyShip?: number;                     // was required → optional (not present on server state)
-  sectorCount?: number;                  // was required → optional
-  sectorStrobing?: number;               // present on server state; treat as sectors fallback
+  dutyShip?: number;
+  sectorCount?: number;
+  sectorStrobing?: number;
   gammaGeo: number;
-  gammaVanDenBroeck: number;             // mass-calibrated version
-  gammaVanDenBroeck_vis?: number;        // visual-only version (physics seed)
-  gammaVanDenBroeck_mass?: number;       // mass calibration version
+  gammaVanDenBroeck: number;
+  gammaVanDenBroeck_vis?: number;
+  gammaVanDenBroeck_mass?: number;
   qCavity: number;
   qSpoilingFactor: number;
   currentMode: string;
@@ -40,99 +42,77 @@ export interface EnergyPipelineState {
 
   // Optional for fallbacks
   dutyEffective_FR?: number;
-  thetaScaleExpected?: number;           // precomputed server value for verification
-  thetaScale?: number;                   // NEW: authoritative θ from pipeline (if provided)
-  thetaScale?: number;                   // NEW: authoritative θ from pipeline (if provided)
+  thetaScaleExpected?: number;
+  thetaScale?: number;
+
+  // Strongly recommended fields (strict mode)
+  axesHull?: [number,number,number];
+  wallWidth_m?: number;
+  wallWidth_rho?: number;
+  dutyLocal?: number;
+  dutyEffectiveFR?: number;
 }
 
 /**
- * Drop-in adapter: pipeline → WarpEngine (single source of truth)
+ * Drop-in adapter: pipeline → WarpEngine (single source of truth, strict)
  * Call this every time the pipeline state changes (or on a fixed tick)
  */
 export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void {
   if (!engine || !s) return;
 
-  // Helpers
-  const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : undefined);
-  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+  // Resolve axes
+  const ax = +(s.axesHull?.[0] ?? s.hull?.Lx_m ?? s.shipRadius_m);
+  const ay = +(s.axesHull?.[1] ?? s.hull?.Ly_m ?? s.shipRadius_m);
+  const az = +(s.axesHull?.[2] ?? s.hull?.Lz_m ?? s.shipRadius_m);
+  req(Number.isFinite(ax)&&Number.isFinite(ay)&&Number.isFinite(az), 'missing axesHull[a,b,c]');
+  const axesHull: [number,number,number] = [ax,ay,az];
+  const aH = aHarmonic(ax,ay,az);
+  req(Number.isFinite(aH), 'bad harmonic radius (axes)');
 
-  // --- Hull semi-axes in meters (renderer expects [a,b,c]) ---
-  const a = num(s.hull?.Lx_m) ?? s.shipRadius_m;
-  const b = num(s.hull?.Ly_m) ?? s.shipRadius_m;
-  const c = num(s.hull?.Lz_m) ?? s.shipRadius_m;
+  // Wall width (prefer meters; compute rho)
+  const w_m  = Number.isFinite(s.wallWidth_m)   ? +s.wallWidth_m   : (Number.isFinite(s.wallWidth_rho) ? +s.wallWidth_rho * aH : Math.max(1e-9, (s.sag_nm ?? 16) * 1e-9));
+  const w_rho= Number.isFinite(s.wallWidth_rho) ? +s.wallWidth_rho : (Number.isFinite(s.wallWidth_m)   ? +s.wallWidth_m / aH   : (Number.isFinite(aH) ? Math.max(1e-6, w_m / aH) : NaN));
+  req(Number.isFinite(w_m) && Number.isFinite(w_rho), 'missing wallWidth_m or wallWidth_rho');
 
-  // --- Canonical wall width in ρ-units (matches HELIX sampler) ---
-  const aH = aHarmonic(a, b, c);
-  const w_m = Math.max(1e-9, (s.sag_nm ?? 16) * 1e-9);
-  const w_rho = (Number.isFinite(s.wallWidth_rho) ? +s.wallWidth_rho! :
-                 Number.isFinite(s.wallWidth_m) && Number.isFinite(aH) ? (+s.wallWidth_m! / aH) :
-                 Number.isFinite(aH) ? Math.max(1e-6, w_m / aH) : undefined);
+  // Sectors / duty
+  const S_total = +(s.sectorCount ?? 400);
+  const S_live  = +(s.sectorStrobing ?? 1);
+  req(Number.isFinite(S_total)&&Number.isFinite(S_live)&&S_total>=1&&S_live>=1, 'missing sectorCount/sectorStrobing');
+  const dutyLocal = Number.isFinite(s.dutyLocal) ? +s.dutyLocal : (Number.isFinite(s.dutyCycle) ? +s.dutyCycle : NaN);
+  req(Number.isFinite(dutyLocal), 'missing dutyLocal/dutyCycle');
+  const dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR) ? +s.dutyEffectiveFR : 
+                         (Number.isFinite(s.dutyEffective_FR) ? +s.dutyEffective_FR : 
+                         (dutyLocal * (S_live/S_total)));
 
-  // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
-  // Keep total tiling vs concurrent strobing distinct
-  const S_total = Math.max(1, Math.floor(num(s.sectorCount) ?? 400));
-  const S_live  = Math.max(1, Math.floor(num(s.sectorStrobing) ?? 1));
-  const sectorsTotal = S_total;
-  const split        = Math.floor(S_total / 2);
+  // Physics gains
+  const gammaGeo  = +s.gammaGeo;
+  const gammaVdB  = +(s.gammaVanDenBroeck_vis ?? s.gammaVanDenBroeck);
+  const qSpoil    = +(s.qSpoilingFactor ?? 1);
+  req(Number.isFinite(gammaGeo)&&Number.isFinite(gammaVdB)&&Number.isFinite(qSpoil), 'missing gammaGeo/gammaVdB/qSpoilingFactor');
 
-  // --- Ship-wide effective duty (exactly HELIX's d_eff) ---
-  // Priority: precomputed FR → explicit ship duty → derive from UI dutyCycle & strobing
-  let d_ship =
-    num(s.dutyEffective_FR) ??
-    num(s.dutyShip) ??
-    (() => {
-      const d_local = clamp(s.dutyCycle ?? 0.01, 0, 1); // local ON fraction
-      const d_eff   = d_local * (S_live / S_total);     // Ford–Roman average
-      return clamp(d_eff, 0, 1);
-    })();
+  // Optional authoritative theta
+  const thetaScale = Number.isFinite(s.thetaScale) ? +s.thetaScale : undefined;
 
-  d_ship = clamp(d_ship, 0, 1);
+  // Burst Q for visuals
+  const Qburst = +(s.qCavity ?? 1e9);
 
-  // --- Physics amplitude chain (renderer consumes this as u_thetaScale) ---
-  // Include qSpoilingFactor in theta calculation for mode differences.
-  // Use visual-only γ_VdB to keep mass calibration away from renderer.
-  const gammaGeo = Math.max(1, num(s.gammaGeo) ?? 26);
-  const gammaVdB = Math.max(0, num(s.gammaVanDenBroeck_vis) ?? num(s.gammaVanDenBroeck) ?? 0);
-  const qSpoil   = Math.max(1e-12, num(s.qSpoilingFactor) ?? num((s as any).deltaAOverA) ?? 1);
-
-  const thetaScaleExpected =
-    Math.pow(gammaGeo, 3) * qSpoil * gammaVdB * Math.sqrt(Math.max(1e-12, d_ship));
-  const thetaForEngine =
-    num(s.thetaScale) ?? num(s.thetaScaleExpected) ?? thetaScaleExpected;
-
-  // --- Burst Q for visuals (matches HELIX Q_BURST semantics) ---
-  const Qburst = num(s.qCavity) ?? 1e9;
-
-  // Push everything into the renderer in one shot using gated uniforms
-  gatedUpdateUniforms(
-    engine,
-    {
-      // Physics/ops - include qSpoilingFactor in physics chain
-      currentMode: s.currentMode,
-      // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
-      dutyCycle: clamp(s.dutyCycle ?? 0.01, 0, 1), // semantic: local burst
-      dutyEffectiveFR: d_ship,                     // explicit FR duty
-      thetaScale: thetaForEngine,                  // authoritative when present
-      sectorCount: sectorsTotal, // total wedges
-      sectors: split, // +/- split for viz that expects half-count
-      gammaGeo,
-      gammaVanDenBroeck: gammaVdB,
-      qSpoilingFactor: qSpoil,
-      deltaAOverA: qSpoil,                         // alias for inspector parity
-      qBurst: Qburst,
-
-      // Geometry
-      hullAxes: [a, b, c],
-      wallWidth_rho: w_rho,
-      wallWidth_m: (Number.isFinite(w_rho) && Number.isFinite(aH)) ? (w_rho! * aH) : w_m,
-
-      // Audit-only; do not override engine θ
-      thetaScaleExpected,
-
-      // Visual defaults locked by gating system
-      colorMode: "theta",
-      viewAvg: true,
-    },
-    "server"
-  );
+  gatedUpdateUniforms(engine, {
+    strictPhysics: true,
+    axesHull,
+    // keep axesScene derived in engine
+    wallWidth: w_rho,
+    wallWidth_rho: w_rho,
+    wallWidth_m: w_m,
+    sectorCount: S_total|0,
+    sectorStrobing: S_live|0,
+    dutyCycle: dutyLocal,
+    dutyEffectiveFR,
+    gammaGeo,
+    gammaVanDenBroeck: gammaVdB,
+    qSpoilingFactor: qSpoil,
+    qBurst: Qburst,
+    currentMode: s.currentMode,
+    lockFraming: true,
+    ...(Number.isFinite(thetaScale) ? { thetaScale } : {})
+  }, "server");
 }
