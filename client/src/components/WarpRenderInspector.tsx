@@ -109,13 +109,9 @@ function calculateCameraZ(canvas: HTMLCanvasElement | null, axes: [number,number
   return -maxRadius * (2.0 + 0.5 / Math.max(aspect, 0.5));
 }
 
+// Enforcement disabled: passthrough (no parity/ridge forcing)
 function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  return {
-    ...patch,
-    physicsParityMode: pane === 'REAL',
-    parityMode: pane === 'REAL',
-    ridgeMode: pane === 'REAL' ? 0 : 1
-  };
+  return { ...patch };
 }
 
 // Sanitize uniform values for safe WebGL consumption
@@ -812,30 +808,8 @@ export default function WarpRenderInspector(props: {
     return getOrCreateEngine(W, canvas);
   }
 
-  // Minimal parity lock function to prevent duplicate shader rebuilds
-  function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
-    if (!engine || engine.__locked) return;
-    engine.__locked = true;
-
-    // enforce at uniform *values* only – no source rebuilds:
-    const forcedParity = (pane === 'REAL');
-    const forcedRidge  = (pane === 'REAL') ? 0 : 1;
-
-    const enforce = (patch: any = {}) => ({
-      ...patch,
-      physicsParityMode: forcedParity,
-      uPhysicsParity: forcedParity,
-      uRidgeMode: forcedRidge,
-      ridgeMode: forcedRidge
-    });
-
-    const origUpdate = engine.updateUniforms?.bind(engine);
-    engine.updateUniforms = (p: any) => origUpdate?.(enforce(p));
-    // also set once immediately
-    origUpdate?.(enforce());
-
-    console.log(`[${pane}] Parity locked: parity=${forcedParity}, ridge=${forcedRidge}`);
-  }
+  // Parity lock disabled (no-op)
+  function lockPane(engine: any, pane: 'REAL' | 'SHOW') { /* no-op */ }
 
   // Initialize engines with enhanced error handling and validation
   useEffect(() => {
@@ -982,13 +956,10 @@ export default function WarpRenderInspector(props: {
             );
           }
 
-          // Initialize with ENFORCED parity mode for REAL
+          // Initialize (no enforced parity/ridge)
           const realInitUniforms = {
             exposure: 5.0,
             zeroStop: 1e-7,
-            physicsParityMode: true,
-            parityMode: true, // Explicit fallback
-            ridgeMode: 0,
             colorMode: 2, // Shear proxy for truth view
             lockFraming: true,
             epsilonTilt: epsilonTilt,
@@ -998,40 +969,9 @@ export default function WarpRenderInspector(props: {
           console.log("Applying REAL initial uniforms:", realInitUniforms);
           gatedUpdateUniforms(leftEngine.current, realInitUniforms, 'client');
 
-          // CRITICAL: Force parity directly on uniforms object as backup
-          if (leftEngine.current.uniforms) {
-            leftEngine.current.uniforms.physicsParityMode = true;
-            leftEngine.current.uniforms.parityMode = true;
-            leftEngine.current.uniforms.ridgeMode = 0;
-          }
+          // No direct parity enforcement
 
-          // Verify parity was set
-          console.log("REAL engine parity after init:", leftEngine.current.uniforms?.physicsParityMode);
-
-          // Add gentle parity correction with debouncing
-          let lastParityCheck = 0;
-          const enforceParityREAL = () => {
-            const now = Date.now();
-            if (now - lastParityCheck < 1000) return; // Check max once per second
-            lastParityCheck = now;
-
-            const U = leftEngine.current?.uniforms;
-            if (U && U.physicsParityMode !== true) {
-              console.warn("🔧 REAL parity drift detected - applying gentle correction");
-              U.physicsParityMode = true;
-              U.parityMode = true;
-              U.ridgeMode = 0;
-            }
-          };
-
-          // Hook into render loop for gentle enforcement
-          if (leftEngine.current._render) {
-            const originalRender = leftEngine.current._render.bind(leftEngine.current);
-            leftEngine.current._render = function(...args: any[]) {
-              enforceParityREAL();
-              return originalRender(...args);
-            };
-          }
+          // No parity enforcement in render loop
 
           leftEngine.current?.setVisible?.(true);
           // Apply parity lock immediately after engine creation
@@ -1083,13 +1023,10 @@ export default function WarpRenderInspector(props: {
             );
           }
 
-          // Initialize with ENFORCED non-parity mode for SHOW
+          // Initialize (no enforced parity/ridge)
           const showInitUniforms = {
             exposure: 7.5,
             zeroStop: 1e-7,
-            physicsParityMode: false,
-            parityMode: false, // Explicit fallback
-            ridgeMode: 1,
             curvatureGainT: 0.70,
             curvatureBoostMax: 40,
             userGain: 1.25,
@@ -1101,9 +1038,6 @@ export default function WarpRenderInspector(props: {
 
           console.log("Applying SHOW initial uniforms:", showInitUniforms);
           gatedUpdateUniforms(rightEngine.current, showInitUniforms, 'client');
-
-          // Verify parity was set
-          console.log("SHOW engine parity after init:", rightEngine.current.uniforms?.physicsParityMode);
 
           rightEngine.current?.setVisible?.(true);
           // Apply parity lock immediately after engine creation
@@ -1486,16 +1420,19 @@ export default function WarpRenderInspector(props: {
     //   return calculated;
     // };
 
-    // Build REAL payload (Ford–Roman parity) - DO NOT include thetaScale here
+    // Build REAL payload (no parity enforcement) + θ passthrough
+    const pipelineTheta = Number.isFinite(Number(live?.thetaScaleUsed))
+      ? Number(live?.thetaScaleUsed)
+      : (Number.isFinite(Number(live?.thetaScale)) ? Number(live?.thetaScale) : undefined);
     const realPayload = {
       ...baseShared,
-      physicsParityMode: true,
-      ridgeMode: 0,
       ...realPhys,
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 2, // Shear proxy for truth view
-      lockFraming: true
+      lockFraming: true,
+      thetaScale: (pipelineTheta ?? realPhys.thetaScale ??
+        computeThetaScale(realPhys))
     };
 
     // Attach metric defaults to both panes (you can turn them off via useMetric=false)
@@ -1503,11 +1440,9 @@ export default function WarpRenderInspector(props: {
     (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
     (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
 
-    // Build SHOW payload (UI boosted) - DO NOT include thetaScale here
+    // Build SHOW payload (no parity enforcement) + θ passthrough
     const showPayload = {
       ...baseShared,
-      physicsParityMode: false,
-      ridgeMode: 1,
       ...showPhys,
       exposure: 7.5,
       zeroStop: 1e-7,
@@ -1515,7 +1450,9 @@ export default function WarpRenderInspector(props: {
       curvatureBoostMax: 40,
       userGain: 1.25,
       colorMode: 1, // Theta mode for visual enhancement
-      lockFraming: true
+      lockFraming: true,
+      thetaScale: (pipelineTheta ?? showPhys.thetaScale ??
+        computeThetaScale({ ...showPhys, gammaVanDenBroeck: showPhys.gammaVanDenBroeck_vis ?? showPhys.gammaVanDenBroeck }))
     };
     (showPayload as any).useMetric   = props.baseShared?.useMetric ?? false;
     (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
@@ -1606,10 +1543,9 @@ export default function WarpRenderInspector(props: {
     const rightState = rightEngine.current;
 
     console.log('=== PARITY VERIFICATION ===');
-    console.log('REAL parity?', leftState?.uniforms?.physicsParityMode, '(should be true)');
-    console.log('SHOW parity?', rightState?.uniforms?.physicsParityMode, '(should be false)');
-    console.log('REAL ridge?', leftState?.uniforms?.ridgeMode, '(should be 0)');
-    console.log('SHOW ridge?', rightState?.uniforms?.ridgeMode, '(should be 1)');
+    console.log('REAL parity?', leftState?.uniforms?.physicsParityMode, '(enforcement disabled)');
+    console.log('SHOW parity?', rightState?.uniforms?.physicsParityMode, '(enforcement disabled)');
+    console.log('REAL ridge?', leftState?.uniforms?.ridgeMode, 'SHOW ridge:', rightState?.uniforms?.ridgeMode);
     const thL = leftState?.uniforms?.thetaScale;
     const thR = rightState?.uniforms?.thetaScale;
     const thLact = leftState?.uniforms?.thetaScale_actual;
@@ -1619,45 +1555,13 @@ export default function WarpRenderInspector(props: {
       'SHOW:', thR?.toExponential?.(2),
       ' [engine actual]', thLact?.toExponential?.(2), thRact?.toExponential?.(2)
     );
-
-    // Check for parity violations and attempt gentle correction
-    if (leftState?.uniforms && leftState.uniforms.physicsParityMode !== true) {
-      console.warn('🔧 REAL parity drift detected in verification - applying correction');
-      leftState.uniforms.physicsParityMode = true;
-      leftState.uniforms.parityMode = true;
-      leftState.uniforms.ridgeMode = 0;
-
-      // Also push through update system gently
-      gatedUpdateUniforms(leftEngine.current, {
-        physicsParityMode: true,
-        parityMode: true,
-        ridgeMode: 0
-      }, 'client');
-    }
-
-    if (rightState?.uniforms && rightState.uniforms.physicsParityMode !== false) {
-      console.error('SHOW parity violation detected - attempting correction');
-      rightState.uniforms.physicsParityMode = false;
-      rightState.uniforms.parityMode = false;
-      rightState.uniforms.ridgeMode = 1;
-
-      // Also push through update system
-      gatedUpdateUniforms(rightEngine.current, {
-        physicsParityMode: false,
-        parityMode: false,
-        ridgeMode: 1
-      }, 'client');
-    }
+    // Enforcement disabled: no corrections here
   };
 
-  // Run verification less frequently and expose to window for debugging
+  // Keep only optional manual verifier hook; no background enforcement
   useEffect(() => {
-    const interval = setInterval(verifyEngineStates, 5000); // Reduce from 2s to 5s
     (window as any).__verifyWarpParity = verifyEngineStates;
-    return () => {
-      clearInterval(interval);
-      delete (window as any).__verifyWarpParity;
-    };
+    return () => { delete (window as any).__verifyWarpParity; };
   }, []);
 
   // Missing variables for new layout
