@@ -172,44 +172,12 @@ function viewMassFractionLocked(u: any, pane: 'REAL' | 'SHOW'): number {
 }
 
 
-function thetaGainExpected(bound: any): number {
-  try {
-    const g  = Number(bound?.gammaGeo ?? bound?.gamma_geo ?? 26);
-    const q  = Number(bound?.qSpoilingFactor ?? bound?.deltaAOverA ?? bound?.q ?? 1);
-    // physics "mass pocket" gamma (not the big visual gamma); canonical clamps internally
-    const vM = Number(
-      bound?.gammaVanDenBroeck_mass ??
-      bound?.gammaVanDenBroeck ??
-      bound?.gammaVdB ??
-      bound?.gamma_vdb ??
-      38.3
-    );
-
-    const dutyLocal = Number(bound?.dutyLocal ?? bound?.dutyCycle ?? bound?.duty ?? 0.01);
-    const sC = Math.max(1, Number(bound?.sectorsConcurrent ?? bound?.sectors ?? 1));
-    const sT = Math.max(1, Number(bound?.sectorsTotal ?? bound?.sectorCount ?? 400));
-
-    // REAL panels average by default; SHOW typically does not
-    const viewAveraged =
-      bound?.viewAveraged ??
-      (bound?.physicsParityMode ?? bound?.parity ?? false) ? true : false;
-
-    const mode = (bound?.mode ?? bound?.currentMode) || undefined;
-
-    return thetaCanonical({
-      gammaGeo: g,
-      qSpoilingFactor: q,
-      gammaVanDenBroeck_mass: vM,
-      dutyLocal,
-      sectorsConcurrent: sC,
-      sectorsTotal: sT,
-      viewAveraged,
-      mode,
-    });
-  } catch (e) {
-    console.warn("[WRI] thetaGainExpected error:", e);
-    return NaN;
-  }
+function thetaGainExpected(b: ThetaBound, dutyEff = 0, viewAvg = true) {
+  const g3 = Math.pow(Math.max(1, b.gammaGeo), 3);
+  const q  = Math.max(1e-12, b.qSpoilingFactor);
+  const v  = Math.max(1, b.gammaVdB);
+  const fr = viewAvg ? Math.sqrt(Math.max(1e-12, dutyEff)) : 1;
+  return g3 * q * v * fr;
 }
 
 // [deleted duplicate paneSanitize]
@@ -1403,25 +1371,9 @@ export default function WarpRenderInspector(props: {
         }
       });
 
-      // After creating both engines and building `shared` once:
-      (async () => {
-        await firstCorrectFrame({
-          engine: leftEngine.current,
-          canvas: leftRef.current!,
-          sharedAxesScene: shared.axesScene,
-          pane: 'REAL'
-        });
-        await firstCorrectFrame({
-          engine: rightEngine.current,
-          canvas: rightRef.current!,
-          sharedAxesScene: shared.axesScene,
-          pane: 'SHOW'
-        });
-
-        // Enable low-FPS mode for mobile after first correct frame
-        enableLowFps(leftEngine.current, 12);
-        enableLowFps(rightEngine.current, 12);
-      })();
+      // Enable low-FPS mode for mobile after first correct frame
+      enableLowFps(leftEngine.current, 12);
+      enableLowFps(rightEngine.current, 12);
 
       // Setup engine checkpoints after first frame is guaranteed correct
       setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
@@ -1634,13 +1586,27 @@ export default function WarpRenderInspector(props: {
 
 
 
-  // Physics bound for theta calculations
-    const bound = useMemo(() => ({
-      gammaGeo: realPayload.gammaGeo || 26,
-      qSpoilingFactor: realPayload.qSpoilingFactor || 1,
-      gammaVdB: realPayload.gammaVanDenBroeck_mass || realPayload.gammaVanDenBroeck || 1,
-      dutyEffectiveFR: realPayload.dutyEffectiveFR || 0.000025
-    }), [realPayload]);
+  // Physics bound for theta calculations (single source of truth)
+  type ThetaBound = {
+    gammaGeo: number;
+    qSpoilingFactor: number;
+    gammaVdB: number;
+  };
+
+  const thetaBound = useMemo<ThetaBound>(() => ({
+    gammaGeo: Number(realPayload?.gammaGeo ?? 26),
+    qSpoilingFactor: Number(realPayload?.qSpoilingFactor ?? 1),
+    gammaVdB: Number(
+      realPayload?.gammaVanDenBroeck_mass ??
+      realPayload?.gammaVanDenBroeck ??
+      1
+    ),
+  }), [
+    realPayload?.gammaGeo,
+    realPayload?.qSpoilingFactor,
+    realPayload?.gammaVanDenBroeck_mass,
+    realPayload?.gammaVanDenBroeck,
+  ]);
 
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
@@ -1823,15 +1789,6 @@ export default function WarpRenderInspector(props: {
   const viewMassFracSHOW = viewMassFractionLocked(uRight, 'SHOW');
 
 
-  // Physics bound for theta calculations
-  const bound = useMemo(() => ({
-    gammaGeo: realPayload.gammaGeo || 26,
-    qSpoilingFactor: realPayload.qSpoilingFactor || 1,
-    gammaVdB: realPayload.gammaVanDenBroeck_mass || realPayload.gammaVanDenBroeck || 1,
-    dutyEffectiveFR: realPayload.dutyEffectiveFR || 0.000025
-  }), [realPayload]);
-
-
   // UI events - use global mode switching instead of local state
   const onMode = (m: 'hover'|'cruise'|'emergency'|'standby') => {
     startTransition(() => {
@@ -1872,7 +1829,7 @@ export default function WarpRenderInspector(props: {
           const report = webglSupport(undefined);
           return (
             <pre className="text-xs p-2 rounded bg-black/70 text-green-200 overflow-auto">
-              GL Debug: {JSON.stringify(report, null, 2)}
+              GL Debug: {JSON.JSON.stringify(report, null, 2)}
             </pre>
           );
         } catch { return null; }
@@ -2024,7 +1981,7 @@ export default function WarpRenderInspector(props: {
           {/* θ-scale verification display */}
           <div className="text-xs text-neutral-600 mb-3 space-y-1">
             <div>θ-scale expected: {(live?.thetaScaleExpected ?? 0).toExponential(2)}</div>
-            <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
+            <div>θ-scale (physics-only): {(thetaBound?.gammaGeo ? thetaGainExpected(thetaBound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">
               γ_VdB bound: {(useMassGamma ? 1e2 : 1e11).toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}
