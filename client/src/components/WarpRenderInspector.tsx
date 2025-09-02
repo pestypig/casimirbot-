@@ -564,8 +564,8 @@ function PaneOverlay(props:{
                         : (Number.isFinite(+UL.thetaUniform) ? +UL.thetaUniform : undefined);
   // Shader actually branches on useMetric/metricOn; reflect that in the label
   const metricActive  = (UL.useMetric === true) || (+UL.metricOn > 0.5) || metricModeUL;
-  const viewFwd       = Array.isArray(UL.viewForward) ? UL.viewForward : undefined;
-  const g0i           = Array.isArray(UL.g0i) ? UL.g0i : undefined;
+  const viewFwd       = Array.isArray(UL.viewForward) ? UL.viewForward : (Array.isArray(s.viewForward) ? s.viewForward : undefined);
+  const g0iUL         = Array.isArray(UL.g0i) ? UL.g0i : (Array.isArray(s.g0i) ? s.g0i : undefined);
 
   return (
     <div className="inspector">
@@ -573,7 +573,7 @@ function PaneOverlay(props:{
       <div>θ (pipeline): {Number.isFinite(thetaPipe) ? thetaPipe.toExponential(3) : (Number.isFinite(thetaPipeUL) ? thetaPipeUL.toExponential(3) : '—')}</div>
       <div>θ̂ (metric): {Number.isFinite(thetaMetric) ? thetaMetric.toExponential(3) : (Number.isFinite(thetaMetricUL) ? thetaMetricUL.toExponential(3) : '—')}</div>
       <div>metric: {metricActive ? 'ON' : 'off'}</div>
-      <div>view fwd: {viewFwd ? `[${viewFwd.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}  g₀ᵢ: {g0i ? `[${g0i.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
+      <div>view fwd: {viewFwd ? `[${viewFwd.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}  g₀ᵢ: {g0iUL ? `[${g0iUL.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
       <div>ẑ (N,β proxy): {Number.isFinite(zProxy)? zProxy.toExponential(2) : '—'}</div>
       <div>N: {Number.isFinite(lapseN) ? lapseN.toFixed(4) : '—'} β: {shiftBeta ? `[${shiftBeta.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
       <div>g_diag: {gDiag ? `[${gDiag.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
