@@ -1,0 +1,72 @@
+diff --git a/src/lib/warp-engine.js b/src/lib/warp-engine.js
+--- a/src/lib/warp-engine.js
++++ b/src/lib/warp-engine.js
+@@ -1,6 +1,34 @@
+ // WarpEngine (WebGL runtime)
+ // ------------------------------------------------------------
+ 
++// Maintain one engine per <canvas>
++// NOTE: Keep this at top-level so it exists before class is used anywhere.
++const __ENGINE_INSTANCES = new WeakMap();
++
+ class WarpEngine {
+-  constructor(canvas) {
++  /**
++   * Create a (or return the existing) WarpEngine bound to the given canvas.
++   * @param {HTMLCanvasElement} canvas
++   */
++  static getOrCreate(canvas) {
++    if (!canvas) throw new Error("WarpEngine.getOrCreate: canvas is required");
++    let eng = __ENGINE_INSTANCES.get(canvas);
++    if (!eng) {
++      eng = new WarpEngine(canvas);
++      __ENGINE_INSTANCES.set(canvas, eng);
++    }
++    return eng;
++  }
++
++  constructor(canvas) {
+     this.canvas = canvas;
+     this.gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+     if (!this.gl) throw new Error("WarpEngine: WebGL not available");
+@@ -9,6 +37,26 @@ class WarpEngine {
+     this.uniforms = {};
+     // ... existing init code (programs, buffers, etc) ...
+   }
++
++  // Optional helpers used by UI; no-ops if you didn’t have them before
++  setDebugTag(tag) {
++    this.__debugTag = String(tag || "");
++  }
++  requestRewarp() {
++    // trigger an immediate draw without waiting for rAF
++    try { this._render && this._render(); } catch (_) {}
++  }
++  destroy() {
++    try {
++      // free GL resources if you track them
++      this.canvas = null;
++      this.gl = null;
++    } finally {
++      // allow GC by removing from instance map
++      for (const [key, val] of __ENGINE_INSTANCES) if (val === this) __ENGINE_INSTANCES.delete(key);
++    }
++  }
+ }
+ 
+ // ... rest of WarpEngine implementation ...
+@@ -120,3 +168,13 @@ class WarpEngine {
+   }
+ }
+ 
++// Safe global exposure for code paths that expect window.WarpEngine
++// (e.g., WarpEngineContainer uses window.WarpEngine.getOrCreate)
++try {
++  if (typeof window !== "undefined") {
++    // Prefer our class; if a prior global exists but lacks getOrCreate, augment it.
++    const w = window;
++    w.WarpEngine = (w.WarpEngine && typeof w.WarpEngine.getOrCreate === "function") ? w.WarpEngine : WarpEngine;
++  }
++} catch {}
++
++export default WarpEngine;
