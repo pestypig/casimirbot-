@@ -1,0 +1,48 @@
+diff --git a/WarpRenderInspector.tsx b/WarpRenderInspector.tsx
+index 4a5f1f2..a2c3c7d 100644
+--- a/WarpRenderInspector.tsx
++++ b/WarpRenderInspector.tsx
+@@ -28,16 +28,33 @@ export function WarpRenderInspector(props: InspectorProps) {
+   const U = engine?.uniforms || {};
+ 
+   // --- Interior gravity (tilt) controls --------------------------------------
+-  // epsilonTilt clamp was extremely small; make it visible but still "gentle"
+-  const setEpsilonTilt = (v:number) => {
+-    const vv = Number.isFinite(v) ? Math.max(0, Math.min(5e-7, v)) : 0;
+-    engine?.updateUniforms({ epsilonTilt: vv });
+-  };
++  // epsilonTilt clamp: visible in HOVER while remaining gentle
++  const setEpsilonTilt = (v:number) => {
++    const vv = Number.isFinite(v) ? Math.max(0, Math.min(5e-5, v)) : 0;
++    engine?.updateUniforms({ epsilonTilt: vv });
++  };
+ 
+-  // derive epsilon from target g and geometry radius (c^2 scale); keep old ceiling
++  // derive epsilon from target g and geometry radius (c^2 scale); use same new ceiling
+   const setEpsilonFromG = (gTarget:number) => {
+     const R = +(U.axesHull?.[0] || 1); // use long axis as characteristic radius
+-    const eps = Math.min(5e-7, Math.max(0, (gTarget * R) / (299792458 * 299792458)));
++    const eps = Math.min(5e-5, Math.max(0, (gTarget * R) / (299792458 * 299792458)));
+     setEpsilonTilt(eps);
+   };
+ 
++  // Always normalize beta before sending (keeps CPU & shader paths consistent)
++  const setBetaTilt = (vx:number, vy:number, vz:number) => {
++    const m = Math.hypot(vx, vy, vz) || 1;
++    engine?.updateUniforms({ betaTiltVec: [vx / m, vy / m, vz / m] });
++  };
++
++  // Compute θ (phys) for audit using FR duty and q alias union
++  const thetaAudit = (() => {
++    const gammaGeo = +(U.gammaGeo ?? 1);
++    const q        = +(U.deltaAOverA ?? U.qSpoilingFactor ?? 1);
++    const gvdB     = +(U.gammaVanDenBroeck ?? 1);
++    const S_total  = Math.max(1, +(U.sectorCount ?? 1));
++    const S_live   = Math.max(1, +(U.sectorStrobing ?? 1));
++    const d_eff    = +(U.dutyEffectiveFR ?? ((+(U.dutyLocal ?? 0)) * (S_live / S_total))) || 0;
++    return Math.pow(gammaGeo, 3) * q * gvdB * Math.sqrt(Math.max(1e-12, d_eff));
++  })();
++
+   // ... UI markup that calls setEpsilonTilt / setEpsilonFromG / setBetaTilt and shows thetaAudit ...
+ 
+   return (
