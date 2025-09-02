@@ -1138,7 +1138,7 @@ export default function WarpBubbleCompare({
   // Mode change effect: use pipeline state for operational mode changes
   useEffect(() => {
     const mode = String(pipelineState?.currentMode || parameters?.currentMode || '');
-    const token = parameters?.reloadToken || pipelineState?.seq;
+    const token = parameters?.reloadToken || pipelineState?.dutyEffectiveFR || pipelineState?.currentMode;
     if (!mode) return;
     if (lastModeRef.current === mode && lastTokenRef.current === token) return; // no-op if same
     lastModeRef.current = mode;
@@ -1152,7 +1152,7 @@ export default function WarpBubbleCompare({
         finally { reinitInFlight.current = null; }
       })();
     }
-  }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.seq]);
+  }, [pipelineState?.currentMode, parameters?.currentMode, parameters?.reloadToken, pipelineState?.dutyEffectiveFR]);
 
   // (removed duplicate early mount effect)
 
