@@ -557,22 +557,24 @@ function PaneOverlay(props:{
   const shiftBeta     = Array.isArray(UL.shiftBeta) ? UL.shiftBeta : undefined;
   const gDiag         = Array.isArray(UL.gSpatialDiag) ? UL.gSpatialDiag : undefined;
   const gSym          = Array.isArray(UL.gSpatialSym) && UL.gSpatialSym.length>=6 ? UL.gSpatialSym : undefined; // [gxx,gyy,gzz,gxy,gyz,gzx]
-  // NOTE: avoid name collision with snapshot-level `thetaMetric` above
+  // Uniform-side diagnostics (avoid name collision with snapshot-level vars)
   const thetaMetricUL = Number.isFinite(+UL.thetaScale_metric) ? +UL.thetaScale_metric : undefined;
   const zProxy        = Number.isFinite(+UL.redshiftProxy) ? +UL.redshiftProxy : undefined;
-  // Keep a UL-side pipeline theta if you need to compare engine uniforms directly:
   const thetaPipeUL   = Number.isFinite(+UL.thetaScale) ? +UL.thetaScale
                         : (Number.isFinite(+UL.thetaUniform) ? +UL.thetaUniform : undefined);
+  // Shader actually branches on useMetric/metricOn; reflect that in the label
+  const metricMode    = (UL.useMetric === true) || (+UL.metricOn > 0.5);
+  const viewFwd       = Array.isArray(UL.viewForward) ? UL.viewForward : undefined;
+  const g0i           = Array.isArray(UL.g0i) ? UL.g0i : undefined;
 
   return (
     <div className="inspector">
       <div>Wall (REAL): {Number.isFinite(wL_m) ? wL_m.toFixed(3) : '—'} m</div>
-      <div>θ (pipeline): {Number.isFinite(thetaPipe) ? thetaPipe.toExponential(3) : '—'}</div>
-      <div>θ̂ (metric): {Number.isFinite(thetaMetric) ? thetaMetric.toExponential(3) : '—'}</div>
-      <div>θ ratio |θ̂−θ|/|θ|: {Number.isFinite(thetaInconsistency) ? thetaInconsistency.toFixed(3) : '—'} {tensorMismatch ? <span style={{color:'#e66'}}>⚠ tensor mismatch</span> : null}</div>
-      <div>view fwd: {vf ? `[${vf.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}  g₀ᵢ: {g0i ? `[${g0i.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
-      <div>ẑ (N,β proxy): {Number.isFinite(zProxy)? zProxy.toExponential(2) : '—'}</div>
+      <div>θ (pipeline): {Number.isFinite(thetaPipe) ? thetaPipe.toExponential(3) : (Number.isFinite(thetaPipeUL) ? thetaPipeUL.toExponential(3) : '—')}</div>
+      <div>θ̂ (metric): {Number.isFinite(thetaMetric) ? thetaMetric.toExponential(3) : (Number.isFinite(thetaMetricUL) ? thetaMetricUL.toExponential(3) : '—')}</div>
       <div>metric: {metricMode ? 'ON' : 'off'}</div>
+      <div>view fwd: {viewFwd ? `[${viewFwd.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}  g₀ᵢ: {g0i ? `[${g0i.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
+      <div>ẑ (N,β proxy): {Number.isFinite(zProxy)? zProxy.toExponential(2) : '—'}</div>
       <div>N: {Number.isFinite(lapseN) ? lapseN.toFixed(4) : '—'} β: {shiftBeta ? `[${shiftBeta.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
       <div>g_diag: {gDiag ? `[${gDiag.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
       <div>g_sym: {gSym ? `[${gSym.map((v:any)=>Number(v).toFixed(3)).join(', ')}]` : '—'}</div>
