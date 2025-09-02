@@ -771,8 +771,8 @@ export function getSystemMetrics(req: Request, res: Response) {
     aEff_geo_m: aEff_geo,
     aEff_harm_m: aEff_harm,
 
-    // ✅ canonical packet the renderer consumes
-    warpUniforms: canonicalWarpUniforms,
+    // ✅ canonical short-key packet the engine consumes
+    warpUniforms: warpUniforms,
     thetaAudit,
 
     // ✅ hint-only values (never applied as uniforms)
