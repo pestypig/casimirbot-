@@ -1130,7 +1130,7 @@ export default function WarpBubbleCompare({
   // Use energy pipeline for mode tracking
   const { data: pipelineState } = useEnergyPipeline();
   const switchMode = useSwitchMode();
-  
+
   // Track mode changes with refs
   const lastModeRef = useRef<string>('');
   const lastTokenRef = useRef<any>(null);
@@ -1174,14 +1174,16 @@ export default function WarpBubbleCompare({
       ...parameters,
       ...pipelineState,
       currentMode: pipelineState?.currentMode || parameters?.currentMode || 'hover',
-      // Ensure we have all physics parameters
-      gammaGeo: pipelineState?.gammaGeo || parameters?.gammaGeo || 26,
-      qSpoilingFactor: pipelineState?.qSpoilingFactor || parameters?.qSpoilingFactor || 1,
-      gammaVanDenBroeck: pipelineState?.gammaVanDenBroeck || parameters?.gammaVanDenBroeck || 38.3,
-      dutyCycle: pipelineState?.dutyCycle || parameters?.dutyCycle || 0.14,
-      dutyEffectiveFR: pipelineState?.dutyEffectiveFR || parameters?.dutyEffectiveFR || 0.000025,
-      sectors: pipelineState?.sectors || parameters?.sectors || 1,
-      sectorCount: pipelineState?.sectorCount || parameters?.sectorCount || 400
+      // Canonical physics (short keys) with fallbacks from long keys
+      gammaGeo: pipelineState?.gammaGeo ?? parameters?.gammaGeo ?? 26,
+      deltaAOverA: pipelineState?.deltaAOverA ?? parameters?.deltaAOverA
+                   ?? pipelineState?.qSpoilingFactor ?? parameters?.qSpoilingFactor ?? 1,
+      gammaVdB: pipelineState?.gammaVdB ?? parameters?.gammaVdB
+                ?? pipelineState?.gammaVanDenBroeck ?? parameters?.gammaVanDenBroeck ?? 1,
+      dutyCycle: pipelineState?.dutyCycle ?? parameters?.dutyCycle ?? 0.14,
+      dutyEffectiveFR: pipelineState?.dutyEffectiveFR ?? parameters?.dutyEffectiveFR ?? 0.000025,
+      sectors: pipelineState?.sectors ?? parameters?.sectors ?? 1,
+      sectorCount: pipelineState?.sectorCount ?? parameters?.sectorCount ?? 400,
     };
 
     console.log('[WarpBubbleCompare] State changed, updating engines:', {
@@ -1190,7 +1192,7 @@ export default function WarpBubbleCompare({
       hasEngines: !!(leftEngine.current && rightEngine.current),
       physics: {
         gammaGeo: mergedState.gammaGeo,
-        qSpoil: mergedState.qSpoilingFactor,
+        qSpoil: mergedState.deltaAOverA,
         dutyFR: mergedState.dutyEffectiveFR
       }
     });
