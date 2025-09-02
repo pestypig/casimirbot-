@@ -1,7 +1,7 @@
 // client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
-import { Home, Activity, Gauge, Brain, Terminal, Atom, Cpu, Send, Settings, HelpCircle } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -507,6 +507,7 @@ import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
+import WarpEngineContainer from "@/components/WarpEngineContainer";
 
 // Mode-specific RF burst fractions now sourced from MODE_CONFIGS
 
@@ -682,7 +683,7 @@ export default function HelixCore() {
       // Adapt to engine's buffer/texture API
       (window as any).WarpEngine?.setGreensPotential?.({ phi, kind, m });
     };
-    
+
     window.addEventListener("helix:greens", handleGreens);
     return () => window.removeEventListener("helix:greens", handleGreens);
   }, []);
@@ -1177,11 +1178,18 @@ export default function HelixCore() {
   }
 
   const baseShared = {
-    hull: {
-      a: Number(hull.a) || 503.5,
-      b: Number(hull.b) || 132.0,
-      c: Number(hull.c) || 86.5,
-    },
+    hull:
+      hullMetrics && hullMetrics.hull
+        ? {
+            a: Number(hullMetrics.hull.a) || Number(hullMetrics.hull.Lx_m / 2) || 503.5,
+            b: Number(hullMetrics.hull.b) || Number(hullMetrics.hull.Ly_m / 2) || 132.0,
+            c: Number(hullMetrics.hull.c) || Number(hullMetrics.hull.Lz_m / 2) || 86.5,
+          }
+        : {
+            a: 503.5,
+            b: 132.0,
+            c: 86.5,
+          },
     wallWidth_m: 6.0,
     driveDir: [1, 0, 0],
     vShip: 0,
@@ -1760,7 +1768,7 @@ export default function HelixCore() {
                               <p className="mb-2">
                                 <strong>FR-avg</strong> uses ship-wide Ford–Roman duty across {totalSectors} sectors;{" "}
                                 <strong>Instant</strong> shows tiles energized in the current live sector window (
-                                {Math.max(1, Math.floor(concurrentSectors))}/{totalSectors}, local ON {localOnLabel}).
+                                {Math.max(1, Math.floor(concurrentSectors))} / {totalSectors}, local ON {localOnLabel}).
                               </p>
                             </TooltipContent>
                           </Tooltip>
@@ -2654,6 +2662,18 @@ export default function HelixCore() {
               fieldEndpoint="/api/helix/displacement"
               modeEndpoint="/api/helix/mode"
               lightCrossing={lc}
+            />
+          </div>
+
+          {/* Warp Engine Visualization */}
+          <div className="bg-card border rounded-lg p-6">
+            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Atom className="w-5 h-5" />
+              Warp Field Visualization
+            </h2>
+            <WarpEngineContainer
+              showComparison={true}
+              metricKappa={undefined} // Set to a number to enable conformal metric
             />
           </div>
         </div>
