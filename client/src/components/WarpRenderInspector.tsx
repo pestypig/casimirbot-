@@ -478,10 +478,16 @@ function PaneOverlay(props:{
       const a = +H[0]||503.5, b = +H[1]||132.0, c = +H[2]||86.5;
       const aH = aHarmonic(a,b,c);
 
-      // prefer explicit meters if present, else convert ρ→m using aH
-      const w_rho = (Number.isFinite(U.wallWidth_rho) ? +U.wallWidth_rho :
-                     Number.isFinite(U.wallWidth)     ? +U.wallWidth : undefined);
-      const w_m = (Number.isFinite(w_rho) && Number.isFinite(aH)) ? (w_rho * aH) : (0.016 * aH);
+      // New: prefer explicit meters; else wallWidth (rho) × a_H; no hidden 0.016 fallback
+      const ax = U.axesHull?.[0] ?? U.axesScene?.[0] ?? a;
+      const ay = U.axesHull?.[1] ?? U.axesScene?.[1] ?? b;
+      const az = U.axesHull?.[2] ?? U.axesScene?.[2] ?? c;
+      const aH_updated = aHarmonic(ax, ay, az);
+      const w_m_explicit = Number.isFinite(U?.hullDimensions?.wallWidth_m) ? +U.hullDimensions.wallWidth_m : undefined;
+      const w_rho = Number.isFinite(U.wallWidth) ? +U.wallWidth
+                   : (Number.isFinite(U.wallWidth_rho) ? +U.wallWidth_rho : undefined);
+      const w_m = Number.isFinite(w_m_explicit) ? w_m_explicit
+                : (Number.isFinite(w_rho) && Number.isFinite(aH_updated) ? (w_rho * aH_updated) : undefined);
 
       const V  = volEllipsoid(a,b,c);
       const S  = areaEllipsoid(a,b,c);
@@ -502,7 +508,7 @@ function PaneOverlay(props:{
       const rearMin   = diag.theta_rear_min_viewed  ?? (Number.isFinite(rearRaw)  ? rearRaw  * Math.sqrt(f) : rearRaw);
 
       setSnap({
-        a,b,c,aH, w_m, V,S, Vshell,
+        a,b,c,aH: aH_updated, w_m, w_rho, V,S, Vshell,
         thetaUniform, thetaPhys, thetaPaper,
         frontMax, rearMin,
         sectors: Math.max(1,(U.sectorCount|0)||1),
@@ -523,7 +529,7 @@ function PaneOverlay(props:{
             {title}
           </span>
           <span className="text-xs text-white/80">
-            wall width: <b>{fmtSI(s.w_m,'m')}</b> {Number.isFinite(widthNm) ? `(${widthNm.toFixed(0)} nm)` : ''}
+            Wall: {s.w_m?.toFixed?.(3) ?? '—'} m  ({(s.w_rho ?? NaN).toFixed?.(3) ?? '—'} ρ)
           </span>
         </div>
 
