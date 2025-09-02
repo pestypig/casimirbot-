@@ -42,28 +42,9 @@ const SCENE_SCALE = window.SCENE_SCALE;
 
 // Math helpers and constants
 const ID3 = new Float32Array([1,0,0, 0,1,0, 0,0,1]);
+const WALL_RHO_DEFAULT = 0.05; // default wall thickness in rho units
 
 // ---- helpers for meters ↔ rho thickness ------------------------------------
-function _aHarmonic(ax, ay, az) {
-  const a = +ax || 0, b = +ay || 0, c = +az || 0;
-  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
-  return d > 0 ? 3 / d : NaN;
-}
-function _guessAH(U) {
-  const H = U.axesHull, S = U.axesScene;
-  if (Array.isArray(H) && H.length>=3) return _aHarmonic(H[0],H[1],H[2]);
-  if (Array.isArray(S) && S.length>=3) return _aHarmonic(S[0],S[1],S[2]);
-  return NaN;
-}
-function _req(cond, name, U) {
-  if (!cond) {
-    const msg = `warp-engine: missing required uniform "${name}"`;
-    U.__error = msg;
-    throw new Error(msg);
-  }
-}
-
-// ---- helpers for meters ↔ rho thickness and validation ----------------------
 function _aHarmonic(ax, ay, az) {
   const a = +ax || 0, b = +ay || 0, c = +az || 0;
   const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
@@ -698,6 +679,11 @@ uniform float u_lapseN;
 uniform vec3  u_shiftBeta;
 uniform float u_redshiftProxy; // Derived diagnostic
 
+// New uniforms for optical scalars and tensor diagnostics
+uniform vec3  u_viewForward;  // Camera forward vector in world space
+uniform vec3  u_g0i;          // Lowered shift vector β_i = g_ij β^j
+uniform float u_metricOn;     // Flag to indicate if metric tensor is active
+
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -850,13 +836,7 @@ void main() {
   // NOTE: kScreen is correctly declared and computed above. curvVis is also computed.
   // No redeclaration needed here.
 #endif
-  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0); // Use computed values
-  float kval = shearProxy;
-  if (ridgeI > 0) {
-    // when ridge overlay is on, blend in curvature to the shear proxy
-    kval = clamp(mix(kval, kval + curvVis, 0.5), 0.0, 1.0);
-  }
-
+  // Use computed values directly
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
   float valTheta  = thetaWithPurple * amp;
@@ -897,8 +877,7 @@ void main() {
 #else
     vec3 dbg = vec3(0.0);
 #endif
-    SET_FRAG(vec4(dbg, 1.0));
-    return;
+    SET_FRAG(vec4(dbg, 1.0)); return;
   }
 
   // Debug modes (4+)
@@ -1016,6 +995,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             metricInv: gl.getUniformLocation(program, 'u_metricInv'),
             useMetric: gl.getUniformLocation(program, 'u_useMetric'),
             metricOn: gl.getUniformLocation(program, 'u_metricOn'),
+
+            // New tensor uniforms
+            viewForward: gl.getUniformLocation(program, 'u_viewForward'), // Camera forward vector
+            g0i:         gl.getUniformLocation(program, 'u_g0i'),         // Lowered shift vector β_i
         };
 
         // (Optional) quick sanity log once
@@ -1457,8 +1440,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         // In strict mode: no span/userGain seasoning
         if (this.strictPhysics) {
-          U.userGain = 1.0;
-          U.displayGain = 1.0;
+            U.userGain = 1.0;
+            U.displayGain = 1.0;
         }
 
         // --- Parse other parameters (mostly visual/cosmetic) --------------------
@@ -1533,7 +1516,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         }
         dutyEffFR = Math.max(1e-12, Math.min(1.0, dutyEffFR ?? 0.01)); // Default to 1% if all else fails
 
-        const gammaGeo = N(P.gammaGeo ?? P.g_y, U.gammaGeo ?? 26);
+        const gammaGeo = N(P.gammaGeo, U.gammaGeo ?? 26);
         const deltaAOverA = N(P.deltaAOverA ?? P.qSpoilingFactor, U.deltaAOverA ?? 1.0);
         const gammaVdB = N(P.gammaVanDenBroeck, U.gammaVanDenBroeck ?? 2.86e5);
 
@@ -2054,6 +2037,13 @@ _renderGridPoints() {
         gl.uniform1f(this.gridUniforms.metricOn, metricOn);
     }
 
+    // --- New tensor uniforms ---
+    if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
+      gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
+    }
+    if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
+      gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
+    }
 
     const vertexCount = (this.gridVertices?.length || 0) / 3;
     if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
