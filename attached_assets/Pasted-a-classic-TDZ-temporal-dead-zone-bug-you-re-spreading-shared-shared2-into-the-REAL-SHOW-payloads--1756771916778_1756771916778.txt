@@ -1,0 +1,66 @@
+a classic TDZ (temporal dead zone) bug: you’re spreading shared/shared2 into the REAL/SHOW payloads before that object exists in the scope.
+
+Here’s a surgical fix you can paste into client/src/components/WarpRenderInspector.tsx that:
+
+Defines a single sharedBase before it’s used.
+
+Stops referring to any shared2/shared names later on.
+
+Keeps the wiring through buildRealPacket/buildShowPacket.
+
+1) Make sure the helpers are imported once (top of file)
+// keep only one import of each — delete duplicates if present
+import { buildRealPacket, buildShowPacket } from "@/lib/warp-uniforms";
+
+2) Add a tiny helper (near your other small helpers)
+function makeSharedBase(parameters: any, live: any, baseShared: any = {}) {
+  const sectorCount = Math.max(1, Number(parameters?.sectorCount ?? live?.sectorCount ?? 400));
+  const sectors     = Math.max(1, Number(parameters?.sectors ?? live?.sectors ?? 1));
+  const dutyCycle   = Number(parameters?.dutyCycle ?? live?.dutyCycle ?? 0.01);
+  const dutyEffectiveFR = dutyCycle * (sectors / sectorCount);
+
+  return {
+    ...baseShared,
+    // authoritative, engine-friendly fields:
+    sectorCount,
+    sectors,
+    dutyCycle,
+    dutyEffectiveFR,
+    currentMode: live?.currentMode ?? parameters?.currentMode ?? "hover",
+
+    // aliases the engine expects (present if you have them):
+    axesScene: parameters?.axesScene ?? live?.axesScene,
+    hullAxes:  parameters?.hullAxes  ?? live?.hullAxes,
+
+    // θ chain raw inputs (prefer explicit names, then UI aliases):
+    gammaGeo:       parameters?.gammaGeo       ?? parameters?.g_y ?? live?.gammaGeo,
+    deltaAOverA:    parameters?.deltaAOverA    ?? parameters?.qSpoilingFactor ?? live?.deltaAOverA,
+    gammaVanDenBroeck_mass:
+                    parameters?.gammaVanDenBroeck_mass ??
+                    parameters?.gammaVanDenBroeck      ??
+                    live?.gammaVanDenBroeck_mass       ??
+                    live?.gammaVanDenBroeck,
+  };
+}
+
+3) In the effect where you bootstrap/push uniforms to the engines
+
+Find the block that currently looks like this (your crash line ~1368):
+
+// ❌ this was referencing shared/shared2 before they existed
+const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
+const showPayload = buildShowPacket(parameters, { ...shared, colorMode: 1 });
+
+
+Replace that whole chunk with:
+
+// Build a single, pane-agnostic base first (NO TDZ)
+const sharedBase = makeSharedBase(parameters, live, props.baseShared);
+
+// Pane-specific payloads (buildX sets parity/ridge/viewAvg correctly)
+const realPayload = buildRealPacket(sharedBase, { colorMode: 2 }); // ridge=0 in REAL
+const showPayload = buildShowPacket(sharedBase, { colorMode: 1 }); // ridge=1 in SHOW
+
+// Push to engines (left=REAL, right=SHOW)
+leftEngine?.updateUniforms(realPayload);
+rightEngine?.updateUniforms(showPayload);
