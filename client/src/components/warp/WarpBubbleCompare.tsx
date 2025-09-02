@@ -1158,201 +1158,52 @@ export default function WarpBubbleCompare({
     }
   }, []); // mount only
 
-  // Use props.parameters directly instead of re-deriving from stale snapshots
+  // In strict 1:1 mode the adapter is the single source of truth.
+  // The compare panel becomes read-only (cosmetics only).
   useEffect(() => {
     if (!leftEngine.current || !rightEngine.current || !parameters) return;
 
-    // build both payloads from the SAME source of truth
-    const wu = normalizeWU(parameters?.warpUniforms || (parameters as any));
-    let real = buildREAL(wu);
-    let show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
-
-    // Validate and clamp physics parameters
-    real = validatePhysicsParams(real, 'REAL');
-    show = validatePhysicsParams(show, 'SHOW');
-
-    // Build shared geometry data
+    // Only apply visual cosmetics - physics uniforms are handled by the adapter
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
-
-    // --- ⟵ REAL: draw to physical scale --- //
-    const a = Number(parameters?.hull?.a) ?? 503.5;
-    const b = Number(parameters?.hull?.b) ?? 132.0;
-    const c = Number(parameters?.hull?.c) ?? 86.5;
-    // effective radius: harmonic mean maps meters → ρ-units (match engine)
-    const aH = aHarmonic(a, b, c);
-    // convert meters to ρ (shader's wall pulse uses ρ)
-    const wallWidth_m = Number(parameters?.wallWidth_m ?? 6.0);
-    const wallWidth_rho = (() => {
-      if (!Number.isFinite(aH)) return undefined;
-      return Math.max(1e-6, wallWidth_m / aH);
-    })();
-    // compact camera exactly to hull scale
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene || [1,1,1]));
-    // make the grid span just outside the hull so the ridge is readable
-    const gridSpanReal = Math.max(2.2, Math.max(...(shared.axesScene || [1,1,1])) * 1.10);
-    // -------------------------------------- //
 
-    // Compute a_H and a consistent wall width in rho + meters
-    const axes = parameters.axesHull || parameters.axesScene || [a, b, c];
-    const aH_local = aHarmonic(axes[0], axes[1], axes[2]);
-    const w_m = Number.isFinite(parameters?.wallWidth_m) ? +parameters.wallWidth_m : 6; // keep prior UI default
-    const w_rho = Number.isFinite(aH_local) ? (w_m / aH_local) : undefined;
-
-    // Build physics payload for REAL engine (no enforced parity)
-    const realPhysicsPayload = paneSanitize('REAL', {
+    // REAL: minimal cosmetic-only updates
+    pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
       ...shared,
-      gridSpan: gridSpanReal,            // tight framing around hull
-      ...real,
-      currentMode: parameters.currentMode,
-      vShip: 0,                          // never "fly" in REAL
-      // strictly physical: no boosts, no gains, wall to ρ-units
-      userGain: Math.max(0.1, Math.min(10, parityExaggeration || 1)), // clamp exaggeration
-      displayGain: 1,
-      curvatureGainT: 0,
-      curvatureBoostMax: 1,
-      wallWidth: w_rho,                  // shader-facing rho width
-      hullDimensions: { wallWidth_m: w_m }, // helper for inspector overlays
-      gammaVdB: Math.max(1, Math.min(1000, real.gammaVanDenBroeck ?? real.gammaVdB ?? 1)), // clamp γ_VdB
-      deltaAOverA: Math.max(0.01, Math.min(10, real.qSpoilingFactor ?? 1)), // clamp q-spoiling
-      dutyEffectiveFR: Math.max(1e-6, Math.min(1, real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025)),
-      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
-      colorMode: 2,                      // shear proxy is a clear "truth" view
-      cameraZ: camZ,                     // ⟵ key: to-scale camera
-      // Force parity mode explicitly (direct assignment, not via paneSanitize)
-      physicsParityMode: true,
-      parityMode: true,
-      ridgeMode: 0,
-      // θ: prefer pipeline (verbatim), else fallback to previous compute
-      thetaScale: (Number.isFinite(Number((parameters as any)?.thetaScale)))
-        ? Number((parameters as any).thetaScale)
-        : computeThetaScale({
-            gammaGeo: real.gammaGeo,
-            qSpoilingFactor: real.qSpoilingFactor,
-            gammaVanDenBroeck: real.gammaVanDenBroeck,
-            gammaVanDenBroeck_mass: real.gammaVanDenBroeck_mass,
-            dutyEffectiveFR: real.dutyEffectiveFR
-          }, { mode: 'mass', vdbMax: 100, vdbDefault: 38.3 }),
-    });
-
-    // REAL (parity / Ford–Roman)
-    pushLeft.current(paneSanitize('REAL', sanitizeUniforms(realPhysicsPayload)), 'REAL');
-
-    // SHOW (UI) with heroExaggeration applied
-    const showTheta = parameters.currentMode === 'standby'
-      ? 0
-      : Math.max(1e-6, show.thetaScale || 0);
-
-    const showPhysicsPayload = paneSanitize('SHOW', {
-      ...shared,
-      ...show,
-      currentMode: parameters.currentMode,
-      vShip: parameters.currentMode === 'standby' ? 0 : 1,
-      gammaVdB: Math.max(1, Math.min(1000, show.gammaVanDenBroeck ?? show.gammaVdB ?? 1)), // clamp γ_VdB
-      deltaAOverA: Math.max(0.01, Math.min(10, show.qSpoilingFactor ?? 1)), // clamp q-spoiling
-      sectors: Math.max(1, Math.min(1000, parameters.sectors || 400)),
-      // SHOW camera can share the same camZ for easy side-by-side comparison
       cameraZ: camZ,
-      // Apply heroExaggeration to visual amplification (normalized heroBoost)
-      curvatureGainT: Math.max(0, Math.min(1, 0.70)), // clamp gain T
-      curvatureBoostMax: Math.max(1, Math.min(1000, heroBoost)), // clamp boost max
-      userGain: Math.max(1, Math.min(100, 4)), // clamp user gain
-      displayGain: 1,
-      // Force non-parity mode explicitly (direct assignment, not via paneSanitize)
-      physicsParityMode: false,
-      parityMode: false,
-      ridgeMode: 1,
-      // Use consistent wall width handling
-      wallWidth: w_rho,
-      hullDimensions: { wallWidth_m: w_m },
-      // θ: prefer pipeline (verbatim), else handle standby/compute fallback
-      thetaScale: (Number.isFinite(Number((parameters as any)?.thetaScale)))
-        ? Number((parameters as any).thetaScale)
-        : (parameters.currentMode === 'standby' ? 0 : computeThetaScale({
-            gammaGeo: show.gammaGeo,
-            qSpoilingFactor: show.qSpoilingFactor,
-            gammaVanDenBroeck: show.gammaVanDenBroeck,
-            gammaVanDenBroeck_vis: show.gammaVanDenBroeck_vis,
-            dutyEffectiveFR: show.dutyEffectiveFR
-          }, { mode: 'vis', vdbMax: 100, vdbDefault: 38.3 })),
-    });
+      exposure: 4.2,
+      zeroStop: 1e-6,
+      colorMode: 2, // shear for truth view
+      lockFraming: true,
+    })), 'REAL/cosmetic');
 
-    console.log('Applying physics to engines:', {
-      real: {
-        parity: realPhysicsPayload.physicsParityMode,
-        ridge: realPhysicsPayload.ridgeMode,
-        theta: realPhysicsPayload.thetaScale,
-        gammaVdB: realPhysicsPayload.gammaVdB,
-        qSpoil: realPhysicsPayload.deltaAOverA
-      },
-      show: {
-        parity: showPhysicsPayload.physicsParityMode,
-        ridge: showPhysicsPayload.ridgeMode,
-        theta: showPhysicsPayload.thetaScale,
-        gammaVdB: showPhysicsPayload.gammaVdB,
-        qSpoil: showPhysicsPayload.deltaAOverA
-      }
-    });
+    // SHOW: minimal cosmetic-only updates with hero boost
+    pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
+      ...shared,
+      cameraZ: camZ,
+      exposure: 7.5,
+      zeroStop: 1e-7,
+      colorMode: 1, // theta for visual appeal
+      lockFraming: true,
+      curvatureGainT: 0.70,
+      curvatureBoostMax: Math.max(1, heroBoost),
+      userGain: 4,
+    })), 'SHOW/cosmetic');
 
-    pushRight.current(paneSanitize('SHOW', sanitizeUniforms(showPhysicsPayload)), 'SHOW');
-
-    // Apply safe display gain for SHOW pane - purely visual, doesn't affect physics
+    // Apply display gain for SHOW pane - purely visual
     const displayGain = Math.max(1, 1 + 0.5 * Math.log10(Math.max(1, heroBoost)));
-    console.log(`[SHOW] 🎯 Final displayGain calculation:`, {
-      heroBoost,
-      logCalc: Math.log10(Math.max(1, heroBoost)),
-      finalGain: displayGain,
-      appliedToEngine: !!rightEngine.current.setDisplayGain
-    });
     rightEngine.current.setDisplayGain?.(displayGain);
 
-    // Redundant parity verification removed - batched writer ensures correctness
+    // Force redraws to show visual changes
+    leftEngine.current.requestRewarp?.();
+    rightEngine.current.requestRewarp?.();
 
-    // Force a draw so the user sees the change immediately
-    leftEngine.current.forceRedraw?.();
-    rightEngine.current.forceRedraw?.();
-
-    // optional: quick console check
-    if (DEBUG) console.log('[WBC] uniforms applied', {
-      real_thetaScale: real.thetaScale,
-      show_thetaScale: show.thetaScale,
-      sectors: real.sectors, sectorCount: real.sectorCount,
-      dutyFR: parameters.dutyEffectiveFR,
-      dutyUI: parameters.dutyCycle,
-      heroExaggeration,
+    console.log('[WarpBubbleCompare] Cosmetic-only update applied', {
       heroBoost,
-      parityExaggeration
+      displayGain,
+      colorMode
     });
-
-    // Also push FR-window/light-crossing controls if present
-    if (parameters.lightCrossing) {
-      const lc = parameters.lightCrossing;
-      const s = Math.max(1, Number(parameters.sectorStrobing ?? lc.sectorCount ?? parameters.sectors ?? 1));
-      const lcPayload = {
-        phase: lc.phase,
-        onWindow: !!lc.onWindowDisplay,
-        split: Math.max(0, (lc.sectorIdx ?? 0) % s),
-        tauLC_ms: lc.tauLC_ms,
-        dwell_ms: lc.dwell_ms,
-        burst_ms: lc.burst_ms,
-        sectors: s
-      };
-      pushLeft.current(paneSanitize('REAL', sanitizeUniforms(lcPayload)), 'REAL');
-      pushRight.current(paneSanitize('SHOW', sanitizeUniforms(lcPayload)), 'SHOW');
-    }
-
-    // REAL: cosmetics only (don't touch wallWidth/cameraZ/amp); no ridge lock
-    pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
-      exposure: real.exposure,
-      zeroStop: real.zeroStop,
-      colorMode: 2
-    })), 'REAL');
-
-    // SHOW: can have live camera and display adjustments
-    if (leftRef.current && rightRef.current) {
-      const fixedCamZ = 1.8; // Fixed camera for SHOW only
-      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ cameraZ: fixedCamZ, lockFraming: true })), 'SHOW');
-    }
-  }, [parameters, colorMode, lockFraming, heroBoost]);
+  }, [parameters, colorMode, heroBoost]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {
