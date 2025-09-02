@@ -59,17 +59,10 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
   const w_rho = Math.max(1e-6, w_m / aEff);
 
   // --- Sectoring: use *total* wedges for York & geometry, never "concurrent" ---
-  const sectorsTotal =
-    Math.max(
-      1,
-      Math.floor(
-        num(s.sectorCount) ??
-          num(s.sectorStrobing) ?? // server field name
-          400
-      )
-    );
-
-  const split = Math.floor(sectorsTotal / 2); // canonical (+/–) split
+  const S_total = Math.max(1, Math.floor(num(s.sectorCount) ?? 400));
+  const S_live  = Math.max(1, Math.floor(num(s.sectorStrobing) ?? 1));
+  const sectorsTotal = S_total;                  // for renderer geometry
+  const split = Math.floor(S_total / 2); // canonical (+/–) split
 
   // --- Ship-wide effective duty (exactly HELIX's d_eff) ---
   // Priority: precomputed FR → explicit ship duty → derive from UI dutyCycle & strobing
@@ -78,9 +71,9 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
     num(s.dutyShip) ??
     (() => {
       const d_ui = clamp(s.dutyCycle ?? 0.14, 0, 1);
-      const strobe = Math.max(1, num(s.sectorStrobing) ?? sectorsTotal);
-      // FR duty is ship-wide time-average per total sectors (do NOT include q here)
-      return clamp(d_ui / strobe, 0, 1);
+      // FR duty is ship-wide time-average: d_eff = burstLocal × (S_live/S_total)
+      const d_eff = d_ui * (S_live / S_total);
+      return clamp(d_eff, 0, 1);
     })();
 
   d_ship = clamp(d_ship, 0, 1);
@@ -115,8 +108,8 @@ export function driveWarpFromPipeline(engine: any, s: EnergyPipelineState): void
       // Physics/ops - include qSpoilingFactor in physics chain
       currentMode: s.currentMode,
       // Do not set physicsParityMode/ridgeMode here; pass them from the caller (REAL/SHOW)
-      dutyCycle: d_ship,          // ship-wide effective duty
-      dutyEffectiveFR: d_ship,    // FR duty for calculations (explicit)
+      dutyCycle: clamp(s.dutyCycle ?? 0.01, 0, 1), // local burst (semantic)
+      dutyEffectiveFR: d_ship,                    // ship-averaged FR duty
       thetaScale: thetaForEngine, // NEW: explicit θ for renderer (authoritative when present)
       sectorCount: sectorsTotal, // total wedges
       sectors: split, // +/- split for viz that expects half-count
