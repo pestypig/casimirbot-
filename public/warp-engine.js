@@ -1337,16 +1337,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           nextUniforms.vShip = 0;
         }
 
-        // --- Engine must not override UI parity/ridge settings ---
-        // Only log if parity/ridge are missing, but preserve what UI sends
-        if (typeof nextUniforms.physicsParityMode !== 'boolean') {
-          console.warn('[WarpEngine] Missing physicsParityMode from UI, using previous value');
-          nextUniforms.physicsParityMode = prev?.physicsParityMode ?? false;
-        }
-        if (typeof nextUniforms.ridgeMode !== 'number') {
-          console.warn('[WarpEngine] Missing ridgeMode from UI, using previous value');
-          nextUniforms.ridgeMode = prev?.ridgeMode ?? 1;
-        }
+        // --- Operational mode validation and enforcement ---
+        // ⛔️ Do not let the engine change parity/ridge — the pane is the authority.
+        // (Old code that forced REAL/SHOW based on debugTag was here; delete it.)
+        console.log(`[WarpEngine] Pane authority - parity: ${nextUniforms.physicsParityMode}, ridge: ${nextUniforms.ridgeMode}`);
 
         // --- decide if the CPU warp needs recompute ---
         const geoChanged =

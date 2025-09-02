@@ -18,18 +18,32 @@ import { thetaCanonical } from "@/lib/warp-theta";
 import { getWarpEngineCtor } from "@/types/globals";
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
-// Single-source pane sanitizer. If you have another copy further down, delete it.
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
+// Helper to sanitize uniforms per pane - ensure ALL required fields are set
+function paneSanitize(pane: 'REAL' | 'SHOW', patch: any) {
   const isREAL = pane === 'REAL';
   return {
     ...patch,
     physicsParityMode: isREAL,
-    parityMode: isREAL,
-    uPhysicsParity: isREAL,
     ridgeMode: isREAL ? 0 : 1,
-    uRidgeMode: isREAL ? 0 : 1,
-    viewAvg: isREAL ? true : false, // <- lock
+    viewAvg: isREAL ? true : false,
   };
+}
+
+// Batched update functions to prevent racing
+let rafL = 0, rafR = 0;
+function pushLeft(patch: any) {
+  if (rafL) cancelAnimationFrame(rafL);
+  rafL = requestAnimationFrame(() => {
+    rafL = 0;
+    leftEngine.current?.updateUniforms(paneSanitize('REAL', patch));
+  });
+}
+function pushRight(patch: any) {
+  if (rafR) cancelAnimationFrame(rafR);
+  rafR = requestAnimationFrame(() => {
+    rafR = 0;
+    rightEngine.current?.updateUniforms(paneSanitize('SHOW', patch));
+  });
 }
 
 // --- pane helpers -----------------------------------------------------------
@@ -552,7 +566,7 @@ function PaneOverlay(props:{
 
       // "θ (shader)" should reflect EFFECTIVE amplitude carried into the fragment math
       const thetaEffective = isREALStandby ? 0 : (Number.isFinite(thetaCanonical) ? thetaCanonical * vShip : NaN);
-      
+
       // Presentational clamp: show 0 for REAL + standby regardless of internal calculations
       let thetaShader = Number(U.thetaScale_actual ?? U.thetaScale ?? NaN);
       const isREAL = !!U.physicsParityMode;
@@ -1014,51 +1028,6 @@ export default function WarpRenderInspector(props: {
     return eng;
   }
 
-  // Create engine instance using the global WarpEngine with Grid3D fallback
-  function createEngine(canvas: HTMLCanvasElement): any {
-    try {
-      const WarpEngine = getWarpEngineCtor();
-      return getOrCreateEngine(WarpEngine, canvas);
-    } catch (error) {
-      console.warn("WarpEngine not found, falling back to Grid3D engine:", error);
-      // Return a Grid3D engine wrapper with WebGL compatibility
-      const grid3DWrapper = {
-        canvas,
-        isLoaded: true,
-        gridProgram: true,
-        gridUniforms: true,
-        gridAttribs: true,
-        gl: { isContextLost: () => false },
-        uniforms: {
-          physicsParityMode: true,
-          parityMode: true,
-          ridgeMode: 0
-        },
-        updateUniforms: (patch: any) => {
-          Object.assign(grid3DWrapper.uniforms, patch);
-        },
-        bootstrap: (payload: any) => {
-          Object.assign(grid3DWrapper.uniforms, payload);
-        },
-        setDebugTag: (tag: string) => {
-          console.log(`[${tag}] Grid3D fallback engine initialized`);
-        },
-        setVisible: (visible: boolean) => {
-          canvas.style.visibility = visible ? 'visible' : 'hidden';
-        },
-        forceRedraw: () => {
-          // Grid3D handles its own rendering
-        },
-        destroy: () => {
-          // Grid3D cleanup handled elsewhere
-        }
-      };
-
-      (canvas as any)[ENGINE_KEY] = grid3DWrapper;
-      return grid3DWrapper;
-    }
-  }
-
   // Minimal parity lock function to prevent duplicate shader rebuilds
   function lockPane(engine: any, pane: 'REAL' | 'SHOW') {
     if (!engine || engine.__locked) return;
@@ -1175,6 +1144,51 @@ export default function WarpRenderInspector(props: {
           checkReady();
         });
       };
+
+      // Create engine instance using the global WarpEngine with Grid3D fallback
+      function createEngine(canvas: HTMLCanvasElement): any {
+        try {
+          const WarpEngine = getWarpEngineCtor();
+          return getOrCreateEngine(WarpEngine, canvas);
+        } catch (error) {
+          console.warn("WarpEngine not found, falling back to Grid3D engine:", error);
+          // Return a Grid3D engine wrapper with WebGL compatibility
+          const grid3DWrapper = {
+            canvas,
+            isLoaded: true,
+            gridProgram: true,
+            gridUniforms: true,
+            gridAttribs: true,
+            gl: { isContextLost: () => false },
+            uniforms: {
+              physicsParityMode: true,
+              parityMode: true,
+              ridgeMode: 0
+            },
+            updateUniforms: (patch: any) => {
+              Object.assign(grid3DWrapper.uniforms, patch);
+            },
+            bootstrap: (payload: any) => {
+              Object.assign(grid3DWrapper.uniforms, payload);
+            },
+            setDebugTag: (tag: string) => {
+              console.log(`[${tag}] Grid3D fallback engine initialized`);
+            },
+            setVisible: (visible: boolean) => {
+              canvas.style.visibility = visible ? 'visible' : 'hidden';
+            },
+            forceRedraw: () => {
+              // Grid3D handles its own rendering
+            },
+            destroy: () => {
+              // Grid3D cleanup handled elsewhere
+            }
+          };
+
+          (canvas as any)[ENGINE_KEY] = grid3DWrapper;
+          return grid3DWrapper;
+        }
+      }
 
       // REAL engine
       if (leftRef.current && !leftEngine.current && mounted) {
@@ -1348,11 +1362,18 @@ export default function WarpRenderInspector(props: {
       }
 
       // Bootstrap both engines once they are ready (engine computes theta)
-      const realPacket = paneSanitize('REAL', sanitizeUniforms(realPayload));
-      const showPacket = paneSanitize('SHOW', sanitizeUniforms(showPayload));
+      const realPayload = buildRealPacket(parameters, { ...shared, colorMode: 2 });
+      const showPayload = buildShowPacket(parameters, {
+        ...shared,
+        exposure: 7.5,
+        colorMode: 1,
+        curvatureGainT: 0.70,
+        curvatureBoostMax: 40,
+        userGain: 1.25,
+      });
 
-      leftEngine.current?.bootstrap?.(realPacket);
-      rightEngine.current?.bootstrap?.(showPacket);
+      leftEngine.current?.bootstrap?.(realPayload);
+      rightEngine.current?.bootstrap?.(showPayload);
 
       // Post-bootstrap theta debugging
       requestAnimationFrame(() => {
@@ -1443,15 +1464,15 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          const leftUpdate = paneSanitize('REAL', {
+          const leftUpdate = paneSanitize('REAL', sanitizeUniforms({
             ...uSafe, ...purple, ...metricU
-          });
+          }));
           applyToEngine(leftEngine.current, leftUpdate);
         }
         if (rightEngine.current) {
-          const rightUpdate = paneSanitize('SHOW', {
+          const rightUpdate = paneSanitize('SHOW', sanitizeUniforms({
             ...uSafe, ...purple, ...metricU
-          });
+          }));
           applyToEngine(rightEngine.current, rightUpdate);
         }
       });
