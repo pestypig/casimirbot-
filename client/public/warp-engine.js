@@ -1662,10 +1662,9 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             return;
         }
 
-        // Copy original vertices
-        this.gridVertices.set(this.originalGridVertices);
-
         // Apply warp field deformation
+        // The _warpGridVertices function now handles the amplitude calculation internally
+        // based on the latest uniforms, so we pass currentParams to it.
         this._warpGridVertices(this.gridVertices, this.currentParams);
 
         // Upload updated vertices to GPU efficiently
@@ -1880,8 +1879,11 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
     }
 
-    // Enhanced diagnostics - check for amplitude overflow
-    maxRadius = 0, maxDisp = 0;
+    // --- Diagnostics logging ---
+    // Max radius check to prevent clipping by frustum
+    let maxRadius = 0;
+    // Max displacement check to prevent visual artifacts/spears
+    let maxDisp = 0;
     for (let i = 0; i < vtx.length; i += 3) {
         const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
         maxRadius = Math.max(maxRadius, r);
@@ -2038,11 +2040,17 @@ _renderGridPoints() {
     }
 
     // --- New tensor uniforms ---
+    // NEW: upload camera forward (world/scene) every frame
     if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
       gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
     }
+    // NEW: upload lowered shift g0i = β_i (ADM)
     if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
       gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
+    }
+    // Keep legacy float toggle in sync if shader still reads it
+    if (this.gridUniforms.metricOn && typeof U.useMetric === 'boolean') {
+      gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
     }
 
     const vertexCount = (this.gridVertices?.length || 0) / 3;
