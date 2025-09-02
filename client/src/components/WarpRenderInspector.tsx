@@ -2,7 +2,7 @@ import React, {useEffect, useMemo, useRef, useState, startTransition} from "reac
 import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
-import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import { normalizeWU, buildRealPacket, buildShowPacket } from "@/lib/warp-uniforms";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 import { subscribe, unsubscribe, publish } from "@/lib/luma-bus";
@@ -271,6 +271,45 @@ function thetaGainExpected(bound: any): number {
 type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+
+// Helper to format numbers for display
+const formatNumber = (num: number | undefined) => {
+  if (num === undefined || num === null || !Number.isFinite(num)) return 'N/A';
+  if (Math.abs(num) < 1e-6) return num.toExponential(2);
+  if (Math.abs(num) > 1e6) return num.toExponential(2);
+  return num.toFixed(3);
+};
+
+// Helper to build shared base uniforms (prevents TDZ bug)
+function makeSharedBase(parameters: any, live: any, baseShared: any = {}) {
+  const sectorCount = Math.max(1, Number(parameters?.sectorCount ?? live?.sectorCount ?? 400));
+  const sectors = Math.max(1, Number(parameters?.sectors ?? live?.sectors ?? 1));
+  const dutyCycle = Number(parameters?.dutyCycle ?? live?.dutyCycle ?? 0.01);
+  const dutyEffectiveFR = dutyCycle * (sectors / sectorCount);
+
+  return {
+    ...baseShared,
+    // authoritative, engine-friendly fields:
+    sectorCount,
+    sectors,
+    dutyCycle,
+    dutyEffectiveFR,
+    currentMode: live?.currentMode ?? parameters?.currentMode ?? "hover",
+
+    // aliases the engine expects (present if you have them):
+    axesScene: parameters?.axesScene ?? live?.axesScene,
+    hullAxes: parameters?.hullAxes ?? live?.hullAxes,
+
+    // θ chain raw inputs (prefer explicit names, then UI aliases):
+    gammaGeo: parameters?.gammaGeo ?? parameters?.g_y ?? live?.gammaGeo,
+    deltaAOverA: parameters?.deltaAOverA ?? parameters?.qSpoilingFactor ?? live?.deltaAOverA,
+    gammaVanDenBroeck_mass:
+      parameters?.gammaVanDenBroeck_mass ??
+      parameters?.gammaVanDenBroeck ??
+      live?.gammaVanDenBroeck_mass ??
+      live?.gammaVanDenBroeck,
+  };
+}
 
 
 // Push only after shaders are ready - now with enhanced gating and diagnostics
@@ -1148,7 +1187,7 @@ export default function WarpRenderInspector(props: {
         });
       };
 
-      // Create engine instance using the global WarpEngine with Grid3D fallback
+      // WarpEngine constructor with Grid3D fallback
       function createEngine(canvas: HTMLCanvasElement): any {
         try {
           const WarpEngine = getWarpEngineCtor();
