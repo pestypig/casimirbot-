@@ -129,19 +129,14 @@ export function driveWarpFromPipeline(
   }
 
   // ---- 5) Push to engine (single source of truth) ---------------------------
-  // Helpful for inspectors: record adapter + mode + ticks (consolidated stamp)
+  // Consolidated stamp for diagnostics/inspectors (no duplicate declarations)
   {
-    const stamp:any = {
-      // keep existing key for UIs that read it
+    const stamp: any = {
       currentMode: mode,
-      // extra diagnostics (non-breaking)
       __pipelineMode: mode,
-      __adapterId: 'warp-pipeline-adapter@stable',
-      __pipelineTick: (pipeline as any)?.tickId ?? (pipeline as any)?.timestamp ?? Date.now(),
+      __pipelineTick: (pipeline?.tickId ?? pipeline?.timestamp ?? Date.now()),
     };
-    if (mx && (mx.timestamp != null)) {
-      stamp.__metricsTick = mx.timestamp;
-    }
+    if (mx?.timestamp != null) stamp.__metricsTick = mx.timestamp;
     engine.updateUniforms?.(stamp);
   }
   engine.setLightCrossing?.(lcPayload);
