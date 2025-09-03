@@ -1,4 +1,5 @@
 
+
 /**
  * Pipeline → WarpEngine Adapter
  *
@@ -38,96 +39,81 @@ export type DriveMetricOpts = {
  * Drop-in adapter: pipeline → WarpEngine (single source of truth, strict)
  * Call this every time the pipeline state changes (or on a fixed tick)
  */
-export function driveWarpFromPipeline(
-  engine: any,
-  s: EnergyPipelineState,
-  opts?: DriveMetricOpts
-): void {
-  if (!engine || !s) return;
+export function driveWarpFromPipeline(engine: any, pipeline: any, options?: { mode?: 'REAL'|'SHOW', strict?: boolean }) {
+  if (!engine || !pipeline) return;
+  const mode   = options?.mode ?? 'REAL';
+  const strict = options?.strict ?? true;
 
-  // ---- Axes (meters) -------------------------------------------------------
-  // Prefer metrics.hull (full lengths) → semi-axes; else spherical shipRadius_m.
-  const mh = opts?.metrics?.hull;
-  const ax = Number.isFinite(mh?.Lx_m) ? (mh!.Lx_m/2) : (Number.isFinite((s as any).Lx_m) ? ((s as any).Lx_m/2) : +s.shipRadius_m ?? NaN);
-  const ay = Number.isFinite(mh?.Ly_m) ? (mh!.Ly_m/2) : (Number.isFinite((s as any).Ly_m) ? ((s as any).Ly_m/2) : +s.shipRadius_m ?? NaN);
-  const az = Number.isFinite(mh?.Lz_m) ? (mh!.Lz_m/2) : (Number.isFinite((s as any).Lz_m) ? ((s as any).Lz_m/2) : +s.shipRadius_m ?? NaN);
-  req(Number.isFinite(ax)&&Number.isFinite(ay)&&Number.isFinite(az), "missing hull dimensions (metrics.hull or shipRadius_m)");
-  const axesHull: [number,number,number] = [ax,ay,az];
-  const aH = aHarmonic(ax,ay,az); req(Number.isFinite(aH), "bad harmonic radius from axes");
+  // ---------- 1) Light-Crossing timing pass-through (no fabrication) ----------
+  const lcSrc = (pipeline.lc ?? pipeline.lightCrossing ?? {}) as any;
+  const lcPayload = {
+    tauLC_ms:   finite(lcSrc.tauLC_ms),
+    dwell_ms:   finite(lcSrc.dwell_ms),
+    burst_ms:   finite(lcSrc.burst_ms),
+    phase:      finite(lcSrc.phase),
+    onWindow:   booly(lcSrc.onWindow),
+    sectorIdx:  inty(lcSrc.sectorIdx),
+    sectorCount:inty(pipeline.sectorCount ?? lcSrc.sectorCount),
+  };
 
-  // ---- Wall width (must be provided; no adapter defaults) ------------------
-  const w_m_explicit =
-    Number.isFinite(opts?.wallWidth_m) ? +opts!.wallWidth_m :
-    Number.isFinite((opts?.metrics as any)?.hull?.wallThickness_m) ? +((opts!.metrics as any).hull.wallThickness_m) :
-    Number.isFinite((s as any).wallWidth_m) ? +(s as any).wallWidth_m : NaN;
-  const w_rho_explicit =
-    Number.isFinite((s as any).wallWidth_rho) ? +(s as any).wallWidth_rho : NaN;
-  const w_m   = Number.isFinite(w_m_explicit)   ? w_m_explicit   : (Number.isFinite(w_rho_explicit) ? w_rho_explicit * aH : NaN);
-  const w_rho = Number.isFinite(w_rho_explicit) ? w_rho_explicit : (Number.isFinite(w_m_explicit)   ? w_m_explicit   / aH : NaN);
-  req(Number.isFinite(w_m) && Number.isFinite(w_rho), "missing wallWidth_m or wallWidth_rho (provide via LC hook, metrics.hull, or pipeline)");
+  // ---------- 2) Duty selection by MODE (no recompute on client) -------------
+  // Prefer pipeline duty used for rendering; if multiple, choose by mode.
+  // Accepted keys (in priority order):
+  //   dutyUsed, dutyEffectiveFR, dutyFR_slice (REAL), dutyFR_ship (SHOW)
+  let dUsed: number | undefined = finite((pipeline as any).dutyUsed);
+  if (!isFinite(dUsed as number)) dUsed = finite((pipeline as any).dutyEffectiveFR);
+  if (!isFinite(dUsed as number)) {
+    const dSlice = finite((pipeline as any).dutyFR_slice);
+    const dShip  = finite((pipeline as any).dutyFR_ship);
+    if (mode === 'REAL' && isFinite(dSlice as number)) dUsed = dSlice!;
+    if (mode === 'SHOW' && isFinite(dShip as number))  dUsed = dShip!;
+  }
 
-  // ---- Sectors / duty (must be explicit; no 400/1 defaults) ----------------
-  const S_total = Number.isFinite((s as any).sectorsTotal)     ? +(s as any).sectorsTotal     :
-                  Number.isFinite(s.sectorCount)               ? +s.sectorCount               : NaN;
-  const S_live  = Number.isFinite((s as any).sectorsConcurrent)? +(s as any).sectorsConcurrent:
-                  Number.isFinite(s.sectorStrobing)            ? +s.sectorStrobing            : NaN;
-  req(Number.isFinite(S_total)&&Number.isFinite(S_live)&&S_total>=1&&S_live>=1, "missing sectorsTotal/sectorsConcurrent (or sectorCount/sectorStrobing)");
-  const dutyLocal = Number.isFinite((s as any).localBurstFrac) ? +(s as any).localBurstFrac :
-                    Number.isFinite(s.dutyCycle)               ? +s.dutyCycle                : NaN;
-  const dutyEffectiveFR = Number.isFinite(s.dutyEffectiveFR)
-    ? +s.dutyEffectiveFR
-    : (req(Number.isFinite(dutyLocal), "missing localBurstFrac/dutyCycle for FR duty"), dutyLocal * (S_live/S_total));
-  req(Number.isFinite(dutyEffectiveFR), "missing dutyEffectiveFR");
+  // ---------- 3) Physics gains & θ verbatim from pipeline --------------------
+  const uniforms: any = {
+    // wall width & axes are passed elsewhere in your pipeline; keep as-is
+    gammaGeo:         finite(pipeline.gammaGeo),
+    qSpoilingFactor:  finite((pipeline as any).qSpoilingFactor ?? (pipeline as any).deltaAOverA),
+    gammaVdB:         finite((pipeline as any).gammaVdB ?? (pipeline as any).gammaVanDenBroeck),
+    thetaScale:       finite((pipeline as any).thetaScale ?? (pipeline as any).thetaUniform),
+    sectorCount:      inty(pipeline.sectorCount),
+    // tensors (if present)
+    metricMode:       booly((pipeline as any).metricMode),
+    gSpatialDiag:     arrayOrUndef((pipeline as any).gSpatialDiag, 3),
+    gSpatialSym:      arrayOrUndef((pipeline as any).gSpatialSym, 6),
+    lapseN:           finite((pipeline as any).lapseN),
+    shiftBeta:        arrayOrUndef((pipeline as any).shiftBeta, 3),
+    // duty used by renderer (Ford–Roman)
+    dutyUsed:         dUsed,
+  };
 
-  // ---- Physics gains (must be present) -------------------------------------
-  const gammaGeo  = +s.gammaGeo!;
-  const gammaVdB  = Number.isFinite((s as any).gammaVanDenBroeck) ? +(s as any).gammaVanDenBroeck : NaN;
-  const qSpoil    = Number.isFinite(s.qSpoilingFactor) ? +s.qSpoilingFactor :
-                    Number.isFinite((s as any).deltaAOverA) ? +(s as any).deltaAOverA : NaN;
-  req(Number.isFinite(gammaGeo)&&Number.isFinite(gammaVdB)&&Number.isFinite(qSpoil), "missing gammaGeo/gammaVanDenBroeck/qSpoilingFactor");
-
-  // ---- Optional authoritative theta (verbatim from pipeline) ----------------
-  const thetaScale = Number.isFinite((s as any).thetaScale) ? +(s as any).thetaScale :
-                     Number.isFinite((s as any).thetaUniform) ? +(s as any).thetaUniform : undefined;
-
-  // ---- Optional: conformal metric from Greens φ + κ -------------------------
-  let metricMode = false; let gSpatialDiag: [number,number,number] | undefined;
-  if (opts?.greens && Number.isFinite(opts?.metricKappa)) {
-    const φ = opts.greens.phi; if (φ && φ.length>0) {
-      let sum = 0; for (let i=0;i<φ.length;i++) sum += φ[i];
-      const φ̄ = sum / φ.length; const κ = Number(opts.metricKappa);
-      const c = 1 + κ*φ̄; gSpatialDiag = [c,c,c]; metricMode = true;
+  // Strict scientific mode: do not push partial physics
+  if (strict) {
+    const missing: string[] = [];
+    if (!isFinite(uniforms.thetaScale as number)) missing.push('thetaScale');
+    if (!isFinite(uniforms.gammaGeo as number))   missing.push('gammaGeo');
+    if (!isFinite(uniforms.qSpoilingFactor as number)) missing.push('q (spoiling)');
+    if (!isFinite(uniforms.gammaVdB as number))   missing.push('gammaVdB');
+    if (!isFinite(uniforms.sectorCount as number))missing.push('sectorCount');
+    if (!isFinite(dUsed as number))               missing.push('dutyUsed');
+    if (!isFinite(lcPayload.tauLC_ms as number) || !isFinite(lcPayload.dwell_ms as number) || !isFinite(lcPayload.burst_ms as number)) {
+      missing.push('LC(tauLC_ms/dwell_ms/burst_ms)');
+    }
+    if (missing.length) {
+      engine.uniforms = engine.uniforms || {};
+      engine.uniforms.__error = `adapter: missing ${missing.join(', ')}`;
+      return; // do not push
     }
   }
 
-  // Optional: full symmetric spatial metric, lapse, shift (wins over diag if provided)
-  let gSpatialSym: [number,number,number,number,number,number] | undefined;
-  let lapseN: number | undefined;
-  let shiftBeta: [number,number,number] | undefined;
-  if (opts?.natario) {
-    if (Array.isArray(opts.natario.gSpatialSym) && opts.natario.gSpatialSym.length>=6) gSpatialSym = opts.natario.gSpatialSym.map(Number) as any;
-    if (Number.isFinite(opts.natario.lapseN)) lapseN = Number(opts.natario.lapseN);
-    if (Array.isArray(opts.natario.shiftBeta) && opts.natario.shiftBeta.length>=3) shiftBeta = opts.natario.shiftBeta.map(Number) as any;
-  }
-
-  gatedUpdateUniforms(engine, {
-    strictPhysics: true,
-    axesHull,
-    wallWidth: w_rho,
-    wallWidth_rho: w_rho,
-    wallWidth_m: w_m,
-    sectorCount: S_total|0,
-    sectorStrobing: S_live|0,
-    dutyEffectiveFR,
-    gammaGeo,
-    gammaVanDenBroeck: gammaVdB,
-    qSpoilingFactor: qSpoil,
-    lockFraming: true,
-    ...(typeof thetaScale === "number" ? { thetaScale } : {}),
-    ...(metricMode ? { metricMode: true } : {}),
-    ...(gSpatialDiag ? { gSpatialDiag } : {}),
-    ...(gSpatialSym ?  { gSpatialSym }  : {}),
-    ...(Number.isFinite(lapseN) ? { lapseN } : {}),
-    ...(shiftBeta ? { shiftBeta } : {}),
-  }, "server");
+  // Mirror LC to engine (engine will also publish to uniforms)
+  engine.setLightCrossing?.(lcPayload);
+  // Push physics verbatim (single write)
+  engine.updateUniforms?.(uniforms);
 }
+
+function finite(x: any){ const n = +x; return Number.isFinite(n) ? n : undefined; }
+function inty(x: any){ const n = Math.floor(+x); return Number.isFinite(n) ? n : undefined; }
+function booly(x: any){ return x === true || x === 1 || x === '1'; }
+function arrayOrUndef(arr: any, needLen: number){ return (Array.isArray(arr) && arr.length >= needLen) ? arr : undefined; }
+
