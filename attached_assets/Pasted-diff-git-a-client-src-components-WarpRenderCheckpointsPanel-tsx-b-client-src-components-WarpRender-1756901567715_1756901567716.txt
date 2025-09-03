@@ -1,0 +1,83 @@
+diff --git a/client/src/components/WarpRenderCheckpointsPanel.tsx b/client/src/components/WarpRenderCheckpointsPanel.tsx
+--- a/client/src/components/WarpRenderCheckpointsPanel.tsx
++++ b/client/src/components/WarpRenderCheckpointsPanel.tsx
+@@ -472,21 +472,34 @@ function useCheckpointList(
+     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
+ 
+-    // Light-crossing display row (renderer authority)
+-    const burst_ms = liveSnap?.lightCrossing?.burst_ms;
+-    const dwell_ms = liveSnap?.lightCrossing?.dwell_ms;
+-    const tauLC = liveSnap?.lightCrossing?.tau_ms;
+-    const phase = liveSnap?.lightCrossing?.phase;
+-    const onWindow = liveSnap?.lightCrossing?.onWindow;
+-    const TSratio = liveSnap?.lightCrossing?.TSratio;
++    // Light-crossing display row (renderer authority via ENGINE UNIFORMS)
++    const tauLC    = N(Ue.tauLC_ms, NaN);
++    const dwell_ms = N(Ue.dwell_ms, NaN);
++    const burst_ms = N(Ue.burst_ms, NaN);
++    const phase    = N(Ue.phase,    NaN);
++    const onWindow = (+Ue.onWindow || 0) > 0.5;
++    const TSratio  = N((Ue.TS_ratio ?? (Ue.TSratio as any)), NaN);
+ 
+     // Duty consistency (info): used vs (burst/dwell)×(S_live/S_total)
+-    if (Number.isFinite(dwell_ms) && Number.isFinite(burst_ms) && Number.isFinite(sectors) && Number.isFinite(sConcLeft) && Number.isFinite(dUsed)) {
+-      const dFR_expected = (burst_ms / Math.max(1e-6, dwell_ms)) * (sConcLeft / sectors);
+-      const dFR_used     = dUsed!;
+-      const ok           = within(dFR_used, dFR_expected, 0.15);
+-      checkpoint({
+-        id: 'lc.duty_consistency', side, stage: 'lc',
+-        pass: ok,
+-        msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
+-        expect: '≈ burst/dwell × S_live/S_total',
+-        actual: { dFR_used, dFR_expected },
+-        sev: ok ? 'info' : 'warn',
+-        meta: { where: 'engine uniforms vs LC' }
+-      });
+-    }
++    {
++      const sLive = Math.max(1, N(Ue.sectors ?? 1, 1)); // <-- use engine uniforms (in-scope)
++      if (Number.isFinite(dwell_ms) && Number.isFinite(burst_ms) && Number.isFinite(sectors) && Number.isFinite(sLive) && Number.isFinite(dUsed)) {
++        const dFR_expected = (burst_ms / Math.max(1e-6, dwell_ms)) * (sLive / sectors);
++        const dFR_used     = dUsed!;
++        const ok           = within(dFR_used, dFR_expected, 0.15);
++        checkpoint({
++          id: 'lc.duty_consistency', side, stage: 'lc',
++          pass: ok,
++          msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
++          expect: '≈ burst/dwell × S_live/S_total',
++          actual: { dFR_used, dFR_expected },
++          sev: ok ? 'info' : 'warn',
++          meta: { where: 'engine uniforms vs LC' }
++        });
++      }
++    }
+ 
+     {
+       const details =
+@@ -627,16 +640,24 @@ export default function WarpRenderCheckpointsPanel({
+   const snap = (live?.byMode && live?.byMode[modeKey]) || (live?.modes && live?.modes[modeKey]) || live || undefined;
+ 
+-  // Compute Ford-Roman duty from light-crossing loop
+-  const dutyLocal = (lightCrossing?.burst_ms && lightCrossing?.dwell_ms)
+-    ? (lightCrossing.burst_ms / lightCrossing.dwell_ms)    // ~0.01
+-    : 0.01;                                                 // fallback
++  // Compute Ford–Roman duty from LC props (STRICT: no fallback)
++  const dutyLocal = (Number.isFinite(lightCrossing?.burst_ms) && Number.isFinite(lightCrossing?.dwell_ms) && (lightCrossing!.dwell_ms! > 0))
++    ? (lightCrossing!.burst_ms! / lightCrossing!.dwell_ms!)
++    : NaN;
+ 
+   const sTotal       = snap?.sectorCount ?? 400;
+   const sConcLeft    = leftEngineRef.current?.uniforms?.sectors  ?? 1;
+   const sConcRight   = rightEngineRef.current?.uniforms?.sectors ?? sConcLeft;
+-  const dutyFR_left  = dutyLocal * (sConcLeft  / sTotal);
+-  const dutyFR_right = dutyLocal * (sConcRight / sTotal);
++  const dutyFR_left  = (Number.isFinite(dutyLocal) ? dutyLocal : NaN) * (sConcLeft  / sTotal);
++  const dutyFR_right = (Number.isFinite(dutyLocal) ? dutyLocal : NaN) * (sConcRight / sTotal);
+ 
+   // Pretty strings
+-  const dutyLocalPct = `${(dutyLocal*100).toFixed(3)}%`;
+-  const dutyFRPct_left = `${(dutyFR_left*100).toFixed(4)}%`;
+-  const dutyFRPct_right = `${(dutyFR_right*100).toFixed(4)}%`;
++  const dutyLocalPct    = Number.isFinite(dutyLocal)    ? `${(dutyLocal*100).toFixed(3)}%`    : '—';
++  const dutyFRPct_left  = Number.isFinite(dutyFR_left)  ? `${(dutyFR_left*100).toFixed(4)}%`  : '—';
++  const dutyFRPct_right = Number.isFinite(dutyFR_right) ? `${(dutyFR_right*100).toFixed(4)}%` : '—';
