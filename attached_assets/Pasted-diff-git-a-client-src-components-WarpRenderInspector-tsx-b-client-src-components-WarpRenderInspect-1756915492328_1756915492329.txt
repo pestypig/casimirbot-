@@ -1,0 +1,108 @@
+diff --git a/client/src/components/WarpRenderInspector.tsx b/client/src/components/WarpRenderInspector.tsx
+--- a/client/src/components/WarpRenderInspector.tsx
++++ b/client/src/components/WarpRenderInspector.tsx
+@@ -1,6 +1,28 @@
+ import React, { useEffect, useMemo, useRef, useState } from "react";
+ // …existing imports…
+ 
++// ---------------------------------------------------------------------------
++// READ-ONLY INSPECTOR: never write physics here. Adapter is the sole writer.
++// This helper strips any physics keys from accidental updateUniforms payloads.
++function withoutPhysics(u:any){
++  if (!u || typeof u !== 'object') return u;
++  const kill = new Set([
++    'thetaScale','thetaUniform','thetaScaleExpected',
++    'gammaGeo','qSpoilingFactor','deltaAOverA','gammaVdB','gammaVanDenBroeck',
++    'sectorCount','sectors','sectorIdx',
++    'tauLC_ms','dwell_ms','burst_ms','phase','onWindow',
++    'dutyUsed','dutyEffectiveFR','dutyFR','dutyFR_slice','dutyFR_ship',
++    'physicsParityMode','ridgeMode',
++    'axesHull','axesMeters','wallWidth_rho','wallWidth_m',
++    // tensors (let adapter/engine own these)
++    'metricMode','useMetric','gSpatialDiag','gSpatialSym','lapseN','shiftBeta','viewForward','g0i'
++  ]);
++  const out:any = {};
++  for (const k of Object.keys(u)) if (!kill.has(k)) out[k]=u[k];
++  return out;
++}
++// Small wrapper to ensure we never push physics
++const applyCosmetics = (engine:any, payload:any) => engine?.updateUniforms?.(withoutPhysics(payload||{}));
++// ---------------------------------------------------------------------------
++
+ export default function WarpRenderInspector(props:any){
+   const leftEngine  = useRef<any>(null);   // REAL
+   const rightEngine = useRef<any>(null);   // SHOW
+@@
+-  // Local duty computation (from props.lightCrossing) — REMOVE (adapter is authority)
+-  const dutyLocal = (() => {
+-    const b = Number(props.lightCrossing?.burst_ms);
+-    const d = Number(props.lightCrossing?.dwell_ms);
+-    return Number.isFinite(b) && Number.isFinite(d) && d > 0 ? Math.max(1e-12, b / d) : 0.01;
+-  })();
+-  const sTotal = Number(props.baseShared?.sectorCount ?? 400);
+-  const sConcurrent = Number(props.baseShared?.sectors ?? 1);
+-  const dutyEffectiveFR = dutyLocal * (sConcurrent / Math.max(1, sTotal));
++  // Duty is adapter/engine-owned. For display, read what engine renders with:
++  const dutyUsedREAL = leftEngine.current?.uniforms?.dutyUsed;
++  const dutyUsedSHOW = rightEngine.current?.uniforms?.dutyUsed;
+@@
+-  // Strobing event handler — previously injected hardcoded duty (REMOVE)
+-  useEffect(() => {
+-    const s = Number(props.baseShared?.sectorCount ?? 400);
+-    const sConcL = Number(leftEngine.current?.uniforms?.sectors ?? 1);
+-    const dutyLocal = 0.01; // ← hardcoded before
+-    const dutyFR_REAL = dutyLocal * (sConcL / s);
+-    const dutyUI_SHOW = dutyLocal * (1 / s);
+-    leftEngine.current?.updateUniforms?.({ dutyUsed: dutyFR_REAL });
+-    rightEngine.current?.updateUniforms?.({ dutyUsed: dutyUI_SHOW });
+-  }, [props.baseShared?.sectorCount]);
++  // Strobing/duty are driven by adapter → engine.setLightCrossing/updateUniforms.
++  // Do not compute or push duty here.
+@@
+-  // Canonical uniforms subscription override (enforced parity/ridge) — REMOVE
+-  if (leftEngine.current) {
+-    applyToEngine(leftEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+-  }
+-  if (rightEngine.current) {
+-    applyToEngine(rightEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+-  }
++  // Never enforce parity/ridge from the inspector. Adapter sets these per mode.
++  // If you need view cosmetics (camera/exposure), use applyCosmetics below.
+@@
+-  // Fallback uniforms with hardcoded modes (REMOVE)
+-  if (!haveUniforms) {
+-    if (leftEngine.current) {
+-      leftEngine.current.updateUniforms?.({
+-        physicsParityMode: true,
+-        // ... other uniforms
+-      });
+-    }
+-    if (rightEngine.current) {
+-      rightEngine.current.updateUniforms?.({
+-        physicsParityMode: false,
+-        // ... other uniforms
+-      });
+-    }
+-  }
++  // No parity/ridge fallbacks. If uniforms are not ready, show adapter/engine __error in UI.
+@@
+-  // Places that pushed uniforms directly: wrap with cosmetic filter
+-  leftEngine.current?.updateUniforms?.(somePayload);
+-  rightEngine.current?.updateUniforms?.(otherPayload);
++  // Any remaining uniform pushes from this component must be cosmetic only:
++  applyCosmetics(leftEngine.current,  somePayload);
++  applyCosmetics(rightEngine.current, otherPayload);
+@@
+-  // Bootstrap or resize flows that previously included physics — replace with cosmetic-only
+-  rightEngine.current?.bootstrap?.({ ...showPayload });
+-  leftEngine.current?.bootstrap?.({ ...realPayload });
++  // Bootstrap/resize cosmetic defaults (no physics fields included)
++  rightEngine.current?.bootstrap?.({});
++  leftEngine.current?.bootstrap?.({});
+@@
+-  // Camera/exposure/color updates — keep, but filtered
+-  leftEngine.current?.updateUniforms?.({ cameraZ: 3.0, exposure: 6, colorMode: 'show' });
+-  rightEngine.current?.updateUniforms?.({ cameraZ: 3.0, exposure: 6, colorMode: 'show' });
++  // Camera/exposure/color updates — keep, but filtered via applyCosmetics
++  applyCosmetics(leftEngine.current,  { cameraZ: 3.0, exposure: 6, colorMode: 'real' });
++  applyCosmetics(rightEngine.current, { cameraZ: 3.0, exposure: 6, colorMode: 'show' });
