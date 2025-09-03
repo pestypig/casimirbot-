@@ -544,11 +544,14 @@ function PaneOverlay(props:{
   const UL: any = engineLeft?.current?.uniforms || {};
 
   // Derive wall widths for REAL from live engine uniforms (safe)
-  const aHL = aHarmonic(
-    UL.hullAxes?.[0] ?? UL.axesHull?.[0],
-    UL.hullAxes?.[1] ?? UL.axesHull?.[1],
-    UL.hullAxes?.[2] ?? UL.axesHull?.[2]
-  );
+  // Prefer hull axes; fall back to scene axes so meters never go blank
+  const aHL = (()=>{
+    const h = UL.axesHull;
+    if (Array.isArray(h) && h.length>=3) return aHarmonic(h[0],h[1],h[2]);
+    const s = UL.axesScene;
+    if (Array.isArray(s) && s.length>=3) return aHarmonic(s[0],s[1],s[2]);
+    return NaN;
+  })();
   const wL_rho = Number.isFinite(+UL.wallWidth_rho) ? +UL.wallWidth_rho : (Number.isFinite(+UL.wallWidth) ? +UL.wallWidth : NaN);
   const wL_m = (Number.isFinite(aHL) && Number.isFinite(wL_rho)) ? wL_rho * aHL : undefined;
 
