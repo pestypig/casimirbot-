@@ -1958,7 +1958,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const betaTilt = this.uniforms?.betaTiltVec || [0,-1,0];
         const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
         // scale small, interior-only, soft-clamped
-        let dispTilt = epsTilt * tiltGain * Math.max(0,sd) * downDot; // only interior gravity
+        let dispTilt = epsTilt * tiltGain * Math.max(0,sd) * downDot;
         const maxTilt = 0.05;          // <= 5% of nominal radius; tune to taste
         dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
         // ----- end interior gravity -----
@@ -2029,770 +2029,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         this._adjustCameraForSpan(targetSpan);
     }
 }
-
-_renderGridPoints() {
-    const gl = this.gl;
-    if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
-        if (!this._warnNoProgramOnce) {
-            console.warn(`[${this.debugTag}] Grid program not ready yet; waiting for shader link…`);
-            this._warnNoProgramOnce = true;
-        }
-        return;
-    }
-
-    // Show diagnostics if strict is missing inputs
-    if (this.strictScientific && this.uniforms?.__error) {
-      gl.clearColor(0.2, 0.0, 0.0, 1.0);
-      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      return;
-    }
-
-    gl.useProgram(this.gridProgram);
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-    const loc = this.gridAttribs.position;
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
-
-    const U = this.uniforms || {};
-
-    // --- names / helpers
-    const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
-    const F = (x, d)=> Number.isFinite(x) ? +x : d;
-    const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
-    // Helper functions for values that might be undefined in uniforms
-    const finite = (x, d)=> Number.isFinite(+x)? +x : d;
-    const integer = (x, d)=> Number.isFinite(Math.floor(+x))? Math.floor(+x) : d;
-
-    // --- colors / matrices you already set:
-    gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
-    gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
-
-    // --- modes / sectoring (use lowercase names in the shader)
-    if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(U.colorMode, 1));
-    if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(U.ridgeMode, 1));
-    if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     U.physicsParityMode ? 1 : 0);
-    const sLive  = Math.max(1, (U.sectors|0)      || 1);
-    const sTotal = Math.max(1, (U.sectorCount|0)  || sLive);
-    if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
-    if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(U.split,0))));
-
-    // --- axes (scene-normalized and legacy hull)
-    const axesScene = U.axesClip || U.axesScene || [1,1,1];
-    const hullAxes  = U.hullAxes || [503.5, 132.0, 86.5];
-    if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
-    if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
-
-    // --- drive + wall
-    const drive = V3(U.driveDir, [1,0,0]);
-    // Use unified wallWidth_rho, aliased as wallWidth for the shader
-    const wRho  = F(U.wallWidth, WALL_RHO_DEFAULT);
-    if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
-    if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
-
-    // --- critical amplitude carrier INSIDE theta field:
-    const vShip = Number.isFinite(U.vShip) ? U.vShip : (U.physicsParityMode ? 0.0 : 1.0);
-    if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
-
-    // --- θ-scale (you already set a fallback in JS if missing)
-    if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0); // Direct pipeline value, no fallback amplification
-
-    // --- exposure / viz chain
-    if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(U.exposure, U.physicsParityMode ? 3.5 : 6.0));
-    if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(U.zeroStop, U.physicsParityMode ? 1e-5 : 1e-7));
-    if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(U.userGain, 1.0));
-    if (this.gridUniforms.displayGain)       gl.uniform1f(this.gridUniforms.displayGain,       F(U.displayGain, 1.0));
-    if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(U.vizGain, 1.0));
-    if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(U.curvatureGainT, 0.0));
-    if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(U.curvatureBoostMax, 1.0));
-
-    // --- interior tilt (benign defaults)
-    if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(U.intWidth, 0.25));
-    if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(U.epsTilt,  0.0));
-    if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(U.tiltViz,  0.0));
-
-    // --- Purple shift uniforms
-    if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(U.epsilonTilt, 0.0));
-    if (this.gridUniforms.betaTiltVec) {
-        const betaTilt = V3(U.betaTiltVec, [0, -1, 0]);
-        gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
-    }
-
-    // --- Metric tensor uniforms (default to identity if not provided)
-    const metric = U.metric || [1,0,0, 0,1,0, 0,0,1];
-    const metricInv = U.metricInv || [1,0,0, 0,1,0, 0,0,1];
-    const useMetric = U.useMetric || false;
-    const metricOn = U.metricOn !== undefined ? U.metricOn : (useMetric ? 1.0 : 0.0);
-
-    if (this.gridUniforms.metric) {
-        gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
-        gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
-        gl.uniform1i(this.gridUniforms.useMetric, useMetric ? 1 : 0);
-    }
-    if (this.gridUniforms.metricOn) {
-        gl.uniform1f(this.gridUniforms.metricOn, metricOn);
-    }
-
-    // --- New tensor uniforms ---
-    // upload camera forward every frame (if present)
-    if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
-      gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
-    }
-    // upload lowered shift g0i = β_i (if present)
-    if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
-      gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
-    }
-    // Mirror metric toggle (no SHOW boosts here)
-    if (typeof U.metricMode === 'boolean') {
-      gl.uniform1f(this.gridUniforms.metricOn, U.metricMode ? 1.0 : 0.0);
-    } else if (typeof U.useMetric === 'boolean') {
-      gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
-    }
-
-    // --- Light-crossing uniforms (mirrored) ---
-    const L = this._lc || {};
-    if (loc.tauLC_ms)     gl.uniform1f(loc.tauLC_ms, isFinite(+L.tauLC_ms)? +L.tauLC_ms : 0.0);
-    if (loc.dwell_ms)     gl.uniform1f(loc.dwell_ms, isFinite(+L.dwell_ms)? +L.dwell_ms : 0.0);
-    if (loc.burst_ms)     gl.uniform1f(loc.burst_ms, isFinite(+L.burst_ms)? +L.burst_ms : 0.0);
-    if (loc.phase)        gl.uniform1f(loc.phase,    isFinite(+L.phase)?    +L.phase    : 0.0);
-    if (loc.onWindow)     gl.uniform1f(loc.onWindow, L.onWindow ? 1.0 : 0.0);
-    if (loc.sectorIdx)    gl.uniform1i(loc.sectorIdx, isFinite(+L.sectorIdx)? +L.sectorIdx : 0);
-    if (loc.sectorCount)  gl.uniform1i(loc.sectorCount, isFinite(+L.sectorCount)? +L.sectorCount : 1);
-    if (loc.dutyUsed && isFinite(+U.dutyUsed)) gl.uniform1f(loc.dutyUsed, +U.dutyUsed);
-
-  }
-  // C) Frame hash for checkpoint validation
-  sampleHash8x8() {
-    if (!this.gl || !this.canvas) return 0;
-
-    try {
-        const gl = this.gl;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
-
-        // Sample 8x8 grid across canvas
-        const pixels = new Uint8Array(64 * 4); // 8x8 RGBA
-        const stepX = Math.max(1, Math.floor(w / 8));
-        const stepY = Math.max(1, Math.floor(h / 8));
-
-        let hash = 0;
-        for (let y = 0; y < 8; y++) {
-            for (let x = 0; x < 8; x++) {
-                const px = Math.min(w - 1, x * stepX);
-                const py = Math.min(h - 1, y * stepY);
-
-                const rgba = new Uint8Array(4);
-                gl.readPixels(px, py, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
-
-                // XOR + simple hash
-                const idx = (y * 8 + x) * 4;
-                pixels[idx] = rgba[0];
-                pixels[idx + 1] = rgba[1];
-                pixels[idx + 2] = rgba[2];
-                pixels[idx + 3] = rgba[3];
-
-                hash ^= (rgba[0] << 24) | (rgba[1] << 16) | (rgba[2] << 8) | rgba[3];
-                hash = ((hash << 1) | (hash >>> 31)) & 0xFFFFFFFF; // rotate left
-            }
-        }
-
-        return hash;
-    } catch (e) {
-        console.warn('sampleHash8x8 error:', e);
-        return 0;
-    }
-}
-
-    // ========== Public API ==========
-
-    /** Set/enable a 3×3 metric tensor (and its inverse). Pass `on=false` to revert to Euclidean. */
-    setMetric(g, gInv=null, on=true) {
-        if (!g) {
-            this.updateUniforms({
-                metric: ID3,
-                metricInv: ID3,
-                metricOn: 0.0,
-                useMetric: false
-            });
-            return this;
-        }
-        this.updateUniforms({
-            metric: (g instanceof Float32Array) ? g : new Float32Array(g),
-            metricInv: (gInv instanceof Float32Array) ? gInv :
-                      (gInv ? new Float32Array(gInv) : ID3),
-            metricOn: on ? 1.0 : 0.0,
-            useMetric: on
-        });
-        return this;
-    }
-
-    /** Update light-crossing timing & strobing gate (authoritative) */
-    setLightCrossing(info = {}) {
-        const L = this._lc || {};
-        L.tauLC_ms    = finite(info.tauLC_ms);
-        L.dwell_ms    = finite(info.dwell_ms);
-        L.burst_ms    = finite(info.burst_ms);
-        L.phase       = finite(info.phase);
-        L.onWindow    = !!info.onWindow;
-        L.sectorIdx   = integer(info.sectorIdx);
-        L.sectorCount = integer(info.sectorCount);
-        this._lc = L;
-        // also reflect to the public uniforms bag so inspector/checkpoints see it
-        Object.assign(this.uniforms, {
-          tauLC_ms: L.tauLC_ms, dwell_ms: L.dwell_ms, burst_ms: L.burst_ms,
-          phase: L.phase, onWindow: L.onWindow ? 1 : 0,
-          sectorIdx: L.sectorIdx, sectorCount: L.sectorCount
-        });
-        return this;
-    }
-
-    // ---------- GL Program compile/link and uniform cache ----------
-    _cacheGridLocations(program) {
-        const gl = this.gl;
-        if (!gl || !program) return false;
-        this.gridProgram = program;
-        const loc = {};
-        loc.mvpMatrix = gl.getUniformLocation(program, 'u_mvpMatrix');
-        loc.sheetColor = gl.getUniformLocation(program, 'u_sheetColor');
-        loc.thetaScale = gl.getUniformLocation(program, 'u_thetaScale');
-        loc.colorMode  = gl.getUniformLocation(program, 'u_colorMode');
-        loc.ridgeMode  = gl.getUniformLocation(program, 'u_ridgeMode');
-        loc.parity     = gl.getUniformLocation(program, 'u_physicsParityMode');
-        loc.sectorCount = gl.getUniformLocation(program, 'u_sectorCount');
-        loc.split      = gl.getUniformLocation(program, 'u_split');
-        loc.axesScene  = gl.getUniformLocation(program, 'u_axesScene');
-        loc.axes       = gl.getUniformLocation(program, 'u_axes');
-        loc.driveDir   = gl.getUniformLocation(program, 'u_driveDir');
-        loc.wallWidth  = gl.getUniformLocation(program, 'u_wallWidth');
-        loc.vShip      = gl.getUniformLocation(program, 'u_vShip');
-        loc.exposure   = gl.getUniformLocation(program, 'u_exposure');
-        loc.zeroStop   = gl.getUniformLocation(program, 'u_zeroStop');
-        loc.userGain   = gl.getUniformLocation(program, 'u_userGain');
-        loc.displayGain= gl.getUniformLocation(program, 'u_displayGain');
-        loc.vizGain    = gl.getUniformLocation(program, 'u_vizGain');
-        loc.curvatureGainT = gl.getUniformLocation(program, 'u_curvatureGainT');
-        loc.curvatureBoostMax = gl.getUniformLocation(program, 'u_curvatureBoostMax');
-        loc.intWidth   = gl.getUniformLocation(program, 'u_intWidth');
-        loc.epsTilt    = gl.getUniformLocation(program, 'u_epsTilt');
-        loc.tiltViz    = gl.getUniformLocation(program, 'u_tiltViz');
-        loc.epsilonTilt = gl.getUniformLocation(program, 'u_epsilonTilt');
-        loc.betaTiltVec = gl.getUniformLocation(program, 'u_betaTiltVec');
-        loc.metric     = gl.getUniformLocation(program, 'u_metric');
-        loc.metricInv  = gl.getUniformLocation(program, 'u_metricInv');
-        loc.useMetric  = gl.getUniformLocation(program, 'u_useMetric');
-        loc.metricOn   = gl.getUniformLocation(program, 'u_metricOn');
-        // tensor extras (camera/shift)
-        loc.viewForward  = gl.getUniformLocation(program, 'u_viewForward');
-        loc.g0i          = gl.getUniformLocation(program, 'u_g0i');
-        // Light-crossing uniforms
-        loc.tauLC_ms     = gl.getUniformLocation(program, 'u_tauLC_ms');
-        loc.dwell_ms     = gl.getUniformLocation(program, 'u_dwell_ms');
-        loc.burst_ms     = gl.getUniformLocation(program, 'u_burst_ms');
-        loc.phase        = gl.getUniformLocation(program, 'u_phase');
-        loc.onWindow     = gl.getUniformLocation(program, 'u_onWindow');
-        loc.sectorIdx    = gl.getUniformLocation(program, 'u_sectorIdx');
-        loc.sectorCount  = gl.getUniformLocation(program, 'u_sectorCount');
-        loc.dutyUsed     = gl.getUniformLocation(program, 'u_dutyUsed');
-        // (TS ratio is display-only; no shader uniform required)
-        this.gridUniforms = loc;
-        this.gridAttribs = {
-            position: gl.getAttribLocation(program, 'a_position'),
-        };
-        this._setLoaded(true);
-        return true;
-    }
-    _setupUniformLocations() { this._cacheGridLocations(this.gridProgram); }
-    _setLoaded(loaded) {
-        this.isLoaded = loaded;
-        if (this.onLoadingStateChange) {
-            this.onLoadingStateChange({
-                type: loaded ? 'ready' : 'loading',
-                message: loaded ? 'Warp engine ready' : 'Initializing...'
-            });
-        }
-        if (loaded && this._readyQueue && this._readyQueue.length) {
-            const q = this._readyQueue.splice(0);
-            for (const fn of q) { try { fn(this); } catch(e){ console.warn(e); } }
-            try { this._render(); } catch {}
-        }
-    }
-    _setLoadingState(state) {
-        this.loadingState = state;
-        this.isLoaded = (state === 'linked');
-        try {
-            this.onLoadingStateChange?.({
-              type: state,
-              isLoaded: this.isLoaded,
-              message:
-                state === 'compiling' ? 'Compiling shaders…' :
-                state === 'linked'    ? 'Shaders linked'     :
-                state === 'failed'    ? 'Link failed'        :
-                state === 'loading'   ? 'Initializing…'      :
-                'Idle'
-            });
-        } catch {}
-    }
-    getLinkStatus() {
-        if (!this.gl || !this.gridProgram) return 'idle';
-        if (this.parallelShaderExt) {
-            const status = this.gl.getProgramParameter(this.gridProgram, this.gl.COMPLETION_STATUS_KHR);
-            if (status === false) return 'compiling';
-        }
-        const linked = this.gl.getProgramParameter(this.gridProgram, this.gl.LINK_STATUS);
-        return linked ? 'linked' : 'failed';
-    }
-    getShaderProfile() { return this.shaderProfile || 'unknown'; }
-    getShaderDiagnostics() {
-        if (!this.gl) return { status: 'no-context', message: 'No WebGL context' };
-        if (!this.gridProgram) return { status: 'no-program', message: 'No shader program' };
-        const linkStatus = this.getLinkStatus();
-        const profile = this.getShaderProfile();
-        if (linkStatus === 'compiling') {
-            return { status: 'compiling', message: '⏳ compiling shaders…', profile };
-        }
-        if (linkStatus === 'failed') {
-            const info = this.gl.getProgramInfoLog(this.gridProgram);
-            return { status: 'failed', message: `Shader link failed: ${info}`, profile };
-        }
-        if (linkStatus === 'linked') {
-            const vertexCount = this.gridVertices?.length / 3 || 0;
-            return {
-                status: 'linked',
-                message: `✅ ${profile} shaders ready (${vertexCount} vertices)`,
-                profile,
-                vertexCount
-            };
-        }
-        return { status: 'idle', message: 'Shader system idle', profile };
-    }
-    isShadersLinked() {
-        try { return !!(this.gl && this.gridProgram && this.gl.getProgramParameter(this.gridProgram, this.gl.LINK_STATUS)); }
-        catch { return false; }
-    }
-    getShaderHealth() {
-        const gl = this.gl;
-        const prog = this.gridProgram;
-        if (!gl) return {ok:false, reason:'no GL', status:this.loadingState, profile:this.getShaderProfile() };
-        if (!prog) return {ok:false, reason:'no program', status:this.loadingState, profile:this.getShaderProfile() };
-        let ok = false, reason = 'unknown';
-        try {
-            ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
-            reason = ok ? 'linked' : (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
-        } catch (e) { reason = `exception: ${e?.message || e}`; }
-        return { ok, reason, status: this.getLinkStatus(), profile: this.getShaderProfile(), async: !!this.parallelShaderExt };
-    }
-    onceReady(fn) {
-        if (this.isLoaded && this.gridProgram) { try { fn(this); } catch(e){ console.warn(e); } }
-        else { this._readyQueue.push(fn); }
-    }
-    forceRedraw() { try { this._updateGrid(); this._render(); } catch(e){ console.warn('forceRedraw:', e); } }
-    setParameters(next) { this.params = Object.assign(this.params || {}, next); }
-    resize(w, h) { this.gl.viewport(0, 0, w, h); }
-    start() {
-        if (this._raf) return;
-        const loop = () => {
-            this._raf = requestAnimationFrame(loop);
-            this._render();
-        };
-        loop();
-    }
-    stop() {
-        if (this._raf) cancelAnimationFrame(this._raf);
-        this._raf = null;
-    }
-    dispose() {
-        const gl = this.gl;
-        if (this.gridVbo) gl.deleteBuffer(this.gridVbo);
-        if (this.gridProgram) gl.deleteProgram(this.gridProgram);
-    }
-    _enqueueUniforms(patch) {
-        this._pendingUpdate = Object.assign(this._pendingUpdate || {}, patch || {});
-        if (this._flushId) return;
-        this._flushId = requestAnimationFrame(() => {
-            const p = this._pendingUpdate || {};
-            this._pendingUpdate = null;
-            this._flushId = 0;
-            const isModeSwitch = !!p.currentMode;
-            const isOperationalChange = !!(p.currentMode || p.physicsParityMode !== undefined || p.ridgeMode !== undefined);
-            if (isModeSwitch || isOperationalChange) {
-                console.log(`[WarpEngine] Operational change detected:`, {
-                    mode: p.currentMode, parity: p.physicsParityMode, ridge: p.ridgeMode,
-                    canvas: this.canvas?.id || 'unknown', isLoaded: this.isLoaded,
-                    hasProgram: !!this.gridProgram, thetaScale: p.thetaScale
-                });
-            }
-            try {
-                this._applyUniformsNow(p);
-                if (isModeSwitch) { console.log('[WarpEngine] Uniforms applied after mode switch'); }
-            } catch(e) { console.error("[WarpEngine] Uniform flush failed during mode switch:", e); }
-            try {
-                this._resizeCanvasToDisplaySize();
-                const axesR = (this.uniforms?.axesClip && this.uniforms.axesClip.length === 3)
-                    ? Math.max(this.uniforms.axesClip[0], this.uniforms.axesClip[1], this.uniforms.axesClip[2])
-                    : (this._lastFittedR || 1);
-                const hasCamZ = Number.isFinite(this.currentParams?.cameraZ);
-                hasCamZ ? this._adjustCameraForSpan(axesR) : this._applyOverheadCamera({ spanHint: axesR });
-            } catch {}
-            try {
-                this._render();
-                if (isModeSwitch) { console.log('[WarpEngine] Render completed after mode switch'); }
-            } catch(e) { console.error("[WarpEngine] Render failed after mode switch:", e); }
-        });
-    }
-    updateUniforms(parameters) {
-        if (this._destroyed) return;
-        if (!this.gridProgram && this.gl) try { this._compileGridShaders(); } catch {}
-        if (!this.gridProgram || !this.isLoaded) {
-            this._pendingUpdate = Object.assign(this._pendingUpdate || {}, parameters || {});
-            return;
-        }
-        this._enqueueUniforms(parameters);
-    }
-    setMetric(g, gInv=null, on=true) {
-        if (!g) { this.updateUniforms({ metric: ID3, metricInv: ID3, metricOn: 0.0, useMetric: false }); return this; }
-        this.updateUniforms({
-            metric: (g instanceof Float32Array) ? g : new Float32Array(g),
-            metricInv: (gInv instanceof Float32Array) ? gInv : (gInv ? new Float32Array(gInv) : ID3),
-            metricOn: on ? 1.0 : 0.0, useMetric: on
-        });
-        return this;
-    }
-    setLightCrossing(info = {}) {
-        const L = this._lc || {};
-        L.tauLC_ms    = finite(info.tauLC_ms); L.dwell_ms    = finite(info.dwell_ms); L.burst_ms    = finite(info.burst_ms);
-        L.phase       = finite(info.phase); L.onWindow    = !!info.onWindow;
-        L.sectorIdx   = integer(info.sectorIdx); L.sectorCount = integer(info.sectorCount);
-        this._lc = L;
-        Object.assign(this.uniforms, {
-          tauLC_ms: L.tauLC_ms, dwell_ms: L.dwell_ms, burst_ms: L.burst_ms,
-          phase: L.phase, onWindow: L.onWindow ? 1 : 0,
-          sectorIdx: L.sectorIdx, sectorCount: L.sectorCount
-        });
-        return this;
-    }
-    _dot(v, w) {
-        if (!this.uniforms?.metricMode || !Array.isArray(this.uniforms?.gSpatialDiag)) { return v[0]*w[0] + v[1]*w[1] + v[2]*w[2]; }
-        const g = this.uniforms.gSpatialDiag;
-        return g[0]*v[0]*w[0] + g[1]*v[1]*w[1] + g[2]*v[2]*w[2];
-    }
-    _norm(v) {
-        const dot = this._dot(v, v);
-        const len = Math.sqrt(Math.max(1e-12, dot));
-        return [v[0]/len, v[1]/len, v[2]/len];
-    }
-    _applyUniformsNow(parameters) {
-        if (!parameters) return;
-        const N = (x, d, type=Number) => (type(x) === x && isFinite(x) ? type(x) : d);
-        const clamp01 = (x) => Math.max(0, Math.min(1, x));
-        const prev = { ...(this.uniforms || {}) };
-        this.currentParams = { ...this.currentParams, ...parameters };
-        const U = this.uniforms = this.uniforms || {};
-        const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
-        const isStandby = modeStr === 'standby';
-        const aH = _guessAH(U, parameters);
-        let w_rho = N(parameters.wallWidth, undefined);
-        if (Number.isFinite(parameters.wallWidth_rho)) w_rho = N(parameters.wallWidth_rho, undefined);
-        const w_m_in = N(parameters?.hullDimensions?.wallWidth_m, undefined);
-        if (!Number.isFinite(w_rho) && Number.isFinite(w_m_in) && Number.isFinite(aH)) { w_rho = w_m_in / aH; }
-        if (Number.isFinite(w_rho)) U.wallWidth_rho = w_rho;
-        if (!Number.isFinite(U.wallWidth_rho)) U.wallWidth_rho = U.wallWidth_rho ?? WALL_RHO_DEFAULT;
-        U.wallWidth = U.wallWidth_rho;
-        if (Number.isFinite(aH)) U.wallWidth_m = U.wallWidth_rho * aH;
-        if (Array.isArray(parameters.axesHull))  U.axesHull  = parameters.axesHull.slice(0,3);
-        if (Array.isArray(parameters.axesScene)) U.axesScene = parameters.axesScene.slice(0,3);
-        if (typeof parameters.strictScientific === "boolean") this.strictScientific = !!parameters.strictScientific;
-        if (typeof U.metricMode === 'boolean') { U.useMetric = !!U.metricMode; }
-        function _metricFromDiag(d) { const gx = +d[0] || 1, gy = +d[1] || 1, gz = +d[2] || 1; return new Float32Array([gx,0,0, 0,gy,0, 0,0,gz]); }
-        function _metricFromSym(s) { const gxx=+s[0]||1, gyy=+s[1]||1, gzz=+s[2]||1; const gxy=+s[3]||0, gyz=+s[4]||0, gzx=+s[5]||0; return new Float32Array([ gxx, gxy, gzx, gxy, gyy, gyz, gzx, gyz, gzz ]); }
-        function _inv3(m){ const [a,b,c, d,e,f, g,h,i] = m; const A = (e*i - f*h), B = -(d*i - f*g), C = (d*h - e*g); const det = a*A + b*B + c*C; if (!isFinite(det) || Math.abs(det) < 1e-18) return null; const inv = new Float32Array([ A, -(b*i - c*h),  (b*f - c*e), B,  (a*i - c*g), -(a*f - c*d), C, -(a*h - b*g),  (a*e - b*d) ]); for (let k=0;k<9;k++) inv[k] /= det; return inv; }
-        if (U.useMetric) {
-          let G = null;
-          if (Array.isArray(U.gSpatialSym) && U.gSpatialSym.length >= 6) G = _metricFromSym(U.gSpatialSym);
-          else if (Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length >= 3) G = _metricFromDiag(U.gSpatialDiag);
-          if (G) { U.metric = G; U.metricInv = _inv3(G) || U.metricInv || ID3; }
-        }
-        if (U.useMetric) {
-          if (Number.isFinite(U.lapseN)) {
-            const N = +U.lapseN; const beta = U.shiftBeta || [0,0,0]; const b2 = beta[0]*beta[0] + beta[1]*beta[1] + beta[2]*beta[2];
-            U.redshiftProxy = Math.sqrt(1 + b2) / Math.max(1e-6, N);
-          } else { U.redshiftProxy = undefined; }
-        }
-        if (Number.isFinite(parameters.gammaGeo))           U.gammaGeo = N(parameters.gammaGeo);
-        const gammaVdB_raw = N(parameters.gammaVanDenBroeck, U.gammaVanDenBroeck ?? 1);
-        U.gammaVdBRaw = gammaVdB_raw; U.gammaVanDenBroeck = gammaVdB_raw;
-        const qIn = N(parameters.qSpoilingFactor, N(parameters.deltaAOverA, U.deltaAOverA ?? 1));
-        U.deltaAOverA    = qIn; U.qSpoilingFactor = qIn;
-        if (Number.isFinite(parameters.dutyEffectiveFR))    U.dutyEffectiveFR = N(parameters.dutyEffectiveFR);
-        if (Number.isFinite(parameters.sectorCount))        U.sectorCount = parameters.sectorCount|0;
-        if (Number.isFinite(parameters.sectorStrobing))     U.sectorStrobing = parameters.sectorStrobing|0;
-        if (typeof parameters.lockFraming === "boolean")    U.lockFraming = !!parameters.lockFraming;
-        if (Number.isFinite(parameters.thetaScale))         U.thetaScale = N(parameters.thetaScale);
-        if (this.strictScientific) {
-          this._req(Array.isArray(U.axesHull) && U.axesHull.length===3, "axesHull[a,b,c]", U);
-          this._req(Number.isFinite(U.wallWidth_rho), "wallWidth_rho", U);
-          this._req(Number.isFinite(U.gammaGeo), "gammaGeo", U);
-          this._req(Number.isFinite(U.deltaAOverA), "qSpoilingFactor/deltaAOverA", U);
-          this._req(Number.isFinite(U.gammaVanDenBroeck), "gammaVanDenBroeck", U);
-          this._req(Number.isFinite(U.sectorCount) && U.sectorCount>=1, "sectorCount", U);
-          this._req(Number.isFinite(U.dutyUsed), "dutyUsed", U);
-          const L = this._lc || {};
-          if (!isFinite(+L.tauLC_ms) || !isFinite(+L.dwell_ms) || !isFinite(+L.burst_ms)) { errs.push('LC(tauLC_ms/dwell_ms/burst_ms)'); }
-          if (errs.length) { U.__error = `engine(strict): missing ${errs.join(', ')}`; } else { delete U.__error; }
-          if (!Number.isFinite(U.dutyEffectiveFR)) {
-              const dutyCycle = N(U.dutyCycle, 0); const sectors = Math.max(1, U.sectors ?? 1); const sectorsTotal = Math.max(1, U.sectorCount ?? sectors);
-              const dutyFR_derived = dutyCycle * (sectors / sectorsTotal);
-              if (Number.isFinite(dutyFR_derived)) U.dutyEffectiveFR = dutyFR_derived;
-          }
-          this._req(Number.isFinite(U.dutyEffectiveFR), "dutyEffectiveFR", U);
-          if (!Number.isFinite(U.thetaScale)) {
-            const haveAll = Number.isFinite(U.gammaGeo) && Number.isFinite(U.deltaAOverA) && Number.isFinite(U.gammaVanDenBroeck) && Number.isFinite(U.dutyEffectiveFR);
-            this._req(haveAll, "thetaScale or (gammaGeo,qSpoil,gammaVdB,dutyFR)", U);
-          }
-          U.lockFraming = true;
-        }
-        if (!Array.isArray(U.axesScene) && Array.isArray(U.hullAxes)) {
-            const a = U.hullAxes; const aMax = Math.max(1e-6, a[0], a[1], a[2]); U.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
-        } else if (Array.isArray(U.axesScene)) { U.axesScene = U.axesScene.slice(0,3); }
-        if (this.strictScientific) { U.userGain = 1.0; U.displayGain = 1.0; }
-        const axesScene = P.axesScene ?? U.axesScene;
-        if (!Array.isArray(axesScene) && Array.isArray(U.hullAxes)) {
-            const aH = _guessAH(U); const hullMaxClip = Math.max(1e-6, U.hullAxes[0], U.hullAxes[1], U.hullAxes[2]); const clipScale = Math.max(1e-9, hullMaxClip, aH || 1); U.axesScene = U.hullAxes.map(x => x / clipScale);
-        } else if (Array.isArray(axesScene)) { U.axesScene = axesScene.slice(0,3); }
-        if (!U.axesScene) U.axesScene = [1,1,1];
-        let gridSpan = P.gridSpan ?? prev?.gridSpan;
-        if (!Number.isFinite(gridSpan) && U.axesScene) {
-            const hullMaxClip = Math.max(1e-6, U.axesScene[0], U.axesScene[1], U.axesScene[2]);
-            const spanPadding = P.gridSpanPadding ?? GRID_DEFAULTS.spanPadding;
-            gridSpan = Math.max(GRID_DEFAULTS.minSpan, hullMaxClip * spanPadding);
-        }
-        if (Number.isFinite(gridSpan)) U.gridSpan = gridSpan;
-        const lockFraming = P.lockFraming ?? U.lockFraming ?? this.strictScientific;
-        if (P.cameraZ != null) U.cameraZ = N(P.cameraZ); else if (!lockFraming && prev?.cameraZ != null) U.cameraZ = prev.cameraZ;
-        const exposure       = N(P.exposure, prev?.exposure ?? (this.strictScientific ? 3.5 : 6.0));
-        const zeroStop       = N(P.zeroStop, prev?.zeroStop ?? (this.strictScientific ? 1e-5 : 1e-7));
-        const vizGain        = this.strictScientific ? 1.0 : N(P.vizGain, prev?.vizGain ?? 1.0);
-        const curvatureGainT = this.strictScientific ? 0.0 : clamp01(N(P.curvatureGainT, prev?.curvatureGainT ?? 0.0));
-        const curvatureBoostMax = this.strictScientific ? 1.0 : Math.max(1.0, N(P.curvatureBoostMax, prev?.curvatureBoostMax ?? 40.0));
-        const cosmeticLevel  = this.strictScientific ? 1.0 : N(P.cosmeticLevel ?? P.viz?.cosmeticLevel, prev?.cosmeticLevel ?? 10.0);
-        U.exposure = exposure; U.zeroStop = zeroStop; U.vizGain = vizGain;
-        U.curvatureGainT = curvatureGainT; U.curvatureBoostMax = curvatureBoostMax; U.cosmeticLevel = cosmeticLevel;
-        const sectorsTotal = Math.max(1, (P.sectorCount ?? U.sectorCount ?? this.strobingState?.sectorCount ?? 400)|0);
-        const sectorsLive  = Math.max(1, (P.sectors ?? U.sectors ?? this.strobingState?.currentSector ?? 1)|0);
-        const dutyCycle    = N(P.dutyCycle, U.dutyCycle ?? 0.01);
-        let dutyEffFR = N(P.dutyEffectiveFR, undefined);
-        if (!Number.isFinite(dutyEffFR)) {
-            const dutyCycleVal = N(U.dutyCycle, 0); const sectorsVal = Math.max(1, U.sectors ?? 1); const sectorsTotalVal = Math.max(1, U.sectorCount ?? sectorsVal);
-            const dutyFR_derived = dutyCycleVal * (sectorsVal / sectorsTotalVal);
-            if (Number.isFinite(dutyFR_derived)) dutyEffFR = dutyFR_derived;
-        }
-        dutyEffFR = Math.max(1e-12, Math.min(1.0, dutyEffFR ?? 0.01));
-        const gammaGeo = N(P.gammaGeo, U.gammaGeo ?? 26);
-        const deltaAOverA = N(P.deltaAOverA ?? P.qSpoilingFactor, U.deltaAOverA ?? 1.0);
-        const gammaVdB = N(P.gammaVanDenBroeck, U.gammaVdB ?? 2.86e5);
-        let thetaScaleFinal;
-        if (this.strictScientific && U.physicsParityMode) {
-            if (isStandby) { thetaScaleFinal = 0; } else {
-                const A_geo = Math.pow(Math.max(1, gammaGeo), 3); const beta_inst = A_geo * Math.max(1e-12, deltaAOverA) * Math.max(1, gammaVdB);
-                const beta_avg  = beta_inst * Math.sqrt(Math.max(1e-12, dutyEffFR));
-                const viewAvg = (P.viewAvg ?? U.viewAvg ?? true); thetaScaleFinal = viewAvg ? beta_avg : beta_inst;
-            }
-        } else { thetaScaleFinal = N(P.thetaScale, thetaScaleFinal ?? 1.0); }
-        U.sectors = sectorsLive; U.sectorCount = sectorsTotal; U.dutyCycle = dutyCycle;
-        U.dutyEffectiveFR = dutyEffFR; U.gammaGeo = gammaGeo; U.deltaAOverA = deltaAOverA; U.gammaVanDenBroeck = gammaVdB;
-        U.thetaScale = thetaScaleFinal; U.thetaScale_actual = thetaScaleFinal;
-        if (U.useMetric && Array.isArray(U.gSpatialDiag) && U.gSpatialDiag.length>=3) {
-          const gx = N(U.gSpatialDiag[0], 1), gy = N(U.gSpatialDiag[1], 1), gz = N(U.gSpatialDiag[2], 1);
-          const dx = Math.abs(gx-1), dy = Math.abs(gy-1), dz = Math.abs(gz-1);
-          const dev = Math.max(dx,dy,dz); U.thetaScale_metric = Math.sqrt(Math.max(0, dev));
-        } else { U.thetaScale_metric = undefined; }
-        if (this.strictScientific) {
-            U.ridgeMode = 0; U.curvatureGainT = 0.0; U.curvatureBoostMax = 1.0; U.userGain = 1.0;
-        } else {
-            U.ridgeMode = P.ridgeMode ?? U.ridgeMode ?? 1; U.curvatureGainT = curvatureGainT;
-            U.curvatureBoostMax = curvatureBoostMax; U.userGain = N(P.userGain, U.userGain ?? 1.0);
-        }
-        const driveDir = P.driveDir ?? U.driveDir ?? [1,0,0];
-        U.driveDir = Array.isArray(driveDir) ? driveDir.slice(0,3) : [1,0,0];
-        const epsilonTilt = N(P.epsilonTilt, U.epsilonTilt ?? 0.0);
-        const betaTiltVec = P.betaTiltVec ?? U.betaTiltVec ?? [0,-1,0];
-        const tiltGain = N(P.tiltGain, U.tiltGain ?? 0.55);
-        U.epsilonTilt = epsilonTilt; U.betaTiltVec = Array.isArray(betaTiltVec) ? betaTiltVec.slice(0,3) : [0,-1,0]; U.tiltGain = tiltGain;
-        const intWidth = N(P.intWidth, U.intWidth ?? 0.25); U.intWidth = intWidth;
-        let colorModeRaw = P.colorMode ?? U.colorMode ?? 'theta';
-        const CM = { solid:0, theta:1, shear:2, interiorTilt:3, debug:4, custom:5, curvature:6 };
-        U.colorMode = (typeof colorModeRaw === 'string') ? (CM[colorModeRaw.toLowerCase()] ?? 1) : (colorModeRaw|0);
-        const metric = P.metric ?? U.metric ?? ID3; const metricInv = P.metricInv ?? U.metricInv ?? ID3;
-        const useMetric = P.useMetric ?? U.useMetric ?? false; const metricOn = P.metricOn ?? (useMetric ? 1.0 : 0.0);
-        U.metric = metric; U.metricInv = metricInv; U.useMetric = useMetric; U.metricOn = metricOn;
-        if (U.useMetric && Number.isFinite(U.lapseN)) {
-          const N = +U.lapseN; const beta = U.shiftBeta || [0,0,0]; const b2 = beta[0]*beta[0] + beta[1]*beta[1] + beta[2]*beta[2];
-          U.redshiftProxy = Math.sqrt(1 + b2) / Math.max(1e-6, N);
-        } else { U.redshiftProxy = undefined; }
-        const geoChanged =
-            (prev?.hullAxes?.[0] !== U.hullAxes?.[0]) || (prev?.hullAxes?.[1] !== U.hullAxes?.[1]) || (prev?.hullAxes?.[2] !== U.hullAxes?.[2]) ||
-            (prev?.wallWidth_rho !== U.wallWidth_rho) || (prev?.gridSpan !== U.gridSpan);
-        const ampChanged =
-            (prev?.thetaScale !== U.thetaScale) || (prev?.userGain !== U.userGain) ||
-            (prev?.cosmeticLevel !== U.cosmeticLevel) || (prev?.curvatureGainT !== U.curvatureGainT) ||
-            (prev?.curvatureBoostMax !== U.curvatureBoostMax) || (prev?.physicsParityMode !== U.physicsParityMode) ||
-            (prev?.ridgeMode !== U.ridgeMode);
-        if (geoChanged || ampChanged) { this._updateGrid(); }
-        else if (parameters.currentMode || P.lockFraming || P.cameraZ != null) { this._adjustCameraForSpan(U.gridSpan || 1.0); }
-    }
-    _calculateModeEffects(params) {
-        const mode = (params.currentMode ?? 'hover').toLowerCase();
-        const config = {
-            hover:     { baseScale: 1.0, strobingViz: 0.8 }, cruise:    { baseScale: 1.0, strobingViz: 0.6 },
-            emergency: { baseScale: 1.0, strobingViz: 1.0 }, standby:   { baseScale: 1.0, strobingViz: 0.3 }
-        }[mode] || { baseScale: 1.0, strobingViz: 0.8 };
-        return { visualScale: config.baseScale, curvatureAmplifier: 1.0, strobingFactor: config.strobingViz };
-    }
-    _updateGrid() {
-        if (!this.originalGridVertices) { console.error("No original vertices stored!"); return; }
-        this._warpGridVertices(this.gridVertices, this.currentParams);
-        const gl = this.gl;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        if (this._vboBytes !== this.gridVertices.byteLength) {
-            gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
-            this._vboBytes = this.gridVertices.byteLength;
-        } else { gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.gridVertices); }
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    }
-    _restoreOriginalGrid() {
-        if (!this.originalGridVertices || !this.gridVertices || !this.gl || !this.gridVbo) return;
-        this.gridVertices.set(this.originalGridVertices);
-        const gl = this.gl;
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
-        gl.bufferData(gl.ARRAY_BUFFER, this.gridVertices, gl.DYNAMIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    }
-    _warpGridVertices(vtx, bubbleParams) {
-        const hullAxes = (this.uniforms?.hullAxes || bubbleParams.hullAxes) || [503.5,132,86.5];
-        const a_m = hullAxes[0], b_m = hullAxes[1], c_m = hullAxes[2];
-        const aH = _guessAH(this.uniforms) || 1;
-        const wallWidth_rho = this.uniforms?.wallWidth_rho ?? this.uniforms?.wallWidth ?? WALL_RHO_DEFAULT;
-        const wallWidth_m   = this.uniforms?.wallWidth_m ?? wallWidth_rho * aH;
-        const axesScene = (this.uniforms?.axesScene && this.uniforms.axesScene.length === 3) ? this.uniforms.axesScene : (() => {
-                const aMax = Math.max(a_m, b_m, c_m); const s    = 1.0 / Math.max(aMax, 1e-9); return [a_m * s, b_m * s, c_m * s]; })();
-        const hullMaxClip = Math.max(axesScene[0], axesScene[1], axesScene[2]);
-        const spanPadding = bubbleParams.gridSpanPadding ?? GRID_DEFAULTS.spanPadding;
-        let targetSpan = Math.max(GRID_DEFAULTS.minSpan, hullMaxClip * spanPadding);
-        const userGain = Math.max(1.0, this.uniforms?.userGain || 1.0);
-        const spanBoost = (bubbleParams.lockFraming === false) ? (1.0 + Math.min(3.0, (Math.log10(userGain) || 0)) * 0.5) : 1.0;
-        targetSpan *= spanBoost;
-        const gridDivisions = 120;
-        const driveDir = Array.isArray(this.uniforms?.driveDir) ? this.uniforms.driveDir : [1,0,0];
-        const gridK = 0.10;
-        const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
-        const mode = (bubbleParams.currentMode ?? this.uniforms?.currentMode ?? 'hover').toLowerCase();
-        const A_base = thetaScale; const boost = userGain;
-        const modeScale = mode === 'standby' ? 0.95 : mode === 'cruise'    ? 1.00 : mode === 'hover'     ? 1.05 : mode === 'emergency' ? 1.08 : 1.00;
-        const A_vis    = Math.min(1.0, Math.log10(1.0 + A_base * boost * modeScale));
-        console.log(`🔗 SCIENTIFIC ELLIPSOIDAL NATÁRIO SHELL:`);
-        console.log(`  Hull: [${a_m.toFixed(1)}, ${b_m.toFixed(1)}, ${c_m.toFixed(1)}] m → scene: [${axesScene.map(x => x.toFixed(3)).join(', ')}]`);
-        console.log(`  Wall: ${wallWidth_m.toFixed(3)} m → ρ-space: ${wallWidth_rho.toFixed(4)} (aH=${aH.toFixed(1)})`);
-        console.log(`  Grid: span=${targetSpan.toFixed(2)} (hull_max=${hullMaxClip.toFixed(3)} × ${bubbleParams.lockFraming === false ? `boost×${spanBoost.toFixed(2)}` : 'locked'})`);
-        console.log(`  🎛️ UNIFIED AMPLITUDE: thetaScale=${thetaScale.toExponential(2)} × userGain=${userGain.toFixed(2)} × modeScale=${modeScale.toFixed(2)}`);
-        console.log(`  🔬 FINAL A_vis=${A_vis.toExponential(2)} (same blend as SliceViewer)`);
-        console.log(`  🎯 AMPLITUDE CLAMP: max_push=10% of shell radius (soft tanh saturation)`);
-        const rhoEllipsoidal = (p) => { return Math.hypot(p[0]/axesScene[0], p[1]/axesScene[1], p[2]/axesScene[2]); };
-        const sdEllipsoid = (p, axes) => { return rhoEllipsoidal(p) - 1.0; };
-        const nEllipsoid = (p, axes) => {
-            const qa = [p[0]/(axes[0]*axes[0]), p[1]/(axes[1]*axes[1]), p[2]/(axes[2]*axes[2])];
-            const rho = Math.max(1e-6, rhoEllipsoidal(p));
-            const n = [qa[0]/rho, qa[1]/rho, qa[2]/rho];
-            const m = Math.hypot(n[0], n[1], n[2]) || 1;
-            return [n[0]/m, n[1]/m, n[2]/m];
-        };
-        const dN = (() => {
-            const t = [driveDir[0]/axesScene[0], driveDir[1]/axesScene[1], driveDir[2]/axesScene[2]];
-            const m = Math.hypot(...t) || 1;
-            return [t[0]/m, t[1]/m, t[2]/m];
-        })();
-        const clamp01 = (x) => Math.max(0, Math.min(1, x));
-        const smoothstep = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-        const softSign = (x) => Math.tanh(x);
-        const thetaScale = Math.max(1e-6, this.uniforms?.thetaScale ?? 1.0);
-        const sectorsUniform    = Math.max(1, (this.uniforms?.sectors ?? 1)|0);
-        const viewAvgUniform    = this.uniforms?.viewAvg ?? true;
-        const gammaGeoUniform = this.uniforms?.gammaGeo ?? 26;
-        const qSpoilUniform   = this.uniforms?.deltaAOverA ?? 1.0;
-        const gammaVdBUniform = this.uniforms?.gammaVdB ?? 2.86e5;
-        const A_geoUniform = gammaGeoUniform * gammaGeoUniform * gammaGeoUniform;
-        const sectorsTotalU = Math.max(1, (this.uniforms?.sectorCount|0) || sectorsUniform);
-        const dutyFR_u = dutyCycleUniform * (sectorsUniform / sectorsTotalU);
-        const effDutyUniform = viewAvgUniform ? Math.max(1e-12, dutyFR_u) : 1.0;
-        const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform;
-        const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-        const betaNetUniform  = betaAvgUniform * (2*viewAvgUniform - 1);
-        const betaVisUniform = betaAvgUniform;
-        const gaussian_local = 1.0;
-        const asd = Math.abs(sd), aWin = 3.5*w_rho_local, bWin = 5.0*w_rho_local;
-        const wallWin = (asd<=aWin) ? 1 : (asd>=bWin) ? 0 : 0.5*(1.0 + Math.cos(3.14159265 * (asd - aWin) / (bWin - aWin)));
-        const rs = rho; const w  = Math.max(1e-6, w_rho_local);
-        const f  = Math.exp(-((rs - 1.0)*(rs - 1.0)) / (w*w));
-        const df = (-2.0 * (rs - 1.0) / (w*w)) * f;
-        const xs_over_rs = (n[0]*dN[0] + n[1]*dN[1] + n[2]*dN[2]);
-        const T_gain       = this.uniforms?.curvatureGainT ?? 0.375;
-        const REF_BOOSTMAX = 40.0;
-        const boostNow     = 1 + T_gain * ((this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX) - 1);
-        const exgLog  = Math.log10(Math.max(1, userGain));
-        const boostMax = (this.uniforms?.curvatureBoostMax ?? REF_BOOSTMAX);
-        const maxPush = 0.12 + 0.10 * (boostNow / Math.max(1, boostMax)) + 0.10 * Math.min(1.0, exgLog / Math.log10(Math.max(10, boostMax)));
-        const softClamp = (x, m) => m * Math.tanh(x / m);
-        let disp = gridK * Math.min(1.0, Math.log10(1.0 + betaVisUniform * userGain * modeScale)) * wallWin * front * sgn * gaussian_local;
-        disp = softClamp(disp, maxPush);
-        const epsTilt = this.uniforms?.epsilonTilt ?? 0.0;
-        const tiltGain = this.uniforms?.tiltGain ?? 0.55;
-        const betaTilt = this.uniforms?.betaTiltVec || [0,-1,0];
-        const downDot   = (n[0]*betaTilt[0] + n[1]*betaTilt[1] + n[2]*betaTilt[2]);
-        let dispTilt = epsTilt * tiltGain * Math.max(0,sd) * downDot;
-        const maxTilt = 0.05;
-        dispTilt = Math.max(-maxTilt, Math.min(maxTilt, dispTilt));
-        vtx[i]     = p[0] - n[0] * (disp + dispTilt);
-        vtx[i + 1] = p[1] - n[1] * (disp + dispTilt);
-        vtx[i + 2] = p[2] - n[2] * (disp + dispTilt);
-    }
-    let maxRadius = 0; let maxDisp = 0;
-    for (let i = 0; i < vtx.length; i += 3) {
-        const r = Math.hypot(vtx[i], vtx[i + 1], vtx[i + 2]);
-        maxRadius = Math.max(maxRadius, r);
-        if (this.originalGridVertices) {
-            const origR = Math.hypot(this.originalGridVertices[i], this.originalGridVertices[i + 1], this.originalGridVertices[i + 2]);
-            maxDisp = Math.max(maxDisp, Math.abs(r - origR));
-        }
-    }
-    console.log(`🎯 AMPLITUDE CHECK: max_radius=${maxRadius.toFixed(4)} (should be <2.0 to stay in frustum)`);
-    console.log(`🎯 DISPLACEMENT: max_change=${maxDisp.toFixed(4)} (controlled deformation, no spears)`);
-    let ymax = -1e9, ymin = 1e9;
-    for (let i = 1; i < vtx.length; i += 3) {
-        const y = vtx[i];
-        if (y > ymax) ymax = y;
-        if (y < ymin) ymin = y;
-    }
-    console.log(`Grid Y range: ${ymin.toFixed(3)} … ${ymax.toFixed(3)} (canonical smooth shell)`);
-    console.log(`🔧 CANONICAL NATÁRIO: Smooth C¹-continuous profile (no micro-mountains)`);
-    console.log(`🔧 SMOOTH STROBING: Wide blend width for canonical smoothness`);
-    this.uniforms.axesClip = axesScene;
-    this.uniforms.wallWidth = wallWidth_rho;
-    this.uniforms.hullDimensions = { a: a_m, b: b_m, c: c_m, aH, SCENE_SCALE, wallWidth_m };
-    if (!Number.isFinite(this.currentGridSpan) || Math.abs(targetSpan - this.currentGridSpan) > 0.1) {
-        console.log(`🔄 Regenerating grid: ${this.currentGridSpan || 'initial'} → ${targetSpan.toFixed(2)}`);
-        this.currentGridSpan = targetSpan;
-        this._gridSpan = targetSpan;
-        const newGridData = this._createGrid(targetSpan, gridDivisions);
-        this.gridVertices = newGridData;
-        this.originalGridVertices = new Float32Array(newGridData);
-        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.gridVbo);
-        if (this._vboBytes !== this.gridVertices.byteLength) {
-            this.gl.bufferData(this.gl.ARRAY_BUFFER, this.gridVertices, this.gl.DYNAMIC_DRAW);
-            this._vboBytes = this.gridVertices.byteLength;
-        } else {
-            this.gl.bufferSubData(this.gl.ARRAY_BUFFER, 0, this.gridVertices);
-        }
-        console.log(`✓ Grid regenerated with span=${targetSpan.toFixed(2)} for hull [${a_m}×${b_m}×${c_m}]m`);
-        this._adjustCameraForSpan(targetSpan);
-    }
-}
     _renderGridPoints() {
         const gl = this.gl;
         if (!this.gridProgram || !this.gridUniforms || !this.gridAttribs) {
@@ -2802,24 +2038,35 @@ _renderGridPoints() {
             }
             return;
         }
+
+        // Show diagnostics if strict is missing inputs
         if (this.strictScientific && this.uniforms?.__error) {
           gl.clearColor(0.2, 0.0, 0.0, 1.0);
           gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
           return;
         }
+
         gl.useProgram(this.gridProgram);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.gridVbo);
         const loc = this.gridAttribs.position;
         gl.enableVertexAttribArray(loc);
         gl.vertexAttribPointer(loc, 3, gl.FLOAT, false, 0, 0);
+
         const U = this.uniforms || {};
+
+        // --- names / helpers
         const I = (x, d)=> Number.isFinite(x) ? (x|0) : d;
         const F = (x, d)=> Number.isFinite(x) ? +x : d;
         const V3 = (arr, d=[0,0,0]) => (Array.isArray(arr) && arr.length===3 ? arr : d);
+        // Helper functions for values that might be undefined in uniforms
         const finite = (x, d)=> Number.isFinite(+x)? +x : d;
         const integer = (x, d)=> Number.isFinite(Math.floor(+x))? Math.floor(+x) : d;
+
+        // --- colors / matrices you already set:
         gl.uniformMatrix4fv(this.gridUniforms.mvpMatrix, false, this.mvpMatrix);
         gl.uniform3f(this.gridUniforms.sheetColor, 1.0, 0.0, 0.0);
+
+        // --- modes / sectoring (use lowercase names in the shader)
         if (this.gridUniforms.colorMode)  gl.uniform1i(this.gridUniforms.colorMode,  I(U.colorMode, 1));
         if (this.gridUniforms.ridgeMode)  gl.uniform1i(this.gridUniforms.ridgeMode,  I(U.ridgeMode, 1));
         if (this.gridUniforms.parity)     gl.uniform1i(this.gridUniforms.parity,     U.physicsParityMode ? 1 : 0);
@@ -2827,17 +2074,28 @@ _renderGridPoints() {
         const sTotal = Math.max(1, (U.sectorCount|0)  || sLive);
         if (this.gridUniforms.sectorCount)gl.uniform1i(this.gridUniforms.sectorCount, sTotal);
         if (this.gridUniforms.split)      gl.uniform1i(this.gridUniforms.split,      Math.max(0, Math.min(sLive - 1, I(U.split,0))));
+
+        // --- axes (scene-normalized and legacy hull)
         const axesScene = U.axesClip || U.axesScene || [1,1,1];
         const hullAxes  = U.hullAxes || [503.5, 132.0, 86.5];
         if (this.gridUniforms.axesScene) gl.uniform3fv(this.gridUniforms.axesScene, new Float32Array(axesScene));
         if (this.gridUniforms.axes)      gl.uniform3fv(this.gridUniforms.axes,      new Float32Array(hullAxes));
+
+        // --- drive + wall
         const drive = V3(U.driveDir, [1,0,0]);
+        // Use unified wallWidth_rho, aliased as wallWidth for the shader
         const wRho  = F(U.wallWidth, WALL_RHO_DEFAULT);
         if (this.gridUniforms.driveDir)  gl.uniform3fv(this.gridUniforms.driveDir, new Float32Array(drive));
         if (this.gridUniforms.wallWidth) gl.uniform1f(this.gridUniforms.wallWidth, wRho);
+
+        // --- critical amplitude carrier INSIDE theta field:
         const vShip = Number.isFinite(U.vShip) ? U.vShip : (U.physicsParityMode ? 0.0 : 1.0);
         if (this.gridUniforms.vShip)     gl.uniform1f(this.gridUniforms.vShip, F(vShip, 1.0));
-        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0);
+
+        // --- θ-scale (you already set a fallback in JS if missing)
+        if (this.gridUniforms.thetaScale) gl.uniform1f(this.gridUniforms.thetaScale, U.thetaScale || 0); // Direct pipeline value, no fallback amplification
+
+        // --- exposure / viz chain
         if (this.gridUniforms.exposure)          gl.uniform1f(this.gridUniforms.exposure,          F(U.exposure, U.physicsParityMode ? 3.5 : 6.0));
         if (this.gridUniforms.zeroStop)          gl.uniform1f(this.gridUniforms.zeroStop,          F(U.zeroStop, U.physicsParityMode ? 1e-5 : 1e-7));
         if (this.gridUniforms.userGain)          gl.uniform1f(this.gridUniforms.userGain,          F(U.userGain, 1.0));
@@ -2845,18 +2103,25 @@ _renderGridPoints() {
         if (this.gridUniforms.vizGain)           gl.uniform1f(this.gridUniforms.vizGain,           F(U.vizGain, 1.0));
         if (this.gridUniforms.curvatureGainT)    gl.uniform1f(this.gridUniforms.curvatureGainT,    F(U.curvatureGainT, 0.0));
         if (this.gridUniforms.curvatureBoostMax) gl.uniform1f(this.gridUniforms.curvatureBoostMax, F(U.curvatureBoostMax, 1.0));
+
+        // --- interior tilt (benign defaults)
         if (this.gridUniforms.intWidth) gl.uniform1f(this.gridUniforms.intWidth, F(U.intWidth, 0.25));
         if (this.gridUniforms.epsTilt)  gl.uniform1f(this.gridUniforms.epsTilt,  F(U.epsTilt,  0.0));
         if (this.gridUniforms.tiltViz)  gl.uniform1f(this.gridUniforms.tiltViz,  F(U.tiltViz,  0.0));
+
+        // --- Purple shift uniforms
         if (this.gridUniforms.epsilonTilt) gl.uniform1f(this.gridUniforms.epsilonTilt, F(U.epsilonTilt, 0.0));
         if (this.gridUniforms.betaTiltVec) {
             const betaTilt = V3(U.betaTiltVec, [0, -1, 0]);
             gl.uniform3fv(this.gridUniforms.betaTiltVec, new Float32Array(betaTilt));
         }
+
+        // --- Metric tensor uniforms (default to identity if not provided)
         const metric = U.metric || [1,0,0, 0,1,0, 0,0,1];
         const metricInv = U.metricInv || [1,0,0, 0,1,0, 0,0,1];
         const useMetric = U.useMetric || false;
         const metricOn = U.metricOn !== undefined ? U.metricOn : (useMetric ? 1.0 : 0.0);
+
         if (this.gridUniforms.metric) {
             gl.uniformMatrix3fv(this.gridUniforms.metric, false, new Float32Array(metric));
             gl.uniformMatrix3fv(this.gridUniforms.metricInv, false, new Float32Array(metricInv));
@@ -2865,14 +2130,24 @@ _renderGridPoints() {
         if (this.gridUniforms.metricOn) {
             gl.uniform1f(this.gridUniforms.metricOn, metricOn);
         }
+
+        // --- New tensor uniforms ---
+        // upload camera forward every frame (if present)
         if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
           gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
         }
+        // upload lowered shift g0i = β_i (if present)
         if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
-          gl.uniform3f(this.gridUniforms.g0i, +U.g0i[0]||0, +U.g0i[1]||0, +U.g0i[2]||0);
+          gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
         }
-        if (typeof U.metricMode === 'boolean') { gl.uniform1f(this.gridUniforms.metricOn, U.metricMode ? 1.0 : 0.0); }
-        else if (typeof U.useMetric === 'boolean') { gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0); }
+        // Mirror metric toggle (no SHOW boosts here)
+        if (typeof U.metricMode === 'boolean') {
+          gl.uniform1f(this.gridUniforms.metricOn, U.metricMode ? 1.0 : 0.0);
+        } else if (typeof U.useMetric === 'boolean') {
+          gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
+        }
+
+        // --- Light-crossing uniforms (mirrored) ---
         const L = this._lc || {};
         if (loc.tauLC_ms)     gl.uniform1f(loc.tauLC_ms, isFinite(+L.tauLC_ms)? +L.tauLC_ms : 0.0);
         if (loc.dwell_ms)     gl.uniform1f(loc.dwell_ms, isFinite(+L.dwell_ms)? +L.dwell_ms : 0.0);
@@ -2882,8 +2157,7 @@ _renderGridPoints() {
         if (loc.sectorIdx)    gl.uniform1i(loc.sectorIdx, isFinite(+L.sectorIdx)? +L.sectorIdx : 0);
         if (loc.sectorCount)  gl.uniform1i(loc.sectorCount, isFinite(+L.sectorCount)? +L.sectorCount : 1);
         if (loc.dutyUsed && isFinite(+U.dutyUsed)) gl.uniform1f(loc.dutyUsed, +U.dutyUsed);
-        if (typeof U.metricMode === 'boolean') { gl.uniform1f(loc.metricOn, U.metricMode ? 1.0 : 0.0); }
-        else if (typeof U.useMetric === 'boolean') { gl.uniform1f(loc.metricOn, U.useMetric ? 1.0 : 0.0); }
+
         const vertexCount = (this.gridVertices?.length || 0) / 3;
         if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
         gl.disableVertexAttribArray(loc);
@@ -3157,9 +2431,12 @@ _renderGridPoints() {
         console.log("WarpEngine resources cleaned up");
     }
 }
-function finite(x){ const n = +x; return Number.isFinite(n)? n : undefined; }
-function integer(x){ const n = Math.floor(+x); return Number.isFinite(n)? n : undefined; }
-function isFinite(n){ return Number.isFinite(n); }
+function finite(x){ const n=+x; return Number.isFinite(n)?n:undefined; }
+function integer(x){ const n=Math.floor(+x); return Number.isFinite(n)?n:undefined; }
+function isF(x){ return Number.isFinite(+x); }
+function inty(x){ const n=Math.floor(+x); return Number.isFinite(n)?n:undefined; }
+function booly(x){ return x===true || x===1 || x==='1'; }
+function arrN(a,k){ return (Array.isArray(a)&&a.length>=k)?a:undefined; }
 window.WarpEngine = window.WarpEngine || WarpEngine;
 export { WarpEngine };
 })();
