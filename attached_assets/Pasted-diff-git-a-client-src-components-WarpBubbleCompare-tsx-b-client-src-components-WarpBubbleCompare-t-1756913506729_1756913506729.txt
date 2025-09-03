@@ -1,0 +1,105 @@
+diff --git a/client/src/components/WarpBubbleCompare.tsx b/client/src/components/WarpBubbleCompare.tsx
+--- a/client/src/components/WarpBubbleCompare.tsx
++++ b/client/src/components/WarpBubbleCompare.tsx
+@@ -1,33 +1,69 @@
+-import React, { useEffect, useMemo } from "react";
+-// …existing imports…
++import React, { useEffect, useMemo } from "react";
++import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
++// (keep other existing imports as-is)
+ 
+ export type CompareProps = {
+-  leftEngine: any;
+-  rightEngine: any;
+-  parameters?: any;   // previously used to build physics locally
+-  real?: any;         // cosmetic-only now
+-  show?: any;         // cosmetic-only now
++  leftEngine: any;
++  rightEngine: any;
++  /** Full pipeline snapshot preferred (same shape as /api/helix/pipeline) */
++  pipeline?: any;
++  /** Legacy: manual “parameters”. We’ll wrap these minimally if pipeline isn’t provided. */
++  parameters?: any;
++  /** Cosmetic knobs only (colors, exposure, camera); no physics here */
++  real?: any;
++  show?: any;
+ };
+ 
+-export function WarpBubbleCompare(props: CompareProps) {
+-  const { leftEngine, rightEngine, parameters, real, show } = props;
++export function WarpBubbleCompare(props: CompareProps) {
++  const { leftEngine, rightEngine, pipeline, parameters, real, show } = props;
+ 
+-  // Wall width & axes should already be normalized by adapter; do not recompute here.
+-  const wallRho = Number.isFinite(parameters.wallWidth_rho) ? +parameters.wallWidth_rho : undefined;
+-  const wallM   = Number.isFinite(parameters.wallWidth_m)   ? +parameters.wallWidth_m   : undefined;
++  // ---- Compose a pipeline snapshot to feed the adapter ----
++  // Preferred: props.pipeline (server snapshot). Fallback: minimally wrap "parameters"
++  const snap = useMemo(() => {
++    if (pipeline) return pipeline;
++    const p = parameters || {};
++    const nat = p.natario || {};
++    // We DO NOT fabricate physics here; just package what’s already present.
++    return {
++      ...p,
++      natario: {
++        metricMode: nat.metricMode ?? p.metricMode,
++        lapseN:     nat.lapseN ?? p.lapseN,
++        shiftBeta:  nat.shiftBeta ?? p.shiftBeta,
++        gSpatialDiag: nat.gSpatialDiag ?? p.gSpatialDiag,
++        gSpatialSym:  nat.gSpatialSym ?? p.gSpatialSym,
++        viewForward:  nat.viewForward ?? p.viewForward,
++        g0i:          nat.g0i ?? p.g0i,
++      },
++      // keep original duty/LC/θ fields if present; adapter will strict-gate if missing
++    };
++  }, [pipeline, parameters]);
+ 
+-  const realPayload = useMemo(() => ({
+-    ...real,
+-    wallWidth: wallRho,
+-    wallWidth_rho: wallRho,
+-    wallWidth_m: wallM,
+-    // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
+-  }), [real, wallRho, wallM]);
++  // ---- Drive engines strictly from pipeline via adapter (no local physics) ----
++  useEffect(() => {
++    const L = leftEngine?.current;
++    const R = rightEngine?.current;
++    if (!L || !R || !snap) return;
++    // All physics (θ, duty, LC, tensors, parity/ridge) flow through the adapter.
++    driveWarpFromPipeline(L, snap, { mode: "REAL", strict: true });
++    driveWarpFromPipeline(R, snap, { mode: "SHOW", strict: true });
++  }, [leftEngine, rightEngine, snap]);
+ 
+-  const showPayload = useMemo(() => ({
+-    ...show,
+-    wallWidth: wallRho,
+-    wallWidth_rho: wallRho,
+-    wallWidth_m: wallM,
+-    // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
+-  }), [show, wallRho, wallM]);
++  // ---- Cosmetic-only updates are still okay (camera, exposure, color) ----
++  // If you had earlier cosmetic-only updates via updateUniforms, keep them here (optional).
++  useEffect(() => {
++    const z = 3.0; // stable framing; purely visual
++    leftEngine?.current?.updateUniforms?.({ cameraZ: z, ...(real || {}) });
++    rightEngine?.current?.updateUniforms?.({ cameraZ: z, ...(show || {}) });
++  }, [leftEngine, rightEngine, real, show]);
+ 
+-  useEffect(() => {
+-    leftEngine?.current?.updateUniforms(realPayload);
+-    rightEngine?.current?.updateUniforms(showPayload);
+-  }, [leftEngine, rightEngine, realPayload, showPayload]);
++  // NOTE:
++  //  - We removed parity/ridge/wall-width enforcement and any local θ/duty math.
++  //  - The adapter handles LC normalization, duty selection by mode, tensors forwarding,
++  //    and strict validation (it will set engine.uniforms.__error if required fields are missing).
++  //  - This component is now a pure consumer: server → adapter → engine.
+ 
+   return (
+     <div className="warp-bubble-compare">
+       {/* existing layout/UI remains unchanged */}
+     </div>
+   );
+ }
