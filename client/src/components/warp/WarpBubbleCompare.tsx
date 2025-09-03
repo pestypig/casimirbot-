@@ -8,16 +8,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import { computeThetaScale } from '@/lib/warp-theta';
 
-// Use harmonic mean for meters↔ρ conversions (match engine)
-function aHarmonic(ax?: number, ay?: number, az?: number) {
-  const a = +ax || 0, b = +ay || 0, c = +az || 0;
-  const denom = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
-  return denom > 0 ? 3/denom : NaN;
-}
-function toWallRhoFromMeters(w_m: number, axes: [number,number,number]) {
-  const aH = aHarmonic(axes[0], axes[1], axes[2]);
-  return Number.isFinite(aH) ? (w_m / aH) : undefined;
-}
+// Wall width conversions now handled by pipeline adapter
 
 // --- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -990,16 +981,13 @@ export default function WarpBubbleCompare({
     if (cv) (cv as any).__warpEngine = undefined;
   }
 
-  // Build REAL/SHOW packets from parameters with unified wall width calculations
+  // Build REAL/SHOW packets from parameters (adapter handles wall width calculations)
   function buildPacketsFromParams(p: any) {
     const wu = normalizeWU(p?.warpUniforms || (p as any));
 
-    // Unified wall width from adapter/pipeline (ρ & m stay in sync)
-    const aH = aHarmonic(p.axesHull?.[0], p.axesHull?.[1], p.axesHull?.[2]);
-    const wallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho
-                   : (Number.isFinite(p.wallWidth_m) && Number.isFinite(aH)) ? (+p.wallWidth_m / aH) : undefined;
-    const wallM   = Number.isFinite(p.wallWidth_m) ? +p.wallWidth_m
-                   : (Number.isFinite(p.wallWidth_rho) && Number.isFinite(aH)) ? (+p.wallWidth_rho * aH) : undefined;
+    // Wall width & axes should already be normalized by adapter; do not recompute here.
+    const wallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho : undefined;
+    const wallM   = Number.isFinite(p.wallWidth_m)   ? +p.wallWidth_m   : undefined;
 
     // Forward Natário tensors and toggle if present (pass-through, no defaults)
     const natarioFields: any = {};
@@ -1015,13 +1003,14 @@ export default function WarpBubbleCompare({
     const real = buildREAL(wu);
     const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
 
-    // Apply unified wall width and Natário fields to both payloads
+    // Apply wall width and Natário fields to both payloads (no physics overrides)
     const realWithWall = {
       ...real,
       wallWidth: wallRho,
       wallWidth_rho: wallRho,
       wallWidth_m: wallM,
       ...natarioFields,
+      // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
     };
 
     const showWithWall = {
@@ -1030,6 +1019,7 @@ export default function WarpBubbleCompare({
       wallWidth_rho: wallRho,
       wallWidth_m: wallM,
       ...natarioFields,
+      // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
     };
 
     return { real: realWithWall, show: showWithWall };
@@ -1083,33 +1073,29 @@ export default function WarpBubbleCompare({
       const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
       const { real, show } = buildPacketsFromParams(parameters);
 
-      // REAL packet
+      // REAL packet (no physics overrides)
       const realPacket = {
         ...shared,
         ...real,
         currentMode: parameters.currentMode,
-        physicsParityMode: true,
         vShip: 0,
         gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
         deltaAOverA: real.qSpoilingFactor,
         dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
         sectors: Math.max(1, parameters.sectors),
-        ridgeMode: 0,
       };
 
-      // SHOW packet
+      // SHOW packet (no physics overrides)
       const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
       const showPacket = {
         ...shared,
         ...show,
         currentMode: parameters.currentMode,
-        physicsParityMode: false,
         vShip: parameters.currentMode === 'standby' ? 0 : 1,
         thetaScale: showTheta,
         gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
         deltaAOverA: show.qSpoilingFactor,
         sectors: Math.max(1, parameters.sectors),
-        ridgeMode: 1,
       };
 
       // 4) Init both engines without uniforms first
@@ -1137,7 +1123,7 @@ export default function WarpBubbleCompare({
       // 6) Single combined uniforms write per pane using batchers
       const heroExaggeration = 82; // default visual boost
 
-      // REAL — physics truth
+      // REAL — physics truth (no overrides)
       pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
         ...shared,
         ...real,
@@ -1147,11 +1133,9 @@ export default function WarpBubbleCompare({
         userGain: 1,
         displayGain: 1,
         colorMode: 2, // shear for truth view
-        physicsParityMode: true,
-        ridgeMode: 0,
       })), 'REAL/combined');
 
-      // SHOW — boosted visuals
+      // SHOW — boosted visuals (no overrides)
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
         ...shared,
         ...show,
@@ -1160,8 +1144,6 @@ export default function WarpBubbleCompare({
         curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
         userGain: 4,
         displayGain: 1,
-        physicsParityMode: false,
-        ridgeMode: 1,
       })), 'SHOW/combined');
 
       // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
@@ -1221,7 +1203,7 @@ export default function WarpBubbleCompare({
     const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene || [1,1,1]));
 
-    // REAL: minimal cosmetic-only updates
+    // REAL: minimal cosmetic-only updates (no physics overrides)
     pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
       ...shared,
       cameraZ: camZ,
@@ -1231,7 +1213,7 @@ export default function WarpBubbleCompare({
       lockFraming: true,
     })), 'REAL/cosmetic');
 
-    // SHOW: minimal cosmetic-only updates with hero boost
+    // SHOW: minimal cosmetic-only updates with hero boost (no physics overrides)
     pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
       ...shared,
       cameraZ: camZ,
