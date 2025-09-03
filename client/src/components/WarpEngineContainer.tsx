@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
-import { useMetrics } from "@/hooks/use-metrics";
 import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
+import { useMetrics } from "@/hooks/use-metrics";
 
 export default function WarpEngineContainer(props: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -58,8 +58,8 @@ export default function WarpEngineContainer(props: { className?: string }) {
   useEffect(() => {
     if (!pipeline) return;
     // Use strict pipeline-driven rendering
-    driveWarpFromPipeline(engineRef.current, pipeline, { mode: 'REAL', strict: true });
-  }, [pipeline]);
+    driveWarpFromPipeline(engineRef.current, pipeline, { mode: 'REAL', strict: true, metrics });
+  }, [pipeline, metrics]);
 
   // Keep cameraZ cosmetic only (no physics knobs here)
   useEffect(() => {
