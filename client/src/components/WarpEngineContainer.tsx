@@ -20,7 +20,15 @@ export default function WarpEngineContainer(props: { className?: string }) {
   // Get live pipeline data
   const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
   const { data: metrics } = useMetrics(2000);
-  const { data: lc } = useLightCrossingLoop(); // τ_LC, dwell, burst, phase, sector, onWindow
+  // Hook returns a plain object (not {data}); also accept undefined pipeline fields safely.
+  const lc = useLightCrossingLoop({
+    sectorStrobing: Number.isFinite(pipeline?.sectorCount) ? (pipeline!.sectorCount as number) : 400,
+    currentSector:  (metrics as any)?.sectorIdx ?? 0,
+    sectorPeriod_ms: (pipeline as any)?.sectorPeriod_ms ?? 1,
+    wallWidth_m:     (pipeline as any)?.wallWidth_m ?? (pipeline as any)?.lc?.wallWidth_m ?? 1.0,
+    freqGHz:         (pipeline as any)?.modulationFreq_GHz ?? 15,
+    localBurstFrac:  (pipeline as any)?.burstLocal ?? 0.01,
+  }); // τ_LC, dwell, burst, phase, sector, onWindow
   const greens = useGreens();
 
   useEffect(() => {

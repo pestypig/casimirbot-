@@ -21,7 +21,7 @@ export function useLightCrossingLoop({
   hull,
   wallWidth_m = 1.0,  // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
   localBurstFrac = 0.01,  // default 1% burst duty
-}: Args) {
+}: Partial<Args> = {}) {
   // --- Light-crossing estimate (choose the *shortest relevant* length scale)
   // Using the wall thickness gives a strict local bound; feel free to swap
   // to min semi-axis or mean chord if you want a different control policy.
