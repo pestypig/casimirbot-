@@ -4,6 +4,7 @@ import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
+import { useMetrics } from "@/hooks/use-metrics";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 
@@ -641,6 +642,7 @@ export default function WarpRenderInspector(props: {
     refetchOnWindowFocus: false,
     staleTime: 10_000,
   });
+  const { data: metrics } = useMetrics(2000);
   const switchMode = useSwitchMode();
   const queryClient = useQueryClient();
 
@@ -1408,9 +1410,9 @@ export default function WarpRenderInspector(props: {
   // Drive engines strictly from pipeline snapshot (no client fabrication)
   useEffect(() => {
     if (!live) return;
-    driveWarpFromPipeline(leftEngine.current, live, { mode: 'REAL', strict: true });
-    driveWarpFromPipeline(rightEngine.current, live, { mode: 'SHOW', strict: true });
-  }, [live]);
+    driveWarpFromPipeline(leftEngine.current, live, { mode: 'REAL', strict: true, metrics });
+    driveWarpFromPipeline(rightEngine.current, live, { mode: 'SHOW', strict: true, metrics });
+  }, [live, metrics]);
 
 
   // Use props directly to avoid scope issues if realPhys isn't defined here
