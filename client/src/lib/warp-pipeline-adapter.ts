@@ -129,17 +129,21 @@ export function driveWarpFromPipeline(
   }
 
   // ---- 5) Push to engine (single source of truth) ---------------------------
-  // Pipeline stamping for diagnostics/tracking
-  const stamp = {
-    __pipelineMode: mode,
-    __pipelineTick: (pipeline?.tickId ?? pipeline?.timestamp ?? Date.now()),
-  };
-  engine.updateUniforms?.(stamp);
-  
-  // Helpful for inspectors: record the active mode
-  const stamp:any = { currentMode: mode };
-  if (mx?.timestamp) stamp.__metricsTick = mx.timestamp;
-  engine.updateUniforms?.(stamp);
+  // Helpful for inspectors: record adapter + mode + ticks (consolidated stamp)
+  {
+    const stamp:any = {
+      // keep existing key for UIs that read it
+      currentMode: mode,
+      // extra diagnostics (non-breaking)
+      __pipelineMode: mode,
+      __adapterId: 'warp-pipeline-adapter@stable',
+      __pipelineTick: (pipeline as any)?.tickId ?? (pipeline as any)?.timestamp ?? Date.now(),
+    };
+    if (mx && (mx.timestamp != null)) {
+      stamp.__metricsTick = mx.timestamp;
+    }
+    engine.updateUniforms?.(stamp);
+  }
   engine.setLightCrossing?.(lcPayload);
   engine.updateUniforms?.(uniforms);
   engine.requestRewarp?.();
