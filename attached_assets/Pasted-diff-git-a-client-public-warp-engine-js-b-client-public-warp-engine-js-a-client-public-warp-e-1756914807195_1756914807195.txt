@@ -1,0 +1,57 @@
+diff --git a/client/public/warp-engine.js b/client/public/warp-engine.js
+--- a/client/public/warp-engine.js
++++ b/client/public/warp-engine.js
+@@ -118,6 +118,8 @@ class WarpEngine {
+   _bindGridUniformLocations(gl, program) {
+     const loc = (this.gridUniforms = this.gridUniforms || {});
+     // --- existing locations (unchanged) ---
+     loc.viewForward  = gl.getUniformLocation(program, 'u_viewForward');
+     loc.g0i          = gl.getUniformLocation(program, 'u_g0i');
+     loc.metricOn     = gl.getUniformLocation(program, 'u_metricOn');
+@@ -128,9 +130,26 @@ class WarpEngine {
+     loc.phase        = gl.getUniformLocation(program, 'u_phase');
+     loc.onWindow     = gl.getUniformLocation(program, 'u_onWindow');
+     loc.sectorIdx    = gl.getUniformLocation(program, 'u_sectorIdx');
+     loc.sectorCount  = gl.getUniformLocation(program, 'u_sectorCount');
+     loc.dutyUsed     = gl.getUniformLocation(program, 'u_dutyUsed');
++
++    // Expose a presence map for diagnostics (inspectors can render this)
++    this._uniformPresence = {
++      viewForward: !!loc.viewForward,
++      g0i:         !!loc.g0i,
++      metricOn:    !!loc.metricOn,
++      tauLC_ms:    !!loc.tauLC_ms,
++      dwell_ms:    !!loc.dwell_ms,
++      burst_ms:    !!loc.burst_ms,
++      phase:       !!loc.phase,
++      onWindow:    !!loc.onWindow,
++      sectorIdx:   !!loc.sectorIdx,
++      sectorCount: !!loc.sectorCount,
++      dutyUsed:    !!loc.dutyUsed,
++    };
++    // Mirror into public bag for UI
++    this.uniforms = this.uniforms || {};
++    this.uniforms.__uniformsBound = this._uniformPresence;
+   }
+ 
+   _applyUniformsNow() {
+     const gl = this.gl;
+     const program = this.gridProgram;
+@@ -141,6 +160,16 @@ class WarpEngine {
+     const U = this.uniforms || {};
+     const L = this._lc || {};
+ 
++    // One-time warning if GLSL omitted any uniforms (e.g., optimizer, name typo)
++    if (!this._warnedUniforms && this._uniformPresence) {
++      const missing = Object.entries(this._uniformPresence)
++        .filter(([, ok]) => !ok)
++        .map(([k]) => k);
++      if (missing.length) {
++        console.warn('[WarpEngine] Missing GLSL uniform locations:', missing);
++      }
++      this._warnedUniforms = true;
++    }
+     // --- existing uploads (thetaScale, tensors, etc.) ---
+     if (loc.viewForward && Array.isArray(U.viewForward)) {
+       gl.uniform3f(loc.viewForward, +U.viewForward[0]||0, +U.viewForward[1]||0, +U.viewForward[2]||0);
+     }

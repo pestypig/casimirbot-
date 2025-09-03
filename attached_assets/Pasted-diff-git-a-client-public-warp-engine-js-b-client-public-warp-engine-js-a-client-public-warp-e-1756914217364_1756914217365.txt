@@ -1,0 +1,99 @@
+diff --git a/client/public/warp-engine.js b/client/public/warp-engine.js
+--- a/client/public/warp-engine.js
++++ b/client/public/warp-engine.js
+@@ -120,18 +120,42 @@ class WarpEngine {
+   _bindGridUniformLocations(gl, program) {
+-    const loc = (this.gridUniforms = this.gridUniforms || {});
+-    // ... existing locations ...
+-    loc.metricOn     = gl.getUniformLocation(program, 'u_metricOn');
+-    loc.viewForward  = gl.getUniformLocation(program, 'u_viewForward');
+-    loc.g0i          = gl.getUniformLocation(program, 'u_g0i');
+-    // LC uniforms (partial / inconsistent before)
+-    // (some were missing or duplicated)
++    const loc = (this.gridUniforms = this.gridUniforms || {});
++    // --- existing locations (unchanged) ---
++    loc.viewForward  = gl.getUniformLocation(program, 'u_viewForward');
++    loc.g0i          = gl.getUniformLocation(program, 'u_g0i');
++    loc.metricOn     = gl.getUniformLocation(program, 'u_metricOn');
++
++    // --- Light-crossing & strobing (authoritative; renderer-gated) ---
++    // Ensure every LC uniform has a cached location and names are consistent.
++    loc.tauLC_ms     = gl.getUniformLocation(program, 'u_tauLC_ms');
++    loc.dwell_ms     = gl.getUniformLocation(program, 'u_dwell_ms');
++    loc.burst_ms     = gl.getUniformLocation(program, 'u_burst_ms');
++    loc.phase        = gl.getUniformLocation(program, 'u_phase');
++    loc.onWindow     = gl.getUniformLocation(program, 'u_onWindow');
++    loc.sectorIdx    = gl.getUniformLocation(program, 'u_sectorIdx');
++    loc.sectorCount  = gl.getUniformLocation(program, 'u_sectorCount');
++    loc.dutyUsed     = gl.getUniformLocation(program, 'u_dutyUsed');
++
++    // Keep the object on instance for render path
++    this.gridUniforms = loc;
+   }
+ 
+   _applyUniformsNow() {
+     const gl = this.gl;
+     const program = this.gridProgram;
+     if (!gl || !program) return;
+-    const loc = this.gridUniforms || {};
++    const loc = this.gridUniforms || {};
+     const U = this.uniforms || {};
++    const L = this._lc || {};
+ 
+     // --- existing uploads (thetaScale, parity/ridge, tensors, view, etc.) ---
+     if (loc.viewForward && Array.isArray(U.viewForward)) {
+       gl.uniform3f(loc.viewForward, +U.viewForward[0]||0, +U.viewForward[1]||0, +U.viewForward[2]||0);
+     }
+     if (loc.g0i && Array.isArray(U.g0i)) {
+       gl.uniform3f(loc.g0i, +U.g0i[0]||0, +U.g0i[1]||0, +U.g0i[2]||0);
+     }
+-    // LC uploads (some were missing)
+-    // (ensure all are present & consistent)
++    // --- LC uploads (consistent with cached locations) ---
++    if (loc.tauLC_ms)     gl.uniform1f(loc.tauLC_ms,     Number.isFinite(+L.tauLC_ms)    ? +L.tauLC_ms    : 0.0);
++    if (loc.dwell_ms)     gl.uniform1f(loc.dwell_ms,     Number.isFinite(+L.dwell_ms)    ? +L.dwell_ms    : 0.0);
++    if (loc.burst_ms)     gl.uniform1f(loc.burst_ms,     Number.isFinite(+L.burst_ms)    ? +L.burst_ms    : 0.0);
++    if (loc.phase)        gl.uniform1f(loc.phase,        Number.isFinite(+L.phase)       ? +L.phase       : 0.0);
++    if (loc.onWindow)     gl.uniform1f(loc.onWindow,     L.onWindow ? 1.0 : 0.0);
++    if (loc.sectorIdx)    gl.uniform1i(loc.sectorIdx,    Number.isFinite(+L.sectorIdx)   ? +L.sectorIdx   : 0);
++    if (loc.sectorCount)  gl.uniform1i(loc.sectorCount,  Number.isFinite(+L.sectorCount) ? +L.sectorCount : 1);
++    if (loc.dutyUsed && Number.isFinite(+U.dutyUsed)) {
++      gl.uniform1f(loc.dutyUsed, +U.dutyUsed);
++    }
++    if (typeof U.metricMode === 'boolean' && loc.metricOn) {
++      gl.uniform1f(loc.metricOn, U.metricMode ? 1.0 : 0.0);
++    }
+ 
+     // ... rest of existing uploads ...
+   }
+@@ -540,14 +564,20 @@ class WarpEngine {
+   _renderGridPoints() {
+     const gl = this.gl;
+     const program = this.gridProgram;
+     if (!gl || !program) return;
+-    const loc = this.gridUniforms || {};
++    const loc = this.gridUniforms || {};
+     const U = this.uniforms || {};
+     const L = this._lc || {};
+ 
+-    // Old path: referenced mismatched property names for sector index/count
+-    // Ensure we use the same names as in _bindGridUniformLocations
+-    if (loc.sectorIdx && Number.isFinite(+L.sectorIdx)) {
+-      gl.uniform1i(loc.sectorIdx, +L.sectorIdx);
+-    }
+-    if (loc.sectorCount && Number.isFinite(+L.sectorCount)) {
+-      gl.uniform1i(loc.sectorCount, +L.sectorCount);
+-    }
++    // Defensive re-upload for LC-related uniforms in the render path
++    if (loc.tauLC_ms && Number.isFinite(+L.tauLC_ms))     gl.uniform1f(loc.tauLC_ms,  +L.tauLC_ms);
++    if (loc.dwell_ms && Number.isFinite(+L.dwell_ms))     gl.uniform1f(loc.dwell_ms,  +L.dwell_ms);
++    if (loc.burst_ms && Number.isFinite(+L.burst_ms))     gl.uniform1f(loc.burst_ms,  +L.burst_ms);
++    if (loc.phase && Number.isFinite(+L.phase))           gl.uniform1f(loc.phase,     +L.phase);
++    if (loc.onWindow)                                     gl.uniform1f(loc.onWindow,  L.onWindow ? 1.0 : 0.0);
++    if (loc.sectorIdx && Number.isFinite(+L.sectorIdx))   gl.uniform1i(loc.sectorIdx, +L.sectorIdx);
++    if (loc.sectorCount && Number.isFinite(+L.sectorCount)) gl.uniform1i(loc.sectorCount, +L.sectorCount);
++    if (loc.dutyUsed && Number.isFinite(+U.dutyUsed))     gl.uniform1f(loc.dutyUsed,  +U.dutyUsed);
++
++    // ... existing draw calls (VAO bind, gl.drawArrays/Elements, etc.) ...
+   }
+ }
