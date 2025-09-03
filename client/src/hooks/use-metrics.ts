@@ -60,6 +60,11 @@ export type HelixMetrics = {
     TS_long?: number;
     TS_geom?: number;
   };
+  // Strobing metrics (optional)
+  lightCrossing_dwell_ms?: number;
+  lightCrossing_burst_ms?: number;
+  lightCrossing_sectorIndex?: number;
+  lightCrossing_sectorCount?: number;
 };
 
 // ---------- Helpers: robust fetch + fallback derivation from pipeline ----------
@@ -122,14 +127,26 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
   const zeta = num(p?.zeta ?? p?.fordRoman?.value ?? p?.fordRoman?.zeta, 0);
   const fordRomanStatus = p?.fordRomanCompliance ? "PASS" : (zeta >= 1.0 ? "FAIL" : "PASS");
 
+  // Strobing metrics
+  const strobingMetrics = {
+    lightCrossing_dwell_ms: num(p?.lightCrossing?.dwell_ms ?? p?.dwell_ms),
+    lightCrossing_burst_ms: num(p?.lightCrossing?.burst_ms ?? p?.burst_ms),
+    lightCrossing_sectorIndex: num(p?.lightCrossing?.sectorIdx ?? p?.currentSector ?? p?.sectorIndex),
+    lightCrossing_sectorCount: num(p?.lightCrossing?.sectorCount ?? p?.totalSectors ?? p?.sectorCount)
+  };
+
+  // Sector counts
+  const sectors = num(p?.activeSectors ?? p?.sectorsActive ?? p?.lightCrossing?.sectorCount ?? p?.totalSectors ?? 0);
+  const tiles = num(p?.activeTiles ?? 0);
+
   return {
     energyOutput: energyMW,
     exoticMass: exoticKg,
     timeScaleRatio: TS_long,
     curvatureMax: num(p?.curvature_max ?? p?.curvatureMax ?? 0),
     fordRoman: { value: zeta, limit: 1.0, status: fordRomanStatus },
-    sectorStrobing: num(p?.activeSectors ?? p?.sectorsActive ?? 0),
-    activeTiles: num(p?.activeTiles ?? N_tiles, 0),
+    sectorStrobing: sectors,
+    activeTiles: tiles,
     totalTiles: num(p?.totalTiles ?? N_tiles, 0),
     gammaVanDenBroeck: gammaVdB,
     modelMode: (p?.modelMode ?? "calibrated") as any,
@@ -145,7 +162,9 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
     timescales: T_m_s > 0 ? {
       f_m_Hz, T_m_s, L_long_m: Llong_m, T_long_s: T_LC_s, TS_long, TS_geom: TS_long
     } : undefined,
-    geometry // Legacy compatibility
+    geometry, // Legacy compatibility
+    // Strobing metrics (undefined when not available)
+    ...strobingMetrics
   };
 }
 
@@ -159,7 +178,7 @@ export function useMetrics(pollMs = 2000) {
   React.useEffect(() => {
     let alive = true;
     const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
-    
+
     const tick = async () => {
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
@@ -182,7 +201,7 @@ export function useMetrics(pollMs = 2000) {
         // Try metrics endpoint first, fall back to pipeline if metrics missing/invalid
         let metrics: any = null;
         let pipeline: any = null;
-        
+
         try {
           metrics = await fetchJSON(makeUrl("/api/helix/metrics"), signal);
         } catch (metricsErr) {
@@ -226,13 +245,13 @@ export function useMetrics(pollMs = 2000) {
         if (timeoutId !== null) clearTimeout(timeoutId);
       }
     };
-    
+
     // Initial fetch
     tick();
-    
+
     // Set up polling interval
     const id = setInterval(tick, pollMs);
-    
+
     return () => { 
       alive = false; 
       clearInterval(id); 

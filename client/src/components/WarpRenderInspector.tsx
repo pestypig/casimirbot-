@@ -22,6 +22,7 @@ import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
+import { useMetrics } from "@/hooks/use-metrics";
 
 // ---- FAST PATH HELPERS (drop-in) --------------------------------------------
 
@@ -1296,7 +1297,6 @@ export default function WarpRenderInspector(props: {
   const viewMassFracREAL = sectorFrac * bandCover;
 
   // Visual-only mass fraction scaling
-  const total = Math.max(1, Number(live?.sectorCount) || 400);
   const viewFracREAL = 1 / total;
 
   // FR duty for both engines - let them derive thetaScale internally
