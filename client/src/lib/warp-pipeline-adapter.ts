@@ -1,4 +1,3 @@
-
 // Adapter: pipeline → engine uniforms (strict; no client fabrication)
 // Keeps tensors; accepts top-level OR pipeline.natario.* sources.
 
@@ -55,7 +54,7 @@ export function driveWarpFromPipeline(
   const natStress = (get(nat, ['stressEnergyTensor']) || {}) as any;
 
   // ---- 2) Duty authority (no recompute on client) ---------------------------
-  // Prefer metrics.dutyFR when present (live FR duty); else pipeline chain
+  // Prefer live metrics.dutyFR when present; else pipeline chain
   let dutyUsed = finite(mx?.dutyFR ?? (pipeline as any).dutyUsed);
   if (!isF(dutyUsed)) dutyUsed = finite((pipeline as any).dutyEffectiveFR);
   if (!isF(dutyUsed)) {
@@ -69,6 +68,7 @@ export function driveWarpFromPipeline(
   const uniforms: any = {
     // Primary physics
     gammaGeo:        finite(pipeline.gammaGeo),
+    // Accept either name; we'll mirror both below
     qSpoilingFactor: finite((pipeline as any).qSpoilingFactor ?? (pipeline as any).deltaAOverA),
     gammaVdB:        finite((pipeline as any).gammaVdB ?? (pipeline as any).gammaVanDenBroeck),
     // θ: prefer explicit pipeline fields, else θ_expected, else Natário amplitude
