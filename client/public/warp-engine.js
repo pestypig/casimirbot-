@@ -688,6 +688,15 @@ uniform vec3  u_betaTiltVec;
 uniform mat3 u_metric;
 uniform mat3 u_metricInv;
 uniform bool u_useMetric;
+// --- Light-crossing & strobing timeline (authoritative; renderer-gated) ---
+uniform float u_tauLC_ms;     // τ_LC in ms
+uniform float u_dwell_ms;     // dwell window in ms
+uniform float u_burst_ms;     // burst (ON) subwindow in ms
+uniform float u_phase;        // 0..1 phase within dwell
+uniform float u_onWindow;     // 0/1: inside reciprocity-checked window
+uniform float u_dutyUsed;     // FR duty actually applied by renderer (0..1)
+// NOTE: we gate intensity by a smooth edge; outside window → fade to zero.
+//       The physics chain already enforces reciprocity (burst ≥ τ_LC) upstream.
 
 // Metric diagnostics
 uniform float u_lapseN;
@@ -698,16 +707,6 @@ uniform float u_redshiftProxy; // Derived diagnostic
 uniform vec3  u_viewForward;  // Camera forward vector in world space
 uniform vec3  u_g0i;          // Lowered shift vector β_i = g_ij β^j
 uniform float u_metricOn;     // Flag to indicate if metric tensor is active
-
-// Light-crossing & strobing timeline uniforms
-uniform float u_tauLC_ms;     // Light-crossing time (ms)
-uniform float u_dwell_ms;     // Sector dwell time (ms)
-uniform float u_burst_ms;     // Burst duration (ms)
-uniform float u_phase;        // Phase within sector (0..1)
-uniform int   u_sectorIdx;    // Current sector index (0..S-1)
-uniform float u_onWindow;     // Inside burst window (0/1)
-uniform float u_TS_ratio;     // τ_LC / T_m ratio
-uniform float u_dutyUsed;     // Effective FR duty used
 
 #endif
 `;
@@ -840,32 +839,14 @@ void main() {
 
   // Metric-aware screen-space curvature (adds ridge accent when enabled)
 #ifdef GL_OES_standard_derivatives
-  vec3 Nm = normalWS;                        // already metric-aware above
-  float kScreen = length(dFdx(Nm)) + length(dFdy(Nm));
-#else
-  float kScreen = 0.0;
-#endif
-  float curvVis = clamp(u_curvatureGainT * kScreen, 0.0, 1.0);
-  float kval = shearProxy;
-  if (ridgeI > 0) {
-    // Blend some metric-aware curvature into the shear proxy when ridge overlay is active
-    kval = clamp(mix(kval, kval + curvVis, 0.5), 0.0, 1.0);
-  }
-
-  // Apply Purple shift modulation to theta field
-  float purpleWeight = purpleShiftWeight(normalWS);
-  float thetaWithPurple = thetaField * (1.0 + purpleWeight);
-
-  // --- Metric-aware screen-space curvature cue (adds soft ridge accent) ---
-#ifdef GL_OES_standard_derivatives
   // NOTE: kScreen is correctly declared and computed above. curvVis is also computed.
   // No redeclaration needed here.
 #endif
   // Use computed values directly
   float amp = u_thetaScale * max(1.0, u_userGain) * showGain * vizSeason;
   amp *= (1.0 + tBlend * (tBoost - 1.0));
-  float valTheta  = thetaWithPurple * amp;
-  float valShear  = kval * amp; // Apply amplitude to the potentially modified shear proxy
+  float valTheta  = thetaField * amp;
+  float valShear  = shearProxy * amp; // Apply amplitude to the potentially modified shear proxy
 
   float magT = log(1.0 + abs(valTheta) / max(u_zeroStop, 1e-18));
   float magS = log(1.0 +      valShear / max(u_zeroStop, 1e-18));
@@ -911,6 +892,28 @@ void main() {
     vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
     col = debugColor;
   }
+
+  // ---- c vs Strobing temporal gate -----------------------------------------
+  // Build a soft gate over the burst subwindow within each dwell.
+  // phase φ in [0,1], burst fraction f = burst/dwell; symmetric window around 0.5
+  float phi   = clamp(u_phase, 0.0, 1.0);
+  float frac  = u_burst_ms / max(1e-6, u_dwell_ms);
+  // Soft trapezoid: when frac → 0, the gate shrinks smoothly; when frac → 1, always on.
+  float edge  = 1.0 - abs(phi - 0.5) * 2.0 / max(1e-6, frac);
+  edge        = clamp(edge, 0.0, 1.0);
+  float reciprocityGate = (u_onWindow > 0.5) ? 1.0 : 0.0;
+  float intensityGate   = edge * reciprocityGate;
+
+  // Duty integration (Ford–Roman average): scale amplitude by √dutyUsed
+  float dutySqrt = sqrt(max(1e-12, u_dutyUsed));
+
+  // Effective theta used for shading (pipeline theta × √duty × temporal gate)
+  float thetaUsed = u_thetaScale * dutySqrt * intensityGate;
+
+  // Base color calculation already done above
+  // Apply temporal/duty gate to base color
+  col *= clamp(thetaUsed / max(1e-12, u_thetaScale), 0.0, 1.0);
+
   SET_FRAG(vec4(col, 0.9));
 }`;
 
@@ -1304,7 +1307,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         state.onWindow = typeof info.onWindow === 'boolean' ? (info.onWindow ? 1 : 0) : undefined;
         state.TS_ratio = Number.isFinite(info.TS_ratio) ? Number(info.TS_ratio) : undefined;
         state.dutyUsed = Number.isFinite(info.dutyEffectiveFR) ? Number(info.dutyEffectiveFR) : undefined;
-        
+
         // Update uniforms with the new values
         this.updateUniforms({
             tauLC_ms: state.tauLC_ms,
@@ -1526,8 +1529,8 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const axesScene = P.axesScene ?? U.axesScene; // Prefer explicit scene axes
         if (!Array.isArray(axesScene) && Array.isArray(U.hullAxes)) {
             const aH = _guessAH(U); // Harmonic mean in meters
-            const hullMax = Math.max(1e-6, U.hullAxes[0], U.hullAxes[1], U.hullAxes[2]);
-            const clipScale = Math.max(1e-9, hullMax, aH || 1); // use largest dimension OR harmonic mean
+            const hullMaxClip = Math.max(1e-6, U.hullAxes[0], U.hullAxes[1], U.hullAxes[2]);
+            const clipScale = Math.max(1e-9, hullMaxClip, aH || 1); // use largest dimension OR harmonic mean
             U.axesScene = U.hullAxes.map(x => x / clipScale);
         } else if (Array.isArray(axesScene)) {
             U.axesScene = axesScene.slice(0,3); // Ensure it's a clean copy
@@ -1685,7 +1688,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           U.redshiftProxy = undefined;
         }
 
-        // --- Trigger grid rebuild if geometry parameters changed ----
+        // ---- Trigger grid rebuild if geometry parameters changed ----
         const geoChanged =
             (prev?.hullAxes?.[0] !== U.hullAxes?.[0]) || (prev?.hullAxes?.[1] !== U.hullAxes?.[1]) || (prev?.hullAxes?.[2] !== U.hullAxes?.[2]) ||
             (prev?.wallWidth_rho !== U.wallWidth_rho) ||
@@ -1708,7 +1711,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
     _calculateModeEffects(params) {
         // visual-only seasoning; geometry ignores this
-        const mode = (params.currentMode || 'hover').toLowerCase();
+        const mode = (params.currentMode ?? 'hover').toLowerCase();
         const config = {
             hover:     { baseScale: 1.0, strobingViz: 0.8 },
             cruise:    { baseScale: 1.0, strobingViz: 0.6 },
@@ -1879,10 +1882,10 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
 
         const betaInstUniform = A_geoUniform * gammaVdBUniform * qSpoilUniform; // ← match thetaScale chain
         const betaAvgUniform  = betaInstUniform * Math.sqrt(effDutyUniform);
-        const betaUsedUniform = viewAvgUniform ? betaAvgUniform : betaInstUniform;
+        const betaNetUniform  = betaAvgUniform * (2*viewAvgUniform - 1);
 
         // Final viz field (no decades boost - cosmetic slider controls all exaggeration)
-        const betaVisUniform = betaUsedUniform;
+        const betaVisUniform = betaAvgUniform; // Use averaged for viz
 
         // === CANONICAL NATÁRIO: Remove micro-bumps for smooth profile ===
         // For canonical Natário bubble, disable local gaussian bumps
@@ -1919,7 +1922,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         const softClamp = (x, m) => m * Math.tanh(x / m);
 
         // disp calculation for geometry
-        let disp = gridK * Math.min(1.0, Math.log10(1.0 + betaUsedUniform * userGain * modeScale)) * wallWin * front * sgn * gaussian_local;
+        let disp = gridK * Math.min(1.0, Math.log10(1.0 + betaVisUniform * userGain * modeScale)) * wallWin * front * sgn * gaussian_local;
         disp = softClamp(disp, maxPush);
 
         // ----- Interior gravity (shift vector "tilt") -----
