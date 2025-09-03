@@ -1,5 +1,6 @@
 import * as React from "react";
 
+// ---------------- Types (unchanged) ----------------
 export interface ShiftVectorMetrics {
   epsilonTilt: number;
   betaTiltVec: [number, number, number];
@@ -61,6 +62,93 @@ export type HelixMetrics = {
   };
 };
 
+// ---------- Helpers: robust fetch + fallback derivation from pipeline ----------
+function num(x: any, d = 0) { const n = +x; return Number.isFinite(n) ? n : d; }
+function arrN(a: any, k: number) { return (Array.isArray(a) && a.length >= k) ? a : undefined; }
+
+async function fetchJSON(url: string, signal?: AbortSignal) {
+  const r = await fetch(url, { method: "GET", headers: { "Accept": "application/json" }, signal });
+  if (!r.ok) {
+    let body = "";
+    try { body = await r.text(); } catch {}
+    throw new Error(`HTTP ${r.status} ${r.statusText}${body ? ` — ${body.slice(0,200)}` : ""}`);
+  }
+  const text = await r.text();
+  return text ? JSON.parse(text) : null;
+}
+
+function deriveMetricsFromPipeline(p: any): HelixMetrics {
+  // Attempt to read calibrated values from the pipeline snapshot with minimal assumptions.
+  // Units: prefer MW & kg; handle W→MW if present. TS from provided ratio or LC/modulation.
+  const energyMW =
+    Number.isFinite(+p?.powerMW)       ? +p.powerMW :
+    Number.isFinite(+p?.P_avg_MW)      ? +p.P_avg_MW :
+    Number.isFinite(+p?.P_avg)         ? (+p.P_avg / 1e6) :
+    Number.isFinite(+p?.power_W)       ? (+p.power_W / 1e6) :
+    0;
+
+  const exoticKg =
+    Number.isFinite(+p?.exoticMass_kg) ? +p.exoticMass_kg :
+    Number.isFinite(+p?.M_exotic)      ? +p.M_exotic :
+    Number.isFinite(+p?.exoticMass)    ? +p.exoticMass :
+    0;
+
+  // Timescales
+  const Llong_m   = num(p?.L_long ?? p?.L_long_m ?? p?.hull?.L_long_m ?? p?.metrics?.L_long_m, 0);
+  const c         = 299_792_458;
+  const T_LC_s    = Llong_m > 0 ? (Llong_m / c) : num(p?.T_LC ?? p?.T_LC_s, 0);
+  const f_m_Hz    = num(p?.modulationFreq_Hz ?? (p?.modulationFreq_GHz * 1e9), 0);
+  const T_m_s     = f_m_Hz > 0 ? (1 / f_m_Hz) : num(p?.T_m ?? p?.T_m_s, 0);
+  const TS_long   = (T_LC_s > 0 && T_m_s > 0) ? (T_LC_s / T_m_s) : num(p?.TS_ratio ?? p?.TS ?? p?.timescales?.TS_long, 0);
+
+  // Tiles/hull
+  const N_tiles   = num(p?.N_tiles ?? p?.tiles?.N_tiles, 0);
+  const tileArea  = num(p?.tileArea_cm2 ?? p?.tiles?.tileArea_cm2, 25);
+  const hullArea  = Number.isFinite(+p?.A_hull) ? +p.A_hull : (Number.isFinite(+p?.tiles?.hullArea_m2) ? +p.tiles.hullArea_m2 : null);
+
+  // γ_VdB (visual)
+  const gammaVdB  = num(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? p?.byMode?.SHOW?.gammaVdB ?? p?.byMode?.REAL?.gammaVdB, 0);
+
+  // Optional legacy geometry block
+  const geometry = (()=>{
+    const Lx = num(p?.geometry?.Lx_m ?? p?.hull?.Lx_m, 0);
+    const Ly = num(p?.geometry?.Ly_m ?? p?.hull?.Ly_m, 0);
+    const Lz = num(p?.geometry?.Lz_m ?? p?.hull?.Lz_m, 0);
+    if (!Lx && !Ly && !Lz) return undefined;
+    return { Lx_m: Lx, Ly_m: Ly, Lz_m: Lz, TS_ratio: TS_long, TS_long, TS_geom: TS_long };
+  })();
+
+  // Ford-Roman compliance
+  const zeta = num(p?.zeta ?? p?.fordRoman?.value ?? p?.fordRoman?.zeta, 0);
+  const fordRomanStatus = p?.fordRomanCompliance ? "PASS" : (zeta >= 1.0 ? "FAIL" : "PASS");
+
+  return {
+    energyOutput: energyMW,
+    exoticMass: exoticKg,
+    timeScaleRatio: TS_long,
+    curvatureMax: num(p?.curvature_max ?? p?.curvatureMax ?? 0),
+    fordRoman: { value: zeta, limit: 1.0, status: fordRomanStatus },
+    sectorStrobing: num(p?.activeSectors ?? p?.sectorsActive ?? 0),
+    activeTiles: num(p?.activeTiles ?? N_tiles, 0),
+    totalTiles: num(p?.totalTiles ?? N_tiles, 0),
+    gammaVanDenBroeck: gammaVdB,
+    modelMode: (p?.modelMode ?? "calibrated") as any,
+    hull: geometry ? { Lx_m: geometry.Lx_m, Ly_m: geometry.Ly_m, Lz_m: geometry.Lz_m } : undefined,
+    shiftVector: arrN(p?.shiftVector, 3) ? {
+      epsilonTilt: num(p.shiftVector[0]),
+      betaTiltVec: [num(p.shiftVector[0]), num(p.shiftVector[1]), num(p.shiftVector[2])],
+      gTarget: num(p?.shiftVector?.gTarget ?? 1),
+      R_geom: num(p?.shiftVector?.R_geom ?? Llong_m),
+      gEff_check: num(p?.shiftVector?.gEff_check ?? 1)
+    } : undefined,
+    tiles: { tileArea_cm2: tileArea, hullArea_m2: hullArea, N_tiles },
+    timescales: T_m_s > 0 ? {
+      f_m_Hz, T_m_s, L_long_m: Llong_m, T_long_s: T_LC_s, TS_long, TS_geom: TS_long
+    } : undefined,
+    geometry // Legacy compatibility
+  };
+}
+
 export function useMetrics(pollMs = 2000) {
   // Configure API base once. In dev, point to your backend port.
   // Example: VITE_API_BASE=http://localhost:3001
@@ -71,12 +159,11 @@ export function useMetrics(pollMs = 2000) {
   React.useEffect(() => {
     let alive = true;
     const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
+    
     const tick = async () => {
-      // ensure timeoutId is visible to try/catch/finally
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
-        // Add a 7s timeout so "Failed to fetch" surfaces quickly + cleanly.
-        // Prefer native AbortSignal.timeout when available; else use controller with a reason.
+        // Create robust signal with 7s timeout
         let controller: AbortController | null = null;
         let signal: AbortSignal | undefined;
         if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
@@ -87,44 +174,44 @@ export function useMetrics(pollMs = 2000) {
           signal = controller.signal;
           timeoutId = setTimeout(() => {
             try {
-              controller!.abort(
-                new DOMException('Request timed out', 'TimeoutError')
-              );
+              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
             } catch {}
           }, 7000);
         }
 
-        const r = await fetch(makeUrl("/api/helix/metrics"), {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          },
-          signal
-        });
-        if (!r.ok) {
-          // Try to extract any text error for easier debugging
-          let body = '';
-          try { body = await r.text(); } catch {}
-          throw new Error(`HTTP ${r.status} ${r.statusText}${body ? ` — ${body.slice(0,200)}` : ''}`);
-        }
+        // Try metrics endpoint first, fall back to pipeline if metrics missing/invalid
+        let metrics: any = null;
+        let pipeline: any = null;
         
-        // Some runtimes return empty; guard JSON parse
-        const text = await r.text();
-        const j = text ? JSON.parse(text) : null;
+        try {
+          metrics = await fetchJSON(makeUrl("/api/helix/metrics"), signal);
+        } catch (metricsErr) {
+          console.warn('[useMetrics] Metrics fetch failed, trying pipeline fallback:', (metricsErr as Error)?.message);
+          try {
+            pipeline = await fetchJSON(makeUrl("/api/helix/pipeline"), signal);
+          } catch (pipelineErr) {
+            throw new Error(`Both endpoints failed: metrics(${(metricsErr as Error)?.message}), pipeline(${(pipelineErr as Error)?.message})`);
+          }
+        }
+
         if (alive) {
-          setData(j);
-          setErr(null); // Clear any previous errors
+          // If metrics worked, use directly; otherwise derive from pipeline
+          const result = metrics || (pipeline ? deriveMetricsFromPipeline(pipeline) : null);
+          setData(result);
+          setErr(null);
+          if (pipeline && !metrics) {
+            console.log('[useMetrics] Used pipeline fallback successfully');
+          }
         }
       } catch (e: any) {
         if (alive) {
           const name = e?.name || '';
-          const msg  = (name === 'AbortError' || name === 'TimeoutError')
+          const msg = (name === 'AbortError' || name === 'TimeoutError')
             ? 'request timeout (7s)'
             : (e?.message || 'network error');
           console.error('[useMetrics] Fetch error:', msg);
           setErr(msg);
-          // Fallback mock so the Bridge stays interactive in dev
+          // Provide fallback so Bridge stays interactive
           setData(d => d ?? {
             energyOutput: 0,
             exoticMass: 0,
@@ -136,7 +223,6 @@ export function useMetrics(pollMs = 2000) {
           });
         }
       } finally {
-        // Always clear the timer if one was created
         if (timeoutId !== null) clearTimeout(timeoutId);
       }
     };
