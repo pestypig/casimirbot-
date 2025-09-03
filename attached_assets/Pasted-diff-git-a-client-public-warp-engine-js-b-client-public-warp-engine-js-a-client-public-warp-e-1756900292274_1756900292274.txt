@@ -1,0 +1,130 @@
+diff --git a/client/public/warp-engine.js b/client/public/warp-engine.js
+--- a/client/public/warp-engine.js
++++ b/client/public/warp-engine.js
+@@ -60,6 +60,16 @@ class WarpEngine {
+     this.gridUniforms = null;
+     this.isLoaded = false;
++    // Strict-science: no silent fabrication of physics. Missing inputs → error.
++    this.strictScientific = true;
++    // Light-crossing state (mirrored into uniforms)
++    this._lc = {
++      tauLC_ms: undefined, dwell_ms: undefined, burst_ms: undefined,
++      phase: undefined, onWindow: false,
++      sectorIdx: undefined, sectorCount: undefined
++    };
++    // Public uniforms bag (inspector reads this)
++    this.uniforms = {};
+   }
+ 
+   // ---------------------------------------------------------------------------
+@@ -128,6 +138,25 @@ class WarpEngine {
+     return this;
+   }
+ 
++  // ---------- Light-Crossing API: mirror to uniforms on next upload ----------
++  setLightCrossing(info = {}) {
++    const L = this._lc || {};
++    L.tauLC_ms    = finite(info.tauLC_ms);
++    L.dwell_ms    = finite(info.dwell_ms);
++    L.burst_ms    = finite(info.burst_ms);
++    L.phase       = finite(info.phase);
++    L.onWindow    = !!info.onWindow;
++    L.sectorIdx   = integer(info.sectorIdx);
++    L.sectorCount = integer(info.sectorCount);
++    this._lc = L;
++    // also reflect to the public uniforms bag so inspector/checkpoints see it
++    Object.assign(this.uniforms, {
++      tauLC_ms: L.tauLC_ms, dwell_ms: L.dwell_ms, burst_ms: L.burst_ms,
++      phase: L.phase, onWindow: L.onWindow ? 1 : 0,
++      sectorIdx: L.sectorIdx, sectorCount: L.sectorCount
++    });
++    return this;
++  }
++
+   // ---------------------------------------------------------------------------
+   // GL Program compile/link and uniform cache
+   _bindGridUniformLocations(gl, program) {
+@@ -150,6 +179,16 @@ class WarpEngine {
+     loc.metricOn     = gl.getUniformLocation(program, 'u_metricOn');
+     // tensor extras (camera/shift)
+     loc.viewForward  = gl.getUniformLocation(program, 'u_viewForward');
+     loc.g0i          = gl.getUniformLocation(program, 'u_g0i');
++    // Light-crossing uniforms
++    loc.tauLC_ms     = gl.getUniformLocation(program, 'u_tauLC_ms');
++    loc.dwell_ms     = gl.getUniformLocation(program, 'u_dwell_ms');
++    loc.burst_ms     = gl.getUniformLocation(program, 'u_burst_ms');
++    loc.phase        = gl.getUniformLocation(program, 'u_phase');
++    loc.onWindow     = gl.getUniformLocation(program, 'u_onWindow');
++    loc.sectorIdx    = gl.getUniformLocation(program, 'u_sectorIdx');
++    loc.sectorCount  = gl.getUniformLocation(program, 'u_sectorCount');
++    loc.dutyUsed     = gl.getUniformLocation(program, 'u_dutyUsed');
++    // (TS ratio is display-only; no shader uniform required)
+     this.gridUniforms = loc;
+   }
+ 
+@@ -212,6 +251,38 @@ class WarpEngine {
+     // Merge new uniforms
+     Object.assign(this.uniforms, (parameters||{}));
+ 
++    // ---------- Strict-science validation (no fabrication) ----------
++    if (this.strictScientific) {
++      const U = this.uniforms;
++      const errs = [];
++      // Required physics inputs
++      if (!isFinite(+U.thetaScale))      errs.push('thetaScale');
++      if (!isFinite(+U.gammaGeo))        errs.push('gammaGeo');
++      if (!isFinite(+U.qSpoilingFactor)) errs.push('qSpoiling');
++      if (!isFinite(+U.gammaVdB))        errs.push('gammaVdB');
++      if (!isFinite(+U.sectorCount))     errs.push('sectorCount');
++      if (!isFinite(+U.dutyUsed))        errs.push('dutyUsed');
++      const L = this._lc || {};
++      if (!isFinite(+L.tauLC_ms) || !isFinite(+L.dwell_ms) || !isFinite(+L.burst_ms)) {
++        errs.push('LC(tauLC_ms/dwell_ms/burst_ms)');
++      }
++      if (errs.length) {
++        this.uniforms.__error = `engine(strict): missing ${errs.join(', ')}`;
++      } else {
++        delete this.uniforms.__error;
++      }
++    }
++
+     // Upload now if GL ready
+     if (this.isLoaded && this.gl && this.gridProgram) {
+       this._applyUniformsNow();
+     }
+     return this;
+   }
+ 
+   _applyUniformsNow() {
+     const gl = this.gl, loc = this.gridUniforms, U = this.uniforms || {};
+     if (!gl || !loc) return;
+@@ -236,6 +305,28 @@ class WarpEngine {
+     if (loc.g0i && Array.isArray(U.g0i)) {
+       gl.uniform3f(loc.g0i, +U.g0i[0]||0, +U.g0i[1]||0, +U.g0i[2]||0);
+     }
++    // Light-crossing uniforms (mirrored)
++    const L = this._lc || {};
++    if (loc.tauLC_ms)     gl.uniform1f(loc.tauLC_ms, isFinite(+L.tauLC_ms)? +L.tauLC_ms : 0.0);
++    if (loc.dwell_ms)     gl.uniform1f(loc.dwell_ms, isFinite(+L.dwell_ms)? +L.dwell_ms : 0.0);
++    if (loc.burst_ms)     gl.uniform1f(loc.burst_ms, isFinite(+L.burst_ms)? +L.burst_ms : 0.0);
++    if (loc.phase)        gl.uniform1f(loc.phase,    isFinite(+L.phase)?    +L.phase    : 0.0);
++    if (loc.onWindow)     gl.uniform1f(loc.onWindow, L.onWindow ? 1.0 : 0.0);
++    if (loc.sectorIdx)    gl.uniform1i(loc.sectorIdx, isFinite(+L.sectorIdx)? +L.sectorIdx : 0);
++    if (loc.sectorCount)  gl.uniform1i(loc.sectorCount, isFinite(+L.sectorCount)? +L.sectorCount : 1);
++    if (loc.dutyUsed && isFinite(+U.dutyUsed)) gl.uniform1f(loc.dutyUsed, +U.dutyUsed);
++
++    // Mirror metric toggle (no SHOW boosts here)
++    if (typeof U.metricMode === 'boolean') {
++      gl.uniform1f(loc.metricOn, U.metricMode ? 1.0 : 0.0);
++    } else if (typeof U.useMetric === 'boolean') {
++      gl.uniform1f(loc.metricOn, U.useMetric ? 1.0 : 0.0);
++    }
+   }
+ }
+ 
++function finite(x){ const n = +x; return Number.isFinite(n)? n : undefined; }
++function integer(x){ const n = Math.floor(+x); return Number.isFinite(n)? n : undefined; }
++function isFinite(n){ return Number.isFinite(n); }
++
+ window.WarpEngine = window.WarpEngine || WarpEngine;
+ export { WarpEngine };
