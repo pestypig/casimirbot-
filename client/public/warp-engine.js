@@ -1050,6 +1050,24 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // (TS ratio is display-only; no shader uniform required)
         };
 
+        // Expose a presence map for diagnostics (inspectors can render this)
+        this._uniformPresence = {
+          viewForward: !!this.gridUniforms.viewForward,
+          g0i:         !!this.gridUniforms.g0i,
+          metricOn:    !!this.gridUniforms.metricOn,
+          tauLC_ms:    !!this.gridUniforms.tauLC_ms,
+          dwell_ms:    !!this.gridUniforms.dwell_ms,
+          burst_ms:    !!this.gridUniforms.burst_ms,
+          phase:       !!this.gridUniforms.phase,
+          onWindow:    !!this.gridUniforms.onWindow,
+          sectorIdx:   !!this.gridUniforms.sectorIdx,
+          sectorCount: !!this.gridUniforms.sectorCount,
+          dutyUsed:    !!this.gridUniforms.dutyUsed,
+        };
+        // Mirror into public bag for UI
+        this.uniforms = this.uniforms || {};
+        this.uniforms.__uniformsBound = this._uniformPresence;
+
         // (Optional) quick sanity log once
         if (!this._uniformAuditOnce) {
             this._uniformAuditOnce = true;
@@ -2130,6 +2148,17 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
           gl.uniform1f(this.gridUniforms.metricOn, U.metricMode ? 1.0 : 0.0);
         } else if (typeof U.useMetric === 'boolean') {
           gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
+        }
+
+        // One-time warning if GLSL omitted any uniforms (e.g., optimizer, name typo)
+        if (!this._warnedUniforms && this._uniformPresence) {
+          const missing = Object.entries(this._uniformPresence)
+            .filter(([, ok]) => !ok)
+            .map(([k]) => k);
+          if (missing.length) {
+            console.warn('[WarpEngine] Missing GLSL uniform locations:', missing);
+          }
+          this._warnedUniforms = true;
         }
 
         // --- Light-crossing uniforms (mirrored) ---
