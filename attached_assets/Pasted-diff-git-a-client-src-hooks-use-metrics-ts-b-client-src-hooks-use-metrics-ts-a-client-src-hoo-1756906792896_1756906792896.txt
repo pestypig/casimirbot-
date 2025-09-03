@@ -1,0 +1,66 @@
+diff --git a/client/src/hooks/use-metrics.ts b/client/src/hooks/use-metrics.ts
+--- a/client/src/hooks/use-metrics.ts
++++ b/client/src/hooks/use-metrics.ts
+@@ -1,5 +1,6 @@
+ import * as React from "react";
+ 
++// ---------------- Types (unchanged) ----------------
+ export interface ShiftVectorMetrics {
+   epsilonTilt: number;
+   betaTiltVec: [number, number, number];
+@@ -62,6 +63,64 @@ export type HelixMetrics = {
+   };
+ };
+ 
++// ---------- Helpers: robust fetch + fallback derivation from pipeline ----------
++function num(x: any, d = 0) { const n = +x; return Number.isFinite(n) ? n : d; }
++function arrN(a: any, k: number) { return (Array.isArray(a) && a.length >= k) ? a : undefined; }
++
++async function fetchJSON(url: string, signal?: AbortSignal) {
++  const r = await fetch(url, { method: "GET", headers: { "Accept": "application/json" }, signal });
++  if (!r.ok) {
++    let body = "";
++    try { body = await r.text(); } catch {}
++    throw new Error(`HTTP ${r.status} ${r.statusText}${body ? ` — ${body.slice(0,200)}` : ""}`);
++  }
++  const text = await r.text();
++  return text ? JSON.parse(text) : null;
++}
++
++function deriveMetricsFromPipeline(p: any): HelixMetrics {
++  // Attempt to read calibrated values from the pipeline snapshot with minimal assumptions.
++  // Units: prefer MW & kg; handle W→MW if present. TS from provided ratio or LC/modulation.
++  const energyMW =
++    Number.isFinite(+p?.powerMW)       ? +p.powerMW :
++    Number.isFinite(+p?.P_avg_MW)      ? +p.P_avg_MW :
++    Number.isFinite(+p?.P_avg)         ? (+p.P_avg / 1e6) :
++    Number.isFinite(+p?.power_W)       ? (+p.power_W / 1e6) :
++    0;
++
++  const exoticKg =
++    Number.isFinite(+p?.exoticMass_kg) ? +p.exoticMass_kg :
++    Number.isFinite(+p?.M_exotic)      ? +p.M_exotic :
++    Number.isFinite(+p?.exoticMass)    ? +p.exoticMass :
++    0;
++
++  // Timescales
++  const Llong_m   = num(p?.L_long ?? p?.L_long_m ?? p?.hull?.L_long_m ?? p?.metrics?.L_long_m, 0);
++  const c         = 299_792_458;
++  const T_LC_s    = Llong_m > 0 ? (Llong_m / c) : num(p?.T_LC ?? p?.T_LC_s, 0);
++  const f_m_Hz    = num(p?.modulationFreq_Hz ?? (p?.modulationFreq_GHz * 1e9), 0);
++  const T_m_s     = f_m_Hz > 0 ? (1 / f_m_Hz) : num(p?.T_m ?? p?.T_m_s, 0);
++  const TS_long   = (T_LC_s > 0 && T_m_s > 0) ? (T_LC_s / T_m_s) : num(p?.TS_ratio ?? p?.TS ?? p?.timescales?.TS_long, 0);
++
++  // Tiles/hull
++  const N_tiles   = num(p?.N_tiles ?? p?.tiles?.N_tiles, 0);
++  const tileArea  = num(p?.tileArea_cm2 ?? p?.tiles?.tileArea_cm2, 25);
++  const hullArea  = Number.isFinite(+p?.A_hull) ? +p.A_hull : (Number.isFinite(+p?.tiles?.hullArea_m2) ? +p.tiles.hullArea_m2 : null);
++
++  // γ_VdB (visual)
++  const gammaVdB  = num(p?.gammaVdB ?? p?.gammaVanDenBroeck ?? p?.byMode?.SHOW?.gammaVdB ?? p?.byMode?.REAL?.gammaVdB, 0);
++
++  // Optional legacy geometry block
++  const geometry = (()=>{
++    const Lx = num(p?.geometry?.Lx_m ?? p?.hull?.Lx_m, 0);
++    const Ly = num(p?.geometry?.Ly_m ?? p?.hull?.Ly_m, 0);
++    const Lz = num(p?.geometry?.Lz_m ?? p?.hull?.Lz_m, 0
