@@ -11,6 +11,12 @@ export function driveWarpFromPipeline(
   const mode   = options?.mode ?? (pipeline.mode as any) ?? 'REAL';
   const strict = options?.strict ?? true;
 
+  // Safe field access for nested Natário shapes
+  const get = (o:any, path:string[]): any => {
+    let v = o; for (const k of path) { if (!v || typeof v!=='object') return undefined; v = v[k]; }
+    return v;
+  };
+
   // ---- 1) Normalize LC (accept alt keys; μs→ms) -----------------------------
   const lcSrc: any = (pipeline.lc ?? pipeline.lightCrossing ?? {});
   const tauLC_ms = finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined));
@@ -21,6 +27,29 @@ export function driveWarpFromPipeline(
   const sectorIdx   = inty(lcSrc.sectorIdx);
   const sectorCount = inty(pipeline.sectorCount ?? lcSrc.sectorCount);
   const lcPayload = { tauLC_ms, dwell_ms, burst_ms, phase, onWindow, sectorIdx, sectorCount };
+
+  // ---- 1b) Bring across Natário shift/tensor outputs for diagnostics --------
+  const nat = (pipeline as any).natario ?? {};
+  // θ choices: prefer explicit thetaScale, else Natário shift amplitude (your θ)
+  const thetaFromNatario = finite(
+    get(nat, ['shiftVectorField','amplitude']) ??
+    get(nat, ['shiftVectorField','theta']) // allow alt naming
+  );
+  const thetaExpected = finite((pipeline as any).thetaScaleExpected);
+  const thetaPrimary  = finite(
+    (pipeline as any).thetaScale ??
+    (pipeline as any).thetaUniform ??
+    thetaExpected ??
+    thetaFromNatario
+  );
+
+  // Optional Natário extras for inspectors (no shader dependency)
+  const natShift = {
+    thetaNet:    finite(get(nat, ['shiftVectorField','netShiftAmplitude'])),
+    thetaPlus:   finite(get(nat, ['shiftVectorField','positivePhaseAmplitude'])),
+    thetaMinus:  finite(get(nat, ['shiftVectorField','negativePhaseAmplitude'])),
+  };
+  const natStress = (get(nat, ['stressEnergyTensor']) || {}) as any;
 
   // ---- 2) Duty authority (no recompute on client) ---------------------------
   let dutyUsed = finite((pipeline as any).dutyUsed);
@@ -33,16 +62,13 @@ export function driveWarpFromPipeline(
   }
 
   // ---- 3) Physics + tensors verbatim (top-level OR natario.*) ---------------
-  const nat = (pipeline as any).natario ?? {};
   const uniforms: any = {
     // Primary physics
     gammaGeo:        finite(pipeline.gammaGeo),
     qSpoilingFactor: finite((pipeline as any).qSpoilingFactor ?? (pipeline as any).deltaAOverA),
     gammaVdB:        finite((pipeline as any).gammaVdB ?? (pipeline as any).gammaVanDenBroeck),
-    // Prefer authoritative theta from pipeline; accept older field names.
-    thetaScale:      finite(
-                      (pipeline as any).thetaScale ??
-                      (pipeline as any).thetaUniform ?? (pipeline as any).thetaScaleExpected),
+    // θ: prefer explicit pipeline fields, else θ_expected, else Natário amplitude
+    thetaScale:      thetaPrimary,
     sectorCount:     inty(pipeline.sectorCount),
     dutyUsed,
     // Mode tags (no boosts)
@@ -61,6 +87,17 @@ export function driveWarpFromPipeline(
     shiftBeta:     arrN((pipeline as any).shiftBeta, 3)     || arrN(nat.shiftBeta, 3),
     viewForward:   arrN((pipeline as any).viewForward, 3)   || arrN(nat.viewForward, 3),
     g0i:           arrN((pipeline as any).g0i, 3)           || arrN(nat.g0i, 3),
+    // Natário diagnostics (no fabrication; useful in inspectors)
+    thetaFromNatario: thetaFromNatario,
+    thetaScaleExpected: thetaExpected,
+    thetaNet:    natShift.thetaNet,
+    thetaPlus:   natShift.thetaPlus,
+    thetaMinus:  natShift.thetaMinus,
+    T00: finite(natStress.T00),
+    T11: finite(natStress.T11),
+    T22: finite(natStress.T22),
+    T33: finite(natStress.T33),
+    NEC_satisfied: (natStress.isNullEnergyConditionSatisfied === true),
   };
   // Auto-enable metric if tensors present but flag absent
   if (typeof uniforms.metricMode === 'undefined') {
@@ -77,7 +114,8 @@ export function driveWarpFromPipeline(
     if (!isF(uniforms.gammaVdB))        miss.push('gammaVdB');
     if (!isF(uniforms.sectorCount))     miss.push('sectorCount');
     if (!isF(uniforms.dutyUsed))        miss.push('dutyUsed');
-    if (!isF(tauLC_ms) || !isF(dwell_ms) || !isF(burst_ms)) miss.push('LC(tauLC_ms/dwell_ms/burst_ms)');
+    if (!isF(tauLC_ms) || !isF(dwell_ms) || !isF(burst_ms))
+      miss.push('LC(tauLC_ms/dwell_ms/burst_ms)');
     if (miss.length) {
       engine.uniforms = engine.uniforms || {};
       engine.uniforms.__error = `adapter: missing ${miss.join(', ')}`;
