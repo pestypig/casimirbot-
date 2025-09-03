@@ -1,0 +1,113 @@
+diff --git a/client/src/components/WarpRenderCheckpointsPanel.tsx b/client/src/components/WarpRenderCheckpointsPanel.tsx
+--- a/client/src/components/WarpRenderCheckpointsPanel.tsx
++++ b/client/src/components/WarpRenderCheckpointsPanel.tsx
+@@ -38,7 +38,7 @@ const aHarmonic = (ax?:number, ay?:number, az?:number) => { const a=+ax||0,b=+ay
+ // ✅ Pane-specific expected θ using one duty law (√d_FR), with ENGINE authority
+ function expectedThetaForPane(live: any, engine: any) {
+   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
+-  // Mode gate
++  // Mode gate (standby short-circuit)
+   const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
+   if (mode === 'standby') return NaN;
+ 
+@@ -48,28 +48,36 @@ function expectedThetaForPane(live: any, engine: any) {
+   const gVdB     = Math.max(1, N(U.gammaVdB ?? U.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
+ 
+-  // Duty: prefer the pane's actual d_FR from uniforms/echo; else compute
+-  const echo = (window as any).__warpEcho;
+-  const dFR_echo = Number.isFinite(echo?.terms?.d_FR) ? Math.max(1e-12, +echo.terms.d_FR) : NaN;
+-  const dFR_used = Number.isFinite(U.dutyUsed) ? Math.max(1e-12, +U.dutyUsed) : NaN;
+-  const dFR_u    = Number.isFinite(U.dutyEffectiveFR) ? Math.max(1e-12, +U.dutyEffectiveFR) : NaN;
+-  const sectorsTotal = Math.max(1, N(live?.sectorCount ?? U.sectorCount, 400));
+-  const sectorsLive  = Math.max(1, N(U.sectors ?? 1, 1));
+-  const dutyLocal    = 0.01; // fallback (REMOVE in strict)
+-  const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
+-  const dFR = Number.isFinite(dFR_used) ? dFR_used
+-            : Number.isFinite(dFR_u)    ? dFR_u
+-            : Number.isFinite(dFR_echo) ? dFR_echo
+-            : dFR_fallback;
++  // Duty: STRICT — require engine-supplied dutyUsed (or dutyEffectiveFR)
++  const dFR_used = Number.isFinite(U.dutyUsed) ? Math.max(1e-12, +U.dutyUsed)
++                  : Number.isFinite(U.dutyEffectiveFR) ? Math.max(1e-12, +U.dutyEffectiveFR)
++                  : NaN;
++  if (!Number.isFinite(dFR_used)) return NaN;
+ 
+   const base = Math.pow(gammaGeo, 3) * q * gVdB;
+-  const viewAvg = (U.viewAvg ?? live?.viewAvg ?? true) ? 1 : 0;
+-  return viewAvg ? base * Math.sqrt(dFR) : base;
++  const viewAvg = (U.viewAvg ?? live?.viewAvg ?? true) ? 1 : 0;
++  return viewAvg ? base * Math.sqrt(dFR_used) : base;
+ }
+@@ -250,6 +258,7 @@ function useCheckpointList(
+     const thetaExpected = expectedThetaForPane(liveSnap, e);
+-    const dutyFR = (() => {
+-      const used = N(Ue.dutyUsed, NaN);
+-      if (Number.isFinite(used)) return Math.max(1e-12, used);
+-      const de   = N(Ue.dutyEffectiveFR, NaN);
+-      if (Number.isFinite(de)) return Math.max(1e-12, de);
+-      const sTot = Math.max(1, N(Ue.sectorCount ?? liveSnap?.sectorCount, 400));
+-      const sCon = Math.max(1, N(Ue.sectors ?? 1, 1));
+-      const dutyLocal = 0.01;
+-      return Math.max(1e-12, dutyLocal * (sCon / sTot));
+-    })();
++    const dutyFR = (()=>{
++      const used = N(Ue.dutyUsed, NaN);
++      if (Number.isFinite(used)) return Math.max(1e-12, used);
++      const de = N(Ue.dutyEffectiveFR, NaN);
++      if (Number.isFinite(de)) return Math.max(1e-12, de);
++      return NaN; // strict: no fallback
++    })();
+@@ -262,11 +271,13 @@ function useCheckpointList(
+       id: 'expect.theta_scale', side, stage: 'expect',
+-      pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
+-      msg: `θ_expected=${thetaExpected.toExponential(2)}`,
+-      expect: '>0', actual: thetaExpected,
+-      sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info',
+-      meta: { gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
++      pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
++      msg: Number.isFinite(thetaExpected) ? `θ_expected=${thetaExpected.toExponential(2)}` : 'θ_expected=— (no dutyUsed)',
++      expect: '>0', actual: thetaExpected,
++      sev: Number.isFinite(thetaExpected) && thetaExpected > 0 ? 'info' : 'error',
++      meta: { where: Number.isFinite(dutyFR) ? 'engine uniforms' : 'adapter/pipeline missing dutyUsed',
++              gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
+     });
+@@ -310,6 +321,14 @@ function useCheckpointList(
+     // === DAG Stage 2.5: LIGHT-CROSSING (LC) / STROBING TIMELINE ================
+     // Read what the renderer actually uses; fail gracefully if any are absent.
+-    const tauLC    = N(Ue.tauLC_ms, NaN);
+-    const dwell    = N(Ue.dwell_ms, NaN);
+-    const burst    = N(Ue.burst_ms, NaN);
++    const tauLC    = N(Ue.tauLC_ms, NaN);
++    const dwell    = N(Ue.dwell_ms, NaN);
++    const burst    = N(Ue.burst_ms, NaN);
+     const phase    = N(Ue.phase,    NaN);
+     const onWindow = (+Ue.onWindow || 0) > 0.5;
+@@ -341,12 +360,13 @@ function useCheckpointList(
+-    // Duty consistency: used/effective vs (burst/dwell)×(S_live/S_total)
+-    if (Number.isFinite(dwell) && Number.isFinite(burst) && Number.isFinite(sectCnt) && Number.isFinite(sLive)) {
++    // Duty consistency (info): used vs (burst/dwell)×(S_live/S_total)
++    if (Number.isFinite(dwell) && Number.isFinite(burst) && Number.isFinite(sectCnt) && Number.isFinite(sLive) && Number.isFinite(dUsed)) {
+       const dFR_expected = (burst / Math.max(1e-6, dwell)) * (sLive / sectCnt);
+-      const dFR_used     = Number.isFinite(dUsed) ? dUsed : (Number.isFinite(dEff) ? dEff : NaN);
+-      const hasUsed      = Number.isFinite(dFR_used);
+-      const ok           = hasUsed ? within(dFR_used, dFR_expected, 0.15) : false;
++      const dFR_used     = dUsed!;
++      const ok           = within(dFR_used, dFR_expected, 0.15);
+       checkpoint({
+         id: 'lc.duty_consistency', side, stage: 'lc',
+-        pass: hasUsed && ok,
+-        msg: hasUsed
+-          ? `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`
+-          : 'no dutyUsed/dutyEffectiveFR',
+-        expect: '≈ burst/dwell × S_live/S_total',
+-        actual: { dFR_used, dFR_expected },
+-        sev: hasUsed ? (ok ? 'info' : 'warn') : 'warn',
+-        meta: { where: hasUsed ? 'warp-engine.js (dutyUsed/dutyEffectiveFR)' : 'adapter→engine duty propagation' }
++        pass: ok,
++        msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
++        expect: '≈ burst/dwell × S_live/S_total',
++        actual: { dFR_used, dFR_expected },
++        sev: ok ? 'info' : 'warn',
++        meta: { where: 'engine uniforms vs LC' }
+       });
+     }
