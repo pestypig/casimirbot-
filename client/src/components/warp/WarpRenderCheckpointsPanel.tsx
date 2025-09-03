@@ -330,7 +330,29 @@ function useCheckpointList(
       meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
     });
 
-    // NEW: CameraZ presence checkpoint (warn-only so it won’t halt render)
+    // Metric toggle consistency: if metric tensors are supplied, toggle should be ON
+    {
+      const hasMetricFields =
+        (Array.isArray(Ue.gSpatialDiag) && Ue.gSpatialDiag.length >= 3) ||
+        (Array.isArray(Ue.gSpatialSym)  && Ue.gSpatialSym.length  >= 6) ||
+        Number.isFinite(Ue.lapseN) ||
+        Array.isArray(Ue.shiftBeta);
+      const metricActive = (Ue.useMetric === true) || (+Ue.metricOn > 0.5) || (!!Ue.metricMode);
+      const pass = !hasMetricFields || metricActive;
+      checkpoint({
+        id: 'metric.toggle_consistency', side, stage: 'uniforms',
+        pass,
+        msg: hasMetricFields
+          ? (metricActive ? 'metric active' : 'metric fields present but toggle OFF')
+          : 'no metric fields',
+        expect: hasMetricFields ? 'active' : 'none',
+        actual: { metricActive, hasMetricFields },
+        sev: pass ? 'info' : 'warn',
+        meta: { where: 'adapter metricMode → engine.useMetric mirror' }
+      });
+    }
+
+    // NEW: CameraZ presence checkpoint (warn-only so it won't halt render)
     const camZOk = Number.isFinite(u?.cameraZ);
     checkpoint({
       id: 'uniforms.cameraZ',
@@ -357,35 +379,6 @@ function useCheckpointList(
       expect: expectations?.parity, actual: !!(u.physicsParityMode ?? u.parityMode),
       sev: expectations?.parity != null && !!(u.physicsParityMode ?? u.parityMode) !== !!expectations.parity ? 'warn' : 'info'
     });
-
-    // NEW: Informational display-space θ (tone-mapped) — for context only
-    {
-      const exposure   = Math.max(1.0, N(u?.exposure, 6.0));
-      const zeroStop   = Math.max(1e-18, N(u?.zeroStop, 1e-7));
-      const userGain   = Math.max(1.0, N(u?.userGain, 1.0));
-      const boostT     = clamp01(N(u?.curvatureGainT, 0));
-      const boostMax   = Math.max(1, N(u?.curvatureBoostMax, 40));
-      const boostNow   = 1 + boostT * (boostMax - 1);
-
-      // We use a unit baseMag for comparability; this row is *informational*, not a pass/fail gate.
-      const baseMag = 1;
-
-      const magUniform = Math.log(1 + (baseMag * ts * userGain * boostNow) / zeroStop);
-      const magExpect  = Math.log(1 + (baseMag * thetaUniformExpected * userGain * boostNow) / zeroStop);
-      const thetaDisplayUniform = magUniform / Math.log(1 + exposure);
-      const thetaDisplayExpect  = magExpect  / Math.log(1 + exposure);
-
-      checkpoint({
-        id: 'uniforms.theta_display_info',
-        side,
-        stage: 'uniforms',
-        pass: true,
-        msg: `θ_display uniform=${Number.isFinite(thetaDisplayUniform) ? thetaDisplayUniform.toFixed(3) : '—'} vs exp=${Number.isFinite(thetaDisplayExpect) ? thetaDisplayExpect.toFixed(3) : '—'}`,
-        expect: 'info-only',
-        actual: { thetaDisplayUniform, thetaDisplayExpect, exposure, zeroStop, userGain, boostNow },
-        sev: 'info'
-      });
-    }
 
     // === DAG Stage 4: GPU STATE ===
     const cw = N(cv?.clientWidth || cv?.width, 0);
@@ -633,6 +626,34 @@ function useCheckpointList(
     }
 
     rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
+
+    // Light-crossing display row (renderer authority)
+    const burst_ms = liveSnap?.lightCrossing?.burst_ms;
+    const dwell_ms = liveSnap?.lightCrossing?.dwell_ms;
+    const tauLC = liveSnap?.lightCrossing?.tau_ms;
+    const phase = liveSnap?.lightCrossing?.phase;
+    const onWindow = liveSnap?.lightCrossing?.onWindow;
+    const TSratio = liveSnap?.lightCrossing?.TSratio;
+
+    {
+      const details =
+        `τ=${Number.isFinite(tauLC)?tauLC.toFixed(3):'—'}ms · ` +
+        `dwell=${Number.isFinite(dwell_ms)?dwell_ms.toFixed(3):'—'}ms · ` +
+        `burst=${Number.isFinite(burst_ms)?burst_ms.toFixed(3):'—'}ms · ` +
+        `φ=${Number.isFinite(phase)?phase.toFixed(3):'—'} · ` +
+        `window=${onWindow?'ON':'off'}`;
+      const lcOk = Number.isFinite(tauLC) && Number.isFinite(dwell_ms) && Number.isFinite(burst_ms);
+      rows.push({ label: "Light crossing", detail: details, state: lcOk ? "ok" : "fail" });
+    }
+
+    // TS ratio (τ_LC / T_m)
+    {
+      const tsrOk = Number.isFinite(TSratio) && TSratio > 1.0;
+      const detail = Number.isFinite(TSratio) ? TSratio.toFixed(1) : '—';
+      rows.push({ label: "TS ratio", detail, state: tsrOk ? "ok" : "warn" });
+    }
+
+    // (existing) View tensors & wall width rows continue below…
 
     // Metric/tensors actually in use by the shader
     {
