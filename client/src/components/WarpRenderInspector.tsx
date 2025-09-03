@@ -23,7 +23,7 @@ import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
 import Grid3DEngine from '@/components/engines/Grid3DEngine';
 
-// --- FAST PATH HELPERS (drop-in) --------------------------------------------
+// ---- FAST PATH HELPERS (drop-in) --------------------------------------------
 
 // Add near other helpers
 async function waitForNonZeroSize(cv: HTMLCanvasElement, timeoutMs = 3000) {
@@ -1088,8 +1088,9 @@ export default function WarpRenderInspector(props: {
       // Moved definitions up.
 
       // Bootstrap both engines once they are ready
-      leftEngine.current?.bootstrap?.({ ...realPayload });
       rightEngine.current?.bootstrap?.({ ...showPayload });
+      leftEngine.current?.bootstrap?.({ ...realPayload });
+
 
       // Build shared frame data once
       const hull = props.baseShared?.hull ?? { a:503.5, b:132, c:86.5 };
@@ -1148,7 +1149,7 @@ export default function WarpRenderInspector(props: {
       const unsubscribeHandler = subscribe('warp:uniforms', (u: any) => {
         setHaveUniforms(true);
         // strip any external theta (engine computes it)
-        const { thetaScale, u_thetaScale, thetaScale_metric, u_thetaScale_metric, useMetric, ...uSafe } = u || {};
+        const { thetaScale, u_thetaScale, thetaScale_metric, u_thetaScale_metric, useMetric, ...rest } = u || {};
         // bring purple back from props/baseShared (or last known engine value)
         const purple = {
           epsilonTilt: props.baseShared?.epsilonTilt ?? leftEngine.current?.uniforms?.epsilonTilt ?? 0,
@@ -1162,10 +1163,10 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+          applyToEngine(leftEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...uSafe, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+          applyToEngine(rightEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
         }
       });
 
@@ -1497,6 +1498,14 @@ export default function WarpRenderInspector(props: {
   useEffect(() => {
     pushLeft.current = makeUniformBatcher(leftEngine);
     pushRight.current = makeUniformBatcher(rightEngine);
+  }, []);
+
+  // Mobile DPR clamping and canvas sizing
+  useEffect(() => {
+    if (!IS_COARSE) return;
+    try { sizeCanvasSafe(leftRef.current!); sizeCanvasSafe(rightRef.current!); } catch {}
+    // DPR is already handled by sizeCanvasSafe; on phones, keep it at ~1
+    if (typeof clampMobileDPR === 'function') clampMobileDPR(1);
   }, []);
 
   // Mobile DPR clamping and canvas sizing
