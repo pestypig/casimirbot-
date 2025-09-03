@@ -1,0 +1,222 @@
+diff --git a/client/src/components/WarpRenderCheckpointsPanel.tsx b/client/src/components/WarpRenderCheckpointsPanel.tsx
+--- a/client/src/components/WarpRenderCheckpointsPanel.tsx
++++ b/client/src/components/WarpRenderCheckpointsPanel.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ import React, {useEffect, useMemo, useRef, useState} from "react";
+-import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoints";
++import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoints";
+ import CheckpointViewer from "./CheckpointViewer";
+ 
+ /*
+@@ -33,6 +33,7 @@ const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
+ const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+ const aHarmonic = (ax?:number, ay?:number, az?:number) => { const a=+ax||0,b=+ay||0,c=+az||0; const d=(a>0?1/a:0)+(b>0?1/b:0)+(c>0?1/c:0); return d>0?3/d:NaN; };
+ 
+@@ -250,6 +251,88 @@ function useCheckpointList(
+     const thetaExpected = expectedThetaForPane(liveSnap, e);
+     const dutyFR = (() => {
+       const used = N(Ue.dutyUsed, NaN);
+       if (Number.isFinite(used)) return Math.max(1e-12, used);
+       const de   = N(Ue.dutyEffectiveFR, NaN);
+       if (Number.isFinite(de)) return Math.max(1e-12, de);
+       const sTot = Math.max(1, N(Ue.sectorCount ?? liveSnap?.sectorCount, 400));
+       const sCon = Math.max(1, N(Ue.sectors ?? 1, 1));
+       const dutyLocal = 0.01;
+       return Math.max(1e-12, dutyLocal * (sCon / sTot));
+     })();
+ 
++    // === DAG Stage 2.5: LIGHT-CROSSING (LC) / STROBING TIMELINE ================
++    // Read what the renderer actually uses; fail gracefully if any are absent.
++    const tauLC    = N(Ue.tauLC_ms, NaN);
++    const dwell    = N(Ue.dwell_ms, NaN);
++    const burst    = N(Ue.burst_ms, NaN);
++    const phase    = N(Ue.phase,    NaN);
++    const onWindow = (+Ue.onWindow || 0) > 0.5;
++    const sectIdx  = N(Ue.sectorIdx,   NaN);
++    const sectCnt  = Math.max(1, N(Ue.sectorCount ?? liveSnap?.sectorCount, 400));
++    const sLive    = Math.max(1, N(Ue.sectors ?? 1, 1));
++    const TSratio  = N(Ue.TS_ratio, NaN);
++    const dUsed    = N(Ue.dutyUsed, NaN);
++    const dEff     = N(Ue.dutyEffectiveFR, NaN);
++
++    // Inputs present?
++    checkpoint({
++      id: 'lc.inputs', side, stage: 'lc',
++      pass: Number.isFinite(tauLC) && Number.isFinite(dwell) && Number.isFinite(burst),
++      msg: `τ_LC=${Number.isFinite(tauLC)?tauLC.toFixed(3):'—'}ms · dwell=${Number.isFinite(dwell)?dwell.toFixed(3):'—'}ms · burst=${Number.isFinite(burst)?burst.toFixed(3):'—'}ms`,
++      expect: 'finite', actual: { tauLC, dwell, burst },
++      sev: (Number.isFinite(tauLC)&&Number.isFinite(dwell)&&Number.isFinite(burst)) ? 'info' : 'error',
++      meta: { where: 'useLightCrossingLoop → WarpEngine.setLightCrossing' }
++    });
++
++    // Reciprocity (burst ≥ τ_LC)
++    if (Number.isFinite(tauLC) && Number.isFinite(burst)) {
++      const reciprocityOk = burst + 1e-6 >= tauLC;
++      checkpoint({
++        id: 'lc.reciprocity', side, stage: 'lc',
++        pass: reciprocityOk,
++        msg: reciprocityOk ? 'burst ≥ τ_LC' : `burst(${burst.toFixed(3)}ms) < τ_LC(${tauLC.toFixed(3)}ms)`,
++        expect: 'burst ≥ τ_LC', actual: { burst, tauLC },
++        sev: reciprocityOk ? 'info' : 'error',
++        meta: { where: 'LightCrossing loop / engine temporal gate' }
++      });
++    }
++
++    // Window phase and width (informational)
++    if (Number.isFinite(dwell) && Number.isFinite(burst)) {
++      const frac = Math.max(0, Math.min(1, burst / Math.max(1e-6, dwell)));
++      checkpoint({
++        id: 'lc.window', side, stage: 'lc',
++        pass: true,
++        msg: `phase=${Number.isFinite(phase)?phase.toFixed(3):'—'} · window=${onWindow?'ON':'off'} · width=${(frac*100).toFixed(2)}%`,
++        expect: 'info', actual: { phase, onWindow, frac },
++        sev: 'info'
++      });
++    }
++
++    // Duty consistency: used/effective vs (burst/dwell)×(S_live/S_total)
++    if (Number.isFinite(dwell) && Number.isFinite(burst) && Number.isFinite(sectCnt) && Number.isFinite(sLive)) {
++      const dFR_expected = (burst / Math.max(1e-6, dwell)) * (sLive / sectCnt);
++      const dFR_used     = Number.isFinite(dUsed) ? dUsed : (Number.isFinite(dEff) ? dEff : NaN);
++      const hasUsed      = Number.isFinite(dFR_used);
++      const ok           = hasUsed ? within(dFR_used, dFR_expected, 0.15) : false;
++      checkpoint({
++        id: 'lc.duty_consistency', side, stage: 'lc',
++        pass: hasUsed && ok,
++        msg: hasUsed
++          ? `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`
++          : 'no dutyUsed/dutyEffectiveFR',
++        expect: '≈ burst/dwell × S_live/S_total',
++        actual: { dFR_used, dFR_expected },
++        sev: hasUsed ? (ok ? 'info' : 'warn') : 'warn',
++        meta: { where: hasUsed ? 'warp-engine.js (dutyUsed/dutyEffectiveFR)' : 'adapter→engine duty propagation' }
++      });
++    }
++
++    // TS ratio sanity (τ_LC/T_m)
++    if (Number.isFinite(TSratio)) {
++      const okTS = TSratio > 1.0;
++      checkpoint({
++        id: 'lc.ts_ratio', side, stage: 'lc',
++        pass: okTS,
++        msg: `TS=${TSratio.toFixed(1)} (τ_LC/T_m)`,
++        expect: '≫ 1', actual: TSratio,
++        sev: okTS ? 'info' : 'warn',
++        meta: { where: 'WarpEngine.setLightCrossing(TS_ratio)' }
++      });
++    }
++
+     checkpoint({
+       id: 'expect.theta_scale', side, stage: 'expect',
+       pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
+@@ -310,6 +393,29 @@ function useCheckpointList(
+       meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
+     });
+ 
++    // Metric toggle consistency: if metric tensors are supplied, toggle should be ON
++    {
++      const hasMetricFields =
++        (Array.isArray(Ue.gSpatialDiag) && Ue.gSpatialDiag.length >= 3) ||
++        (Array.isArray(Ue.gSpatialSym)  && Ue.gSpatialSym.length  >= 6) ||
++        Number.isFinite(Ue.lapseN) ||
++        Array.isArray(Ue.shiftBeta);
++      const metricActive = (Ue.useMetric === true) || (+Ue.metricOn > 0.5) || (!!Ue.metricMode);
++      const pass = !hasMetricFields || metricActive;
++      checkpoint({
++        id: 'metric.toggle_consistency', side, stage: 'uniforms',
++        pass,
++        msg: hasMetricFields
++          ? (metricActive ? 'metric active' : 'metric fields present but toggle OFF')
++          : 'no metric fields',
++        expect: hasMetricFields ? 'active' : 'none',
++        actual: { metricActive, hasMetricFields },
++        sev: pass ? 'info' : 'warn',
++        meta: { where: 'adapter metricMode → engine.useMetric mirror' }
++      });
++    }
++
+     // NEW: CameraZ presence checkpoint (warn-only so it won’t halt render)
+     const camZOk = Number.isFinite(u?.cameraZ);
+     checkpoint({
+@@ -415,6 +521,21 @@ function useCheckpointList(
+       rows.push({
+         label: 'Shaders linked',
+         detail: reason,
+         state: progOk ? 'ok' : (compiling ? 'warn' : 'fail'),
+       });
+     }
+ 
++    // GPU uniform bindings for tensor extras (what shader actually needs)
++    {
++      const gu = (e as any)?.gridUniforms || {};
++      const haveVF  = !!gu?.viewForward;
++      const haveG0i = !!gu?.g0i;
++      checkpoint({
++        id: 'gpu.uniforms_tensor', side, stage: 'gpu',
++        pass: haveVF && haveG0i,
++        msg: `viewForward=${haveVF?'bound':'missing'} · g0i=${haveG0i?'bound':'missing'}`,
++        expect: 'locations bound', actual: { viewForward: haveVF, g0i: haveG0i },
++        sev: (haveVF && haveG0i) ? 'info' : 'warn',
++        meta: { where: 'warp-engine.js: gridUniforms cache' }
++      });
++    }
++
+     // Grid buffers
+     const verts = (e?.gridVertices?.length || 0);
+     const orig = (e?.originalGridVertices?.length || 0);
+@@ -474,6 +595,27 @@ function useCheckpointList(
+       });
+     }
+ 
++    // Light-crossing display row (renderer authority)
++    {
++      const details =
++        `τ=${Number.isFinite(tauLC)?tauLC.toFixed(3):'—'}ms · ` +
++        `dwell=${Number.isFinite(dwell)?dwell.toFixed(3):'—'}ms · ` +
++        `burst=${Number.isFinite(burst)?burst.toFixed(3):'—'}ms · ` +
++        `φ=${Number.isFinite(phase)?phase.toFixed(3):'—'} · ` +
++        `window=${onWindow?'ON':'off'}`;
++      const lcOk = Number.isFinite(tauLC) && Number.isFinite(dwell) && Number.isFinite(burst);
++      rows.push({ label: "Light crossing", detail: details, state: lcOk ? "ok" : "fail" });
++    }
++
++    // TS ratio (τ_LC / T_m)
++    {
++      const tsrOk = Number.isFinite(TSratio) && TSratio > 1.0;
++      const detail = Number.isFinite(TSratio) ? TSratio.toFixed(1) : '—';
++      rows.push({ label: "TS ratio", detail, state: tsrOk ? "ok" : "warn" });
++    }
++
++    // (existing) View tensors & wall width rows continue below…
++
+     // Metric/tensors actually in use by the shader
+     {
+       const metricActive = (u?.useMetric === true) || (+u?.metricOn > 0.5) || (!!u?.metricMode);
+       const gDiag = Array.isArray(u?.gSpatialDiag) ? u.gSpatialDiag : null;
+       const gSym  = Array.isArray(u?.gSpatialSym)  && u.gSpatialSym.length>=6 ? u.gSpatialSym : null;
+@@ -491,6 +633,7 @@ function useCheckpointList(
+       });
+     }
+ 
+     // Wall width as the renderer uses it (ρ and meters)
+     {
+       const aH = aHarmonic(u?.axesHull?.[0], u?.axesHull?.[1], u?.axesHull?.[2]);
+       const w_rho = Number.isFinite(u?.wallWidth_rho) ? +u.wallWidth_rho : (Number.isFinite(u?.wallWidth) ? +u.wallWidth : NaN);
+       const w_m   = Number.isFinite(u?.wallWidth_m)   ? +u.wallWidth_m   : (Number.isFinite(aH) && Number.isFinite(w_rho) ? w_rho * aH : NaN);
+@@ -502,6 +645,7 @@ function useCheckpointList(
+       });
+     }
+ 
+     // View forward & lowered shift g0i presence (tensors used by shader)
+     {
+       const vf = Array.isArray(u?.viewForward) ? u.viewForward : null;
+       const g0 = Array.isArray(u?.g0i) ? u.g0i : null;
+@@ -513,6 +657,7 @@ function useCheckpointList(
+         state: (vf && g0) ? "ok" : "warn"
+       });
+     }
+ 
+     // Show detailed breakdown from bound uniforms if available
+     if (echo && echo.terms) {
+       const terms = echo.terms;
