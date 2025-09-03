@@ -98,10 +98,9 @@ function getLinkStatus(engine: any) {
 // ✅ Pane-specific expected θ using one duty law (√d_FR), with ENGINE authority
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
-
-  // Mode gate
+  // Mode gate (standby short-circuit)
   const mode = String((engine?.uniforms?.currentMode ?? live?.currentMode) || '').toLowerCase();
-  if (mode === 'standby') return 0;
+  if (mode === 'standby') return NaN;
 
   // Values bound to the engine (authoritative for the pane)
   const U = engine?.uniforms || {};
@@ -109,26 +108,15 @@ function expectedThetaForPane(live: any, engine: any) {
   const q        = Math.max(1e-12, N(U.qSpoilingFactor ?? U.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
   const gVdB     = Math.max(1, N(U.gammaVdB ?? U.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
 
-  // Duty: prefer the pane's actual d_FR from uniforms/echo; else compute
-  const echo = (window as any).__warpEcho;
-  const dFR_echo = Number.isFinite(echo?.terms?.d_FR) ? Math.max(1e-12, +echo.terms.d_FR) : NaN;
-  const dFR_used = Number.isFinite(U.dutyUsed) ? Math.max(1e-12, +U.dutyUsed) : NaN;
-  const dFR_u    = Number.isFinite(U.dutyEffectiveFR) ? Math.max(1e-12, +U.dutyEffectiveFR) : NaN;
-
-  // Fallback from UI knobs only if needed (dutyCycle/sectorCount)
-  const sectorsTotal = Math.max(1, N(live?.sectorCount ?? U.sectorCount, 400));
-  const sectorsLive  = Math.max(1, N(U.sectors ?? 1, 1));
-  const dutyLocal    = 0.01; // from light-crossing loop
-  const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
-
-  const dFR = Number.isFinite(dFR_used) ? dFR_used
-            : Number.isFinite(dFR_u)    ? dFR_u
-            : Number.isFinite(dFR_echo) ? dFR_echo
-            : dFR_fallback;
+  // Duty: STRICT — require engine-supplied dutyUsed (or dutyEffectiveFR)
+  const dFR_used = Number.isFinite(U.dutyUsed) ? Math.max(1e-12, +U.dutyUsed)
+                  : Number.isFinite(U.dutyEffectiveFR) ? Math.max(1e-12, +U.dutyEffectiveFR)
+                  : NaN;
+  if (!Number.isFinite(dFR_used)) return NaN;
 
   const base = Math.pow(gammaGeo, 3) * q * gVdB;
   const viewAvg = (U.viewAvg ?? live?.viewAvg ?? true) ? 1 : 0;
-  return viewAvg ? base * Math.sqrt(dFR) : base; // (no √ term when not averaging)
+  return viewAvg ? base * Math.sqrt(dFR_used) : base;
 }
 
 // ✅ Prefer pipeline/engine d_FR; fall back to dutyCycle/sectors
@@ -521,6 +509,8 @@ function useCheckpointList(
 
     // Get bound uniforms from engine's __warpEcho for self-consistency
     const echo = (window as any).__warpEcho;
+    const dUsed = Number.isFinite(u?.dutyUsed) ? Math.max(1e-12, +u.dutyUsed) : NaN;
+    const dEff  = Number.isFinite(u?.dutyEffectiveFR) ? Math.max(1e-12, +u.dutyEffectiveFR) : NaN;
 
     // use the engine's own viewAvg if set, else live snapshot, else default true
     const viewAvg = (u?.viewAvg ?? liveSnap?.viewAvg ?? true);
@@ -634,6 +624,22 @@ function useCheckpointList(
     const phase = liveSnap?.lightCrossing?.phase;
     const onWindow = liveSnap?.lightCrossing?.onWindow;
     const TSratio = liveSnap?.lightCrossing?.TSratio;
+
+    // Duty consistency (info): used vs (burst/dwell)×(S_live/S_total)
+    if (Number.isFinite(dwell_ms) && Number.isFinite(burst_ms) && Number.isFinite(sectors) && Number.isFinite(sConcLeft) && Number.isFinite(dUsed)) {
+      const dFR_expected = (burst_ms / Math.max(1e-6, dwell_ms)) * (sConcLeft / sectors);
+      const dFR_used     = dUsed!;
+      const ok           = within(dFR_used, dFR_expected, 0.15);
+      checkpoint({
+        id: 'lc.duty_consistency', side, stage: 'lc',
+        pass: ok,
+        msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
+        expect: '≈ burst/dwell × S_live/S_total',
+        actual: { dFR_used, dFR_expected },
+        sev: ok ? 'info' : 'warn',
+        meta: { where: 'engine uniforms vs LC' }
+      });
+    }
 
     {
       const details =
