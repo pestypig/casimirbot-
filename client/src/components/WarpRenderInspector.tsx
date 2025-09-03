@@ -1431,13 +1431,17 @@ export default function WarpRenderInspector(props: {
   }, [live]);
 
 
-  // Physics bound for theta calculations
-    const bound = useMemo(() => ({
-      gammaGeo: realPhys.gammaGeo || 26,
-      qSpoilingFactor: realPhys.qSpoilingFactor || 1,
-      gammaVdB: realPhys.gammaVanDenBroeck || realPhys.gammaVdB || 1,
-      dutyEffectiveFR: realPhys.dutyEffectiveFR || 0.000025
-    }), [realPhys]);
+  // Use props directly to avoid scope issues if realPhys isn't defined here
+    const bound = useMemo(() => {
+      const rp: any = props.parityPhys ?? {};
+      return {
+        gammaGeo: Number(rp.gammaGeo) || 26,
+        qSpoilingFactor: Number(rp.qSpoilingFactor) || 1,
+        gammaVdB: Number(rp.gammaVanDenBroeck ?? rp.gammaVdB) || 1,
+        // fall back to pipeline/live duty if provided, else a tiny nonzero to avoid NaN
+        dutyEffectiveFR: Number(rp.dutyEffectiveFR ?? (live?.dutyEffectiveFR)) || 0.000025,
+      };
+    }, [props.parityPhys, live?.dutyEffectiveFR]);
 
   // Keep canvases crisp on container resize with mobile optimizations
   useEffect(() => {
