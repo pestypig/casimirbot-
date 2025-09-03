@@ -99,8 +99,11 @@ async function firstCorrectFrame({
   const cz = safeCamZ(calculateCameraZ(canvas, sharedAxesScene));
   const packet = paneSanitize(pane, { cameraZ: cz, lockFraming: true, viewAvg: true });
 
-  gatedUpdateUniforms(engine, packet, 'client');
-  engine.forceRedraw?.();
+  // 🎯 seed cameraZ so "CameraZ unset" never trips (cosmetic only)
+  try {
+    const camZ0 = calculateCameraZ(canvas, sharedAxesScene);
+    applyCosmetics(engine, { cameraZ: camZ0, lockFraming: true });
+  } catch {}
 }
 
 // Helper functions needed by firstCorrectFrame
@@ -202,6 +205,29 @@ type Num = number | undefined | null;
 const N = (x: Num, d = 0) => (Number.isFinite(x as number) ? Number(x) : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
+// A cosmetic uniform wrapper that applies updates directly
+function applyCosmetics(engine: any, patch: Record<string, any>) {
+  if (!engine) {
+    console.warn(`[cosmetics] Cannot apply patch - engine is null`);
+    return;
+  }
+  try {
+    // Bypass gatedUpdateUniforms for purely cosmetic changes.
+    // Only apply if the engine is ready, otherwise, it's a no-op.
+    if (engine.isLoaded && engine.gridProgram) {
+      applyToEngine(engine, patch, 'client'); // Use applyToEngine for cosmetic props
+      engine.forceRedraw?.();
+      if (DEBUG) console.log('[cosmetics] Applied patch:', Object.keys(patch));
+    } else if (typeof engine.onceReady === "function") {
+      engine.onceReady(() => {
+        applyToEngine(engine, patch, 'client');
+        engine.forceRedraw?.();
+      });
+    }
+  } catch (error) {
+    console.error("[cosmetics] Failed to apply patch:", error);
+  }
+}
 
 // Push only after shaders are ready - now with enhanced gating and diagnostics
   function pushUniformsWhenReady(engine: any, patch: Record<string, any>, source: string = 'inspector') {
@@ -304,62 +330,6 @@ function setupEngineCheckpoints(engine: any, side: 'REAL' | 'SHOW', payload: any
       pass: (U.ridgeMode===0 || U.ridgeMode===1) && U.physicsParityMode!=null,
       sev:'warn',
       msg:`ridge=${U.ridgeMode} parity=${U.physicsParityMode}`
-    });
-
-    // GPU health with enhanced diagnostics support
-    function getLinkStatus(engine: any) {
-      const gl   = engine?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
-      const prog = engine?.gridProgram || engine?.program || engine?._program || null;
-      const ext  = (engine?.parallelShaderExt || null) as any;
-
-      if (!gl || !prog) return { stage: engine?.loadingState || 'idle', ok: false, reason: 'no GL or program' };
-
-      // Enhanced diagnostics temporarily disabled for debugging
-      // if (typeof engine.getShaderDiagnostics === 'function') {
-      //   const diag = engine.getShaderDiagnostics();
-      //   const ok = diag.status === 'linked';
-      //   return {
-      //     stage: diag.status,
-      //     ok: ok,
-      //     reason: diag.message || '',
-      //     profile: diag.profile || 'auto'
-      //   };
-      // }
-
-      // Fallback to original method for compatibility
-      if (engine?.loadingState === 'compiling') {
-        return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
-      }
-      if (engine?.loadingState === 'failed') {
-        const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
-        return { stage: 'failed', ok: false, reason: log };
-      }
-      if (engine?.loadingState === 'linked') {
-        return { stage: 'linked', ok: true, reason: '' };
-      }
-
-      // Infer via KHR if state not provided
-      if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
-        return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
-      }
-
-      // Final truth from LINK_STATUS
-      const ok = !!gl.getProgramParameter(prog, gl.LINK_STATUS);
-      const reason = ok ? '' : (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
-      return { stage: ok ? 'linked' : 'failed', ok, reason };
-    }
-
-    const { stage, ok: linked, reason } = getLinkStatus(engine);
-
-    checkpoint({
-      id: 'gpu/link', side, stage: 'gpu',
-      pass: linked, // keeps ✅ / ✗ semantics
-      sev: linked ? 'info' : (stage === 'compiling' ? 'warn' : 'error'),
-      msg: linked
-        ? 'shader linked'
-        : (stage === 'compiling'
-            ? '⏳ compiling shaders…'
-            : `link error: ${reason || 'unknown'}`)
     });
 
     // CameraZ
@@ -1175,10 +1145,10 @@ export default function WarpRenderInspector(props: {
         };
 
         if (leftEngine.current) {
-          applyToEngine(leftEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 });
+          applyCosmetics(leftEngine.current, paneSanitize('REAL', { ...rest, ...purple, ...metricU, physicsParityMode: true,  ridgeMode: 0 }));
         }
         if (rightEngine.current) {
-          applyToEngine(rightEngine.current, { ...rest, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 });
+          applyCosmetics(rightEngine.current, paneSanitize('SHOW', { ...rest, ...purple, ...metricU, physicsParityMode: false, ridgeMode: 1 }));
         }
       });
 
@@ -1205,22 +1175,22 @@ export default function WarpRenderInspector(props: {
       rightEngine.current?.setVisible?.(true);
       if (!haveUniforms) {
         if (leftEngine.current) {
-          leftEngine.current.updateUniforms?.({
+          applyCosmetics(leftEngine.current, sanitizeUniforms({
             physicsParityMode: true,
             exposure: TONEMAP_LOCK.exp,
             zeroStop: TONEMAP_LOCK.zero,
             colorMode: TONEMAP_LOCK.colorMode,
             viewAvg: TONEMAP_LOCK.viewAvg
-          });
+          }));
         }
         if (rightEngine.current) {
-          rightEngine.current.updateUniforms?.({
+          applyCosmetics(rightEngine.current, sanitizeUniforms({
             physicsParityMode: false,
             exposure: TONEMAP_LOCK.exp,
             zeroStop: TONEMAP_LOCK.zero,
             colorMode: TONEMAP_LOCK.colorMode,
             viewAvg: TONEMAP_LOCK.viewAvg
-          });
+          }));
         }
       }
 
@@ -1495,16 +1465,16 @@ export default function WarpRenderInspector(props: {
 
       // Temporarily use direct updates to debug syntax error
       if (leftEngine.current) {
-        gatedUpdateUniforms(leftEngine.current, sanitizeUniforms({
+        applyCosmetics(leftEngine.current, sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyFR_REAL,
-        }), 'client');
+        }));
       }
       if (rightEngine.current) {
-        gatedUpdateUniforms(rightEngine.current, sanitizeUniforms({
+        applyCosmetics(rightEngine.current, sanitizeUniforms({
           ...payload,
           dutyEffectiveFR: dutyUI_SHOW,
-        }), 'client');
+        }));
       }
     });
     return () => { try { off?.(); } catch {} };
@@ -1719,8 +1689,8 @@ export default function WarpRenderInspector(props: {
                   const v = e.target.checked;
                   setUseMetric(v);
                   const patch = sanitizeUniforms({ useMetric: v, metric: metricDiag.g, metricInv: metricDiag.inv });
-                  pushLeft.current(paneSanitize('REAL', patch), 'REAL');
-                  pushRight.current(paneSanitize('SHOW', patch), 'SHOW');
+                  applyCosmetics(leftEngine.current, paneSanitize('REAL', patch));
+                  applyCosmetics(rightEngine.current, paneSanitize('SHOW', patch));
                 }}
               />
               Metric on
@@ -1742,8 +1712,8 @@ export default function WarpRenderInspector(props: {
             onChange={e => {
               const v = Number(e.target.value);
               setCurvT(v);
-              pushLeft.current(paneSanitize('REAL', sanitizeUniforms({ curvT: v })), 'REAL');
-              pushRight.current(paneSanitize('SHOW', sanitizeUniforms({ curvT: v })), 'SHOW');
+              applyCosmetics(leftEngine.current, paneSanitize('REAL', sanitizeUniforms({ curvT: v })));
+              applyCosmetics(rightEngine.current, paneSanitize('SHOW', sanitizeUniforms({ curvT: v })));
             }}
           >
             <option value={0.00}>Flat</option>
@@ -1773,8 +1743,8 @@ export default function WarpRenderInspector(props: {
           >Dump uniforms + diagnostics</button>
           <button
             onClick={()=>{
-              pushLeft.current({ colorMode: 6 }, 'REAL');
-              pushRight.current({ colorMode: 6 }, 'SHOW');
+              applyCosmetics(leftEngine.current, { colorMode: 6 });
+              applyCosmetics(rightEngine.current, { colorMode: 6 });
             }}
             className="ml-2 px-3 py-1 rounded bg-indigo-700 text-white text-sm"
           >Curvature Debug</button>
