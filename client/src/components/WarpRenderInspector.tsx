@@ -3,6 +3,7 @@ import WarpRenderCheckpointsPanel from "./warp/WarpRenderCheckpointsPanel";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
+import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 
@@ -1421,79 +1422,12 @@ export default function WarpRenderInspector(props: {
     console.log("---------------------------------");
   };
 
-  // Apply physics from props with comprehensive validation
-    const realPhys = props.parityPhys || {};
-    const showPhys = props.showPhys || {};
-    const baseShared = props.baseShared || {};
-
-    // Enhanced theta scale calculation with debugging
-    // const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
-    //   const gammaGeo = +phys.gammaGeo || 26;
-    //   const qSpoil   = +phys.qSpoilingFactor || 1;
-    //   // use explicit pocket factors
-    //   const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
-    //   const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
-    //   const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
-    //   const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
-
-    //   const calculated = computeThetaScale(phys);
-    //   const actualTheta = source === 'fr'
-    //     ? leftEngine.current?.uniforms?.thetaScale
-    //     : rightEngine.current?.uniforms?.thetaScale;
-
-    //   console.log(`[${label}] Theta calculation debug:`, {
-    //     gammaGeo,
-    //     qSpoil,
-    //     gammaVdB,
-    //     dutyFR,
-    //     viewAvg: true,
-    //     calculated,
-    //     actualTheta
-    //   });
-
-    //   return calculated;
-    // };
-
-    // Build REAL payload (no parity enforcement) + θ passthrough
-    const pipelineTheta = Number.isFinite(Number(live?.thetaScaleUsed))
-      ? Number(live?.thetaScaleUsed)
-      : (Number.isFinite(Number(live?.thetaScale)) ? Number(live?.thetaScale) : undefined);
-    const realPayload = {
-      ...baseShared,
-      ...realPhys,
-      exposure: 5.0,
-      zeroStop: 1e-7,
-      colorMode: 2, // Shear proxy for truth view
-      lockFraming: true,
-      thetaScale: (pipelineTheta ?? realPhys.thetaScale ??
-        computeThetaScale(realPhys)),
-      thetaScale_metric: computeThetaScale({ ...realPhys, gammaVanDenBroeck: realPhys.gammaVanDenBroeck_mass ?? realPhys.gammaVanDenBroeck }),
-      useMetric: useMetric
-    };
-
-    // Attach metric defaults to both panes (you can turn them off via useMetric=false)
-    (realPayload as any).useMetric   = props.baseShared?.useMetric ?? useMetric;
-    (realPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
-    (realPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
-
-    // Build SHOW payload (no parity enforcement) + θ passthrough
-    const showPayload = {
-      ...baseShared,
-      ...showPhys,
-      exposure: 7.5,
-      zeroStop: 1e-7,
-      curvatureGainT: 0.70,
-      curvatureBoostMax: 40,
-      userGain: 1.25,
-      colorMode: 1, // Theta mode for visual enhancement
-      lockFraming: true,
-      thetaScale: (pipelineTheta ?? showPhys.thetaScale ??
-        computeThetaScale({ ...showPhys, gammaVanDenBroeck: showPhys.gammaVanDenBroeck_vis ?? showPhys.gammaVanDenBroeck }))
-    };
-    (showPayload as any).useMetric   = props.baseShared?.useMetric ?? useMetric;
-    (showPayload as any).metric      = props.baseShared?.metric    ?? metricDiag.g;
-    (showPayload as any).metricInv   = props.baseShared?.metricInv ?? metricDiag.inv;
-    (showPayload as any).thetaScale_metric = computeThetaScale({ ...showPhys, gammaVanDenBroeck: showPhys.gammaVanDenBroeck_vis ?? showPhys.gammaVanDenBroeck });
+  // Drive engines strictly from pipeline snapshot (no client fabrication)
+  useEffect(() => {
+    if (!live) return;
+    driveWarpFromPipeline(leftEngine.current, live, { mode: 'REAL', strict: true });
+    driveWarpFromPipeline(rightEngine.current, live, { mode: 'SHOW', strict: true });
+  }, [live]);
 
 
   // Physics bound for theta calculations
