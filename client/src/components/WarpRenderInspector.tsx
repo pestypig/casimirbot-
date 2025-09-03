@@ -1296,8 +1296,8 @@ export default function WarpRenderInspector(props: {
   // final view mass fraction for REAL's diagnostics & proxies
   const viewMassFracREAL = sectorFrac * bandCover;
 
-  // Visual-only mass fraction scaling
-  const viewFracREAL = 1 / total;
+  // Visual-only mass fraction scaling: use the fraction we just derived
+  const viewFracREAL = viewMassFracREAL;
 
   // FR duty for both engines - let them derive thetaScale internally
   const dutyEffectiveFR = dutyLocal * (sConcurrent / sTotal); // 0.01 × (1/400) here
