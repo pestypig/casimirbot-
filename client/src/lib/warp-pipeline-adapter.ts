@@ -39,7 +39,10 @@ export function driveWarpFromPipeline(
     gammaGeo:        finite(pipeline.gammaGeo),
     qSpoilingFactor: finite((pipeline as any).qSpoilingFactor ?? (pipeline as any).deltaAOverA),
     gammaVdB:        finite((pipeline as any).gammaVdB ?? (pipeline as any).gammaVanDenBroeck),
-    thetaScale:      finite((pipeline as any).thetaScale ?? (pipeline as any).thetaUniform),
+    // Prefer authoritative theta from pipeline; accept older field names.
+    thetaScale:      finite(
+                      (pipeline as any).thetaScale ??
+                      (pipeline as any).thetaUniform ?? (pipeline as any).thetaScaleExpected),
     sectorCount:     inty(pipeline.sectorCount),
     dutyUsed,
     // Mode tags (no boosts)
@@ -83,6 +86,8 @@ export function driveWarpFromPipeline(
   }
 
   // ---- 5) Push to engine (single source of truth) ---------------------------
+  // Helpful for inspectors: record the active mode
+  engine.updateUniforms?.({ currentMode: mode });
   engine.setLightCrossing?.(lcPayload);
   engine.updateUniforms?.(uniforms);
   engine.requestRewarp?.();
