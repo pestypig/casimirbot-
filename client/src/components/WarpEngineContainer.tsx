@@ -1,19 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+import { useMetrics } from "@/hooks/use-metrics";
+import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 
-// Mock imports for demonstration purposes if not running in a context with these available
-// const useEnergyPipeline = () => ({ data: { modulationFreq_GHz: 10, dutyEffectiveFR: 0.5 } });
-// const useMetrics = () => ({});
-// const useGreens = () => ({});
-// const useLightCrossing = () => ({ lc: { tauLC_ms: 10, dwell_ms: 5, burst_ms: 2, phase: 1, sectorIdx: 0, sectorCount: 10, onWindow: true } });
-
-
-// Mock imports for demonstration purposes - replace with actual imports if needed
-// In a real scenario, these would be imported from their respective modules.
-// For this example, we'll define them as empty functions or objects if they aren't provided.
-const useEnergyPipeline = (options?: { refetchInterval: number }) => ({ data: null });
-const useMetrics = (interval: number) => ({ data: null });
+// Mock greens hook for demonstration purposes
 const useGreens = () => ({});
-const useLightCrossing = () => ({ lc: null }); // Assuming lc can be null initially
 
 // Refactored to use provided props and mock data structures if necessary for standalone testing
 // In the original code, `lc` was not defined, so we'll assume it comes from `useLightCrossing`
@@ -26,9 +17,11 @@ export default function WarpEngineContainer(props: { className?: string }) {
   const [status, setStatus] = useState<"idle"|"loading"|"ready"|"error">("idle");
   const [err, setErr] = useState<string | null>(null);
 
-  // Mocking the light crossing hook as it was not present in the original code snippet
-  // but is referenced in the changes.
-  const { lc } = useLightCrossing();
+  // Get live pipeline data
+  const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
+  const { data: metrics } = useMetrics(2000);
+  const { data: lc } = useLightCrossingLoop(); // τ_LC, dwell, burst, phase, sector, onWindow
+  const greens = useGreens();
 
   useEffect(() => {
     let cancelled = false;
@@ -71,12 +64,6 @@ export default function WarpEngineContainer(props: { className?: string }) {
     };
   }, []);
 
-  // Get live pipeline data
-  const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
-  // NOTE: LC loop already exists in your file; we just forward it to the engine.
-  const { data: metrics } = useMetrics(2000);
-  const greens = useGreens(); // This was in the original code, keeping it
-
   // State for comparison view
   const [showComparison, setShowComparison] = useState(false);
 
@@ -98,9 +85,16 @@ export default function WarpEngineContainer(props: { className?: string }) {
     }
   }, [pipeline, metrics, greens]); // Added greens to dependencies
 
-  // Push Light-Crossing timeline into both engines every tick
+  // --- NEW: push Light-Crossing timeline into engines each tick --------------
   useEffect(() => {
+    if (!engineRef.current) return;
     if (!lc) return;
+    // Compute TS ratio if modulation freq is present
+    const fGHz = Number.isFinite(pipeline?.modulationFreq_GHz) ? +pipeline!.modulationFreq_GHz! : NaN;
+    const Tm_ms = Number.isFinite(fGHz) ? (1000.0 / (fGHz * 1e9)) : NaN; // ms
+    const tauLC_ms = +lc.tauLC_ms ?? NaN;
+    const TS_ratio = (Number.isFinite(tauLC_ms) && Number.isFinite(Tm_ms) && Tm_ms > 0) ? (tauLC_ms / Tm_ms) : undefined;
+
     const payload = {
       tauLC_ms: lc.tauLC_ms,
       dwell_ms: lc.dwell_ms,
@@ -108,13 +102,26 @@ export default function WarpEngineContainer(props: { className?: string }) {
       phase: lc.phase,
       sectorIdx: lc.sectorIdx,
       sectorCount: lc.sectorCount,
-      onWindow: lc.onWindow,
-      TS_ratio: (Number.isFinite(lc.tauLC_ms) && Number.isFinite(pipeline?.modulationFreq_GHz))
-        ? (lc.tauLC_ms / (1000 / (pipeline!.modulationFreq_GHz! * 1e9))) : undefined,
-      dutyEffectiveFR: (pipeline as any)?.dutyEffectiveFR,
+      onWindow: !!lc.onWindow,
+      TS_ratio,
+      dutyEffectiveFR: (pipeline as any)?.dutyEffectiveFR
     };
-    engineRef.current?.setLightCrossing?.(payload); // Using engineRef.current directly
+    engineRef.current?.setLightCrossing?.(payload);
   }, [lc?.tauLC_ms, lc?.dwell_ms, lc?.burst_ms, lc?.phase, lc?.sectorIdx, lc?.sectorCount, lc?.onWindow, pipeline?.modulationFreq_GHz, (pipeline as any)?.dutyEffectiveFR]);
+
+  // --- NEW: set a deterministic cameraZ and forward view/tensors -------------
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const z = 3.0; // stable frame (tweak if you have a UI knob)
+    const vf: [number,number,number] = [0,0,-1]; // camera looks -Z in our scene
+    const g0i = (pipeline as any)?.natario?.g0i || (pipeline as any)?.natario?.shiftBeta || undefined;
+    const pack = {
+      cameraZ: z,
+      viewForward: vf,
+      ...(Array.isArray(g0i) ? { g0i } : {})
+    };
+    engineRef.current.updateUniforms?.(pack);
+  }, [pipeline?.natario]);
 
 
   // Drive engines from pipeline data
