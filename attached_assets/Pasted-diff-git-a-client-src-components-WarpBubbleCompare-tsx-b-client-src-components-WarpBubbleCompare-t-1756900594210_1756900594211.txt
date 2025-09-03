@@ -1,0 +1,46 @@
+diff --git a/client/src/components/WarpBubbleCompare.tsx b/client/src/components/WarpBubbleCompare.tsx
+--- a/client/src/components/WarpBubbleCompare.tsx
++++ b/client/src/components/WarpBubbleCompare.tsx
+@@ -1,28 +1,22 @@
+ import React, { useEffect, useMemo } from "react";
+ // …existing imports…
+ 
+-const aHarmonic = (ax?: number, ay?: number, az?: number) => { const a=+ax||0,b=+ay||0,c=+az||0; const d=(a>0?1/a:0)+(b>0?1/b:0)+(c>0?1/c:0); return d>0?3/d:NaN; };
+ export function WarpBubbleCompare(props: CompareProps) {
+   const { leftEngine, rightEngine, parameters, real, show } = props;
+ 
+-  // Unified wall width from adapter/pipeline (ρ & m stay in sync)
+-  const aH = aHarmonic(parameters.axesHull?.[0], parameters.axesHull?.[1], parameters.axesHull?.[2]);
+-  const wallRho = Number.isFinite(parameters.wallWidth_rho) ? +parameters.wallWidth_rho
+-                 : (Number.isFinite(parameters.wallWidth_m) && Number.isFinite(aH)) ? (+parameters.wallWidth_m / aH) : undefined;
+-  const wallM   = Number.isFinite(parameters.wallWidth_m) ? +parameters.wallWidth_m
+-                 : (Number.isFinite(parameters.wallWidth_rho) && Number.isFinite(aH)) ? (+parameters.wallWidth_rho * aH) : undefined;
+-
+-  // Enforce expected modes (REMOVE physics overrides):
+-  // REAL → physicsParityMode=true, ridgeMode=0
+-  // SHOW → physicsParityMode=false, ridgeMode=1
+-  const realModes = { physicsParityMode: true, ridgeMode: 0 };
+-  const showModes = { physicsParityMode: false, ridgeMode: 1 };
++  // Wall width & axes should already be normalized by adapter; do not recompute here.
++  const wallRho = Number.isFinite(parameters.wallWidth_rho) ? +parameters.wallWidth_rho : undefined;
++  const wallM   = Number.isFinite(parameters.wallWidth_m)   ? +parameters.wallWidth_m   : undefined;
+ 
+   const realPayload = useMemo(() => ({
+     ...real,
+     wallWidth: wallRho,
+     wallWidth_rho: wallRho,
+     wallWidth_m: wallM,
+-    ...realModes,
++    // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
+   }), [real, wallRho, wallM]);
+ 
+   const showPayload = useMemo(() => ({
+     ...show,
+     wallWidth: wallRho,
+     wallWidth_rho: wallRho,
+     wallWidth_m: wallM,
+-    ...showModes,
++    // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
+   }), [show, wallRho, wallM]);
+ 
+   useEffect(() => {
