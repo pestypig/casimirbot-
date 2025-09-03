@@ -5,7 +5,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
 import { useMetrics } from "@/hooks/use-metrics";
-import { useMetrics } from "@/hooks/use-metrics";
 
 import { gatedUpdateUniforms, applyToEngine } from "@/lib/warp-uniforms-gate";
 
