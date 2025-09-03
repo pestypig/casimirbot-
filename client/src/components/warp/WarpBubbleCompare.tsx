@@ -239,7 +239,24 @@ function sizeCanvas(cv: HTMLCanvasElement) {
 function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
   const p = { ...patch };
 
-  // Enforcement disabled: leave parity/ridge untouched (pass-through)
+  // Unified wall width and physics mode enforcement
+  const aH = aHarmonic(p?.hullAxes?.[0], p?.hullAxes?.[1], p?.hullAxes?.[2]);
+  if (p.wallWidth_m !== undefined && Number.isFinite(p.wallWidth_m)) {
+    p.wallWidth = Number.isFinite(aH) ? p.wallWidth_m / aH : undefined;
+    p.wallWidth_m = p.wallWidth_m;
+  } else if (p.wallWidth !== undefined && Number.isFinite(p.wallWidth)) {
+    p.wallWidth_m = Number.isFinite(aH) ? p.wallWidth * aH : undefined;
+  }
+
+  // Enforce expected physics modes
+  if (pane === 'REAL') {
+    p.physicsParityMode = true;
+    p.ridgeMode = 0;
+  } else if (pane === 'SHOW') {
+    p.physicsParityMode = false;
+    p.ridgeMode = 1;
+  }
+
   return p;
 }
 
@@ -976,15 +993,13 @@ export default function WarpBubbleCompare({
   // Build REAL/SHOW packets from parameters with unified wall width calculations
   function buildPacketsFromParams(p: any) {
     const wu = normalizeWU(p?.warpUniforms || (p as any));
-    
-    // NEW: single source of truth from adapter/pipeline (no per-pane recompute)
+
+    // Unified wall width from adapter/pipeline (ρ & m stay in sync)
     const aH = aHarmonic(p.axesHull?.[0], p.axesHull?.[1], p.axesHull?.[2]);
-    const unifiedWallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho
-                          : (Number.isFinite(p.wallWidth_m) && Number.isFinite(aH)) ? (+p.wallWidth_m / aH)
-                          : undefined;
-    const unifiedWallM   = Number.isFinite(p.wallWidth_m) ? +p.wallWidth_m
-                          : (Number.isFinite(p.wallWidth_rho) && Number.isFinite(aH)) ? (+p.wallWidth_rho * aH)
-                          : undefined;
+    const wallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho
+                   : (Number.isFinite(p.wallWidth_m) && Number.isFinite(aH)) ? (+p.wallWidth_m / aH) : undefined;
+    const wallM   = Number.isFinite(p.wallWidth_m) ? +p.wallWidth_m
+                   : (Number.isFinite(p.wallWidth_rho) && Number.isFinite(aH)) ? (+p.wallWidth_rho * aH) : undefined;
 
     // Forward Natário tensors and toggle if present (pass-through, no defaults)
     const natarioFields: any = {};
@@ -999,24 +1014,24 @@ export default function WarpBubbleCompare({
 
     const real = buildREAL(wu);
     const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
-    
+
     // Apply unified wall width and Natário fields to both payloads
     const realWithWall = {
       ...real,
-      wallWidth: unifiedWallRho,
-      wallWidth_rho: unifiedWallRho,
-      wallWidth_m: unifiedWallM,
+      wallWidth: wallRho,
+      wallWidth_rho: wallRho,
+      wallWidth_m: wallM,
       ...natarioFields,
     };
-    
+
     const showWithWall = {
       ...show,
-      wallWidth: unifiedWallRho,
-      wallWidth_rho: unifiedWallRho,
-      wallWidth_m: unifiedWallM,
+      wallWidth: wallRho,
+      wallWidth_rho: wallRho,
+      wallWidth_m: wallM,
       ...natarioFields,
     };
-    
+
     return { real: realWithWall, show: showWithWall };
   }
 
