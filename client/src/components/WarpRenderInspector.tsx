@@ -21,9 +21,6 @@ import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
-import CanvasFallback from '@/components/CanvasFallback';
-import Grid3DEngine from '@/components/engines/Grid3DEngine';
-import { useMetrics } from "@/hooks/use-metrics";
 
 // ---- FAST PATH HELPERS (drop-in) --------------------------------------------
 
