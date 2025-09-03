@@ -288,6 +288,19 @@ class WarpEngine {
             currentSector: 0
         };
 
+        // Light-crossing timing state
+        this.lightCrossingState = {
+            tauLC_ms: undefined,
+            dwell_ms: undefined,
+            burst_ms: undefined,
+            phase: undefined,
+            sectorIdx: undefined,
+            sectorCount: undefined,
+            onWindow: undefined,
+            TS_ratio: undefined,
+            dutyUsed: undefined
+        };
+
         // Initialize WebGL state
         this.gl.clearColor(0.0, 0.0, 0.0, 1.0); // Black background for visibility
         this.gl.enable(this.gl.DEPTH_TEST);
@@ -686,6 +699,16 @@ uniform vec3  u_viewForward;  // Camera forward vector in world space
 uniform vec3  u_g0i;          // Lowered shift vector β_i = g_ij β^j
 uniform float u_metricOn;     // Flag to indicate if metric tensor is active
 
+// Light-crossing & strobing timeline uniforms
+uniform float u_tauLC_ms;     // Light-crossing time (ms)
+uniform float u_dwell_ms;     // Sector dwell time (ms)
+uniform float u_burst_ms;     // Burst duration (ms)
+uniform float u_phase;        // Phase within sector (0..1)
+uniform int   u_sectorIdx;    // Current sector index (0..S-1)
+uniform float u_onWindow;     // Inside burst window (0/1)
+uniform float u_TS_ratio;     // τ_LC / T_m ratio
+uniform float u_dutyUsed;     // Effective FR duty used
+
 #endif
 `;
             return `${uniformsBlock}\n${src}`;
@@ -1001,6 +1024,16 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             // New tensor uniforms
             viewForward: gl.getUniformLocation(program, 'u_viewForward'), // Camera forward vector
             g0i:         gl.getUniformLocation(program, 'u_g0i'),         // Lowered shift vector β_i
+
+            // Light-crossing timeline uniforms
+            tauLC_ms:    gl.getUniformLocation(program, 'u_tauLC_ms'),
+            dwell_ms:    gl.getUniformLocation(program, 'u_dwell_ms'),
+            burst_ms:    gl.getUniformLocation(program, 'u_burst_ms'),
+            phase:       gl.getUniformLocation(program, 'u_phase'),
+            sectorIdx:   gl.getUniformLocation(program, 'u_sectorIdx'),
+            onWindow:    gl.getUniformLocation(program, 'u_onWindow'),
+            TS_ratio:    gl.getUniformLocation(program, 'u_TS_ratio'),
+            dutyUsed:    gl.getUniformLocation(program, 'u_dutyUsed')
         };
 
         // (Optional) quick sanity log once
@@ -1254,6 +1287,35 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
                       (gInv ? new Float32Array(gInv) : ID3),
             metricOn: on ? 1.0 : 0.0,
             useMetric: on
+        });
+        return this;
+    }
+
+    /** Update light-crossing timing & strobing gate (authoritative) */
+    setLightCrossing(info) {
+        if (!info) return this;
+        const state = this.lightCrossingState;
+        state.tauLC_ms = Number.isFinite(info.tauLC_ms) ? Number(info.tauLC_ms) : undefined;
+        state.dwell_ms = Number.isFinite(info.dwell_ms) ? Number(info.dwell_ms) : undefined;
+        state.burst_ms = Number.isFinite(info.burst_ms) ? Number(info.burst_ms) : undefined;
+        state.phase = Number.isFinite(info.phase) ? Number(info.phase) : undefined;
+        state.sectorIdx = Number.isFinite(info.sectorIdx) ? Number(info.sectorIdx) : undefined;
+        state.sectorCount = Number.isFinite(info.sectorCount) ? Number(info.sectorCount) : undefined;
+        state.onWindow = typeof info.onWindow === 'boolean' ? (info.onWindow ? 1 : 0) : undefined;
+        state.TS_ratio = Number.isFinite(info.TS_ratio) ? Number(info.TS_ratio) : undefined;
+        state.dutyUsed = Number.isFinite(info.dutyEffectiveFR) ? Number(info.dutyEffectiveFR) : undefined;
+        
+        // Update uniforms with the new values
+        this.updateUniforms({
+            tauLC_ms: state.tauLC_ms,
+            dwell_ms: state.dwell_ms,
+            burst_ms: state.burst_ms,
+            phase: state.phase,
+            sectorIdx: state.sectorIdx,
+            sectorCount: state.sectorCount,
+            onWindow: state.onWindow,
+            TS_ratio: state.TS_ratio,
+            dutyUsed: state.dutyUsed
         });
         return this;
     }
@@ -2046,17 +2108,27 @@ _renderGridPoints() {
 
     // --- New tensor uniforms ---
     // upload camera forward every frame (if present)
-    if (loc.viewForward && Array.isArray(u.viewForward)) {
-      gl.uniform3f(loc.viewForward, u.viewForward[0], u.viewForward[1], u.viewForward[2]);
+    if (this.gridUniforms.viewForward && Array.isArray(U.viewForward)) {
+      gl.uniform3f(this.gridUniforms.viewForward, U.viewForward[0], U.viewForward[1], U.viewForward[2]);
     }
     // upload lowered shift g0i = β_i (if present)
-    if (loc.g0i && Array.isArray(u.g0i)) {
-      gl.uniform3f(loc.g0i, u.g0i[0], u.g0i[1], u.g0i[2]);
+    if (this.gridUniforms.g0i && Array.isArray(U.g0i)) {
+      gl.uniform3f(this.gridUniforms.g0i, U.g0i[0], U.g0i[1], U.g0i[2]);
     }
     // keep legacy float toggle in sync
-    if (loc.metricOn && typeof u.useMetric === 'boolean') {
-      gl.uniform1f(loc.metricOn, u.useMetric ? 1.0 : 0.0);
+    if (this.gridUniforms.metricOn && typeof U.useMetric === 'boolean') {
+      gl.uniform1f(this.gridUniforms.metricOn, U.useMetric ? 1.0 : 0.0);
     }
+
+    // --- Light-crossing timeline uniforms ---
+    if (this.gridUniforms.tauLC_ms) gl.uniform1f(this.gridUniforms.tauLC_ms, F(U.tauLC_ms, 0.0));
+    if (this.gridUniforms.dwell_ms) gl.uniform1f(this.gridUniforms.dwell_ms, F(U.dwell_ms, 0.0));
+    if (this.gridUniforms.burst_ms) gl.uniform1f(this.gridUniforms.burst_ms, F(U.burst_ms, 0.0));
+    if (this.gridUniforms.phase) gl.uniform1f(this.gridUniforms.phase, F(U.phase, 0.0));
+    if (this.gridUniforms.sectorIdx) gl.uniform1i(this.gridUniforms.sectorIdx, I(U.sectorIdx, 0));
+    if (this.gridUniforms.onWindow) gl.uniform1f(this.gridUniforms.onWindow, F(U.onWindow, 0.0));
+    if (this.gridUniforms.TS_ratio) gl.uniform1f(this.gridUniforms.TS_ratio, F(U.TS_ratio, 0.0));
+    if (this.gridUniforms.dutyUsed) gl.uniform1f(this.gridUniforms.dutyUsed, F(U.dutyUsed, 0.0));
 
     const vertexCount = (this.gridVertices?.length || 0) / 3;
     if (vertexCount > 0) gl.drawArrays(gl.LINES, 0, vertexCount);
