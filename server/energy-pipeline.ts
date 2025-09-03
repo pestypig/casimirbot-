@@ -839,6 +839,10 @@ export function setGlobalPipelineState(state: EnergyPipelineState): void {
   globalPipelineState = state;
 }
 
+// Helper functions for normalization
+function finite(n: any){ const x = +n; return Number.isFinite(x) ? x : undefined; }
+function arrN(a:any, k:number){ return (Array.isArray(a) && a.length>=k) ? a : undefined; }
+
 /**
  * Compute energy snapshot for unified client consumption
  * Calls the central pipeline and merges outputs into shared snapshot
@@ -864,6 +868,37 @@ export async function computeEnergySnapshot(sim: any) {
 
   // Run the unified pipeline calculation
   const result = await calculateEnergyPipeline(state);
+
+  // ---- Normalize Light–Crossing payload for the client API -------------------
+  const lcSrc = (result.lc ?? result.lightCrossing ?? {}) as any;
+  const lc = {
+    tauLC_ms:   finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined)),
+    dwell_ms:   finite(lcSrc.dwell_ms ?? (lcSrc.dwell_us!=null ? lcSrc.dwell_us/1000 : lcSrc.dwell_ms)),
+    burst_ms:   finite(lcSrc.burst_ms ?? (lcSrc.burst_us!=null ? lcSrc.burst_us/1000 : lcSrc.burst_ms)),
+    phase:      finite(lcSrc.phase),
+    onWindow:   !!lcSrc.onWindow,
+    sectorIdx:  Number.isFinite(+lcSrc.sectorIdx) ? Math.floor(+lcSrc.sectorIdx) : undefined,
+    sectorCount:Number.isFinite(+result.sectorCount) ? Math.floor(+result.sectorCount) : undefined,
+  };
+
+  // ---- Duty (renderer authority) by mode; keep explicit fields too ----------
+  const duty = {
+    dutyUsed:        finite(result.dutyUsed),
+    dutyEffectiveFR: finite(result.dutyEffectiveFR),
+    dutyFR_slice:    finite(result.dutyFR_slice),
+    dutyFR_ship:     finite(result.dutyFR_ship),
+  };
+
+  // ---- Natário tensors (kept under natario.*; adapter also accepts top-level)
+  const natario = {
+    metricMode:  !!(result.natario?.metricMode),
+    lapseN:      finite(result.natario?.lapseN),
+    shiftBeta:   arrN(result.natario?.shiftBeta, 3),
+    gSpatialDiag:arrN(result.natario?.gSpatialDiag, 3),
+    gSpatialSym: arrN(result.natario?.gSpatialSym, 6),
+    viewForward: arrN(result.natario?.viewForward, 3),
+    g0i:         arrN(result.natario?.g0i, 3),
+  };
 
   // Trust the pipeline's FR duty (ship-wide, sector-averaged)
   const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
@@ -1016,7 +1051,15 @@ export async function computeEnergySnapshot(sim: any) {
     warpModule: (result as any).warp ? {
       timeMs: (result as any).warp.calculationTime ?? 0,
       status: (result as any).warp.validationSummary?.overallStatus ?? 'optimal'
-    } : { timeMs: 0, status: 'optimal' }
+    } : { timeMs: 0, status: 'optimal' },
+
+    // Normalized, renderer-ready data structures
+    lc,
+    natario,
+    // Duty authority (adapter selects by mode; renderer never fabricates)
+    ...duty,
+    // For adapter mode selection & viewers
+    mode: sim.mode ?? result.currentMode ?? 'hover'
   };
 }
 
