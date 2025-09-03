@@ -12,6 +12,8 @@
   globalThis.WarpEngine.BUILD = BUILD;
   globalThis.__WarpEngineBuild = BUILD;
 
+// WarpEngine (WebGL) – public build (served as classic script)
+
 // Optimized 3D spacetime curvature visualization engine
 // Authentic Natário warp bubble physics with WebGL rendering
 
@@ -845,7 +847,7 @@ void main() {
   // Calculate surface normal for Purple shift (metric-aware)
   vec3 normalWS = u_useMetric ? normalizeG(v_pos) : normalize(v_pos);
 
-  // Metric-aware screen-space curvature (adds ridge accent when enabled)
+  // Metric-space screen-space curvature (adds ridge accent when enabled)
 #ifdef GL_OES_standard_derivatives
   // NOTE: kScreen is correctly declared and computed above. curvVis is also computed.
   // No redeclaration needed here.
@@ -1361,7 +1363,7 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
         this.currentParams = { ...this.currentParams, ...parameters };
         const U = this.uniforms = this.uniforms || {}; // Ensure uniforms object exists
 
-        // debug detection for physics parity mode
+        // Debug detection for physics parity mode
         const modeStr = String(parameters?.currentMode ?? prev?.currentMode ?? 'hover').toLowerCase();
         const isStandby = modeStr === 'standby';
 
@@ -1515,23 +1517,6 @@ ${fsBody.replace('VARY_DECL', 'varying').replace('VEC4_DECL frag;', '').replace(
             U.axesScene = [a[0]/aMax, a[1]/aMax, a[2]/aMax];
         } else if (Array.isArray(U.axesScene)) {
             U.axesScene = U.axesScene.slice(0,3); // Ensure it's a clean copy
-        }
-
-        // In strict mode: no span/userGain seasoning
-        if (this.strictScientific) {
-            U.userGain = 1.0;
-            U.displayGain = 1.0;
-        }
-
-        // --- Hull scaling and clipping axes (used for camera fit) ---
-        const axesScene = P.axesScene ?? U.axesScene; // Prefer explicit scene axes
-        if (!Array.isArray(axesScene) && Array.isArray(U.hullAxes)) {
-            const aH = _guessAH(U); // Harmonic mean in meters
-            const hullMaxClip = Math.max(1e-6, U.hullAxes[0], U.hullAxes[1], U.hullAxes[2]);
-            const clipScale = Math.max(1e-9, hullMaxClip, aH || 1); // use largest dimension OR harmonic mean
-            U.axesScene = U.hullAxes.map(x => x / clipScale);
-        } else if (Array.isArray(axesScene)) {
-            U.axesScene = axesScene.slice(0,3); // Ensure it's a clean copy
         }
         // Ensure axesScene is defined for camera fitting
         if (!U.axesScene) U.axesScene = [1,1,1];
