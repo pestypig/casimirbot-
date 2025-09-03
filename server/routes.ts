@@ -415,16 +415,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add target validation routes
   app.use("/api", targetValidationRoutes);
 
-  // HELIX-CORE routes
-  const { 
-    handleHelixCommand, 
-    getTileStatus, 
+  // ---- Helix core: prefer .ts in dev, fall back to .js in prod --------------
+  async function importHelixCore() {
+    try {
+      // ts-node/tsx dev: load TypeScript module directly
+      return await import("./helix-core.ts");
+    } catch (eTs) {
+      try {
+        // compiled/bundled prod: load emitted JavaScript
+        return await import("./helix-core.js");
+      } catch (eJs) {
+        const tsMsg = (eTs instanceof Error ? eTs.message : String(eTs));
+        const jsMsg = (eJs instanceof Error ? eJs.message : String(eJs));
+        throw new Error(
+          `Failed to load helix-core (tried .ts then .js). ` +
+          `ts: ${tsMsg} | js: ${jsMsg}`
+        );
+      }
+    }
+  }
+  const {
+    handleHelixCommand,
+    getTileStatus,
     getSystemMetrics,
     getPipelineState,
     getDisplacementField,
     updatePipelineParams,
     switchOperationalMode
-  } = await import("./helix-core.js");
+  } = await importHelixCore();
 
   app.post("/api/helix/command", handleHelixCommand);
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
