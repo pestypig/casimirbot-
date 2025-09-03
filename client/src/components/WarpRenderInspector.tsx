@@ -1083,13 +1083,25 @@ export default function WarpRenderInspector(props: {
         }
       }
 
-      // Bootstrap both engines once they are ready
-      // Need to define realPayload and showPayload before this point.
-      // Moved definitions up.
+      // Bootstrap both engines once they are ready.
+      // Build payloads inline to avoid scope/ordering issues with showPayload/realPayload.
+      const showBoot = {
+        ...(props.baseShared || {}),
+        ...(props.showPhys || {}),
+        currentMode: 'SHOW' as const,
+      };
+      const realBoot = {
+        ...(props.baseShared || {}),
+        ...(props.parityPhys || {}),
+        currentMode: 'REAL' as const,
+      };
 
-      // Bootstrap both engines once they are ready
-      rightEngine.current?.bootstrap?.({ ...showPayload });
-      leftEngine.current?.bootstrap?.({ ...realPayload });
+      if (rightEngine.current?.bootstrap) {
+        rightEngine.current.bootstrap(showBoot);
+      }
+      if (leftEngine.current?.bootstrap) {
+        leftEngine.current.bootstrap(realBoot);
+      }
 
 
       // Build shared frame data once
@@ -1119,8 +1131,8 @@ export default function WarpRenderInspector(props: {
       })();
 
       // Setup engine checkpoints after first frame is guaranteed correct
-      setupEngineCheckpoints(leftEngine.current, 'REAL', realPayload);
-      setupEngineCheckpoints(rightEngine.current, 'SHOW', showPayload);
+      setupEngineCheckpoints(leftEngine.current, 'REAL', realBoot);
+      setupEngineCheckpoints(rightEngine.current, 'SHOW', showBoot);
 
       // Diagnostics -> window for quick comparison
       leftEngine.current && (leftEngine.current.onDiagnostics  = (d: any) => ((window as any).__diagREAL = d));
