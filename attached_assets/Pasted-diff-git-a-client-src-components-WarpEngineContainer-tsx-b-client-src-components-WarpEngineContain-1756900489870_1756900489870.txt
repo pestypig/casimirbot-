@@ -1,0 +1,52 @@
+diff --git a/client/src/components/WarpEngineContainer.tsx b/client/src/components/WarpEngineContainer.tsx
+--- a/client/src/components/WarpEngineContainer.tsx
++++ b/client/src/components/WarpEngineContainer.tsx
+@@ -1,14 +1,12 @@
+ import React, { useEffect, useMemo, useRef } from "react";
+ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+ import { useMetrics } from "@/hooks/use-metrics";
+-import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
+ import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
+ 
+ export default function WarpEngineContainer(props:any){
+   const leftEngine = useRef<any>(null);
+   const rightEngine = useRef<any>(null);
+   const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
+   const { data: metrics }  = useMetrics(2000);
+-  const lc = useLightCrossingLoop({}); // REMOVE: no fabricated LC in strict mode
+ 
+   // Create engines, link GL (existing code)
+   // …
+@@ -33,46 +31,45 @@ export default function WarpEngineContainer(props:any){
+   // Drive engines strictly from pipeline (no client physics)
+   useEffect(() => {
+     if (!pipeline) return;
+-    // REAL pane (slice)
+-    driveWarpFromPipeline(leftEngine.current,  { ...pipeline, _view: 'REAL' }, { mode: 'REAL',  strict: true });
+-    // SHOW pane (whole-ship)
+-    driveWarpFromPipeline(rightEngine.current, { ...pipeline, _view: 'SHOW' }, { mode: 'SHOW', strict: true });
++    // REAL pane (slice duty)
++    driveWarpFromPipeline(leftEngine.current,  pipeline, { mode: 'REAL',  strict: true });
++    // SHOW pane (whole-ship duty)
++    driveWarpFromPipeline(rightEngine.current, pipeline, { mode: 'SHOW', strict: true });
+   }, [pipeline]);
+ 
+-  // Remove parity/ridge physics injections; keep cosmetic only (camera, exposure)
+-  useEffect(() => {
+-    const z = 3.0; // stable framing
+-    leftEngine.current?.updateUniforms?.({ cameraZ: z });
+-    rightEngine.current?.updateUniforms?.({ cameraZ: z });
+-  }, []);
++  // Keep cameraZ cosmetic only (no physics knobs here)
++  useEffect(() => {
++    const z = 3.0; // stable framing
++    leftEngine.current?.updateUniforms?.({ cameraZ: z });
++    rightEngine.current?.updateUniforms?.({ cameraZ: z });
++  }, []);
+ 
+   return (
+     <div className="warp-engines">
+       {/* canvases & overlays */}
+     </div>
+   );
+ }
