@@ -1731,7 +1731,7 @@ export default function WarpRenderInspector(props: {
             <div>θ-scale (physics-only): {(bound?.gammaGeo ? thetaGainExpected(bound) : 0).toExponential(3)} • Current status: READY</div>
             <div>FR duty: {(dutyEffectiveFR * 100).toExponential(2)}%</div>
             <div className="text-yellow-600">γ_VdB bound: {gammaVdBBound.toExponential(2)} {useMassGamma ? '(mass)' : '(visual)'}</div>
-            <div>view mass fraction (REAL): {(viewMassFracREAL * 100).toFixed(3)}% (1/{total})</div>
+            <div>view mass fraction (REAL): {(viewMassFracREAL * 100).toFixed(3)}% (1/{sTotal})</div>
             <div>view mass fraction (SHOW): {(1.0 * 100).toFixed(3)}% (full bubble)</div>
           </div>
           <button
