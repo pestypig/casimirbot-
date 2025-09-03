@@ -5,11 +5,12 @@
 export function driveWarpFromPipeline(
   engine: any,
   pipeline: any,
-  options?: { mode?: 'REAL'|'SHOW', strict?: boolean }
+  options?: { mode?: 'REAL'|'SHOW', strict?: boolean, metrics?: any }
 ) {
   if (!engine || !pipeline) return;
   const mode   = options?.mode ?? (pipeline.mode as any) ?? 'REAL';
   const strict = options?.strict ?? true;
+  const mx     = options?.metrics ?? null; // optional /api/helix/metrics payload
 
   // Safe field access for nested Natário shapes
   const get = (o:any, path:string[]): any => {
@@ -19,13 +20,15 @@ export function driveWarpFromPipeline(
 
   // ---- 1) Normalize LC (accept alt keys; μs→ms) -----------------------------
   const lcSrc: any = (pipeline.lc ?? pipeline.lightCrossing ?? {});
-  const tauLC_ms = finite(lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined));
-  const dwell_ms = finite(lcSrc.dwell_ms ?? (lcSrc.dwell_us!=null ? lcSrc.dwell_us/1000 : lcSrc.dwell_ms));
-  const burst_ms = finite(lcSrc.burst_ms ?? (lcSrc.burst_us!=null ? lcSrc.burst_us/1000 : lcSrc.burst_ms));
-  const phase    = finite(lcSrc.phase);
-  const onWindow = booly(lcSrc.onWindow);
-  const sectorIdx   = inty(lcSrc.sectorIdx);
-  const sectorCount = inty(pipeline.sectorCount ?? lcSrc.sectorCount);
+  // Prefer live metrics when provided; otherwise use pipeline LC
+  const mLC = (mx && (mx.lightCrossing || mx)) || {};
+  const tauLC_ms = finite(mLC.tauLC_ms ?? lcSrc.tauLC_ms ?? lcSrc.tau_ms ?? (lcSrc.tau_us!=null ? lcSrc.tau_us/1000 : undefined));
+  const dwell_ms = finite(mLC.dwell_ms  ?? lcSrc.dwell_ms  ?? (lcSrc.dwell_us!=null ? lcSrc.dwell_us/1000 : lcSrc.dwell_ms));
+  const burst_ms = finite(mLC.burst_ms  ?? lcSrc.burst_ms  ?? (lcSrc.burst_us!=null ? lcSrc.burst_us/1000 : lcSrc.burst_ms));
+  const phase    = finite(mLC.phase ?? lcSrc.phase);
+  const onWindow = booly(mLC.onWindow ?? lcSrc.onWindow);
+  const sectorIdx   = inty(mLC.sectorIdx ?? mx?.currentSector ?? lcSrc.sectorIdx);
+  const sectorCount = inty(mLC.sectorCount ?? mx?.totalSectors ?? pipeline.sectorCount ?? lcSrc.sectorCount);
   const lcPayload = { tauLC_ms, dwell_ms, burst_ms, phase, onWindow, sectorIdx, sectorCount };
 
   // ---- 1b) Bring across Natário shift/tensor outputs for diagnostics --------
@@ -52,7 +55,8 @@ export function driveWarpFromPipeline(
   const natStress = (get(nat, ['stressEnergyTensor']) || {}) as any;
 
   // ---- 2) Duty authority (no recompute on client) ---------------------------
-  let dutyUsed = finite((pipeline as any).dutyUsed);
+  // Prefer metrics.dutyFR when present (live FR duty); else pipeline chain
+  let dutyUsed = finite(mx?.dutyFR ?? (pipeline as any).dutyUsed);
   if (!isF(dutyUsed)) dutyUsed = finite((pipeline as any).dutyEffectiveFR);
   if (!isF(dutyUsed)) {
     const dSlice = finite((pipeline as any).dutyFR_slice);
@@ -114,8 +118,9 @@ export function driveWarpFromPipeline(
     if (!isF(uniforms.gammaVdB))        miss.push('gammaVdB');
     if (!isF(uniforms.sectorCount))     miss.push('sectorCount');
     if (!isF(uniforms.dutyUsed))        miss.push('dutyUsed');
-    if (!isF(tauLC_ms) || !isF(dwell_ms) || !isF(burst_ms))
+    if (!isF(tauLC_ms) || !isF(dwell_ms) || !isF(burst_ms)) {
       miss.push('LC(tauLC_ms/dwell_ms/burst_ms)');
+    }
     if (miss.length) {
       engine.uniforms = engine.uniforms || {};
       engine.uniforms.__error = `adapter: missing ${miss.join(', ')}`;
@@ -132,7 +137,9 @@ export function driveWarpFromPipeline(
   engine.updateUniforms?.(stamp);
   
   // Helpful for inspectors: record the active mode
-  engine.updateUniforms?.({ currentMode: mode });
+  const stamp:any = { currentMode: mode };
+  if (mx?.timestamp) stamp.__metricsTick = mx.timestamp;
+  engine.updateUniforms?.(stamp);
   engine.setLightCrossing?.(lcPayload);
   engine.updateUniforms?.(uniforms);
   engine.requestRewarp?.();
