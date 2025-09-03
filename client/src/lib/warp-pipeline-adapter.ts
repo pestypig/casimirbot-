@@ -1,7 +1,45 @@
 
-// Adapter: pipeline → engine uniforms (strict-science: no client fabrication)
-// (keep any existing imports)
 
+
+/**
+ * Pipeline → WarpEngine Adapter
+ *
+ * Drives renderer uniforms from pipeline state (single source of truth, strict; no fallbacks)
+ */
+import { gatedUpdateUniforms } from "./warp-uniforms-gate";
+import type { GreensPayload, HelixMetrics, EnergyPipelineState } from "@/hooks/use-energy-pipeline";
+
+// Optional Natário-esque tensor inputs (pass-through; no defaults here)
+export type NatarioTensorOpts = {
+  lapseN?: number;                           // N
+  shiftBeta?: [number,number,number];        // β^i
+  gSpatialSym?: [number,number,number,number,number,number]; // gxx,gyy,gzz,gxy,gyz,gzx
+};
+
+function aHarmonic(ax: number, ay: number, az: number) {
+  const a = +ax || 0, b = +ay || 0, c = +az || 0;
+  const d = (a>0?1/a:0) + (b>0?1/b:0) + (c>0?1/c:0);
+  return d > 0 ? 3 / d : NaN;
+}
+
+function req(cond: any, msg: string) {
+  if (!cond) throw new Error(`adapter: ${msg}`);
+}
+
+export type DriveMetricOpts = {
+  // Optional conformal metric inputs (Commit B)
+  greens?: GreensPayload;   // φ samples; when present with kappa → metricMode
+  metricKappa?: number;     // required to enable metric
+  natario?: NatarioTensorOpts; // optional 3+1 tensors (pass-through)
+  // Hooks-fed helpers (no defaults in adapter)
+  metrics?: HelixMetrics;   // from use-metrics (for hull)
+  wallWidth_m?: number;     // from useLightCrossingLoop or explicit UI
+};
+
+/**
+ * Drop-in adapter: pipeline → WarpEngine (single source of truth, strict)
+ * Call this every time the pipeline state changes (or on a fixed tick)
+ */
 export function driveWarpFromPipeline(
   engine: any,
   pipeline: any,
@@ -63,48 +101,38 @@ export function driveWarpFromPipeline(
   // ---- 4) Strict gate: refuse to push partial physics -----------------------
   if (strict) {
     const miss: string[] = [];
-    if (!_isFinite(uniforms.gammaGeo)) miss.push('gammaGeo');
+    if (!_isFinite(uniforms.thetaScale))      miss.push('thetaScale');
+    if (!_isFinite(uniforms.gammaGeo))        miss.push('gammaGeo');
     if (!_isFinite(uniforms.qSpoilingFactor)) miss.push('qSpoilingFactor');
-    if (!_isFinite(uniforms.gammaVdB)) miss.push('gammaVdB');
-    if (!_isFinite(uniforms.dutyUsed)) miss.push('dutyUsed');
-    if (!_isFinite(uniforms.sectorCount)) miss.push('sectorCount');
-
-    if (miss.length > 0) {
-      console.warn(`[driveWarpFromPipeline] Missing physics: ${miss.join(', ')}`);
-      return;
+    if (!_isFinite(uniforms.gammaVdB))        miss.push('gammaVdB');
+    if (!_isFinite(uniforms.sectorCount))     miss.push('sectorCount');
+    if (!_isFinite(uniforms.dutyUsed))        miss.push('dutyUsed');
+    if (!_isFinite(tauLC_ms) || !_isFinite(dwell_ms) || !_isFinite(burst_ms)) {
+      miss.push('LC(tauLC_ms/dwell_ms/burst_ms)');
+    }
+    if (miss.length) {
+      engine.uniforms = engine.uniforms || {};
+      engine.uniforms.__error = `adapter: missing ${miss.join(', ')}`;
+      return; // stop here; viewers will show the error string
     }
   }
 
-  // ---- 5) Apply to engine (with light-crossing payload) ---------------------
-  if (engine.updateUniforms) {
-    engine.updateUniforms(uniforms);
-  }
-  if (engine.setLightCrossingPayload) {
-    engine.setLightCrossingPayload(lcPayload);
-  }
+  // ---- 5) Push to engine (single source of truth) ---------------------------
+  engine.setLightCrossing?.(lcPayload);     // mirrors into uniforms
+  engine.updateUniforms?.(uniforms);        // verbatim physics/tensors
+  engine.requestRewarp?.();                 // optional: force rebind/recalc
 }
 
-// ---- Helper functions ------------------------------------------------------
-function _finite(x: any): number | undefined {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : undefined;
+// ---------- tiny helpers (scoped to this module) ----------
+function _finite(x:any){ const n = +x; return Number.isFinite(n) ? n : undefined; }
+function _inty(x:any){ const n = Math.floor(+x); return Number.isFinite(n) ? n : undefined; }
+function _booly(x:any){ return x===true || x===1 || x==='1'; }
+function _isFinite(x:any){ return Number.isFinite(+x); }
+function _arrN(a:any, k:number){
+  return (Array.isArray(a) && a.length>=k) ? a : undefined;
 }
 
-function _isFinite(x: any): x is number {
-  return Number.isFinite(x);
-}
-
-function _booly(x: any): boolean {
-  return Boolean(x);
-}
-
-function _inty(x: any): number | undefined {
-  const n = Number(x);
-  return Number.isInteger(n) ? n : undefined;
-}
-
-function _arrN(x: any, len: number): number[] | undefined {
-  if (!Array.isArray(x) || x.length !== len) return undefined;
-  const arr = x.map(Number);
-  return arr.every(Number.isFinite) ? arr : undefined;
-}
+function finite(x: any){ const n = +x; return Number.isFinite(n) ? n : undefined; }
+function inty(x: any){ const n = Math.floor(+x); return Number.isFinite(n) ? n : undefined; }
+function booly(x: any){ return x === true || x === 1 || x === '1'; }
+function arrayOrUndef(arr: any, needLen: number){ return (Array.isArray(arr) && arr.length >= needLen) ? arr : undefined; }
