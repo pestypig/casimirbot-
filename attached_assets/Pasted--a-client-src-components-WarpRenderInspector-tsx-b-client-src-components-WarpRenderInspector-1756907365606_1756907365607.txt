@@ -1,0 +1,106 @@
+*** a/client/src/components/WarpRenderInspector.tsx
+--- b/client/src/components/WarpRenderInspector.tsx
+@@
+ export default function WarpRenderInspector(props: {
+   // Optional: calculator outputs. Pass exactly what your calculator returns
+   // (REAL/FR vs SHOW/UI). Any missing fields fall back safely.
+   parityPhys?: Record<string, any>;
+   showPhys?: Record<string, any>;
+   baseShared?: Record<string, any>; // e.g. hull, sectors/split, colorMode, etc.
+   lightCrossing?: { burst_ms?: number; dwell_ms?: number };  // ⬅️ add
+   debugTag?: string; // Debug tag for console logging
+ }) {
+@@
+   const [haveUniforms, setHaveUniforms] = useState(false);
+   const [loadError, setLoadError] = useState<string | null>(null);
+ 
++  // ---- Physics from props (declare ONCE, near top; avoid duplicate re-decls) ----
++  // These are the “calculator”/pipeline-fed inputs we pass into payload builders.
++  // Keeping them here guarantees anything below can reference them safely.
++  const realPhys: Record<string, any> = props.parityPhys ?? {};
++  const showPhys: Record<string, any> = props.showPhys   ?? {};
++  const baseShared: Record<string, any> = props.baseShared ?? {};
++
+   // ... existing hooks/effects continue ...
+@@
+-  // Apply physics from props with comprehensive validation
+-    const realPhys = props.parityPhys || {};
+-    const showPhys = props.showPhys || {};
+-    const baseShared = props.baseShared || {};
+-
+-    // Enhanced theta scale calculation with debugging
+-    // const computeThetaWithDebug = (phys: any, source: 'fr' | 'ui', label: string) => {
+-    //   const gammaGeo = +phys.gammaGeo || 26;
+-    //   const qSpoil   = +phys.qSpoilingFactor || 1;
+-    //   // use explicit pocket factors
+-    //   const gammaVdB_mass = +phys.gammaVanDenBroeck_mass || 1;
+-    //   const gammaVdB_vis  = +phys.gammaVanDenBroeck_vis  || 1;
+-    //   const gammaVdB      = source === 'fr' ? gammaVdB_mass : gammaVdB_vis;
+-    //   const dutyFR = phys.dutyEffectiveFR || phys.d_FR || 0.000025;
+-    //
+-    //   const calculated = computeThetaScale(phys);
+-    //   const actualTheta = source === 'fr'
+-    //     ? leftEngine.current?.uniforms?.thetaScale
+-    //     : rightEngine.current?.uniforms?.thetaScale;
+-    //
+-    //   console.log(`[${label}] Theta calculation debug:`, {
+-    //     gammaGeo,
+-    //     qSpoil,
+-    //     gammaVdB,
+-    //     dutyFR,
+-    //     viewAvg: true,
+-    //     calculated,
+-    //     actualTheta
+-    //   });
+-    //
+-    //   return calculated;
+-    // };
++  // (debug helper kept elsewhere; removed duplicate block)
+@@
+-  // Apply physics from props with comprehensive validation
+-    const realPhys = props.parityPhys || {};
+-    const showPhys = props.showPhys || {};
+-    const baseShared = props.baseShared || {};
+-    // (duplicate block removed)
++  // (duplicate “physics from props” block removed)
+@@
+-  // Apply physics from props with comprehensive validation
+-    const realPhys = props.parityPhys || {};
+-    const showPhys = props.showPhys || {};
+-    const baseShared = props.baseShared || {};
+-    // (duplicate block removed)
++  // (duplicate “physics from props” block removed)
+@@
+-  // Apply physics from props with comprehensive validation
+-    const realPhys = props.parityPhys || {};
+-    const showPhys = props.showPhys || {};
+-    const baseShared = props.baseShared || {};
+-    // (duplicate block removed)
++  // (duplicate “physics from props” block removed)
+@@
+   // Build REAL payload (no parity enforcement) + θ passthrough
+   const pipelineTheta = Number.isFinite(Number(live?.thetaScaleUsed))
+     ? Number(live?.thetaScaleUsed)
+     : (Number.isFinite(Number(live?.thetaScale)) ? Number(live?.thetaScale) : undefined);
+   const realPayload = {
+     ...baseShared,
+     ...realPhys,
+@@
+   // Build SHOW payload (no parity enforcement) + θ passthrough
+   const showPayload = {
+     ...baseShared,
+     ...showPhys,
+@@
+   // Physics bound for theta calculations
+-    const bound = useMemo(() => ({
+-      gammaGeo: realPhys.gammaGeo || 26,
+-      qSpoilingFactor: realPhys.qSpoilingFactor || 1,
+-      gammaVdB: realPhys.gammaVanDenBroeck || realPhys.gammaVdB || 1,
+-      dutyEffectiveFR: realPhys.dutyEffectiveFR || 0.000025
+-    }), [realPhys]);
++  const bound = useMemo(() => ({
++    gammaGeo: Number(realPhys?.gammaGeo) || 26,
++    qSpoilingFactor: Number(realPhys?.qSpoilingFactor) || 1,
++    gammaVdB: Number(realPhys?.gammaVanDenBroeck ?? realPhys?.gammaVdB) || 1,
++    dutyEffectiveFR: Number(realPhys?.dutyEffectiveFR ?? live?.dutyEffectiveFR) || 0.000025
++  }), [realPhys, live?.dutyEffectiveFR]);
