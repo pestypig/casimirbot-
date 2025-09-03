@@ -1,0 +1,74 @@
+diff --git a/warp-engine.js b/warp-engine.js
+--- a/warp-engine.js
++++ b/warp-engine.js
+@@ -560,6 +560,16 @@ function buildFragmentShaderSource(opts) {
+ uniform mat3 u_metricInv;
+ uniform bool u_useMetric;
+ uniform vec3 u_viewForward;  // camera forward (world→scene basis already applied)
++// --- Light-crossing & strobing timeline (authoritative; renderer-gated) ---
++uniform float u_tauLC_ms;     // τ_LC in ms
++uniform float u_dwell_ms;     // dwell window in ms
++uniform float u_burst_ms;     // burst (ON) subwindow in ms
++uniform float u_phase;        // 0..1 phase within dwell
++uniform float u_onWindow;     // 0/1: inside reciprocity-checked window
++uniform float u_dutyUsed;     // FR duty actually applied by renderer (0..1)
++// NOTE: we gate intensity by a smooth edge; outside window → fade to zero.
++//       The physics chain already enforces reciprocity (burst ≥ τ_LC) upstream.
+ 
+ // Metric diagnostics
+ uniform float u_lapseN;
+@@ -635,6 +645,23 @@ void main() {
+   float kScreen = 0.0;
+ #endif
+ 
++  // ---- c vs Strobing temporal gate -----------------------------------------
++  // Build a soft gate over the burst subwindow within each dwell.
++  // phase φ in [0,1], burst fraction f = burst/dwell; symmetric window around 0.5
++  float phi   = clamp(u_phase, 0.0, 1.0);
++  float frac  = u_burst_ms / max(1e-6, u_dwell_ms);
++  // Soft trapezoid: when frac → 0, the gate shrinks smoothly; when frac → 1, always on.
++  float edge  = 1.0 - abs(phi - 0.5) * 2.0 / max(1e-6, frac);
++  edge        = clamp(edge, 0.0, 1.0);
++  float reciprocityGate = (u_onWindow > 0.5) ? 1.0 : 0.0;
++  float intensityGate   = edge * reciprocityGate;
++
++  // Duty integration (Ford–Roman average): scale amplitude by √dutyUsed
++  float dutySqrt = sqrt(max(1e-12, u_dutyUsed));
++
++  // Effective theta used for shading (pipeline theta × √duty × temporal gate)
++  float thetaUsed = u_thetaScale * dutySqrt * intensityGate;
++
+   // ---- base color (your existing shading) ----------------------------------
+   vec3 col = baseColor;
+ 
+@@ -712,6 +739,7 @@ void main() {
+     float sigma_opt = abs(sx - sy);
+     // blend a tiny lapse/shift cue via projection of g0i along view
+     float g0i_view = dot(normalize(u_g0i), normalize(u_viewForward));
+     float zCue = clamp(0.5 + 0.5 * g0i_view, 0.0, 1.0);
+     float eVis = clamp(0.5 + 0.5 * theta_opt, 0.0, 1.0);
+     float sVis = clamp(sigma_opt, 0.0, 1.0);
+     // map: shear → green channel, expansion → red/blue split, zCue modulates brightness
+-    vec3 col7 = vec3(eVis, sVis, 1.0 - eVis);
+-    col7 = mix(col7, col7 * (0.65 + 0.35*zCue), 0.5);
++    vec3 col7 = vec3(eVis, sVis, 1.0 - eVis);
++    col7 = mix(col7, col7 * (0.65 + 0.35*zCue), 0.5);
++    // Apply temporal/duty gate to optical-scalars visualization
++    col7 *= clamp(thetaUsed / max(1e-12, u_thetaScale), 0.0, 1.0);
+     SET_FRAG(vec4(col7, 1.0));
+     return;
+   }
+ 
+   // Debug modes (4+)
+   if (colorI >= 4) {
+-    float debug = abs(thetaField) * u_thetaScale; // Use thetaField for debug based on context
+-    vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
++    float debug = abs(thetaField) * thetaUsed; // gate by LC and duty
++    vec3 debugColor = vec3(debug, 0.0, 1.0 - debug);
+     col = debugColor;
+   }
+-  SET_FRAG(vec4(col, 0.9));
++  // Apply temporal/duty gate to the final color in all modes
++  col *= clamp(thetaUsed / max(1e-12, u_thetaScale), 0.0, 1.0);
++  SET_FRAG(vec4(col, 0.9));
+ }`;
