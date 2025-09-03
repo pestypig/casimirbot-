@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useCallback, useState } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
 import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
 import CanvasFallback from '@/components/CanvasFallback';
@@ -680,6 +681,9 @@ const applyShow = (
 
 /* ---------------- Component ---------------- */
 type Props = {
+  /** Full pipeline snapshot preferred (same shape as /api/helix/pipeline) */
+  pipeline?: any;
+  /** Legacy: manual "parameters". We'll wrap these minimally if pipeline isn't provided. */
   parameters: any;                   // compareParams from HelixCore
   parityExaggeration?: number;       // keep at 1 (userGain) for REAL
   heroExaggeration?: number;         // display gain cap (e.g., 40..120)
@@ -688,6 +692,7 @@ type Props = {
 };
 
 export default function WarpBubbleCompare({
+  pipeline,
   parameters,
   parityExaggeration = 1,
   heroExaggeration = 82,
@@ -981,49 +986,41 @@ export default function WarpBubbleCompare({
     if (cv) (cv as any).__warpEngine = undefined;
   }
 
-  // Build REAL/SHOW packets from parameters (adapter handles wall width calculations)
-  function buildPacketsFromParams(p: any) {
-    const wu = normalizeWU(p?.warpUniforms || (p as any));
-
-    // Wall width & axes should already be normalized by adapter; do not recompute here.
-    const wallRho = Number.isFinite(p.wallWidth_rho) ? +p.wallWidth_rho : undefined;
-    const wallM   = Number.isFinite(p.wallWidth_m)   ? +p.wallWidth_m   : undefined;
-
-    // Forward Natário tensors and toggle if present (pass-through, no defaults)
-    const natarioFields: any = {};
-    if (p.metricMode === true || p.useMetric === true) {
-      natarioFields.metricMode = true;
-      natarioFields.useMetric  = true;
-    }
-    if (Array.isArray((p as any).gSpatialSym))  natarioFields.gSpatialSym  = (p as any).gSpatialSym;
-    if (Array.isArray((p as any).gSpatialDiag)) natarioFields.gSpatialDiag = (p as any).gSpatialDiag;
-    if (Number.isFinite((p as any).lapseN))     natarioFields.lapseN       = +(p as any).lapseN;
-    if (Array.isArray((p as any).shiftBeta))    natarioFields.shiftBeta    = (p as any).shiftBeta;
-
-    const real = buildREAL(wu);
-    const show = buildSHOW(wu, { T: 0.70, boost: 40, userGain: 4 });
-
-    // Apply wall width and Natário fields to both payloads (no physics overrides)
-    const realWithWall = {
-      ...real,
-      wallWidth: wallRho,
-      wallWidth_rho: wallRho,
-      wallWidth_m: wallM,
-      ...natarioFields,
-      // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
+  // ---- Compose a pipeline snapshot to feed the adapter ----
+  // Preferred: live pipeline data. Fallback: minimally wrap "parameters"
+  const pipelineSnapshot = useMemo(() => {
+    // If we have live pipeline data, use it directly
+    if (parameters?.pipeline) return parameters.pipeline;
+    
+    const p = parameters || {};
+    const nat = p.natario || {};
+    
+    // Package existing fields for the adapter without fabricating new physics
+    return {
+      ...p,
+      natario: {
+        metricMode: nat.metricMode ?? p.metricMode,
+        lapseN: nat.lapseN ?? p.lapseN,
+        shiftBeta: nat.shiftBeta ?? p.shiftBeta,
+        gSpatialDiag: nat.gSpatialDiag ?? p.gSpatialDiag,
+        gSpatialSym: nat.gSpatialSym ?? p.gSpatialSym,
+        viewForward: nat.viewForward ?? p.viewForward,
+        g0i: nat.g0i ?? p.g0i,
+        stressEnergyTensor: nat.stressEnergyTensor,
+        shiftVectorField: nat.shiftVectorField,
+      },
+      // Forward timing/duty fields for adapter
+      lc: p.lightCrossing || p.lc,
+      lightCrossing: p.lightCrossing,
+      sectorCount: p.sectorCount,
+      dutyUsed: p.dutyUsed || p.dutyEffectiveFR,
+      dutyEffectiveFR: p.dutyEffectiveFR,
+      thetaScale: p.thetaScale,
+      gammaGeo: p.gammaGeo,
+      qSpoilingFactor: p.qSpoilingFactor,
+      gammaVdB: p.gammaVdB || p.gammaVanDenBroeck,
     };
-
-    const showWithWall = {
-      ...show,
-      wallWidth: wallRho,
-      wallWidth_rho: wallRho,
-      wallWidth_m: wallM,
-      ...natarioFields,
-      // no physics overrides; cosmetics may differ elsewhere (e.g., colorMode)
-    };
-
-    return { real: realWithWall, show: showWithWall };
-  }
+  }, [parameters]);
 
   // Full re-init using current parameters + camera + strobing
   async function reinitEnginesFromParams() {
@@ -1069,40 +1066,16 @@ export default function WarpBubbleCompare({
         return eng;
       };
 
-      // 3) Build uniforms from parameters (single source of truth)
-      const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
-      const { real, show } = buildPacketsFromParams(parameters);
-
-      // REAL packet (no physics overrides)
-      const realPacket = {
-        ...shared,
-        ...real,
-        currentMode: parameters.currentMode,
-        vShip: 0,
-        gammaVdB: real.gammaVanDenBroeck ?? real.gammaVdB,
-        deltaAOverA: real.qSpoilingFactor,
-        dutyEffectiveFR: real.dutyEffectiveFR ?? (real as any).dutyEff ?? (real as any).dutyFR ?? 0.000025,
-        sectors: Math.max(1, parameters.sectors),
-      };
-
-      // SHOW packet (no physics overrides)
-      const showTheta = parameters.currentMode === 'standby' ? 0 : Math.max(1e-6, show.thetaScale || 0);
-      const showPacket = {
-        ...shared,
-        ...show,
-        currentMode: parameters.currentMode,
-        vShip: parameters.currentMode === 'standby' ? 0 : 1,
-        thetaScale: showTheta,
-        gammaVdB: show.gammaVanDenBroeck ?? show.gammaVdB,
-        deltaAOverA: show.qSpoilingFactor,
-        sectors: Math.max(1, parameters.sectors),
-      };
-
-      // 4) Init both engines without uniforms first
+      // 3) Init both engines without uniforms first
       leftEngine.current  = await initOne(leftRef.current,  {});
       rightEngine.current = await initOne(rightRef.current, {});
 
-      // 5) After creating both engines and building `shared` once:
+      // 4) Drive engines strictly from pipeline snapshot (no client fabrication)
+      driveWarpFromPipeline(leftEngine.current, pipelineSnapshot, { mode: 'REAL', strict: true });
+      driveWarpFromPipeline(rightEngine.current, pipelineSnapshot, { mode: 'SHOW', strict: true });
+
+      // 5) After adapter sets physics, apply cosmetic framing
+      const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
       await firstCorrectFrame({
         engine: leftEngine.current,
         canvas: leftRef.current!,
@@ -1120,31 +1093,29 @@ export default function WarpBubbleCompare({
       enableLowFps(leftEngine.current, 12);
       enableLowFps(rightEngine.current, 12);
 
-      // 6) Single combined uniforms write per pane using batchers
-      const heroExaggeration = 82; // default visual boost
-
-      // REAL — physics truth (no overrides)
+      // 6) Apply cosmetic-only updates (no physics overrides)
+      // REAL — truth view with minimal cosmetics
       pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
         ...shared,
-        ...real,
-        vShip: 0,
-        curvatureGainT: 0,
-        curvatureBoostMax: 1,
-        userGain: 1,
-        displayGain: 1,
+        ...(real || {}),
         colorMode: 2, // shear for truth view
-      })), 'REAL/combined');
+        exposure: 4.2,
+        zeroStop: 1e-6,
+        lockFraming: true,
+      })), 'REAL/cosmetic');
 
-      // SHOW — boosted visuals (no overrides)
+      // SHOW — boosted visuals for demonstration
       pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
         ...shared,
-        ...show,
-        vShip: parameters.currentMode === 'standby' ? 0 : 1,
+        ...(show || {}),
+        colorMode: 1, // theta for visual appeal
+        exposure: 7.5,
+        zeroStop: 1e-7,
+        lockFraming: true,
         curvatureGainT: 0.70,
-        curvatureBoostMax: Math.max(1, +heroExaggeration || 82),
+        curvatureBoostMax: Math.max(1, heroBoost),
         userGain: 4,
-        displayGain: 1,
-      })), 'SHOW/combined');
+      })), 'SHOW/cosmetic');
 
       // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
       ensureStrobeMux();
@@ -1194,13 +1165,16 @@ export default function WarpBubbleCompare({
     }
   }, []); // mount only
 
-  // In strict 1:1 mode the adapter is the single source of truth.
-  // The compare panel becomes read-only (cosmetics only).
+  // ---- Drive engines via adapter (physics) + apply cosmetics ----
   useEffect(() => {
-    if (!leftEngine.current || !rightEngine.current || !parameters) return;
+    if (!leftEngine.current || !rightEngine.current || !pipelineSnapshot) return;
 
-    // Only apply visual cosmetics - physics uniforms are handled by the adapter
-    const shared = frameFromHull(parameters.hull, parameters.gridSpan || 2.6);
+    // 1) All physics from adapter (single source of truth)
+    driveWarpFromPipeline(leftEngine.current, pipelineSnapshot, { mode: 'REAL', strict: true });
+    driveWarpFromPipeline(rightEngine.current, pipelineSnapshot, { mode: 'SHOW', strict: true });
+
+    // 2) Apply cosmetic-only updates after physics
+    const shared = frameFromHull(parameters?.hull, parameters?.gridSpan || 2.6);
     const camZ = safeCamZ(compactCameraZ(leftRef.current!, shared.axesScene || [1,1,1]));
 
     // REAL: minimal cosmetic-only updates (no physics overrides)
@@ -1234,12 +1208,13 @@ export default function WarpBubbleCompare({
     leftEngine.current.requestRewarp?.();
     rightEngine.current.requestRewarp?.();
 
-    console.log('[WarpBubbleCompare] Cosmetic-only update applied', {
+    console.log('[WarpBubbleCompare] Adapter-driven physics + cosmetics applied', {
       heroBoost,
       displayGain,
-      colorMode
+      colorMode,
+      hasAdapter: true
     });
-  }, [parameters, colorMode, heroBoost]);
+  }, [pipelineSnapshot, colorMode, heroBoost]);
 
   // 7.4 — Mirror strobing state from parameters.lightCrossing
   useEffect(() => {
