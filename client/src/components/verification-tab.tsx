@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
          BarChart, Bar } from 'recharts';
 import { CheckCircle, XCircle, AlertCircle, Eye, Calculator, TrendingUp, FileCheck, Target, Zap } from "lucide-react";
+import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 
 interface VerificationTabProps {
   simulation: any;
@@ -67,8 +68,8 @@ export function VerificationTab({ simulation, results }: VerificationTabProps) {
     // Use the full 25 mm disk area as reference (from research papers)
     const diskRadius = 25e-3; // 25 mm radius in meters
     const area = Math.PI * Math.pow(diskRadius, 2); // full disk area in m²
-    const hbar = 1.054571817e-34; // J⋅s
-    const c = 299792458; // m/s
+  const hbar = 1.054571817e-34; // J⋅s
+  const c = SPEED_OF_LIGHT; // m/s
     
     // Casimir energy between parallel plates: E = -π²ℏcA/(240a³)
     const analyticEnergy = -Math.pow(Math.PI, 2) * hbar * c * area / (240 * Math.pow(gap, 3));

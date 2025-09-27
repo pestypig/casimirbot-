@@ -220,7 +220,7 @@ const ChartTooltipContent = React.forwardRef<
                           style={{
                             "--color-bg": indicatorColor,
                             "--color-border": indicatorColor,
-                          }}
+                          } as any}
                         />
                       )
                     )}

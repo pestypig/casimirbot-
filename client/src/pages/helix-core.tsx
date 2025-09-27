@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTrans
 import { Link } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,8 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
+import SnapshotProbe from '@/dev/SnapshotProbe';
+import DataNamesPanel from '@/dev/DataNamesPanel';
 
 // Greens bridge: auto-publish φ from pipeline/metrics so the Greens cards populate
 type V3 = [number, number, number];
@@ -27,7 +30,7 @@ function computePhi(positions: V3[], rho: number[], kernel = poissonG, normalize
     for (let j = 0; j < N; j++) {
       const [xj, yj, zj] = positions[j];
       const r = Math.hypot(xi - xj, yi - yj, zi - zj) + 1e-6;
-      sum += kernel(r) * rho[j];
+  sum += kernel(r) * rho[j]; 
     }
     out[i] = sum;
   }
@@ -69,8 +72,8 @@ function GreensLivePanel() {
 
   // Returns timing with explicit **priority** and **unit coercion**
   function pickTiming(): {
-    tauLC: Prov<number>, burst: Prov<number>, dwell: Prov<number>,
-    sectorsTotal: Prov<number>, sectorsConcurrent: Prov<number>
+    tauLC: Prov<number | undefined>, burst: Prov<number | undefined>, dwell: Prov<number | undefined>,
+    sectorsTotal: Prov<number | undefined>, sectorsConcurrent: Prov<number | undefined>
   } {
     const lcM = (metrics as any)?.lightCrossing ?? {};
     const lcL = (live as any)?.lightCrossing ?? {};
@@ -84,37 +87,41 @@ function GreensLivePanel() {
       toMs((live as any)?.tau_LC_ms, "ms") ?? toMs((live as any)?.tauLC_ms, "ms") ??
       toMs(lcL.tauLC_ms, "ms") ?? toMs(lcL.tau_ms, "ms") ?? toMs(lcL.tauLC_s, "s")
     );
-    const tauLC = tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics")
-                : tauFromDerived !== undefined ? prov(tauFromDerived, "derived")
-                : tauFromLive !== undefined ? prov(tauFromLive, "live")
-                : prov(undefined, "none");
+  const tauLC = tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics")
+        : tauFromDerived !== undefined ? prov(tauFromDerived, "derived")
+        : tauFromLive !== undefined ? prov(tauFromLive, "live")
+        : prov<number | undefined>(undefined, "none");
 
     // burst / dwell priority mirrors τ_LC
-    const burst = ((): Prov<number> => {
+    const burst = ((): Prov<number | undefined> => {
       const m = saneMs(toMs(lcM.burst_ms, "ms"));
       const d = saneMs(derived?.burst_ms);
       const l = saneMs(toMs((live as any)?.burst_ms, "ms") ?? toMs(lcL.burst_ms, "ms"));
-      return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov(undefined, "none");
+  return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov<number | undefined>(undefined, "none");
     })();
-    const dwell = ((): Prov<number> => {
+  const dwell = ((): Prov<number | undefined> => {
       const m = saneMs(toMs(lcM.dwell_ms, "ms") ?? toMs(lcM.sectorPeriod_ms, "ms"));
       const d = saneMs(derived?.dwell_ms ?? derived?.sectorPeriod_ms);
       const l = saneMs(toMs((live as any)?.dwell_ms, "ms") ?? toMs((live as any)?.sectorPeriod_ms, "ms") ?? toMs(lcL.dwell_ms, "ms") ?? toMs(lcL.sectorPeriod_ms, "ms"));
-      return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov(undefined, "none");
+  return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov<number | undefined>(undefined, "none");
     })();
 
     // sectors: prefer metrics root (activeSectors/totalSectors), then derived, then live
     const sectorsTotal =
       isNum((metrics as any)?.totalSectors) ? prov((metrics as any).totalSectors, "metrics")
       : isNum(derived?.sectorsTotal) ? prov(derived.sectorsTotal, "derived")
-      : isNum((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) ? prov((live as any)?.sectorsTotal ?? (live as any)?.sectorCount, "live")
-      : prov(undefined, "none");
+      : isNum(((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) as any) ? prov(((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) as any, "live")
+      : prov<number | undefined>(undefined, "none");
     const sectorsConcurrent =
       isNum((metrics as any)?.activeSectors) ? prov((metrics as any).activeSectors, "metrics")
       : isNum(derived?.sectorsConcurrent) ? prov(derived.sectorsConcurrent, "derived")
       : isNum((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors) ? prov((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors, "live")
       : prov(undefined, "none");
 
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  const mode = (derived?.mode ?? (live as any)?.currentMode ?? (metrics as any)?.currentMode ?? "hover") as string;
+
+    // Return the provenance-wrapped timing values
     return { tauLC, burst, dwell, sectorsTotal, sectorsConcurrent };
   }
 
@@ -146,7 +153,7 @@ function GreensLivePanel() {
   const phi = toF32(greens?.phi);
   const phiStat = phi ? stat(phi) : undefined;
 
-  const mode = (derived?.mode ?? live?.currentMode ?? metrics?.currentMode ?? "hover") as string;
+  const mode = (derived?.mode ?? (live as any)?.currentMode ?? (metrics as any)?.currentMode ?? "hover") as string;
   const dutyFR =
     Number.isFinite(derived?.dutyEffectiveFR) ? derived.dutyEffectiveFR :
     Number.isFinite((live as any)?.dutyEffectiveFR) ? (live as any).dutyEffectiveFR :
@@ -173,7 +180,7 @@ function GreensLivePanel() {
   const dutyDelta = (isNum(dutyFR_calc) && Number.isFinite(dutyFR_fallback))
     ? Math.abs(dutyFR_calc - (dutyFR_fallback as number))
     : undefined;
-  const dutyConsistent = !isNum(dutyDelta) || dutyDelta < 5e-4; // <0.05% abs
+  const dutyConsistent = !isNum(dutyDelta) || dutyDelta < 5e-4; 
   const r_b_over_tau = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
   const sectorsTotal = T.sectorsTotal.val;
   const sectorsConcurrent = T.sectorsConcurrent.val;
@@ -189,6 +196,21 @@ function GreensLivePanel() {
   })();
 
   const dutyFrom = isNum(dutyFR_calc) ? "calc" : (Number.isFinite(dutyFR_fallback) ? "derived" : "—");
+  // Development-only diagnostic: log duty components and compare to pipeline-provided values
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV) {
+    React.useEffect(() => {
+      try {
+        // Keep this debug tidy and scoped to dev only
+        console.debug('[GreensLivePanel · duty-debug]', {
+          burst_ms, dwell_ms, sectorsTotal, sectorsConcurrent,
+          dutyFR_calc, dutyFR_fallback, dutyFR_display,
+          derivedDuty: derived?.dutyEffectiveFR,
+          liveDuty: (live as any)?.dutyEffectiveFR,
+        });
+      } catch (e) {}
+    }, [burst_ms, dwell_ms, sectorsTotal, sectorsConcurrent, dutyFR_calc, dutyFR_fallback, derived?.dutyEffectiveFR, (live as any)?.dutyEffectiveFR]);
+  }
+
   // ---- undeniable liveness: flash + age counter ----
   const [sig, setSig] = React.useState<string>("");
   const [lastAt, setLastAt] = React.useState<number>(0);
@@ -375,24 +397,18 @@ function useGreensBridge() {
 
 // Utils for live mode descriptions
 
-const formatPower = (P_MW?: number, P_W?: number) => {
-  if (Number.isFinite(P_MW as number)) return `${(P_MW as number).toFixed(1)} MW`;
-  if (Number.isFinite(P_W as number)) {
-    const w = P_W as number;
-    if (w >= 1e6) return `${(w / 1e6).toFixed(1)} MW`;
-    if (w >= 1e3) return `${(w / 1e3).toFixed(1)} kW`;
-    return `${w.toFixed(1)} W`;
-  }
-  return "—";
-};
-
 const buildLiveDesc = (
-  snap?: { P_avg_MW?: number; M_exotic_kg?: number; zeta?: number },
+  snap?: { P_avg_MW?: number; P_avg_W?: number; M_exotic_kg?: number; zeta?: number },
   cfg?: { powerTarget_W?: number },
   pipelineTargetW?: number
 ) => {
-  const targetW = pipelineTargetW ?? cfg?.powerTarget_W;
-  const P = formatPower(snap?.P_avg_MW, targetW);
+  // Use canonical formatter from the shared hook for consistent units
+  const watts = Number.isFinite(snap?.P_avg_W)
+    ? snap!.P_avg_W!
+    : Number.isFinite(snap?.P_avg_MW)
+      ? snap!.P_avg_MW! * 1e6
+      : undefined;
+  const P = fmtPowerUnitFromW(watts);
   const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
   const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
   return `${P} • ${M} • ${Z}`;
@@ -412,7 +428,7 @@ const buildModeSelectItems = (pipeline: any) => {
 };
 
 import { useMetrics } from "@/hooks/use-metrics";
-const WarpRenderInspector = lazy(() => import("@/components/WarpRenderInspector"));
+import AlcubierrePanel from "@/components/AlcubierrePanel";
 import { FuelGauge, computeEffectiveLyPerHour } from "@/components/FuelGauge";
 
 import { TripPlayer } from "@/components/TripPlayer";
@@ -627,6 +643,8 @@ interface EnergyPipelineState {
   modulationFreq_GHz?: number;
   M_exotic?: number;
   gammaVanDenBroeck?: number;
+  gammaVanDenBroeck_vis?: number;
+  gammaVanDenBroeck_mass?: number;
   qMechanical?: number; // used in ShellOutlineVisualizer + HUD calc
   sagDepth_nm?: number; // used in WarpVisualizer parameters
   overallStatus?: string; // used in "System Status"
@@ -665,41 +683,43 @@ interface SystemMetrics {
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
-  timestamp: Date;
+  timestamp?: Date | string;
   functionCall?: {
     name: string;
     result: any;
   };
 }
 
+// Safe formatter for chat timestamps (some messages come back as strings)
+const formatMsgTime = (ts?: Date | string) => {
+  if (!ts) return "";
+  try {
+    return typeof ts === "string" ? new Date(ts).toLocaleTimeString() : ts.toLocaleTimeString();
+  } catch {
+    return "";
+  }
+};
+
 export default function HelixCore() {
   // Auto-publish φ from server pipeline/metrics into the shared cache/event bus
   useGreensBridge();
 
-  // Feed φ values to WarpEngine/renderer automatically
+  // Bridge: external “helix:greens” → publish via luma-bus (no direct engine calls)
   useEffect(() => {
-    const handleGreens = (e: any) => {
-      const { phi, kind, m } = e.detail || {};
-      // Adapt to engine's buffer/texture API
-      (window as any).WarpEngine?.setGreensPotential?.({ phi, kind, m });
+    const handler = (ev: CustomEvent) => {
+      const detail: any = (ev && (ev as any).detail) || {};
+      const { phi, kind, m } = detail || {};
+      try {
+        publish("warp:greens", { phi, kind, m });
+      } catch (e) {
+        if (import.meta.env?.DEV) console.warn("[helix-core] publish warp:greens failed:", e);
+      }
     };
-
-    window.addEventListener("helix:greens", handleGreens);
-    return () => window.removeEventListener("helix:greens", handleGreens);
+    window.addEventListener("helix:greens", handler as EventListener);
+    return () => window.removeEventListener("helix:greens", handler as EventListener);
   }, []);
 
-  // Preload lazy bundles to avoid suspending during user input
-  useEffect(() => {
-    const preload = () => {
-      import("@/components/warp/WarpBubbleCompare");
-      import("@/components/WarpRenderInspector");
-    };
-    const id = "requestIdleCallback" in window ? (window as any).requestIdleCallback(preload) : setTimeout(preload, 50);
-    return () => {
-      if ("cancelIdleCallback" in window) (window as any).cancelIdleCallback?.(id);
-      else clearTimeout(id);
-    };
-  }, []);
+  // (Optional) Idle-time preloads were here. To simplify and avoid redundancy with lazy() below, they are removed.
 
   // Generate logical sector list (no physics here)
   const SECTORS = useMemo(() => Array.from({ length: 400 }, (_, i) => ({ id: `S${i + 1}` })), []);
@@ -734,7 +754,11 @@ export default function HelixCore() {
   // Re-mount viz engines whenever the server says "reload"
   useEffect(() => {
     const off = subscribe("warp:reload", () => setRenderNonce((n) => n + 1));
-    return () => (off ? unsubscribe(off) : undefined);
+    return () => {
+      if (off) unsubscribe(off);
+      // explicit void return
+      return undefined as void;
+    };
   }, []);
 
   const [optimisticMode, setOptimisticMode] = useState<ModeKey | null>(null);
@@ -782,7 +806,7 @@ export default function HelixCore() {
   }, []);
 
   // Get metrics data for hull geometry (reduced polling for performance)
-  const { metrics: hullMetrics } = useMetrics(20000); // 20s vs 2s default
+  const { data: hullMetrics } = useMetrics(20000); // 20s vs 2s default
 
   // Update solar system positions periodically
   useEffect(() => {
@@ -914,7 +938,7 @@ export default function HelixCore() {
   }, [serverMode]);
 
   // --- Derived mode knobs for UI (always reflect the selected mode)
-  const modeCfg = MODE_CONFIGS[pipeline?.currentMode || effectiveMode] || MODE_CONFIGS.hover;
+  const modeCfg = MODE_CONFIGS[((pipeline?.currentMode ?? effectiveMode) as ModeKey)] || MODE_CONFIGS.hover;
 
   // Prefer live pipeline values if present; otherwise fall back to the mode config
   const dutyUI = isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : modeCfg.dutyCycle ?? 0.14;
@@ -949,9 +973,10 @@ export default function HelixCore() {
     hullMetrics && hullMetrics.hull
       ? {
           ...hullMetrics.hull,
-          a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-          b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-          c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2,
+          // preserve explicit zeros from pipeline; only fallback when undefined/null
+          a: Number.isFinite(hullMetrics.hull.a) ? Number(hullMetrics.hull.a) : (Number.isFinite(hullMetrics.hull.Lx_m) ? hullMetrics.hull.Lx_m / 2 : 503.5),
+          b: Number.isFinite(hullMetrics.hull.b) ? Number(hullMetrics.hull.b) : (Number.isFinite(hullMetrics.hull.Ly_m) ? hullMetrics.hull.Ly_m / 2 : 132.0),
+          c: Number.isFinite(hullMetrics.hull.c) ? Number(hullMetrics.hull.c) : (Number.isFinite(hullMetrics.hull.Lz_m) ? hullMetrics.hull.Lz_m / 2 : 86.5),
         }
       : { Lx_m: 1007, Ly_m: 264, Lz_m: 173, a: 503.5, b: 132, c: 86.5 };
 
@@ -990,15 +1015,17 @@ export default function HelixCore() {
   const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
   const dutyUI_safe = isStandby ? 0 : dutyUI;
 
-  console.table({
-    mode: effectiveMode,
-    totalSectors,
-    concurrentSectors,
-    dwell_ms: lc.dwell_ms,
-    burst_ms: lc.burst_ms,
-    localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac,
-    dutyFR: dutyEffectiveFR_safe,
-  });
+  if (import.meta.env?.DEV) {
+    console.table({
+      mode: effectiveMode,
+      totalSectors,
+      concurrentSectors,
+      dwell_ms: lc.dwell_ms,
+      burst_ms: lc.burst_ms,
+      localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac,
+      dutyFR: dutyEffectiveFR_safe,
+    });
+  }
 
   // --- Active tiles: robust fallback calc
   const TOTAL_SECTORS_FALLBACK = 400;
@@ -1103,7 +1130,7 @@ export default function HelixCore() {
 
 
   // Calculate epsilonTilt and normalized beta-tilt vector (Purple shift)
-  const G = 9.80665, c = 299792458;
+  const G = 9.80665, c = SPEED_OF_LIGHT;
 
   const gTargets: Record<string, number> = {
     hover: 0.1 * G,
@@ -1130,7 +1157,7 @@ export default function HelixCore() {
 
 
 
-  // --- Derived physics uniforms for WarpRenderInspector
+  // --- Derived physics uniforms for AlcubierrePanel
   const realPhys = {
     gammaGeo: pipeline?.gammaGeo ?? 26,
     q: qSpoilUI,
@@ -1181,9 +1208,9 @@ export default function HelixCore() {
     hull:
       hullMetrics && hullMetrics.hull
         ? {
-            a: Number(hullMetrics.hull.a) || Number(hullMetrics.hull.Lx_m / 2) || 503.5,
-            b: Number(hullMetrics.hull.b) || Number(hullMetrics.hull.Ly_m / 2) || 132.0,
-            c: Number(hullMetrics.hull.c) || Number(hullMetrics.hull.Lz_m / 2) || 86.5,
+            a: Number.isFinite(hullMetrics.hull.a) ? Number(hullMetrics.hull.a) : (Number.isFinite(hullMetrics.hull.Lx_m) ? hullMetrics.hull.Lx_m / 2 : 503.5),
+            b: Number.isFinite(hullMetrics.hull.b) ? Number(hullMetrics.hull.b) : (Number.isFinite(hullMetrics.hull.Ly_m) ? hullMetrics.hull.Ly_m / 2 : 132.0),
+            c: Number.isFinite(hullMetrics.hull.c) ? Number(hullMetrics.hull.c) : (Number.isFinite(hullMetrics.hull.Lz_m) ? hullMetrics.hull.Lz_m / 2 : 86.5),
           }
         : {
             a: 503.5,
@@ -1240,18 +1267,7 @@ export default function HelixCore() {
         "POST",
         "/api/helix/command",
         {
-          messages: chatMessages
-            .map((msg) => ({
-              role: msg.role,
-              content: msg.content,
-            }))
-            .concat([
-              {
-                role: "user" as const,
-                content: commandInput,
-                timestamp: new Date(),
-              },
-            ]),
+          messages: chatMessages.map((msg) => ({ role: msg.role, content: msg.content })).concat([{ role: "user" as const, content: commandInput }]),
         },
         commandAbortRef.current.signal
       );
@@ -1535,9 +1551,9 @@ export default function HelixCore() {
                   hull:
                     hullMetrics && hullMetrics.hull
                       ? {
-                          a: hullMetrics.hull.a ?? hullMetrics.hull.Lx_m / 2,
-                          b: hullMetrics.hull.b ?? hullMetrics.hull.Ly_m / 2,
-                          c: hullMetrics.hull.c ?? hullMetrics.hull.Lz_m / 2,
+                          a: Number.isFinite(hullMetrics.hull.a) ? hullMetrics.hull.a : (Number.isFinite(hullMetrics.hull.Lx_m) ? hullMetrics.hull.Lx_m / 2 : 0.42),
+                          b: Number.isFinite(hullMetrics.hull.b) ? hullMetrics.hull.b : (Number.isFinite(hullMetrics.hull.Ly_m) ? hullMetrics.hull.Ly_m / 2 : 0.11),
+                          c: Number.isFinite(hullMetrics.hull.c) ? hullMetrics.hull.c : (Number.isFinite(hullMetrics.hull.Lz_m) ? hullMetrics.hull.Lz_m / 2 : 0.09),
                         }
                       : {
                           a: 0.42,
@@ -1591,25 +1607,11 @@ export default function HelixCore() {
             </CardContent>
           </Card>
 
-          {/* ====== Warp Render Inspector • Physics Debug ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
-            <CardHeader>
-              <CardTitle>Warp Render Inspector • Physics Debug</CardTitle>
-              <CardDescription>Single source of truth for REAL vs SHOW with live pipeline</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <Suspense fallback={<div className="h-40 grid place-items-center text-slate-400">Loading inspector…</div>}>
-                <WarpRenderInspector
-                  key={`inspector-${modeNonce}`}
-                  debugTag="HelixCore/WarpRenderInspector"
-                  parityPhys={realPhys}
-                  showPhys={showPhys}
-                  baseShared={baseShared}
-                  lightCrossing={lc}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
+        {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
+          <AlcubierrePanel />
+        </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -1725,7 +1727,7 @@ export default function HelixCore() {
                             M_exotic_kg: pipeline?.M_exotic,
                             zeta: pipeline?.zeta,
                           };
-                          const currentTitle = buildLiveDesc(currentSnap, currentCfg, pipeline?.P_target_W);
+                          const currentTitle = buildLiveDesc(currentSnap, currentCfg, undefined);
                           return (
                             <div className="flex flex-col">
                               <span className="font-medium">{currentCfg?.name ?? currentModeKey}</span>
@@ -1740,13 +1742,13 @@ export default function HelixCore() {
                         <SelectItem key={key} value={key}>
                           <div className="flex flex-col">
                             <span className={`font-medium ${cfg.color}`}>{cfg?.name ?? key}</span>
-                            <span className="text-xs text-muted-foreground">{buildLiveDesc(snap, cfg, pipeline?.P_target_W)}</span>
+                            <span className="text-xs text-muted-foreground">{buildLiveDesc(snap, cfg, undefined)}</span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  {pipeline && <p className="text-xs text-slate-400">{MODE_CONFIGS[pipeline.currentMode]?.description}</p>}
+                  {pipeline && pipeline.currentMode && <p className="text-xs text-slate-400">{MODE_CONFIGS[pipeline.currentMode as ModeKey]?.description}</p>}                                                            
                 </div>
 
                 {/* Active Tiles Panel with helper strings */}
@@ -2094,12 +2096,12 @@ export default function HelixCore() {
               {/* Shift Vector • Interior Gravity */}
               <ShiftVectorPanel
                 mode={pipelineState?.currentMode || "hover"}
-                shift={systemMetrics?.shiftVector ? {
-                  ...systemMetrics.shiftVector,
-                  gTarget: systemMetrics.shiftVector.gTarget ?? 0.980665,
-                  R_geom: systemMetrics.shiftVector.R_geom ?? 179.14162298838383,
-                  gEff_check: systemMetrics.shiftVector.gEff_check ?? 0.980665
-                } : undefined}
+                shift={systemMetrics?.shiftVector ? ({
+                  ...(systemMetrics.shiftVector as any),
+                  gTarget: (systemMetrics.shiftVector as any).gTarget ?? 0.980665,
+                  R_geom: (systemMetrics.shiftVector as any).R_geom ?? 179.14162298838383,
+                  gEff_check: (systemMetrics.shiftVector as any).gEff_check ?? 0.980665,
+                } as any) : undefined}
               />
             </div>
 
@@ -2174,14 +2176,14 @@ export default function HelixCore() {
                                 }`}
                               >
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
-                                {msg.functionCall && (
+                    {msg.functionCall && (
                                   <div className="mt-2 pt-2 border-t border-slate-700 text-xs">
                                     <p className="text-yellow-400">Function: {msg.functionCall.name}</p>
                                     <pre className="mt-1 text-slate-300">{JSON.stringify(msg.functionCall.result, null, 2)}</pre>
                                   </div>
                                 )}
                               </div>
-                              <div className="text-xs text-slate-500">{msg.timestamp.toLocaleTimeString()}</div>
+                      <div className="text-xs text-slate-500">{formatMsgTime(msg.timestamp)}</div>
                             </div>
                           ))}
                           {isProcessing && (
@@ -2397,7 +2399,7 @@ export default function HelixCore() {
 
               {/* Mission Fuel / Range Gauge */}
               <FuelGauge
-                mode={(pipelineState?.currentMode || "hover").replace(/^./, (c) => c.toUpperCase())}
+                mode={String(pipelineState?.currentMode || "hover").replace(/^./, (c: string) => c.toUpperCase())}
                 powerMW={pipelineState?.P_avg || 83.3}
                 zeta={pipelineState?.zeta}
                 tsRatio={pipelineState?.TS_ratio || 5.03e4}
@@ -2441,7 +2443,7 @@ export default function HelixCore() {
                       Emergency: "Breathe once. Choose the useful distance.",
                       Standby: "Meet change with correct posture. The rest aligns.",
                     } as const;
-                    publish("luma:whisper", { text: whispers[mode] || "Configuration updated." });
+                    publish("luma:whisper", { text: (whispers as any)[mode] || "Configuration updated." });
                   }
                 }}
                 setDuty={(duty) => {
@@ -2612,23 +2614,39 @@ export default function HelixCore() {
                     mode={mapMode}
                     perf={
                       {
-                        mode: (pipelineState?.currentMode || "hover").replace(/^./, (c) => c.toUpperCase()),
+                        mode: String(pipelineState?.currentMode || "hover").replace(/^./, (c: string) => c.toUpperCase()),
                         powerMW: pipelineState?.P_avg || 83.3,
-                        duty: pipelineState?.dutyCycle || 0.14,
+                        duty: (Number.isFinite(pipelineState?.dutyCycle) ? pipelineState!.dutyCycle! : 0.14),
                         gammaGeo: pipelineState?.gammaGeo || 26,
                         qFactor: pipelineState?.qCavity || 1e9,
                         zeta: pipelineState?.zeta,
                         tsRatio: pipelineState?.TS_ratio || 5.03e4,
                         freqGHz: 15.0,
                         energyPerLyMWh: (() => {
-                          const vLyPerHour = computeEffectiveLyPerHour(
+                          const vModelLyPerHour = computeEffectiveLyPerHour(
                             pipelineState?.currentMode || "Hover",
-                            pipelineState?.dutyCycle || 0.14,
+                            (Number.isFinite(pipelineState?.dutyCycle) ? pipelineState!.dutyCycle! : 0.14),
                             pipelineState?.gammaGeo || 26,
                             pipelineState?.qCavity || 1e9,
                             pipelineState?.zeta,
                             pipelineState?.TS_ratio || 5.03e4
                           );
+                          const betaCfg = Number.isFinite(pipelineState?.beta_trans)
+                            ? Math.max(0, Math.min(1, pipelineState!.beta_trans!))
+                            : 1;
+                          const currentMode = String(pipelineState?.currentMode ?? "").toLowerCase();
+                          const isTaxi = currentMode === "taxi";
+                          const targetMps = Number.isFinite(pipelineState?.taxi_target_mps)
+                            ? (pipelineState!.taxi_target_mps as number)
+                            : 1.4;
+                          const LY_TO_M = 9.4607e15;
+                          const SECONDS_PER_HOUR = 3600;
+                          let betaTarget = 1;
+                          if (isTaxi && vModelLyPerHour > 0) {
+                            const vModelMps = (vModelLyPerHour * LY_TO_M) / SECONDS_PER_HOUR;
+                            betaTarget = Math.min(1, Math.max(0, targetMps / Math.max(vModelMps, 1e-9)));
+                          }
+                          const vLyPerHour = vModelLyPerHour * Math.min(betaCfg, betaTarget);
                           const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
                           return isFinite(hoursPerLy) ? (pipelineState?.P_avg || 83.3) * hoursPerLy : Infinity;
                         })(),
@@ -2636,15 +2654,32 @@ export default function HelixCore() {
                           const cyclesPerSec = 15.0 * 1e9;
                           return cyclesPerSec > 0 ? ((pipelineState?.P_avg || 83.3) * 1e6) / cyclesPerSec : Infinity;
                         })(),
-                        vEffLyPerHour: (mode, duty) =>
-                          computeEffectiveLyPerHour(
+                        vEffLyPerHour: (mode, duty) => {
+                          const vModelLyPerHour = computeEffectiveLyPerHour(
                             mode,
                             duty,
                             pipelineState?.gammaGeo || 26,
                             pipelineState?.qCavity || 1e9,
                             pipelineState?.zeta,
                             pipelineState?.TS_ratio || 5.03e4
-                          ),
+                          );
+                          const betaCfg = Number.isFinite(pipelineState?.beta_trans)
+                            ? Math.max(0, Math.min(1, pipelineState!.beta_trans!))
+                            : 1;
+                          const currentMode = String(pipelineState?.currentMode ?? "").toLowerCase();
+                          const isTaxi = currentMode === "taxi";
+                          const targetMps = Number.isFinite(pipelineState?.taxi_target_mps)
+                            ? (pipelineState!.taxi_target_mps as number)
+                            : 1.4;
+                          const LY_TO_M = 9.4607e15;
+                          const SECONDS_PER_HOUR = 3600;
+                          let betaTarget = 1;
+                          if (isTaxi && vModelLyPerHour > 0) {
+                            const vModelMps = (vModelLyPerHour * LY_TO_M) / SECONDS_PER_HOUR;
+                            betaTarget = Math.min(1, Math.max(0, targetMps / Math.max(vModelMps, 1e-9)));
+                          }
+                          return vModelLyPerHour * Math.min(betaCfg, betaTarget);
+                        },
                       } as HelixPerf
                     }
                   />
@@ -2671,12 +2706,20 @@ export default function HelixCore() {
               <Atom className="w-5 h-5" />
               Warp Field Visualization
             </h2>
-            <WarpEngineContainer
-              showComparison={true}
-              metricKappa={undefined} // Set to a number to enable conformal metric
-            />
+            <WarpEngineContainer />
           </div>
         </div>
+      </div>
+      {/* --- Dev-only: end-to-end snapshot visibility (server → adapter → engine) --- */}
+      {import.meta.env.DEV && (
+        <div className="mt-8">
+          <SnapshotProbe />
+        </div>
+      )}
+
+      {/* Data Names/DAG panel — visible in all builds */}
+      <div className="mt-6">
+        <DataNamesPanel />
       </div>
     </TooltipProvider>
   );

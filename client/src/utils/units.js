@@ -37,7 +37,8 @@ export const kJ = 1e3;      // kilojoules
 export const MJ = 1e6;      // megajoules
 
 // Fundamental constants (SI units)
-export const c = 299792458;           // speed of light (m/s)
+import { C as c } from '../lib/physics-const';
+export { c };
 export const hbar = 1.054571817e-34;  // reduced Planck constant (J⋅s)
 export const G = 6.67430e-11;         // gravitational constant (m³/kg⋅s²)
 

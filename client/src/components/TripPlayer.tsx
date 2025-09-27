@@ -59,7 +59,7 @@ export function TripPlayer({ plan, getState, setMode, setDuty, onTick }: TripPla
     let t = 0, id: any;
 
     function step() {
-      const total = DUR[phase];
+  const total = DUR[phase as keyof typeof DUR];
       t += 0.5; // tick every 0.5s
       setProgress(Math.min(1, t/total));
       onTick?.(phase, t);

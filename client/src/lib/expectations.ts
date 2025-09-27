@@ -49,7 +49,8 @@ export function resolveDutyFR({
     : Number.isFinite(dutyEffectiveFR as number)
       ? (dutyEffectiveFR as number)
       : dutyLocal * (concurrent / Math.max(1, total));
-  return Math.max(EPS, Math.min(1, Number(fr) || EPS));
+  // allow exact 0 in standby for perfect audit equality
+  return Math.max(0, Math.min(1, Number(fr) || 0));
 }
 
 // ─────────────── Expected θ (engine law) ───────────────
@@ -67,11 +68,12 @@ export function thetaScaleExpected(args: ThetaExpectedArgs = {}) {
 
   const dFR = resolveDutyFR(args);
 
-  return Math.pow(gammaGeo, 3) * q * gammaV_vis * Math.sqrt(dFR);
+  // Use linear duty to match server canonical calculation: θ = γ³ · q · γ_VdB · duty_FR
+  return Math.pow(gammaGeo, 3) * q * gammaV_vis * dFR;
 }
 
 // ─────────────── Used θ in renderer ───────────────
-// Convert expected (which already includes √d_FR) into what the renderer actually uses.
+// Convert expected (which now uses linear duty like server) into what the renderer actually uses.
 export function thetaScaleUsed(expected: number, opts: ThetaUsedArgs = {}) {
   const concurrent = Math.max(1, Number(opts.concurrent ?? 1));
   const total = Math.max(1, Number(opts.total ?? 400));
@@ -92,8 +94,10 @@ export function thetaScaleUsed(expected: number, opts: ThetaUsedArgs = {}) {
   const viewAveraging = (opts.viewAveraging ?? true) ? true : false;
 
   if (viewAveraging) {
+    // With averaging: apply view fraction to expected (both use linear duty)
     return expected * viewFraction;
   }
-  // No averaging: engine omits √d_FR, so remove it from expected for apples-to-apples checks.
-  return expected / Math.sqrt(dFR);
+  
+  // No averaging: both expected and engine use linear duty, so direct comparison
+  return expected;
 }

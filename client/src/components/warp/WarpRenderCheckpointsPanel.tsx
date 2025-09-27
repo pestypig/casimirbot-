@@ -31,7 +31,14 @@ import CheckpointViewer from "./CheckpointViewer";
 // tiny helpers
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
-const aHarmonic = (ax?:number, ay?:number, az?:number) => { const a=+ax||0,b=+ay||0,c=+az||0; const d=(a>0?1/a:0)+(b>0?1/b:0)+(c>0?1/c:0); return d>0?3/d:NaN; };
+const aHarmonic = (ax:number=0, ay:number=0, az:number=0) => {
+  const aNum = Number(ax), bNum = Number(ay), cNum = Number(az);
+  const a = Number.isFinite(aNum) ? aNum : 0;
+  const b = Number.isFinite(bNum) ? bNum : 0;
+  const c = Number.isFinite(cNum) ? cNum : 0;
+  const d=(a>0?1/a:0)+(b>0?1/b:0)+(c>0?1/c:0);
+  return d>0?3/d:NaN;
+};
 
 // Enhanced canvas/GL inspection that works with both slice2d and grid3d engines
   const getCanvasEngine = (engineRef: React.MutableRefObject<any>, canvasRef: React.MutableRefObject<HTMLCanvasElement | null>) => {
@@ -105,7 +112,8 @@ function expectedThetaForPane(live: any, engine: any) {
   // Values bound to the engine (authoritative for the pane)
   const U = engine?.uniforms || {};
   const gammaGeo = Math.max(1, N(U.gammaGeo ?? live?.gammaGeo ?? live?.g_y, 26));
-  const q        = Math.max(1e-12, N(U.qSpoilingFactor ?? U.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1));
+  const q        = Number.isFinite(N(U.qSpoilingFactor ?? U.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1)) ? 
+           N(U.qSpoilingFactor ?? U.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1) : 1e-12;
   const gVdB     = Math.max(1, N(U.gammaVdB ?? U.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
 
   // Duty: STRICT — require engine-supplied dutyUsed (or dutyEffectiveFR)
@@ -123,7 +131,8 @@ function expectedThetaForPane(live: any, engine: any) {
 function computeThetaScaleFromParams(v: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   const gammaGeo = Math.max(1, N(v.gammaGeo, 26));
-  const q        = Math.max(1e-12, N(v.qSpoilingFactor ?? v.deltaAOverA, 1));
+  const q        = Number.isFinite(N(v.qSpoilingFactor ?? v.deltaAOverA, 1)) ? 
+           N(v.qSpoilingFactor ?? v.deltaAOverA, 1) : 1e-12;
   const gVdB     = Math.max(1, N(v.gammaVanDenBroeck ?? v.gammaVdB, 1.4e5));
 
   const sectors   = Math.max(1, Math.floor(N(v.sectorCount ?? v.sectors, 1)));
@@ -141,7 +150,8 @@ function computeThetaScaleFromParams(v: any) {
 function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   const g  = Math.max(1, N(u.gammaGeo, 26));
-  const q  = Math.max(1e-12, N(u.deltaAOverA ?? u.qSpoilingFactor, 1));
+  const q  = Number.isFinite(N(u.deltaAOverA ?? u.qSpoilingFactor, 1)) ? 
+        N(u.deltaAOverA ?? u.qSpoilingFactor, 1) : 1e-12;
   const gv = Math.max(1, N(u.gammaVdB ?? u.gammaVanDenBroeck, 1.35e5));
 
   const dFR = Math.max(1e-12, dutyFR);
@@ -236,14 +246,15 @@ function useCheckpointList(
   thetaExpectedFn?: (u: any, dutyFR: number) => number
 ) {
   const hb = useEngineHeartbeat(engineRef);
+  // Collect checkpoint records during render and flush them post-render
+  const pendingChecksRef = useRef<Partial<Check>[]>([]);
+  const pushCheck = (c: Partial<Check>) => { pendingChecksRef.current.push({ ...c, at: Date.now() }); };
 
-  return useMemo(() => {
-    const { engine: e, canvas: cv } = getCanvasEngine(engineRef, canvasRef); // Use the utility function
-    const rows: { label: string; detail?: string; state: "ok" | "warn" | "fail" }[] = [];
+  const rows = useMemo(() => {
+  const { engine: e, canvas: cv } = getCanvasEngine(engineRef, canvasRef); // Use the utility function
+  const rows: { label: string; detail?: string; state: "ok" | "warn" | "fail" }[] = [];
     const side: Side = label === "REAL" ? "REAL" : "SHOW";
-
-    // 👂 Publish the engine's current physics authority for other UI bits
-    publishWarpEcho(e, side, liveSnap);
+  // NOTE: publishWarpEcho is intentionally deferred to a post-render effect
 
     // === DAG Stage 1: INPUT CHECKPOINTS (ENGINE-FIRST) ===
     // Prefer bound uniforms; fall back to live snapshot for context only.
@@ -254,7 +265,7 @@ function useCheckpointList(
     const sectors = Math.max(1, Math.floor(N(Ue.sectorCount ?? liveSnap?.sectorCount ?? liveSnap?.sectors, 400)));
     const duty    = N(Ue.dutyCycle ?? liveSnap?.dutyCycle, 0);
 
-    checkpoint({
+  pushCheck({
       id: 'input.gamma_geo', side, stage: 'input',
       pass: gammaGeo >= 1 && gammaGeo <= 1000,
       msg: `γ_geo=${gammaGeo}`,
@@ -262,7 +273,7 @@ function useCheckpointList(
       sev: gammaGeo < 1 || gammaGeo > 1000 ? 'error' : 'info'
     });
 
-    checkpoint({
+  pushCheck({
       id: 'input.delta_aa', side, stage: 'input',
       pass: deltaAOverA >= 1e-12 && deltaAOverA <= 100,
       msg: `δA/A=${deltaAOverA}`,
@@ -270,7 +281,7 @@ function useCheckpointList(
       sev: deltaAOverA < 1e-12 || deltaAOverA > 100 ? 'error' : 'info'
     });
 
-    checkpoint({
+  pushCheck({
       id: 'input.gamma_vdb', side, stage: 'input',
       pass: gammaVdB >= 1 && gammaVdB <= 1e15,
       msg: `γ_VdB=${gammaVdB.toExponential(1)}`,
@@ -293,7 +304,7 @@ function useCheckpointList(
       return Math.max(1e-12, dutyLocal * (sCon / sTot));
     })();
 
-    checkpoint({
+  pushCheck({
       id: 'expect.theta_scale', side, stage: 'expect',
       pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
       msg: `θ_expected=${thetaExpected.toExponential(2)}`,
@@ -309,7 +320,7 @@ function useCheckpointList(
     // Expected uniforms θ from the same chain the engine uses (RAW)
     const thetaUniformExpected = expectedThetaForPane(liveSnap, e);
 
-    checkpoint({
+  pushCheck({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
       msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformExpected.toExponential(2)}`,
@@ -342,7 +353,7 @@ function useCheckpointList(
 
     // NEW: CameraZ presence checkpoint (warn-only so it won't halt render)
     const camZOk = Number.isFinite(u?.cameraZ);
-    checkpoint({
+  pushCheck({
       id: 'uniforms.cameraZ',
       side,
       stage: 'uniforms',
@@ -352,7 +363,7 @@ function useCheckpointList(
       sev: camZOk ? 'info' : 'warn'
     });
 
-    checkpoint({
+  pushCheck({
       id: 'uniforms.ridge_mode', side, stage: 'uniforms',
       pass: expectations?.ridge != null ? (u?.ridgeMode | 0) === (expectations.ridge | 0) : true,
       msg: `ridgeMode=${u?.ridgeMode}`,
@@ -360,7 +371,7 @@ function useCheckpointList(
       sev: expectations?.ridge != null && (u?.ridgeMode | 0) !== (expectations.ridge | 0) ? 'warn' : 'info'
     });
 
-    checkpoint({
+  pushCheck({
       id: 'uniforms.parity_mode', side, stage: 'uniforms', 
       pass: expectations?.parity != null ? !!(u.physicsParityMode ?? u.parityMode) === !!expectations.parity : true,
       msg: `parity=${!!(u.physicsParityMode ?? u.parityMode)}`,
@@ -373,7 +384,7 @@ function useCheckpointList(
     const ch = N(cv?.clientHeight || cv?.height, 0);
     const canvasOk = cw >= 64 && ch >= 64;
 
-    checkpoint({
+  pushCheck({
       id: 'gpu.canvas_size', side, stage: 'gpu',
       pass: canvasOk,
       msg: `Canvas ${cw}×${ch}px`,
@@ -387,7 +398,7 @@ function useCheckpointList(
     const gl = e?.gl;
     const ctxOk = !!gl && !(gl?.isContextLost && gl.isContextLost());
 
-    checkpoint({
+  pushCheck({
       id: 'gpu.webgl_context', side, stage: 'gpu',
       pass: ctxOk,
       msg: gl ? (ctxOk ? "WebGL alive" : "context lost") : "missing",
@@ -438,7 +449,7 @@ function useCheckpointList(
       }
 
       // Checkpoint row (GPU → shaders_linked)
-      checkpoint({
+  pushCheck({
         id: 'gpu.shaders_linked',
         side,
         stage: 'gpu',
@@ -458,11 +469,11 @@ function useCheckpointList(
     }
 
     // Grid buffers
-    const verts = (e?.gridVertices?.length || 0);
-    const orig = (e?.originalGridVertices?.length || 0);
+  const verts = Number.isFinite(e?.gridVertices?.length) ? e!.gridVertices!.length : 0;
+  const orig = Number.isFinite(e?.originalGridVertices?.length) ? e!.originalGridVertices!.length : 0;
     const gridOk = verts > 0 && orig > 0;
 
-    checkpoint({
+  pushCheck({
       id: 'gpu.grid_buffers', side, stage: 'gpu',
       pass: gridOk,
       msg: `Grid buffers ${verts}/${orig} floats`,
@@ -474,7 +485,7 @@ function useCheckpointList(
     // Frame analysis would need readPixels - simplified for now
     const frameAlive = !!e?._raf;
 
-    checkpoint({
+  pushCheck({
       id: 'frame.render_loop', side, stage: 'frame',
       pass: frameAlive,
       msg: frameAlive ? "RAF active" : "render stopped",
@@ -483,7 +494,7 @@ function useCheckpointList(
     });
 
     // Tone mapping checkpoint (exp/zs/toneOk declared later in original code)
-    checkpoint({
+  pushCheck({
       id: 'frame.tone_mapping', side, stage: 'frame',
       pass: true, // will be updated when exp/zs are calculated below
       msg: `tone mapping params pending...`,
@@ -501,6 +512,12 @@ function useCheckpointList(
     const axes = Array.isArray(u?.axesClip) && u.axesClip.length === 3 ? u.axesClip : null;
     const axesOk = !!axes && axes.every((n: any) => Number.isFinite(n) && Math.abs(n) > 0);
     rows.push({ label: "Axes/clip", detail: axesOk ? `[${axes!.map((n: number) => n.toFixed(2)).join(", ")}]` : "unset", state: axesOk ? "ok" : "warn" });
+
+  // Pipeline stamps forwarded by the adapter (if present) — helpful for correlating frames
+  const pipelineSeq = Number.isFinite(N(Ue.__pipelineSeq ?? Ue.seq ?? Ue.__PIPE_SEQ, NaN)) ? (Ue.__pipelineSeq ?? Ue.seq ?? Ue.__PIPE_SEQ) : undefined;
+  const pipelineTs  = Number.isFinite(N(Ue.__pipelineTs ?? Ue.__ts ?? Ue.__PIPE_TS, NaN)) ? (Ue.__pipelineTs ?? Ue.__ts ?? Ue.__PIPE_TS) : undefined;
+  rows.push({ label: "Pipeline seq", detail: pipelineSeq != null ? String(pipelineSeq) : '—', state: pipelineSeq != null ? "ok" : "warn" });
+  rows.push({ label: "Pipeline ts",  detail: pipelineTs  != null ? new Date(+pipelineTs).toLocaleTimeString().slice(-8) : '—', state: pipelineTs  != null ? "ok" : "warn" });
 
     // Theta-scale (reusing existing ts)
     const tsOk = Number.isFinite(ts) && ts > 0;
@@ -540,7 +557,7 @@ function useCheckpointList(
     const mismatch = echo && thetaExpectedFromBound && tsOk
       ? (ts / thetaExpectedFromBound) : 1;
 
-    if (echo && echo.terms) {
+    if (echo && echo.terms && typeof thetaExpectedFromBound === 'number' && Number.isFinite(thetaExpectedFromBound)) {
       // Use bound uniforms for perfect self-consistency
       const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
 
@@ -622,7 +639,7 @@ function useCheckpointList(
     const dwell_ms = N(Ue.dwell_ms, NaN);
     const burst_ms = N(Ue.burst_ms, NaN);
     const phase    = N(Ue.phase,    NaN);
-    const onWindow = (+Ue.onWindow || 0) > 0.5;
+  const onWindow = (Number.isFinite(+Ue.onWindow) ? +Ue.onWindow : 0) > 0.5;
     const TSratio  = N((Ue.TS_ratio ?? (Ue.TSratio as any)), NaN);
 
     // Duty consistency (info): used vs (burst/dwell)×(S_live/S_total)
@@ -633,7 +650,7 @@ function useCheckpointList(
         const dFR_used     = dUsed!;
         const ok           = within(dFR_used, dFR_expected, 0.15);
         checkpoint({
-          id: 'lc.duty_consistency', side, stage: 'lc',
+          id: 'lc.duty_consistency', side, stage: 'frame',
           pass: ok,
           msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
           expect: '≈ burst/dwell × S_live/S_total',
@@ -702,7 +719,7 @@ function useCheckpointList(
     // Show detailed breakdown from bound uniforms if available
     if (echo && echo.terms) {
       const terms = echo.terms;
-      const breakdown = `src=${echo.src || 'unknown'} v=${echo.v || '?'} · γ_geo=${terms.γ_geo || '?'}^3 · q=${terms.q || '?'} · γ_VdB=${(terms.γ_VdB || 0).toExponential(2)} · d_FR=${((terms.d_FR || 0) * 100).toExponential(2)}%`;
+  const breakdown = `src=${echo.src ?? 'unknown'} v=${echo.v ?? '?'} · γ_geo=${terms.γ_geo ?? '?'}^3 · q=${terms.q ?? '?'} · γ_VdB=${(Number.isFinite(terms.γ_VdB) ? terms.γ_VdB : 0).toExponential(2)} · d_FR=${((Number.isFinite(terms.d_FR) ? terms.d_FR : 0) * 100).toExponential(2)}%`;
       rows.push({ label: "θ breakdown", detail: breakdown, state: "ok" });
     }
 
@@ -782,6 +799,23 @@ function useCheckpointList(
 
     return rows;
   }, [engineRef.current, canvasRef.current, liveSnap, hb, label, dutyFR, thetaExpectedFn]);
+
+  // Post-render: publish the warp echo and flush any pending checkpoints (safe to call setState now)
+  useEffect(() => {
+    try {
+      const { engine: e } = getCanvasEngine(engineRef, canvasRef);
+      publishWarpEcho(e, label === 'REAL' ? 'REAL' : 'SHOW', liveSnap);
+    } catch (e) { /* ignore */ }
+
+    if (pendingChecksRef.current.length > 0) {
+      const toFlush = pendingChecksRef.current.splice(0, pendingChecksRef.current.length);
+      toFlush.forEach((c) => {
+        try { checkpoint(c as Check); } catch (e) { /* ignore */ }
+      });
+    }
+  }, [rows]);
+
+  return rows;
 }
 
 // D) Compact checkpoint table component
@@ -938,8 +972,8 @@ function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObjec
   const { engine: e, canvas: cv } = getCanvasEngine(engineRef, canvasRef); // Use the utility function
 
   if (!e || !cv) {
-    checkpoint({ id: 'gpu.canvas_size', side, stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
-    checkpoint({ id: 'gpu.webgl_context', side, stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
+    checkpoint({ id: 'gpu.canvas_size', side: side === 'LEFT' ? 'REAL' : 'SHOW', stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
+    checkpoint({ id: 'gpu.webgl_context', side: side === 'LEFT' ? 'REAL' : 'SHOW', stage: 'gpu', pass: false, msg: 'Missing engine/canvas', expect: 'present', actual: 'missing', sev: 'error'});
     return;
   }
 
@@ -948,7 +982,7 @@ function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObjec
   const canvasOk = cw >= 64 && ch >= 64;
 
   checkpoint({
-    id: 'gpu.canvas_size', side, stage: 'gpu',
+    id: 'gpu.canvas_size', side: side === 'LEFT' ? 'REAL' : 'SHOW', stage: 'gpu',
     pass: canvasOk,
     msg: `Canvas ${cw}×${ch}px`,
     expect: '>=64x64', actual: `${cw}×${ch}`,
@@ -959,7 +993,7 @@ function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObjec
   const ctxOk = !!gl && !(gl?.isContextLost && gl.isContextLost());
 
   checkpoint({
-    id: 'gpu.webgl_context', side, stage: 'gpu',
+    id: 'gpu.webgl_context', side: side === 'LEFT' ? 'REAL' : 'SHOW', stage: 'gpu',
     pass: ctxOk,
     msg: gl ? (ctxOk ? "WebGL alive" : "context lost") : "missing",
     expect: 'alive', actual: gl ? (ctxOk ? 'alive' : 'lost') : 'missing',
@@ -970,7 +1004,7 @@ function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObjec
   const glStatus = getLinkStatus(e);
   checkpoint({
     id: 'gpu.shaders_linked',
-    side,
+    side: side === 'LEFT' ? 'REAL' : 'SHOW',
     stage: 'gpu',
     pass: glStatus.ok,
     msg: glStatus.reason,

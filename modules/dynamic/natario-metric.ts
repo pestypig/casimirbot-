@@ -6,7 +6,8 @@
  * curves (1D), surfaces (2D), volumes (3D), graph forms, and spherical ↔ Cartesian maps.
  */
 // ------------------------ Constants / Types ---------------------------------
-const C = 299792458;                    // m/s
+import { PHYSICS_CONSTANTS } from '../core/physics-constants';
+const C = PHYSICS_CONSTANTS.C;                    // m/s
 const NM_TO_M = 1e-9;
 const G = 6.67430e-11;                  // m³/(kg·s²)
 const clamp01 = (x: number, lo = 1e-12) => Math.max(lo, Math.min(1, Number(x) || 0));

@@ -32,6 +32,7 @@ export default function CurvatureSlicePanel() {
       ? [H.a ?? H.Lx_m/2, H.b ?? H.Ly_m/2, H.c ?? H.Lz_m/2]
       : [503.5, 132.0, 86.5];
   }, [hullMetrics]);
+  const hullVec = hull as unknown as [number, number, number];
 
   // Concurrent/total sectors (for FR fallback). Total = paper 400.
   const totalSectors = 400;
@@ -108,7 +109,7 @@ export default function CurvatureSlicePanel() {
           className="bg-slate-950/60"
 
           // geometry
-          hullAxes={hull}
+          hullAxes={hullVec}
           wallWidth_m={6.0}
 
           // REAL parity chain (no boosts)
@@ -131,7 +132,7 @@ export default function CurvatureSlicePanel() {
           curvatureBoostMax={1}
         />
         <div className="mt-2 text-[10px] text-slate-400 font-mono">
-          mode={mode} • FR-duty={dutyFR.toExponential(2)} • γ³={Math.pow(gammaGeo,3).toExponential(2)} • ΔA/A≈{qSpoil.toFixed(3)} • γ<sub>VdB</sub>≈{gammaVdB.toExponential(1)}
+          mode={mode} • FR-duty={Number.isFinite(dutyFR) ? dutyFR.toExponential(2) : '—'} • γ³={Number.isFinite(gammaGeo) ? Math.pow(gammaGeo,3).toExponential(2) : '—'} • ΔA/A≈{Number.isFinite(qSpoil) ? qSpoil.toFixed(3) : '—'} • γ<sub>VdB</sub>≈{Number.isFinite(gammaVdB) ? gammaVdB.toExponential(1) : '—'}
         </div>
       </CardContent>
     </Card>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
-import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
 
 /**
  * MarginHunterPanel — SHOW-only background optimizer
@@ -195,20 +195,17 @@ export default function MarginHunterPanel({
     const burst = clamp(dutyLocal * dwell, 0, dwell*0.9);
 
     const patch = normalizeKeys({
-      physicsParityMode: false,
-      parityMode: false,
       qSpoilingFactor: cand.q,
       gammaVanDenBroeck: gammaVdB0 * cand.gScale,
       sectors: cand.sectors,
       lightCrossing: { burst_ms: burst, dwell_ms: dwell },
       // display seasoning (SHOW only)
-      ridgeMode: 1,
       exposure: 5.0,
       zeroStop: 1e-7,
       colorMode: 'theta',
       viewAvg: true,
     });
-    gatedUpdateUniforms(eng, patch, 'margin-hunter-preview');
+  gatedUpdateUniforms(eng, withoutPhysics(patch), 'margin-hunter-preview');
   };
 
   const commitBestToShow = () => {
@@ -218,14 +215,12 @@ export default function MarginHunterPanel({
     const dwell = Math.max(1e-9, dwell_ms);
     const burst = clamp(best.dutyLocal * dwell, 0, dwell*0.9);
     const patch = normalizeKeys({
-      physicsParityMode: false,
-      parityMode: false,
       qSpoilingFactor: best.q,
       gammaVanDenBroeck: gammaVdB0 * best.gScale,
       sectors: best.sectors,
       lightCrossing: { burst_ms: burst, dwell_ms: dwell },
     });
-    gatedUpdateUniforms(eng, patch, 'margin-hunter-commit');
+  gatedUpdateUniforms(eng, withoutPhysics(patch), 'margin-hunter-commit');
   };
 
   // Start/stop the loop

@@ -28,8 +28,13 @@ export interface EnergyPipelineState {
   temperature_K: number;
   modulationFreq_GHz: number;
   
+  /** Post-scale for translational bias (0..1). 1 = full translation. */
+  beta_trans?: number;
+  /** Optional target ground speed for Taxi mode, meters/second (default 1.4). */
+  taxi_target_mps?: number;
+
   // Mode parameters
-  currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
+  currentMode: 'hover' | 'taxi' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
   sectorStrobing: number;
   qSpoilingFactor: number;
@@ -124,10 +129,12 @@ export interface SystemMetrics {
 export interface HelixMetrics {
   totalTiles: number;
   activeTiles: number;
+  activeFraction?: number;
   data?: any;
   tileData?: TileDatum[];
   tiles?: TileDatum[];
-  lightCrossing?: SystemMetrics['lightCrossing'];
+  // lightCrossing may be a simple numeric or the structured SystemMetrics lighting object
+  lightCrossing?: SystemMetrics['lightCrossing'] | number;
 }
 
 // Shared physics constants from pipeline backend
@@ -147,7 +154,10 @@ export const fmtPowerUnitFromW = (watts?: number) => {
 };
 
 // Optional: inline compute helper (Poisson kernel) for emergency fallback
-const poissonKernel = (r: number) => 1/(4*Math.PI*Math.max(r,1e-6));
+const poissonKernel = (r: number) => {
+  const rr = Number.isFinite(r) && r > 0 ? r : 1e-6;
+  return 1 / (4 * Math.PI * rr);
+};
 
 /**
  * Publish Greens payload to the canonical cache key and broadcast the window event.
@@ -304,7 +314,7 @@ export function useSwitchMode() {
 }
 
 // --- Types
-export type ModeKey = "standby" | "hover" | "cruise" | "emergency";
+export type ModeKey = "standby" | "hover" | "taxi" | "cruise" | "emergency";
 
 export type ModeConfig = {
   name: string;
@@ -355,6 +365,18 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     sectorsConcurrent: 1,        // one live sector at a time (classic sweep)
     localBurstFrac: 0.01,        // 1% local ON inside dwell
     powerTarget_W: 83.3e6,       // match your display target
+    sectorStrobing: 1,
+    qSpoilingFactor: 1,
+  },
+  taxi: {
+    name: "Taxi",
+    color: "text-sky-300",
+    description: "Ground ops posture; translation suppressed",
+    dutyCycle: 0.14,
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,        // identical electrical posture; translation stays suppressed
+    localBurstFrac: 0.01,
+    powerTarget_W: 83.3e6,       // inherits hover power budget
     sectorStrobing: 1,
     qSpoilingFactor: 1,
   },

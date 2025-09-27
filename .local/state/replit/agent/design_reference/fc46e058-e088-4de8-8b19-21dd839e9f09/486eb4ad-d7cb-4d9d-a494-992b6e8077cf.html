@@ -1,0 +1,525 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casimir Bot Lite - SCUFF-EM Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'sans': ['Inter', 'system-ui', 'sans-serif'],
+                    'mono': ['JetBrains Mono', 'Consolas', 'monospace'],
+                },
+                colors: {
+                    primary: '#2563eb',
+                    secondary: '#64748b', 
+                    success: '#059669',
+                    warning: '#d97706',
+                    error: '#dc2626',
+                }
+            }
+        }
+    };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-700 font-sans">
+    <!-- @COMPONENT: AppHeader -->
+    <header class="bg-white border-b border-slate-200 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                    <i class="fas fa-atom text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-semibold text-slate-800">Casimir Bot Lite</h1>
+                    <p class="text-sm text-slate-500">SCUFF-EM Simulation Interface</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">
+                    <i class="fas fa-book mr-2"></i>Documentation
+                </button>
+                <button class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors">
+                    <i class="fas fa-history mr-2"></i>History
+                </button>
+            </div>
+        </div>
+    </header>
+    <!-- @END_COMPONENT: AppHeader -->
+
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- @COMPONENT: ParameterPanel -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center space-x-2 mb-6">
+                        <i class="fas fa-sliders-h text-primary"></i>
+                        <h2 class="text-lg font-semibold text-slate-800">Simulation Parameters</h2>
+                    </div>
+
+                    <form data-implementation="Handle form submission and validation">
+                        <!-- Geometry Selection -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-slate-700 mb-3">Geometry Type</label>
+                            <div class="grid grid-cols-1 gap-3">
+                                <label class="relative flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input type="radio" name="geometry" value="sphere" class="sr-only" data-bind="parameters.geometry">
+                                    <div class="w-4 h-4 border border-slate-300 rounded-full mr-3 flex items-center justify-center">
+                                        <div class="w-2 h-2 bg-primary rounded-full hidden"></div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-slate-800">Sphere</div>
+                                        <div class="text-sm text-slate-500">Sphere above a plate</div>
+                                    </div>
+                                    <i class="fas fa-circle text-slate-400"></i>
+                                </label>
+                                
+                                <label class="relative flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input type="radio" name="geometry" value="parallel_plate" class="sr-only" data-bind="parameters.geometry">
+                                    <div class="w-4 h-4 border border-slate-300 rounded-full mr-3 flex items-center justify-center">
+                                        <div class="w-2 h-2 bg-primary rounded-full hidden"></div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-slate-800">Parallel Plate</div>
+                                        <div class="text-sm text-slate-500">Two parallel flat disks</div>
+                                    </div>
+                                    <i class="fas fa-equals text-slate-400"></i>
+                                </label>
+                                
+                                <label class="relative flex items-center p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
+                                    <input type="radio" name="geometry" value="bowl" class="sr-only" data-bind="parameters.geometry">
+                                    <div class="w-4 h-4 border border-slate-300 rounded-full mr-3 flex items-center justify-center">
+                                        <div class="w-2 h-2 bg-primary rounded-full hidden"></div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="font-medium text-slate-800">Bowl</div>
+                                        <div class="text-sm text-slate-500">Concave bowl with flat piston</div>
+                                    </div>
+                                    <i class="fas fa-adjust text-slate-400"></i>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Numerical Parameters -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Gap Distance</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" placeholder="1.0" data-bind="parameters.gap" 
+                                           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-12">
+                                    <span class="absolute right-3 top-2 text-sm text-slate-500">nm</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Distance between objects</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Radius</label>
+                                <div class="relative">
+                                    <input type="number" step="1" placeholder="25000" data-bind="parameters.radius"
+                                           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-12">
+                                    <span class="absolute right-3 top-2 text-sm text-slate-500">µm</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Object characteristic size</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Material</label>
+                                <select data-bind="parameters.material" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary">
+                                    <option value="PEC">PEC (Perfect Electric Conductor)</option>
+                                    <option value="custom">Custom Material</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Temperature</label>
+                                <div class="relative">
+                                    <input type="number" step="0.1" placeholder="20" data-bind="parameters.temperature"
+                                           class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary pr-12">
+                                    <span class="absolute right-3 top-2 text-sm text-slate-500">K</span>
+                                </div>
+                                <p class="text-xs text-slate-500 mt-1">Simulation temperature (default: 20 K)</p>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Parameters (Collapsible) -->
+                        <!-- @STATE: showAdvanced:boolean = false -->
+                        <div class="mt-6 pt-6 border-t border-slate-200">
+                            <button type="button" class="flex items-center justify-between w-full text-sm font-medium text-slate-700 hover:text-slate-900 transition-colors"
+                                    data-event="click:toggleAdvanced">
+                                <span>Advanced Parameters</span>
+                                <i class="fas fa-chevron-down transition-transform"></i>
+                            </button>
+                            <div class="mt-4 space-y-4 hidden" data-bind="showAdvanced">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Xi Min</label>
+                                        <input type="number" step="0.001" placeholder="0.001" data-bind="advanced.xiMin"
+                                               class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-primary focus:border-primary">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Max Xi Points</label>
+                                        <input type="number" placeholder="10000" data-bind="advanced.maxXiPoints"
+                                               class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-primary focus:border-primary">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Intervals</label>
+                                        <input type="number" placeholder="50" data-bind="advanced.intervals"
+                                               class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-primary focus:border-primary">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-600 mb-1">Rel Tol</label>
+                                        <input type="number" step="0.01" placeholder="0.01" data-bind="advanced.relTol"
+                                               class="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:ring-1 focus:ring-primary focus:border-primary">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="mt-8 space-y-3">
+                            <button type="submit" data-event="click:generateAndRun" data-implementation="Generate .scuffgeo file and run cas3D simulation"
+                                    class="w-full bg-primary text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center">
+                                <i class="fas fa-play mr-2"></i>
+                                Generate & Run Simulation
+                            </button>
+                            <button type="button" data-event="click:generateOnly" data-implementation="Generate .scuffgeo file only"
+                                    class="w-full bg-slate-100 text-slate-700 px-4 py-3 rounded-lg font-medium hover:bg-slate-200 transition-colors flex items-center justify-center">
+                                <i class="fas fa-file-code mr-2"></i>
+                                Generate .scuffgeo Only
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Example/Help Panel -->
+                <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="flex items-start space-x-2">
+                        <i class="fas fa-info-circle text-blue-600 mt-0.5"></i>
+                        <div>
+                            <h3 class="text-sm font-medium text-blue-800 mb-2">Example Usage</h3>
+                            <div class="text-xs text-blue-700 font-mono bg-blue-100 p-2 rounded">
+                                Geometry: parallel_plate<br>
+                                Gap: 1.0 nm<br>
+                                Radius: 25000 µm<br>
+                                Temperature: 20 K
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: ParameterPanel -->
+
+            <!-- @COMPONENT: MainContent -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- Status Panel -->
+                <!-- @STATE: simulationStatus:string = 'idle' -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-slate-800">Simulation Status</h2>
+                        <div class="flex items-center space-x-2" data-bind="simulationStatus">
+                            <div class="w-2 h-2 bg-slate-400 rounded-full"></div>
+                            <span class="text-sm text-slate-500">Ready</span>
+                        </div>
+                    </div>
+
+                    <!-- Progress Steps -->
+                    <div class="space-y-3">
+                        <div class="flex items-center space-x-3 opacity-50">
+                            <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                                <i class="fas fa-file-code text-slate-500 text-sm"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-600">.scuffgeo Generation</div>
+                                <div class="text-xs text-slate-500">Create geometry description file</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 opacity-50">
+                            <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                                <i class="fas fa-cube text-slate-500 text-sm"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-600">Mesh Generation</div>
+                                <div class="text-xs text-slate-500">Create computational mesh files</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 opacity-50">
+                            <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                                <i class="fas fa-calculator text-slate-500 text-sm"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-600">SCUFF-EM Calculation</div>
+                                <div class="text-xs text-slate-500">Running cas3D simulation</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3 opacity-50">
+                            <div class="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                                <i class="fas fa-chart-line text-slate-500 text-sm"></i>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-600">Results Processing</div>
+                                <div class="text-xs text-slate-500">Analyzing output files</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Tabs -->
+                <!-- @STATE: activeTab:string = 'results' -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="border-b border-slate-200">
+                        <nav class="flex space-x-8 px-6" data-bind="activeTab">
+                            <button class="py-4 px-1 border-b-2 border-primary text-primary font-medium text-sm" data-event="click:setActiveTab('results')">
+                                <i class="fas fa-chart-bar mr-2"></i>Results
+                            </button>
+                            <button class="py-4 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-sm" data-event="click:setActiveTab('files')">
+                                <i class="fas fa-folder mr-2"></i>Generated Files
+                            </button>
+                            <button class="py-4 px-1 border-b-2 border-transparent text-slate-500 hover:text-slate-700 font-medium text-sm" data-event="click:setActiveTab('logs')">
+                                <i class="fas fa-terminal mr-2"></i>Simulation Logs
+                            </button>
+                        </nav>
+                    </div>
+
+                    <!-- Results Tab Content -->
+                    <div class="p-6" data-show="activeTab === 'results'">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <!-- Energy Results -->
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-800 mb-4">Casimir Energy</h3>
+                                <div class="space-y-4">
+                                    <div class="bg-slate-50 rounded-lg p-4">
+                                        <div class="text-2xl font-mono font-semibold text-slate-800" data-bind="results.totalEnergy">
+                                            -2.34 × 10⁻²¹
+                                        </div>
+                                        <div class="text-sm text-slate-500">Joules (Total Energy)</div>
+                                    </div>
+                                    
+                                    <div class="bg-slate-50 rounded-lg p-4">
+                                        <div class="text-2xl font-mono font-semibold text-slate-800" data-bind="results.energyPerArea">
+                                            -4.58 × 10⁻⁸
+                                        </div>
+                                        <div class="text-sm text-slate-500">J/m² (Energy per unit area)</div>
+                                    </div>
+
+                                    <div class="bg-slate-50 rounded-lg p-4">
+                                        <div class="text-2xl font-mono font-semibold text-slate-800" data-bind="results.force">
+                                            2.34 × 10⁻¹⁵
+                                        </div>
+                                        <div class="text-sm text-slate-500">N (Casimir Force)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Visualization -->
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-800 mb-4">Energy vs. Gap Distance</h3>
+                                <div class="bg-slate-50 rounded-lg p-4 h-64 flex items-center justify-center">
+                                    <!-- @FUNCTIONALITY: Chart component should plot energy vs gap using Chart.js or similar -->
+                                    <div class="text-center text-slate-500">
+                                        <i class="fas fa-chart-line text-3xl mb-2"></i>
+                                        <p class="text-sm">Chart will appear after simulation</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Analysis -->
+                        <div class="mt-8">
+                            <h3 class="text-base font-semibold text-slate-800 mb-4">Analysis Summary</h3>
+                            <div class="bg-slate-50 rounded-lg p-4">
+                                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                        <div class="text-slate-500">Convergence</div>
+                                        <div class="font-medium text-success" data-bind="analysis.convergence">Achieved</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-500">Xi Points</div>
+                                        <div class="font-medium" data-bind="analysis.xiPoints">8,432</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-500">Computation Time</div>
+                                        <div class="font-medium" data-bind="analysis.computeTime">3.2 min</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-slate-500">Error Estimate</div>
+                                        <div class="font-medium" data-bind="analysis.errorEstimate">0.8%</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Files Tab Content -->
+                    <div class="p-6 hidden" data-show="activeTab === 'files'">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4">Generated Files</h3>
+                        
+                        <!-- @MAP: generatedFiles.map(file => ( -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-file-code text-blue-600"></i>
+                                    <div>
+                                        <div class="font-medium text-slate-800" data-bind="file.name">generated.scuffgeo</div>
+                                        <div class="text-sm text-slate-500" data-bind="file.description">Geometry description file</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-slate-500" data-bind="file.size">2.4 KB</span>
+                                    <button class="text-primary hover:text-blue-700 transition-colors" data-event="click:downloadFile(file.id)">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-cube text-green-600"></i>
+                                    <div>
+                                        <div class="font-medium text-slate-800">object1.msh</div>
+                                        <div class="text-sm text-slate-500">Primary object mesh</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-slate-500">156 KB</span>
+                                    <button class="text-primary hover:text-blue-700 transition-colors">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                <div class="flex items-center space-x-3">
+                                    <i class="fas fa-file-alt text-orange-600"></i>
+                                    <div>
+                                        <div class="font-medium text-slate-800">output.out</div>
+                                        <div class="text-sm text-slate-500">Simulation results</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm text-slate-500">8.9 KB</span>
+                                    <button class="text-primary hover:text-blue-700 transition-colors">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- @END_MAP )) -->
+
+                        <div class="mt-6 pt-6 border-t border-slate-200">
+                            <button class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-medium hover:bg-slate-200 transition-colors">
+                                <i class="fas fa-download mr-2"></i>Download All Files (.zip)
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Logs Tab Content -->
+                    <div class="p-6 hidden" data-show="activeTab === 'logs'">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4">Simulation Logs</h3>
+                        <div class="bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-sm h-96 overflow-y-auto">
+                            <div data-bind="logs" data-implementation="Real-time log streaming">
+$ cas3D --Geometry generated.scuffgeo --Energy --Temperature 20 --FileBase output<br>
+SCUFF-EM v1.6.0 (C) 2023 Homer Reid<br>
+<br>
+Reading geometry from generated.scuffgeo...<br>
+  Found object Object1 with mesh object1.msh<br>
+  Found object Object2 with mesh object2.msh (displaced 0 0 0.001)<br>
+<br>
+Initializing BEM matrices...<br>
+  Mesh Object1: 1,248 panels, 624 edges<br>
+  Mesh Object2: 1,248 panels, 624 edges<br>
+<br>
+Computing Casimir energy at T=20K...<br>
+  Xi integration: 0.001 → ∞<br>
+  Using 8,432 integration points<br>
+  Relative tolerance: 0.01<br>
+<br>
+[████████████████████████████████] 100% Complete<br>
+<br>
+Results written to output.out<br>
+Total Casimir energy: -2.34e-21 J<br>
+Computation completed in 3.2 minutes.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: MainContent -->
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        // TODO: Implement state management for simulation parameters and results
+        
+        // Form interaction handlers
+        document.addEventListener('DOMContentLoaded', function() {
+            // Radio button interaction for geometry selection
+            const radioButtons = document.querySelectorAll('input[type="radio"]');
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // Update visual state
+                    document.querySelectorAll(`input[name="${this.name}"]`).forEach(r => {
+                        const indicator = r.parentElement.querySelector('.w-2.h-2');
+                        indicator.classList.toggle('hidden', r !== this);
+                    });
+                });
+            });
+
+            // Advanced parameters toggle
+            const advancedToggle = document.querySelector('[data-event="click:toggleAdvanced"]');
+            const advancedPanel = document.querySelector('[data-bind="showAdvanced"]');
+            const chevron = advancedToggle.querySelector('i');
+            
+            advancedToggle.addEventListener('click', function() {
+                advancedPanel.classList.toggle('hidden');
+                chevron.classList.toggle('rotate-180');
+            });
+
+            // Tab switching
+            const tabButtons = document.querySelectorAll('[data-event^="click:setActiveTab"]');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const tabName = this.textContent.trim().toLowerCase().split(' ')[0];
+                    
+                    // Update tab appearance
+                    tabButtons.forEach(b => {
+                        b.classList.remove('border-primary', 'text-primary');
+                        b.classList.add('border-transparent', 'text-slate-500');
+                    });
+                    this.classList.add('border-primary', 'text-primary');
+                    this.classList.remove('border-transparent', 'text-slate-500');
+
+                    // Show/hide content
+                    document.querySelectorAll('[data-show]').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.querySelector(`[data-show="activeTab === '${tabName}'"]`).classList.remove('hidden');
+                });
+            });
+
+            // Form submission handler
+            document.querySelector('form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                // TODO: Implement parameter validation and .scuffgeo generation
+                // TODO: Execute cas3D command with proper error handling
+                // TODO: Update simulation status and progress indicators
+                console.log('Simulation started...');
+            });
+        });
+    })();
+    </script>
+</body>
+</html>

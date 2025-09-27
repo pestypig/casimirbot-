@@ -85,11 +85,15 @@ export default function AmplificationPanel({ readOnly = false }: { readOnly?: bo
     true;
 
   // ---- chain terms ----
-  const A_geo = Math.pow(Math.max(1, Number(gammaGeo) || 1), 3);
-  const A_total = A_geo * Math.max(1e-12, Number(qSpoil) || 1e-12) * Math.max(1, Number(gammaVdB) || 1);
+  const gGeoNum = Number(gammaGeo);
+  const qNum = Number(qSpoil);
+  const gVdBNum = Number(gammaVdB);
+  const A_geo = Math.pow(Math.max(1, Number.isFinite(gGeoNum) ? gGeoNum : 1), 3);
+  const A_total = A_geo * Math.max(1e-12, Number.isFinite(qNum) ? qNum : 1e-12) * Math.max(1, Number.isFinite(gVdBNum) ? gVdBNum : 1);
 
   // Use √(duty/sectors) when averaging is enabled (matches label & viewer semantics)
-  const avgTerm = viewAvg ? Math.sqrt(Math.max(1e-12, (Number(duty) || 0) / sectors)) : 1.0;
+  const dutyNum = Number(duty);
+  const avgTerm = viewAvg ? Math.sqrt(Math.max(1e-12, (Number.isFinite(dutyNum) ? dutyNum : 0) / sectors)) : 1.0;
 
   // final θ-scale used by the grid shader / CPU geometry
   const thetaScale = A_total * avgTerm;
@@ -172,12 +176,7 @@ export default function AmplificationPanel({ readOnly = false }: { readOnly?: bo
           </Tooltip>
 
           <span className="opacity-60">=</span>
-
-          <span className="px-2 py-0.5 rounded bg-emerald-500/20 ring-1 ring-emerald-400/30">
-            θ-scale = {fmtSci(thetaScale)}
-          </span>
-        </div>
-
+        </div> {/* ← close the Equation line wrapper */}
         {/* Tiny bars */}
         <div className="mt-4 grid grid-cols-4 gap-3">
           <Bar label="γ_geo^3" value={A_geo} mode="log" min={1e-6} max={1e9} />

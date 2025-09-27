@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
 
 type MechanicalParams = {
   /** Power-only mechanical knob from pipeline (used to back out damping) */
@@ -20,8 +20,10 @@ type Props = {
     betaTiltVec?: [number,number,number];
     // Mode coupling
     mode?: string;
+    currentMode?: string;         // alias for mode
     dutyCycle?: number;
     sectors?: number;
+    sectorCount?: number;
     gammaGeo?: number;
     qSpoil?: number;
     qCavity?: number;
@@ -73,7 +75,10 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
   useEffect(() => {
     if (!ready || !canvasRef.current) return;
     if (!engineRef.current) {
-      engineRef.current = new window.OutlineEngine(canvasRef.current);
+      // Prefer authoritative factory if available
+      engineRef.current = (typeof window.OutlineEngine?.getOrCreate === 'function')
+        ? window.OutlineEngine.getOrCreate(canvasRef.current, { animate: true })
+        : new window.OutlineEngine(canvasRef.current);
       if (debugTag && typeof engineRef.current.setDebugTag === 'function') {
         engineRef.current.setDebugTag(debugTag);
       }
@@ -97,26 +102,30 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       f0_Hz: f0,
       mechZeta: zeta,
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
-      
+
       // Ford-Roman window + light-crossing data
       dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
       lightCrossing: parameters?.lightCrossing,
       zeta: parameters?.zeta
     };
-    engineRef.current.bootstrap(initialUniforms);
+  // Enable animate so the outline keeps redrawing even if adapter gating blocks updates
+  engineRef.current.bootstrap(Object.assign({ animate: true }, initialUniforms));
   }, [ready]);
 
   useEffect(() => {
     if (!engineRef.current) return;
+    const currentMode = parameters?.currentMode || parameters?.mode || 'hover';
     const updatedUniforms = {
       hullAxes: [hull.a, hull.b, hull.c],
       wallWidth: parameters?.wallWidth ?? 0.06,
       epsilonTilt: parameters?.epsilonTilt ?? 0.0,
       betaTiltVec: parameters?.betaTiltVec || [0,-1,0],
       // Mode coupling
-      mode: parameters?.mode || 'hover',
+      mode: currentMode,
+      currentMode: currentMode,
       dutyCycle: parameters?.dutyCycle ?? 0.14,
       sectors: parameters?.sectors ?? 1,
+      sectorCount: parameters?.sectorCount ?? 400,
       gammaGeo: parameters?.gammaGeo ?? 26,
       qSpoil: parameters?.qSpoil ?? 1.0,
       qCavity: parameters?.qCavity ?? 1e9,
@@ -127,14 +136,23 @@ export function ShellOutlineVisualizer({ parameters, debugTag }: Props) {
       f0_Hz: f0,
       mechZeta: zeta,
       mechGain,           // single "is-mechanics-hot?" scalar for the shader
-      
+
       // Ford-Roman window + light-crossing data
       dutyEffectiveFR: parameters?.dutyEffectiveFR ?? 0.01,
       lightCrossing: parameters?.lightCrossing,
       zeta: parameters?.zeta
     };
-    gatedUpdateUniforms(engineRef.current, updatedUniforms, 'shell-outline');
-  }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.dutyCycle, parameters?.sectors, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain, parameters?.dutyEffectiveFR, parameters?.lightCrossing, parameters?.zeta]);
+    
+    // Use direct engine update for essential mode changes to bypass gate
+    try {
+      if (engineRef.current && typeof engineRef.current.updateUniforms === 'function') {
+        engineRef.current.updateUniforms(updatedUniforms);
+      }
+    } catch (error) {
+      console.warn('[ShellOutline] Direct update failed, trying gated:', error);
+      gatedUpdateUniforms(engineRef.current, withoutPhysics(updatedUniforms), 'shell-outline');
+    }
+  }, [hull.a, hull.b, hull.c, parameters?.wallWidth, parameters?.epsilonTilt, parameters?.betaTiltVec, parameters?.mode, parameters?.currentMode, parameters?.dutyCycle, parameters?.sectors, parameters?.sectorCount, parameters?.gammaGeo, parameters?.qSpoil, parameters?.qCavity, parameters?.qMechanical, parameters?.modulationHz, parameters?.mech, qMech, f_mod, f0, zeta, mechGain, parameters?.dutyEffectiveFR, parameters?.lightCrossing, parameters?.zeta]);
 
   return (
     <div className="rounded-xl overflow-hidden bg-black">

@@ -5,6 +5,7 @@
  */
 
 import { calculateNatarioWarpBubble, type NatarioWarpParams } from '../../modules/warp/natario-warp.js';
+import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe';
 
 export interface TargetValidationParams {
   gapA: number;          // m (gap size)
@@ -31,8 +32,10 @@ export interface TargetValidationResult {
   deltaEStatic: number;            // J (static Casimir energy)
   deltaEGeo: number;               // J (geometry-boosted energy)
   deltaEQ: number;                 // J (Q-boosted energy)
+  deltaEVdB?: number;             // J (Van den Broeck amplified energy)
   energyPerTileCycleAvg: number;   // J (cycle-averaged energy per tile)
   totalEnergyPerCycle: number;     // J (total energy across all tiles)
+  mitigatedPower?: number;         // W (paper target power included optionally)
   
   // Mass calculations
   exoticMassPerTileOriginal: number;  // kg (original calculation)
@@ -77,7 +80,7 @@ export function computeTargetValidation(params: TargetValidationParams): TargetV
   const { gammaGeo, f_m, Q_i, t_burst, t_cycle, S } = params;
   
   // Physical constants
-  const c = 299792458;           // m/s (speed of light)
+  const c = SPEED_OF_LIGHT;           // m/s (speed of light)
   const N_tiles = 1.96e9;        // total tiles from Needle Hull ledger
   const deltaEStatic = -2.55e-3; // J (flat-plate Casimir energy)
   
@@ -93,11 +96,11 @@ export function computeTargetValidation(params: TargetValidationParams): TargetV
   
   // 3) Geometry & Q-boosted energy with Van den Broeck enhancement
   const deltaEGeo = deltaEStatic * Math.pow(gammaGeo, 3);  // ≃ -0.40 J
-  const deltaEQ = deltaEGeo * Q_i;                         // ≃ -4.0×10⁸ J
-  const deltaEVdB = deltaEQ * gammaVdB;                    // Van den Broeck amplification
+  const deltaE_Qboost = deltaEGeo * Q_i;                    // Q-boosted energy
+  const deltaE_VdB = deltaE_Qboost * gammaVdB;              // Van den Broeck amplification
   
   // 4) Cycle-average per tile with full amplification
-  const energyPerTileCycleAvg = deltaEVdB * dutyFactor;    // Enhanced energy per tile
+  const energyPerTileCycleAvg = deltaE_VdB * dutyFactor;    // Enhanced energy per tile
   
   // 5) Total exotic energy per cycle across all tiles
   const totalEnergyPerCycle = energyPerTileCycleAvg * N_tiles;
@@ -156,15 +159,17 @@ export function computeTargetValidation(params: TargetValidationParams): TargetV
     effectiveDuty,
     deltaEStatic,
     deltaEGeo,
-    deltaEQ: deltaEVdB, // Use Van den Broeck enhanced value
+  deltaEQ: deltaE_Qboost,
+  deltaEVdB: deltaE_VdB,
     energyPerTileCycleAvg,
     totalEnergyPerCycle,
     exoticMassPerTileOriginal: exoticMassPerTile,
     totalExoticMass,
     zetaMargin,
     quantumSafetyStatusOriginal: quantumSafetyStatus,
-    rawPower,
-    averagePower: mitigatedPower, // Use target power for consistency
+  rawPower,
+  averagePower, // duty-cycle averaged raw power
+  mitigatedPower, // canonical target power (paper)
     massTargetCheck,
     powerTargetCheck,
     zetaTargetCheck,

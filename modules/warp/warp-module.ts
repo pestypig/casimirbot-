@@ -362,14 +362,13 @@ export const warpBubbleModule: CasimirModule = {
       if (!Number.isFinite(warpParams.bowlRadius) || warpParams.bowlRadius <= 0) {
         throw new Error(`Invalid bowl radius: ${warpParams.bowlRadius}`);
       }
+          if (!Number.isFinite((warpParams as any).effectiveDuty) || (warpParams as any).effectiveDuty <= 0) {
+            throw new Error(`Invalid effective duty: ${(warpParams as any).effectiveDuty}`);
+          }
 
-      if (!Number.isFinite(warpParams.effectiveDuty) || warpParams.effectiveDuty <= 0) {
-        throw new Error(`Invalid effective duty: ${warpParams.effectiveDuty}`);
-      }
-
-      if (!Number.isFinite(warpParams.gammaGeo) || warpParams.gammaGeo <= 0) {
-        throw new Error(`Invalid gamma geometric: ${warpParams.gammaGeo}`);
-      }
+          if (!Number.isFinite((warpParams as any).gammaGeo) || (warpParams as any).gammaGeo <= 0) {
+            throw new Error(`Invalid gamma geometric: ${(warpParams as any).gammaGeo}`);
+          }
 
       // Perform Natário warp bubble calculations
       const warpResult = calculateNatarioWarpBubble(warpParams);
@@ -389,13 +388,24 @@ export const warpBubbleModule: CasimirModule = {
       console.log('[WarpModule] Calculation completed in', calculationTime, 'ms');
 
       // Add debug information for shift vector field
+      // Provide a small runtime-safe interface for shiftVectorField so consumers can rely on these keys
+      interface ShiftVectorField {
+        amplitude?: number;
+        radialProfile?: (r: number) => number;
+        tangentialComponent?: (x: number, y: number, z: number) => number;
+        axialComponent?: (x: number, y: number, z: number) => number;
+        netShiftAmplitude?: number;
+        evaluateShiftVector?: (x: number, y: number, z: number) => [number, number, number];
+      }
+
       if (warpResult.shiftVectorField) {
+        const sv = warpResult.shiftVectorField as ShiftVectorField;
         console.log('[WarpModule] Shift vector field validation:', {
-          amplitude: warpResult.shiftVectorField.amplitude,
-          hasRadialProfile: typeof warpResult.shiftVectorField.radialProfile === 'function',
-          tangentialComponent: warpResult.shiftVectorField.tangentialComponent,
-          axialComponent: warpResult.shiftVectorField.axialComponent,
-          netShiftAmplitude: warpResult.shiftVectorField.netShiftAmplitude
+          amplitude: Number.isFinite(sv?.amplitude) ? sv!.amplitude : undefined,
+          hasRadialProfile: typeof sv?.radialProfile === 'function',
+          tangentialComponent: typeof sv?.tangentialComponent === 'function' ? 'fn' : undefined,
+          axialComponent: typeof sv?.axialComponent === 'function' ? 'fn' : undefined,
+          netShiftAmplitude: Number.isFinite(sv?.netShiftAmplitude) ? sv!.netShiftAmplitude : undefined
         });
       }
 

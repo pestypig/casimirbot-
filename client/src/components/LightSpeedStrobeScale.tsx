@@ -27,10 +27,14 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
 
   // HUD model (source of truth with sensible fallbacks)
   const hud = toHUDModel({
-    warpUniforms: {},
-    viewerHints: {},
+    P_avg: (pipeline as any)?.P_avg ?? (metrics as any)?.energyOutput ?? 0,
+    P_loss_raw: (pipeline as any)?.P_loss_raw ?? (metrics as any)?.P_loss_raw ?? 0,
+    N_tiles: (pipeline as any)?.N_tiles ?? (metrics as any)?.totalTiles ?? 0,
+    dutyEffective_FR: (pipeline as any)?.dutyEffectiveFR ?? (metrics as any)?.dutyEffectiveFR ?? (metrics as any)?.dutyEffective_FR ?? 0,
+    strobeHz: (pipeline as any)?.strobeHz ?? (metrics as any)?.strobeHz ?? 1000,
+    sectorPeriod_ms: (pipeline as any)?.sectorPeriod_ms ?? (metrics as any)?.sectorPeriod_ms,
     lightCrossing: (metrics as any)?.lightCrossing || {},
-  });
+  } as any);
 
   // Modulation period
   const fGHz = (pipeline as any)?.modulationFreq_GHz;
@@ -103,7 +107,7 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
     : undefined;
 
   // Timeline sizing
-  const tMax = Math.max(tauLC || 0, Tm || 0, Tsec || 0) || 1;
+  const tMax = Math.max(Number.isFinite(tauLC) ? tauLC : 0, Number.isFinite(Tm) ? Tm : 0, Number.isFinite(Tsec) ? Tsec : 0) || 1;
   const tPad = tMax * 1.08; // headroom so labels don’t clip
 
   // Compliance checks

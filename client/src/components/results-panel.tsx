@@ -112,6 +112,11 @@ export default function ResultsPanel({
     return `${mantissa} × 10^${exp}`;
   };
 
+  const safeToFixed = (v: unknown, digits = 1) => {
+    if (typeof v === "number" && Number.isFinite(v)) return v.toFixed(digits);
+    return "—";
+  };
+
   const getFileIcon = (type: string) => {
     switch (type) {
       case "scuffgeo":
@@ -212,7 +217,7 @@ export default function ResultsPanel({
                 <div className="space-y-4">
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(gammaGeoDisplay) ? (gammaGeoDisplay as number).toFixed(1) : "—"}
+                      {safeToFixed(gammaGeoDisplay, 1)}
                     </div>
                     <div className="text-sm text-muted-foreground">γ_geo (Geometric Amplification)</div>
                   </div>
@@ -281,21 +286,21 @@ export default function ResultsPanel({
                 <div className="space-y-4">
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.totalEnergy) ? formatScientificNotation(results.totalEnergy) : "—"}
+                      {Number.isFinite(results?.totalEnergy) ? formatScientificNotation(results!.totalEnergy as number) : "—"}
                     </div>
                     <div className="text-sm text-muted-foreground">Joules (Total Energy)</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.energyPerArea) ? formatScientificNotation(results.energyPerArea) : "—"}
+                      {Number.isFinite(results?.energyPerArea) ? formatScientificNotation(results!.energyPerArea as number) : "—"}
                     </div>
                     <div className="text-sm text-muted-foreground">J/m² (Energy per unit area)</div>
                   </div>
 
                   <div className="bg-muted rounded-lg p-4">
                     <div className="text-2xl font-mono font-semibold">
-                      {Number.isFinite(results?.force) ? formatScientificNotation(results.force) : "—"}
+                      {Number.isFinite(results?.force) ? formatScientificNotation(results!.force as number) : "—"}
                     </div>
                     <div className="text-sm text-muted-foreground">N (Casimir Force)</div>
                   </div>
@@ -326,7 +331,7 @@ export default function ResultsPanel({
                     </div>
                     <div>
                       <div className="text-muted-foreground">Amplification Factor</div>
-                      <div className="font-medium">{Number.isFinite(gammaGeoDisplay) ? (gammaGeoDisplay as number).toFixed(1) : "—"}</div>
+                      <div className="font-medium">{safeToFixed(gammaGeoDisplay, 1)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Computation Time</div>
@@ -471,11 +476,11 @@ export default function ResultsPanel({
             averagePower: results?.powerDraw ?? results?.averagePower ?? powerWFromPipeline,
             massTargetCheck: (() => {
               const m = (results?.totalExoticMass ?? massFromPipeline) as number | undefined;
-              return Number.isFinite(m) ? Math.abs(m - 1400) <= 70 : false;
+              return Number.isFinite(m as number) ? Math.abs((m as number) - 1400) <= 70 : false;
             })(),
             powerTargetCheck: (() => {
               const pW = (results?.powerDraw ?? powerWFromPipeline) as number | undefined;
-              return Number.isFinite(pW) ? Math.abs(pW - 83e6) <= 8.3e6 : false;
+              return Number.isFinite(pW as number) ? Math.abs((pW as number) - 83e6) <= 8.3e6 : false;
             })()
           }} />
         </TabsContent>

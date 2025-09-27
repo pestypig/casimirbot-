@@ -113,7 +113,9 @@ const ROLE_META: Record<RoleKey, {
 export default function StationPage() {
   const params = useParams();
   const role = (params.role as RoleKey) || "optimist";
-  const { data, err } = useMetrics();
+  const metrics = useMetrics();
+  const data = metrics.data;
+  const err = (metrics as any).error ?? (metrics as any).err;
 
   const meta = ROLE_META[role] ?? ROLE_META.optimist;
 

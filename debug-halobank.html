@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HaloBank Debug</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+</head>
+<body style="margin:0; background:#0b0f18; color:#e8eefc; font-family: ui-sans-serif;">
+<div id="debug-info" style="position:absolute; top:10px; left:10px; z-index:1000; background:rgba(0,0,0,0.8); padding:10px; border-radius:8px;">
+  <h3>HaloBank Debug</h3>
+  <div id="status">Loading...</div>
+  <button onclick="testBasics()">Test Basics</button>
+  <button onclick="testLabels()">Test Labels</button>
+  <button onclick="testSample()">Load Sample</button>
+</div>
+<canvas id="renderer" style="width:100%; height:100vh;"></canvas>
+
+<script>
+console.log('🚀 HaloBank Debug Starting...');
+
+// Globals
+let scene, camera, renderer, sunMesh;
+const halos = new Map();
+const markers = new Map();
+const labels = new Map();
+const ownHalos = new Map();
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2(-2, -2);
+let hoverId = null;
+
+// Debug status
+const status = document.getElementById('status');
+function updateStatus(msg) {
+  status.textContent = msg;
+  console.log('📊', msg);
+}
+
+// Test functions
+function testBasics() {
+  updateStatus(`Scene has ${scene.children.length} objects, Markers: ${markers.size}, Labels: ${labels.size}`);
+}
+
+function testLabels() {
+  updateStatus(`Testing labels... Hover ID: ${hoverId}, Labels visible: ${Array.from(labels.values()).filter(l => l.visible).length}`);
+}
+
+function testSample() {
+  console.log('🧪 Creating test record...');
+  const rec = {
+    id: 'test123',
+    name: 'Test File.jpg',
+    homeAngleDeg: 90, // 90 degrees
+    year: 2023
+  };
+  
+  try {
+    // Create marker
+    const geom = new THREE.SphereGeometry(0.05, 16, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xff6600 });
+    const mesh = new THREE.Mesh(geom, mat);
+    mesh.position.set(0, 0, 1); // Simple position
+    mesh.userData.id = rec.id;
+    scene.add(mesh);
+    markers.set(rec.id, mesh);
+    
+    // Create label
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 200;
+    canvas.height = 50;
+    ctx.fillStyle = '#101733';
+    ctx.fillRect(0, 0, 200, 50);
+    ctx.fillStyle = '#dfe6ff';
+    ctx.font = '14px ui-sans-serif';
+    ctx.fillText(rec.name, 10, 30);
+    
+    const tex = new THREE.CanvasTexture(canvas);
+    const sprMat = new THREE.SpriteMaterial({ map: tex });
+    const sprite = new THREE.Sprite(sprMat);
+    sprite.position.set(0.1, 0.1, 1);
+    sprite.scale.set(0.2, 0.1, 1);
+    sprite.visible = true; // Always visible for test
+    scene.add(sprite);
+    labels.set(rec.id, sprite);
+    
+    updateStatus(`Added test marker and label! Check the scene.`);
+  } catch (error) {
+    updateStatus(`Error: ${error.message}`);
+    console.error('❌ Test failed:', error);
+  }
+}
+
+// Basic scene setup
+function initScene() {
+  updateStatus('Initializing scene...');
+  
+  const canvas = document.getElementById('renderer');
+  renderer = new THREE.WebGLRenderer({ canvas });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 1000);
+  camera.position.set(0, 2, 4);
+  camera.lookAt(0, 0, 0);
+  
+  // Lights
+  const amb = new THREE.AmbientLight(0x223355, 0.7);
+  scene.add(amb);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.6);
+  dir.position.set(3, 3, 2);
+  scene.add(dir);
+  
+  // Sun
+  const sunGeo = new THREE.SphereGeometry(0.08, 32, 32);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xffd26a });
+  sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  scene.add(sunMesh);
+  
+  // Basic orbit
+  const pts = [];
+  for (let i = 0; i <= 360; i++) {
+    const angle = (i * Math.PI) / 180;
+    pts.push(new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineBasicMaterial({ color: 0x6aa4ff, opacity: 0.75, transparent: true });
+  const line = new THREE.Line(geo, mat);
+  scene.add(line);
+  
+  updateStatus('Scene initialized!');
+  animate();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera);
+}
+
+// Start
+initScene();
+</script>
+</body>
+</html>

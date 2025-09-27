@@ -6,6 +6,7 @@ import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
 import targetValidationRoutes from "./routes/target-validation.js";
+import { getHorizonsElements } from "./utils/horizons-proxy";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -48,12 +49,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Optional keepalive/ping to clean up dead sockets
     const pingInterval = setInterval(() => {
-      for (const bucket of connections.values()) {
+      for (const bucket of Array.from(connections.values())) {
         for (const ws of Array.from(bucket)) {
-          if (ws.readyState === WebSocket.OPEN) {
-            try { ws.ping(); } catch { bucket.delete(ws); }
+          if (ws && (ws as WebSocket).readyState === WebSocket.OPEN) {
+            try { (ws as WebSocket).ping(); } catch { bucket.delete(ws as WebSocket); }
           } else {
-            bucket.delete(ws);
+            bucket.delete(ws as WebSocket);
           }
         }
       }
@@ -415,6 +416,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add target validation routes
   app.use("/api", targetValidationRoutes);
 
+  // ---- JPL Horizons API Proxy for precise orbital elements ---------------
+  app.get("/api/horizons", async (req, res) => {
+    try {
+      const year = req.query.year;
+      if (!year || typeof year !== 'string') {
+        return res.status(400).json({ error: 'Year parameter required' });
+      }
+      
+      const elements = await getHorizonsElements(year);
+      res.json(elements);
+    } catch (error) {
+      console.error('Horizons API error:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch orbital elements',
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // ---- Serve HaloBank static HTML file ------------------------------------
+  app.get("/halobank", (req, res) => {
+    // Use Express's built-in sendFile method - no need for require/import
+    res.sendFile('halobank.html', { root: process.cwd() }, (err) => {
+      if (err) {
+        console.log(`[/halobank] ❌ Error serving file: ${err.message}`);
+        res.status(404).send(`HaloBank page not found: ${err.message}`);
+      } else {
+        console.log(`[/halobank] ✅ Successfully served halobank.html`);
+      }
+    });
+  });
+
   // ---- Helix core: prefer .ts in dev, fall back to .js in prod --------------
   async function importHelixCore() {
     try {
@@ -434,6 +467,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   }
+  const core = await importHelixCore();
   const {
     handleHelixCommand,
     getTileStatus,
@@ -441,14 +475,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getPipelineState,
     getDisplacementField,
     updatePipelineParams,
-    switchOperationalMode
-  } = await importHelixCore();
+    switchOperationalMode,
+    getEnergySnapshot
+  } = core;
+
+  // Helpful startup log to confirm dynamic import succeeded and which build was loaded
+  try {
+    console.log(`[routes] Loaded helix-core module; VERSION=${(core as any).VERSION ?? 'unknown'}`);
+  } catch (e) {
+    console.log('[routes] Loaded helix-core module (version unknown)');
+  }
 
   app.post("/api/helix/command", handleHelixCommand);
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
   app.get("/api/helix/metrics", getSystemMetrics);
   app.get("/api/helix/pipeline", getPipelineState);
+  // Backwards-compatible alias: some clients (HelixCasimirAmplifier) request /api/helix/state
+  app.get("/api/helix/state", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);
+  // NEW: expose exact computeEnergySnapshot result (GET returns current defaults; POST accepts optional { sim })
+  app.get ("/api/helix/snapshot", getEnergySnapshot);
+  app.post("/api/helix/snapshot", getEnergySnapshot);
   // Alias for HelixCasimirAmplifier component compatibility
   app.get("/api/helix/displacement", getDisplacementField);
   app.post("/api/helix/pipeline/update", updatePipelineParams);
@@ -458,3 +505,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return httpServer;
 }
+
+// Export a minimal routes list so tooling importing routes succeeds.
+export const routes = [
+  { path: '/', name: 'home' },
+  { path: '/inspector', name: 'inspector' }
+];
+export default routes;

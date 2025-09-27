@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { publish, subscribe } from "@/lib/luma-bus";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 
 type SlicePrefs = {
   exposure: number;     // 1..12
@@ -55,8 +55,10 @@ export function useSlicePrefs() {
 export function useSlicePrefsBus() {
   const [state, setState] = useState<SlicePrefs | null>(null);
   useEffect(() => {
-    const unsub = subscribe("slice:prefs", (p: SlicePrefs) => setState(p));
-    return () => unsub?.();
+    const handlerId = subscribe("slice:prefs", (p: SlicePrefs) => setState(p));
+    return () => {
+      if (handlerId) unsubscribe(handlerId);
+    };
   }, []);
   return state;
 }

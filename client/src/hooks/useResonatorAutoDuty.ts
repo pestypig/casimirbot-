@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { apiRequest } from "@/lib/queryClient";
 
 type Args = {
-  mode: 'standby'|'hover'|'cruise'|'emergency';
+  mode: 'standby'|'hover'|'taxi'|'cruise'|'emergency';
   duty: number;
   sectors: number;
   freqGHz: number;
@@ -28,7 +28,7 @@ export function useResonatorAutoDuty({
     if (debounceRef.current) cancelAnimationFrame(debounceRef.current);
     debounceRef.current = requestAnimationFrame(async () => {
       try {
-        const cmd = (mode === 'hover' || mode === 'emergency')
+        const cmd = (mode === 'hover' || mode === 'taxi' || mode === 'emergency')
           ? "Execute auto-duty pulse sequence across all 400 sectors"
           : `Simulate a full pulse cycle at ${freqGHz} GHz`;
 

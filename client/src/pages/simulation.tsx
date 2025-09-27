@@ -70,7 +70,6 @@ export default function Simulation() {
       currentSimulation?.status && !["completed", "failed"].includes(currentSimulation.status)
         ? 2000
         : false,
-    suspense: false,
     queryFn: () => fetchSimulation(currentSimulation!.id),
   });
 
@@ -239,33 +238,33 @@ export default function Simulation() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Parameters and Controls */}
           <div className="space-y-6">
-            <ParameterPanel
-              tileArea={tileArea}
-              setTileArea={setTileArea}
-              shipRadius={shipRadius}
-              setShipRadius={setShipRadius}
-              gammaGeo={gammaGeo}
-              setGammaGeo={setGammaGeo}
-              qFactor={qFactor}
-              setQFactor={setQFactor}
-              duty={duty}
-              setDuty={setDuty}
-              sagDepth={sagDepth}
-              setSagDepth={setSagDepth}
-              temperature={temperature}
-              setTemperature={setTemperature}
-              strokeAmplitude={strokeAmplitude}
-              setStrokeAmplitude={setStrokeAmplitude}
-              burstTime={burstTime}
-              setBurstTime={setBurstTime}
-              cycleTime={cycleTime}
-              setCycleTime={setCycleTime}
-              xiPoints={xiPoints}
-              setXiPoints={setXiPoints}
-              onApplyNeedleHullPreset={applyNeedleHullPreset}
-              onRunSimulation={handleRunSimulation}
-              isRunning={createSimulationMutation.isPending}
-            />
+            <ParameterPanel {...({
+              tileArea,
+              setTileArea,
+              shipRadius,
+              setShipRadius,
+              gammaGeo,
+              setGammaGeo,
+              qFactor,
+              setQFactor,
+              duty,
+              setDuty,
+              sagDepth,
+              setSagDepth,
+              temperature,
+              setTemperature,
+              strokeAmplitude,
+              setStrokeAmplitude,
+              burstTime,
+              setBurstTime,
+              cycleTime,
+              setCycleTime,
+              xiPoints,
+              setXiPoints,
+              onApplyNeedleHullPreset: applyNeedleHullPreset,
+              onRunSimulation: handleRunSimulation,
+              isRunning: createSimulationMutation.isPending,
+            } as any)} />
 
             <div className="flex gap-2">
               <Button
@@ -299,19 +298,13 @@ export default function Simulation() {
 
           {/* Right Column - Status and Visualization */}
           <div className="space-y-6">
-            <SimulationStatus simulation={currentSimulation} currentStep={currentStep} onDownload={handleDownload} />
+            <SimulationStatus {...( { simulation: currentSimulation, currentStep, onDownload: handleDownload } as any)} />
 
-            <MeshVisualization sagDepth1={0} sagDepth2={sagDepth} radius={25} />
+            <MeshVisualization {...({ sagDepth1: 0, sagDepth2: sagDepth, radius: 25 } as any)} />
 
             {simulation && (
               <ResultsPanel
-                simulation={simulation}
-                onDownload={handleDownload}
-                showVisualProof={true}
-                showVerification={true}
-                showPhaseDiagram={false}
-                tileArea={tileArea}
-                shipRadius={shipRadius}
+                {...({ simulation, onDownload: handleDownload, showVisualProof: true, showVerification: true, showPhaseDiagram: false, tileArea, shipRadius } as any)}
               />
             )}
           </div>

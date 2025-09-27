@@ -167,7 +167,7 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
 
   const thetaExpected =
     gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
-      ? Math.pow(gammaGeo, 3) * q * gammaVdB_vis * Math.sqrt(clamp01(dEff))
+      ? Math.pow(gammaGeo, 3) * q * gammaVdB_vis * clamp01(dEff)
       : undefined;
 
   // --- P_avg substitution pieces (best-effort) ---
@@ -231,10 +231,10 @@ function UniformsExplainCard({ data, m, className = "" }: { data?: UniformsExpla
       ? `U_static = [-π²·ℏ·c/(720·(${(gap_nm * 1e-9).toExponential(2)})³)] · ${fexp(A_tile_m2, 2)} m²`
       : undefined;
 
-  const baseTheta = eqn.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB(vis) · √d_eff";
+  const baseTheta = eqn.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB(vis) · d_eff";
   const subTheta =
     gammaGeo !== undefined && q !== undefined && gammaVdB_vis !== undefined && dEff !== undefined
-      ? `θ = (${fmt(gammaGeo, 0)})^3 · ${fmt(q, 3)} · ${fexp(gammaVdB_vis, 2)} · √${fmt(dEff, 6)}`
+      ? `θ = (${fmt(gammaGeo, 0)})^3 · ${fmt(q, 3)} · ${fexp(gammaVdB_vis, 2)} · ${fmt(dEff, 6)}`
       : undefined;
 
   const baseMass = eqn.M_exotic || "M = [U_static · γ_geo^3 · Q_burst · γ_VdB · d_eff] · N_tiles / c²";
@@ -447,77 +447,143 @@ function TimeScaleCard({ m }: { m: HelixMetrics }) {
   );
 }
 
-/** θ-scale derivation */
+/** θ-scale derivation (pipeline-only, single-source with dual raw/calibrated audit) */
 function ThetaScaleCard({ m }: { m: HelixMetrics }) {
-  const uexp: UniformsExplain | undefined = (m as any)?.uniformsExplain;
-  const dEff =
-    num(uexp?.fordRomanDuty?.computed_d_eff) ??
-    num(uexp?.live?.dutyEffectiveFR) ??
-    num((m as any)?.dutyEffectiveFR) ??
-    num((m as any)?.pipeline?.dutyEffectiveFR) ??
-    num((m as any)?.pipeline?.dutyEff);
+  // Use only the pipeline snapshot to avoid mixing stamps/sources
+  const snap: any = (m as any)?.pipeline ?? {};
+  const mode = String(snap.currentMode ?? '').toUpperCase();
 
-  const gammaGeo =
-    num(uexp?.live?.gammaGeo) ??
-    num((m as any)?.pipeline?.gammaGeo) ??
-    num((m as any)?.gammaGeo);
+  // Get dual-value audit if available
+  const thetaAudit = snap.uniformsExplain?.thetaAudit;
+  const modelMode = thetaAudit?.mode || snap.modelMode || 'calibrated';
+  
+  const gammaGeo = num(snap.gammaGeo);
+  const q = num(snap.qSpoilingFactor ?? snap.deltaAOverA ?? snap.q);
+  
+  // Use calibrated gamma_VdB for UI consistency with pipeline
+  const gammaVdB_cal = num(
+    thetaAudit?.inputs?.gammaVdB_cal ??
+    snap.gammaVanDenBroeck_mass ?? // ✅ prefer calibrated/mass
+    snap.gammaVanDenBroeck ??       // next: pipeline gamma
+    snap.gammaVdB ??                // legacy
+    snap.gammaVanDenBroeck_vis      // last: visual/raw seed
+  );
+  const gammaVdB_raw = num(thetaAudit?.inputs?.gammaVdB_raw);
 
-  const q =
-    num(uexp?.live?.qSpoilingFactor) ??
-    num((m as any)?.pipeline?.qSpoilingFactor) ??
-    num((m as any)?.qSpoilingFactor) ??
-    num((m as any)?.q);
+  // Prefer pipeline's canonical FR duty (underscore name is authoritative)
+  let dEff: number | undefined = undefined;
+  let dutySrc: string | undefined = undefined;
+  if (Number.isFinite((snap as any)?.dutyEffective_FR)) { dEff = num(snap.dutyEffective_FR); dutySrc = 'dutyEffective_FR'; }
+  else if (Number.isFinite((snap as any)?.dutyEffectiveFR)) { dEff = num(snap.dutyEffectiveFR); dutySrc = 'dutyEffectiveFR'; }
+  else if (Number.isFinite((snap as any)?.dutyEff)) { dEff = num(snap.dutyEff); dutySrc = 'dutyEff'; }
+  else if (Number.isFinite((snap as any)?.duty)) { dEff = num(snap.duty); dutySrc = 'duty'; }
 
-  const gammaVdB =
-    num(uexp?.live?.gammaVanDenBroeck_vis) ??
-    num((m as any)?.pipeline?.gammaVanDenBroeck_vis) ??
-    num((m as any)?.gammaVanDenBroeck_vis) ??
-    num((m as any)?.pipeline?.gammaVanDenBroeck) ??
-    num((m as any)?.gammaVanDenBroeck) ??
-    num((m as any)?.gammaVdB);
+  // Server audit values from dual-value audit
+  const thetaRaw = num(thetaAudit?.results?.thetaRaw);
+  const thetaCal = num(thetaAudit?.results?.thetaCal);
+  const serverAuditTheta = num(snap.thetaScaleExpected); // same as thetaCal
 
-  // Server audit theta with broader fallback search
-  const serverAuditTheta =
-    num(uexp?.thetaAudit?.thetaScaleExpected) ??
-    num((m as any)?.thetaScaleExpected) ??
-    num((m as any)?.pipeline?.thetaScaleExpected) ??
-    num((m as any)?.uniformsExplain?.thetaAudit?.thetaScaleExpected);
-
-  const thetaExpected =
-    gammaGeo !== undefined && q !== undefined && gammaVdB !== undefined && dEff !== undefined
-      ? Math.pow(gammaGeo, 3) * q * gammaVdB * Math.sqrt(clamp01(dEff))
+  // Calculate expected values using UI data for verification
+  const thetaExpectedCal =
+    gammaGeo != null && q != null && gammaVdB_cal != null && dEff != null
+      ? Math.pow(gammaGeo, 3) * q * gammaVdB_cal * dEff
+      : undefined;
+      
+  const thetaExpectedRaw =
+    gammaGeo != null && q != null && gammaVdB_raw != null && dEff != null
+      ? Math.pow(gammaGeo, 3) * q * gammaVdB_raw * dEff
       : undefined;
 
-  const baseEq = uexp?.equations?.theta_expected || "θ_expected = γ_geo^3 · q · γ_VdB · √d_eff";
+  const tol = (a?: number) => Math.max(1e-12, Math.abs(a ?? 0) * 1e-6);
+  const mismatchCal =
+    serverAuditTheta != null &&
+    thetaExpectedCal != null &&
+    Math.abs(serverAuditTheta - thetaExpectedCal) > tol(thetaExpectedCal);
+
+  const baseEq = "θ = γ_geo^3 · q · γ_VdB · d_eff";
 
   return (
     <section className="bg-card/60 border rounded-lg p-4 space-y-3">
-      <h3 className="font-semibold text-sm">θ-Scale Derivation</h3>
+      <h3 className="font-semibold text-sm">
+        θ-Scale Derivation 
+        <span className="ml-2 text-xs px-2 py-1 rounded bg-slate-700 text-slate-300">
+          {modelMode.toUpperCase()}
+        </span>
+      </h3>
 
+      {/* Mode explanation badge */}
+      <div className="text-xs bg-slate-800/50 p-2 rounded border-l-2 border-slate-600">
+        <div className="font-medium mb-1">Model Mode: {modelMode}</div>
+        {modelMode === 'calibrated' ? (
+          <div className="text-slate-400">γ_VdB scaled to hit mass target (~1405 kg). Physics θ ≈ 4.4×10¹⁰ becomes calibrated θ ≈ 5.9×10⁴</div>
+        ) : (
+          <div className="text-slate-400">Raw physics values, no mass calibration. Both θ values should match paper expectations.</div>
+        )}
+      </div>
+
+      {/* Calibrated (active) theta */}
       <FormulaBlock
-        title="Expected θ (mode-aware)"
+        title={`θ (${modelMode}) — Pipeline Active`}
         base={baseEq}
         sub={
-          gammaGeo !== undefined && q !== undefined && gammaVdB !== undefined && dEff !== undefined
-            ? `θ = (${fmt(gammaGeo, 0)})^3 · ${fmt(q, 3)} · ${fexp(gammaVdB, 2)} · √${fmt(dEff, 6)}`
+          gammaGeo != null && q != null && gammaVdB_cal != null && dEff != null
+            ? `θ = (${fmt(gammaGeo, 0)})³ · ${fmt(q, 3)} · ${fexp(gammaVdB_cal, 2)} · ${fexp(Math.max(1e-12, dEff), 6)}`
             : undefined
         }
-        result={thetaExpected !== undefined ? `θ_expected = ${fexp(thetaExpected, 2)}` : undefined}
+        result={thetaExpectedCal != null ? `θ_cal = ${fexp(thetaExpectedCal, 2)}` : undefined}
         notes={
           <>
-            <div>Inputs from live pipeline snapshot:</div>
-            <ul className="list-disc ml-5">
-              <li>γ_geo — geometric amplification</li>
-              <li>q — net Q-spoiling factor</li>
-              <li>γ_VdB — Van den Broeck pocket amplification (visual)</li>
-              <li>d_eff — Ford–Roman averaged duty</li>
-            </ul>
-            {serverAuditTheta !== undefined && (
-              <div className="mt-1">Server θ (audit): <Eq>{fexp(serverAuditTheta, 2)}</Eq></div>
-            )}
+            <div className="text-sm">Active pipeline value (drives rendering and physics):</div>
+            <div className="text-xs text-slate-400 mt-1">
+              Server: θ_cal = {thetaCal ? fexp(thetaCal, 2) : '—'} • 
+              Expected: {thetaExpectedCal ? fexp(thetaExpectedCal, 2) : '—'}
+              {mismatchCal && <span className="ml-2 text-amber-500">⚠ mismatch</span>}
+            </div>
           </>
         }
       />
+
+      {/* Raw theta (for comparison) */}
+      {gammaVdB_raw != null && (
+        <FormulaBlock
+          title="θ (raw) — Paper Physics"
+          base={baseEq}
+          sub={
+            gammaGeo != null && q != null && gammaVdB_raw != null && dEff != null
+              ? `θ = (${fmt(gammaGeo, 0)})³ · ${fmt(q, 3)} · ${fexp(gammaVdB_raw, 2)} · ${fexp(Math.max(1e-12, dEff), 6)}`
+              : undefined
+          }
+          result={thetaExpectedRaw != null ? `θ_raw = ${fexp(thetaExpectedRaw, 2)}` : undefined}
+          notes={
+            <>
+              <div className="text-sm">Raw paper value (γ_VdB = 1×10¹¹, no mass calibration):</div>
+              <div className="text-xs text-slate-400 mt-1">
+                Server: θ_raw = {thetaRaw ? fexp(thetaRaw, 2) : '—'} • 
+                Expected: ~4.4×10¹⁰
+                {thetaRaw && Math.abs((thetaRaw - 4.4e10) / 4.4e10) < 0.1 && <span className="ml-2 text-green-500">✓ matches</span>}
+              </div>
+              {thetaRaw && thetaCal && (
+                <div className="text-xs text-slate-400 mt-1">
+                  Ratio (raw/cal): {fexp(thetaRaw / thetaCal, 2)} ≈ γ_VdB ratio
+                </div>
+              )}
+            </>
+          }
+        />
+      )}
+
+      {/* Parameter details */}
+      <div className="text-xs space-y-1 text-slate-400 border-t pt-2">
+        <div>Pipeline snapshot (seq {snap.seq ?? '—'}, ts {snap.__ts ?? '—'}):</div>
+        <div>• γ_geo = {gammaGeo ? fmt(gammaGeo, 0) : '—'} (geometric amplification)</div>
+        <div>• q = {q ? fmt(q, 3) : '—'} (Q-spoiling factor)</div>
+        <div>• γ_VdB_cal = {gammaVdB_cal ? fexp(gammaVdB_cal, 2) : '—'} (calibrated)</div>
+        {gammaVdB_raw && <div>• γ_VdB_raw = {fexp(gammaVdB_raw, 2)} (raw paper)</div>}
+        {dutySrc && <div>• d_eff = {dEff ? fexp(dEff, 6) : '—'} (from {dutySrc})</div>}
+        {mode === 'STANDBY' && (
+          <div className="text-amber-400">⚠ Standby: adapter may override visual θ→0</div>
+        )}
+      </div>
     </section>
   );
 }
@@ -655,7 +721,7 @@ function GreensCard({ m }: { m: HelixMetrics }) {
         setGreens(cached);
       }
     };
-    
+
     const interval = setInterval(checkCache, 1000);
     return () => clearInterval(interval);
   }, [qc, greens]);

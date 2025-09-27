@@ -8,7 +8,11 @@ export function LumaOverlayHost() {
   
   React.useEffect(() => {
     const id = subscribe("luma:whisper", (p: any) => setMsg(p.text));
-    return () => unsubscribe(id);
+    return () => {
+      unsubscribe(id);
+      // explicit void return to satisfy EffectCallback
+      return void 0;
+    };
   }, []);
   
   if (!msg) return null;

@@ -47,7 +47,7 @@ export function createDebouncedFunction<T extends (...args: any[]) => any>(
 
   const debouncedFn = ((...args: Parameters<T>) => {
     const now = Date.now();
-    
+
     // Clear existing timeout
     if (timeoutId !== null) {
       clearTimeout(timeoutId);
@@ -130,10 +130,10 @@ export function usePollingSmart<T = any>(
         // cancel any in-flight request from the previous cycle
         abortWith(ch.controller, "restart");
         ch.controller = new AbortController();
-        
+
         // Add debugging for fetch attempts
         console.log(`[usePollingSmart] Fetching: ${url}`);
-        
+
         const res = await fetch(url, { 
           signal: ch.controller.signal,
           // Add basic headers and timeout handling
@@ -142,19 +142,19 @@ export function usePollingSmart<T = any>(
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (!res.ok) {
           const errorMsg = `HTTP ${res.status} ${res.statusText}`;
           console.error(`[usePollingSmart] Request failed: ${errorMsg} for ${url}`);
           throw new Error(errorMsg);
         }
-        
+
         const json = await parser(res);
         ch.last = json;
         ch.subscribers.forEach(fn => fn(json));
         if (!disposed) setErr(null);
         delayRef.current = minMs; // reset backoff on success
-        
+
         console.log(`[usePollingSmart] Success: ${url}`);
       } catch (e: any) {
         // Treat our own aborts as benign: no error/backoff
@@ -163,7 +163,7 @@ export function usePollingSmart<T = any>(
           e?.message?.toLowerCase?.().includes("abort") ||
           e === "restart" ||
           e === "cleanup";
-          
+
         if (!disposed && !isAbort) {
           const errorMsg = e?.message ?? "fetch failed";
           console.error(`[usePollingSmart] Error for ${url}:`, e);
@@ -217,4 +217,35 @@ export function usePollingSmart<T = any>(
   }, [key, url, enabled, minMs, maxMs, backoffFactor, parser]);
 
   return { data, err } as const;
+}
+
+/**
+ * usePollingSmart(cb, intervalMs)
+ * - Calls cb() once immediately and then every intervalMs while mounted.
+ * - Returns a control object { stop, start } for manual control.
+ */
+export function usePollingSmartImmediate(cb: () => void, intervalMs = 1000) {
+  const idRef = useRef<number | null>(null);
+  const cbRef = useRef(cb);
+  cbRef.current = cb;
+
+  useEffect(() => {
+    if (!cbRef.current) return;
+    // initial call
+    try { cbRef.current(); } catch {}
+    idRef.current = window.setInterval(() => {
+      try { cbRef.current(); } catch {}
+    }, intervalMs);
+    return () => {
+      if (idRef.current !== null) {
+        clearInterval(idRef.current);
+        idRef.current = null;
+      }
+    };
+  }, [intervalMs]);
+
+  return {
+    stop: () => { if (idRef.current !== null) { clearInterval(idRef.current); idRef.current = null; } },
+    start: () => { if (idRef.current === null) idRef.current = window.setInterval(() => { try { cbRef.current(); } catch {} }, intervalMs); }
+  };
 }

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Horizons Connection</title>
+</head>
+<body>
+    <h1>Testing JPL Horizons Proxy</h1>
+    <button onclick="testConnection()">Test Connection</button>
+    <div id="output"></div>
+
+    <script>
+        async function testConnection() {
+            const output = document.getElementById('output');
+            output.innerHTML = '<p>Testing connection...</p>';
+            
+            try {
+                console.log('Fetching from /api/horizons?year=2023...');
+                const response = await fetch('/api/horizons?year=2023');
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                output.innerHTML = `
+                    <h3>✅ Success!</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                output.innerHTML = `
+                    <h3>❌ Failed</h3>
+                    <p>Error: ${error.message}</p>
+                    <p>Check console for details</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -148,15 +148,16 @@ export default function Home() {
                 exoticMassTarget={exoticMassTarget}
                 isRunning={false}
                 selectedMode={selectedMode}
-                onModeChange={(mode: ModeKey) => {
-                  setSelectedMode(mode);
-                  const cfg = MODE_CONFIGS[mode];
+                onModeChange={(mode: string) => {
+                  const mk = mode as ModeKey;
+                  setSelectedMode(mk);
+                  const cfg = MODE_CONFIGS[mk];
                   if (cfg?.dutyCycle != null) {
                     setDuty(cfg.dutyCycle);
                   }
                   // Update backend with mode & aligned duty
                   updatePipeline.mutate({
-                    currentMode: mode,
+                    currentMode: mk as any,
                     dutyCycle: cfg?.dutyCycle ?? duty,
                   });
                 }}
@@ -243,12 +244,13 @@ export default function Home() {
                 currentSimulation={null}
                 // Add mode synchronization
                 selectedMode={selectedMode}
-                onModeChange={(newMode: ModeKey) => {
-                  setSelectedMode(newMode);
-                  const cfg = MODE_CONFIGS[newMode];
+                onModeChange={(newMode: string) => {
+                  const mk = newMode as ModeKey;
+                  setSelectedMode(mk);
+                  const cfg = MODE_CONFIGS[mk as unknown as ModeKey];
                   if (cfg?.dutyCycle != null) setDuty(cfg.dutyCycle);
                   updatePipeline.mutate({
-                    currentMode: newMode,
+                    currentMode: mk as any,
                     dutyCycle: cfg?.dutyCycle ?? duty,
                   });
                 }}

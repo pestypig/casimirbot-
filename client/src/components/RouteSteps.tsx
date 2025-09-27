@@ -4,6 +4,8 @@ import { routeSummary } from "@/lib/route-math";
 import { Body, RoutePlan, HelixPerf } from "@/lib/galaxy-schema";
 import { auToLightMinutes } from "@/lib/solar-adapter";
 import { LY_PER_PC, formatETA, hoursAtHighNoon } from "@/lib/eta";
+// Import the speed helper from the gauge (same source of truth)
+import { computeEffectiveLyPerHour } from "./FuelGauge";
 import {
   Tooltip,
   TooltipContent,
@@ -18,6 +20,19 @@ export function RouteSteps({ bodies, plan, perf, mode = "galactic", etaMode = "m
   mode?: "galactic" | "solar";
   etaMode?: "model" | "highnoon";
 }) {
+  // --- Speed band from existing perf values (no helix-core change) ---
+  const C_LY_PER_HOUR = 1 / (365 * 24);
+  const vAvgLyH = typeof perf?.vEffLyPerHour === "function"
+    ? perf.vEffLyPerHour(perf.mode, perf.duty)
+    : computeEffectiveLyPerHour(perf.mode, perf.duty, perf.gammaGeo, perf.qFactor, perf.zeta, perf.tsRatio);
+  const vMinLyH = computeEffectiveLyPerHour(perf.mode, Math.max(0, (perf.duty||0)*0.5), perf.gammaGeo, perf.qFactor, perf.zeta, perf.tsRatio);
+  const vMaxLyH = computeEffectiveLyPerHour(perf.mode, 1, perf.gammaGeo, perf.qFactor, perf.zeta, perf.tsRatio);
+  const fracC_min = vMinLyH / C_LY_PER_HOUR;
+  const fracC_avg = vAvgLyH / C_LY_PER_HOUR;
+  const fracC_max = vMaxLyH / C_LY_PER_HOUR;
+  const baselineFracC = 0.01;
+  const baselineLyH = baselineFracC * C_LY_PER_HOUR;
+
   // Create legs with real-time ETA calculation
   const byId = Object.fromEntries(bodies.map(b => [b.id, b]));
   const legs = [];
@@ -93,7 +108,26 @@ export function RouteSteps({ bodies, plan, perf, mode = "galactic", etaMode = "m
   return (
     <TooltipProvider>
       <div className="rounded-lg border p-3">
-        <div className="text-sm font-semibold mb-2">Route Steps</div>
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-semibold">Route Steps</div>
+          <div className="flex gap-2 text-[11px]">
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-800 text-slate-100">
+              ETA: {etaMode}
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-cyan-900/60 text-cyan-100" title={`${vAvgLyH.toExponential(3)} ly/h`}>
+              v_avg: {(fracC_avg*100).toFixed(3)}% c
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-emerald-900/60 text-emerald-100" title={`${vMinLyH.toExponential(3)} ly/h`}>
+              v_min: {(fracC_min*100).toFixed(3)}% c
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-amber-900/60 text-amber-100" title={`${vMaxLyH.toExponential(3)} ly/h`}>
+              v_max: {(fracC_max*100).toFixed(3)}% c
+            </span>
+            <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-700/60 text-slate-100" title={`${baselineLyH.toExponential(3)} ly/h`}>
+              baseline: {(baselineFracC*100).toFixed(2)}% c
+            </span>
+          </div>
+        </div>
         <ol className="space-y-2 text-sm">
           {legs.map((leg, i) => (
             <li key={i} className="flex justify-between items-start">

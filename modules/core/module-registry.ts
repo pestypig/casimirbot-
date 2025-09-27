@@ -79,7 +79,7 @@ export class ModuleRegistry {
    * Clean up all modules
    */
   async cleanup(): Promise<void> {
-    for (const name of this.modules.keys()) {
+    for (const name of Array.from(this.modules.keys())) {
       const module = this.modules.get(name);
       if (module && this.initialized.has(name) && module.cleanup) {
         await module.cleanup();

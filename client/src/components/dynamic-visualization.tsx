@@ -31,13 +31,13 @@ export function DynamicVisualization({ results, parameters }: DynamicVisualizati
     const burst_us = Math.max(0, Number(burstLengthUs));
     const burstFrac = Math.min(1, burst_us / Tcycle_us); // clamp 0..1
 
-    const A_pm = Number(strokeAmplitudePm) || 0; // keep pm so it's visible on screen
+  const A_pm = Number.isFinite(Number(strokeAmplitudePm)) ? Number(strokeAmplitudePm) : 0; // keep pm so it's visible on screen
 
-    // energy baseline from results (J); fall back to 0
-    const E_base = Math.abs(Number((results as any)?.totalEnergy) || 0);
-    const E_boostHint = Math.abs(Number((results as any)?.boostedEnergy) || 0);
-    // Scale for plotting: prefer boostedEnergy as a denominator; otherwise E_base * Q
-    const energyScale = Math.max(1, E_boostHint || (E_base * Math.max(1, Number(cavityQ) || 1)));
+  // energy baseline from results (J); fall back to 0 but preserve literal zeros
+  const E_base = Math.abs(Number.isFinite(Number((results as any)?.totalEnergy)) ? Number((results as any).totalEnergy) : 0);
+  const E_boostHint = Math.abs(Number.isFinite(Number((results as any)?.boostedEnergy)) ? Number((results as any).boostedEnergy) : 0);
+  // Scale for plotting: prefer boostedEnergy as a denominator; otherwise E_base * Q
+  const energyScale = Math.max(1, Number.isFinite(E_boostHint) && E_boostHint > 0 ? E_boostHint : (E_base * Math.max(1, Number(cavityQ) || 1)));
 
     const data: Array<{
       time: number;          // µs

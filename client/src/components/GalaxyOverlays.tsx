@@ -31,16 +31,17 @@ export function GalaxyOverlays({
 
   React.useEffect(() => {
     if (!viewer || !canvasRef.current) return;
+    const V = viewer as OpenSeadragon.Viewer; // narrow for TypeScript (non-null alias)
     
     const cvs = canvasRef.current;
     const ctx = cvs.getContext("2d");
     if (!ctx || typeof ctx.clearRect !== 'function') return;
     
     function draw() {
-      const tiled = viewer.world.getItemAt(0);
+  const tiled = V.world.getItemAt(0);
       if (!tiled) return;
       
-      const containerSize = viewer.viewport.getContainerSize();
+  const containerSize = V.viewport.getContainerSize();
       const { x: vw, y: vh } = containerSize;
       
       cvs.width = vw; 
@@ -48,8 +49,8 @@ export function GalaxyOverlays({
       ctx!.clearRect(0, 0, vw, vh);
 
       const imageToViewport = (pt: {x: number; y: number}) => {
-        const vp = tiled.imageToViewportCoordinates(pt.x, pt.y);
-        const px = viewer.viewport.pixelFromPoint(vp, true);
+  const vp = tiled.imageToViewportCoordinates(pt.x, pt.y);
+  const px = V.viewport.pixelFromPoint(vp, true);
         return { x: px.x, y: px.y };
       };
       
@@ -83,8 +84,8 @@ export function GalaxyOverlays({
       });
 
       // Draw labels with view culling
-      const bounds = viewer.viewport.getBounds(true);
-      const zoom = viewer.viewport.getZoom(true);
+  const bounds = V.viewport.getBounds(true);
+  const zoom = V.viewport.getZoom(true);
       
       ctx!.textBaseline = "top";
       labels.forEach(L => {
@@ -108,18 +109,18 @@ export function GalaxyOverlays({
 
     const update = () => requestAnimationFrame(draw);
     
-    viewer.addHandler("animation", update);
-    viewer.addHandler("open", update);
-    viewer.addHandler("zoom", update);
-    viewer.addHandler("pan", update);
+  V.addHandler?.("animation", update);
+  V.addHandler?.("open", update);
+  V.addHandler?.("zoom", update);
+  V.addHandler?.("pan", update);
     
     // Handle clicks for body selection
     const handleClick = (event: any) => {
       if (!onBodyClick) return;
       
       const webPoint = event.position;
-      const viewportPoint = viewer.viewport.pointFromPixel(webPoint);
-      const tiled = viewer.world.getItemAt(0);
+  const viewportPoint = V.viewport.pointFromPixel(webPoint);
+  const tiled = V.world.getItemAt(0);
       if (!tiled) return;
       
       const imagePoint = tiled.viewportToImageCoordinates(viewportPoint);
@@ -143,14 +144,14 @@ export function GalaxyOverlays({
       }
     };
     
-    viewer.addHandler("canvas-click", handleClick);
+  V.addHandler?.("canvas-click", handleClick);
     
     return () => {
-      viewer.removeAllHandlers("animation");
-      viewer.removeAllHandlers("open");
-      viewer.removeAllHandlers("zoom");
-      viewer.removeAllHandlers("pan");
-      viewer.removeAllHandlers("canvas-click");
+  V.removeAllHandlers?.("animation");
+  V.removeAllHandlers?.("open");
+  V.removeAllHandlers?.("zoom");
+  V.removeAllHandlers?.("pan");
+  V.removeAllHandlers?.("canvas-click");
     };
   }, [viewer, labels, bodies, routeIds, originPx, pxPerPc, onBodyClick]);
 

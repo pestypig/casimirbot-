@@ -10,6 +10,9 @@ function fmt(x?: number, d=2) {
   return (a >= 1e4 || a < 1e-3) ? x.toExponential(2) : x.toFixed(d);
 }
 
+// 1c in ly/h
+const C_LY_PER_HOUR = 1 / (365 * 24); // ≈ 1.14155e-4 ly/h
+
 export type FuelGaugeProps = {
   mode: "Hover" | "Cruise" | "Emergency" | "Standby" | string;
   powerMW: number;      // P_avg (throttled)
@@ -30,10 +33,17 @@ export type FuelGaugeProps = {
 /** Derive effective velocity (ly/hour) from current parameters.
  *  v_eff is provisional: tuned constants today, later replace with warp visual slope -> metric factor.
  */
-export function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0) {
-  // base per-mode nominal speeds (training wheels; update when you wire metric output)
-  const base: Record<string, number> = { Hover: 0.002, Cruise: 0.02, Emergency: 0.03, Standby: 0 };
-  let v = base[mode] ?? 0;
+export function computeEffectiveLyPerHour(
+  mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0
+) {
+  // Base FRACTIONS of c (keeps us subluminal by construction)
+  const baseFrac: Record<string, number> = {
+    Hover:     0.001,  // 0.1% c
+    Cruise:    0.010,  // 1.0% c
+    Emergency: 0.015,  // 1.5% c
+    Standby:   0
+  };
+  let v = (baseFrac[mode] ?? 0) * C_LY_PER_HOUR;
 
   // gentle scaling with current tuning (kept bounded)
   const g = Math.min(40, Math.max(10, gammaGeo || 26));
@@ -42,8 +52,13 @@ export function computeEffectiveLyPerHour(mode: string, duty=0, gammaGeo=0, q=0,
   const safety = clamp01(zeta / 0.84) * clamp01(tsRatio / 100);
 
   // small multipliers so we don't explode estimates
-  v *= (1 + 0.01*(g - 26)) * (1 + 0.05*qn) * (0.5 + 0.5*dutyBoost) * (0.5 + 0.5*safety);
-  return v; // ly per hour
+  v *= (1 + 0.01*(g - 26))
+     * (1 + 0.05*qn)
+     * (0.5 + 0.5*dutyBoost)
+     * (0.5 + 0.5*safety);
+  // Hard ceiling to stay sane
+  const VMAX = 0.05 * C_LY_PER_HOUR; // 5% c
+  return Math.min(v, VMAX);
 }
 
 /** Derive safe continuous window (hours) using constraints/budgets. */
@@ -65,12 +80,25 @@ export function FuelGauge(props: FuelGaugeProps) {
   const { mode, powerMW, zeta, tsRatio, frOk, natarioOk, curvatureOk, freqGHz=0, duty=0, gammaGeo=26, qFactor=1e9, pMaxMW } = props;
 
   const safeHours = computeSafeWindowHours(mode, zeta, tsRatio, frOk, natarioOk, curvatureOk, powerMW, pMaxMW);
-  const vLyPerHour = computeEffectiveLyPerHour(mode, duty, gammaGeo, qFactor, zeta, tsRatio);
+
+  // --- Speed band (min / avg / max) from *existing* inputs only ---
+  const vAvgLyH = computeEffectiveLyPerHour(mode, duty,     gammaGeo, qFactor, zeta, tsRatio);
+  const vMinLyH = computeEffectiveLyPerHour(mode, Math.max(0, (duty||0)*0.5), gammaGeo, qFactor, zeta, tsRatio); // pessimistic duty
+  const vMaxLyH = computeEffectiveLyPerHour(mode, 1,        gammaGeo, qFactor, zeta, tsRatio);                    // optimistic duty=1
 
   // ----- Energy / ly & Range -----
-  const hoursPerLy = vLyPerHour > 0 ? 1 / vLyPerHour : Infinity;
+  const hoursPerLy = vAvgLyH > 0 ? 1 / vAvgLyH : Infinity;
   const energyPerLyMWh = isFinite(hoursPerLy) ? powerMW * hoursPerLy : Infinity;
-  const rangeLy = vLyPerHour * safeHours;
+  const rangeLyAvg = vAvgLyH * safeHours;
+  const rangeLyMin = vMinLyH * safeHours;
+  const rangeLyMax = vMaxLyH * safeHours;
+
+  // Baseline (0.01c) for verification
+  const baselineFracC = 0.01;
+  const baselineLyH = baselineFracC * C_LY_PER_HOUR;
+  const fracC_avg = vAvgLyH / C_LY_PER_HOUR;
+  const fracC_min = vMinLyH / C_LY_PER_HOUR;
+  const fracC_max = vMaxLyH / C_LY_PER_HOUR;
 
   // ----- Cycles (simple, useful now) -----
   // Per-cycle energy ≈ P_avg / f.  P[MW]*1e6 W  /  (GHz*1e9)  =  J per cycle.
@@ -113,7 +141,22 @@ export function FuelGauge(props: FuelGaugeProps) {
           </div>
 
           <div className="text-muted-foreground">Range @ current</div>
-          <div className="text-right tabular-nums">{fmt(rangeLy,3)} ly</div>
+          <div className="text-right tabular-nums">{fmt(rangeLyAvg,3)} ly</div>
+
+          <div className="text-muted-foreground">Speed (avg)</div>
+          <div className="text-right tabular-nums">
+            {(fracC_avg*100).toFixed(3)}% c · {vAvgLyH.toExponential(3)} ly/h
+          </div>
+
+          <div className="text-muted-foreground">Speed band</div>
+          <div className="text-right tabular-nums">
+            {(fracC_min*100).toFixed(3)}–{(fracC_max*100).toFixed(3)}% c
+          </div>
+
+          <div className="text-muted-foreground">Range band</div>
+          <div className="text-right tabular-nums">
+            {fmt(rangeLyMin,3)}–{fmt(rangeLyMax,3)} ly
+          </div>
 
           <div className="text-muted-foreground">P_avg</div>
           <div className="text-right tabular-nums">{fmt(powerMW,1)} MW</div>
@@ -126,6 +169,11 @@ export function FuelGauge(props: FuelGaugeProps) {
           <div className="text-muted-foreground">Per-cycle energy</div>
           <div className="text-right tabular-nums">
             {isFinite(energyPerCycleJ) ? `${fmt(energyPerCycleJ,2)} J` : "—"}
+          </div>
+
+          <div className="text-muted-foreground">Baseline (0.01c)</div>
+          <div className="text-right tabular-nums">
+            {(baselineFracC*100).toFixed(2)}% c · {baselineLyH.toExponential(3)} ly/h
           </div>
         </div>
 

@@ -17,9 +17,16 @@ type Vec3 = [number, number, number];
 type Kernel = (r: number) => number;
 
 // safe kernels (avoid r=0 blowup)
-const poissonKernel: Kernel = r => 1 / (4 * Math.PI * Math.max(r, 1e-6));
+const poissonKernel: Kernel = r => {
+  const rr = Number.isFinite(r) && r > 0 ? r : 1e-6;
+  return 1 / (4 * Math.PI * rr);
+};
 const helmholtzKernel = (m: number): Kernel =>
-  r => Math.exp(-m * Math.max(r, 1e-6)) / (4 * Math.PI * Math.max(r, 1e-6));
+  r => {
+    const rr = Number.isFinite(r) && r > 0 ? r : 1e-6;
+    const mm = Number.isFinite(m) ? m : 0;
+    return Math.exp(-mm * rr) / (4 * Math.PI * rr);
+  };
 
 function computeGreenPotential(
   positions: Vec3[],
@@ -86,7 +93,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // Prefer *live* pipeline; fall back to `results` snapshot
   const live = pipelineState ?? results ?? {};
-  const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "cruise" | "emergency";
+  const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "taxi" | "cruise" | "emergency";
 
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
   const dutyEffectiveFR: number = useMemo(() => {
@@ -172,12 +179,12 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     return 0;
   }, [live, U_geo_raw, ω, N, dutyEffectiveFR]);
 
-  // Average total electrical power (ship-avg):
-  const P_total_W = P_tile_on * N * dutyEffectiveFR;
+  // Average total electrical power (ship-avg) - local calc (dev-only)
+  const P_total_W_local = P_tile_on * N * dutyEffectiveFR;
 
-  // Prefer calibrated totals from pipeline if present
-  const P_avg_W = isFiniteNum(live?.P_avg) ? live.P_avg * 1e6 : P_total_W;
-  const m_exotic = isFiniteNum(live?.M_exotic) ? live.M_exotic : (Number(live?.M_exotic_raw) || 0);
+  // Prefer calibrated totals from pipeline (P_avg in MW). Do not surface the local calc as canonical.
+  const P_avg_W = isFiniteNum(live?.P_avg) ? live.P_avg * 1e6 : undefined;
+  const m_exotic = isFiniteNum(live?.M_exotic) ? live.M_exotic : (Number.isFinite(Number(live?.M_exotic_raw)) ? Number(live?.M_exotic_raw) : 0);
 
   // Time-scale separation
   const TS_ratio = isFiniteNum(live?.TS_ratio) ? live.TS_ratio : isFiniteNum(live?.TS_long) ? live.TS_long : undefined;
@@ -224,8 +231,9 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       mode,
       dutyUI,
       dutyEffectiveFR,
-      P_tile_on_W: P_tile_on,
-      P_total_W: P_avg_W,
+  P_tile_on_W: P_tile_on,
+  P_total_W: P_avg_W, // canonical pipeline value (may be undefined)
+  P_total_W_local: P_total_W_local, // dev-only local calculation for reconciliation
       tau_Q_ms: τ_Q_ms,
       τ_Q_ms,
       tau_LC_ms,
@@ -384,7 +392,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
             <Badge variant="outline" className="ml-2">{mode.toUpperCase()}</Badge>
             {allowModeSwitch && (
               <div className="ml-3 flex gap-2">
-                {(["standby","hover","cruise","emergency"] as const).map(m => (
+                {(["standby","hover","taxi","cruise","emergency"] as const).map(m => (
                   <button
                     key={m}
                     className={`px-2 py-0.5 rounded text-xs border ${

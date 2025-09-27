@@ -7,7 +7,8 @@ const MODEL_MODE: 'calibrated' | 'raw' =
   (process.env.HELIX_MODEL_MODE === 'raw') ? 'raw' : 'calibrated';
 
 // ── Physics Constants (centralized) ──────────────────────────────────────────
-import { HBAR, C } from "./physics-const.js";
+import { HBAR } from "./physics-const.js";
+import { C } from "./utils/physics-const-safe";
 
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
@@ -143,6 +144,18 @@ export interface EnergyPipelineState {
   sectorPeriod_ms?: number;
   dutyBurst?: number;
   dutyEffective_FR?: number;
+
+  // --- Compatibility / adapter fields (optional) ---
+  // Alternative or legacy keys that may be emitted/consumed by adapters or clients.
+  lc?: any;
+  lightCrossing?: any;
+  dutyUsed?: number;
+  dutyEffectiveFR?: number; // camel-case alias
+  dutyFR_slice?: number;
+  dutyFR_ship?: number;
+  dutyEff?: number;
+  natario?: any;
+  P_avg_W?: number;
 
   // Model mode for client consistency
   modelMode?: 'calibrated' | 'raw';
@@ -517,11 +530,77 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   }
 
   // Precomputed physics-only θ gain for client verification
-  (state as any).thetaScaleExpected = 
-    Math.pow(state.gammaGeo, 3) *
-    (state.qSpoilingFactor ?? 1) *
-    ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB) *
-    Math.sqrt(Math.max(1e-12, state.dutyEffective_FR ?? d_eff));
+  // Canonical ship-wide θ (authoritative):
+  //   θ = γ_geo^3 · q · γ_VdB · duty_FR
+  // Use the calibrated/mass γ_VdB when available; fall back to visual seed if not.
+  const _gammaVdB_forTheta = Number.isFinite(state.gammaVanDenBroeck)
+    ? state.gammaVanDenBroeck
+    : ((state as any).gammaVanDenBroeck_vis ?? PAPER_VDB.GAMMA_VDB);
+
+  // DEBUG: θ-Scale Field Strength Audit (dual-value: raw vs calibrated)
+  const gammaVdB_raw = PAPER_VDB.GAMMA_VDB;  // Raw paper value (1e11)
+  const gammaVdB_cal = _gammaVdB_forTheta;   // Calibrated value (mass-adjusted)
+
+  const thetaComponents = {
+    gammaGeo: state.gammaGeo,
+    gammaGeo_cubed: Math.pow(state.gammaGeo, 3),
+    qSpoilingFactor: state.qSpoilingFactor ?? 1,
+    dutyEffective: Math.max(1e-12, state.dutyEffective_FR ?? d_eff),
+    gammaVdB_raw,
+    gammaVdB_cal
+  };
+
+  // Calculate both raw and calibrated theta
+  const thetaRaw = thetaComponents.gammaGeo_cubed *
+    thetaComponents.qSpoilingFactor *
+    gammaVdB_raw *
+    thetaComponents.dutyEffective;
+
+  const thetaCal = thetaComponents.gammaGeo_cubed *
+    thetaComponents.qSpoilingFactor *
+    gammaVdB_cal *
+    thetaComponents.dutyEffective;
+
+  // Store calibrated value as the "expected" (what the pipeline actually uses)
+  (state as any).thetaScaleExpected = thetaCal;
+
+  // Store model mode for UI fallback
+  (state as any).modelMode = MODEL_MODE;
+
+  // Store both values for audit
+  (state as any).thetaRaw = thetaRaw;
+  (state as any).thetaCal = thetaCal;
+
+  // Publish compact thetaAudit for UI consumption
+  (state as any).uniformsExplain ??= {};
+  (state as any).uniformsExplain.thetaAudit = {
+    mode: MODEL_MODE,
+    eq: "θ = γ_geo^3 · q · γ_VdB · d_eff",
+    inputs: {
+      gammaGeo: state.gammaGeo,
+      q: state.qSpoilingFactor,
+      gammaVdB_raw: PAPER_VDB.GAMMA_VDB,
+      gammaVdB_cal: state.gammaVanDenBroeck,
+      d_eff: Math.max(1e-12, state.dutyEffective_FR ?? d_eff)
+    },
+    results: { thetaRaw, thetaCal }
+  };
+
+  console.log('🔍 θ-Scale Field Strength Audit (Raw vs Calibrated):', {
+    mode: MODEL_MODE,
+    formula: 'θ = γ_geo^3 · q · γ_VdB · d_eff',
+    components: thetaComponents,
+    results: {
+      thetaRaw: thetaRaw,
+      thetaRawSci: thetaRaw.toExponential(2),
+      thetaCal: thetaCal,
+      thetaCalSci: thetaCal.toExponential(2),
+      ratio: thetaRaw / thetaCal,
+      gammaVdBRatio: gammaVdB_raw / gammaVdB_cal
+    },
+    expected_raw: 4.4e10,
+    ratio_vs_expected: thetaRaw / 4.4e10
+  });
 
   // Overall clamping status for UI warnings
   (state as any).parametersClamped = (state as any).qMechanicalClamped || (state as any).gammaVanDenBroeckClamped;
@@ -541,7 +620,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   const d0 = PAPER_DUTY.BURST_DUTY_LOCAL / PAPER_DUTY.TOTAL_SECTORS;       // 0.01/400
   const zeta0 = 0.84;                                // baseline fit
   state.zeta = zeta0 * (d_ship / d0);                // keeps ζ≈0.84 at baseline
-  state.fordRomanCompliance = state.zeta < (ui.zeta_max ?? 1.0); // Use mode-specific max
+  state.fordRomanCompliance = state.zeta < ((ui as any).zeta_max ?? 1.0); // Use mode-specific max
 
   // Physics logging for debugging (before UI field updates)
   if (DEBUG_PIPE) console.log("[PIPELINE]", {
@@ -882,9 +961,12 @@ export async function computeEnergySnapshot(sim: any) {
   };
 
   // ---- Duty (renderer authority) by mode; keep explicit fields too ----------
+  // Trust the pipeline's FR duty (ship-wide, sector-averaged)
+  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
+
   const duty = {
     dutyUsed:        finite(result.dutyUsed),
-    dutyEffectiveFR: finite(result.dutyEffectiveFR),
+    dutyEffectiveFR: finite(dutyEffectiveFR),
     dutyFR_slice:    finite(result.dutyFR_slice),
     dutyFR_ship:     finite(result.dutyFR_ship),
   };
@@ -898,10 +980,39 @@ export async function computeEnergySnapshot(sim: any) {
     gSpatialSym: arrN(result.natario?.gSpatialSym, 6),
     viewForward: arrN(result.natario?.viewForward, 3),
     g0i:         arrN(result.natario?.g0i, 3),
+  // pass-through diagnostics from Natário (unit-annotated upstream)
+  dutyFactor:      finite(result.natario?.dutyFactor),       // unitless (μs/μs)
+  // NOTE: natario.thetaScaleCore_sqrtDuty is the explicit Natário sqrt-duty
+  // diagnostic (√duty semantics). Prefer `_sqrtDuty` when inspecting Natário
+  // outputs; it intentionally excludes γ_VdB and is NOT the canonical ship-wide
+  // theta used by engines (engines should use `thetaScale` / `thetaScaleExpected`).
+  // Keep the legacy `thetaScaleCore` key for back-compat but mark it deprecated
+  // here by mapping it from the `_sqrtDuty` alias when present.
+  thetaScaleCore_sqrtDuty: finite((result as any).natario?.thetaScaleCore_sqrtDuty ?? (result as any).natario?.thetaScaleCore),
+  /* @deprecated legacy key; prefer thetaScaleCore_sqrtDuty */
+  thetaScaleCore: finite((result as any).natario?.thetaScaleCore ?? (result as any).natario?.thetaScaleCore_sqrtDuty),
   };
 
-  // Trust the pipeline's FR duty (ship-wide, sector-averaged)
-  const dutyEffectiveFR = result.dutyEffective_FR ?? result.dutyShip ?? (result as any).dutyEff ?? 2.5e-5;
+  // --- Compatibility aliases: accept alternate server keys and provide both forms ---
+  // Some older code emits dutyEffective_FR or nests light-crossing under `lc`.
+  const compat = {} as any;
+  // dutyEffective_FR -> dutyEffectiveFR
+  if ((result as any).dutyEffective_FR != null && (result as any).dutyEffectiveFR == null) {
+    compat.dutyEffectiveFR = finite((result as any).dutyEffective_FR);
+  }
+  // lightCrossing vs lc
+  if ((result as any).lightCrossing == null && (result as any).lc != null) {
+    compat.lightCrossing = (result as any).lc;
+  }
+  // natario may be missing in some shapes; ensure it exists
+  if ((result as any).natario == null) {
+    compat.natario = {};
+  }
+
+  // Merge compat back into result for downstream consumers
+  const normalizedResult = { ...(result as any), lc, duty, natario, ...compat } as any;
+
+
 
   const warpUniforms = {
     // physics (visual) — mass stays split and separate
@@ -963,23 +1074,32 @@ export async function computeEnergySnapshot(sim: any) {
 
     // θ audit + the inputs used to compute it (for transparency)
     thetaAudit: {
-      note: "Expected θ: γ_geo^3 · q · γ_VdB(vis) · √d_eff",
-      thetaScaleExpected: (result as any).thetaScaleExpected,
+      note: "θ audit — raw vs calibrated VdB",
+      equation: "θ = γ_geo^3 · q · γ_VdB · d_eff", 
+      mode: MODEL_MODE, // "raw" | "calibrated"
       inputs: {
         gammaGeo: result.gammaGeo,
         q: result.qSpoilingFactor,
-        gammaVdB_vis: (result as any).gammaVanDenBroeck_vis,
         d_eff: dutyEffectiveFR,
+        gammaVdB_raw: PAPER_VDB.GAMMA_VDB,
+        gammaVdB_cal: (result as any).gammaVanDenBroeck_mass ?? (result as any).gammaVanDenBroeck_vis,
       },
+      results: {
+        thetaRaw: (result as any).thetaRaw,
+        thetaCal: (result as any).thetaCal,
+        thetaScaleExpected: (result as any).thetaScaleExpected, // same as thetaCal
+        ratio_raw_vs_cal: ((result as any).thetaRaw || 0) / Math.max(1e-12, (result as any).thetaCal || 1e-12),
+        gammaVdB_ratio: PAPER_VDB.GAMMA_VDB / Math.max(1e-12, (result as any).gammaVanDenBroeck_mass ?? (result as any).gammaVanDenBroeck_vis ?? 1e-12)
+      }
     },
 
     // Live numeric values the cards can render directly
-    live: {
+  live: {
       // sectors / duty
       S_total: result.sectorCount,
       S_live: result.concurrentSectors,
       dutyCycle: result.dutyCycle,
-      dutyEffectiveFR,
+  // dutyEffectiveFR is included in thetaAudit.inputs and elsewhere; omit duplicate here to avoid overwrites
 
       // amps and Q
       gammaGeo: result.gammaGeo,
@@ -1030,13 +1150,16 @@ export async function computeEnergySnapshot(sim: any) {
     gammaVanDenBroeck_vis: (result as any).gammaVanDenBroeck_vis,
     gammaVanDenBroeck_mass: (result as any).gammaVanDenBroeck_mass,
     thetaScaleExpected: (result as any).thetaScaleExpected,
+    // Dual-value theta audit
+    thetaRaw: (result as any).thetaRaw,
+    thetaCal: (result as any).thetaCal,
+    modelMode: (result as any).modelMode,
     qCavity: result.qCavity,
     qSpoilingFactor: result.qSpoilingFactor,
 
-    // Strobing parameters
-    dutyCycle: result.dutyCycle,
-    sectorStrobing: result.sectorStrobing,
-    dutyEffectiveFR,  // authoritative
+  // Strobing parameters
+  dutyCycle: result.dutyCycle,
+  sectorStrobing: result.sectorStrobing,
 
     // Natário / stress-energy surface (time-averaged)
     T00_avg: (result as any).warp?.stressEnergyTensor?.T00 ?? (result as any).stressEnergy?.T00,

@@ -2,6 +2,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMetrics } from "@/hooks/use-metrics";
+import { C as c } from '@/lib/physics-const';
 
 type Props = {
   mode: string;
@@ -26,7 +27,6 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
   
   // Compute fallback values based on mode and hull geometry (for when metrics aren't loaded yet)
   const G = 9.80665; // m/s²
-  const c = 299792458; // m/s
   
   const gTargets: Record<string, number> = {
     hover: 0.10 * G,

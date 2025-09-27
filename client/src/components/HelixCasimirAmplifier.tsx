@@ -42,7 +42,8 @@ function useDriveEnvelope({ on, tauRise_s, tauFall_s }: {
 
       const tau = on ? tauRise_s : tauFall_s;
       const target = on ? 1 : 0;
-      const k = dt / Math.max(1e-6, tau);
+  const tauNum = Number(tau);
+  const k = dt / (Number.isFinite(tauNum) && tauNum > 0 ? tauNum : 1e-6);
       setEnv(e => e + (target - e) * (1 - Math.exp(-k)));
 
       raf = requestAnimationFrame(step);
@@ -137,6 +138,9 @@ type HelixMetrics = {
   totalSectors: number;
   activeSectors: number;
   activeFraction: number;
+  // Optional helpers used by the UI; may be missing on some endpoints
+  activeTiles?: number;
+  lightCrossing?: Partial<LightCrossing>;
   gammaVanDenBroeck: number;
   gammaGeo: number;
   qCavity: number;
@@ -474,14 +478,16 @@ export default function HelixCasimirAmplifier({
     minMs: 10000, maxMs: 30000, dedupeKey: "helix:state"
   });
 
-  // Use HUD adapter for drift-proof field access
-  const wu  = metrics?.warpUniforms ?? state?.warpUniforms ?? null;
+  // Use HUD adapter for drift-proof field access (cast to any for flexible server shapes)
+  const _metricsAny: any = metrics;
+  const _stateAny: any = state;
+  const wu  = _metricsAny?.warpUniforms ?? _stateAny?.warpUniforms ?? null;
   const hud = toHUDModel({
     warpUniforms: wu || {},
-    viewerHints: metrics?.viewerHints || {},
-    lightCrossing: metrics?.lightCrossing || {},
+    viewerHints: _metricsAny?.viewerHints || {},
+    lightCrossing: _metricsAny?.lightCrossing || {},
     // keep any *explicit* HUD inputs you need; do NOT spread raw metrics
-  });
+  } as any);
 
   // ✅ Unified light-crossing packet for gating/labels
   const lc = useMemo(
@@ -503,8 +509,8 @@ export default function HelixCasimirAmplifier({
   const fGHz =
     Number.isFinite(fGHz_state) && fGHz_state > 0
       ? fGHz_state
-      : (Number.isFinite(lc?.freqGHz) && (lc!.freqGHz as number) > 0
-          ? (lc!.freqGHz as number)
+      : (lc && Number.isFinite((lc as any).freqGHz) && (lc as any).freqGHz > 0
+          ? (lc as any).freqGHz
           : 15);
 
   const f = fGHz * 1e9;
@@ -513,10 +519,10 @@ export default function HelixCasimirAmplifier({
 
   // ---- DISPLAY gating consistency fix ----
   const MIN_CYCLES_PER_BURST = 10;
-  const isBurstMeaningful = (lc?.cyclesPerBurst ?? Infinity) >= MIN_CYCLES_PER_BURST;
+  const isBurstMeaningful = lc && Number.isFinite((lc as any).cyclesPerBurst) ? ((lc as any).cyclesPerBurst >= MIN_CYCLES_PER_BURST) : false;
 
   // Use display gating consistently
-  const onDisplay = !!lc?.onWindowDisplay;
+  const onDisplay = !!(lc && (lc as any).onWindowDisplay);
   const gateOn = onDisplay && isBurstMeaningful;
 
   // effective duty for ship-averaged quantities:
@@ -524,8 +530,8 @@ export default function HelixCasimirAmplifier({
   const d_eff = (() => {
     const fromMetrics = metrics?.dutyEffectiveFR;
     if (Number.isFinite(fromMetrics)) return Math.max(0, Math.min(1, Number(fromMetrics)));
-    if (lc && lc.dwell_ms > 0) {
-      const val = lc.burst_ms / lc.dwell_ms;
+    if (lc && Number.isFinite((lc as any).dwell_ms) && Number.isFinite((lc as any).burst_ms) && (lc as any).dwell_ms > 0) {
+      const val = (lc as any).burst_ms / (lc as any).dwell_ms;
       return Math.max(0, Math.min(1, val));
     }
     return state?.dutyCycle ?? metrics?.dutyGlobal ?? 0; // last resort
@@ -539,7 +545,7 @@ export default function HelixCasimirAmplifier({
 
     // inputs
     const U_static = state.U_static;                 // J per tile (signed)
-    
+
     // Debug: log all input values
     console.debug("[HelixCasimirAmplifier] Input values:", {
       U_static: state.U_static,
@@ -629,24 +635,24 @@ export default function HelixCasimirAmplifier({
   const N_tiles = (() => {
     // Try HUD first
     if (Number.isFinite(hud.tilesTotal) && hud.tilesTotal! > 0) return hud.tilesTotal!;
-    
+
     // Try state pipeline
     if (Number.isFinite(state?.N_tiles) && state!.N_tiles! > 0) return state!.N_tiles!;
-    
+
     // Try metrics
     if (Number.isFinite(metrics?.totalTiles) && metrics!.totalTiles! > 0) return metrics!.totalTiles!;
-    
+
     // Try derived calculation from activeTiles and activeFraction
     if (Number.isFinite(metrics?.activeTiles) && Number.isFinite(metrics?.activeFraction) && metrics!.activeFraction! > 0) {
       const total = Math.round(metrics!.activeTiles! / metrics!.activeFraction!);
       if (total > 0) return total;
     }
-    
+
     // Try from sectors calculation
     const sectors = metrics?.totalSectors ?? state?.sectorStrobing ?? 400;
     const tilesPerSector = Math.floor(sectors / 4); // rough estimate
     if (sectors > 0) return sectors * tilesPerSector;
-    
+
     return 0;
   })();
 
@@ -659,24 +665,24 @@ export default function HelixCasimirAmplifier({
       derivedCalc: derived?.P_ship_avg_calc_MW,
       stateAvg: state?.P_avg
     };
-    
+
     console.debug("[HelixCasimirAmplifier] Power fallback sources:", sources);
-    
+
     // Try HUD first (most authoritative)
     if (Number.isFinite(hud.powerMW) && hud.powerMW! > 0) return hud.powerMW!;
-    
+
     // Try metrics direct power
     if (Number.isFinite(metrics?.energyOutput) && metrics!.energyOutput! > 0) return metrics!.energyOutput!;
-    
+
     // Try derived report (backend calculated)
     if (Number.isFinite(derived?.P_ship_avg_report_MW) && derived?.P_ship_avg_report_MW! > 0) return derived?.P_ship_avg_report_MW!;
-    
+
     // Try derived calculation
     if (Number.isFinite(derived?.P_ship_avg_calc_MW) && derived?.P_ship_avg_calc_MW! > 0) return derived?.P_ship_avg_calc_MW!;
-    
+
     // Try state pipeline average
     if (Number.isFinite(state?.P_avg) && state!.P_avg! > 0) return state!.P_avg!;
-    
+
     return 0;
   })();
 
@@ -690,27 +696,27 @@ export default function HelixCasimirAmplifier({
       stateExotic: state?.M_exotic,
       metricsRaw: metrics?.exoticMassRaw
     };
-    
+
     console.debug("[HelixCasimirAmplifier] Mass fallback sources:", sources);
-    
+
     // Try HUD first (most authoritative)
     if (Number.isFinite(hud.exoticMassKg) && hud.exoticMassKg! > 0) return hud.exoticMassKg!;
-    
+
     // Try metrics direct mass
     if (Number.isFinite(metrics?.exoticMass) && metrics!.exoticMass! > 0) return metrics!.exoticMass!;
-    
+
     // Try derived report (backend calculated)
     if (Number.isFinite(derived?.M_total_report) && derived?.M_total_report! > 0) return derived?.M_total_report!;
-    
+
     // Try derived calculation
     if (Number.isFinite(derived?.M_total_calc) && derived?.M_total_calc! > 0) return derived?.M_total_calc!;
-    
+
     // Try state pipeline
     if (Number.isFinite(state?.M_exotic) && state!.M_exotic! > 0) return state!.M_exotic!;
-    
+
     // Try raw metrics fields
     if (Number.isFinite(metrics?.exoticMassRaw) && metrics!.exoticMassRaw! > 0) return metrics!.exoticMassRaw!;
-    
+
     return 0;
   })();
 
@@ -753,8 +759,8 @@ export default function HelixCasimirAmplifier({
 
     if (typeof window !== "undefined" && typeof window.setStrobingState === "function") {
       try {
-        const sc = Math.max(1, Number(sectorCount) || 1);
-        const cs = Math.max(0, Number(currentSector) || 0) % sc;
+  const sc = Math.max(1, Number.isFinite(Number(sectorCount)) ? Number(sectorCount) : 1);
+  const cs = Math.max(0, Number.isFinite(Number(currentSector)) ? Number(currentSector) : 0) % sc;
         window.setStrobingState({ sectorCount: sc, currentSector: cs });
       } catch (err) {
         // Prevent panel crash if the visualizer's handler references undefined globals (e.g., sceneScale)
@@ -790,7 +796,7 @@ export default function HelixCasimirAmplifier({
         if (tauQ_s <= 0) return U0;
         const alpha = dt / tauQ_s;
         return on
-          ? U0 + ((U_inf || 1e-6) - U0) * (1 - Math.exp(-alpha))   // ring-up
+          ? U0 + ((Number.isFinite(U_inf) ? U_inf : 1e-6) - U0) * (1 - Math.exp(-alpha))   // ring-up
           : U0 * Math.exp(-alpha);                       // ring-down
       });
 
@@ -872,7 +878,7 @@ export default function HelixCasimirAmplifier({
 
   // Duty presence & consistency (prefer authoritative metrics)
   const dutyPipeline = Number.isFinite(state.dutyEffective_FR ?? NaN) ? Number(state.dutyEffective_FR) : undefined;
-  const dutyMetric   = Number.isFinite(metrics.dutyEffectiveFR ?? NaN) ? Number(metrics.dutyEffectiveFR) : undefined;
+  const dutyMetric   = Number.isFinite(_metricsAny?.dutyEffectiveFR ?? NaN) ? Number(_metricsAny.dutyEffectiveFR) : undefined;
   const dRef = Number.isFinite(d_eff) ? d_eff : dutyMetric ?? dutyPipeline ?? 0;
   const dutyOK = within(dRef, (dutyMetric ?? dRef), 0.001, 0) && within(dRef, (dutyPipeline ?? dRef), 0.001, 0);
 
@@ -886,7 +892,7 @@ export default function HelixCasimirAmplifier({
     : true;
 
   // Sectoring sanity
-  const sectorTotal = metrics.totalSectors || state.sectorStrobing || 0;
+  const sectorTotal = (_metricsAny?.totalSectors ?? state.sectorStrobing ?? 0);
   const sectorOK = sectorTotal > 0 && Number.isFinite(sectorTotal);
 
   const checkpointRows: CheckRow[] = [
@@ -974,8 +980,8 @@ export default function HelixCasimirAmplifier({
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-              <Badge variant="secondary" className="justify-center">ζ = {fmtNum(metrics.fordRoman.value, "", 3)}</Badge>
-              <Badge variant={metrics.timeScaleRatio > 1 ? "default" : "destructive"} className="justify-center">TS = {fmtNum(metrics.timeScaleRatio, "", 1)}</Badge>
+              <Badge variant="secondary" className="justify-center">ζ = {fmtNum(_metricsAny?.fordRoman?.value, "", 3)}</Badge>
+              <Badge variant={Number(_metricsAny?.timeScaleRatio ?? metrics?.timeScaleRatio ?? 0) > 1 ? "default" : "destructive"} className="justify-center">TS = {fmtNum(_metricsAny?.timeScaleRatio ?? metrics?.timeScaleRatio, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">γ_geo = {fmtNum(derived.gammaGeo, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">q_mech = {fmtNum(derived.qMech, "", 1)}</Badge>
               <Badge variant="outline" className="justify-center">γ_VdB = {fmtNum(state.gammaVanDenBroeck, "", 1)}</Badge>
@@ -1004,7 +1010,7 @@ export default function HelixCasimirAmplifier({
                 <div className="grid grid-cols-3 gap-3 text-[10px] font-mono">
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">τ_LC</div>
-                    <div className="text-slate-200">{(lc.tauLC_ms).toFixed(3)} ms</div>
+                    <div className="text-slate-200">{fmtNum(lc?.tauLC_ms, "", 3)} ms</div>
                   </div>
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">τ_Q</div>
@@ -1012,7 +1018,7 @@ export default function HelixCasimirAmplifier({
                   </div>
                   <div className="px-2 py-1 rounded bg-slate-800/60 border border-slate-700 text-center">
                     <div className="text-slate-400 mb-0.5">U(t)/U∞</div>
-                    <div className="text-slate-200">{(U / Math.max(1e-12, U_inf || 1e-6)).toFixed(3)}</div>
+                    <div className="text-slate-200">{(U / Math.max(1e-12, Number.isFinite(U_inf) ? U_inf : 1e-6)).toFixed(3)}</div>
                   </div>
                 </div>
 
@@ -1023,7 +1029,7 @@ export default function HelixCasimirAmplifier({
                       className={`h-full transition-all duration-100 ${
                         onDisplay ? 'bg-cyan-400' : 'bg-slate-600'
                       }`}
-                      style={{ width: `${Math.min(100, (U / Math.max(1e-12, U_inf || 1e-6)) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (U / Math.max(1e-12, Number.isFinite(U_inf) ? U_inf : 1e-6)) * 100)}%` }}
                     />
                   </div>
                   <Badge 

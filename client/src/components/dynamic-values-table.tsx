@@ -37,7 +37,7 @@ export function DynamicValuesTable({ results, parameters }: DynamicValuesTablePr
       category: "Time Domain Variables",
       rows: [
         { variable: "Tₘ", description: "Stroke Period", value: `${formatNumber(results.strokePeriodPs)} ps`, formula: "Tₘ = 1/fₘ" },
-        { variable: "d", description: "Duty Factor", value: `${formatNumber((results.dutyFactor || 0) * 100)}%`, formula: "d = t_burst/t_cycle" },
+  { variable: "d", description: "Duty Factor", value: `${formatNumber((Number.isFinite(results.dutyFactor as any) ? results.dutyFactor as number : 0) * 100)}%`, formula: "d = t_burst/t_cycle" },
         { variable: "f_rep", description: "Repetition Rate", value: `${formatNumber(1000 / dynamicConfig.cycleLengthUs)} kHz`, formula: "f_rep = 1/t_cycle" },
       ]
     },
@@ -63,8 +63,8 @@ export function DynamicValuesTable({ results, parameters }: DynamicValuesTablePr
     {
       category: "Power Variables",
       rows: [
-        { variable: "P_instant", description: "Instantaneous Power", value: `${formatNumber((results.instantaneousPower || 0) / 1e12)} TW`, formula: "P = ΔE_boost/t_burst" },
-        { variable: "P_average", description: "Average Power", value: `${formatNumber((results.averagePower || 0) / 1e6)} MW`, formula: "P_avg = P_instant × d" },
+  { variable: "P_instant", description: "Instantaneous Power", value: `${formatNumber((Number.isFinite(results.instantaneousPower as any) ? results.instantaneousPower as number : 0) / 1e12)} TW`, formula: "P = ΔE_boost/t_burst" },
+  { variable: "P_average", description: "Average Power", value: `${formatNumber((Number.isFinite(results.averagePower as any) ? results.averagePower as number : 0) / 1e6)} MW`, formula: "P_avg = P_instant × d" },
         { variable: "P_target", description: "Target Average Power", value: "~83 MW", formula: "Engineering constraint" },
       ]
     },
@@ -73,7 +73,7 @@ export function DynamicValuesTable({ results, parameters }: DynamicValuesTablePr
       category: "Quantum Constraints",
       rows: [
         { variable: "ζ", description: "Quantum Inequality Margin", value: formatScientific(results.quantumInequalityMargin), formula: "ζ = ρ_eff × τ_pulse / QI_bound" },
-        { variable: "QI_status", description: "Quantum Safety", value: results.quantumSafetyStatus || 'Unknown', formula: "Safe if ζ < 1" },
+  { variable: "QI_status", description: "Quantum Safety", value: (results.quantumSafetyStatus ?? 'Unknown'), formula: "Safe if ζ < 1" },
         { variable: "QI_bound", description: "Ford-Roman Bound", value: "~10¹⁶ J⋅s/m³", formula: "Quantum field theory limit" },
       ]
     },
@@ -131,7 +131,7 @@ export function DynamicValuesTable({ results, parameters }: DynamicValuesTablePr
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div className="text-center">
             <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-              {formatNumber((results.dutyFactor || 0) * 100)}%
+              {formatNumber((Number.isFinite(results.dutyFactor as any) ? results.dutyFactor as number : 0) * 100)}%
             </div>
             <div className="text-gray-600 dark:text-gray-400">Duty Cycle</div>
           </div>
@@ -149,7 +149,7 @@ export function DynamicValuesTable({ results, parameters }: DynamicValuesTablePr
           </div>
           <div className="text-center">
             <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
-              {formatNumber((results.averagePower || 0) / 1e6)} MW
+              {formatNumber((Number.isFinite(results.averagePower as any) ? results.averagePower as number : 0) / 1e6)} MW
             </div>
             <div className="text-gray-600 dark:text-gray-400">Avg Power</div>
           </div>

@@ -17,7 +17,7 @@ export function subscribe(eventType: string, handler: LumaEventHandler): string 
 }
 
 export function unsubscribe(handlerId: string) {
-  for (const [eventType, handlers] of eventBus.entries()) {
+  for (const [eventType, handlers] of Array.from(eventBus.entries())) {
     if (handlers.has(handlerId)) {
       handlers.delete(handlerId);
       if (handlers.size === 0) {

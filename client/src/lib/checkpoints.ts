@@ -12,7 +12,16 @@ type Sink = (c: Check) => void;
 let sinks: Sink[] = [];
 export const onCheck = (fn: Sink) => { sinks.push(fn); };
 export const checkpoint = (c: Omit<Check,'at'>) => {
-  const rec = { ...c, at: Date.now() }; sinks.forEach(s => s(rec)); return rec;
+  const rec = { ...c, at: Date.now() };
+  // Dispatch sinks asynchronously to avoid synchronous setState calls during React render
+  // (prevents "Cannot update a component while rendering a different component" warnings).
+  try {
+    for (const s of sinks) queueMicrotask(() => { try { s(rec); } catch(e){ console.warn('checkpoint sink error', e); } });
+  } catch (e) {
+    // fallback to setTimeout if queueMicrotask isn't available
+    for (const s of sinks) setTimeout(() => { try { s(rec); } catch(e){ console.warn('checkpoint sink error', e); } }, 0);
+  }
+  return rec;
 };
 
 export const within = (actual: number, expect: number, rel=0.05) =>

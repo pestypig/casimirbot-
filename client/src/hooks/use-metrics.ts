@@ -168,95 +168,53 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
   };
 }
 
+import { useState, useEffect } from "react";
+import { queryClient } from "@/lib/queryClient";
+type DerivedMetrics = {
+  timestamp: number;
+  dutyFR?: number | undefined;
+  sectorCount?: number | undefined;
+  currentSector?: number | undefined;
+};
+
+/**
+ * useMetrics(pollMs)
+ * - Lightweight stub for metrics polling used in debugging.
+ * - Returns { data } where data starts null and is populated with a small object.
+ */
 export function useMetrics(pollMs = 2000) {
-  // Configure API base once. In dev, point to your backend port.
-  // Example: VITE_API_BASE=http://localhost:3001
-  const API_BASE = (typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_BASE : '') || '';
-  const [data, setData] = React.useState<HelixMetrics | null>(null);
-  const [err, setErr] = React.useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
 
-  React.useEffect(() => {
-    let alive = true;
-    const makeUrl = (path: string) => (API_BASE ? `${API_BASE}${path}` : path);
-
+  useEffect(() => {
+    let mounted = true;
     const tick = async () => {
-      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      if (!mounted) return;
+      // Prefer the canonical energy pipeline snapshot from react-query cache
       try {
-        // Create robust signal with 7s timeout
-        let controller: AbortController | null = null;
-        let signal: AbortSignal | undefined;
-        if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
-          // @ts-ignore: TS lib may not have AbortSignal.timeout yet
-          signal = AbortSignal.timeout(7000);
-        } else {
-          controller = new AbortController();
-          signal = controller.signal;
-          timeoutId = setTimeout(() => {
-            try {
-              controller!.abort(new DOMException('Request timed out', 'TimeoutError'));
-            } catch {}
-          }, 7000);
+        const pipeline = queryClient.getQueryData(['/api/helix/pipeline']) as any | undefined;
+        if (pipeline) {
+          // Derive a compact HelixMetrics-like view for UI consumers
+          const derived = deriveMetricsFromPipeline(pipeline);
+          // Merge pipeline payload with derived fields so callers can access both
+          setData({ ...pipeline, ...derived, pipeline });
+          return;
         }
+      } catch {}
 
-        // Try metrics endpoint first, fall back to pipeline if metrics missing/invalid
-        let metrics: any = null;
-        let pipeline: any = null;
-
-        try {
-          metrics = await fetchJSON(makeUrl("/api/helix/metrics"), signal);
-        } catch (metricsErr) {
-          console.warn('[useMetrics] Metrics fetch failed, trying pipeline fallback:', (metricsErr as Error)?.message);
-          try {
-            pipeline = await fetchJSON(makeUrl("/api/helix/pipeline"), signal);
-          } catch (pipelineErr) {
-            throw new Error(`Both endpoints failed: metrics(${(metricsErr as Error)?.message}), pipeline(${(pipelineErr as Error)?.message})`);
-          }
-        }
-
-        if (alive) {
-          // If metrics worked, use directly; otherwise derive from pipeline
-          const result = metrics || (pipeline ? deriveMetricsFromPipeline(pipeline) : null);
-          setData(result);
-          setErr(null);
-          if (pipeline && !metrics) {
-            console.log('[useMetrics] Used pipeline fallback successfully');
-          }
-        }
-      } catch (e: any) {
-        if (alive) {
-          const name = e?.name || '';
-          const msg = (name === 'AbortError' || name === 'TimeoutError')
-            ? 'request timeout (7s)'
-            : (e?.message || 'network error');
-          console.error('[useMetrics] Fetch error:', msg);
-          setErr(msg);
-          // Provide fallback so Bridge stays interactive
-          setData(d => d ?? {
-            energyOutput: 0,
-            exoticMass: 0,
-            timeScaleRatio: 0,
-            curvatureMax: 0,
-            fordRoman: { value: 0, limit: 1, status: 'PASS' },
-            modelMode: 'calibrated',
-            tiles: { tileArea_cm2: 25, hullArea_m2: null, N_tiles: 0 }
-          });
-        }
-      } finally {
-        if (timeoutId !== null) clearTimeout(timeoutId);
-      }
+      // Fallback: minimal metrics payload to keep consumers functional
+      setData((prev: DerivedMetrics | null) => prev ?? {
+        timestamp: Date.now(),
+        dutyFR: undefined,
+        sectorCount: undefined,
+        currentSector: undefined
+      });
     };
-
-    // Initial fetch
     tick();
-
-    // Set up polling interval
-    const id = setInterval(tick, pollMs);
-
-    return () => { 
-      alive = false; 
-      clearInterval(id); 
-    };
+    const id = window.setInterval(tick, Math.max(250, pollMs));
+    return () => { mounted = false; clearInterval(id); };
   }, [pollMs]);
 
-  return { data, err };
+  return { data };
 }
+
+export default useMetrics;

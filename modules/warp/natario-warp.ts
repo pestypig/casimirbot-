@@ -8,6 +8,7 @@
  */
 
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
+import { casimirEnergyDensity } from '../dynamic/stress-energy-equations.js';
 import type { SimulationParameters } from '../../shared/schema.js';
 
 // Pipeline-driven defaults (configurable, no hard-coded targets)
@@ -261,11 +262,9 @@ export function calculateNatarioWarpBubble(params: NatarioWarpParams): NatarioWa
   });
   // 3) Sector strobing (time-avg)
   const strobe = calculateSectorStrobing(dyn.totalAmplification, params.sectorCount || 1, params.dutyFactor || 0, params.effectiveDuty || 0);
-  // 4) Baseline Casimir energy density approximate (very rough): use a^-4 scaling constant
+  // 4) Baseline Casimir energy density (canonical): ρ0(a) = −π² ħ c / (720 a⁴)
   const a_m = Math.max(1e-12, params.gap * 1e-9);
-  const HBAR_C = 3.16152649e-26; // placeholder for ħ·c (J·m) ~ 3.16e-26
-  const u0 = - (Math.PI**2 / 720) * HBAR_C / Math.max(1e-48, Math.pow(a_m, 4));
-  const baselineEnergyDensity = u0;
+  const baselineEnergyDensity = casimirEnergyDensity(a_m);
   const amplifiedEnergyDensity = baselineEnergyDensity * strobe.timeAveragedAmplification;
   // 5) Mass estimate: prefer an explicit target if present
   const tileArea = Math.max(1e-12, params.tileArea_m2 ?? DEFAULTS.tileArea_m2);

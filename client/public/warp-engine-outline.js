@@ -3,7 +3,9 @@
  * Ellipsoidal wireframes for inner / center / outer shell (Natário),
  * with interior shift vector (violet).
  */
-(function () {
+(function (global) {
+  'use strict';
+
   const TAU = Math.PI * 2;
 
   // Helpers
@@ -345,6 +347,70 @@
     if (p.animate) this._requestDraw();
   };
 
-  // expose
-  window.OutlineEngine = OutlineEngine;
-})();
+  var WARNED = new WeakSet();
+
+  function getEngine(canvas) {
+    if (!canvas) return null;
+    // prefer the exact instance the engine attached to the canvas
+    return (
+      canvas.__warp_instance ||
+      canvas.__warpEngine ||
+      (global.__warp && canvas.id && global.__warp[canvas.id]) ||
+      null
+    );
+  }
+
+  function ensureVertices(eng) {
+    if (!eng) return false;
+    if (eng.originalGridVertices && eng.originalGridVertices.length) return true;
+    // fallback: if gridVertices exist, clone as original
+    if (eng.gridVertices && eng.gridVertices.length) {
+      try {
+        eng.originalGridVertices = new Float32Array(eng.gridVertices);
+        return true;
+      } catch (_) { /* noop */ }
+    }
+    // last resort: if the engine exposes a grid builder, rebuild once
+    if (typeof eng._createGrid === 'function') {
+      try {
+        var grid = eng._createGrid(1.6, 64);
+        eng.gridVertices = new Float32Array(grid);
+        eng.originalGridVertices = new Float32Array(grid);
+        return true;
+      } catch (_) { /* noop */ }
+    }
+    if (!WARNED.has(eng)) {
+      WARNED.add(eng);
+      console.warn('No original vertices stored! (outline)');
+    }
+    return false;
+  }
+
+  function renderOutline(opts) {
+    opts = opts || {};
+    var canvas = opts.canvas || null;
+    var eng = opts.engine || getEngine(canvas);
+    if (!eng || !ensureVertices(eng)) return;
+    // outline rendering logic (kept minimal / scientific-only) …
+  }
+
+  global.WarpOutline = global.WarpOutline || {
+    render: renderOutline,
+    ensureVertices: ensureVertices
+  };
+
+  // Expose OutlineEngine constructor to global scope
+  global.OutlineEngine = OutlineEngine;
+
+  // Add factory method for easier integration
+  OutlineEngine.getOrCreate = function(canvas, options) {
+    // Check if there's already an engine instance for this canvas
+    if (canvas.__outlineEngine instanceof OutlineEngine) {
+      return canvas.__outlineEngine;
+    }
+    // Create new instance and store reference
+    const engine = new OutlineEngine(canvas);
+    canvas.__outlineEngine = engine;
+    return engine;
+  };
+})(typeof window !== 'undefined' ? window : this);

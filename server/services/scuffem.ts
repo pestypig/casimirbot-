@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { gmshService } from './gmsh';
 import { moduleRegistry } from '../../modules/core/module-registry.js';
+import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe';
 
 export class ScuffemService {
   private workingDir: string;
@@ -315,7 +316,7 @@ ENDOBJECT
     
     // Physical constants (CODATA 2018)
     const hbar = 1.0545718176461565e-34; // Reduced Planck constant (J⋅s)
-    const c = 299792458; // Speed of light (m/s)
+  const c = SPEED_OF_LIGHT; // Speed of light (m/s)
     const kB = 1.380649e-23; // Boltzmann constant (J/K)
     const pi = Math.PI;
     

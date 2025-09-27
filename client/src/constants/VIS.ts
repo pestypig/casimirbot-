@@ -28,6 +28,7 @@ export const vizGainEmergency = 2.0;     // Emergency mode viz gain
 export const vizGainCruise = 0.8;        // Cruise mode viz gain
 export const exposureDefault = Math.max(1.0, 6.0);      // Default exposure level (>= 1.0)
 export const zeroStopDefault = Math.max(1e-18, 1e-7);     // Default zero-stop threshold (> 0)
+export const baseMargin = 0.08;          // Default canvas margin fraction used by WarpVisualizer
 
 // Wall width constants
 export const defaultWallWidthRho = 0.016;  // Default wall width in ρ-units (16 nm normalized)

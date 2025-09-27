@@ -61,14 +61,24 @@ export default class WebGLErrorBoundary extends React.Component<
     try {
       // Test WebGL availability
       const canvas = document.createElement('canvas');
-      const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+      const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as
+        | WebGLRenderingContext
+        | WebGL2RenderingContext
+        | null;
       
       if (gl) {
         console.info('WebGL Context: Available');
-        console.info('Renderer:', gl.getParameter(gl.RENDERER));
-        console.info('Vendor:', gl.getParameter(gl.VENDOR));
-        console.info('Version:', gl.getParameter(gl.VERSION));
-        console.info('Shading Language Version:', gl.getParameter(gl.SHADING_LANGUAGE_VERSION));
+        try {
+          const g: any = gl;
+          if (typeof g.getParameter === 'function') {
+            console.info('Renderer:', g.getParameter(g.RENDERER));
+            console.info('Vendor:', g.getParameter(g.VENDOR));
+            console.info('Version:', g.getParameter(g.VERSION));
+            console.info('Shading Language Version:', g.getParameter(g.SHADING_LANGUAGE_VERSION));
+          }
+        } catch (err) {
+          console.warn('Failed to probe WebGL parameters:', err);
+        }
       } else {
         console.error('WebGL Context: Not Available');
       }

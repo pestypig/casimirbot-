@@ -1,0 +1,16 @@
+SCUFF-EM simulation log
+========================
+Started: 2025-07-27T19:52:13.875Z
+Geometry type: sphere
+Gap distance: 6 nm
+Radius: 1500 μm
+Temperature: 20 K
+
+Mesh generation: COMPLETED
+BEM matrix assembly: COMPLETED
+Frequency integration: COMPLETED
+Energy calculation: COMPLETED
+
+Total computation time: 2.4 minutes
+Memory usage: 355 MB
+Convergence: Achieved (rel. error < 1%)

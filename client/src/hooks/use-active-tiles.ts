@@ -40,8 +40,10 @@ export function useActiveTiles(opts: {
   }, [lc?.phase, lc?.burst_ms, lc?.dwell_ms]);
 
   // Hardened input sanitization
-  const T       = Math.max(0, Number(totalTiles) || 0);
-  const fr      = Math.max(0, Math.min(1, Number(dutyEffectiveFR) || 0));
+  const totalTilesNum = Number(totalTiles);
+  const T       = Math.max(0, Number.isFinite(totalTilesNum) ? totalTilesNum : 0);
+  const dutyNum = Number(dutyEffectiveFR);
+  const fr      = Math.max(0, Math.min(1, Number.isFinite(dutyNum) ? dutyNum : 0));
   const S_total = Math.max(1, Math.floor(Number(totalSectors) || 1));
   const S_live  = Math.max(1, Math.floor(Number(concurrentSectors) || 1));
   const EMA     = Math.min(1, Math.max(0, Number(ema)));
@@ -110,8 +112,8 @@ export function useActiveTiles(opts: {
 
   return {
     avgTiles,                                  // integer
-    instantTiles: Number(instantTiles) || 0,   // fractional by design
-    instantTilesSmooth: Math.round(instantSmooth || 0),
+  instantTiles: Number.isFinite(Number(instantTiles)) ? Number(instantTiles) : 0,   // fractional by design
+  instantTilesSmooth: Math.round(Number.isFinite(instantSmooth) ? instantSmooth : 0),
     burstLocal,
     inBurstNow,
   };
