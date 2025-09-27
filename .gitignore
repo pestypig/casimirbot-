@@ -4,3 +4,37 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+# Simulation output artifacts (large, reproducible)
+simulations/*/output.log
+simulations/*/output.Energy
+simulations/*/*.msh
+simulations/*/*.geo
+simulations/*/*.scuffgeo
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# TypeScript build caches
+*.tsbuildinfo
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.7z
+*.rar
+
+# Coverage / test artifacts
+coverage/
+.nyc_output/
+*.lcov
