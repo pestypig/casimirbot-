@@ -38,3 +38,8 @@ ehthumbs.db
 coverage/
 .nyc_output/
 *.lcov
+
+# Large static image assets (ignored to keep repo lean)
+attached_assets/*.png
+client/public/galaxymap.png
+dist/public/galaxymap.png
