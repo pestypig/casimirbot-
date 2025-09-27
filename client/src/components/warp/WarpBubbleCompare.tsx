@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useCallback, useState } from "react";
 import { normalizeWU, buildREAL, buildSHOW } from "@/lib/warp-uniforms";
-import { gatedUpdateUniforms } from "@/lib/warp-uniforms-gate";
+import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
 import { driveWarpFromPipeline } from "@/lib/warp-pipeline-adapter";
 import { sizeCanvasSafe, clampMobileDPR } from '@/lib/gl/capabilities';
 import { webglSupport } from '@/lib/gl/webgl-support';
@@ -228,59 +228,30 @@ function sizeCanvas(cv: HTMLCanvasElement) {
   return { w, h };
 }
 
-function paneSanitize(pane: 'REAL'|'SHOW', patch: any) {
-  const p = { ...patch };
-
-  // Unified wall width and physics mode enforcement
-  const aH = aHarmonic(p?.hullAxes?.[0], p?.hullAxes?.[1], p?.hullAxes?.[2]);
-  if (p.wallWidth_m !== undefined && Number.isFinite(p.wallWidth_m)) {
-    p.wallWidth = Number.isFinite(aH) ? p.wallWidth_m / aH : undefined;
-    p.wallWidth_m = p.wallWidth_m;
-  } else if (p.wallWidth !== undefined && Number.isFinite(p.wallWidth)) {
-    p.wallWidth_m = Number.isFinite(aH) ? p.wallWidth * aH : undefined;
-  }
-
-  // Enforce expected physics modes
-  if (pane === 'REAL') {
-    p.physicsParityMode = true;
-    p.ridgeMode = 0;
-  } else if (pane === 'SHOW') {
-    p.physicsParityMode = false;
-    p.ridgeMode = 1;
-  }
-
-  return p;
+// Cosmetic-only wrapper (do not touch physics uniforms)
+function paneSanitize(_pane: 'REAL'|'SHOW', patch: any) {
+  return { ...patch };
 }
 
 function sanitizeUniforms(u: any = {}) {
-  const s = { ...u };
+  const s: any = { ...u };
 
-  // numeric coercions + clamps
-  // default missing γ_VdB to visual seed
-  if ('gammaVanDenBroeck' in s && !Number.isFinite(s.gammaVanDenBroeck)) {
-    s.gammaVanDenBroeck = 1.35e5;
-  }
-  if ('thetaScale' in s) {
-    // allow 0 (standby), clamp negatives to 0
-    s.thetaScale = Math.max(0, finite(s.thetaScale, 0));
-  }
-  s.exposure          = Math.min(12, Math.max(1, finite(s.exposure,  6)));
-  s.zeroStop          = Math.max(1e-9,    finite(s.zeroStop,   1e-7));
-  s.wallWidth         = Math.max(1e-4,    finite(s.wallWidth,  0.016));
-  s.curvatureBoostMax = Math.max(1,       finite(s.curvatureBoostMax, 40));
-  s.curvatureGainT    = Math.max(0, Math.min(1, finite(s.curvatureGainT, 0)));
-  s.userGain          = Math.max(1,       finite(s.userGain,  1));
-  s.displayGain       = Math.max(1,       finite(s.displayGain, 1));
-  s.sectors           = Math.max(1, Math.floor(finite(s.sectors, 1)));
-  s.split             = Math.max(0, Math.min(s.sectors - 1, Math.floor(finite(s.split, 0))));
-
-  // map strings → ints
-  if (typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode as keyof typeof CM] ?? 1;
-  s.ridgeMode = Math.max(0, Math.min(1, Math.floor(finite(s.ridgeMode, 0))));
-
-  // hull normalization (drop invalid)
-  if (s.hull) {
-    const a = finite(s.hull.a, NaN), b = finite(s.hull.b, NaN), c = finite(s.hull.c, NaN);
+  // Only clamp keys that are explicitly provided (avoid overriding adapter uniforms)
+  if ('gammaVanDenBroeck' in s && !Number.isFinite(s.gammaVanDenBroeck)) s.gammaVanDenBroeck = 1.35e5;
+  if ('thetaScale' in s)           s.thetaScale           = Math.max(0, finite(s.thetaScale, s.thetaScale));
+  if ('exposure' in s)             s.exposure             = Math.min(12, Math.max(1, finite(s.exposure, s.exposure)));
+  if ('zeroStop' in s)             s.zeroStop             = Math.max(1e-9, finite(s.zeroStop, s.zeroStop));
+  if ('wallWidth' in s)            s.wallWidth            = Math.max(1e-4, finite(s.wallWidth, s.wallWidth));
+  if ('curvatureBoostMax' in s)    s.curvatureBoostMax    = Math.max(1, finite(s.curvatureBoostMax, s.curvatureBoostMax));
+  if ('curvatureGainT' in s)       s.curvatureGainT       = Math.max(0, Math.min(1, finite(s.curvatureGainT, s.curvatureGainT)));
+  if ('userGain' in s)             s.userGain             = Math.max(1, finite(s.userGain, s.userGain));
+  if ('displayGain' in s)          s.displayGain          = Math.max(1, finite(s.displayGain, s.displayGain));
+  if ('sectors' in s)              s.sectors              = Math.max(1, Math.floor(finite(s.sectors, s.sectors)));
+  if ('split' in s && 'sectors' in s) s.split            = Math.max(0, Math.min(s.sectors - 1, Math.floor(finite(s.split, s.split))));
+  if ('colorMode' in s && typeof s.colorMode === 'string') s.colorMode = CM[s.colorMode as keyof typeof CM] ?? s.colorMode;
+  if ('ridgeMode' in s)            s.ridgeMode            = Math.max(0, Math.min(1, Math.floor(finite(s.ridgeMode, s.ridgeMode))));
+  if ('hull' in s) {
+    const a = finite(s.hull?.a, NaN), b = finite(s.hull?.b, NaN), c = finite(s.hull?.c, NaN);
     if (Number.isFinite(a) && Number.isFinite(b) && Number.isFinite(c)) s.hull = { a, b, c };
     else delete s.hull;
   }
@@ -589,8 +560,6 @@ const applyReal = (
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
-    physicsParityMode: true,
-    ridgeMode: 0,
     colorMode: colorModeIndex,
     colorModeIndex,
     colorModeName: colorMode,
@@ -644,10 +613,7 @@ const applyShow = (
     ...shared,
     cameraZ: camZ,
     lockFraming: true,
-    physicsParityMode: false,   // enable amplification
-    ridgeMode: 1,
-    // Force numeric color mode for engine compatibility (engine: 0=solid,1=theta,2=shear)
-    colorMode: colorModeIndex,
+    colorMode: colorModeIndex, // engine expects numeric (0=solid,1=theta,2=shear)
     colorModeIndex,
     colorModeName: colorMode,
     curvatureGainT: t,
@@ -991,10 +957,10 @@ export default function WarpBubbleCompare({
   const pipelineSnapshot = useMemo(() => {
     // If we have live pipeline data, use it directly
     if (parameters?.pipeline) return parameters.pipeline;
-    
+
     const p = parameters || {};
     const nat = p.natario || {};
-    
+
     // Package existing fields for the adapter without fabricating new physics
     return {
       ...p,
@@ -1095,19 +1061,17 @@ export default function WarpBubbleCompare({
 
       // 6) Apply cosmetic-only updates (no physics overrides)
       // REAL — truth view with minimal cosmetics
-      pushLeft.current(paneSanitize('REAL', sanitizeUniforms({
+      pushLeft.current(paneSanitize('REAL', withoutPhysics(sanitizeUniforms({
         ...shared,
-        ...(real || {}),
         colorMode: 2, // shear for truth view
         exposure: 4.2,
         zeroStop: 1e-6,
         lockFraming: true,
-      })), 'REAL/cosmetic');
+      }))), 'REAL/cosmetic');
 
       // SHOW — boosted visuals for demonstration
-      pushRight.current(paneSanitize('SHOW', sanitizeUniforms({
+      pushRight.current(paneSanitize('SHOW', withoutPhysics(sanitizeUniforms({
         ...shared,
-        ...(show || {}),
         colorMode: 1, // theta for visual appeal
         exposure: 7.5,
         zeroStop: 1e-7,
@@ -1115,17 +1079,11 @@ export default function WarpBubbleCompare({
         curvatureGainT: 0.70,
         curvatureBoostMax: Math.max(1, heroBoost),
         userGain: 4,
-      })), 'SHOW/cosmetic');
+      }))), 'SHOW/cosmetic');
 
       // 6) Ensure strobe mux exists, then re-broadcast strobing from the LC loop carried in parameters
       ensureStrobeMux();
-      const lc = parameters.lightCrossing;
-      if (lc) {
-        const total = Math.max(1, Number(parameters.sectorCount) || 1);
-        const live  = Math.max(1, Number(parameters.sectors) || total);
-        const cur   = Math.max(0, Math.floor(lc.sectorIdx || 0) % live);
-        (window as any).setStrobingState?.({ sectorCount: total, currentSector: cur, split: cur });
-      }
+  // Do not mirror LC/strobing; adapter owns it
     } catch (error) {
       console.error('[WarpBubbleCompare] Error in reinitEnginesFromParams:', error);
       setLoadError(String(error));
