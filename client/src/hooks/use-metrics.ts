@@ -139,6 +139,45 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
   const sectors = num(p?.activeSectors ?? p?.sectorsActive ?? p?.lightCrossing?.sectorCount ?? p?.totalSectors ?? 0);
   const tiles = num(p?.activeTiles ?? 0);
 
+  // shiftVector: accept either object with named fields or legacy array-form
+  const shiftVector = (() => {
+    const sv = p?.shiftVector;
+    if (!sv) return undefined;
+    // Object shape
+    if (typeof sv === 'object' && !Array.isArray(sv)) {
+      const epsilonTilt = num(sv.epsilonTilt);
+      const beta = Array.isArray(sv.betaTiltVec) && sv.betaTiltVec.length === 3
+        ? [num(sv.betaTiltVec[0]), num(sv.betaTiltVec[1]), num(sv.betaTiltVec[2])] as [number, number, number]
+        : undefined;
+      const R_geom = num(sv.R_geom ?? Llong_m);
+      const gTarget = num(sv.gTarget);
+      const gEff_check = num(sv.gEff_check ?? (epsilonTilt * (c*c) / (R_geom || 1)));
+      if (Number.isFinite(epsilonTilt) || Number.isFinite(gTarget) || beta) {
+        return {
+          epsilonTilt: Number.isFinite(epsilonTilt) ? epsilonTilt : 0,
+          betaTiltVec: (beta ?? [0, -1, 0]) as [number, number, number],
+          gTarget: Number.isFinite(gTarget) ? gTarget : 0,
+          R_geom: Number.isFinite(R_geom) ? R_geom : Llong_m,
+          gEff_check: Number.isFinite(gEff_check) ? gEff_check : 0
+        } as ShiftVectorMetrics;
+      }
+      return undefined;
+    }
+    // Legacy array-like: [epsilonTilt, betaX, betaY, betaZ] with optional named fields alongside
+    if (arrN(sv, 3)) {
+      const epsilonTilt = num(sv[0]);
+      const beta: [number, number, number] = [num(sv[1]), num(sv[2]), num(sv[3])];
+      return {
+        epsilonTilt,
+        betaTiltVec: beta,
+        gTarget: num(sv?.gTarget ?? p?.shiftVector?.gTarget ?? 0),
+        R_geom: num(sv?.R_geom ?? p?.shiftVector?.R_geom ?? Llong_m),
+        gEff_check: num(sv?.gEff_check ?? p?.shiftVector?.gEff_check ?? 0)
+      } as ShiftVectorMetrics;
+    }
+    return undefined;
+  })();
+
   return {
     energyOutput: energyMW,
     exoticMass: exoticKg,
@@ -150,14 +189,8 @@ function deriveMetricsFromPipeline(p: any): HelixMetrics {
     totalTiles: num(p?.totalTiles ?? N_tiles, 0),
     gammaVanDenBroeck: gammaVdB,
     modelMode: (p?.modelMode ?? "calibrated") as any,
-    hull: geometry ? { Lx_m: geometry.Lx_m, Ly_m: geometry.Ly_m, Lz_m: geometry.Lz_m } : undefined,
-    shiftVector: arrN(p?.shiftVector, 3) ? {
-      epsilonTilt: num(p.shiftVector[0]),
-      betaTiltVec: [num(p.shiftVector[0]), num(p.shiftVector[1]), num(p.shiftVector[2])],
-      gTarget: num(p?.shiftVector?.gTarget ?? 1),
-      R_geom: num(p?.shiftVector?.R_geom ?? Llong_m),
-      gEff_check: num(p?.shiftVector?.gEff_check ?? 1)
-    } : undefined,
+  hull: geometry ? { Lx_m: geometry.Lx_m, Ly_m: geometry.Ly_m, Lz_m: geometry.Lz_m } : undefined,
+    shiftVector,
     tiles: { tileArea_cm2: tileArea, hullArea_m2: hullArea, N_tiles },
     timescales: T_m_s > 0 ? {
       f_m_Hz, T_m_s, L_long_m: Llong_m, T_long_s: T_LC_s, TS_long, TS_geom: TS_long

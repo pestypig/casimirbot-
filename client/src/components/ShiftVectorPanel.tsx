@@ -23,13 +23,15 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
   
   // Debug logging
   console.debug("[ShiftVectorPanel] Props:", { mode, shift });
-  console.debug("[ShiftVectorPanel] Metrics shift data:", metrics?.shift);
+  console.debug("[ShiftVectorPanel] Metrics shiftVector data:", metrics?.shiftVector);
   
   // Compute fallback values based on mode and hull geometry (for when metrics aren't loaded yet)
   const G = 9.80665; // m/s²
   
   const gTargets: Record<string, number> = {
     hover: 0.10 * G,
+    taxi: 0.10 * G,
+    nearzero: 0.08 * G,
     cruise: 0.05 * G,
     emergency: 0.30 * G,
     standby: 0.00 * G,
@@ -38,28 +40,51 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
   const fallbackGTarget = gTargets[mode?.toLowerCase()] ?? 0;
   const fallbackRGeom = Math.cbrt(503.5 * 132.0 * 86.5); // ∛(a·b·c)
   const fallbackEpsilonTilt = Math.min(5e-7, Math.max(0, (fallbackGTarget * fallbackRGeom) / (c * c)));
-  const fallbackBetaTiltVec = [0, -1, 0];
+  const fallbackBetaTiltVec: [number, number, number] = [0, -1, 0];
   const fallbackGEffCheck = (fallbackEpsilonTilt * c * c) / fallbackRGeom;
 
   // Use live metrics data first, then props, then fallback calculations
-  const liveShift = metrics?.shift;
+  const liveShift = metrics?.shiftVector;
   const propShift = shift;
-  
-  const displayShift = {
-    gTarget: liveShift?.gTarget ?? propShift?.gTarget ?? fallbackGTarget,
-    R_geom: liveShift?.R_geom ?? propShift?.R_geom ?? fallbackRGeom,
-    epsilonTilt: liveShift?.epsilonTilt ?? propShift?.epsilonTilt ?? fallbackEpsilonTilt,
-    betaTiltVec: liveShift?.betaTiltVec ?? propShift?.betaTiltVec ?? fallbackBetaTiltVec,
-    gEff_check: liveShift?.gEff_check ?? propShift?.gEff_check ?? fallbackGEffCheck,
+
+  // Helper: pick a numeric value with preference rules and record source
+  const pickNum = (live: any, prop: any, fb: number, preferPositive = false) => {
+    const isNum = (v: any) => typeof v === 'number' && Number.isFinite(v);
+    const wantPos = preferPositive && fb > 0;
+    if (isNum(live) && (!wantPos || live > 0)) return { value: live as number, source: 'live' as const };
+    if (isNum(prop) && (!wantPos || prop > 0)) return { value: prop as number, source: 'props' as const };
+    return { value: fb, source: 'computed' as const };
   };
-  
+
+  // Helper: pick a 3-vector
+  const pickVec3 = (live: any, prop: any, fb: [number, number, number]) => {
+    const ok = (v: any) => Array.isArray(v) && v.length === 3 && v.every(x => typeof x === 'number' && Number.isFinite(x));
+    if (ok(live)) return { value: live as [number, number, number], source: 'live' as const };
+    if (ok(prop)) return { value: prop as [number, number, number], source: 'props' as const };
+    return { value: fb, source: 'computed' as const };
+  };
+
+  // Prefer positive gTarget in modes with nonzero fallback (so Near-Zero won’t show 0 from live)
+  const gTargetPick = pickNum(liveShift?.gTarget, propShift?.gTarget, fallbackGTarget, true);
+  const RGeomPick = pickNum(liveShift?.R_geom, propShift?.R_geom, fallbackRGeom, true);
+  const epsPick = pickNum(liveShift?.epsilonTilt, propShift?.epsilonTilt, fallbackEpsilonTilt, true);
+  const betaPick = pickVec3(liveShift?.betaTiltVec, propShift?.betaTiltVec, fallbackBetaTiltVec);
+  const gEffPick = pickNum(liveShift?.gEff_check, propShift?.gEff_check, fallbackGEffCheck, true);
+
+  const displayShift = {
+    gTarget: gTargetPick.value,
+    R_geom: RGeomPick.value,
+    epsilonTilt: epsPick.value,
+    betaTiltVec: betaPick.value,
+    gEff_check: gEffPick.value,
+  };
+
   console.debug("[ShiftVectorPanel] Final display values:", displayShift);
-  
+
   const hasLiveData = !!(liveShift && Object.keys(liveShift).length > 0);
   const hasPropData = !!(propShift && Object.keys(propShift).length > 0);
   const ok = hasLiveData || hasPropData || fallbackGTarget > 0; // Show panel if we have any data
-  
-  const dataSource = hasLiveData ? "live" : hasPropData ? "props" : "computed";
+
   return (
     <Card className="bg-slate-900/50 border-slate-800">
       <CardHeader>
@@ -87,12 +112,12 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>target</sub></div>
                 <div className="text-violet-400">{fstd(displayShift.gTarget, 3)} m/s²</div>
-                <div className="text-xs text-slate-500">{dataSource}</div>
+                <div className="text-xs text-slate-500">{gTargetPick.source}</div>
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">R<sub>geom</sub></div>
                 <div className="text-cyan-300">{fstd(displayShift.R_geom, 1)} m</div>
-                <div className="text-xs text-slate-500">{dataSource}</div>
+                <div className="text-xs text-slate-500">{RGeomPick.source}</div>
               </div>
               <div className="p-3 bg-slate-950 rounded">
                 <TooltipProvider>
@@ -100,7 +125,7 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
                     <TooltipTrigger className="text-left">
                       <div className="text-slate-400">ε<sub>tilt</sub> (dimensionless)</div>
                       <div className="text-violet-400">{fmt(displayShift.epsilonTilt, 3)}</div>
-                      <div className="text-xs text-slate-500">{dataSource}</div>
+                      <div className="text-xs text-slate-500">{epsPick.source}</div>
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
                       Kept ≪ 1e-6 ("whisper" regime) to preserve QI headroom and keep tilt visual-only inside.
@@ -111,12 +136,12 @@ export function ShiftVectorPanel({ mode, shift }: Props) {
               <div className="p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">β⃗<sub>tilt</sub></div>
                 <div className="text-violet-400">[{displayShift.betaTiltVec.join(", ")}]</div>
-                <div className="text-xs text-slate-500">{dataSource}</div>
+                <div className="text-xs text-slate-500">{betaPick.source}</div>
               </div>
               <div className="col-span-2 p-3 bg-slate-950 rounded">
                 <div className="text-slate-400">g<sub>eff</sub> (check)</div>
                 <div className="text-amber-300">{fstd(displayShift.gEff_check, 3)} m/s²</div>
-                <div className="text-xs text-slate-500">{dataSource}</div>
+                <div className="text-xs text-slate-500">{gEffPick.source}</div>
               </div>
             </div>
 

@@ -4,15 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-interface FieldSample {
-  p: [number, number, number];
-  rho: number;
-  bell: number;
-  n: [number, number, number];
-  sgn: number;
-  disp: number;
-}
-
 interface FieldResponse {
   count: number;
   axes: any;
@@ -22,7 +13,22 @@ interface FieldResponse {
     qSpoiling: number;
     sectorStrobing: number;
   };
-  data: FieldSample[];
+  data: FieldSampleBuffer;
+}
+
+interface FieldSampleBuffer {
+  length: number;
+  x: number[];
+  y: number[];
+  z: number[];
+  nx: number[];
+  ny: number[];
+  nz: number[];
+  rho: number[];
+  bell: number[];
+  sgn: number[];
+  disp: number[];
+  dA: number[];
 }
 
 export function PhysicsFieldSampler() {
@@ -61,11 +67,15 @@ export function PhysicsFieldSampler() {
       console.log('  Physics params:', data.physics);
       
       // Sample a few displacement values for comparison
-      const samples = data.data.slice(0, 10);
+      const logCount = Math.min(10, data.data.length);
       console.log('  Sample displacements:');
-      samples.forEach((sample: FieldSample, i: number) => {
-        console.log(`    [${i}] ρ=${sample.rho.toFixed(4)}, bell=${sample.bell.toExponential(2)}, sgn=${sample.sgn}, disp=${sample.disp.toExponential(2)}`);
-      });
+      for (let i = 0; i < logCount; i++) {
+        const rho = data.data.rho[i];
+        const bell = data.data.bell[i];
+        const sgn = data.data.sgn[i];
+        const disp = data.data.disp[i];
+        console.log(`    [${i}] ρ=${rho.toFixed(4)}, bell=${bell.toExponential(2)}, sgn=${sgn.toFixed(3)}, disp=${disp.toExponential(2)}`);
+      }
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sample field');
@@ -78,24 +88,26 @@ export function PhysicsFieldSampler() {
     if (!fieldData) return;
     
     const headers = ['theta', 'phi', 'x', 'y', 'z', 'rho', 'bell', 'nx', 'ny', 'nz', 'sgn', 'disp'];
-    const rows = fieldData.data.map((sample, i) => {
+    const buffer = fieldData.data;
+    const rows: string[][] = [];
+    for (let i = 0; i < buffer.length; i++) {
       const theta = (i % nTheta) * (2 * Math.PI) / nTheta;
       const phi = -Math.PI / 2 + Math.floor(i / nTheta) * Math.PI / (nPhi - 1);
-      return [
+      rows.push([
         theta.toFixed(6),
         phi.toFixed(6),
-        sample.p[0].toFixed(3),
-        sample.p[1].toFixed(3),
-        sample.p[2].toFixed(3),
-        sample.rho.toFixed(6),
-        sample.bell.toExponential(6),
-        sample.n[0].toFixed(6),
-        sample.n[1].toFixed(6),
-        sample.n[2].toFixed(6),
-        sample.sgn.toString(),
-        sample.disp.toExponential(6)
-      ];
-    });
+        buffer.x[i].toFixed(3),
+        buffer.y[i].toFixed(3),
+        buffer.z[i].toFixed(3),
+        buffer.rho[i].toFixed(6),
+        buffer.bell[i].toExponential(6),
+        buffer.nx[i].toFixed(6),
+        buffer.ny[i].toFixed(6),
+        buffer.nz[i].toFixed(6),
+        buffer.sgn[i].toFixed(3),
+        buffer.disp[i].toExponential(6)
+      ]);
+    }
     
     const csv = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });

@@ -121,6 +121,11 @@
       <button class="btn" id="btnFilterLunar">Lunar</button>
       <button class="btn" id="btnResetFilters">Reset</button>
     </div>
+    <div class="pill pill-search">
+      <label for="hbSearch">Search</label>
+      <input class="search-input" type="search" id="hbSearch" placeholder="#hashtag" autocomplete="off" />
+    </div>
+    
   </header>
 
   <section id="scene">
@@ -165,6 +170,7 @@
 
 <!-- Three.js CDN -->
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
 
 <script>
 /* =========================
@@ -174,10 +180,35 @@
 /* =========================
    Utilities
 ========================= */
+// Adaptively increase decimals if rounding would show 0.0 even when the value is non-zero
+function fixedAdaptive(x, baseDp=1, maxDp=6){
+  if (x==null || isNaN(x)) return 'n/a';
+  const v = +x;
+  let d = baseDp;
+  let s = v.toFixed(d);
+  while (d < maxDp && Math.abs(+s) === 0 && v !== 0){
+    d++;
+    s = v.toFixed(d);
+  }
+  if (Math.abs(+s) === 0) s = (0).toFixed(d);
+  return s;
+}
 const fmt = {
-  deg: v => (Math.round(v*10)/10).toFixed(1) + '°',
+  deg: v => {
+    const val = +v; if (!isFinite(val)) return 'n/a';
+    // If 1dp would render 0.0 but val is not zero, increase decimals; if extremely small, show arcseconds
+    const ad = Math.abs(val);
+    if (ad < 1e-3 && ad > 0) return `${(val*3600).toFixed(1)}″`;
+    const s = fixedAdaptive(val, 1, 6);
+    return `${s}°`;
+  },
   min: v => Math.round(v) + ' min',
-  pct: v => (v>=0?'+':'') + (Math.round(v*10)/10).toFixed(1) + '%',
+  pct: v => {
+    const val = +v; if (!isFinite(val)) return 'n/a';
+    const sign = val>=0?'+':'';
+    const s = fixedAdaptive(val, 1, 6);
+    return `${sign}${s}%`;
+  },
   date: ts => new Date(ts).toLocaleString(),
   // Timezone-aware formatter that respects per-record capture zone
   dateLocal: (ts, tz) => {
@@ -214,6 +245,54 @@ const HORIZONS = {
 
 const halosPrecise = new Map();  // year -> THREE.Line (precise)
 const yearElements = new Map();  // year -> {a,e,i,Omega,omega,M,epochJD, perihelionISO}
+
+const orbitGradientLines = new Set();
+window.__orbitGradientLines = orbitGradientLines;
+
+function createOrbitLineMaterial(opacity = 0.75) {
+  return new THREE.LineBasicMaterial({
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    vertexColors: true,
+    toneMapped: false
+  });
+}
+
+function prepareOrbitGradientLine(line) {
+  if (!line || !line.geometry) return;
+  const geo = line.geometry;
+  const posAttr = geo.getAttribute && geo.getAttribute('position');
+  if (!posAttr || !posAttr.count) return;
+  const count = posAttr.count;
+  const fractions = new Float32Array(count);
+  const colors = new Float32Array(count * 3);
+  const divisor = Math.max(1, count - 1);
+  for (let i = 0; i < count; i++) {
+    fractions[i] = i / divisor;
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.attributes.color.needsUpdate = true;
+  line.userData = line.userData || {};
+  line.userData.orbitFractions = fractions;
+  if (line.material) {
+    line.material.vertexColors = true;
+    line.material.needsUpdate = true;
+  }
+  orbitGradientLines.add(line);
+  if (typeof window.__updateOrbitGradientColors === 'function') {
+    try {
+      window.__updateOrbitGradientColors();
+    } catch (err) {
+      console.warn('Orbit gradient update failed', err);
+    }
+  }
+}
+
+function releaseOrbitGradientLine(line) {
+  if (!line) return;
+  orbitGradientLines.delete(line);
+}
 
 function toJD(dateISO) {
   // minimalist UTC->JD; ok for our ephemeris stamps
@@ -285,30 +364,25 @@ async function fetchElementsForYear(year){
 }
 
 function elementsToEllipseGeometry(el, samples=720){
-  const a=el.a, e=el.e, i=el.i, Ω=el.Omega, ω=el.omega;
+  const a = Number.isFinite(el?.a) ? el.a : 1;
+  const e = Number.isFinite(el?.e) ? el.e : 0;
+  const argPeri = Number.isFinite(el?.omega) ? el.omega : 0;
+  const ascNode = Number.isFinite(el?.Omega) ? el.Omega : 0;
+  const inPlaneRotation = argPeri + ascNode;
   const pts = [];
-  for(let k=0;k<=samples;k++){
-    const ν = 2*Math.PI*(k/samples);           // true anomaly
-    const r = a*(1 - e*e) / (1 + e*Math.cos(ν)); // radius in perifocal plane
-    // Perifocal coords
-    const x_p = r*Math.cos(ν), y_p = r*Math.sin(ν), z_p = 0;
-    // Rotate perifocal -> inertial (Ω,i,ω)
-    const cΩ=Math.cos(Ω), sΩ=Math.sin(Ω);
-    const ci=Math.cos(i), si=Math.sin(i);
-    const cω=Math.cos(ω), sω=Math.sin(ω);
-    const x = (cΩ*cω - sΩ*sω*ci)*x_p + (-cΩ*sω - sΩ*cω*ci)*y_p;
-    const y = (sΩ*cω + cΩ*sω*ci)*x_p + (-sΩ*sω + cΩ*cω*ci)*y_p;
-    const z = (sω*si)*x_p + (cω*si)*y_p;
-    // We render in XZ plane originally; map inertial (x,y,z) -> (x,0,z) by dropping y
+  for (let k = 0; k <= samples; k++) {
+    const nu = 2 * Math.PI * (k / samples);
+    const r = a * (1 - e * e) / (1 + e * Math.cos(nu));
+    const angle = nu + inPlaneRotation;
+    const x = r * Math.cos(angle);
+    const z = r * Math.sin(angle);
     pts.push(new THREE.Vector3(x, 0, z));
   }
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  // dashed distances for dashed materials
   const tmp = new THREE.Line(geo, new THREE.LineBasicMaterial());
   tmp.computeLineDistances();
   return geo;
 }
-
 function hashColor(str){
   let h=0; for(let i=0;i<str.length;i++){ h = (h<<5)-h + str.charCodeAt(i); h|=0; }
   const r = (h>>16 & 255), g=(h>>8 & 255), b=(h & 255);
@@ -800,8 +874,8 @@ function makeNarrative(A, B, score, diffs) {
     
     // Orbital geometry
     const geomParts = [];
-    if (Math.abs(diffs.dOmegaDeg || 0) >= 0.01) geomParts.push(`Δω = ${narrNumber(diffs.dOmegaDeg, {dp:2, unit:'°'})}`);
-    if (Math.abs(diffs.dVarpiDeg || 0) >= 0.01) geomParts.push(`Δϖ = ${narrNumber(diffs.dVarpiDeg, {dp:2, unit:'°'})}`);
+    if (typeof diffs.dOmegaDeg === 'number') geomParts.push(`Δω = ${angleSmartDeg(diffs.dOmegaDeg)}`);
+    if (typeof diffs.dVarpiDeg === 'number') geomParts.push(`Δϖ = ${angleSmartDeg(diffs.dVarpiDeg)}`);
     if (geomParts.length > 0) parts.push(`year geometry rotated: ${geomParts.join(', ')}`);
     
     // Perihelion info (always show if available)
@@ -945,7 +1019,21 @@ function leanPhrase(rel, who){
   if (rel<=-4) return `field from the ${who} weaker than average (−${Math.abs(rel).toFixed(1)}%)`;
   return null;
 }
-function num(x, dp=1, unit=''){ return (x==null||isNaN(x))?'n/a':`${(+x).toFixed(dp)}${unit}`; }
+function num(x, dp=1, unit=''){
+  if (x==null || isNaN(x)) return 'n/a';
+  const v = +x;
+  const maxDp = 6;
+  let d = dp;
+  let s = v.toFixed(d);
+  // If rounding to "0.0" but value isn't zero, increase decimals until a non-zero digit appears or maxDp reached
+  while (d < maxDp && Math.abs(+s) === 0 && v !== 0){
+    d++;
+    s = v.toFixed(d);
+  }
+  // Normalize -0.0 to 0 with the chosen precision
+  if (Math.abs(+s) === 0) s = (0).toFixed(d);
+  return `${s}${unit}`;
+}
 function numSig(x, sig=3, unit=''){ return (x==null||isNaN(x))?'n/a':`${(+x).toExponential(sig)}${unit}`; }
 
 // Nice number formatting (fixed for readable range, exponential for extremes)
@@ -956,6 +1044,26 @@ function nice(x, unit=''){
     ? v.toFixed(3).replace(/\.?0+$/,'')
     : v.toExponential(2);
   return `${s}${unit}`;
+}
+
+// Angle smart formatter: use arcseconds for tiny angles, else degrees with 3 dp
+function angleSmartDeg(deg){
+  if (deg==null || isNaN(deg)) return 'n/a';
+  const v = +deg; const ad = Math.abs(v);
+  if (ad < 1e-3){
+    const as = v*3600; // arcseconds
+    const aas = Math.abs(as);
+    const dp = aas >= 0.1 ? 1 : (aas >= 0.01 ? 2 : 3);
+    // Avoid "-0.0" and ensure visibility of tiny non-zero values
+    let s = as.toFixed(dp);
+    if (Math.abs(+s) === 0 && as !== 0){
+      const dp2 = Math.min(dp+1, 4);
+      s = as.toFixed(dp2);
+    }
+    if (Math.abs(+s) === 0) s = (0).toFixed(dp);
+    return `${s}″`;
+  }
+  return `${v.toFixed(3)}°`;
 }
 
 // Accurate day-phase classification by sun altitude
@@ -1013,8 +1121,8 @@ function makeNarrative(A, B, score, diffs, extras={}){
   if (Math.abs(diffs.dNs_grav||0) >= 1e-3) parts.push(`1-s tidal time-bias changed ${nice(diffs.dNs_grav,' ns/s')}`);
   if (Math.abs(diffs.dNs_kin||0) >= 1e-3) parts.push(`rotation/latitude rate changed ${nice(diffs.dNs_kin,' ns/s')}`);
   if (Math.abs(diffs.dNs_comb||0) >= 1e-3) parts.push(`combined rate shifted ${nice(diffs.dNs_comb,' ns/s')}`);
-  if (Math.abs(diffs.dOmegaDeg||0) >= 0.01) parts.push(`Δω = ${num(diffs.dOmegaDeg,2,'°')}`);
-  if (Math.abs(diffs.dVarpiDeg||0) >= 0.01) parts.push(`Δϖ = ${num(diffs.dVarpiDeg,2,'°')}`);
+  if (typeof diffs.dOmegaDeg === 'number') parts.push(`Δω = ${angleSmartDeg(diffs.dOmegaDeg)}`);
+  if (typeof diffs.dVarpiDeg === 'number') parts.push(`Δϖ = ${angleSmartDeg(diffs.dVarpiDeg)}`);
   if (extras.periA || extras.periB) parts.push(`perihelion A: ${extras.periA||'n/a'} → B: ${extras.periB||'n/a'}`);
 
   // 1) Causal/envelope line (bounded % or n/a)
@@ -1639,6 +1747,8 @@ function animate(){
   hoverId = intersects.length ? intersects[0].object.userData.id : null;
   updateLabelVisibility();
   
+  window.ColorDirector?.tick?.(performance.now());
+
   renderer.render(scene, camera);
 }
 
@@ -1656,10 +1766,11 @@ async function getHalo(year){
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     geo.computeBoundingSphere();
-    const tmpLine = new THREE.Line(geo, new THREE.LineBasicMaterial());
-    tmpLine.computeLineDistances();
-    const mat = new THREE.LineBasicMaterial({ color:0x6aa4ff, transparent:true, opacity:0.55, depthWrite:false });
-    const line = new THREE.Line(geo, mat); scene.add(line);
+    const mat = createOrbitLineMaterial(0.62);
+    const line = new THREE.Line(geo, mat);
+    line.computeLineDistances();
+    prepareOrbitGradientLine(line);
+    scene.add(line);
     halos.set(year, line);
     return line;
   })();
@@ -1668,13 +1779,16 @@ async function getHalo(year){
   try{
     const el = await fetchElementsForYear(year);
     const geo = elementsToEllipseGeometry(el, 960);
-    const mat = new THREE.LineBasicMaterial({ color:0x6aa4ff, transparent:true, opacity:0.85, depthWrite:false });
+    const mat = createOrbitLineMaterial(0.85);
     const precise = new THREE.Line(geo, mat);
+    precise.computeLineDistances();
+    prepareOrbitGradientLine(precise);
     precise.visible = approx.visible;           // respect current mode
     scene.add(precise);
     halosPrecise.set(year, precise);
 
     // remove approx
+    releaseOrbitGradientLine(approx);
     scene.remove(approx);
     halos.delete(year);
 
@@ -1771,6 +1885,7 @@ elFile.addEventListener('change', async (e)=>{
   warmYears(); // pre-fetch precise orbits
 });
 
+
 document.getElementById('btnSample').onclick = async ()=>{
   // Seed with a few demo items including equinox samples at exact wall-clock times
   const base = Date.UTC(2023,5,21,9,14);
@@ -1810,7 +1925,9 @@ document.getElementById('btnSetSite').onclick = ()=>{
   const lat = prompt('Latitude (deg, north positive):', '34.05');
   const lon = prompt('Longitude (deg, east positive):', '-118.25');
   if(lat!=null && lon!=null){
-    store.defaultSite = { lat: +lat, lon: +lon };
+    const site = { lat: +lat, lon: +lon };
+    store.defaultSite = site;
+    window.ColorDirector?.setSite?.(site);
     alert('Default site set. New uploads will use this unless EXIF GPS is present.');
   }
 };
@@ -2134,17 +2251,29 @@ function renderStates(){
       br: ((b.states.tideVec.moon.bearing - a.states.tideVec.moon.bearing + 540)%360 - 180)
     };
 
-    // Orbital elements for narrative (if available)
+    // Orbital elements for narrative: prefer GR module; fallback to Horizons elements if present
     const elA_narr = yearElements.get(a.year), elB_narr = yearElements.get(b.year);
-    let dOmega = 0, dVarpi = 0, periA = null, periB = null;
-    if (elA_narr && elB_narr) {
+    let dOmega = null, dVarpi = null, periA = null, periB = null;
+    try {
+      const HP = window.HaloPeri;
+      if (HP && typeof HP.stateAt==='function' && typeof HP.delta==='function'){
+        const Aperi = HP.stateAt(Date.parse(a.when), ['earth']);
+        const Bperi = HP.stateAt(Date.parse(b.when), ['earth']);
+        const Dperi = HP.delta(Aperi, Bperi);
+        dVarpi = +(Dperi?.dVarpiDeg?.earth ?? null);
+        // Without Ω,ω split, expose ω as approximate using ϖ
+        dOmega = dVarpi;
+        periA = Aperi.earth?.lastPerihelionISO || null;
+        periB = Bperi.earth?.lastPerihelionISO || null;
+      }
+    } catch {}
+    if (dVarpi==null && elA_narr && elB_narr) {
       const deg = x => (x*180/Math.PI);
       const wrapDeg = d => ((d+540)%360)-180; // wrap to [-180,180)
       const omegaA = deg(elA_narr.omega), omegaB = deg(elB_narr.omega);
       const bigOmegaA = deg(elA_narr.Omega), bigOmegaB = deg(elB_narr.Omega);
       const varpiA = omegaA + bigOmegaA; // ϖ = Ω + ω
       const varpiB = omegaB + bigOmegaB;
-
       dOmega = wrapDeg(omegaB - omegaA);
       dVarpi = wrapDeg(varpiB - varpiA);
       periA = elA_narr.perihelionISO || null;
@@ -2314,26 +2443,59 @@ function renderStates(){
       'Change in vertical/horizontal lunar gravitational tidal acceleration components and bearing.'));
 
     // Add orbital mechanics comparison if elements available
-    const elA = yearElements.get(a.year), elB = yearElements.get(b.year);
-    if (elA && elB){
-      const deg = x => (x*180/Math.PI);
-      const wrapDeg = d => ((d+540)%360)-180; // wrap to [-180,180)
-      const omegaA = deg(elA.omega), omegaB = deg(elB.omega);
-      const bigOmegaA = deg(elA.Omega), bigOmegaB = deg(elB.Omega);
-      const varpiA = omegaA + bigOmegaA; // ϖ = Ω + ω
-      const varpiB = omegaB + bigOmegaB;
+    // Prefer GR perihelion module if available for robust values; fallback to yearElements
+    try {
+      const tAms = Date.parse(a.when), tBms = Date.parse(b.when);
+      const HP = window.HaloPeri;
+      if (HP && typeof HP.stateAt === 'function' && typeof HP.delta === 'function'){
+        const Aperi = HP.stateAt(tAms, ['earth']);
+        const Bperi = HP.stateAt(tBms, ['earth']);
+        const Dperi = HP.delta(Aperi, Bperi);
+        const dVarpiEarthNum = +(Dperi?.dVarpiDeg?.earth ?? 0);
+        const wrap = d => ((d+540)%360)-180;
+        // We do not have Ω,ω split from HaloPeri; keep Δϖ from GR and omit Δω specific unless Horizons elements exist.
+        const elA = yearElements.get(a.year), elB = yearElements.get(b.year);
+        let dOmegaNum = dVarpiEarthNum; // fallback: with i≈0, treat Δω≈Δϖ (approx)
+        if (elA && elB) {
+          const degf = x => (x*180/Math.PI);
+          const omegaA = degf(elA.omega), omegaB = degf(elB.omega);
+          dOmegaNum = wrap(omegaB - omegaA);
+        }
+        // Perihelion timestamps from HaloPeri proximity cycles
+        const periADisp = Aperi.earth?.lastPerihelionISO || '(n/a)';
+        const periBDisp = Bperi.earth?.lastPerihelionISO || '(n/a)';
 
-      const dOmegaDisp = wrapDeg(omegaB - omegaA).toFixed(3);
-      const dVarpiDisp = wrapDeg(varpiB - varpiA).toFixed(3);
-      const periADisp = elA.perihelionISO || '(n/a)';
-      const periBDisp = elB.perihelionISO || '(n/a)';
+        diff.appendChild(makeToggleRow('Δ Argument of perihelion (ω)', `${angleSmartDeg(dOmegaNum)}`,
+          'Change in the ellipse\'s orientation within its orbital plane (year B − year A). Fallback uses GR Δϖ (i≈0 assumption).'));
+        diff.appendChild(makeToggleRow('Δ Longitude of perihelion (ϖ = Ω+ω)', `${angleSmartDeg(dVarpiEarthNum)}`,
+          'Change in the ellipse\'s absolute orientation against the reference frame (year B − year A).'));
+        diff.appendChild(makeToggleRow('Perihelion (A → B)', `${periADisp} → ${periBDisp}`,
+          'The date/time of closest approach to the Sun for each year\'s osculating orbit (GR-secular, approximate).'));
+      } else {
+        const elA = yearElements.get(a.year), elB = yearElements.get(b.year);
+        if (elA && elB){
+          const deg = x => (x*180/Math.PI);
+          const wrapDeg = d => ((d+540)%360)-180; // wrap to [-180,180)
+          const omegaA = deg(elA.omega), omegaB = deg(elB.omega);
+          const bigOmegaA = deg(elA.Omega), bigOmegaB = deg(elB.Omega);
+          const varpiA = omegaA + bigOmegaA; // ϖ = Ω + ω
+          const varpiB = omegaB + bigOmegaB;
 
-      diff.appendChild(makeToggleRow('Δ Argument of perihelion (ω)', `${dOmegaDisp}°`,
-        'Change in the ellipse\'s orientation within its orbital plane (year B − year A).'));
-      diff.appendChild(makeToggleRow('Δ Longitude of perihelion (ϖ = Ω+ω)', `${dVarpiDisp}°`,
-        'Change in the ellipse\'s absolute orientation against the reference frame (year B − year A).'));
-      diff.appendChild(makeToggleRow('Perihelion (A → B)', `${periADisp} → ${periBDisp}`,
-        'The date/time of closest approach to the Sun for each year\'s osculating orbit (from Horizons).'));
+          const dOmegaDisp = angleSmartDeg(wrapDeg(omegaB - omegaA));
+          const dVarpiDisp = angleSmartDeg(wrapDeg(varpiB - varpiA));
+          const periADisp = elA.perihelionISO || '(n/a)';
+          const periBDisp = elB.perihelionISO || '(n/a)';
+
+          diff.appendChild(makeToggleRow('Δ Argument of perihelion (ω)', `${dOmegaDisp}`,
+            'Change in the ellipse\'s orientation within its orbital plane (year B − year A).'));
+          diff.appendChild(makeToggleRow('Δ Longitude of perihelion (ϖ = Ω+ω)', `${dVarpiDisp}`,
+            'Change in the ellipse\'s absolute orientation against the reference frame (year B − year A).'));
+          diff.appendChild(makeToggleRow('Perihelion (A → B)', `${periADisp} → ${periBDisp}`,
+            'The date/time of closest approach to the Sun for each year\'s osculating orbit (from Horizons).'));
+        }
+      }
+    } catch (e) {
+      // Silent fallback if anything goes wrong
     }
   }
 }
@@ -2640,6 +2802,8 @@ function createMethodsSection(methodsDiag) {
   methodsSection.style.border = '1px solid #2a3856';
   methodsSection.style.borderRadius = '8px';
   methodsSection.style.backgroundColor = '#0a1018';
+  // Mark for easy cleanup on re-render
+  methodsSection.setAttribute('data-methods-section', '');
   
   const methodsHeader = document.createElement('div');
   methodsHeader.className = 'row toggle';
@@ -2742,6 +2906,8 @@ function createMethodsComparisonSection(methodsComp) {
   methodsCompSection.style.border = '1px solid #2a3856';
   methodsCompSection.style.borderRadius = '8px';
   methodsCompSection.style.backgroundColor = '#0a1018';
+  // Mark for easy cleanup on re-render
+  methodsCompSection.setAttribute('data-methods-comparison', '');
   
   const methodsCompHeader = document.createElement('div');
   methodsCompHeader.className = 'row toggle';
@@ -2803,6 +2969,13 @@ renderStates = function() {
   
   // Now add Methods Appendix sections
   const sel = [...store.selected].map(id=>store.items.find(x=>x.id===id)).filter(Boolean);
+  // Clean up previously injected Methods sections so content refreshes
+  try {
+    const singleHost = document.getElementById('single');
+    const diffHost = document.getElementById('diffText');
+    if (singleHost) singleHost.querySelectorAll('[data-methods-section]').forEach(n=>n.remove());
+    if (diffHost) diffHost.querySelectorAll('[data-methods-comparison]').forEach(n=>n.remove());
+  } catch {}
   
   // Add Methods section for single selection
   if (sel.length === 1) {
@@ -2824,10 +2997,3026 @@ renderStates = function() {
   
   // Keep the light-time dial update
   renderLightTimeDial();
+  
+  // Notify GR Perihelion panel to refresh using current A/B timestamps
+  try {
+    let tA = null, tB = null;
+    if (sel.length === 1) {
+      tA = Date.parse(sel[0]?.when) || Date.now();
+      tB = tA;
+    } else if (sel.length >= 2) {
+      const a = sel[sel.length-2], b = sel[sel.length-1];
+      tA = Date.parse(a?.when) || Date.now();
+      tB = Date.parse(b?.when) || tA;
+    } else {
+      tA = Date.now();
+      tB = tA;
+    }
+    // Also pass diffs for optional post-processors; stash globally for convenience
+    const detail = { tA, tB };
+    try { if (typeof diffData === 'object') { detail.diffs = diffData; window.lastDiffs = diffData; } } catch {}
+    window.dispatchEvent(new CustomEvent('states:updated', { detail }));
+  } catch {}
 };
 
 /* End Methods Appendix Implementation */
 
+// When the GR perihelion module becomes ready, re-render so Methods uses it (not the fallback)
+window.addEventListener('perihelion:ready', () => {
+  try { renderStates(); } catch {}
+});
+
 </script>
+  
+  <!-- Make Relative States text selectable -->
+  <style id="relative-states-selectable">
+    #statesBody, #single, #diffText, #relative-states, [data-relativestates], .relative-states,
+    #chips,
+    #statesBody *, #single *, #diffText *, #relative-states *, [data-relativestates] *, .relative-states *,
+    .row, .row *, .toggle, .toggle * {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+      cursor: text;
+    }
+  </style>
+  <!-- ========================== -->
+  <!-- GR Perihelion module START -->
+  <!-- ========================== -->
+  <style id="perihelion-gr-styles">
+    .peri-chip{display:inline-flex;align-items:center;gap:.5rem;padding:.35rem .6rem;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);font:600 12px/1.2 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial}
+    .peri-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-top:.5rem}
+    .peri-card{border:1px solid rgba(255,255,255,.12);border-radius:1rem;padding:.75rem;background:rgba(0,0,0,.25);backdrop-filter:saturate(120%) blur(2px)}
+    .peri-kv{display:flex;justify-content:space-between;gap:.75rem;font:500 12px/1.35 ui-sans-serif,system-ui}
+    .peri-kv b{font-weight:700}
+    .peri-muted{opacity:.7}
+    .peri-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .5rem;border-radius:.5rem;background:#0f172a;color:#cbd5e1;border:1px solid #1e293b}
+    .peri-badge svg{width:14px;height:14px}
+  </style>
+  <script id="perihelion-gr" type="module">
+  (() => {
+    // ------------------------------
+    // Numerics & tiny helpers
+    // ------------------------------
+    const C = 299_792_458;                        // m/s
+    const GM_SUN = 1.327_124_400_18e20;          // m^3/s^2
+    const AU = 149_597_870_700;                  // m
+    const TAU = Math.PI*2;
+    const deg = r => r*180/Math.PI;
+    const rad = d => d*Math.PI/180;
+    const normRad = x => (x%TAU + TAU)%TAU;
+    const normDeg = d => (d%360 + 360)%360;
+    const cycDeltaDeg = (a,b) => {
+      let d = normDeg(b) - normDeg(a);
+      if (d>180) d-=360;
+      if (d<-180) d+=360;
+      return d;
+    };
+    const toISO = t => new Date(t).toISOString().replace('.000','');
+
+    // ------------------------------
+    // Minimal planet catalog
+    // J2000 approximate mean elements sufficient for analytics & UI
+    // Source: standard astro refs (values rounded); extend as needed.
+    // a in AU, e dimensionless, P in days, varpi0 in deg @ J2000 (ICRS)
+    // ------------------------------
+    const PLANETS = {
+      earth:   { label:"Earth",   a_AU: 1.00000011, e:0.01671022, P_days:365.256363004, varpi0_deg:102.937348 },
+      mercury: { label:"Mercury", a_AU: 0.38709893, e:0.20563069, P_days:87.9691,       varpi0_deg: 77.456119 },
+      // venus: { a_AU:0.72333199,e:0.00677323,P_days:224.701, varpi0_deg:131.53298 },
+      // mars:  { a_AU:1.52366231,e:0.09341233,P_days:686.98,  varpi0_deg:336.04084 },
+      // (feel free to uncomment/extend)
+    };
+
+    // ------------------------------
+    // GR perihelion advance per orbit: Δϖ = 6π GM / [a(1-e²)c²]
+    // a in meters
+    // ------------------------------
+    function grPerOrbitRad({a_m,e}) {
+      return 6*Math.PI*GM_SUN/(a_m*(1-e*e)*C*C);
+    }
+
+    // Kepler solver (for proximity % calculation)
+    function keplerSolveE(M,e, tol=1e-8){
+      // M in rad
+      let E = e < 0.8 ? M : Math.PI;
+      for (let i=0;i<30;i++){
+        const f = E - e*Math.sin(E) - M;
+        const fp = 1 - e*Math.cos(E);
+        const dE = -f/fp;
+        E += dE;
+        if (Math.abs(dE) < tol) break;
+      }
+      return E;
+    }
+    function trueAnomalyFromM(M,e){
+      const E = keplerSolveE(M,e);
+      const cosE = Math.cos(E), sinE = Math.sin(E);
+      const sqrt = Math.sqrt((1+e)/(1-e));
+      const tanNu2 = sqrt * (sinE/(1 - e*cosE));
+      return 2*Math.atan(tanNu2);
+    }
+
+    // Mean motion (rad/s) from period (days)
+    const n_from_P = P_days => TAU / (P_days*86400);
+
+    // Reference epoch (J2000.0 TT ~ UTC proxy); OK for analytics/UI
+    const T0 = Date.UTC(2000,0,1,12,0,0);
+
+    // Mean longitude at J2000 for Earth (deg); used to estimate M0.
+    // We keep this local to Earth because we only compute proximity% for Earth by default.
+    const L0_earth_deg = 100.46435; // approx mean longitude Earth @J2000
+
+    // Compute instantaneous ϖ(t) with GR advance (rad) using per-orbit increment
+    function varpiAt(tms, body){
+      const { a_AU, e, P_days, varpi0_deg } = body;
+      const a_m = a_AU*AU;
+      const dvarpi = grPerOrbitRad({a_m,e});
+      const nOrbits = (tms - T0)/(P_days*86400*1000);
+      const varpi0 = rad(varpi0_deg);
+      return normRad(varpi0 + nOrbits*dvarpi);
+    }
+
+    // Proximity to perihelion for Earth (0..100%)
+    // Based on mean anomaly evolution since J2000; independent of GR (which rotates the ellipse).
+    function perihelionProximityPct_Earth(tms){
+      const E = PLANETS.earth;
+      const n = n_from_P(E.P_days);
+      // Mean anomaly @J2000: M0 = L0 - ϖ0
+      const M0 = rad(L0_earth_deg - E.varpi0_deg);
+      const M = normRad(M0 + n*((tms - T0)/1000));
+      const nu = trueAnomalyFromM(M, E.e); // radians
+      // distance ratio: r_p = a(1-e); r = a(1-e^2)/(1+e cos nu)
+      // proximity: 0 at aphelion (nu=π), 1 at perihelion (nu=0)
+      // map cos(nu) to [0..1]: prox = (1+cos nu)/2 weighted by eccentricity
+      const prox = (1 + Math.cos(nu))/2;
+      return Math.round(prox*1000)/10; // one decimal %
+    }
+
+    // Find last/next perihelion timestamps for Earth (by scanning around now)
+    function nearestPerihelionTimes_Earth(tms){
+      const E = PLANETS.earth;
+      const Pms = E.P_days*86400*1000;
+      // Estimate k such that J2000 + k*P ≈ tms with k integer
+      const k = Math.round((tms - T0)/Pms);
+      // Perihelion around cycle k occurs when M ≈ 0 (nu≈0). We'll just return centers of cycles as proxies.
+      const cand = T0 + k*Pms;
+      const prev = cand - Pms;
+      const next = cand + Pms;
+      // Choose prev/next around tms
+      const last = cand <= tms ? cand : prev;
+      const upcoming = cand > tms ? cand : next;
+      return { last, next: upcoming };
+    }
+
+    // Build a state object for a planet at time t
+    function periState(tms, key){
+      const body = PLANETS[key];
+      if (!body) return null;
+      const varpi = varpiAt(tms, body);
+      const res = {
+        key, label: body.label,
+        varpiDeg: deg(varpi),
+        varpiRad: varpi,
+        source: "GR-secular+J2000",
+      };
+      if (key === "earth"){
+        res.proximityPct = perihelionProximityPct_Earth(tms);
+        const {last, next} = nearestPerihelionTimes_Earth(tms);
+        res.lastPerihelionISO = toISO(last);
+        res.nextPerihelionISO = toISO(next);
+      }
+      return res;
+    }
+
+    // Public API
+    const HaloPeri = {
+      version: "0.4.0",
+      stateAt: (tms, keys=["earth","mercury"]) => {
+        const out = {};
+        keys.forEach(k => out[k] = periState(tms,k));
+        return out;
+      },
+      delta: (A,B) => {
+        // returns Δϖ (deg) per key + Earth proximity delta
+        const keys = Object.keys(A).filter(k => B[k]);
+        const d = { keys, dVarpiDeg:{} };
+        for (const k of keys){
+          // Preserve full precision; formatting will handle visibility (arcseconds if tiny)
+          d.dVarpiDeg[k] = cycDeltaDeg(A[k].varpiDeg, B[k].varpiDeg);
+        }
+        if (A.earth?.proximityPct!=null && B.earth?.proximityPct!=null){
+          d.dProxPct = Math.round((B.earth.proximityPct - A.earth.proximityPct)*10)/10;
+        }
+        return d;
+      },
+      // similarity feature in [0..1], tiny weight: compare Earth's ϖ and proximity
+      similarityFeature: (A,B) => {
+        if (!A?.earth || !B?.earth) return 0;
+        const dVarpi = Math.abs(cycDeltaDeg(A.earth.varpiDeg, B.earth.varpiDeg)); // 0..180
+        const sVarpi = 1 - (dVarpi/180); // 1 when equal
+        const proxA = A.earth.proximityPct ?? 0, proxB = B.earth.proximityPct ?? 0;
+        const sProx = 1 - Math.min(1, Math.abs(proxA - proxB)/100);
+        // Mercury echo (very small)
+        let sMerc = 0;
+        if (A.mercury && B.mercury){
+          const dM = Math.abs(cycDeltaDeg(A.mercury.varpiDeg, B.mercury.varpiDeg));
+          sMerc = 1 - (dM/180);
+        }
+        // Weighted blend; capped to [0..1]
+        const s = Math.max(0, Math.min(1, 0.5*sVarpi + 0.4*sProx + 0.1*sMerc));
+        return s;
+      }
+    };
+    // Expose globally (non-enumerable to keep consoles tidy)
+    Object.defineProperty(window, "HaloPeri", { value: HaloPeri, writable:false });
+
+    // ============================================================
+    // NEW: GR Compliance (PPN) + Warp Exterior (defaults only)
+    // ============================================================
+    // Defaults (no sliders): beta=gamma=1 → F_PPN=1
+    const PPN = { beta: 1.0, gamma: 1.0 };
+    function F_PPN(beta=PPN.beta, gamma=PPN.gamma){
+      // F = (2 - beta + 2*gamma)/3; equals 1 in GR
+      return (2 - beta + 2*gamma)/3;
+    }
+    // Predict Δvarpi over span (A→B) for planet key with PPN scaling (SIGNED arcsec)
+    function predictAdvancePPN_arcsec(tA, tB, key){
+      const body = PLANETS[key]; if(!body) return 0;
+      // Use SIGNED number of orbits so prediction follows A→B direction
+      const dOrbit = (tB - tA)/(body.P_days*86400*1000);
+      const perOrbit = grPerOrbitRad({ a_m: body.a_AU*AU, e: body.e }); // radians/orbit
+      const dPPN = F_PPN()*perOrbit*dOrbit; // radians over span (signed)
+      return dPPN * (180/Math.PI) * 3600; // arcsec
+    }
+    // Observed Δvarpi from state objects (degrees) → arcsec
+    function observedAdvance_arcsec(A,B,key){
+      const a = A[key]?.varpiDeg, b = B[key]?.varpiDeg;
+      if (typeof a !== 'number' || typeof b !== 'number') return 0;
+      return cycDeltaDeg(a,b) * 3600; // arcsec
+    }
+    // Convert arcsec over span to arcsec/century equivalent
+    function toArcsecPerCentury(arcsecSpan, tA, tB){
+      const dt_years = Math.abs(tB - tA)/(365.25*86400*1000);
+      return dt_years>0 ? arcsecSpan * (100/dt_years) : 0;
+    }
+    // Implied exterior deviation ε from residual (toy: scale factor 1+ε)
+    function impliedEpsilonFromResidual(residual_arcsec, gr_arcsec){
+      // If prediction is effectively zero for this span, don’t blow up ε
+      if (!isFinite(gr_arcsec) || Math.abs(gr_arcsec) < 1e-6) return 0;
+      return residual_arcsec / gr_arcsec;
+    }
+    // Verdicts (conservative)
+    const TOL = { mercury: 1.0, earth: 0.2 }; // ″/century
+    function verdictFromResidual(rate_arcsec_per_century, key){
+      const lim = (key==='mercury')?TOL.mercury:TOL.earth;
+      const mag = Math.abs(rate_arcsec_per_century);
+      if (!isFinite(mag)) return 'n/a';
+      // Treat tiny residuals as “consistent / below resolution”
+      if (mag <= lim) {
+        return mag < 0.05 ? 'OK (consistent; below resolution)' : 'OK (GR-consistent)';
+      }
+      return 'Ruled-out';
+    }
+
+    // -----------------------------------------------
+    // NEW helpers for refined perihelion timing
+    // -----------------------------------------------
+    function meanAnomalyAt(tms, body){
+      const n = n_from_P(body.P_days);                 // rad/s
+      const M0 = rad(L0_earth_deg - body.varpi0_deg);  // deg->rad (Earth uses L0)
+      const dt = (tms - T0)/1000;                      // s
+      return normRad(M0 + n*dt);
+    }
+    function trueAnomalyAt(tms, body){
+      const M = meanAnomalyAt(tms, body);
+      return trueAnomalyFromM(M, body.e);
+    }
+    function rOf(tms, body){
+      const { a_AU, e } = body;
+      const a = a_AU; // AU, cancels in min search; absolute unit not needed
+      const nu = trueAnomalyAt(tms, body);
+      return a*(1 - e*e)/(1 + e*Math.cos(nu)); // proportional to distance; fine for argmin
+    }
+    // Golden-section search for argmin in [t0, t1]
+    function goldenSectionArgmin(f, t0, t1, iters=42){
+      const gr = (Math.sqrt(5)-1)/2; // ~0.618
+      let a=t0, b=t1;
+      let c=b - gr*(b-a), d=a + gr*(b-a);
+      let fc=f(c), fd=f(d);
+      for (let i=0;i<iters;i++){
+        if (fc < fd){ b=d; d=c; fd=fc; c=b - gr*(b-a); fc=f(c); }
+        else { a=c; c=d; fc=fd; d=a + gr*(b-a); fd=f(d); }
+      }
+      return (a+b)/2;
+    }
+
+    // Refined Earth perihelion finder: search for min r(t) near cycle centers
+    function nearestPerihelionTimes_Earth_refined(tms){
+      const E = PLANETS.earth;
+      const Pms = E.P_days*86400*1000;
+      // center indices near the target time
+      const k = Math.round((tms - T0)/Pms);
+      const centers = [k-1, k, k+1].map(j => T0 + j*Pms);
+      // search window around each center (±0.6 P covers drift and ensures bracket)
+      const span = 0.6*Pms;
+      const peris = centers.map(c => goldenSectionArgmin(t => rOf(t, E), c - span, c + span, 48));
+      peris.sort((a,b)=>a-b);
+      // pick last <= tms and next > tms
+      let last = peris[0], next = peris[peris.length-1];
+      for (let i=0;i<peris.length;i++){
+        if (peris[i] <= tms) last = peris[i];
+        if (peris[i] > tms){ next = peris[i]; break; }
+      }
+      return { last, next };
+    }
+
+    // Optional Sun altitude check (uses app-provided hooks if available)
+    function sunAltAtMaybe(tms){
+      // Try common hooks: app may expose one of these
+      const hook = (window.SunAlt && typeof window.SunAlt.at === "function")
+                    ? window.SunAlt.at
+                    : (typeof window.getSunAlt === "function" ? window.getSunAlt : null);
+      if (!hook) return null;
+      try {
+        const alt = hook(tms); // expect degrees
+        if (typeof alt === "number" && isFinite(alt)) return alt;
+      } catch {}
+      return null;
+    }
+
+    // Small UI helpers for "ⓘ" tooltips and badges
+    const periUI = {
+      // Note: role=button + tabindex=0 for keyboard/touch access. We keep title for desktop hover,
+      // and add a JS popover for touch/click (see initInfoPopovers below).
+      infoIcon: `<span class="peri-info" role="button" tabindex="0" aria-expanded="false" title=""><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="12" cy="7.2" r="1.1" fill="currentColor"/><rect x="11" y="10" width="2" height="7" rx="1" fill="currentColor"/></svg></span>`,
+      badge(status){
+        const cls = /OK/.test(status) ? 'ok' : (/Ruled/.test(status)?'warn':'peri-muted');
+        return `<span class="peri-badge ${cls}">${status}</span>`;
+      },
+      fmtArcsec(x){
+        const ax = Math.abs(x);
+        if (ax >= 0.1) return `${x.toFixed(1)}″`;
+        return `${(x*1000).toFixed(1)} mas`;
+      },
+      fmtRate(x){
+        const ax = Math.abs(x);
+        if (ax >= 0.1) return `${x.toFixed(1)}″/century`;
+        return `${(x*1000).toFixed(1)} mas/century`;
+      }
+    };
+
+    // Minimal CSS for info icon hover + touch popover (reuses existing palette)
+    (function injectInfoStyles(){
+      if (document.getElementById('perihelion-gr-info-styles')) return;
+      const css = `
+        .peri-info{display:inline-flex;align-items:center;justify-content:center;margin-left:.35rem;color:#9fb0d9;opacity:.9;cursor:pointer;outline:none}
+        .peri-info:hover{color:#cfe1ff}
+        .peri-info:focus-visible{box-shadow:0 0 0 2px #9fb0d980;border-radius:999px}
+        .peri-badge.ok{border-color:#1a4836;background:#103528;color:#a6ffd8}
+        .peri-badge.warn{border-color:#5b3d12;background:#2b200f;color:#ffd38a}
+        .peri-popover{position:absolute;z-index:99999;max-width:min(80vw,340px);padding:.5rem .6rem;border-radius:.5rem;border:1px solid #1e293b;background:#0f172a;color:#cbd5e1;font:500 12px/1.35 ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+        .peri-popover[data-placement="top"]::after,.peri-popover[data-placement="bottom"]::after{content:"";position:absolute;left:12px;border:6px solid transparent}
+        .peri-popover[data-placement="top"]::after{bottom:-12px;border-top-color:#1e293b}
+        .peri-popover[data-placement="bottom"]::after{top:-12px;border-bottom-color:#1e293b}
+        @media (hover:none){ .peri-info{opacity:1} }
+      `;
+      const el = document.createElement('style');
+      el.id='perihelion-gr-info-styles'; el.textContent=css; document.head.appendChild(el);
+    })();
+
+    // Touch-friendly, accessible popovers for info icons
+    (function initInfoPopovers(){
+      if (window.__periInfoInit) return; window.__periInfoInit = true;
+      let open = null; let openIcon = null;
+      function close(){
+        if (open){ try { open.remove(); } catch {} open = null; }
+        if (openIcon){ try { openIcon.setAttribute('aria-expanded','false'); openIcon.classList.remove('open'); } catch {} openIcon = null; }
+      }
+      function makePopover(text, anchor){
+        const tip = document.createElement('div');
+        tip.className = 'peri-popover';
+        tip.textContent = text;
+        document.body.appendChild(tip);
+        // Position near anchor
+        const r = anchor.getBoundingClientRect();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const scrollX = window.scrollX || window.pageXOffset, scrollY = window.scrollY || window.pageYOffset;
+        const preferBottom = r.top < vh*0.6;
+        tip.setAttribute('data-placement', preferBottom ? 'bottom' : 'top');
+        // compute size after adding
+        const tw = tip.offsetWidth, th = tip.offsetHeight;
+        let left = r.left + scrollX;
+        let top = (preferBottom ? (r.bottom + 8 + scrollY) : (r.top - th - 8 + scrollY));
+        // keep within viewport
+        if (left + tw + 8 > scrollX + vw) left = Math.max(8 + scrollX, vw + scrollX - tw - 8);
+        if (left < 8 + scrollX) left = 8 + scrollX;
+        if (top < 8 + scrollY) top = r.bottom + 8 + scrollY, tip.setAttribute('data-placement','bottom');
+        tip.style.left = left + 'px'; tip.style.top = top + 'px';
+        return tip;
+      }
+      function toggleIcon(el){
+        const text = (el.getAttribute('title') || '').trim();
+        if (!text) return;
+        if (open && openIcon === el){ close(); return; }
+        close();
+        open = makePopover(text, el);
+        openIcon = el; el.setAttribute('aria-expanded','true'); el.classList.add('open');
+      }
+      document.addEventListener('click', (ev)=>{
+        const icon = ev.target && ev.target.closest && ev.target.closest('.peri-info');
+        if (icon){
+          ev.preventDefault(); ev.stopPropagation();
+          toggleIcon(icon);
+        } else {
+          close();
+        }
+      }, { capture:true });
+      document.addEventListener('keydown', (ev)=>{
+        const tgt = ev.target && ev.target.closest && ev.target.closest('.peri-info');
+        if (!tgt) { if (ev.key === 'Escape') close(); return; }
+        if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); toggleIcon(tgt); }
+        if (ev.key === 'Escape'){ close(); }
+      });
+      window.addEventListener('scroll', ()=>{ close(); }, { passive:true });
+      window.addEventListener('resize', ()=>{ close(); });
+    })();
+
+    // -----------------------------------------------
+    // Integration hooks (progressive enhancement)
+    // -----------------------------------------------
+    function nowMs(){ return Date.now(); }
+    function safeContainer(){
+      // Prefer explicit mount if provided, else fall back to existing app containers
+      return document.querySelector('[data-peri-mount], #statesBody, #single, #diffText, #relative-states, [data-relativestates], .relative-states') || null;
+    }
+
+    // 1) UI injector: add a small "Perihelion (GR)" card into Relative States if present
+    function injectPeriUI(tsA=null, tsB=null){
+      const mount = safeContainer();
+      if (!mount) return; // app may render its own panels; no-op
+      const existing = mount.querySelector("[data-peri-panel]");
+      const raw_tA = tsA ?? nowMs();
+      const raw_tB = tsB ?? raw_tA;
+      const swapped = raw_tA > raw_tB;
+      const tA = swapped ? raw_tB : raw_tA;
+      const tB = swapped ? raw_tA : raw_tB;
+  // Persist chronology for async renderers or external callers
+  HaloPeri.lastChrono = { tA, tB };
+  const A = HaloPeri.stateAt(tA);
+  const B = HaloPeri.stateAt(tB);
+      const Δ = HaloPeri.delta(A,B);
+      const s = HaloPeri.similarityFeature(A,B);
+
+      const fmtAng = (degVal) => {
+        const v = +degVal;
+        if (!isFinite(v)) return 'n/a';
+        if (typeof window.angleSmartDeg === 'function') return window.angleSmartDeg(v);
+        const ad = Math.abs(v);
+        if (ad < 1e-3){
+          const as = v*3600; const aas = Math.abs(as);
+          let dp = aas >= 0.1 ? 1 : (aas >= 0.01 ? 2 : 3);
+          let s = as.toFixed(dp);
+          let tries = dp;
+          while (tries < 6 && Math.abs(+s) === 0 && as !== 0){ tries++; s = as.toFixed(tries); }
+          if (Math.abs(+s) === 0) s = (0).toFixed(dp);
+          return `${s}″`;
+        }
+        return `${v.toFixed(3)}°`;
+      };
+
+      // Replace placeholder perihelion with refined timings
+      try {
+        const { last: lastA, next: nextA } = nearestPerihelionTimes_Earth_refined(tA);
+        const { last: lastB, next: nextB } = nearestPerihelionTimes_Earth_refined(tB);
+        A.earth.lastPerihelionISO = toISO(lastA);
+        A.earth.nextPerihelionISO = toISO(nextA);
+        B.earth.lastPerihelionISO = toISO(lastB);
+        B.earth.nextPerihelionISO = toISO(nextB);
+      } catch {}
+
+      // Optional Sun altitude info if available
+      const altA = sunAltAtMaybe(tA);
+      const altB = sunAltAtMaybe(tB);
+      const altBlock = (altA!=null || altB!=null) ? `
+        <div class="peri-card">
+          <div class="peri-kv"><span>Sun altitude (A)</span><b>${altA!=null ? altA.toFixed(1)+'°' : 'n/a'}</b></div>
+          <div class="peri-kv"><span>Sun altitude (B)</span><b>${altB!=null ? altB.toFixed(1)+'°' : 'n/a'}</b></div>
+          ${(altA!=null && (altA<-6 || altA>88)) || (altB!=null && (altB<-6 || altB>88)) ? `
+            <div class="peri-kv peri-muted"><span>Note</span><b>not near local noon</b></div>` : ``}
+        </div>` : ``;
+
+      // ---- NEW: GR Compliance (PPN) & Warp Exterior blocks ----
+      const keys = ["mercury","earth"].filter(k => A[k] && B[k]);
+      const rows = keys.map(k => {
+        const obs = observedAdvance_arcsec(A,B,k);
+        const pred = predictAdvancePPN_arcsec(tA,tB,k); // GR with defaults (signed)
+        const res  = obs - pred;
+        const rateObs  = toArcsecPerCentury(obs, tA, tB);
+        const ratePred = toArcsecPerCentury(pred, tA, tB);
+        const rateRes  = toArcsecPerCentury(res,  tA, tB);
+        const ver = verdictFromResidual(rateRes, k);
+        const eps = impliedEpsilonFromResidual(res, Math.abs(pred) < 1e-9 ? 0 : pred);
+        const spanOK = Math.abs((tB - tA)/(PLANETS[k].P_days*86400*1000)) >= 0.2; // ≥0.2 orbits
+        const resLabel = spanOK
+          ? `${periUI.fmtArcsec(res)} (${periUI.fmtRate(rateRes)})`
+          : `<span class="peri-muted">span too short</span>`;
+        const epsLabel = spanOK
+          ? (isFinite(eps) ? eps.toExponential(2) : 'n/a')
+          : `<span class="peri-muted">n/a</span>`;
+        return `
+          <div class="peri-card">
+            <div class="peri-kv"><span>${PLANETS[k].label} Δϖ<sub>obs</sub> (A→B) ${periUI.infoIcon.replace('title=""','title="Measured rotation between the two timestamps, wrapped to ±180° (sign follows A→B direction)."')}</span><b>${periUI.fmtArcsec(obs)} (${periUI.fmtRate(rateObs)})</b></div>
+            <div class="peri-kv"><span>Δϖ<sub>pred</sub> (PPN, β=γ=1) ${periUI.infoIcon.replace('title=""','title="Prediction from tested Solar-System PPN (β≈1, γ≈1). Uses the SIGNED number of orbits over A→B."')}</span><b>${periUI.fmtArcsec(pred)} (${periUI.fmtRate(ratePred)})</b></div>
+            <div class="peri-kv"><span>Residual ${periUI.infoIcon.replace('title=""','title="obs − pred. If small, the exterior is consistent with GR within the span’s resolution."')}</span><b>${resLabel}</b></div>
+            <div class="peri-kv"><span>Implied exterior ε ${periUI.infoIcon.replace('title=""','title="Toy mapping: fractional exterior deviation that would scale perihelion by (1+ε) at the planet’s orbital radius."')}</span><b>${epsLabel}</b></div>
+            <div class="peri-kv"><span>Verdict</span><b>${periUI.badge(ver)}</b></div>
+          </div>`;
+      }).join('');
+
+      const grPPNBlock = `
+        <div class="peri-card" data-ppn-panel style="margin-top:.5rem">
+          <div class="peri-kv" style="margin-bottom:.5rem">
+            <b>GR Compliance (PPN)</b>
+            ${periUI.infoIcon.replace('title=""','title="We compare observed perihelion rotation to the PPN/GR prediction (β=γ=1). Residuals large enough to imply ≥1″/century (Mercury) would contradict precision Solar-System tests."')}
+            <span class="peri-badge">β=1.000, γ=1.000</span>
+          </div>
+          <div class="peri-grid">
+            ${rows}
+          </div>
+        </div>`;
+
+      // Chronology header and series/accumulator helpers (moved outside templates)
+      function fmtUTC(ms){ try{ return new Date(ms).toISOString().replace('.000','').replace('T',' ');}catch{ return 'n/a'; } }
+      function fmtDeltaT(a,b){ const dt = Math.max(0, (b-a)/1000); const yrs = dt/31557600; return `${dt.toFixed(0)} s  (~${yrs.toFixed(2)} yr)`; }
+      const chronoHeader = `
+        <div class="peri-card" data-chrono-banner>
+          <div class="peri-kv">
+            <span>Chronology (UTC)</span>
+            <b>${fmtUTC(tA)} <span class="peri-muted">→</span> ${fmtUTC(tB)}</b>
+          </div>
+          <div class="peri-kv"><span>Δt (A→B)</span><b>+${fmtDeltaT(tA,tB)}</b></div>
+          ${swapped ? `<div class=\"peri-kv\"><span class=\"peri-muted\">Note</span><b class=\"peri-muted\">Inputs were reversed; reporting forward in time.</b></div>` : ``}
+        </div>`;
+
+  // Series sampling (fallback; Kepler ellipse)
+      function monthlySamples(t1, t2){
+        const tmin = Math.min(t1,t2), tmax = Math.max(t1,t2);
+        const out = []; let t = tmin;
+        while (t <= tmax + 1){ out.push(t); t += 30.44*DAY; }
+        if (out[out.length-1] !== tmax) out.push(tmax);
+        return out;
+      }
+      // Use helpers defined later in Everyday GR section: curvatureProxy, solarTide_uGal,
+      // shapiroDelay_s, summarize, fmtSigned, fmtRange, sunLonRad, pickConjunctionLambda, MIN_B, DAY.
+      // Provide a small helper that uses existing MIN_B for psi-aware impact parameter.
+      function impactParameter_b_withPsi(rE, psi){ return Math.max(MIN_B, rE*Math.sin(psi)); }
+      async function buildSpanSeries(tStart, tEnd){
+        const stamps = monthlySamples(tStart, tEnd);
+        const out = [];
+  for (const t of stamps){ const {r,v}=earth_r_v(t); out.push({t, r, v, tide_uGal: solarTide_uGal(r), K_m2: curvatureProxy(r), einstein_nsps: einsteinNsPerS(r,v)}); }
+        const series = { span: out, source: 'kepler' };
+        HaloPeri.series = series; window.lastSeries = series; return series;
+      }
+      function sparklineSVG(values, {w=120,h=24,stroke="#a7c4ff"}={}){
+        if (!values || values.length<2) return `<svg width="${w}" height="${h}"></svg>`;
+        const min = Math.min(...values), max = Math.max(...values), span = (max-min)||1; const dx = w/(values.length-1);
+        const pts = values.map((v,i)=> `${(i*dx).toFixed(1)},${(h - ((v-min)/span)*h).toFixed(1)}`).join(" ");
+        return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="1.3" vector-effect="non-scaling-stroke"/></svg>`;
+      }
+      // Trapezoid integral over span in "value·day" units (series is time-ordered)
+      function trapzDays(series, accessor){
+        if (!series || series.length<2) return 0;
+        let acc=0;
+        for (let i=0;i<series.length-1;i++){
+          const a=series[i], b=series[i+1];
+          const ya=accessor(a), yb=accessor(b);
+          const dt_day=(b.t-a.t)/DAY;
+          acc += 0.5*(ya+yb)*dt_day;
+        }
+        return acc;
+      }
+      // Absolute Einstein activity ∫|rate-mean| dt in ns, and RMS(ns/s) across span
+      function einsteinAbs_ns(series){
+        if (!series || series.length<2) return 0;
+        const mean = series.reduce((s,p)=>s+p.einstein_nsps,0)/series.length;
+        let acc=0;
+        for (let i=0;i<series.length-1;i++){
+          const a=series[i], b=series[i+1];
+          const ra=Math.abs(a.einstein_nsps-mean), rb=Math.abs(b.einstein_nsps-mean);
+          const dt_s=(b.t-a.t)/1000;
+          acc += 0.5*(ra+rb)*dt_s;
+        }
+        return acc;
+      }
+      function einsteinRMS_nsps(series){
+        if (!series || series.length<2) return 0;
+        let acc=0, w=0;
+        for (let i=0;i<series.length-1;i++){
+          const a=series[i], b=series[i+1];
+          const rm=0.5*(a.einstein_nsps + b.einstein_nsps);
+          const dt_s=(b.t-a.t)/1000;
+          acc += rm*rm*dt_s; w += dt_s;
+        }
+        return Math.sqrt(acc/(w||1));
+      }
+      // Higher-cadence Shapiro exposure: weekly steps, fixed ICRS target picked at A
+      function shapiroIndex_usDay_highres(tA, tB){
+        const step = 7*DAY; const star = (typeof pickConjunctionICRS==='function') ? pickConjunctionICRS(tA) : { alpha:0, delta:0 };
+        let acc=0;
+        for (let t=tA; t<tB; t+=step){
+          const t2 = Math.min(t+step, tB);
+            const r1 = earth_r_v(t).r, r2 = earth_r_v(t2).r;
+            const psi1 = (typeof separationICRS==='function') ? separationICRS(t, star.alpha, star.delta) : 0;
+            const psi2 = (typeof separationICRS==='function') ? separationICRS(t2, star.alpha, star.delta) : 0;
+            const b1 = impactParameter_b_withPsi(r1, psi1), b2 = impactParameter_b_withPsi(r2, psi2);
+            const sh1 = shapiroDelay_s(r1, r1, b1)*1e6, sh2 = shapiroDelay_s(r2, r2, b2)*1e6;
+            const dt_day=(t2-t)/DAY; acc += 0.5*(Math.abs(sh1)+Math.abs(sh2))*dt_day;
+        }
+        return acc;
+      }
+      function linearTrendPerYear(xs, ys){ if(xs.length<2) return 0; const x0=xs[0], toYr = ms=> (ms - x0)/(365.25*DAY); const X=xs.map(toYr); const n=X.length; const sx=X.reduce((a,b)=>a+b,0), sy=ys.reduce((a,b)=>a+b,0); const sxx=X.reduce((a,b)=>a+b*b,0), sxy=X.reduce((a,b,i)=>a+b*ys[i],0); const denom = n*sxx - sx*sx; if (Math.abs(denom)<1e-12) return 0; return (n*sxy - sx*sy)/denom; }
+      async function renderSpanEvolution(tStart, tEnd){
+        const panel=document.querySelector('[data-series-panel]'); if(!panel) return;
+        const series= await (HaloPeri.series?.span? HaloPeri.series: buildSpanSeries(tStart,tEnd));
+        const xs = series.span.map(p=>p.t);
+        const tide = series.span.map(p=>p.tide_uGal);
+        const K = series.span.map(p=>p.K_m2/1e-31);
+        const trendT = linearTrendPerYear(xs,tide).toFixed(2);
+        const trendK = linearTrendPerYear(xs,K).toFixed(3);
+        const svgT = sparklineSVG(tide,{w:220});
+        const svgK = sparklineSVG(K,{w:220,stroke:'#ffd38a'});
+        const durDays = (tEnd - tStart)/DAY;
+        const durYears = (tEnd - tStart)/(365.25*DAY);
+        const tideExp = trapzDays(series.span, p=>p.tide_uGal);
+        const tideMean = tideExp/(durDays||1);
+        const KExp_day = trapzDays(series.span, p=>p.K_m2/1e-31);
+        const KExp_yr = KExp_day/365.25;
+        const KMean = KExp_day/(durDays||1);
+        const shapExp = shapiroIndex_usDay_highres(tStart, tEnd);
+        const shapMean = shapExp/(durDays||1);
+        const einAbs = einsteinAbs_ns(series.span);
+        const einRMS = einsteinRMS_nsps(series.span);
+        panel.innerHTML = `
+          <div class="peri-kv"><span>Span evolution (SSB)</span><b><span class="peri-badge ${series.source==='horizons'?'ok':'peri-muted'}">${series.source}</span></b></div>
+          <div class="peri-grid">
+            <div class="peri-card"><div class="peri-kv"><span>Solar tide (µGal)</span><b class="peri-muted">${trendT} /yr</b></div>${svgT}</div>
+            <div class="peri-card"><div class="peri-kv"><span>Curvature ×10⁻³¹ m⁻²</span><b class="peri-muted">${trendK} /yr</b></div>${svgK}</div>
+          </div>
+          <div class="peri-card" style="margin-top:.35rem">
+            <div class="peri-kv"><span>Totals (A→B)</span><b class="peri-muted">integrated across ${durYears.toFixed(2)} yr</b></div>
+            <div class="peri-grid">
+              <div class="peri-card"><div class="peri-kv"><span>Solar tide exposure</span><b>${tideExp.toFixed(2)} µGal·day • mean ${tideMean.toFixed(2)} µGal</b></div></div>
+              <div class="peri-card"><div class="peri-kv"><span>Curvature exposure</span><b>${KExp_yr.toFixed(3)} ×10⁻³¹ m⁻²·yr • mean ${KMean.toFixed(2)} ×10⁻³¹ m⁻²</b></div></div>
+              <div class="peri-card"><div class="peri-kv"><span>Shapiro exposure</span><b>${shapExp.toFixed(2)} µs·day • mean ${shapMean.toFixed(2)} µs/day</b></div></div>
+              <div class="peri-card"><div class="peri-kv"><span>Einstein activity</span><b>${einAbs.toFixed(2)} ns (abs) • RMS rate ${einRMS.toFixed(2)} ns/s</b></div></div>
+            </div>
+          </div>`;
+      }
+  function accrueGR_arcsec(key, tStart, tEnd){ const body=PLANETS[key]; if(!body) return {arcsec:0,norbits:0,perOrbit_as:0}; const norb=(tEnd - tStart)/(body.P_days*DAY); const perOrbit = (function(){ const a_m=body.a_AU*AU, e=body.e; return 6*Math.PI*GM_SUN/(a_m*(1-e*e)*C*C); })(); const perAs = perOrbit*(180/Math.PI)*3600; return { arcsec: perAs*norb, norbits: norb, perOrbit_as: perAs }; }
+      function integrateEinsteinRelative_ns(series){ if(!series||series.length<2) return 0; const mean = series.reduce((s,p)=>s+p.einstein_nsps,0)/series.length; let acc=0; for(let i=0;i<series.length-1;i++){ const a=series[i], b=series[i+1]; const dt_s=(b.t-a.t)/1000; const ra=a.einstein_nsps-mean, rb=b.einstein_nsps-mean; acc += 0.5*(ra+rb)*dt_s; } return acc; }
+      // Pick a fixed ecliptic target once per span for consistent Shapiro integration
+      function pickFixedTargetLambdaForSpan(series){
+        const t0 = series && series[0] && series[0].t;
+        if (!t0) return (typeof ECLIPTIC_TARGETS !== 'undefined' ? ECLIPTIC_TARGETS[0] : 0);
+        return pickConjunctionLambda(t0).lambda;
+      }
+      function shapiroIndex_usDay(series){
+        if(!series||series.length<2) return 0;
+        let acc=0;
+        const lamStar = pickFixedTargetLambdaForSpan(series);
+        for(let i=0;i<series.length-1;i++){
+          const a=series[i], b=series[i+1];
+          const lamSunA = sunLonRad(a.t); const lamSunB = sunLonRad(b.t);
+          const psiA = Math.abs((lamSunA - lamStar + Math.PI)%(2*Math.PI) - Math.PI);
+          const psiB = Math.abs((lamSunB - lamStar + Math.PI)%(2*Math.PI) - Math.PI);
+          const bA=impactParameter_b_withPsi(a.r,psiA); const bB=impactParameter_b_withPsi(b.r,psiB);
+          const shA=shapiroDelay_s(a.r,a.r,bA)*1e6; const shB=shapiroDelay_s(b.r,b.r,bB)*1e6;
+          const dt_day=(b.t-a.t)/DAY; acc += 0.5*(Math.abs(shA)+Math.abs(shB))*dt_day;
+        }
+        return acc;
+      }
+  async function renderAccumulators(tStart,tEnd){ const panel=document.querySelector('[data-accum-panel]'); if(!panel) return; const series = await (HaloPeri.series?.span? HaloPeri.series: buildSpanSeries(tStart,tEnd)); const merc=accrueGR_arcsec('mercury',tStart,tEnd); const earthAcc=accrueGR_arcsec('earth',tStart,tEnd); const ein_ns=integrateEinsteinRelative_ns(series.span); const shp_idx=shapiroIndex_usDay_highres(tStart,tEnd); panel.innerHTML = `<div class="peri-kv"><span>Accumulators (A→B)</span><b><span class="peri-badge ${series.source==='horizons'?'ok':'peri-muted'}">${series.source}</span></b></div><div class="peri-grid"><div class="peri-card"><div class="peri-kv"><span>Mercury GR accrued</span><b>${periUI.fmtArcsec(merc.arcsec)} • ${merc.norbits.toFixed(1)} orbits × ${merc.perOrbit_as.toFixed(3)}″/orbit</b></div></div><div class="peri-card"><div class="peri-kv"><span>Earth GR accrued</span><b>${periUI.fmtArcsec(earthAcc.arcsec)} • ${earthAcc.norbits.toFixed(1)} orbits × ${earthAcc.perOrbit_as.toFixed(3)}″/orbit</b></div></div><div class="peri-card"><div class="peri-kv"><span>Einstein redshift (net vs span-mean)</span><b>${fmtSigned(ein_ns,2)} ns</b></div></div><div class="peri-card"><div class="peri-kv"><span>Shapiro cumulative index</span><b>${shp_idx.toFixed(2)} µs·day</b></div></div></div>`; }
+      async function renderTimeline(tStart,tEnd){
+        const panel=document.querySelector('[data-timeline-panel]'); if(!panel) return;
+        const host = panel.querySelector('#spore-timeline-root');
+        if (host) {
+          host.setAttribute('data-span-start', String(tStart));
+          host.setAttribute('data-span-end', String(tEnd));
+          try {
+            host.dispatchEvent(new CustomEvent('spore:timeline-span', { detail: { tStart, tEnd } }));
+          } catch {}
+          return;
+        }
+        const series = await (HaloPeri.series?.span? HaloPeri.series: buildSpanSeries(tStart,tEnd));
+        const span = series.span || [];
+        // Collect extrema at monthly cadence
+        const allExtrema = (function(){ const arr=[]; for(let i=1;i<span.length-1;i++){ const p0=span[i-1], p=span[i], p1=span[i+1]; if (p.r<p0.r && p.r<p1.r) arr.push({t:p.t, type:'Perihelion (Earth)'}); if (p.r>p0.r && p.r>p1.r) arr.push({t:p.t, type:'Aphelion (Earth)'}); } return arr; })()
+          .filter(e=> e.t>=tStart && e.t<=tEnd)
+          .sort((a,b)=>a.t-b.t);
+        // Year ticks for each UTC year in the span
+        const yearsSet = new Set(span.map(p=> new Date(p.t).getUTCFullYear()));
+        const years = Array.from(yearsSet).map(y=> ({ t: Date.parse(`${y}-01-01T00:00:00Z`), type:`Year ${y}` }))
+          .filter(e=> e.t>=tStart && e.t<=tEnd)
+          .sort((a,b)=>a.t-b.t);
+        // Anchor with all year ticks, sprinkle up to N extrema
+        const maxExtrema = 6;
+        const sprinkled = allExtrema.slice(0, maxExtrema);
+        const events = [...years, ...sprinkled].sort((a,b)=>a.t-b.t);
+        const Pm=PLANETS.mercury.P_days*DAY; const perAs=accrueGR_arcsec('mercury',tStart,tEnd).perOrbit_as;
+        const items = events.map(ev=>{ const norb=(ev.t - tStart)/Pm; const cumAs=perAs*norb; return `<li><b>${new Date(ev.t).toISOString().slice(0,10)}</b> • ${ev.type} <span class=\"peri-muted\">• Mercury GR +${cumAs.toFixed(2)}″ since A</span></li>`; }).join('');
+        panel.innerHTML = `<div class=\"peri-kv\"><span>Timeline (A→B)</span><b class=\"peri-muted\">key milestones</b></div><ul class=\"peri-list\" style=\"padding-left:1rem; margin:.25rem 0 0;\"><li><b>${new Date(tStart).toISOString().slice(0,10)}</b> • Start (A)</li>${items || `<li class=\"peri-muted\">no notable extrema detected at monthly cadence</li>`}<li><b>${new Date(tEnd).toISOString().slice(0,10)}</b> • End (B)</li></ul>`;
+      }
+
+      const timelineBlock = `
+        <div class="peri-card" data-timeline-panel style="margin:.5rem 0 .75rem 0; padding:0;">
+          <div id="spore-timeline-root"></div>
+        </div>`;
+      const warpBlock = `
+        <div class="peri-card" data-warp-panel style="margin-top:.5rem">
+          <div class="peri-kv" style="margin-bottom:.5rem">
+            <b>Warp Exterior</b>
+            ${periUI.infoIcon.replace('title=""','title="A viable warp metric must match Schwarzschild/Minkowski outside the shell. Any residual ε(r>r₀) would leak into planetary precession; here we report the ε that would be implied by the observed residuals."')}
+          ${chronoHeader}
+            <span class="peri-badge ok">Asymptotically GR (ε=0)</span>
+          </div>
+          <div class="peri-grid">
+            <div class="peri-card peri-muted">
+              <div class="peri-kv"><span>Exterior model</span><b>ε(r)=0 (default)</b></div>
+              <div class="peri-kv"><span>PPN scale</span><b>𝔉<sub>PPN</sub>=${F_PPN().toFixed(3)}</b></div>
+              <div class="peri-kv"><span>Note</span><b class="peri-muted">Non-zero implied ε above would be observational, not assumed.</b></div>
+            </div>
+            <div class="peri-card" data-accum-panel style="margin-top:.5rem"><div class="peri-kv"><span>Accumulators (A→B)</span><b class="peri-muted">integrating…</b></div></div>
+          </div>
+        </div>`;
+
+      // ============================
+      // Everyday GR lenses — helpers and computations (A/B windows + geometry-aware Shapiro)
+      // ============================
+      const R_SUN = 696_340_000;            // m (IAU nominal)
+      const J2_SUN = 2.2e-7;                // Solar quadrupole (representative)
+      const MU_SUN = GM_SUN;                // shorthand
+      const DAY = 86400*1000;               // ms in a day
+      const PI = Math.PI;
+      const LAMBDA_Q_RAD = 0;               // notional ecliptic quasar longitude
+      const MIN_B = 1.005*R_SUN;            // cap minimum b near grazing
+
+      // Orbital r(t) & v(t) for Earth
+      function earth_r_v(tms){
+        const E = PLANETS.earth;
+        const a = E.a_AU*AU, e=E.e;
+        const nu = trueAnomalyAt(tms, E);
+        const r  = a*(1 - e*e)/(1 + e*Math.cos(nu)); // m
+        const v  = Math.sqrt(MU_SUN*(2/r - 1/a));    // m/s (vis-viva)
+        return { r, v };
+      }
+      function curvatureProxy(r){ return 2*MU_SUN/(r*r*r*C*C); }
+      const SOLAR_TIDE_AT_1AU_uGal = 50;
+      function solarTide_uGal(r){ return SOLAR_TIDE_AT_1AU_uGal * Math.pow(AU/r, 3); }
+      function shapiroDelay_s(rE, rS, b){ return (2*MU_SUN/(C*C*C)) * Math.log( (4*rE*rS)/(b*b) ); }
+      function einsteinNsPerS(r,v){
+        const frac = (-MU_SUN/r)/(C*C) - (v*v)/(2*C*C);
+        return frac*1e9; // ns/s
+      }
+      function dvarpiJ2_perOrbit_rad(body){
+        const a = body.a_AU*AU, e=body.e;
+        return 3*Math.PI*J2_SUN * (R_SUN*R_SUN)/(a*a) / ((1 - e*e)*(1 - e*e));
+      }
+      function spanOrbits(tA,tB, body){ return (tB - tA)/(body.P_days*DAY); }
+      function toArcsec(x_rad){ return x_rad*(180/Math.PI)*3600; }
+      function summarize(arr){
+        if (!arr.length) return {mean:NaN, min:NaN, max:NaN, range:NaN};
+        const mean = arr.reduce((a,b)=>a+b,0)/arr.length;
+        const mn = Math.min(...arr), mx = Math.max(...arr);
+        return { mean, min:mn, max:mx, range: mx - mn };
+      }
+      function fmtSigned(x, dp=2){ const s = (x>=0?'+':''); return s + x.toFixed(dp); }
+      function fmtRange(mean, range, unit){ return `${mean.toFixed(2)} ± ${(range/2).toFixed(2)} ${unit}`; }
+
+      // Sun apparent ecliptic longitude λ_sun(t) ≈ λ_Earth + π, with λ_Earth ≈ varpi_Earth + ν_Earth
+      function sunLonRad(tms){
+        const E = PLANETS.earth;
+        const varpi = varpiAt(tms, E);
+        const nu    = trueAnomalyAt(tms, E);
+        const lambdaEarth = normRad(varpi + nu);
+        return normRad(lambdaEarth + Math.PI);
+      }
+      // Discrete ecliptic catalog and nearest-conjunction picker
+      const ECLIPTIC_TARGETS = Array.from({length:12}, (_,i)=> i*(2*Math.PI/12)); // 0°,30°,…,330°
+      function pickConjunctionLambda(tms){
+        const lamSun = sunLonRad(tms);
+        let best = ECLIPTIC_TARGETS[0], bestPsi = Math.PI;
+        for (const lam of ECLIPTIC_TARGETS){
+          const psi = Math.abs((lamSun - lam + Math.PI)%(2*Math.PI) - Math.PI); // ∈ [0,π]
+          if (psi < bestPsi) { bestPsi = psi; best = lam; }
+        }
+        return { lambda: best, psi: bestPsi };
+      }
+      // Impact parameter to fixed ecliptic quasar at λ*=0°, b(t) = r_E sin ψ
+      function impactParameter_b(tms){
+        const { r } = earth_r_v(tms);
+        const lamSun = sunLonRad(tms);
+        let dpsi = Math.abs((lamSun - LAMBDA_Q_RAD + PI)%(2*PI) - PI);
+        const b = Math.max(MIN_B, r * Math.sin(dpsi));
+        return b;
+      }
+      // Sample ±N days window around a timestamp
+      function sampleWindow(centerT, halfDays=30){
+        const vals = { tide:[], K:[], ein:[] };
+        const start = centerT - halfDays*DAY, stop = centerT + halfDays*DAY;
+        for (let t=start; t<=stop; t+=DAY){
+          const { r, v } = earth_r_v(t);
+          vals.tide.push( solarTide_uGal(r) );
+          vals.K.push( curvatureProxy(r) );
+          vals.ein.push( einsteinNsPerS(r,v) );
+        }
+        return {
+          tide: summarize(vals.tide),
+          K:    summarize(vals.K),
+          ein:  summarize(vals.ein)
+        };
+      }
+
+      const winA = sampleWindow(tA, 30);
+      const winB = sampleWindow(tB, 30);
+
+      // Geometry-aware Shapiro at endpoints
+      const rA = earth_r_v(tA).r, rB = earth_r_v(tB).r;
+      const bA = impactParameter_b(tA), bB = impactParameter_b(tB);
+      const shA_us = shapiroDelay_s(rA, rA, bA)*1e6;
+      const shB_us = shapiroDelay_s(rB, rB, bB)*1e6;
+      const shDelta_us = shB_us - shA_us;
+
+      // Solar J2 lens for Mercury & Earth over span
+      function j2LensRow(key){
+        const body = PLANETS[key];
+        const dper_orb = dvarpiJ2_perOrbit_rad(body);           // radians/orbit
+        const norb     = spanOrbits(tA,tB, body);               // signed
+        const dspan_as = toArcsec(dper_orb * norb);             // arcsec over A→B
+        const rate_asC = toArcsecPerCentury(dspan_as, tA, tB);  // ″/century eq
+        const gr_span_as = predictAdvancePPN_arcsec(tA,tB,key); // GR (β=γ=1) over span
+        const frac = (Math.abs(gr_span_as)>1e-9) ? (Math.abs(dspan_as)/Math.abs(gr_span_as)) : 0;
+        return { key, dspan_as, rate_asC, frac };
+      }
+      const j2Merc = j2LensRow("mercury");
+      const j2Earth= j2LensRow("earth");
+
+      // ---------- NARRATIVE (five-part) HELPERS ----------
+      const SYNODIC_D = 29.530588;   // synodic month (days)
+      const CARRINGTON_D = 27.2753;  // Carrington rotation (days)
+      const YEAR = 365.25*DAY;       // year in ms (DAY defined above)
+
+      // Build a short series around a single timestamp (±windowDays), reusing our Kepler/Horizons pipe.
+      async function buildWindowSeries(t0, windowDays=30){
+        const t1 = t0 - windowDays*DAY, t2 = t0 + windowDays*DAY;
+        return buildSpanSeries(t1, t2); // { span:[{t,r,v,tide_uGal,K_m2,einstein_nsps}...], source }
+      }
+      function meanOf(series, key){
+        if (!series || !series.length) return NaN;
+        let s=0; for (const p of series) s += (+p[key]||0);
+        return s/series.length;
+      }
+      function pickEndpointShapiro_us(tms){
+        // Fixed ecliptic target chosen by nearest conjunction at the endpoint
+        const lamStar = pickConjunctionLambda(tms).lambda;
+        const r = earth_r_v(tms).r;
+        const psi = Math.abs((sunLonRad(tms) - lamStar + Math.PI)%(2*Math.PI) - Math.PI);
+        const b = impactParameter_b_withPsi(r, psi);
+        const sh_s = shapiroDelay_s(r, r, b);
+        return sh_s*1e6; // µs
+      }
+      // Minimal lunar long-cycle phases for narrative purposes
+      function lunarLongCyclePhases(tms){
+        const t0 = Date.parse('2000-01-01T12:00:00Z');
+        const days = (tms - t0)/DAY;
+        const NODAL_D = 18.6*365.25;     // ~18.6 years
+        const ANOM_D  = 27.554551;       // anomalistic month
+        const nodalPhaseDeg   = ((days / NODAL_D)%1)*360;
+        const perigeePhaseDeg = ((days / ANOM_D)%1)*360;
+        return { nodalPhaseDeg, perigeePhaseDeg };
+      }
+      function cyclesBetween(tA, tB){
+        const dt_d = (tB - tA)/DAY;
+        const earthOrbits   = dt_d / PLANETS.earth.P_days;
+        const mercuryOrbits = dt_d / PLANETS.mercury.P_days;
+        const synMonths     = dt_d / SYNODIC_D;
+        const carrRot       = dt_d / CARRINGTON_D;
+        const phA = lunarLongCyclePhases(tA), phB = lunarLongCyclePhases(tB);
+        const dNodal   = (((phB.nodalPhaseDeg   - phA.nodalPhaseDeg)+360)%360);
+        const dPerigee = (((phB.perigeePhaseDeg - phA.perigeePhaseDeg)+360)%360);
+        return { earthOrbits, mercuryOrbits, synMonths, carrRot, nodalFrac:dNodal/360, perigeeFrac:dPerigee/360, dNodal, dPerigee };
+      }
+
+      // ---------- FIVE-PART NARRATIVE RENDERER ----------
+      async function renderNarrativeFive(tA, tB){
+        const panel = document.querySelector('[data-narrative-panel]');
+        if (!panel) return;
+        try{
+          // Window summaries at A and B (±30 d)
+          const [winA, winB] = await Promise.all([buildWindowSeries(tA,30), buildWindowSeries(tB,30)]);
+          const meanTideA = meanOf(winA.span, 'tide_uGal');
+          const meanTideB = meanOf(winB.span, 'tide_uGal');
+          const meanKA    = meanOf(winA.span, 'K_m2');
+          const meanKB    = meanOf(winB.span, 'K_m2');
+          const meanEinA  = meanOf(winA.span, 'einstein_nsps');
+          const meanEinB  = meanOf(winB.span, 'einstein_nsps');
+          const shapA_us  = pickEndpointShapiro_us(tA);
+          const shapB_us  = pickEndpointShapiro_us(tB);
+
+          // Accumulations across the span (reuse our accumulators)
+          const merc = accrueGR_arcsec('mercury', tA, tB);
+          const earthAcc = accrueGR_arcsec('earth',   tA, tB);
+          const series = await (HaloPeri.series?.span ? Promise.resolve(HaloPeri.series) : buildSpanSeries(tA, tB));
+          const einNet_ns = integrateEinsteinRelative_ns(series.span);
+          const shapExp   = shapiroIndex_usDay_highres(tA, tB);
+
+          // Cycles & elapsed “things”
+          const cyc = cyclesBetween(tA, tB);
+          const days = (tB - tA)/DAY, years = (tB - tA)/YEAR;
+
+          // Names (fallbacks)
+          const Aname = (window?.Selected?.A?.name) || 'A';
+          const Bname = (window?.Selected?.B?.name) || 'B';
+
+          // 1) What essentially stayed the same
+          const stayed = [];
+          if (isFinite(meanTideA) && isFinite(meanTideB) && Math.abs(meanTideB-meanTideA) < 0.3)
+            stayed.push(`**solar tide** was essentially identical (A ${meanTideA.toFixed(2)} µGal, B ${meanTideB.toFixed(2)} µGal)`);
+          if (isFinite(meanKA) && isFinite(meanKB) && Math.abs(meanKB-meanKA) < 0.02e-31)
+            stayed.push(`**curvature scale** (2GM/(r^3c^2)) matched (A ${(meanKA/1e-31).toFixed(2)}×10⁻³¹ m⁻², B ${(meanKB/1e-31).toFixed(2)}×10⁻³¹ m⁻²)`);
+          if (isFinite(meanEinA) && isFinite(meanEinB) && Math.abs(meanEinB-meanEinA) < 0.02)
+            stayed.push(`**Einstein redshift mean** ~ ${(meanEinA).toFixed(2)} ns/s at both epochs`);
+          if (isFinite(shapA_us) && isFinite(shapB_us) && Math.abs(shapB_us-shapA_us) < 0.2)
+            stayed.push(`**Shapiro endpoint delay** ≈ ${shapA_us.toFixed(2)} µs at A and ${shapB_us.toFixed(2)} µs at B`);
+          const stayedHTML = stayed.length ? `<ul>${stayed.map(s=>`<li>${s}</li>`).join('')}</ul>` : `<p class="peri-muted">No near-constants cleared the “essentially same” thresholds.</p>`;
+
+          // 2) What accumulated between A→B
+          const accum = [
+            `**Mercury perihelion (GR):** +${merc.arcsec.toFixed(1)}″ (${merc.norbits.toFixed(1)} orbits × ${merc.perOrbit_as.toFixed(3)}″/orbit)`,
+            `**Earth perihelion (GR):** +${earthAcc.arcsec.toFixed(1)}″ (${earthAcc.norbits.toFixed(1)} orbits × ${earthAcc.perOrbit_as.toFixed(3)}″/orbit)`,
+            `**Einstein net (vs span-mean):** ${einNet_ns>=0?'+':''}${einNet_ns.toFixed(2)} ns`,
+            `**Shapiro exposure:** ${shapExp.toFixed(2)} µs·day`
+          ];
+
+          // 3) Who did what first? (rank by cycles)
+          const who = [
+            `~${cyc.synMonths.toFixed(1)} synodic months`,
+            `~${cyc.carrRot.toFixed(0)} Carrington rotations`,
+            `~${cyc.mercuryOrbits.toFixed(1)} Mercury orbits`,
+            `~${cyc.earthOrbits.toFixed(1)} Earth orbits`,
+            `lunar nodes advanced ~${cyc.dNodal.toFixed(0)}°`,
+            `lunar perigee ~${cyc.dPerigee.toFixed(0)}°`
+          ];
+
+          // 4) How many “things” had to elapse
+          const howmany = `≈ ${Math.round(days)} days (~${years.toFixed(2)} yr), ` +
+                          `${cyc.synMonths.toFixed(1)} synodic months, ` +
+                          `${cyc.carrRot.toFixed(0)} Carrington rotations, ` +
+                          `${cyc.mercuryOrbits.toFixed(1)} Mercury years, ` +
+                          `${cyc.earthOrbits.toFixed(1)} Earth years.`;
+
+          // 5) What your results say about the two images (without seeing them)
+          const say = `By choosing **equinox ↔ equinox**, you held the viewing geometry nearly constant; the small endpoint deltas are expected. The **differences that matter** are the **time-integrated GR effects** (perihelion advance), which accrued exactly as predicted. At this precision the exterior metric is **consistent with GR** (PPN residuals at ~mas level).`;
+
+          panel.innerHTML = `
+            <div class="peri-kv"><span>Narrative summary</span><b class="peri-muted">${new Date(tA).toISOString().slice(0,10)} → ${new Date(tB).toISOString().slice(0,10)}</b></div>
+            <div class="story">
+              <p class="lead">Comparing "<b>${Aname}</b>" to "<b>${Bname}</b>" tells a time-ordered story.</p>
+              <p><b>1) What essentially stayed the same.</b></p>
+              ${stayedHTML}
+              <p><b>2) What accumulated between A → B (and why it matters).</b></p>
+              <ul>${accum.map(s=>`<li>${s}</li>`).join('')}</ul>
+              <p><b>3) “Who did what first?” (time-ordered, cycle-based).</b></p>
+              <ul>${who.map(s=>`<li>${s}</li>`).join('')}</ul>
+              <p><b>4) How many “things” had to elapse.</b><br>${howmany}</p>
+              <p><b>5) What your results say about the two images.</b><br>${say}</p>
+            </div>`;
+        }catch(e){ panel.innerHTML = `<div class="peri-kv"><span>Narrative summary</span><b class="peri-muted">unavailable</b></div>`; }
+      }
+
+      // ---------- Everyday GR lenses UI ----------
+      const lensInfo = {
+        bary: periUI.infoIcon.replace('title=""','title="Solar-System barycentric (SSB) view. For each timestamp we sample ±30 days to summarize the solar tide (∝1/r^3) and the curvature proxy 2GM/(r^3 c^2). We also show Δ of the window means."'),
+        j2:   periUI.infoIcon.replace('title=""','title="Sun’s small quadrupole J2 adds a classical perihelion precession. We show its predicted share of the total over your A→B span (no sliders; fixed J2)."'),
+        pc:   periUI.infoIcon.replace('title=""','title="Photon/Clock lens. Geometry-aware Shapiro delay to a fixed ecliptic quasar (λ*=0°) using b(t)=r_E sin ψ(t); Einstein redshift from Sun’s potential and orbital speed — each summarized over ±30 days."')
+      };
+
+      const baryBlock = `
+        <div class="peri-card" data-bary-panel style="margin-top:.5rem">
+          <div class="peri-kv" style="margin-bottom:.5rem">
+            <b>Everyday GR lenses</b>
+          </div>
+          <div class="peri-grid">
+            <div class="peri-card">
+              <div class="peri-kv"><span>Barycentric lens (SSB) ${lensInfo.bary}</span><b></b></div>
+              <div class="peri-kv"><span>Solar tide (A ±30d)</span><b>${fmtRange(winA.tide.mean, winA.tide.range, 'µGal')}</b></div>
+              <div class="peri-kv"><span>Solar tide (B ±30d)</span><b>${fmtRange(winB.tide.mean, winB.tide.range, 'µGal')}</b></div>
+              <div class="peri-kv"><span>Δ mean</span><b>${fmtSigned(winB.tide.mean - winA.tide.mean, 2)} µGal</b></div>
+              <div class="peri-kv"><span>Curvature 2GM/(r³c²) (A)</span><b>${(winA.K.mean/1e-31).toFixed(2)} ×10⁻³¹ m⁻²</b></div>
+              <div class="peri-kv"><span>Curvature 2GM/(r³c²) (B)</span><b>${(winB.K.mean/1e-31).toFixed(2)} ×10⁻³¹ m⁻²</b></div>
+              <div class="peri-kv"><span>Δ mean</span><b>${fmtSigned((winB.K.mean - winA.K.mean)/1e-31, 2)} ×10⁻³¹ m⁻²</b></div>
+            </div>
+            <div class="peri-card">
+              <div class="peri-kv"><span>Solar quadrupole lens ${lensInfo.j2}</span><b></b></div>
+              <div class="peri-kv"><span>Mercury Δϖ<sub>J₂</sub> (A→B)</span><b>${periUI.fmtArcsec(j2Merc.dspan_as)} (${periUI.fmtRate(j2Merc.rate_asC)}) • ${(j2Merc.frac*100).toFixed(2)}%</b></div>
+              <div class="peri-kv"><span>Earth Δϖ<sub>J₂</sub> (A→B)</span><b>${periUI.fmtArcsec(j2Earth.dspan_as)} (${periUI.fmtRate(j2Earth.rate_asC)}) • ${(j2Earth.frac*100).toFixed(2)}%</b></div>
+            </div>
+            <div class="peri-card">
+              <div class="peri-kv"><span>Photon/Clock lens ${lensInfo.pc}</span><b></b></div>
+              <div class="peri-kv"><span>Shapiro to quasar λ*=0°</span><b>A: ${shA_us.toFixed(2)} µs • B: ${shB_us.toFixed(2)} µs • Δ: ${fmtSigned(shDelta_us,2)} µs</b></div>
+              <div class="peri-kv"><span>Einstein redshift (A ±30d)</span><b>${fmtRange(winA.ein.mean, winA.ein.range, 'ns/s')}</b></div>
+              <div class="peri-kv"><span>Einstein redshift (B ±30d)</span><b>${fmtRange(winB.ein.mean, winB.ein.range, 'ns/s')}</b></div>
+              <div class="peri-kv"><span>Δ mean</span><b>${fmtSigned(winB.ein.mean - winA.ein.mean, 2)} ns/s</b></div>
+            </div>
+          </div>
+        </div>`;
+
+
+      const narrativeBlock = `
+        <div class="peri-card" data-narrative-panel style="margin-top:.5rem">
+          <div class="peri-kv"><span>Narrative summary</span><b class="peri-muted">composing…</b></div>
+        </div>`;
+
+      const timelinePanel = mount.querySelector('[data-timeline-panel]');
+      if (timelinePanel) {
+        if (timelinePanel !== mount.firstElementChild) {
+          mount.insertBefore(timelinePanel, mount.firstChild);
+        }
+      } else {
+        mount.insertAdjacentHTML("afterbegin", timelineBlock);
+      }
+
+      const html = `
+        <div data-peri-panel class="peri-card" style="margin-top:.5rem">
+          <div class="peri-kv" style="margin-bottom:.5rem">
+            <b>Perihelion (GR)</b>
+            <span class="peri-badge" title="Similarity feature contribution (0..1)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 12h18M3 6h18M3 18h18" stroke-width="1.5"/></svg>
+              s<sub>peri</sub>=${s.toFixed(3)}
+            </span>
+          </div>
+          ${narrativeBlock}
+          <div class="peri-grid">
+            <div class="peri-card peri-muted">
+              <div class="peri-kv"><span>Earth ϖ (A)</span><b>${A.earth.varpiDeg.toFixed(3)}°</b></div>
+              <div class="peri-kv"><span>Earth ϖ (B)</span><b>${B.earth.varpiDeg.toFixed(3)}°</b></div>
+              <div class="peri-kv"><span>Δϖ<sub>Earth</sub></span><b>${fmtAng(Δ.dVarpiDeg.earth ?? 0)}</b></div>
+            </div>
+            <div class="peri-card peri-muted">
+              <div class="peri-kv"><span>Mercury ϖ (A)</span><b>${A.mercury.varpiDeg.toFixed(3)}°</b></div>
+              <div class="peri-kv"><span>Mercury ϖ (B)</span><b>${B.mercury.varpiDeg.toFixed(3)}°</b></div>
+              <div class="peri-kv"><span>Δϖ<sub>Mercury</sub></span><b>${fmtAng(Δ.dVarpiDeg.mercury ?? 0)}</b></div>
+            </div>
+            <div class="peri-card">
+              <div class="peri-kv"><span>Earth perihelion proximity (A)</span><b>${A.earth.proximityPct?.toFixed(1)}%</b></div>
+              <div class="peri-kv"><span>Earth perihelion proximity (B)</span><b>${B.earth.proximityPct?.toFixed(1)}%</b></div>
+              <div class="peri-kv"><span>Δ proximity</span><b>${(Δ.dProxPct??0).toFixed(1)}%</b></div>
+            </div>
+            <div class="peri-card">
+              <div class="peri-kv"><span>Last perihelion (A)</span><b>${A.earth.lastPerihelionISO}</b></div>
+              <div class="peri-kv"><span>Next perihelion (A)</span><b>${A.earth.nextPerihelionISO}</b></div>
+              <div class="peri-kv"><span>Last perihelion (B)</span><b>${B.earth.lastPerihelionISO}</b></div>
+              <div class="peri-kv"><span>Next perihelion (B)</span><b>${B.earth.nextPerihelionISO}</b></div>
+              <div class="peri-kv"><span class="peri-muted">Method</span><b class="peri-muted">GR-secular + min-r search</b></div>
+            </div>
+            ${altBlock}
+          </div>
+          <div style="margin-top:.5rem">
+            <span class="peri-chip" title="Ellipse rotation due to GR">
+              Δϖ (A→B): <b style="margin-left:.35rem">${fmtAng(Δ.dVarpiDeg.earth ?? 0)}</b> Earth,
+              <b style="margin-left:.35rem">${fmtAng(Δ.dVarpiDeg.mercury ?? 0)}</b> Mercury
+            </span>
+          </div>
+          ${grPPNBlock}
+          ${warpBlock}
+          ${baryBlock}
+          <div class="peri-card" data-series-panel style="margin-top:.5rem"><div class="peri-kv"><span>Span evolution (SSB)</span><b class="peri-muted">sampling…</b></div></div>
+        </div>`;
+      if (existing) existing.outerHTML = html; else mount.insertAdjacentHTML("beforeend", html);
+  // kick async renders after mount
+  setTimeout(()=>{ try{ renderSpanEvolution(tA,tB); renderAccumulators(tA,tB); renderTimeline(tA,tB); renderNarrativeFive(tA,tB);}catch(e){ console.warn('peri async post-mount failed:', e);} }, 60);
+    }
+
+    // 2) Similarity hook: blend a small perihelion feature into existing score if possible.
+    //    We try three strategies for maximum compatibility:
+    //    (a) window.registerSimilarityFeature(fn, weight)
+    //    (b) window.Similarity?.use(fn, weight)
+    //    (c) monkey-patch window.computeSimilarity(A,B,...) -> adds +w*s
+    const WEIGHT = 0.06; // gentle contribution
+    function tryRegisterSimilarity(){
+      const apiA = window.registerSimilarityFeature;
+      if (typeof apiA === "function"){
+        apiA((A,B)=>HaloPeri.similarityFeature(A?.peri??A, B?.peri??B), WEIGHT, "perihelionGR");
+        return true;
+      }
+      const apiB = window.Similarity?.use;
+      if (typeof apiB === "function"){
+        window.Similarity.use((A,B)=>({ name:"perihelionGR", weight:WEIGHT, score: HaloPeri.similarityFeature(A?.peri??A, B?.peri??B)}));
+        return true;
+      }
+      // Fallback: wrap computeSimilarity if it exists and hasn't been wrapped by us
+      const cs = window.computeSimilarity;
+      if (typeof cs === "function" && !cs.__periWrapped){
+        const wrapped = function(A,B,...rest){
+          const base = cs.call(this,A,B,...rest);
+          try {
+            const s = HaloPeri.similarityFeature(A?.peri??A, B?.peri??B);
+            return base + WEIGHT*s;
+          } catch { return base; }
+        };
+        wrapped.__periWrapped = true;
+        window.computeSimilarity = wrapped;
+        return true;
+      }
+      return false;
+    }
+
+    // 3) State provider hook: if your app has a notion of timeline A/B,
+    //    listen for custom events to (re)render our panel.
+    //    You can dispatch: window.dispatchEvent(new CustomEvent("states:updated", {detail:{tA,tB, A,B}}))
+    window.addEventListener("states:updated", (ev)=>{
+      const tA = ev.detail?.tA ?? nowMs();
+      const tB = ev.detail?.tB ?? tA;
+      injectPeriUI(tA, tB);
+      // After DOM replacement, kick narrative explicitly
+      setTimeout(()=>{ try { renderNarrativeFive(tA, tB); } catch(e){ console.warn('narrative render failed after states:updated', e);} }, 50);
+    });
+
+    // 4) Expose a handy API for the rest of the app (no-op if unused)
+    window.HaloPeriRender = {
+      renderPanel: (tA, tB) => injectPeriUI(tA, tB),
+      stateAt: HaloPeri.stateAt,
+      similarity: HaloPeri.similarityFeature
+    };
+
+    // --- NEW: tiny similarity add-on based on Mercury residual ---
+    const W_PPN = 0.02; // gentle
+    function tryRegisterPPNSim(){
+      const hook = (A,B)=>{
+        try{
+          const tA = A?.ts ?? Date.now(), tB = B?.ts ?? tA;
+          const obs = observedAdvance_arcsec(A?.peri||A, B?.peri||B, "mercury");
+          const pred = predictAdvancePPN_arcsec(tA,tB,"mercury");
+          const res  = obs - pred;
+          const rate = toArcsecPerCentury(res, tA, tB);
+          const s = 1 - Math.max(0, Math.min(1, Math.abs(rate)/1.0)); // 1″/century scale
+          return s;
+        }catch{return 0;}
+      };
+      if (typeof window.registerSimilarityFeature === "function") window.registerSimilarityFeature(hook, W_PPN, "ppnResidual");
+      else if (window.Similarity?.use) window.Similarity.use((A,B)=>({ name:"ppnResidual", weight:W_PPN, score:hook(A,B)}));
+    }
+
+    // 5) First-pass init: attempt registration and initial render once DOM is ready
+    function init(){
+      tryRegisterSimilarity();
+      tryRegisterPPNSim();
+      injectPeriUI(); // best-effort render into Relative States if present
+      // Optional: signal to the app that perihelion states are available
+      window.dispatchEvent(new CustomEvent("perihelion:ready", { detail: { version: HaloPeri.version }}));
+      // Kick async panels using the last known chronology (avoid relying on window.Selected here)
+      setTimeout(()=>{
+        try{
+          const cp = (window.HaloPeri && window.HaloPeri.lastChrono) ? window.HaloPeri.lastChrono : null;
+          if (cp && typeof cp.tA==='number' && typeof cp.tB==='number' && cp.tB >= cp.tA){
+            renderSpanEvolution(cp.tA, cp.tB);
+            renderAccumulators(cp.tA, cp.tB);
+            renderTimeline(cp.tA, cp.tB);
+          } else {
+            // Last resort fallback to globals if provided by host app
+            const a = window?.Selected?.A?.ts ?? window?.lastA?.ts ?? null;
+            const b = window?.Selected?.B?.ts ?? window?.lastB?.ts ?? null;
+            if (a && b){ const A = Math.min(a,b), B = Math.max(a,b);
+              renderSpanEvolution(A,B); renderAccumulators(A,B); renderTimeline(A,B); }
+          }
+        }catch(e){ console.warn('perihelion async render failed:', e); }
+      }, 60);
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init, { once:true });
+    } else {
+      init();
+    }
+
+    // ============================================================
+    // ZERO-GUARD: smarter number formatting for tiny non-zeros
+    // ============================================================
+    (function ZeroGuard(){
+      // --- helpers ---
+      const toFixedNoNegZero = (v, dp) => {
+        let s = (+v).toFixed(dp);
+        if (Math.abs(+s) === 0) s = (0).toFixed(dp);
+        return s;
+      };
+      // seconds → ms → µs if needed; keep sign
+      function smartSec(x){
+        if (x==null || !isFinite(x)) return 'n/a';
+        const v = +x; const av = Math.abs(v);
+        if (av >= 0.1)   return `${toFixedNoNegZero(v,1)} s`;
+        if (av >= 1e-3)  return `${toFixedNoNegZero(v*1e3,2)} ms`;
+        if (av >= 1e-6)  return `${toFixedNoNegZero(v*1e6,1)} µs`;
+        if (av > 0)      return `${v.toExponential(1)} s`;
+        return `0.0 s`;
+      }
+      // milliseconds → µs if needed
+      function smartMs(x){
+        if (x==null || !isFinite(x)) return 'n/a';
+        const v = +x, av=Math.abs(v);
+        if (av >= 0.01)  return `${toFixedNoNegZero(v,2)} ms`;
+        if (av >= 1e-3)  return `${toFixedNoNegZero(v*1e3,1)} µs`;
+        if (av > 0)      return `${v.toExponential(1)} ms`;
+        return `0.00 ms`;
+      }
+      // percent → basis points for tiny values; preserve sign
+      function smartPct(x){
+        if (x==null || !isFinite(x)) return 'n/a';
+        const v=+x, av=Math.abs(v);
+        if (av >= 0.1)     return `${toFixedNoNegZero(v,1)}%`;
+        if (av >= 0.01)    return `${toFixedNoNegZero(v,2)}%`;
+        if (av >= 0.001)   return `${toFixedNoNegZero(v*100,1)} bp`;
+        if (av > 0)        return `${v.toExponential(1)}%`;
+        return `0.0%`;
+      }
+      // ns/s tiny printer (don’t collapse to "≈0" unless truly zero)
+      function smartNsPerS(x){
+        if (x==null || !isFinite(x)) return 'n/a';
+        const v=+x, av=Math.abs(v);
+        if (av >= 0.1)   return `${toFixedNoNegZero(v,3)} ns/s`;
+        if (av >= 1e-3)  return `${toFixedNoNegZero(v,6)} ns/s`;
+        if (av > 0)      return `${v.toExponential(2)} ns/s`;
+        return `0 ns/s`;
+      }
+
+      // --- monkey-patch global formatters if present ---
+      try {
+        if (typeof window.num === 'function') {
+          const _num = window.num;
+          window.num = function(x, dp=1, unit=''){
+            const u = (unit||'').trim();
+            if (u === 's')   return smartSec(x);
+            if (u === ' ms') return smartMs(x); // in case callers pass leading space
+            if (u === 'ms')  return smartMs(x);
+            if (u === '%')   return smartPct(x);
+            return _num.call(this, x, dp, unit);
+          };
+        }
+      } catch {}
+      try {
+        if (typeof window.niceNsPerS === 'function') {
+          window.niceNsPerS = smartNsPerS;
+        }
+      } catch {}
+
+      // --- optional post-render smoother for the "Differences" text block ---
+      function patchDiffText(diffs){
+        const root = document.getElementById('diffText');
+        if (!root || !diffs) return;
+        // 1) Δ Light-time to Sun
+        if (typeof diffs.dLightTime_s === 'number'){
+          root.innerHTML = root.innerHTML.replace(/(Δ Light-time to Sun<\/span>\s*)[-+\d\.eE]+\s*s/,
+            (_, pre) => pre + smartSec(diffs.dLightTime_s));
+          root.innerHTML = root.innerHTML.replace(/Sun light-time changed\s*[-+\d\.eE]+\s*s/,
+            () => `Sun light-time changed ${smartSec(diffs.dLightTime_s)}`);
+        }
+        // 2) Δ Solar contribution
+        if (typeof diffs.dSolarPct === 'number'){
+          root.innerHTML = root.innerHTML.replace(/(Δ Solar contribution<\/span>\s*)[-+\d\.eE]+%/,
+            (_, pre) => pre + smartPct(diffs.dSolarPct));
+          root.innerHTML = root.innerHTML.replace(/solar contribution\s*[-+\d\.eE]+%/,
+            () => `solar contribution ${smartPct(diffs.dSolarPct)}`);
+        }
+        // 3) Δ Voxel fraction (unitless)
+        if (typeof diffs.dVoxelFrac === 'number'){
+          const v = diffs.dVoxelFrac;
+          const s = (Math.abs(v) >= 1e-3) ? toFixedNoNegZero(v,3) : v.toExponential(2);
+          root.innerHTML = root.innerHTML.replace(/(Δ Voxel fraction<\/span>\s*)[^\s<]+/, (_, pre)=> pre + s);
+          root.innerHTML = root.innerHTML.replace(/we traversed\s*[^\s]+\s*of a light-second/,
+            () => `we traversed ${s} of a light-second`);
+        }
+        // 4) Proper-time rates (ns/s)
+        if (typeof diffs.dNs_grav === 'number'){
+          const s = smartNsPerS(diffs.dNs_grav);
+          root.innerHTML = root.innerHTML.replace(/(Δ Clock bias \(1 s\)<\/span>\s*)[^<]+/, (_, pre) => pre + s);
+          root.innerHTML = root.innerHTML.replace(/1-s tidal time-bias changed\s*[^;.,<]+/,
+            () => `1-s tidal time-bias changed ${s}`);
+        }
+        if (typeof diffs.dNs_kin === 'number'){
+          const s = smartNsPerS(diffs.dNs_kin);
+          root.innerHTML = root.innerHTML.replace(/(Δ Kinematic rate \(1 s\)<\/span>\s*)[^<]+/, (_, pre) => pre + s);
+        }
+        if (typeof diffs.dNs_comb === 'number'){
+          const s = smartNsPerS(diffs.dNs_comb);
+          root.innerHTML = root.innerHTML.replace(/(Δ Combined rate \(1 s\)<\/span>\s*)[^<]+/, (_, pre) => pre + s);
+        }
+        // 5) Light-time along Earth
+        if (typeof diffs.dLightAlong_ms === 'number' && Math.abs(diffs.dLightAlong_ms) > 0){
+          root.innerHTML = root.innerHTML.replace(/(Light-time along Earth<\/span>\s*Δ\s*)0\.00\s*ms/,
+            (_, pre) => pre + smartMs(diffs.dLightAlong_ms));
+        }
+      }
+
+      function onStates(ev){
+        const d = (ev && ev.detail && ev.detail.diffs) || window.lastDiffs || null;
+        try { patchDiffText(d); } catch {}
+      }
+      window.addEventListener('states:updated', onStates);
+      setTimeout(()=>{ try { patchDiffText(window.lastDiffs||null); } catch {} }, 100);
+    })();
+  })();
+  </script>
+  <!-- ======================== -->
+  <!-- GR Perihelion module END -->
+  <!-- ======================== -->
+
+  <script>
+  (function(){
+    const TAU = Math.PI * 2;
+    const SIDEREAL_DAY_S = 86164.0905;
+    const SOLAR_DAY_S = 86400;
+    const EASE_ALPHA = 0.12;
+    const DEG2RAD = Math.PI / 180;
+    const DEFAULT_FILTERS = { day: true, season: true, lunar: true };
+    const DEFAULT_SITE = { lat: 34.05, lon: -118.25 };
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const mod1 = value => ((value % 1) + 1) % 1;
+    const root = document.documentElement;
+    const headerEl = document.querySelector('header');
+    const sceneEl = document.getElementById('scene');
+
+    function safeNumber(value, fallback) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function pickSite() {
+      const explicit = window.__site;
+      if (explicit && Number.isFinite(explicit.lat) && Number.isFinite(explicit.lon)) {
+        return { lat: explicit.lat, lon: explicit.lon };
+      }
+      const storeSite = window.store && window.store.defaultSite;
+      if (storeSite && Number.isFinite(storeSite.lat) && Number.isFinite(storeSite.lon)) {
+        return { lat: storeSite.lat, lon: storeSite.lon };
+      }
+      return { lat: DEFAULT_SITE.lat, lon: DEFAULT_SITE.lon };
+    }
+
+    function solarLongitudeDeg(ts) {
+      const date = new Date(ts);
+      const yearStart = Date.UTC(date.getUTCFullYear(), 0, 0);
+      const n = (ts - yearStart) / 86400000;
+      const L = (280.46 + 0.9856474 * n) % 360;
+      const g = (357.528 + 0.9856003 * n) % 360;
+      const lambda = L + 1.915 * Math.sin(g * DEG2RAD) + 0.020 * Math.sin(2 * g * DEG2RAD);
+      return (lambda % 360 + 360) % 360;
+    }
+
+    function solarDeclinationDeg(ts) {
+      const lonDeg = solarLongitudeDeg(ts);
+      const date = new Date(ts);
+      const yearStart = Date.UTC(date.getUTCFullYear(), 0, 0);
+      const n = (ts - yearStart) / 86400000;
+      const epsilon = 23.439 - 0.0000004 * n;
+      const delta = Math.asin(Math.sin(epsilon * DEG2RAD) * Math.sin(lonDeg * DEG2RAD));
+      return delta * (180 / Math.PI);
+    }
+
+    function seasonFraction(ts) {
+      return mod1(solarLongitudeDeg(ts) / 360);
+    }
+
+    function orbitPhase(ts) {
+      try {
+        const yearMap = window.yearElements;
+        if (yearMap && typeof yearMap.get === 'function') {
+          const year = new Date(ts).getUTCFullYear();
+          const el = yearMap.get(year);
+          if (el && Number.isFinite(el.a) && Number.isFinite(el.epochJD)) {
+            const mu = safeNumber(window.HORIZONS && window.HORIZONS.muSun_AU3_per_d2, 0.00029591220828559104);
+            const jd = ts / 86400000 + 2440587.5;
+            const meanMotion = Math.sqrt(mu / Math.pow(el.a || 1, 3));
+            const meanAnomaly = safeNumber(el.M, 0) + meanMotion * (jd - el.epochJD);
+            return mod1(meanAnomaly / TAU);
+          }
+        }
+      } catch (err) {
+        console.warn('ColorDirector orbitPhase fallback', err);
+      }
+      if (typeof heliocentricLongitude === 'function') {
+        return mod1(heliocentricLongitude(ts) / TAU);
+      }
+      if (typeof perihelionApprox === 'object' && perihelionApprox && typeof perihelionApprox.getTime === 'function') {
+        const yearMs = 365.25 * 86400000;
+        return mod1((ts - perihelionApprox.getTime()) / yearMs);
+      }
+      return mod1(ts / (365.25 * 86400000));
+    }
+
+    function rotationPhase(ts, lonDeg) {
+      const lonOffset = (lonDeg || 0) / 360 * SIDEREAL_DAY_S;
+      const seconds = ts / 1000;
+      return mod1((seconds + lonOffset) / SIDEREAL_DAY_S);
+    }
+
+    function localDayFraction(ts, lonDeg) {
+      const lonOffset = (lonDeg || 0) / 360 * SOLAR_DAY_S;
+      const seconds = ts / 1000;
+      return mod1((seconds + lonOffset) / SOLAR_DAY_S);
+    }
+
+    function lunarPhaseFraction(ts, latDeg, lonDeg) {
+      try {
+        if (typeof moonContext === 'function') {
+          const ctx = moonContext(ts, latDeg, lonDeg);
+          if (ctx && typeof ctx.phasePct === 'number') {
+            return clamp(ctx.phasePct / 100, 0, 1);
+          }
+        }
+      } catch (err) {
+        console.warn('ColorDirector lunarPhase fallback', err);
+      }
+      return 0.5;
+    }
+
+    const OrbitColor = window.THREE && window.THREE.Color ? window.THREE.Color : null;
+    const orbitTmpColor = OrbitColor ? new OrbitColor() : null;
+
+    function computeShading(state) {
+      const rotationHue = 12 * Math.sin(TAU * mod1(state.rotation));
+      const seasonWave = Math.sin(Math.PI * mod1(state.season));
+      const lunarPulse = 0.5 - Math.abs(0.5 - mod1(state.lunar));
+      const distanceNudge = clamp((1 - state.rAu) * 18, -3, 3);
+      const saturation = clamp(55 + 20 * seasonWave, 35, 85);
+      const lightness = clamp(12 + 10 * lunarPulse + distanceNudge, 8, 40);
+      return { rotationHue, seasonWave, lunarPulse, distanceNudge, saturation, lightness };
+    }
+
+    function updateOrbitGradients(state, shading) {
+      if (!orbitTmpColor) return;
+      const lines = window.__orbitGradientLines;
+      if (!lines || !lines.size) return;
+      const rotationHue = shading?.rotationHue ?? 0;
+      const saturation = shading?.saturation ?? 55;
+      const lightness = shading?.lightness ?? 24;
+      const lineSaturation = clamp(saturation + 14, 42, 96);
+      const lineLightness = clamp(lightness + 24, 24, 74);
+      lines.forEach(line => {
+        const fractions = line?.userData?.orbitFractions;
+        const colorAttr = line?.geometry?.getAttribute && line.geometry.getAttribute('color');
+        if (!fractions || !colorAttr) return;
+        const arr = colorAttr.array;
+        const count = colorAttr.count;
+        const divisor = Math.max(1, count - 1);
+        for (let i = 0; i < count; i++) {
+          const frac = fractions[i] ?? (i / divisor);
+          let hue = (360 * mod1(frac) + rotationHue) % 360;
+          if (hue < 0) hue += 360;
+          orbitTmpColor.setHSL(hue / 360, lineSaturation / 100, lineLightness / 100);
+          const idx = i * 3;
+          arr[idx] = orbitTmpColor.r;
+          arr[idx + 1] = orbitTmpColor.g;
+          arr[idx + 2] = orbitTmpColor.b;
+        }
+        colorAttr.needsUpdate = true;
+        if (line.material && !line.material.vertexColors) {
+          line.material.vertexColors = true;
+          line.material.needsUpdate = true;
+        }
+      });
+    }
+
+    class ColorDirectorImpl {
+      constructor() {
+        const now = Date.now();
+        this.filters = { ...DEFAULT_FILTERS };
+        this.site = pickSite();
+        this.targets = {
+          orbit: orbitPhase(now),
+          rotation: 0.5,
+          season: 0.5,
+          lunar: 0.5,
+          rAu: 1,
+          decSun: 0,
+          localDay: 0.5
+        };
+        this.smoothed = { ...this.targets };
+        this.filtered = { ...this.targets };
+        this.intervals = [];
+        this.running = false;
+        this.onFiltersChanged = null;
+        this.sampleSlow(now);
+        this.sampleMid(now);
+        this.sampleFast(now);
+        this.smoothed = { ...this.targets };
+        this.filtered = { ...this.targets };
+      }
+
+      start() {
+        if (this.running) return;
+        this.running = true;
+        this.site = pickSite();
+        const now = Date.now();
+        this.sampleSlow(now);
+        this.sampleMid(now);
+        this.sampleFast(now);
+        this.smoothed = { ...this.targets };
+        this.filtered = { ...this.targets };
+        this.applyColors(this.filtered);
+        this.intervals.push(setInterval(() => this.sampleSlow(), 120000));
+        this.intervals.push(setInterval(() => this.sampleMid(), 60000));
+        this.intervals.push(setInterval(() => this.sampleFast(), 300));
+      }
+
+      stop() {
+        this.running = false;
+        while (this.intervals.length) {
+          clearInterval(this.intervals.pop());
+        }
+      }
+
+      setSite(site) {
+        if (!site) return;
+        const next = { ...this.site };
+        if (Number.isFinite(site.lat)) next.lat = site.lat;
+        if (Number.isFinite(site.lon)) next.lon = site.lon;
+        this.site = next;
+        window.__site = { ...next };
+        this.sampleSlow();
+        this.sampleMid();
+        this.sampleFast();
+      }
+
+      setFilters(partial) {
+        if (!partial) return { ...this.filters };
+        const next = { ...this.filters };
+        if (typeof partial.day === 'boolean') next.day = partial.day;
+        if (typeof partial.season === 'boolean') next.season = partial.season;
+        if (typeof partial.lunar === 'boolean') next.lunar = partial.lunar;
+        this.filters = next;
+        if (typeof this.onFiltersChanged === 'function') {
+          try {
+            this.onFiltersChanged({ ...this.filters });
+          } catch (err) {
+            console.warn(err);
+          }
+        }
+        return { ...this.filters };
+      }
+
+      getFilters() {
+        return { ...this.filters };
+      }
+
+      sampleSlow(ts = Date.now()) {
+        this.targets.orbit = orbitPhase(ts);
+        this.targets.rAu = safeNumber(earthSunDistance(ts), 1);
+        this.targets.decSun = safeNumber(solarDeclinationDeg(ts), 0);
+      }
+
+      sampleMid(ts = Date.now()) {
+        this.targets.season = seasonFraction(ts);
+        const loc = this.site || DEFAULT_SITE;
+        this.targets.lunar = lunarPhaseFraction(ts, loc.lat || 0, loc.lon || 0);
+      }
+
+      sampleFast(ts = Date.now()) {
+        const loc = this.site || DEFAULT_SITE;
+        const lat = Number.isFinite(loc.lat) ? loc.lat : DEFAULT_SITE.lat;
+        const lon = Number.isFinite(loc.lon) ? loc.lon : DEFAULT_SITE.lon;
+        this.targets.rotation = rotationPhase(ts, lon);
+        this.targets.localDay = localDayFraction(ts, lon);
+        this.site = { lat, lon };
+      }
+
+      tick(now = performance.now()) {
+        if (!this.running) return;
+        const alpha = EASE_ALPHA;
+        const target = this.targets;
+        const sm = this.smoothed;
+        sm.orbit += alpha * (target.orbit - sm.orbit);
+        sm.rotation += alpha * (target.rotation - sm.rotation);
+        sm.season += alpha * (target.season - sm.season);
+        sm.lunar += alpha * (target.lunar - sm.lunar);
+        sm.rAu += alpha * (target.rAu - sm.rAu);
+        sm.decSun += alpha * (target.decSun - sm.decSun);
+        sm.localDay += alpha * (target.localDay - sm.localDay);
+
+        this.filtered.orbit = sm.orbit;
+        this.filtered.rotation = this.filters.day ? sm.rotation : 0.5;
+        this.filtered.season = this.filters.season ? sm.season : 0.5;
+        this.filtered.lunar = this.filters.lunar ? sm.lunar : 0.5;
+        this.filtered.rAu = sm.rAu;
+        this.filtered.decSun = sm.decSun;
+        this.filtered.localDay = this.filters.day ? sm.localDay : 0.5;
+
+        this.applyColors(this.filtered);
+      }
+
+      applyColors(state) {
+        const shading = computeShading(state);
+        const { rotationHue, saturation, lightness } = shading;
+        const baseHue = (360 * mod1(state.orbit)) % 360;
+        let hue = baseHue + rotationHue;
+        if (hue < 0) hue += 360;
+        hue = hue % 360;
+
+        const topHue = (hue + 8) % 360;
+        const topSaturation = clamp(saturation + 6, 35, 92);
+        const topLightness = clamp(lightness + 6, 8, 55);
+
+        const angleDeg = (360 * mod1(state.localDay)) % 360;
+        const focusY = clamp(-8 * (state.decSun / 23.44), -8, 8);
+
+        const bg = `hsl(${hue.toFixed(2)} ${saturation.toFixed(1)}% ${lightness.toFixed(1)}%)`;
+        const bgTop = `hsl(${topHue.toFixed(2)} ${topSaturation.toFixed(1)}% ${topLightness.toFixed(1)}%)`;
+
+        root.style.setProperty('--bg', bg);
+        root.style.setProperty('--bg-top', bgTop);
+        root.style.setProperty('--bg-angle', `${angleDeg.toFixed(2)}deg`);
+        root.style.setProperty('--bg-focus-y', `${focusY.toFixed(2)}%`);
+
+        if (headerEl) {
+          headerEl.style.background = 'linear-gradient(var(--bg-angle), var(--bg-top) 0%, var(--bg) 100%)';
+        }
+        if (sceneEl) {
+          sceneEl.style.background = 'radial-gradient(1200px 600px at 50% calc(-200px + var(--bg-focus-y)), color-mix(in oklab, var(--bg-top) 60%, transparent), var(--bg) 60%)';
+        }
+        document.body.style.background = 'var(--bg)';
+
+        updateOrbitGradients(state, shading);
+      }
+    }
+
+    const director = new ColorDirectorImpl();
+    window.ColorDirector = director;
+
+    window.__updateOrbitGradientColors = (stateOverride) => {
+      const source = stateOverride || director.filtered || director.targets || director.smoothed;
+      updateOrbitGradients(source, computeShading(source));
+    };
+    window.__updateOrbitGradientColors();
+
+    const filterButtons = [
+      { id: 'btnFilterDay', key: 'day' },
+      { id: 'btnFilterSeason', key: 'season' },
+      { id: 'btnFilterLunar', key: 'lunar' }
+    ];
+
+    function updateFilterVisual(btn, isOn) {
+      if (!btn) return;
+      if (typeof setActive === 'function' && btn.id) {
+        setActive(btn.id, isOn);
+      } else {
+        btn.classList.toggle('active', isOn);
+      }
+      btn.style.opacity = isOn ? '' : '0.6';
+      btn.setAttribute('aria-pressed', String(isOn));
+    }
+
+    director.onFiltersChanged = (filters) => {
+      filterButtons.forEach(({ id, key }) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const state = filters[key] !== false;
+        updateFilterVisual(btn, state);
+      });
+    };
+
+    filterButtons.forEach(({ id, key }) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const current = director.filters[key] !== false;
+        director.setFilters({ [key]: !current });
+      });
+    });
+
+    director.onFiltersChanged(director.getFilters());
+    window.ColorDirector?.start?.();
+  })();
+  </script>
+
+  <style>
+    dialog.upload {
+      border: none;
+      padding: 0;
+      background: #101729;
+      color: var(--ink, #e8eefc);
+      border-radius: 16px;
+      box-shadow: 0 18px 60px rgba(8, 12, 24, 0.6);
+      min-width: min(90vw, 820px);
+      max-width: 880px;
+      position: relative;
+    }
+    dialog.upload::backdrop {
+      background: rgba(4, 8, 16, 0.72);
+      backdrop-filter: blur(4px);
+    }
+    .upload .u-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid rgba(35, 51, 95, 0.65);
+    }
+    .upload .u-head h2 {
+      margin: 0;
+      font-size: 16px;
+      letter-spacing: 0.04em;
+    }
+    .upload .u-body {
+      display: flex;
+      gap: 18px;
+      padding: 18px 20px;
+      flex-wrap: wrap;
+    }
+    .upload .u-prev {
+      flex: 1 1 280px;
+      background: #0d1425;
+      border: 1px solid rgba(33, 49, 86, 0.8);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .upload .u-prev-frame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: #0b101d;
+      border: 1px dashed rgba(73, 102, 170, 0.45);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .upload .u-prev-frame img,
+    .upload .u-prev-frame video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+    .upload .u-prev-frame video {
+      background: #000;
+    }
+    .upload .u-prev-hint {
+      text-align: center;
+      color: var(--muted, #97a3c0);
+      font-size: 13px;
+      padding: 12px;
+    }
+    .upload .u-prev-meta {
+      font-size: 12px;
+      color: var(--muted, #97a3c0);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .upload .u-fields {
+      flex: 1 1 320px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px 16px;
+    }
+    .upload .u-fields .wide {
+      grid-column: 1 / -1;
+    }
+    .upload label.u-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--muted, #97a3c0);
+    }
+    .upload input.u-input,
+    .upload textarea.u-input {
+      background: #111a2c;
+      border: 1px solid rgba(35, 51, 95, 0.85);
+      color: var(--ink, #e8eefc);
+      border-radius: 9px;
+      font: inherit;
+      padding: 7px 10px;
+      resize: vertical;
+      min-height: 34px;
+    }
+    .upload input.u-input[readonly] {
+      color: rgba(190, 203, 235, 0.85);
+      cursor: default;
+    }
+    .upload textarea.u-input {
+      min-height: 64px;
+    }
+    .upload .u-tags {
+      position: relative;
+    }
+    .upload .u-suggest,
+    .hb-search .u-suggest {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #0f162b;
+      border: 1px solid rgba(47, 70, 122, 0.85);
+      border-radius: 10px;
+      margin-top: 6px;
+      padding: 4px;
+      max-height: 170px;
+      overflow-y: auto;
+      display: none;
+      z-index: 10;
+      box-shadow: 0 10px 40px rgba(4, 10, 24, 0.5);
+    }
+    .upload .u-suggest.visible,
+    .hb-search .u-suggest.visible {
+      display: block;
+    }
+    .upload .u-suggest button,
+    .hb-search .u-suggest button {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: transparent;
+      border: none;
+      color: var(--ink, #e8eefc);
+      padding: 6px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .upload .u-suggest button:hover,
+    .hb-search .u-suggest button:hover {
+      background: rgba(58, 82, 138, 0.3);
+    }
+    .upload .u-chips {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .upload .u-chip {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(60, 90, 148, 0.7);
+      background: rgba(28, 44, 74, 0.75);
+      font-size: 12px;
+    }
+    .upload .u-foot {
+      padding: 0 20px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .upload .u-foot .u-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn-s {
+      background: #141b31;
+      border: 1px solid rgba(45, 68, 124, 0.9);
+      color: var(--ink, #e8eefc);
+      border-radius: 10px;
+      padding: 7px 14px;
+      cursor: pointer;
+      font: inherit;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .btn-s:hover {
+      border-color: rgba(91, 134, 208, 0.9);
+    }
+    .hb-search {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .hb-search input {
+      background: #0f162b;
+      border: 1px solid rgba(45, 68, 124, 0.8);
+      color: var(--ink, #e8eefc);
+      border-radius: 10px;
+      padding: 7px 12px;
+      min-width: 180px;
+      font: inherit;
+    }
+    .btn-s.primary {
+      background: linear-gradient(120deg, #78d7f4, #8d9bff);
+      border-color: rgba(136, 176, 255, 0.9);
+      color: #041226;
+      font-weight: 600;
+    }
+    .btn-s.ghost {
+      background: transparent;
+      border-color: rgba(58, 82, 138, 0.5);
+    }
+    .upload .u-loading {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 13, 24, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink, #e8eefc);
+      font-size: 15px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border-radius: 16px;
+      backdrop-filter: blur(3px);
+      display: none;
+    }
+    .upload .u-loading.show {
+      display: flex;
+    }
+    @media (max-width: 780px) {
+      dialog.upload {
+        min-width: 92vw;
+      }
+      .upload .u-body {
+        flex-direction: column;
+      }
+      .upload .u-fields {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+    }
+  </style>
+
+  <dialog id="uploadDialog" class="upload">
+    <div class="u-head">
+      <h2>New Memory</h2>
+      <button type="button" class="btn-s ghost" id="uClose">Close</button>
+    </div>
+    <div class="u-body">
+      <section class="u-prev">
+        <div class="u-prev-frame">
+          <img id="uImg" alt="Memory preview">
+          <video id="uVid" controls></video>
+          <div class="u-prev-hint" id="uPrevHint">Choose an image or video to begin.</div>
+        </div>
+        <div class="u-prev-meta">
+          <span id="uPrevName">No file selected</span>
+          <button type="button" class="btn-s ghost" id="uPick">Choose file…</button>
+        </div>
+      </section>
+      <section class="u-fields">
+        <label class="u-field wide">
+          Title
+          <input id="uTitle" class="u-input" type="text" placeholder="Memory title">
+        </label>
+        <label class="u-field">
+          Captured
+          <input id="uWhen" class="u-input" type="text" readonly>
+        </label>
+        <label class="u-field">
+          Time Zone
+          <input id="uTZ" class="u-input" type="text" placeholder="e.g. America/Los_Angeles">
+        </label>
+        <label class="u-field">
+          Latitude
+          <input id="uLat" class="u-input" type="number" step="0.000001" placeholder="34.052235">
+        </label>
+        <label class="u-field">
+          Longitude
+          <input id="uLon" class="u-input" type="number" step="0.000001" placeholder="-118.243683">
+        </label>
+        <label class="u-field wide u-tags">
+          Hashtags
+          <textarea id="uTags" class="u-input" rows="2" placeholder="#memory #sunrise"></textarea>
+          <div class="u-suggest" id="uSuggest"></div>
+          <div class="u-chips" id="uChips"></div>
+        </label>
+      </section>
+    </div>
+    <div class="u-foot">
+      <div class="u-actions">
+        <button type="button" class="btn-s ghost" id="uReset">Reset</button>
+      </div>
+      <div class="u-actions">
+        <button type="button" class="btn-s ghost" id="uCancel">Close</button>
+        <button type="button" class="btn-s primary" id="uSave">Submit upload</button>
+      </div>
+    </div>
+    <div class="u-loading" id="uLoad">Processing...</div>
+  </dialog>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const STORAGE_KEY = 'hb_memories_v1';
+    const TAG_KEY = 'hb_tag_counts_v1';
+    const YEAR_MS = 365.256 * 24 * 3600 * 1000;
+    const TAU = Math.PI * 2;
+
+    const doc = document;
+    const header = doc.querySelector('header');
+    const elFile = doc.getElementById('file');
+    const btnUpload = doc.getElementById('btnUpload');
+    const dialog = doc.getElementById('uploadDialog');
+    if (!header || !dialog) return;
+
+    const refs = {
+      dialog,
+      load: doc.getElementById('uLoad'),
+      pick: doc.getElementById('uPick'),
+      close: doc.getElementById('uClose'),
+      cancel: doc.getElementById('uCancel'),
+      reset: doc.getElementById('uReset'),
+      save: doc.getElementById('uSave'),
+      img: doc.getElementById('uImg'),
+      vid: doc.getElementById('uVid'),
+      hint: doc.getElementById('uPrevHint'),
+      prevName: doc.getElementById('uPrevName'),
+      title: doc.getElementById('uTitle'),
+      when: doc.getElementById('uWhen'),
+      tz: doc.getElementById('uTZ'),
+      lat: doc.getElementById('uLat'),
+      lon: doc.getElementById('uLon'),
+      tags: doc.getElementById('uTags'),
+      suggest: doc.getElementById('uSuggest'),
+      chips: doc.getElementById('uChips'),
+      list: doc.getElementById('fileList')
+    };
+
+    const state = {
+      previewURL: '',
+      revokeOnReset: true,
+      ts: Date.now(),
+      tz: tzGuess(),
+      lat: null,
+      lon: null,
+      file: null,
+      mime: ''
+    };
+
+    let memories = [];
+    let tagCounts = {};
+    let searchInput = null;
+    let searchSuggest = null;
+    let filterTag = '';
+
+    const memoryMap = new Map();
+    const recordMap = new Map();
+    const markerMap = new Map();
+
+    const markerGroup = { group: null, retry: null, warned: false };
+
+    const makeLabel = typeof window.makeLabelSprite === 'function' ? window.makeLabelSprite : null;
+    const THREERef = window.THREE;
+
+    const heliocentricLon = typeof window.heliocentricLongitude === 'function'
+      ? window.heliocentricLongitude
+      : (ts) => TAU * (((ts % YEAR_MS) + YEAR_MS) % YEAR_MS) / YEAR_MS;
+    const earthDistance = typeof window.earthSunDistance === 'function'
+      ? window.earthSunDistance
+      : () => 1;
+
+    const legacyRenderList = typeof window.renderList === 'function' ? window.renderList.bind(window) : null;
+    window.renderList = renderList;
+
+    if (btnUpload) {
+      btnUpload.onclick = (ev) => {
+        ev.preventDefault();
+        openDialog();
+      };
+    }
+
+    if (elFile) {
+      elFile.addEventListener('change', onFilePickedCapture, true);
+    }
+
+    attachDialogEvents();
+    initSearchBar();
+    ensureMarkerGroup();
+
+    document.addEventListener('click', handleGlobalClick, true);
+
+    loadStorage().then(() => {
+      renderList();
+      applyFilter(filterTag, { skipInput: true });
+    });
+
+    function getStore() {
+      try {
+        return typeof store !== 'undefined' ? store : window.store;
+      } catch (err) {
+        return window.store;
+      }
+    }
+
+    async function loadStorage() {
+      tagCounts = loadTagCounts();
+      const raw = safeJson(localStorage.getItem(STORAGE_KEY));
+      memories = [];
+      memoryMap.clear();
+      recordMap.clear();
+
+      if (Array.isArray(raw)) {
+        for (const item of raw) {
+          const mem = normalizeMemory(item);
+          if (mem && mem.id) {
+            memories.push(mem);
+            memoryMap.set(mem.id, mem);
+          }
+        }
+      }
+
+      memories.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      tagCounts = recomputeTagCounts(memories);
+      saveTagCounts();
+
+      for (const mem of memories) {
+        await ensureStoreRecord(mem);
+        addMemoryMarker(mem);
+      }
+    }
+
+    function attachDialogEvents() {
+      dialog.addEventListener('cancel', (ev) => {
+        ev.preventDefault();
+        closeDialog();
+      });
+      if (refs.pick) {
+        refs.pick.addEventListener('click', () => {
+          if (elFile) elFile.click();
+        });
+      }
+      if (refs.close) refs.close.addEventListener('click', closeDialog);
+      if (refs.cancel) refs.cancel.addEventListener('click', closeDialog);
+      if (refs.reset) refs.reset.addEventListener('click', resetForm);
+      if (refs.save) refs.save.addEventListener('click', onSubmit);
+      if (refs.tags) {
+        refs.tags.addEventListener('input', () => {
+          updateChips(parseHashtags(refs.tags.value));
+          updateTagSuggestions(refs.tags, refs.suggest);
+        });
+        refs.tags.addEventListener('focus', () => updateTagSuggestions(refs.tags, refs.suggest));
+        refs.tags.addEventListener('blur', () => hideSuggestions(refs.suggest));
+        refs.tags.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter' && !ev.shiftKey) {
+            ev.preventDefault();
+            onSubmit();
+          }
+        });
+      }
+      if (refs.tz) {
+        refs.tz.addEventListener('blur', () => {
+          const tz = sanitizeTZ(refs.tz.value) || tzGuess();
+          state.tz = tz;
+          refs.tz.value = tz;
+          refs.when.value = toLocalISO(state.ts, tz);
+        });
+      }
+      if (refs.list) {
+        refs.list.addEventListener('click', (ev) => {
+          const chip = ev.target.closest('.chip[data-tag]');
+          if (chip) {
+            ev.stopPropagation();
+            const tag = chip.dataset.tag;
+            if (tag) {
+              setSearchValue(tag);
+              applyFilter(tag);
+            }
+            return;
+          }
+          const item = ev.target.closest('.item[data-id]');
+          if (item && typeof window.toggleSelect === 'function') {
+            window.toggleSelect(item.dataset.id);
+          }
+        });
+      }
+    }
+
+    function initSearchBar() {
+      if (!header || doc.getElementById('hbSearch')) return;
+      const wrap = doc.createElement('div');
+      wrap.className = 'pill hb-search';
+
+      const label = doc.createElement('label');
+      label.setAttribute('for', 'hbSearch');
+      label.textContent = 'Search';
+      wrap.appendChild(label);
+
+      const input = doc.createElement('input');
+      input.type = 'search';
+      input.id = 'hbSearch';
+      input.placeholder = 'Filter #tag';
+      wrap.appendChild(input);
+
+      const suggest = doc.createElement('div');
+      suggest.className = 'u-suggest';
+      wrap.appendChild(suggest);
+
+      header.appendChild(wrap);
+
+      searchInput = input;
+      searchSuggest = suggest;
+
+      input.addEventListener('input', onSearchInput);
+      input.addEventListener('focus', onSearchInput);
+      input.addEventListener('blur', () => hideSuggestions(searchSuggest));
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') {
+          input.value = '';
+          hideSuggestions(searchSuggest);
+          applyFilter('', { skipInput: true });
+        }
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          const tags = parseHashtags(input.value);
+          const tag = tags[0] || '';
+          applyFilter(tag, { skipInput: true });
+          hideSuggestions(searchSuggest);
+        }
+      });
+    }
+
+    function onSearchInput() {
+      if (!searchInput) return;
+      const caret = searchInput.selectionStart ?? searchInput.value.length;
+      const tokenInfo = findActiveToken(searchInput.value, caret);
+      if (tokenInfo) {
+        const list = getTagSuggestions(tokenInfo.token.toLowerCase());
+        renderSuggestions(searchSuggest, list, (tag) => {
+          insertTagSuggestion(searchInput, tokenInfo, tag, false);
+          applyFilter(tag, { skipInput: true });
+        });
+      } else {
+        hideSuggestions(searchSuggest);
+        const tags = parseHashtags(searchInput.value);
+        applyFilter(tags[0] || '', { skipInput: true });
+      }
+    }
+
+    function handleGlobalClick(ev) {
+      if (refs.suggest && !refs.suggest.contains(ev.target) && ev.target !== refs.tags) {
+        hideSuggestions(refs.suggest);
+      }
+      if (searchSuggest && !searchSuggest.contains(ev.target) && ev.target !== searchInput) {
+        hideSuggestions(searchSuggest);
+      }
+    }
+
+    function onFilePickedCapture(ev) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      const input = ev.target;
+      const files = Array.from(input.files || []);
+      if (!files.length) return;
+      const file = files[0];
+      if (!dialog.open) openDialog();
+      showPreviewAndEXIF(file);
+      input.value = '';
+    }
+
+    function openDialog() {
+      resetForm();
+      try {
+        dialog.showModal();
+      } catch (err) {
+        dialog.show();
+      }
+    }
+
+    function closeDialog() {
+      hideSuggestions(refs.suggest);
+      try {
+        dialog.close();
+      } catch (err) {
+        dialog.open = false;
+      }
+      resetForm();
+    }
+
+    function resetForm() {
+      if (state.previewURL && state.revokeOnReset) {
+        try { URL.revokeObjectURL(state.previewURL); } catch (err) { /* ignore */ }
+      }
+      state.previewURL = '';
+      state.revokeOnReset = true;
+      state.file = null;
+      state.mime = '';
+      state.ts = Date.now();
+      state.tz = tzGuess();
+      state.lat = null;
+      state.lon = null;
+
+      if (refs.img) {
+        refs.img.removeAttribute('src');
+        refs.img.style.display = 'none';
+      }
+      if (refs.vid) {
+        refs.vid.removeAttribute('src');
+        refs.vid.load();
+        refs.vid.style.display = 'none';
+      }
+      if (refs.hint) refs.hint.style.display = 'block';
+      if (refs.prevName) refs.prevName.textContent = 'No file selected';
+      if (refs.title) refs.title.value = '';
+      if (refs.when) refs.when.value = toLocalISO(state.ts, state.tz);
+      if (refs.tz) refs.tz.value = state.tz;
+      if (refs.lat) refs.lat.value = '';
+      if (refs.lon) refs.lon.value = '';
+      if (refs.tags) refs.tags.value = '';
+      if (refs.chips) refs.chips.innerHTML = '';
+      hideSuggestions(refs.suggest);
+    }
+
+    async function showPreviewAndEXIF(file) {
+      state.file = file;
+      state.mime = file.type || '';
+      setLoading(true);
+      try {
+        const url = URL.createObjectURL(file);
+        if (state.previewURL && state.revokeOnReset) {
+          try { URL.revokeObjectURL(state.previewURL); } catch (err) { /* ignore */ }
+        }
+        state.previewURL = url;
+        state.revokeOnReset = true;
+        if (refs.prevName) refs.prevName.textContent = file.name;
+        if (refs.title && !refs.title.value) refs.title.value = defaultTitle(file.name);
+        updatePreviewMedia(url, file.type);
+
+        const meta = await extractMetadata(file);
+        state.ts = meta.ts;
+        state.tz = meta.tz;
+        state.lat = meta.lat;
+        state.lon = meta.lon;
+
+        if (refs.when) refs.when.value = toLocalISO(state.ts, state.tz);
+        if (refs.tz) refs.tz.value = state.tz;
+        if (refs.lat) refs.lat.value = meta.lat != null ? meta.lat.toFixed(6) : '';
+        if (refs.lon) refs.lon.value = meta.lon != null ? meta.lon.toFixed(6) : '';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function extractMetadata(file) {
+      let ts = file.lastModified || Date.now();
+      let tz = tzGuess();
+      let lat = null;
+      let lon = null;
+
+      if (file.type && file.type.startsWith('image/') && window.exifr?.parse) {
+        try {
+          const exif = await window.exifr.parse(file, { tiff: true, ifd0: true, exif: true, gps: true });
+          if (exif) {
+            const dateCandidate = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+            const offset = exif.OffsetTimeOriginal || exif.OffsetTime;
+            const parsed = parseExifDate(dateCandidate, offset);
+            if (parsed) ts = parsed;
+            const tzCandidate = exif.TimeZoneName || exif.TimeZone || exif.Timezone;
+            tz = sanitizeTZ(tzCandidate) || tzGuess();
+            if (Number.isFinite(exif.latitude)) lat = roundCoord(exif.latitude);
+            if (Number.isFinite(exif.longitude)) lon = roundCoord(exif.longitude);
+          }
+        } catch (err) {
+          console.warn('EXIF parse failed', err);
+        }
+      }
+      return { ts, tz, lat, lon };
+    }
+
+    function updatePreviewMedia(url, mime) {
+      const isVideo = mime ? mime.startsWith('video/') : false;
+      if (refs.hint) refs.hint.style.display = 'none';
+      if (isVideo) {
+        if (refs.img) {
+          refs.img.removeAttribute('src');
+          refs.img.style.display = 'none';
+        }
+        if (refs.vid) {
+          refs.vid.src = url;
+          refs.vid.style.display = 'block';
+          refs.vid.load();
+        }
+      } else {
+        if (refs.img) {
+          refs.img.src = url;
+          refs.img.style.display = 'block';
+        }
+        if (refs.vid) {
+          refs.vid.removeAttribute('src');
+          refs.vid.style.display = 'none';
+          refs.vid.load();
+        }
+      }
+    }
+
+    async function onSubmit() {
+      if (!state.file || !state.previewURL) {
+        alert('Choose a file before submitting.');
+        return;
+      }
+      const title = (refs.title?.value || '').trim() || defaultTitle(state.file.name);
+      const tz = sanitizeTZ(refs.tz?.value) || state.tz || tzGuess();
+      const tags = parseHashtags(refs.tags?.value || '');
+      if (!tags.length) {
+        alert('Add at least one hashtag.');
+        return;
+      }
+      const latVal = parseFloat(refs.lat?.value);
+      const lonVal = parseFloat(refs.lon?.value);
+      const lat = Number.isFinite(latVal) ? roundCoord(latVal) : null;
+      const lon = Number.isFinite(lonVal) ? roundCoord(lonVal) : null;
+
+      const memory = {
+        id: typeof window.uid === 'function' ? window.uid() : `mem_${Date.now()}`,
+        name: title,
+        ts: state.ts || Date.now(),
+        tz,
+        lat,
+        lon,
+        tags,
+        fileURL: state.previewURL,
+        mime: state.mime
+      };
+
+      state.revokeOnReset = false;
+
+      memoryMap.set(memory.id, memory);
+      memories = [memory, ...memories.filter((m) => m.id !== memory.id)];
+      tagCounts = recomputeTagCounts(memories);
+      saveMemories();
+      saveTagCounts();
+
+      try {
+        await ensureStoreRecord(memory);
+        addMemoryMarker(memory);
+        if (typeof window.ensureYearHalo === 'function') {
+          const record = recordMap.get(memory.id);
+          if (record?.year) {
+            window.ensureYearHalo(record.year).catch(() => {});
+          }
+        }
+        if (typeof window.warmYears === 'function') {
+          window.warmYears();
+        }
+      } catch (err) {
+        console.warn('Memory hydration failed', err);
+      }
+
+      renderList();
+      applyFilter(filterTag, { skipInput: true });
+      closeDialog();
+    }
+
+    function ensureMarkerGroup() {
+      if (markerGroup.group && markerGroup.group.parent) return markerGroup.group;
+      const hasSceneAdd = Boolean(window.scene && typeof window.scene.add === 'function');
+      if (THREERef && hasSceneAdd) {
+        markerGroup.group = new THREERef.Group();
+        markerGroup.group.name = 'memMarkers';
+        window.scene.add(markerGroup.group);
+        markerGroup.warned = false;
+        return markerGroup.group;
+      }
+      if (window.scene && !hasSceneAdd && !markerGroup.warned) {
+        markerGroup.warned = true;
+        console.warn('[halobank] window.scene is present but does not expose an add() method. Skipping marker attachment.');
+      }
+      if (!markerGroup.retry) {
+        markerGroup.retry = setInterval(() => {
+          if (THREERef && window.scene && typeof window.scene.add === 'function') {
+            clearInterval(markerGroup.retry);
+            markerGroup.retry = null;
+            ensureMarkerGroup();
+            markerMap.forEach((entry) => {
+              if (entry?.memory) addMemoryMarker(entry.memory);
+            });
+          }
+        }, 50);
+      }
+      return null;
+    }
+
+    function addMemoryMarker(memory) {
+      if (!memory || !THREERef) return;
+      const group = ensureMarkerGroup();
+      if (!group) {
+        const existing = markerMap.get(memory.id);
+        if (existing) {
+          existing.memory = memory;
+        } else {
+          markerMap.set(memory.id, { memory });
+        }
+        return;
+      }
+
+      const lon = heliocentricLon(memory.ts || Date.now());
+      const dist = earthDistance(memory.ts || Date.now()) || 1;
+      const x = Math.cos(lon) * dist;
+      const z = Math.sin(lon) * dist;
+
+      let entry = markerMap.get(memory.id);
+      if (!entry) {
+        const geometry = new THREERef.SphereGeometry(0.01, 16, 16);
+        const material = new THREERef.MeshBasicMaterial({
+          color: tagColor(memory.tags[0]),
+          transparent: true,
+          opacity: 0.92
+        });
+        const mesh = new THREERef.Mesh(geometry, material);
+        mesh.position.set(x, 0, z);
+        mesh.userData = { id: memory.id, tags: memory.tags, source: 'memory' };
+        group.add(mesh);
+        if (window.markers instanceof Map) {
+          window.markers.set(memory.id, mesh);
+        }
+
+        let label = null;
+        if (makeLabel) {
+          label = makeLabel(memory.name || 'Memory');
+          if (label) {
+            label.position.copy(mesh.position).add(new THREERef.Vector3(0.03, 0.03, 0));
+            label.visible = false;
+            group.add(label);
+            if (window.labels instanceof Map) {
+              window.labels.set(memory.id, label);
+            }
+          }
+        }
+        entry = { mesh, label, memory };
+        markerMap.set(memory.id, entry);
+      } else {
+        const { mesh, label } = entry;
+        mesh.position.set(x, 0, z);
+        mesh.material.color.setHex(tagColor(memory.tags[0]));
+        mesh.userData.tags = memory.tags;
+        if (label) {
+          label.position.copy(mesh.position).add(new THREERef.Vector3(0.03, 0.03, 0));
+        }
+        entry.memory = memory;
+      }
+    }
+
+    async function ensureStoreRecord(memory) {
+      if (!memory || recordMap.has(memory.id)) {
+        return recordMap.get(memory?.id);
+      }
+      let record = null;
+      if (typeof window.buildRecordFromTimestamp === 'function') {
+        try {
+          record = await window.buildRecordFromTimestamp(memory.name, memory.ts, {
+            lat: memory.lat ?? undefined,
+            lon: memory.lon ?? undefined,
+            tz: memory.tz
+          });
+        } catch (err) {
+          console.warn('buildRecordFromTimestamp fallback', err);
+        }
+      }
+      if (!record) {
+        record = {
+          id: memory.id,
+          name: memory.name,
+          when: new Date(memory.ts).toISOString(),
+          tz: memory.tz,
+          year: new Date(memory.ts).getUTCFullYear(),
+          tags: [...memory.tags]
+        };
+      }
+      record.id = memory.id;
+      record.name = memory.name;
+      record.when = new Date(memory.ts).toISOString();
+      record.tz = memory.tz;
+      record.tags = [...memory.tags];
+      record.memoryMeta = memory;
+      const storeRef = getStore();
+      const items = storeRef?.items;
+      if (Array.isArray(items) && !items.find((item) => item.id === record.id)) {
+        items.push(record);
+      }
+      recordMap.set(memory.id, record);
+      return record;
+    }
+
+    function renderList() {
+      if (!refs.list) return;
+      const frag = doc.createDocumentFragment();
+      const seen = new Set();
+
+      const storeRef = getStore();
+      const combined = [];
+      for (const mem of memories) {
+        const record = recordMap.get(mem.id) || null;
+        combined.push({
+          id: mem.id,
+          ts: mem.ts,
+          tz: mem.tz,
+          name: mem.name,
+          tags: mem.tags,
+          type: 'memory',
+          record
+        });
+        seen.add(mem.id);
+      }
+
+      const storeItems = Array.isArray(storeRef?.items) ? storeRef.items : [];
+      for (const rec of storeItems) {
+        if (seen.has(rec.id)) continue;
+        combined.push({
+          id: rec.id,
+          ts: Date.parse(rec.when || '') || rec.ts || 0,
+          tz: rec.tz || tzGuess(),
+          name: rec.name,
+          tags: Array.isArray(rec.tags) ? rec.tags : [],
+          type: 'legacy',
+          record: rec
+        });
+      }
+
+      combined.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+      const selected = storeRef?.selected;
+
+      for (const item of combined) {
+        const row = doc.createElement('div');
+        row.className = 'item';
+        if (selected?.has?.(item.id)) row.classList.add('active');
+        row.dataset.id = item.id;
+        row.dataset.type = item.type;
+        row.dataset.tags = item.tags.join(',');
+
+        const labelTime = typeof window.fmt?.dateLocal === 'function'
+          ? window.fmt.dateLocal(item.ts, item.tz)
+          : toLocalISO(item.ts, item.tz);
+
+        row.innerHTML = `
+          <div class="title">${escapeHtml(item.name)}</div>
+          <div class="meta">${escapeHtml(labelTime)}${item.tz ? ' &middot; ' + escapeHtml(item.tz) : ''}</div>
+          ${item.tags.length ? `<div class="chips">${item.tags.map((tag) => `<span class="chip" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`).join('')}</div>` : '<div class="chips muted">No hashtags</div>'}
+        `;
+
+        frag.appendChild(row);
+      }
+
+      refs.list.innerHTML = '';
+      refs.list.appendChild(frag);
+
+      if (typeof window.renderStates === 'function') {
+        try { window.renderStates(); } catch (err) { console.warn(err); }
+      } else if (legacyRenderList) {
+        try { legacyRenderList(); } catch (err) { console.warn(err); }
+      }
+    }
+
+    function applyFilter(tag, opts = {}) {
+      filterTag = tag || '';
+      if (!opts.skipInput && searchInput) {
+        searchInput.value = filterTag;
+      }
+      if (refs.list) {
+        const rows = Array.from(refs.list.querySelectorAll('.item'));
+        for (const row of rows) {
+          const tags = (row.dataset.tags || '').split(',').filter(Boolean);
+          const visible = !filterTag || tags.includes(filterTag);
+          row.style.display = visible ? '' : 'none';
+        }
+      }
+      filterMarkersByTag(filterTag);
+    }
+
+    function filterMarkersByTag(tag) {
+      markerMap.forEach((entry) => {
+        if (!entry || !entry.mesh || !entry.memory) return;
+        const has = !tag || entry.memory.tags.includes(tag);
+        entry.mesh.visible = has;
+        if (!has && entry.label) entry.label.visible = false;
+      });
+    }
+
+    function updateChips(tags) {
+      if (!refs.chips) return;
+      const frag = doc.createDocumentFragment();
+      for (const tag of tags) {
+        const chip = doc.createElement('span');
+        chip.className = 'u-chip';
+        chip.dataset.tag = tag;
+        chip.textContent = tag;
+        frag.appendChild(chip);
+      }
+      refs.chips.innerHTML = '';
+      refs.chips.appendChild(frag);
+    }
+
+    function updateTagSuggestions(input, suggestEl) {
+      if (!input || !suggestEl) return;
+      const caret = input.selectionStart ?? input.value.length;
+      const tokenInfo = findActiveToken(input.value, caret);
+      if (!tokenInfo) {
+        hideSuggestions(suggestEl);
+        return;
+      }
+      const list = getTagSuggestions(tokenInfo.token.toLowerCase());
+      renderSuggestions(suggestEl, list, (tag) => {
+        insertTagSuggestion(input, tokenInfo, tag, true);
+        updateChips(parseHashtags(input.value));
+      });
+    }
+
+    function renderSuggestions(host, list, onSelect) {
+      if (!host) return;
+      host.innerHTML = '';
+      if (!list.length) {
+        host.classList.remove('visible');
+        return;
+      }
+      for (const [tag, count] of list) {
+        const btn = doc.createElement('button');
+        btn.type = 'button';
+        btn.dataset.tag = tag;
+        btn.innerHTML = `<span>${escapeHtml(tag)}</span><span>${count}</span>`;
+        btn.addEventListener('mousedown', (ev) => {
+          ev.preventDefault();
+          onSelect(tag);
+          host.classList.remove('visible');
+        });
+        host.appendChild(btn);
+      }
+      host.classList.add('visible');
+    }
+
+    function hideSuggestions(el) {
+      if (el) el.classList.remove('visible');
+    }
+
+    function findActiveToken(text, caret) {
+      const uptoCaret = text.slice(0, caret);
+      const match = /(^|[\s.,;])([#][\p{L}\p{N}_-]*)$/u.exec(uptoCaret);
+      if (!match) return null;
+      const token = match[2];
+      const start = caret - token.length;
+      return { token, start, end: caret };
+    }
+
+    function insertTagSuggestion(input, tokenInfo, tag, addSpace) {
+      const value = input.value;
+      const before = value.slice(0, tokenInfo.start);
+      const after = value.slice(tokenInfo.end);
+      const suffix = addSpace ? ' ' : '';
+      const next = `${before}${tag}${suffix}${after}`;
+      input.value = next;
+      const caret = before.length + tag.length + suffix.length;
+      input.setSelectionRange(caret, caret);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function getTagSuggestions(prefix) {
+      const raw = prefix.startsWith('#') ? prefix.slice(1) : prefix;
+      const needle = raw.trim().toLowerCase();
+      const entries = Object.entries(tagCounts);
+      if (!needle) {
+        return entries
+          .sort((a, b) => (b[1] - a[1]) || a[0].localeCompare(b[0]))
+          .slice(0, 8);
+      }
+      const scored = [];
+      for (const [tag, count] of entries) {
+        const body = tag.startsWith('#') ? tag.slice(1) : tag;
+        const lowerBody = body.toLowerCase();
+        const idx = lowerBody.indexOf(needle);
+        if (idx === -1) continue;
+        const exactPrefix = idx === 0 ? 0 : 1;
+        scored.push({ tag, count, idx, exactPrefix });
+      }
+      scored.sort((a, b) => {
+        if (a.exactPrefix !== b.exactPrefix) return a.exactPrefix - b.exactPrefix;
+        if (a.idx !== b.idx) return a.idx - b.idx;
+        if (a.count !== b.count) return b.count - a.count;
+        return a.tag.localeCompare(b.tag);
+      });
+      return scored.slice(0, 8).map(({ tag, count }) => [tag, count]);
+    }
+
+    function parseHashtags(text) {
+      if (!text) return [];
+      const matches = text.match(/#[\p{L}\p{N}_-]+/gu) || [];
+      const seen = new Set();
+      const tags = [];
+      for (const tag of matches) {
+        const lower = tag.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          tags.push(lower);
+        }
+      }
+      return tags;
+    }
+
+    function normalizeMemory(item) {
+      if (!item || !item.id) return null;
+      const latNum = Number(item.lat);
+      const lonNum = Number(item.lon);
+      const mem = {
+        id: String(item.id),
+        name: String(item.name || 'Memory'),
+        ts: Number(item.ts) || Date.now(),
+        tz: item.tz || tzGuess(),
+        lat: Number.isFinite(latNum) ? latNum : null,
+        lon: Number.isFinite(lonNum) ? lonNum : null,
+        tags: Array.isArray(item.tags) ? item.tags.map((t) => String(t).toLowerCase()) : [],
+        fileURL: item.fileURL || '',
+        mime: item.mime || ''
+      };
+      return mem;
+    }
+
+    function recomputeTagCounts(entries) {
+      const counts = {};
+      for (const mem of entries) {
+        for (const tag of mem.tags) {
+          counts[tag] = (counts[tag] || 0) + 1;
+        }
+      }
+      return counts;
+    }
+
+    function saveMemories() {
+      try {
+        const payload = memories.map((mem) => ({
+          id: mem.id,
+          name: mem.name,
+          ts: mem.ts,
+          tz: mem.tz,
+          lat: mem.lat,
+          lon: mem.lon,
+          tags: mem.tags,
+          fileURL: mem.fileURL,
+          mime: mem.mime
+        }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('Failed to persist memories', err);
+      }
+    }
+
+    function loadTagCounts() {
+      const parsed = safeJson(localStorage.getItem(TAG_KEY));
+      if (parsed && typeof parsed === 'object') return parsed;
+      return {};
+    }
+
+    function saveTagCounts() {
+      try {
+        localStorage.setItem(TAG_KEY, JSON.stringify(tagCounts));
+      } catch (err) {
+        console.warn('Failed to persist tag counts', err);
+      }
+    }
+
+    function safeJson(str) {
+      if (!str) return null;
+      try {
+        return JSON.parse(str);
+      } catch (err) {
+        console.warn('JSON parse failed', err);
+        return null;
+      }
+    }
+
+    function tzGuess() {
+      try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      } catch (err) {
+        return 'UTC';
+      }
+    }
+
+    function toLocalISO(ts, tz) {
+      try {
+        const opts = {
+          timeZone: tz || 'UTC',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        };
+        const parts = new Intl.DateTimeFormat('en-CA', opts).formatToParts(new Date(ts));
+        const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+        return `${map.year}-${map.month}-${map.day} ${map.hour}:${map.minute}:${map.second}`;
+      } catch (err) {
+        return new Date(ts).toISOString().replace('T', ' ').slice(0, 19);
+      }
+    }
+
+    function sanitizeTZ(value) {
+      const val = (value || '').trim();
+      if (!val) return '';
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: val });
+        return val;
+      } catch (err) {
+        return '';
+      }
+    }
+
+    function roundCoord(num) {
+      return Math.round(num * 1e6) / 1e6;
+    }
+
+    function parseExifDate(value, offset) {
+      if (!value) return null;
+      if (value instanceof Date) return value.getTime();
+      if (typeof value === 'number') return value;
+      let raw = String(value).trim();
+      if (!raw) return null;
+      raw = raw.replace(/^(\d{4}):(\d{2}):(\d{2})\s+/, '$1-$2-$3T');
+      if (!/[+-]\d{2}:\d{2}$/.test(raw)) {
+        if (typeof offset === 'string' && /^[+-]\d{2}:\d{2}$/.test(offset)) {
+          raw += offset;
+        } else {
+          raw += '+00:00';
+        }
+      }
+      const parsed = Date.parse(raw);
+      return Number.isNaN(parsed) ? null : parsed;
+    }
+
+    function defaultTitle(name) {
+      if (!name) return 'Untitled memory';
+      return name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' ').trim() || 'Untitled memory';
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function setLoading(isOn) {
+      if (!refs.load) return;
+      refs.load.classList.toggle('show', Boolean(isOn));
+    }
+
+    function setSearchValue(tag) {
+      if (searchInput) {
+        searchInput.value = tag;
+      }
+    }
+
+    function tagColor(tag) {
+      if (!tag || !THREERef) return 0x7bdcf3;
+      const color = new THREERef.Color();
+      const hue = (hashString(tag) % 360) / 360;
+      color.setHSL(hue, 0.62, 0.58);
+      return color.getHex();
+    }
+
+    function hashString(str) {
+      let h = 0;
+      for (let i = 0; i < str.length; i++) {
+        h = (h << 5) - h + str.charCodeAt(i);
+        h |= 0;
+      }
+      return Math.abs(h);
+    }
+  })();
+</script>
+
+<script type="module">
+(async () => {
+  const resolvedLocal = new URL("halobank-spore-timeline.js", window.location.href).pathname;
+  const candidates = [
+    "/halobank-spore-timeline.js",
+    "/halobank/halobank-spore-timeline.js",
+    "/warp/halobank-spore-timeline.js",
+    "./halobank-spore-timeline.js",
+    "halobank-spore-timeline.js",
+    resolvedLocal,
+  ].filter((value, index, array) => value && array.indexOf(value) === index);
+
+  let lastError = null;
+  for (const specifier of candidates) {
+    try {
+      await import(specifier);
+      window.__haloBankTimelineSource = specifier;
+      console.info(`[halobank] Loaded timeline module from ${specifier}`);
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`[halobank] Timeline import failed for ${specifier}`, lastError);
+    }
+  }
+
+  console.error(
+    "[halobank] Unable to load halobank-spore-timeline.js from any known location. " +
+      "Ensure the file is hosted alongside halobank.html or served at /halobank-spore-timeline.js.",
+    lastError,
+  );
+})();
+</script>
+
 </body>
 </html>

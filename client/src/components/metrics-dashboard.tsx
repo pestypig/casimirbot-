@@ -44,7 +44,7 @@ const deriveActiveTiles = (
   totalTiles?: number,
   sectors?: number,
   duty?: number,
-  mode?: 'standby'|'hover'|'cruise'|'emergency'
+  mode?: 'standby'|'hover'|'nearzero'|'cruise'|'emergency'
 ) => {
   if (!Number.isFinite(totalTiles) || !Number.isFinite(sectors) || (sectors as number) <= 0) return undefined;
   if (mode === 'standby' || !Number.isFinite(duty) || (duty as number) <= 0) return 0;

@@ -17,17 +17,45 @@ export function CasimirTileGridPanel({
   width = 320,
   height = 170,
   dark = true,
+  onSectorFocus,
+  pulseSector,
 }: {
   metrics: Metrics;
   width?: number;
   height?: number;
   dark?: boolean;
+  onSectorFocus?: (sector: number | null) => void;
+  pulseSector?: number | null;
 }) {
   const ref = React.useRef<HTMLCanvasElement>(null);
 
   // fade trail store
   const trail = React.useRef<number[]>([]);
   const lastStamp = React.useRef<number>(0);
+  const layoutRef = React.useRef<{
+    x0: number;
+    y0: number;
+    cellW: number;
+    cellH: number;
+    cols: number;
+    rows: number;
+    usableWidth: number;
+    usableHeight: number;
+  } | null>(null);
+  const hoverIndexRef = React.useRef<number | null>(null);
+  const pulseLevelsRef = React.useRef<number[]>([]);
+  const [drawNonce, setDrawNonce] = React.useState(0);
+  const schedulePulseRedraw = React.useCallback(() => {
+    let frames = 0;
+    const step = () => {
+      frames += 1;
+      setDrawNonce((value) => value + 1);
+      if (frames < 6) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
+  }, []);
 
   // compute a nice grid that fits totalSectors (<= 20x20)
   const { rows, cols } = React.useMemo(() => {
@@ -48,9 +76,10 @@ export function CasimirTileGridPanel({
 
   // draw
   React.useEffect(() => {
-    const cvs = ref.current; if (!cvs) return;
+    const cvs = ref.current;
+    if (!cvs) return;
     const ctx = cvs.getContext("2d");
-    if (!ctx || typeof ctx.clearRect !== 'function') return;
+    if (!ctx || typeof ctx.clearRect !== "function") return;
 
     const dpr = window.devicePixelRatio || 1;
     cvs.width = Math.floor(width * dpr);
@@ -59,15 +88,28 @@ export function CasimirTileGridPanel({
 
     const pad = 10;
     const legendH = 30;
-    const w = width - pad*2;
-    const h = height - pad*2 - legendH;
-    const x0 = pad, y0 = pad;
+    const w = width - pad * 2;
+    const h = height - pad * 2 - legendH;
+    const x0 = pad;
+    const y0 = pad;
 
     // cell geometry
     const cellW = w / cols;
     const cellH = h / rows;
     const gap = Math.max(0, Math.min(2, Math.floor(Math.min(cellW, cellH) * 0.08)));
-    const innerW = cellW - gap, innerH = cellH - gap;
+    const innerW = cellW - gap;
+    const innerH = cellH - gap;
+
+    layoutRef.current = {
+      x0,
+      y0,
+      cellW,
+      cellH,
+      cols,
+      rows,
+      usableWidth: w,
+      usableHeight: h,
+    };
 
     // clear
     ctx.fillStyle = dark ? "#0a0f1a" : "#0b1220";
@@ -79,58 +121,60 @@ export function CasimirTileGridPanel({
 
     const N = metrics.totalSectors;
 
-    // lazy-init trail
     if (!trail.current.length || trail.current.length !== N) {
       trail.current = new Array(N).fill(0);
     }
+    if (!pulseLevelsRef.current.length || pulseLevelsRef.current.length !== N) {
+      pulseLevelsRef.current = new Array(N).fill(0);
+    }
 
-    // trail decay based on elapsed time
     const now = performance.now();
     const dt = lastStamp.current ? (now - lastStamp.current) / 1000 : 0;
     lastStamp.current = now;
-    const decay = Math.exp(-dt * 6); // faster decay → shorter trail
+    const decay = Math.exp(-dt * 6); // faster decay + shorter trail
     for (let i = 0; i < N; i++) trail.current[i] *= decay;
-    // mark current active sectors (could be >1 if sectorStrobing>1)
+    const pulseDecay = Math.exp(-dt * 5);
+    for (let i = 0; i < N; i++) pulseLevelsRef.current[i] *= pulseDecay;
     for (let k = 0; k < metrics.sectorStrobing; k++) {
       const idx = (sectorIndex + k) % N;
       trail.current[idx] = 1;
     }
 
-    // compute per-sector instantaneous fill (how many tiles of that sector are energized *now*)
-    // In your physics, at any instant only `sectorStrobing` sectors are on:
-    // fractionOn = sectorStrobing / totalSectors
     const fracOn = Math.min(1, Math.max(0, metrics.sectorStrobing / metrics.totalSectors));
+    const hoverIdx = hoverIndexRef.current;
 
     for (let r = 0, s = 0; r < rows; r++) {
       for (let c = 0; c < cols && s < N; c++, s++) {
-        const x = x0 + c * cellW + gap/2;
-        const y = y0 + r * cellH + gap/2;
+        const x = x0 + c * cellW + gap / 2;
+        const y = y0 + r * cellH + gap / 2;
 
-        // base tile background
         ctx.fillStyle = "rgba(255,255,255,0.04)";
         ctx.fillRect(x, y, innerW, innerH);
 
-        // fill proportional to fracOn (vertical fill from bottom)
         const fillH = innerH * fracOn;
         ctx.fillStyle = "rgba(100, 220, 255, 0.18)";
         ctx.fillRect(x, y + (innerH - fillH), innerW, fillH);
 
-        // active/trail overlay
-        const t = trail.current[s]; // [0..1]
+        const tTrail = trail.current[s];
+        const tPulse = pulseLevelsRef.current[s] ?? 0;
+        const t = Math.max(tTrail, tPulse);
         if (t > 0.01) {
-          // active
           const g = Math.floor(180 + 60 * t);
-          ctx.fillStyle = `rgba(80, ${g}, 120, ${0.30 + 0.5 * t})`;
+          ctx.fillStyle = `rgba(80, ${g}, 120, ${0.3 + 0.5 * t})`;
           ctx.fillRect(x, y, innerW, innerH);
-          // rim
           ctx.strokeStyle = `rgba(120, 240, 255, ${0.4 + 0.5 * t})`;
           ctx.lineWidth = 1;
+          ctx.strokeRect(x + 0.5, y + 0.5, innerW - 1, innerH - 1);
+        }
+
+        if (hoverIdx === s) {
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = "rgba(245,245,255,0.7)";
           ctx.strokeRect(x + 0.5, y + 0.5, innerW - 1, innerH - 1);
         }
       }
     }
 
-    // legend
     const Lx = x0, Ly = y0 + h + 10;
     ctx.font = "11px ui-sans-serif, system-ui, Segoe UI, Roboto";
     ctx.textBaseline = "top";
@@ -138,27 +182,27 @@ export function CasimirTileGridPanel({
     const txt = [
       `Sectors: ${metrics.sectorStrobing}/${metrics.totalSectors}`,
       `Tiles/sector: ${(metrics.tilesPerSector || 0).toLocaleString()}`,
-      `Active fraction: ${(fracOn*100).toFixed(5)}%`,
+      `Active fraction: ${(fracOn * 100).toFixed(5)}%`,
       `Sweep: ${(metrics.strobeHz || 0).toLocaleString()} Hz`,
     ];
 
     let cx = Lx;
     const chips = (label: string, color: string) => {
-      const w = ctx.measureText(label).width + 14;
+      const chipWidth = ctx.measureText(label).width + 14;
       ctx.fillStyle = `rgba(255,255,255,0.06)`;
-      ctx.fillRect(cx, Ly, w, 18);
+      ctx.fillRect(cx, Ly, chipWidth, 18);
       ctx.fillStyle = color;
       ctx.fillRect(cx + 6, Ly + 6, 6, 6);
       ctx.fillStyle = "rgba(240,240,255,0.9)";
       ctx.fillText(label, cx + 16, Ly + 3);
-      cx += w + 6;
+      cx += chipWidth + 6;
     };
 
     chips(txt[0], "rgba(120,220,255,1)");
     chips(txt[1], "rgba(220,180,255,1)");
     chips(txt[2], "rgba(180,255,200,1)");
     chips(txt[3], "rgba(255,220,160,1)");
-  }, [metrics, width, height, rows, cols, dark]);
+  }, [metrics, width, height, rows, cols, dark, drawNonce]);
 
   // lightweight animation loop – we only redraw when sector changes.
   React.useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
-import React, {useEffect, useMemo, useRef, useState} from "react";
-import { checkpoint, Check, Side, Stage, within, onCheck } from "@/lib/checkpoints";
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react";
+import { checkpoint, Check, Side, Stage, within, onCheck, _listenerCount } from "@/lib/checkpoints";
 import CheckpointViewer from "./CheckpointViewer";
 
 /*
@@ -11,7 +11,7 @@ import CheckpointViewer from "./CheckpointViewer";
   - shader link/engine readiness
   - uniforms sanity (cameraZ, axesClip, thetaScale, parity/ridge)
   - grid/geometry presence
-  - live energy-pipeline agreement (θ-scale, sectors/duty)
+  - live energy-pipeline agreement (  -scale, sectors/duty)
   - strobing mux presence
   - recent diagnostics heartbeat (via computeDiagnostics)
 
@@ -27,6 +27,15 @@ import CheckpointViewer from "./CheckpointViewer";
      live={live}
   />
 */
+
+function useEvent<T extends (...args: any[]) => unknown>(handler: T): T {
+  const handlerRef = React.useRef(handler);
+  useLayoutEffect(() => {
+    handlerRef.current = handler;
+  });
+  // eslint-disable-next-line react-hooks-exhaustive-deps
+  return React.useCallback(((...args: Parameters<T>) => handlerRef.current(...args)) as T, []);
+}
 
 // tiny helpers
 const N = (x: any, d = 0) => (Number.isFinite(+x) ? +x : d);
@@ -81,7 +90,7 @@ function getLinkStatus(engine: any) {
 
   // Fallback to original method for compatibility
   if (engine?.loadingState === 'compiling') {
-    return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
+    return { stage: 'compiling', ok: false, reason: '    compiling shaders   ' };
   }
   if (engine?.loadingState === 'failed') {
     const log = (gl.getProgramInfoLog(prog) || 'link failed').trim();
@@ -93,7 +102,7 @@ function getLinkStatus(engine: any) {
 
   // Infer via KHR if state not provided
   if (ext && gl.getProgramParameter(prog, ext.COMPLETION_STATUS_KHR) === false) {
-    return { stage: 'compiling', ok: false, reason: '⏳ compiling shaders…' };
+    return { stage: 'compiling', ok: false, reason: '    compiling shaders   ' };
   }
 
   // Final truth from LINK_STATUS
@@ -102,7 +111,7 @@ function getLinkStatus(engine: any) {
   return { stage: ok ? 'linked' : 'failed', ok, reason };
 }
 
-// ✅ Pane-specific expected θ using one duty law (√d_FR), with ENGINE authority
+//     Pane-specific expected    using one duty law (   d_FR), with ENGINE authority
 function expectedThetaForPane(live: any, engine: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   // Mode gate (standby short-circuit)
@@ -116,7 +125,7 @@ function expectedThetaForPane(live: any, engine: any) {
            N(U.qSpoilingFactor ?? U.deltaAOverA ?? live?.deltaAOverA ?? live?.qSpoilingFactor, 1) : 1e-12;
   const gVdB     = Math.max(1, N(U.gammaVdB ?? U.gammaVanDenBroeck ?? live?.gammaVanDenBroeck ?? live?.gammaVdB, 1.4e5));
 
-  // Duty: STRICT — require engine-supplied dutyUsed (or dutyEffectiveFR)
+  // Duty: STRICT     require engine-supplied dutyUsed (or dutyEffectiveFR)
   const dFR_used = Number.isFinite(U.dutyUsed) ? Math.max(1e-12, +U.dutyUsed)
                   : Number.isFinite(U.dutyEffectiveFR) ? Math.max(1e-12, +U.dutyEffectiveFR)
                   : NaN;
@@ -127,7 +136,7 @@ function expectedThetaForPane(live: any, engine: any) {
   return viewAvg ? base * Math.sqrt(dFR_used) : base;
 }
 
-// ✅ Prefer pipeline/engine d_FR; fall back to dutyCycle/sectors
+//     Prefer pipeline/engine d_FR; fall back to dutyCycle/sectors
 function computeThetaScaleFromParams(v: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   const gammaGeo = Math.max(1, N(v.gammaGeo, 26));
@@ -146,7 +155,7 @@ function computeThetaScaleFromParams(v: any) {
   return averaging ? base * Math.sqrt(dFR) : base;
 }
 
-// ✅ Single-source expected θ; caller provides dutyFR for the pane
+//     Single-source expected   ; caller provides dutyFR for the pane
 function thetaExpected(u: any, dutyFR: number, liveSnap?: any) {
   const N = (x:any,d=0)=>Number.isFinite(+x)?+x:d;
   const g  = Math.max(1, N(u.gammaGeo, 26));
@@ -191,7 +200,7 @@ function Row({ label, detail, state }: { label: string; detail?: string; state: 
     <div className="flex items-start justify-between py-1.5 border-b last:border-b-0 border-white/10 text-xs">
       <div className="flex items-start min-w-0">
         <StatusDot state={state} />
-        <div className="truncate"><span className="font-medium">{label}</span>{detail ? <span className="text-white/70"> — {detail}</span> : null}</div>
+        <div className="truncate"><span className="font-medium">{label}</span>{detail ? <span className="text-white/70">     {detail}</span> : null}</div>
       </div>
     </div>
   );
@@ -205,7 +214,7 @@ function FixButton({ onClick, children }: React.PropsWithChildren<{ onClick: () 
   );
 }
 
-// 🔊 Publish a pane-local echo of the physics chain so other panels can read the same authority.
+//      Publish a pane-local echo of the physics chain so other panels can read the same authority.
 function publishWarpEcho(engine: any, side: Side, liveSnap?: any) {
   try {
     const u = engine?.uniforms || {};
@@ -216,7 +225,7 @@ function publishWarpEcho(engine: any, side: Side, liveSnap?: any) {
     const sectorsTotal = Math.max(1, N(u.sectorCount ?? liveSnap?.sectorCount, 400));
     const sectorsLive  = Math.max(1, N(u.sectors ?? 1, 1));
 
-    const dutyLocal = 0.01; // Ford–Roman window (local)
+    const dutyLocal = 0.01; // Ford   Roman window (local)
     const dFR_fallback = dutyLocal * (sectorsLive / sectorsTotal);
     const dFR = Number.isFinite(+u.dutyEffectiveFR) ? Math.max(1e-12, +u.dutyEffectiveFR) : dFR_fallback;
 
@@ -226,9 +235,9 @@ function publishWarpEcho(engine: any, side: Side, liveSnap?: any) {
     w.__warpEcho.v = Date.now();
     w.__warpEcho.terms = { 
       // expose canonical names used by the checker rows
-      ['γ_geo']: gammaGeo,
+      ['  _geo']: gammaGeo,
       ['q']: q,
-      ['γ_VdB']: gammaVdB,
+      ['  _VdB']: gammaVdB,
       ['d_FR']: dFR,
     };
   } catch {
@@ -268,7 +277,7 @@ function useCheckpointList(
   pushCheck({
       id: 'input.gamma_geo', side, stage: 'input',
       pass: gammaGeo >= 1 && gammaGeo <= 1000,
-      msg: `γ_geo=${gammaGeo}`,
+      msg: `  _geo=${gammaGeo}`,
       expect: [1, 1000], actual: gammaGeo,
       sev: gammaGeo < 1 || gammaGeo > 1000 ? 'error' : 'info'
     });
@@ -276,7 +285,7 @@ function useCheckpointList(
   pushCheck({
       id: 'input.delta_aa', side, stage: 'input',
       pass: deltaAOverA >= 1e-12 && deltaAOverA <= 100,
-      msg: `δA/A=${deltaAOverA}`,
+      msg: `  A/A=${deltaAOverA}`,
       expect: [1e-12, 100], actual: deltaAOverA,
       sev: deltaAOverA < 1e-12 || deltaAOverA > 100 ? 'error' : 'info'
     });
@@ -284,14 +293,14 @@ function useCheckpointList(
   pushCheck({
       id: 'input.gamma_vdb', side, stage: 'input',
       pass: gammaVdB >= 1 && gammaVdB <= 1e15,
-      msg: `γ_VdB=${gammaVdB.toExponential(1)}`,
+      msg: `  _VdB=${gammaVdB.toExponential(1)}`,
       expect: [1, 1e15], actual: gammaVdB,
       sev: gammaVdB < 1 || gammaVdB > 1e15 ? 'error' : 'info'
     });
 
     // === DAG Stage 2: EXPECTATIONS (ENGINE AUTHORITY) ===
-    // Calculate expected θ-scale using the SAME chain the engine uses (RAW)
-    // Prefer dutyUsed→dutyEffectiveFR→(dutyLocal*sectorsLive/total) as in expectedThetaForPane.
+    // Calculate expected   -scale using the SAME chain the engine uses (RAW)
+    // Prefer dutyUsed   dutyEffectiveFR   (dutyLocal*sectorsLive/total) as in expectedThetaForPane.
     const thetaExpected = expectedThetaForPane(liveSnap, e);
     const dutyFR = (() => {
       const used = N(Ue.dutyUsed, NaN);
@@ -307,7 +316,7 @@ function useCheckpointList(
   pushCheck({
       id: 'expect.theta_scale', side, stage: 'expect',
       pass: Number.isFinite(thetaExpected) && thetaExpected > 0,
-      msg: `θ_expected=${thetaExpected.toExponential(2)}`,
+      msg: `  _expected=${thetaExpected.toExponential(2)}`,
       expect: '>0', actual: thetaExpected,
       sev: !Number.isFinite(thetaExpected) || thetaExpected <= 0 ? 'error' : 'info',
       meta: { gammaGeo, q: deltaAOverA, gammaVdB, dFR: dutyFR }
@@ -317,16 +326,16 @@ function useCheckpointList(
     const u = e?.uniforms || {};
     const ts = N(u?.thetaScale, NaN);
 
-    // Expected uniforms θ from the same chain the engine uses (RAW)
+    // Expected uniforms    from the same chain the engine uses (RAW)
     const thetaUniformExpected = expectedThetaForPane(liveSnap, e);
 
   pushCheck({
       id: 'uniforms.theta_scale', side, stage: 'uniforms',
       pass: Number.isFinite(ts) && ts > 0,
-      msg: `θ_uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformExpected.toExponential(2)}`,
+      msg: `  _uniforms=${Number.isFinite(ts) ? ts.toExponential(2) : 'NaN'} vs expected=${thetaUniformExpected.toExponential(2)}`,
       expect: thetaUniformExpected, actual: ts,
       sev: !Number.isFinite(ts) || ts <= 0 ? 'error' : (within(ts, thetaUniformExpected, 0.10) ? 'info' : 'warn'),
-      meta: { law: 'γ^3·q·γVdB·(√d_FR if viewAvg)' }
+      meta: { law: '  ^3  q    VdB  (   d_FR if viewAvg)' }
     });
 
     // Metric toggle consistency: if metric tensors are supplied, toggle should be ON
@@ -347,7 +356,7 @@ function useCheckpointList(
         expect: hasMetricFields ? 'active' : 'none',
         actual: { metricActive, hasMetricFields },
         sev: pass ? 'info' : 'warn',
-        meta: { where: 'adapter metricMode → engine.useMetric mirror' }
+        meta: { where: 'adapter metricMode     engine.useMetric mirror' }
       });
     }
 
@@ -387,12 +396,12 @@ function useCheckpointList(
   pushCheck({
       id: 'gpu.canvas_size', side, stage: 'gpu',
       pass: canvasOk,
-      msg: `Canvas ${cw}×${ch}px`,
-      expect: '>=64x64', actual: `${cw}×${ch}`,
+      msg: `Canvas ${cw}  ${ch}px`,
+      expect: '>=64x64', actual: `${cw}  ${ch}`,
       sev: !canvasOk ? 'error' : 'info'
     });
 
-    rows.push({ label: "Canvas sized", detail: `${cw}×${ch}px`, state: canvasOk ? "ok" : "fail" });
+    rows.push({ label: "Canvas sized", detail: `${cw}  ${ch}px`, state: canvasOk ? "ok" : "fail" });
 
     // GL context
     const gl = e?.gl;
@@ -408,7 +417,7 @@ function useCheckpointList(
 
     rows.push({ label: "WebGL context", detail: gl ? (ctxOk ? "alive" : "lost") : "missing", state: ctxOk ? "ok" : gl ? "fail" : "fail" });
 
-    // ── Shaders / program (driver-queried, GL1/GL2 + async aware) ─────────────────
+    //        Shaders / program (driver-queried, GL1/GL2 + async aware)                                                    
     {
       const gl = e?.gl as WebGLRenderingContext | WebGL2RenderingContext | undefined;
       const prog =
@@ -439,7 +448,7 @@ function useCheckpointList(
           if (progOk) {
             reason = 'linked';
           } else if (compiling) {
-            reason = 'compiling…';
+            reason = 'compiling   ';
           } else {
             reason = (gl.getProgramInfoLog(prog) || 'link failed (no log)').trim();
           }
@@ -448,13 +457,13 @@ function useCheckpointList(
         reason = `exception: ${e?.message || e}`;
       }
 
-      // Checkpoint row (GPU → shaders_linked)
+      // Checkpoint row (GPU     shaders_linked)
   pushCheck({
         id: 'gpu.shaders_linked',
         side,
         stage: 'gpu',
         pass: progOk,
-        msg: progOk ? 'Shaders compiled & linked' : (compiling ? 'Compiling shaders…' : reason),
+        msg: progOk ? 'Shaders compiled & linked' : (compiling ? 'Compiling shaders   ' : reason),
         expect: 'linked',
         actual: reason,
         sev: progOk ? 'info' : (compiling ? 'warn' : 'error'),
@@ -513,11 +522,11 @@ function useCheckpointList(
     const axesOk = !!axes && axes.every((n: any) => Number.isFinite(n) && Math.abs(n) > 0);
     rows.push({ label: "Axes/clip", detail: axesOk ? `[${axes!.map((n: number) => n.toFixed(2)).join(", ")}]` : "unset", state: axesOk ? "ok" : "warn" });
 
-  // Pipeline stamps forwarded by the adapter (if present) — helpful for correlating frames
+  // Pipeline stamps forwarded by the adapter (if present)     helpful for correlating frames
   const pipelineSeq = Number.isFinite(N(Ue.__pipelineSeq ?? Ue.seq ?? Ue.__PIPE_SEQ, NaN)) ? (Ue.__pipelineSeq ?? Ue.seq ?? Ue.__PIPE_SEQ) : undefined;
   const pipelineTs  = Number.isFinite(N(Ue.__pipelineTs ?? Ue.__ts ?? Ue.__PIPE_TS, NaN)) ? (Ue.__pipelineTs ?? Ue.__ts ?? Ue.__PIPE_TS) : undefined;
-  rows.push({ label: "Pipeline seq", detail: pipelineSeq != null ? String(pipelineSeq) : '—', state: pipelineSeq != null ? "ok" : "warn" });
-  rows.push({ label: "Pipeline ts",  detail: pipelineTs  != null ? new Date(+pipelineTs).toLocaleTimeString().slice(-8) : '—', state: pipelineTs  != null ? "ok" : "warn" });
+  rows.push({ label: "Pipeline seq", detail: pipelineSeq != null ? String(pipelineSeq) : '   ', state: pipelineSeq != null ? "ok" : "warn" });
+  rows.push({ label: "Pipeline ts",  detail: pipelineTs  != null ? new Date(+pipelineTs).toLocaleTimeString().slice(-8) : '   ', state: pipelineTs  != null ? "ok" : "warn" });
 
     // Theta-scale (reusing existing ts)
     const tsOk = Number.isFinite(ts) && ts > 0;
@@ -532,21 +541,21 @@ function useCheckpointList(
     // use the engine's own viewAvg if set, else live snapshot, else default true
     const viewAvg = (u?.viewAvg ?? liveSnap?.viewAvg ?? true);
 
-    // Build expected θ from the bound terms, honoring √d_FR when averaging
+    // Build expected    from the bound terms, honoring    d_FR when averaging
     const thetaExpectedFromBound =
       echo && echo.terms
-        ? Math.pow(Math.max(1, N(echo.terms.γ_geo, 26)), 3) *
+        ? Math.pow(Math.max(1, N(echo.terms.  _geo, 26)), 3) *
           Math.max(1e-12, N(echo.terms.q, 1)) *
-          Math.max(1, N(echo.terms.γ_VdB, 1.4e5)) *
+          Math.max(1, N(echo.terms.  _VdB, 1.4e5)) *
           (viewAvg ? Math.sqrt(Math.max(1e-12, N(echo.terms.d_FR, 1e-6))) : 1)
         : undefined;
 
     // Enhanced theta debugging
     if (echo && echo.terms) {
       console.log(`[${label}] Theta calculation debug:`, {
-        γ_geo: echo.terms.γ_geo,
+          _geo: echo.terms.  _geo,
         q: echo.terms.q,
-        γ_VdB: echo.terms.γ_VdB,
+          _VdB: echo.terms.  _VdB,
         d_FR: echo.terms.d_FR,
         viewAvg,
         calculated: thetaExpectedFromBound,
@@ -561,11 +570,11 @@ function useCheckpointList(
       // Use bound uniforms for perfect self-consistency
       const rel = tsOk ? Math.abs(ts - thetaExpectedFromBound) / Math.max(1e-12, thetaExpectedFromBound) : Infinity;
 
-      // Smart θ mismatch detection
+      // Smart    mismatch detection
       const parity = !!(u.physicsParityMode ?? u.parityMode);
       const boostLeak = parity && N(u.curvatureBoostMax, 1) > 1;
       if (boostLeak) {
-        tsDetail += ' • (check: REAL boost should be 1)';
+        tsDetail += '     (check: REAL boost should be 1)';
         tsState = 'warn';
       }
 
@@ -576,11 +585,11 @@ function useCheckpointList(
 
       if (tsOk && Number.isFinite(rel)) {
         if (inTransition) {
-          tsDetail += ` • (transition)`;
+          tsDetail += `     (transition)`;
         } else {
           if (rel > 0.25) tsState = "warn"; // large disagreement
           const pct = (mismatch * 100 - 100);
-          tsDetail += ` • exp ${thetaExpectedFromBound.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
+          tsDetail += `     exp ${thetaExpectedFromBound.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
         }
       }
     } else if (liveSnap && thetaExpectedFn && typeof dutyFR === 'number') {
@@ -591,7 +600,7 @@ function useCheckpointList(
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
         tsState = "warn";
         const pct = (ts / tsExp - 1) * 100;
-        tsDetail += ` • exp ${tsExp.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
+        tsDetail += `     exp ${tsExp.toExponential(2)} (${pct >= 0 ? '+' : ''}${pct.toFixed(0)}% off)`;
       }
     } else if (liveSnap) {
       // Final fallback to old method
@@ -600,11 +609,11 @@ function useCheckpointList(
 
       if (tsOk && Number.isFinite(rel) && rel > 0.25) {
         tsState = "warn";
-        tsDetail += ` • exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
+        tsDetail += `     exp ${tsExp.toExponential(2)} (${(rel * 100).toFixed(0)}% off)`;
       }
     }
 
-    // Bonus: inferred θ-duty hint (prefer dutyUsed if available)
+    // Bonus: inferred   -duty hint (prefer dutyUsed if available)
     let inferredDutyPct: string | null = null;
     if (typeof u?.dutyUsed === 'number') {
       // Use actual duty the engine computed
@@ -628,11 +637,11 @@ function useCheckpointList(
       const tsExp = thetaExpectedFn(u, dutyFR);
       const rel = Math.abs(ts - tsExp) / Math.max(1e-12, tsExp);
       if (Number.isFinite(rel) && !String(tsDetail).includes('(transition)')) {
-        tsDetail += ` • used≈${inferredDutyPct}`;
+        tsDetail += `     used   ${inferredDutyPct}`;
       }
     }
 
-    rows.push({ label: "θ-scale", detail: tsDetail, state: tsState });
+    rows.push({ label: "  -scale", detail: tsDetail, state: tsState });
 
     // Light-crossing display row (renderer authority via ENGINE UNIFORMS)
     const tauLC    = N(Ue.tauLC_ms, NaN);
@@ -642,7 +651,7 @@ function useCheckpointList(
   const onWindow = (Number.isFinite(+Ue.onWindow) ? +Ue.onWindow : 0) > 0.5;
     const TSratio  = N((Ue.TS_ratio ?? (Ue.TSratio as any)), NaN);
 
-    // Duty consistency (info): used vs (burst/dwell)×(S_live/S_total)
+    // Duty consistency (info): used vs (burst/dwell)  (S_live/S_total)
     {
       const sLive = Math.max(1, N(Ue.sectors ?? 1, 1)); // <-- use engine uniforms (in-scope)
       if (Number.isFinite(dwell_ms) && Number.isFinite(burst_ms) && Number.isFinite(sectors) && Number.isFinite(sLive) && Number.isFinite(dUsed)) {
@@ -653,7 +662,7 @@ function useCheckpointList(
           id: 'lc.duty_consistency', side, stage: 'frame',
           pass: ok,
           msg: `used=${(dFR_used*100).toFixed(3)}% vs exp=${(dFR_expected*100).toFixed(3)}%`,
-          expect: '≈ burst/dwell × S_live/S_total',
+          expect: '    burst/dwell    S_live/S_total',
           actual: { dFR_used, dFR_expected },
           sev: ok ? 'info' : 'warn',
           meta: { where: 'engine uniforms vs LC' }
@@ -663,23 +672,23 @@ function useCheckpointList(
 
     {
       const details =
-        `τ=${Number.isFinite(tauLC)?tauLC.toFixed(3):'—'}ms · ` +
-        `dwell=${Number.isFinite(dwell_ms)?dwell_ms.toFixed(3):'—'}ms · ` +
-        `burst=${Number.isFinite(burst_ms)?burst_ms.toFixed(3):'—'}ms · ` +
-        `φ=${Number.isFinite(phase)?phase.toFixed(3):'—'} · ` +
+        `  =${Number.isFinite(tauLC)?tauLC.toFixed(3):'   '}ms    ` +
+        `dwell=${Number.isFinite(dwell_ms)?dwell_ms.toFixed(3):'   '}ms    ` +
+        `burst=${Number.isFinite(burst_ms)?burst_ms.toFixed(3):'   '}ms    ` +
+        `  =${Number.isFinite(phase)?phase.toFixed(3):'   '}    ` +
         `window=${onWindow?'ON':'off'}`;
       const lcOk = Number.isFinite(tauLC) && Number.isFinite(dwell_ms) && Number.isFinite(burst_ms);
       rows.push({ label: "Light crossing", detail: details, state: lcOk ? "ok" : "fail" });
     }
 
-    // TS ratio (τ_LC / T_m)
+    // TS ratio (  _LC / T_m)
     {
       const tsrOk = Number.isFinite(TSratio) && TSratio > 1.0;
-      const detail = Number.isFinite(TSratio) ? TSratio.toFixed(1) : '—';
+      const detail = Number.isFinite(TSratio) ? TSratio.toFixed(1) : '   ';
       rows.push({ label: "TS ratio", detail, state: tsrOk ? "ok" : "warn" });
     }
 
-    // (existing) View tensors & wall width rows continue below…
+    // (existing) View tensors & wall width rows continue below   
 
     // Metric/tensors actually in use by the shader
     {
@@ -688,19 +697,19 @@ function useCheckpointList(
       const gSym  = Array.isArray(u?.gSpatialSym)  && u.gSpatialSym.length>=6 ? u.gSpatialSym : null;
       rows.push({
         label: "Metric",
-        detail: `${metricActive ? 'ON' : 'off'} · g_diag=${gDiag ? `[${gDiag.map((x:number)=>N(x).toFixed(3)).join(', ')}]` : '—'} · g_sym=${gSym ? '[…6]' : '—'}`,
+        detail: `${metricActive ? 'ON' : 'off'}    g_diag=${gDiag ? `[${gDiag.map((x:number)=>N(x).toFixed(3)).join(', ')}]` : '   '}    g_sym=${gSym ? '[   6]' : '   '}`,
         state: metricActive ? "ok" : "warn"
       });
     }
 
-    // Wall width as the renderer uses it (ρ and meters)
+    // Wall width as the renderer uses it (   and meters)
     {
       const aH = aHarmonic(u?.axesHull?.[0], u?.axesHull?.[1], u?.axesHull?.[2]);
       const w_rho = Number.isFinite(u?.wallWidth_rho) ? +u.wallWidth_rho : (Number.isFinite(u?.wallWidth) ? +u.wallWidth : NaN);
       const w_m   = Number.isFinite(u?.wallWidth_m)   ? +u.wallWidth_m   : (Number.isFinite(aH) && Number.isFinite(w_rho) ? w_rho * aH : NaN);
       rows.push({
         label: "Wall width",
-        detail: `${Number.isFinite(w_m)? w_m.toFixed(3) : '—'} m • ${Number.isFinite(w_rho)? w_rho.toExponential(3) : '—'} ρ`,
+        detail: `${Number.isFinite(w_m)? w_m.toFixed(3) : '   '} m     ${Number.isFinite(w_rho)? w_rho.toExponential(3) : '   '}   `,
         state: (Number.isFinite(w_m) && Number.isFinite(w_rho)) ? "ok" : "warn"
       });
     }
@@ -710,8 +719,8 @@ function useCheckpointList(
       const vf = Array.isArray(u?.viewForward) ? u.viewForward : null;
       const g0 = Array.isArray(u?.g0i) ? u.g0i : null;
       rows.push({
-        label: "Tensors (view/g₀ᵢ)",
-        detail: `${vf ? `[${vf.map((x:number)=>N(x).toFixed(2)).join(', ')}]` : '—'} • ${g0 ? `[${g0.map((x:number)=>N(x).toFixed(2)).join(', ')}]` : '—'}`,
+        label: "Tensors (view/g      )",
+        detail: `${vf ? `[${vf.map((x:number)=>N(x).toFixed(2)).join(', ')}]` : '   '}     ${g0 ? `[${g0.map((x:number)=>N(x).toFixed(2)).join(', ')}]` : '   '}`,
         state: (vf && g0) ? "ok" : "warn"
       });
     }
@@ -719,8 +728,8 @@ function useCheckpointList(
     // Show detailed breakdown from bound uniforms if available
     if (echo && echo.terms) {
       const terms = echo.terms;
-  const breakdown = `src=${echo.src ?? 'unknown'} v=${echo.v ?? '?'} · γ_geo=${terms.γ_geo ?? '?'}^3 · q=${terms.q ?? '?'} · γ_VdB=${(Number.isFinite(terms.γ_VdB) ? terms.γ_VdB : 0).toExponential(2)} · d_FR=${((Number.isFinite(terms.d_FR) ? terms.d_FR : 0) * 100).toExponential(2)}%`;
-      rows.push({ label: "θ breakdown", detail: breakdown, state: "ok" });
+  const breakdown = `src=${echo.src ?? 'unknown'} v=${echo.v ?? '?'}      _geo=${terms.  _geo ?? '?'}^3    q=${terms.q ?? '?'}      _VdB=${(Number.isFinite(terms.  _VdB) ? terms.  _VdB : 0).toExponential(2)}    d_FR=${((Number.isFinite(terms.d_FR) ? terms.d_FR : 0) * 100).toExponential(2)}%`;
+      rows.push({ label: "   breakdown", detail: breakdown, state: "ok" });
     }
 
     // Parity & ridge expectations with enhanced debugging
@@ -733,7 +742,7 @@ function useCheckpointList(
 
         // Enhanced debugging for parity failures
         if (!ok) {
-          console.error(`❌ ${label} engine parity enforcement FAILED - should be ${!!expParity}, got:`, parity);
+          console.error(`    ${label} engine parity enforcement FAILED - should be ${!!expParity}, got:`, parity);
           console.error(`${label} uniforms.physicsParityMode:`, u.physicsParityMode);
           console.error(`${label} uniforms.parityMode:`, u.parityMode);
           console.error(`${label} expected parity:`, !!expParity);
@@ -751,7 +760,7 @@ function useCheckpointList(
         const ok = actualRidge === expectedRidge;
 
         if (!ok) {
-          console.warn(`⚠️ ${label} ridge mode mismatch - should be ${expectedRidge}, got:`, actualRidge);
+          console.warn(`       ${label} ridge mode mismatch - should be ${expectedRidge}, got:`, actualRidge);
         }
 
         rows.push({ 
@@ -770,7 +779,7 @@ function useCheckpointList(
     const sTotal = liveSnap?.sectorCount ?? 400;
     const sp = Math.max(0, Math.min(sConcurrent - 1, N(u?.split, 0)));
     const strobeOk = sConcurrent >= 1 && sp < sConcurrent;
-    rows.push({ label: "Strobing", detail: `concurrent=${sConcurrent} • total=${sTotal} • split=${sp}`, state: strobeOk ? "ok" : "warn" });
+    rows.push({ label: "Strobing", detail: `concurrent=${sConcurrent}     total=${sTotal}     split=${sp}`, state: strobeOk ? "ok" : "warn" });
 
     // Heartbeat (did diagnostics run in the last ~2s?)
     const dt = Date.now() - hb;
@@ -791,7 +800,7 @@ function useCheckpointList(
       sev: !toneOk ? 'warn' : 'info'
     });
 
-    rows.push({ label: "Tone mapping", detail: `exp=${exp} • zero=${zs}` , state: toneOk ? "ok" : "warn" });
+    rows.push({ label: "Tone mapping", detail: `exp=${exp}     zero=${zs}` , state: toneOk ? "ok" : "warn" });
 
     // Render loop alive (RAF attached)
     const rafAlive = !!e?._raf;
@@ -824,41 +833,43 @@ function CompactCheckpointTable() {
   const [stopOnError, setStopOnError] = useState(false);
   const [renderPaused, setRenderPaused] = useState(false);
 
-  useEffect(() => {
-    const handleCheck = (check: Check) => {
-      setChecks(prev => {
-        // Keep last 50 checks, grouped by id+side
-        const key = `${check.side}:${check.id}`;
-        const updated = prev.filter(c => `${c.side}:${c.id}` !== key);
-        updated.push(check);
-        return updated.slice(-50);
+  const onCheckEvent = useEvent((check: Check) => {
+    setChecks(prev => {
+      // Keep last 50 checks, grouped by id+side
+      const key = `${check.side}:${check.id}`;
+      const updated = prev.filter(c => `${c.side}:${c.id}` !== key);
+      updated.push(check);
+      return updated.slice(-50);
+    });
+
+    // Stop render loop on first error if enabled
+    if (stopOnError && !check.pass && check.sev === 'error' && !renderPaused) {
+      setRenderPaused(true);
+      // Pause both engines' render loops
+      const engines = [
+        (window as any).__leftEngine,
+        (window as any).__rightEngine
+      ].filter(Boolean);
+
+      engines.forEach(engine => {
+        if (engine._raf) {
+          cancelAnimationFrame(engine._raf);
+          engine._raf = null;
+        }
       });
 
-      // Stop render loop on first error if enabled
-      if (stopOnError && !check.pass && check.sev === 'error' && !renderPaused) {
-        setRenderPaused(true);
-        // Pause both engines' render loops
-        const engines = [
-          (window as any).__leftEngine, 
-          (window as any).__rightEngine
-        ].filter(Boolean);
+      console.warn('?? Render loop halted due to checkpoint error:', check);
+    }
+  });
 
-        engines.forEach(engine => {
-          if (engine._raf) {
-            cancelAnimationFrame(engine._raf);
-            engine._raf = null;
-          }
-        });
-
-        console.warn('🛑 Render loop halted due to checkpoint error:', check);
-      }
-    };
-
-    onCheck(handleCheck);
-    return () => {
-      // No cleanup needed - onCheck just pushes to array
-    };
-  }, [stopOnError, renderPaused]);
+  useEffect(() => {
+    const off = onCheck(onCheckEvent);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.debug('[checkpoints] listeners:', _listenerCount());
+    }
+    return () => off();
+  }, [onCheckEvent]);
 
   const resumeRender = () => {
     setRenderPaused(false);
@@ -896,10 +907,10 @@ function CompactCheckpointTable() {
 
   const getStateIcon = (check: Check) => {
     if (!check.pass) {
-      if (check.sev === 'error') return '❌';
-      if (check.sev === 'warn') return '⚠️';
+      if (check.sev === 'error') return '   ';
+      if (check.sev === 'warn') return '      ';
     }
-    return '✅';
+    return '   ';
   };
 
   return (
@@ -929,7 +940,7 @@ function CompactCheckpointTable() {
 
       {renderPaused && (
         <div className="bg-red-900/30 border border-red-700 rounded p-2 mb-3 text-xs text-red-300">
-          🛑 Render loop paused due to checkpoint error. Click Resume to continue.
+               Render loop paused due to checkpoint error. Click Resume to continue.
         </div>
       )}
 
@@ -984,8 +995,8 @@ function validateEngine(side: 'LEFT' | 'RIGHT', engineRef: React.MutableRefObjec
   checkpoint({
     id: 'gpu.canvas_size', side: side === 'LEFT' ? 'REAL' : 'SHOW', stage: 'gpu',
     pass: canvasOk,
-    msg: `Canvas ${cw}×${ch}px`,
-    expect: '>=64x64', actual: `${cw}×${ch}`,
+    msg: `Canvas ${cw}  ${ch}px`,
+    expect: '>=64x64', actual: `${cw}  ${ch}`,
     sev: !canvasOk ? 'error' : 'info'
   });
 
@@ -1043,7 +1054,7 @@ export default function WarpRenderCheckpointsPanel({
   const modeKey = (live?.currentMode as string) || "hover";
   const snap = (live?.byMode && live?.byMode[modeKey]) || (live?.modes && live?.modes[modeKey]) || live || undefined;
 
-  // Compute Ford–Roman duty from LC props (STRICT: no fallback)
+  // Compute Ford   Roman duty from LC props (STRICT: no fallback)
   const dutyLocal = (Number.isFinite(lightCrossing?.burst_ms) && Number.isFinite(lightCrossing?.dwell_ms) && (lightCrossing!.dwell_ms! > 0))
     ? (lightCrossing!.burst_ms! / lightCrossing!.dwell_ms!)
     : NaN;
@@ -1055,9 +1066,9 @@ export default function WarpRenderCheckpointsPanel({
   const dutyFR_right = (Number.isFinite(dutyLocal) ? dutyLocal : NaN) * (sConcRight / sTotal);
 
   // Pretty strings
-  const dutyLocalPct    = Number.isFinite(dutyLocal)    ? `${(dutyLocal*100).toFixed(3)}%`    : '—';
-  const dutyFRPct_left  = Number.isFinite(dutyFR_left)  ? `${(dutyFR_left*100).toFixed(4)}%`  : '—';
-  const dutyFRPct_right = Number.isFinite(dutyFR_right) ? `${(dutyFR_right*100).toFixed(4)}%` : '—';
+  const dutyLocalPct    = Number.isFinite(dutyLocal)    ? `${(dutyLocal*100).toFixed(3)}%`    : '   ';
+  const dutyFRPct_left  = Number.isFinite(dutyFR_left)  ? `${(dutyFR_left*100).toFixed(4)}%`  : '   ';
+  const dutyFRPct_right = Number.isFinite(dutyFR_right) ? `${(dutyFR_right*100).toFixed(4)}%` : '   ';
 
 
   const leftRows  = useCheckpointList(leftLabel,  leftEngineRef,  leftCanvasRef,  snap, { parity: true,  ridge: 0 }, dutyFR_left,  (u)=>thetaExpected(u, dutyFR_left,  snap));
@@ -1100,32 +1111,32 @@ export default function WarpRenderCheckpointsPanel({
   // Energy pipeline summary panel - use parameters if available for perfect renderer consistency
   const pipelineSummary = (snap || parameters) ? (
     <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
-      <h4 className="text-sm font-semibold text-white/90 mb-2">Energy Pipeline — {modeKey}{parameters ? " (renderer-sync)" : ""}</h4>
+      <h4 className="text-sm font-semibold text-white/90 mb-2">Energy Pipeline     {modeKey}{parameters ? " (renderer-sync)" : ""}</h4>
       <div className="space-y-1 text-xs">
         <div className="flex justify-between">
-          <span className="text-white/70">θ-scale expected:</span>
+          <span className="text-white/70">  -scale expected:</span>
           <span className="font-mono">{
             (() => {
               const exp = expectedThetaForPane(snap, leftEngineRef.current);
-              return Number.isFinite(exp) ? exp.toExponential(2) : '—';
+              return Number.isFinite(exp) ? exp.toExponential(2) : '   ';
             })()
           }</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-white/70">γ_geo × q × γ_VdB:</span>
+          <span className="text-white/70">  _geo    q      _VdB:</span>
           <span className="font-mono">{
             parameters
-              ? `${N(parameters.g_y, 26)}³ × ${N(parameters.qSpoilingFactor, 1).toFixed(2)} × ${N(parameters.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
-              : `${N(snap?.gammaGeo ?? snap?.g_y, 26)}³ × ${N(snap?.deltaAOverA ?? snap?.qSpoilingFactor, 1).toFixed(2)} × ${N(snap?.gammaVdB ?? snap?.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
+              ? `${N(parameters.g_y, 26)}      ${N(parameters.qSpoilingFactor, 1).toFixed(2)}    ${N(parameters.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
+              : `${N(snap?.gammaGeo ?? snap?.g_y, 26)}      ${N(snap?.deltaAOverA ?? snap?.qSpoilingFactor, 1).toFixed(2)}    ${N(snap?.gammaVdB ?? snap?.gammaVanDenBroeck, 1.4e5).toExponential(1)}`
           }</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">Duty local / Ford-Roman:</span>
-          <span className="font-mono">{dutyLocalPct} / {dutyFRPct_left} (REAL) • {dutyFRPct_right} (SHOW)</span>
+          <span className="font-mono">{dutyLocalPct} / {dutyFRPct_left} (REAL)     {dutyFRPct_right} (SHOW)</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">Sectors conc/total:</span>
-          <span className="font-mono">{sConcLeft}/{sTotal} (REAL) • {sConcRight}/{sTotal} (SHOW)</span>
+          <span className="font-mono">{sConcLeft}/{sTotal} (REAL)     {sConcRight}/{sTotal} (SHOW)</span>
         </div>
         <div className="flex justify-between">
           <span className="text-white/70">View averaging:</span>
@@ -1172,12 +1183,12 @@ export default function WarpRenderCheckpointsPanel({
       <CompactCheckpointTable />
 
       {/* DAG Checkpoint System */}
-      <CheckpointViewer title="DAG: Props → Calc → Uniforms → GPU → Frame" />
+      <CheckpointViewer title="DAG: Props     Calc     Uniforms     GPU     Frame" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-semibold text-white/90">{leftLabel} — Legacy Checks</h4>
+            <h4 className="text-sm font-semibold text-white/90">{leftLabel}     Legacy Checks</h4>
             <div className="flex gap-1">
             <FixButton onClick={() => act.presets.real(L)}>Preset</FixButton>
             <FixButton onClick={() => act.forceResize(L)}>Resize</FixButton>
@@ -1200,7 +1211,7 @@ export default function WarpRenderCheckpointsPanel({
       </div>
         <div className="rounded-2xl border border-white/10 bg-black/40 p-3">
           <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-semibold text-white/90">{rightLabel} — Legacy Checks</h4>
+            <h4 className="text-sm font-semibold text-white/90">{rightLabel}     Legacy Checks</h4>
             <div className="flex gap-1">
             <FixButton onClick={() => act.presets.show(R)}>Preset</FixButton>
             <FixButton onClick={() => act.forceResize(R)}>Resize</FixButton>

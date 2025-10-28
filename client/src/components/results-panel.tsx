@@ -133,18 +133,23 @@ export default function ResultsPanel({
   };
 
   // Prefer pipeline values where available; otherwise fall back to simulation results
+  const isFiniteNumber = (value: unknown): value is number =>
+    typeof value === "number" && Number.isFinite(value);
+
   const gammaGeoDisplay =
     Number.isFinite(results?.geometricBlueshiftFactor)
       ? results!.geometricBlueshiftFactor
-      : (Number.isFinite(pipeline?.gammaGeo) ? pipeline.gammaGeo : undefined);
+      : (isFiniteNumber(pipeline?.gammaGeo) ? pipeline.gammaGeo : undefined);
 
-  const powerWFromPipeline = Number.isFinite(pipeline?.P_avg)
-    ? pipeline.P_avg * 1e6 // pipeline P_avg is MW
-    : (Number.isFinite(pipeline?.P_avg_W) ? pipeline.P_avg_W : undefined);
+  const pipelinePAvg = pipeline?.P_avg;
+  const pipelinePAvgW = pipeline?.P_avg_W;
+  const powerWFromPipeline = isFiniteNumber(pipelinePAvg)
+    ? pipelinePAvg * 1e6 // pipeline P_avg is MW
+    : (isFiniteNumber(pipelinePAvgW) ? pipelinePAvgW : undefined);
 
-  const massFromPipeline = Number.isFinite(pipeline?.M_exotic) ? pipeline.M_exotic : undefined;
+  const massFromPipeline = isFiniteNumber(pipeline?.M_exotic) ? pipeline.M_exotic : undefined;
 
-  const zetaFromPipeline = Number.isFinite(pipeline?.zeta) ? pipeline.zeta : undefined;
+  const zetaFromPipeline = isFiniteNumber(pipeline?.zeta) ? pipeline.zeta : undefined;
 
   const dutyLocal =
     simulation.parameters.dynamicConfig
@@ -152,17 +157,19 @@ export default function ResultsPanel({
         (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)
       : undefined;
 
+  const pipelineDutyFR = pipeline?.dutyEffective_FR;
   const effectiveDutyFR =
-    Number.isFinite(pipeline?.dutyEffective_FR)
-      ? pipeline.dutyEffective_FR
+    isFiniteNumber(pipelineDutyFR)
+      ? pipelineDutyFR
       : simulation.parameters.dynamicConfig
         ? ((simulation.parameters.dynamicConfig.burstLengthUs || 10) /
           (simulation.parameters.dynamicConfig.cycleLengthUs || 1000)) /
           (simulation.parameters.dynamicConfig.sectorCount || 400)
         : undefined;
 
+  const pipelineUCycle = pipeline?.U_cycle;
   const energyPerTileCycleAvg =
-    Number.isFinite(pipeline?.U_cycle) ? pipeline.U_cycle : undefined;
+    isFiniteNumber(pipelineUCycle) ? pipelineUCycle : undefined;
 
   return (
     <Card>

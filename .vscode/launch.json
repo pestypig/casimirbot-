@@ -1,15 +1,196 @@
 {
     // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        // Node server (Express + Vite middleware in dev) on port 5000
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Server: Dev (5000)",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx"],
+            "args": ["server/index.ts"],
+            "env": {
+                "NODE_ENV": "development",
+                "PORT": "5000"
+            },
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+
+        // Open Chrome to the server base page on :5000
         {
             "type": "chrome",
             "request": "launch",
-            "name": "Launch Chrome against localhost",
+            "name": "Browser: Chrome (auto http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "userDataDir": true,
+            "trace": true
+        },
+        
+        // Open Chrome to the server base page on :5000 (explicit path)
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Browser: Chrome (http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true
+        },
+
+        // Edge fallback on :5000
+        {
+            "type": "msedge",
+            "request": "launch",
+            "name": "Browser: Edge (http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "timeout": 30000,
+            "userDataDir": true,
+            "trace": true
+        },
+        // Browser-only Edge launcher (for manual server start)
+        {
+            "type": "msedge",
+            "request": "launch",
+            "name": "Browser Only: Edge (http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "timeout": 30000,
+            "userDataDir": true,
+            "trace": true
+        },
+
+        // Optional: Chrome Beta
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Browser: Chrome Beta (http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome Beta\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true,
+            "presentation": { "hidden": true }
+        },
+
+        // Optional: Chrome Canary
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Browser: Chrome Canary (http://localhost:5000/)",
+            "url": "http://localhost:5000/",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5000/*",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome SxS\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true,
+            "presentation": { "hidden": true }
+        },
+
+        // Client-only Vite dev server (optional) on port 5173
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Client: Vite (5173)",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["vite"],
+            "console": "integratedTerminal"
+        },
+
+        // Browser to Vite route (Chrome)
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Browser: Chrome (http://localhost:5173/helix-core)",
+            "url": "http://localhost:5173/helix-core",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:5173/helix-core*",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true
+        },
+
+        // Optional: Node server on port 8080
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Server: Dev (8080)",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx"],
+            "args": ["server/index.ts"],
+            "env": {
+                "NODE_ENV": "development",
+                "PORT": "8080"
+            },
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Browser: Chrome (http://localhost:8080/helix-core)",
+            "url": "http://localhost:8080/helix-core",
+            "webRoot": "${workspaceFolder}",
+            "urlFilter": "http://localhost:8080/helix-core*",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true
+        },
+
+        // Legacy Chrome on :8080 (hidden)
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "(Legacy) Chrome on :8080",
             "url": "http://localhost:8080",
-            "webRoot": "${workspaceFolder}"
+            "webRoot": "${workspaceFolder}",
+            "runtimeExecutable": "${env:LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe",
+            "userDataDir": true,
+            "trace": true,
+            "presentation": { "hidden": true }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Dev: Server + Browser (5000)",
+            "configurations": [
+                "Server: Dev (5000)",
+                "Browser: Chrome (auto http://localhost:5000/)"
+            ]
+        },
+        {
+            "name": "Dev: Server + Edge (5000)",
+            "configurations": [
+                "Server: Dev (5000)",
+                "Browser: Edge (http://localhost:5000/)"
+            ]
+        },
+        {
+            "name": "Dev: Vite + Browser (5173)",
+            "configurations": [
+                "Client: Vite (5173)",
+                "Browser: Chrome (http://localhost:5173/helix-core)"
+            ]
+        },
+        {
+            "name": "Dev: Server + Browser (8080)",
+            "configurations": [
+                "Server: Dev (8080)",
+                "Browser: Chrome (http://localhost:8080/helix-core)"
+            ]
         }
     ]
 }

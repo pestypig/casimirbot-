@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Warp Creator</title>
+  <link rel="stylesheet" href="./css/base.css" />
+  <style>
+    /* Lightweight styles for Parameter Pills, Summary, and Drawer */
+    .pill{border-radius:999px;padding:4px 8px;font-size:12px;border:1px solid transparent;display:inline-flex;gap:6px;align-items:center}
+    .pill.ok{background:#0e2b17;border-color:#1f6b3d;color:#b7ffd1}
+    .pill.warn{background:#2b270e;border-color:#6b5e1f;color:#ffe9b7}
+    .pill.fail{background:#2b0e0e;border-color:#6b1f1f;color:#ffb7b7}
+    .pills-grid{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow:auto;padding:6px;background:#0c131d;border-radius:10px;border:1px solid #152131}
+    .pills-grid .pill{cursor:default}
+    .pills-grid .pill b{color:#dfefff}
+    .summary{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+    .dot.ok{background:#20d16b}.dot.warn{background:#ffd166}.dot.fail{background:#ff5c5c}
+    details.drawer{border:1px solid #1b2736;border-radius:12px;overflow:hidden;background:#0f1620}
+    details.drawer>summary{cursor:pointer;padding:10px 12px;background:#0c131a;color:#dbe8ff;font-weight:600;list-style:none}
+    details.drawer>summary::-webkit-details-marker{display:none}
+    details.drawer .drawer-body{padding:10px 12px}
+    /* Responsive layout: stack controls under canvas on narrower viewports */
+    .leftCol{min-width:0}
+    .rightCol{min-width:0; position:static}
+    @media (max-width: 1280px){
+      .container.split{grid-template-columns: 1fr !important}
+      .leftCol{grid-column:1; order:1}
+      .rightCol{grid-column:1; order:2}
+      /* Let right panel flow (no constrained height) when stacked */
+      .panel.scroll{max-height:none}
+    }
+  </style>
+</head>
+<body class="page">
+  <header class="header">
+    <h1>Warp Creator</h1>
+    <div class="actions">
+      <a class="btn" href="./spore-pedia.html">← Spore-pedia</a>
+      <button id="saveProfile" class="btn primary">Save Profile</button>
+    </div>
+  </header>
+  <main class="container split">
+    <section class="panel leftCol">
+      <canvas id="shipCanvas"></canvas>
+      <div class="minirow">
+        <label>Length (m) <input id="len" type="number" step="0.1" value="120"></label>
+        <label>Width (m) <input id="wid" type="number" step="0.1" value="18"></label>
+  <label>Area (m²) <input id="area" type="number" step="1" value="8200" readonly></label>
+        <label>Depth (m) <input id="depth_m" type="number" step="0.01" value="0.5"></label>
+        <label>Habitat reserve (m³) <input id="hab_m3" type="number" step="1" value="0"></label>
+        <label style="align-items:center;flex-direction:row;gap:8px;margin-left:auto">
+          <input id="autoSolve" type="checkbox" checked>
+          <span style="font-size:12px;color:#b7c6de">Auto-solve to green</span>
+        </label>
+      </div>
+    </section>
+  <section class="panel scroll rightCol">
+      <h2>Parameters</h2>
+      <div class="grid2">
+        <label>Author <input id="author" value="anon"></label>
+    <label>Name <input id="name" value="Needle Mk I"></label>
+      <label>Target ship power (MW) <input id="P_target_MW" type="number" step="0.01" value="0"></label>
+    <label>Tile area (m²) <input id="A_tile" type="number" step="0.001" value="0.003"></label>
+  <label>Tile thickness (m) <input id="tileT" type="number" step="0.0001" value="0.001"></label>
+    <label>Tile areal mass (kg/m²) <input id="tileAkg" type="number" step="0.1" value="2.0"></label>
+        <label>Gap a (nm) <input id="a_nm" type="number" step="0.1" value="1.0"></label>
+        <label>Pocket D (µm) <input id="D_um" type="number" step="1" value="2000"></label>
+        <label>Sag h (nm) <input id="h_nm" type="number" step="0.1" value="2.9"></label>
+        <label>γ_geo <input id="gammaGeo" type="number" step="0.1" value="26"></label>
+        <label>f (GHz) <input id="f_GHz" type="number" step="0.1" value="15"></label>
+        <label>Q <input id="Q" type="number" step="1e8" value="1000000000"></label>
+  <label>β (coupling) <input id="beta" type="number" step="0.1" value="1.0"></label>
+  <label>Q0 (optional) <input id="Q0" type="number" step="1e8" placeholder="e.g. 2e9"></label>
+  <label>Qext (optional) <input id="Qext" type="number" step="1e8" placeholder="e.g. 2e9"></label>
+        <label>δa (pm) <input id="deltaA_pm" type="number" step="1" value="20"></label>
+        <label>d_eff <input id="d_eff" type="number" step="1e-6" value="2.5e-5"></label>
+        <label>τ_curv mode
+          <select id="tauMode">
+            <option value="geom" selected>Geometry (pocket)</option>
+            <option value="hull">Hull (length/sector)</option>
+          </select>
+        </label>
+  <label>Sectors (strobing) <input id="sectors" type="number" step="1" value="16"></label>
+  <label>Sectors concurrent <input id="sectorsLive" type="number" step="1" value="1"></label>
+        <label>Burst (µs) <input id="burst_us" type="number" step="0.1" placeholder="e.g., 10"></label>
+        <label>Dwell (µs) <input id="dwell_us" type="number" step="0.1" placeholder="optional"></label>
+        <label>Design intent
+          <select id="intent">
+            <option value="geom" selected>Demo / Geometry</option>
+            <option value="hull">Hull / Natário</option>
+          </select>
+        </label>
+        <label>Target R2* (hull) <input id="r2star" type="number" step="0.01" value="0.2"></label>
+        <label>Fill η <input id="fill" type="number" step="0.01" value="0.72"></label>
+        <label>Tile pitch (m) <input id="pitch" type="number" step="0.001" value="0.02"></label>
+  <label>T (K) <input id="T_K" type="number" step="0.1" value="4.2"></label>
+  <label>R_s (nΩ) <input id="Rs_nOhm" type="number" step="1" value="100"></label>
+  <label>COP 4K (el) <input id="COP4K" type="number" step="0.001" value="0.01"></label>
+  <label>Radiator ε <input id="epsRad" type="number" step="0.05" value="0.8"></label>
+  <label>Radiator T (K) <input id="TRad" type="number" step="1" value="300"></label>
+  <label>Plant kg/kW <input id="plantKgPerkW" type="number" step="0.5" value="8"></label>
+  <label>Plant m³/kW <input id="plantM3PerkW" type="number" step="0.005" value="0.02"></label>
+  <label>Frame mass factor <input id="frameFactor" type="number" step="0.1" value="0.5"></label>
+  <label>Design a (m/s²) <input id="aDesign" type="number" step="0.1" value="1.0"></label>
+  <label>σ_allow (MPa) <input id="sigmaAllow" type="number" step="10" value="150"></label>
+      </div>
+  <h3 style="margin-top:1rem">Parameter Pills</h3>
+  <div id="paramPills" class="pills-grid"></div>
+  <div style="font-size:12px;color:#b7c6de;margin:6px 0">All start green; turn amber near limits, red when invalid/out-of-band.</div>
+  <h2 style="margin-top:1rem">Live Summary</h2>
+  <div id="summary" class="summary"></div>
+      <h4 style="margin-top:1rem">Alcubierre & QI (Proxies)</h4>
+      <div class="grid2">
+        <label>Bubble R (m) <input id="bubble_R_m" type="number" step="0.1" value="5"></label>
+        <label>Wall Δ (m) <input id="wall_thick_m" type="number" step="0.01" value="0.5"></label>
+        <label>v_s (fraction of c) <input id="v_s" type="number" step="0.01" value="0.01"></label>
+        <label>k_warp (shape factor) <input id="k_warp" type="number" step="0.1" value="1"></label>
+        <label>f_throat (0..1) <input id="f_throat" type="number" step="0.01" value="0.05"></label>
+        <label>QI C (proxy) <input id="C_QI" type="number" step="0.001" value="0.01"></label>
+        <label>QI τ (ms) <input id="tau_QI_ms" type="number" step="0.01" placeholder="default = τ_LC"></label>
+      </div>
+      <div class="minirow">
+        <button id="btnUseQTarget" class="btn">Use Q_target(@R2*)</button>
+      </div>
+      <details class="drawer" id="engDrawer">
+        <summary>Engineering Details</summary>
+        <div class="drawer-body">
+          <h3>Live Tuple & Gates</h3>
+          <pre id="tuple" class="pre"></pre>
+          <div id="gates" class="gates"></div>
+          <h3>Key Results</h3>
+          <div id="results" class="results"></div>
+          <h3>Helpers</h3>
+          <div id="helpers" class="subrow"></div>
+        </div>
+      </details>
+    </section>
+  </main>
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="./js/physics-core.js"></script>
+  <script src="./js/profile-store.js"></script>
+  <script src="./js/ship-editor.js"></script>
+  <script>
+    // Wire inputs ↔ ShipEditor ↔ PhysicsCore
+  const inputs = {
+      len: q('#len'), wid: q('#wid'), area: q('#area'), depth_m: q('#depth_m'), hab_m3: q('#hab_m3'),
+      author: q('#author'), name: q('#name'),
+  A_tile: q('#A_tile'), tileT: q('#tileT'), tileAkg: q('#tileAkg'), a_nm: q('#a_nm'), D_um: q('#D_um'), h_nm: q('#h_nm'), gammaGeo: q('#gammaGeo'),
+  f_GHz: q('#f_GHz'), Q: q('#Q'), beta: q('#beta'), Q0: q('#Q0'), Qext: q('#Qext'),
+      deltaA_pm: q('#deltaA_pm'), d_eff: q('#d_eff'),
+  tauMode: q('#tauMode'), sectors: q('#sectors'), sectorsLive: q('#sectorsLive'), burst_us: q('#burst_us'), dwell_us: q('#dwell_us'),
+  intent: q('#intent'), r2star: q('#r2star'),
+  P_target_MW: q('#P_target_MW'),
+      fill: q('#fill'), pitch: q('#pitch'),
+  T_K: q('#T_K'), Rs_nOhm: q('#Rs_nOhm'), COP4K: q('#COP4K'), epsRad: q('#epsRad'), TRad: q('#TRad'), plantKgPerkW: q('#plantKgPerkW'), plantM3PerkW: q('#plantM3PerkW'), frameFactor: q('#frameFactor'), aDesign: q('#aDesign'), sigmaAllow: q('#sigmaAllow'),
+      // Alcubierre / QI
+      bubble_R_m: q('#bubble_R_m'), wall_thick_m: q('#wall_thick_m'), v_s: q('#v_s'),
+      k_warp: q('#k_warp'), f_throat: q('#f_throat'),
+      C_QI: q('#C_QI'), tau_QI_ms: q('#tau_QI_ms')
+    };
+  const tupleEl = q('#tuple'), gatesEl = q('#gates'), resultsEl = q('#results'), helpersEl = q('#helpers');
+  const paramPillsEl = q('#paramPills');
+  const summaryEl = q('#summary');
+  const autoSolveEl = q('#autoSolve');
+  // Persist Auto-solve (default ON)
+  (function initAutoSolve(){
+    if(!autoSolveEl) return;
+    const KEY = 'warp.autoSolve';
+    const saved = localStorage.getItem(KEY);
+    if(saved === null){
+      autoSolveEl.checked = true; // default ON
+      localStorage.setItem(KEY, 'true');
+    } else {
+      autoSolveEl.checked = (saved === 'true');
+    }
+    autoSolveEl.addEventListener('change', ()=>{
+      localStorage.setItem(KEY, autoSolveEl.checked ? 'true' : 'false');
+      tick();
+    });
+  })();
+    // Build a PhysicsCore tuple from current inputs (keeps Area = L×W bound)
+    function buildTupleFromInputs(){
+      const L_now = +inputs.len.value;
+      const W_now = +inputs.wid.value;
+      const areaSolved = Math.max(0, (isFinite(L_now)?L_now:0) * (isFinite(W_now)?W_now:0));
+      inputs.area.value = String(areaSolved);
+      const ship = {
+        length_m: L_now,
+        width_m: W_now,
+        area_m2: areaSolved,
+        tilesFill: +inputs.fill.value,
+        tilePitch_m: +inputs.pitch.value,
+        depth_m: +inputs.depth_m.value,
+        habitatReserve_m3: +inputs.hab_m3.value,
+        // structure & framing live on ship for PhysicsCore
+        frame_mass_factor: +inputs.frameFactor.value,
+        a_design_ms2: +inputs.aDesign.value,
+        sigma_allow_MPa: +inputs.sigmaAllow.value
+      };
+      const tile = {
+        A_tile_m2: +inputs.A_tile.value,
+        tileThickness_m: +inputs.tileT.value,
+        tile_areal_kgpm2: +inputs.tileAkg.value,
+        a_nm: +inputs.a_nm.value,
+        D_um: +inputs.D_um.value,
+        h_nm: +inputs.h_nm.value,
+        gammaGeo: +inputs.gammaGeo.value
+      };
+      const drive = {
+        f_GHz: +inputs.f_GHz.value,
+        Q: +inputs.Q.value,
+        beta: +inputs.beta.value,
+        Q0: inputs.Q0.value ? +inputs.Q0.value : undefined,
+        Qext: inputs.Qext.value ? +inputs.Qext.value : undefined,
+        deltaA_pm: +inputs.deltaA_pm.value,
+        d_eff: +inputs.d_eff.value,
+        tauCurvMode: inputs.tauMode.value,
+        sectors: +inputs.sectors.value || 16,
+        sectorsConcurrent: +inputs.sectorsLive.value || 1,
+        burst_us: inputs.burst_us.value ? +inputs.burst_us.value : undefined,
+        dwell_us: inputs.dwell_us.value ? +inputs.dwell_us.value : undefined,
+        designIntent: inputs.intent.value,
+        R2_star: +inputs.r2star.value,
+        P_target_MW: +inputs.P_target_MW.value || 0
+      };
+      const env = {
+        T_K: +inputs.T_K.value, Rs_nOhm: +inputs.Rs_nOhm.value,
+        COP_4K: +inputs.COP4K.value, eps_rad: +inputs.epsRad.value,
+        T_rad_K: +inputs.TRad.value,
+        plant_kg_per_kW: +inputs.plantKgPerkW.value,
+        plant_m3_per_kW: +inputs.plantM3PerkW.value
+      };
+      const warp = {
+        bubble_R_m: +inputs.bubble_R_m.value,
+        wall_thick_m: +inputs.wall_thick_m.value,
+        v_s: +inputs.v_s.value,
+        k_warp: +inputs.k_warp.value,
+        f_throat: +inputs.f_throat.value,
+        C_QI: +inputs.C_QI.value,
+        tau_QI_ms: inputs.tau_QI_ms.value ? +inputs.tau_QI_ms.value : undefined
+      };
+      return PhysicsCore.buildTuple({
+        name: inputs.name.value,
+        author: inputs.author.value,
+        ship, tile, drive, env, warp
+      });
+    }
+
+    // Initialize editor with a full profile; let its onUpdate drive UI
+    const editor = ShipEditor.init(document.getElementById('shipCanvas'), {
+      profile: buildTupleFromInputs(),
+      onUpdate: ({profile, derived}) => {
+        profile.derived = derived;
+        profile.ship.N = derived.N;
+        tupleEl.textContent = JSON.stringify(PhysicsCore.publicTuple(profile), null, 2);
+        renderSummary(derived);
+        updatePills(profile, derived);
+        gatesEl.innerHTML = PhysicsCore.renderGates(derived);
+        resultsEl.innerHTML = PhysicsCore.renderResults(derived);
+        helpersEl.innerHTML = `
+          <span>L_min(@R2*) = ${fmt(derived.L_min_for_R2star)} m</span>
+          · <span>Q_target(@R2*) = ${fmt(derived.Q_target_for_R2star)}</span>
+          · <span>V_hull = ${fmt(derived.V_hull)} m³</span>
+          · <span>V_tiles = ${fmt(derived.V_tiles)} m³</span>
+          · <span>d_eff(src=${derived.d_eff_source}) = ${fmt(derived.d_eff_effective)}</span>
+          · <span>burst_ms = ${isFinite(derived.burst_ms)? fmt(derived.burst_ms): '—'}</span>
+          · <span>τ_Q_ms = ${fmt(derived.tau_LC_ms)}</span>
+          · <span>duty_timing = ${isFinite(derived.duty_timing)? fmt(derived.duty_timing): '—'}</span>
+          · <span>duty_sector = ${fmt(derived.duty_sector)}</span>
+          ${derived.P_target_MW>0 ? `· <span>need tiles ≥ ${derived.N_required} → area ≥ ${fmt(derived.area_required_m2)} m²</span>` : ''}
+        `;
+        // Auto-solver: single-pass nudge
+        if(!solving && autoSolve(profile, derived)){
+          solving = true;
+          requestAnimationFrame(()=>{ solving=false; editor.setProfile(buildTupleFromInputs()); });
+        }
+      }
+    });
+    // Any input change → rebuild tuple and hand to editor (re-solves + updates UI)
+    Object.values(inputs).forEach(inp => inp.addEventListener('input', () => {
+      const tuple = buildTupleFromInputs();
+      editor.setProfile(tuple);
+    }));
+    // --- Parameter Pills setup ---
+    const paramKeys = [
+      'len','wid','area','depth_m','hab_m3',
+      'A_tile','tileT','tileAkg','a_nm','D_um','h_nm','gammaGeo',
+      'f_GHz','Q','beta','Q0','Qext','deltaA_pm','d_eff','tauMode','sectors','sectorsLive','burst_us','dwell_us','intent','r2star',
+      'fill','pitch','T_K','Rs_nOhm','COP4K','epsRad','TRad','plantKgPerkW','plantM3PerkW','frameFactor','aDesign','sigmaAllow',
+      'bubble_R_m','wall_thick_m','v_s','k_warp','f_throat','C_QI','tau_QI_ms'
+    ];
+    function buildPills(){
+      const labelMap = {
+        len:'L', wid:'W', area:'A', depth_m:'Depth', hab_m3:'Hab',
+        A_tile:'A_tile', tileT:'t_tile', tileAkg:"m'_tile", a_nm:'a', D_um:'D', h_nm:'h', gammaGeo:'γ_geo',
+        f_GHz:'f', Q:'Q', beta:'β', Q0:'Q0', Qext:'Qext', deltaA_pm:'δa', d_eff:'d_eff',
+        tauMode:'τ_mode', sectors:'S', sectorsLive:'S_live', burst_us:'Burst', dwell_us:'Dwell', intent:'Intent', r2star:'R2*',
+        fill:'Fill', pitch:'Pitch', T_K:'T', Rs_nOhm:'R_s', COP4K:'COP4K', epsRad:'ε_rad', TRad:'T_rad',
+        plantKgPerkW:'kg/kW', plantM3PerkW:'m³/kW', frameFactor:'frame×', aDesign:'a_design', sigmaAllow:'σ_allow',
+        bubble_R_m:'R_bub', wall_thick_m:'Δ', v_s:'v_s', k_warp:'k_warp', f_throat:'f_throat', C_QI:'C_QI', tau_QI_ms:'τ_QI'
+      };
+      if(paramPillsEl){
+        paramPillsEl.innerHTML = paramKeys.map(k=>`<span class="pill ok" data-pill="${k}"><b>${labelMap[k]||k}</b></span>`).join('');
+      }
+    }
+    buildPills();
+
+    function levelFor(key, tuple, d){
+      const v = (id)=>inputs[id]?.value;
+      const num = (id)=>+inputs[id]?.value;
+      switch(key){
+        case 'Q': {
+          const q = num('Q'); if(!isFinite(q)||q<=0) return 'fail';
+          if(q < 1e8) return 'fail'; if(q < 1e9) return 'warn'; return 'ok';
+        }
+        case 'a_nm': {
+          const a = num('a_nm'); if(!isFinite(a)||a<=0) return 'fail';
+          if(a < 0.3) return 'warn'; return 'ok';
+        }
+        case 'deltaA_pm': {
+          const a = num('a_nm')*1e-9, da = num('deltaA_pm')*1e-12; if(!isFinite(da)) return 'fail';
+          const rel = da/Math.max(1e-12,a);
+          if(da > 50e-12 || rel>0.1) return 'fail';
+          if(rel>0.05) return 'warn';
+          return 'ok';
+        }
+        case 'T_K': {
+          const T=num('T_K'); if(!isFinite(T)||T<=0) return 'fail';
+          if(T>9) return 'warn'; return 'ok';
+        }
+        case 'Rs_nOhm': {
+          const r=num('Rs_nOhm'); if(!isFinite(r)||r<=0) return 'fail';
+          if(r>500) return 'warn';
+          return 'ok';
+        }
+        case 'burst_us': {
+          if(!v('burst_us') && !v('dwell_us')) return 'ok';
+          if(!v('burst_us')) return 'fail';
+          const b_ms = (+v('burst_us'))/1000, tau_ms = d.tau_LC_ms;
+          if(!isFinite(b_ms)) return 'fail';
+          if(b_ms < tau_ms) return 'fail';
+          if(b_ms < 1.5*tau_ms) return 'warn';
+          return 'ok';
+        }
+        case 'dwell_us': {
+          if(!v('burst_us') && !v('dwell_us')) return 'ok';
+          if(!v('dwell_us')) return 'warn';
+          const dwell_ms = (+v('dwell_us'))/1000, burst_ms = (+v('burst_us'))/1000;
+          if(!isFinite(dwell_ms) || dwell_ms<=0) return 'fail';
+          if(dwell_ms < burst_ms) return 'warn';
+          return 'ok';
+        }
+        case 'sectors': {
+          const S=num('sectors'); if(!isFinite(S)||S<1) return 'fail';
+          if(S<8) return 'warn'; return 'ok';
+        }
+        case 'sectorsLive': {
+          const SL=num('sectorsLive'), S=num('sectors'); if(!isFinite(SL)||SL<1) return 'fail';
+          if(SL>S) return 'fail';
+          if(SL>1) return 'warn';
+          return 'ok';
+        }
+        case 'r2star': {
+          const r=num('r2star'); if(!isFinite(r)||r<=0) return 'fail';
+          if(r<0.1||r>0.3) return 'warn'; return 'ok';
+        }
+        case 'pitch': {
+          const p=num('pitch'); if(!isFinite(p)||p<=0) return 'fail';
+          return d.pitchOK ? 'ok' : 'fail';
+        }
+        case 'A_tile': {
+          return d.pitchOK ? 'ok' : 'warn';
+        }
+        case 'tileT': {
+          const t=num('tileT'); if(!isFinite(t)||t<=0) return 'fail';
+          if(t>0.005) return 'warn';
+          return 'ok';
+        }
+        case 'tileAkg': {
+          const m=num('tileAkg'); if(!isFinite(m)||m<=0) return 'fail';
+          if(m>10) return 'warn';
+          return 'ok';
+        }
+        case 'len': {
+          if(v('intent')==='hull'){
+            if((+v('len')) < d.L_min_for_R2star) return 'fail';
+          }
+          return 'ok';
+        }
+        case 'TRad': {
+          return d.radiatorOK ? 'ok' : 'fail';
+        }
+        case 'COP4K': {
+          const cop=num('COP4K'); if(!isFinite(cop)||cop<=0) return 'fail';
+          if(cop<0.005) return 'warn';
+          return 'ok';
+        }
+        case 'sigmaAllow': {
+          return d.structureOK ? 'ok' : 'fail';
+        }
+        case 'tauMode': {
+          return 'ok';
+        }
+        case 'intent': {
+          return 'ok';
+        }
+        case 'wall_thick_m': {
+          const D=num('wall_thick_m'); if(!isFinite(D)||D<=0) return 'fail';
+          if(D<0.1) return 'warn'; return 'ok';
+        }
+        case 'v_s': {
+          const vs=num('v_s'); if(!isFinite(vs)||vs<0) return 'fail';
+          if(vs>0.3) return 'warn'; return 'ok';
+        }
+        case 'C_QI': {
+          return d.QI_OK ? 'ok' : 'warn';
+        }
+        default:
+          return 'ok';
+      }
+    }
+    function updatePills(tuple, d){
+      if(!paramPillsEl) return;
+      paramKeys.forEach(k=>{
+        const el = paramPillsEl.querySelector(`[data-pill="${k}"]`);
+        if(!el) return;
+        const lvl = levelFor(k, tuple, d);
+        el.classList.remove('ok','warn','fail');
+        el.classList.add(lvl==='ok'?'ok':(lvl==='warn'?'warn':'fail'));
+      });
+    }
+    function renderSummary(d){
+      if(!summaryEl) return;
+      const status = (d.status==='ok'?'ok':(d.status==='warn'?'warn':'fail'));
+      const chip = (label, val)=>`<span class="pill ${/fail|×/.test(val)?'fail':/warn|·/.test(val)?'warn':'ok'}"><b>${label}</b> ${val}</span>`;
+      summaryEl.innerHTML = `
+        <span class="dot ${status}"></span>
+        ${chip('R1', fmt(d.R1))}
+        ${chip('R2(active)', `${fmt(d.R2)} [${d.tauCurvMode}]`)}
+        ${chip('N', d.N)}
+        ${chip('P_ship', fmt(d.P_ship_W)+' W')}
+        ${chip('L_min', fmt(d.L_min_for_R2star)+' m')}
+        ${chip('Q_target', fmt(d.Q_target_for_R2star))}
+        ${d.P_target_MW>0 ? chip('Tiles sufficiency', d.tilesEnough ? 'ok' : `fail × need ${d.N_required} (area ≥ ${fmt(d.area_required_m2)} m²)`) : ''}
+      `;
+    }
+  // ------- Auto-solver: nudge inputs to keep pills green -------
+  let solving = false;
+  function autoSolve(tuple, d){
+    if(!autoSolveEl?.checked) return false; // no changes
+    let changed = false;
+    // Helpers
+    const set = (id,val)=>{ const el=inputs[id]; if(!el) return; const v=+el.value; if(!isFinite(val)) return; if(Math.abs(v - val) > (Math.abs(val)*1e-9 + 1e-12)){ el.value = String(val); changed = true; } };
+    const clamp = (x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+    // 1) Hull R2 band (intent hull): choose smaller move between Q→Q_target or L→L_min
+    if(inputs.intent.value==='hull'){
+      const Q_now = +inputs.Q.value || 1e9;
+      const Q_tgt = d.Q_target_for_R2star;
+      const L_now = +inputs.len.value || 1;
+      const L_min = d.L_min_for_R2star;
+      const need_Q = (Q_now < Q_tgt);
+      const need_L = (L_now < L_min);
+      if(need_Q || need_L){
+        // Compare relative moves: ΔQ/Q vs ΔL/L
+        const relQ = need_Q ? (Q_tgt - Q_now)/Math.max(Q_tgt,1) : 0;
+        const relL = need_L ? (L_min - L_now)/Math.max(L_min,1e-9) : 0;
+        if(relQ <= relL && Q_tgt <= 1e10){ // prefer Q move if smaller and reasonable cap
+          set('Q', Math.min(1e10, Q_tgt));
+        } else {
+          set('len', L_min);
+          // Keep editor aspect helpful
+          editor.setSize(+inputs.len.value, +inputs.wid.value);
+        }
+      }
+    }
+    // 2) Reciprocity: Burst ≥ 1.5 τ_LC (µs) if Burst present or any timing fields present
+    if((inputs.burst_us.value || inputs.dwell_us.value) && isFinite(d.tau_LC_ms)){
+      const need_burst_us = Math.ceil(1.5 * d.tau_LC_ms * 1000); // ms→µs
+      const b_now = +inputs.burst_us.value || 0;
+      if(b_now < need_burst_us){ set('burst_us', need_burst_us); }
+    }
+    // 3) Duty timing: if Burst present & we have target d_eff (input), back-solve dwell to match it
+    if(inputs.burst_us.value){
+      const burst_ms = (+inputs.burst_us.value)/1000;
+      const d_eff_input = +inputs.d_eff.value;
+      const S = Math.max(1, +inputs.sectors.value || 16);
+      const S_live = Math.max(1, +inputs.sectorsLive.value || 1);
+      const duty_sector = S_live / S;
+      const duty_needed = clamp(d_eff_input/Math.max(duty_sector,1e-9), 1e-6, 0.999999);
+      // duty = burst / (burst + dwell) → dwell = burst*(1 - duty)/duty
+      const dwell_ms = burst_ms * (1 - duty_needed)/Math.max(duty_needed,1e-9);
+      if(isFinite(dwell_ms) && dwell_ms >= 0){ set('dwell_us', Math.max(0.1, dwell_ms*1000)); }
+    }
+    // 4) Radiator fit: if radiator pill red, raise ε→0.9 then raise T_rad to fit hull area
+    if(!d.radiatorOK){
+      const eps0 = +inputs.epsRad.value || 0.8;
+      if(eps0 < 0.9){ set('epsRad', 0.9); }
+      // Recompute needed T after ε change (estimate using current numbers)
+      const SIGMA = 5.670374419e-8;
+      const P = d.P_el_cryo || 0;
+      const Amax = d.hull_ext_area || (2*(+inputs.len.value + +inputs.wid.value)*(+inputs.depth_m.value) + 2*(+inputs.area.value));
+      const T_need = Math.pow(P / (Math.max(+inputs.epsRad.value,0.5) * SIGMA * Math.max(Amax,1e-6)), 0.25);
+      const T_cap = 600; // do not exceed 600 K panel default
+      if(isFinite(T_need) && T_need > (+inputs.TRad.value || 300)){ set('TRad', clamp(T_need, 300, T_cap)); }
+    }
+    // 5) Packing: ensure pitch ≥ sqrt(A_tile); if grid cap exceeded, trim fill
+    const A_tile = +inputs.A_tile.value || 0.003;
+    const pitch_min = Math.sqrt(Math.max(A_tile,1e-12));
+    if((+inputs.pitch.value) < pitch_min){ set('pitch', pitch_min); }
+    // If still over grid cap, reduce fill so N_area ≤ N_pitchMax
+    const shipArea = +inputs.area.value || 0;
+    const pitch = +inputs.pitch.value || pitch_min;
+    const N_pitchMax = Math.floor(shipArea / (pitch*pitch));
+    const fill_now = +inputs.fill.value || 0.72;
+    const N_area = Math.floor((fill_now * shipArea) / Math.max(1e-12, A_tile));
+    if(N_area > N_pitchMax && shipArea>0){ 
+      const fill_new = clamp((N_pitchMax * A_tile)/shipArea, 0, 0.95);
+      set('fill', fill_new);
+    }
+    // 6) Structure: if avg stress > allow/margin, increase depth minimally
+    if(!d.structureOK){
+      const M = d.M_tiles_kg + d.M_frames_kg + d.M_cryo_kg + d.plant_mass_kg;
+      const a_design = +inputs.aDesign.value || 1.0;
+      const sigma_allow = (+inputs.sigmaAllow.value || 150)*1e6 / (d.structure_margin || 3.0);
+      const L = +inputs.len.value || 1, W = +inputs.wid.value || 1, depth = +inputs.depth_m.value || 0.1, A = +inputs.area.value || (L*W);
+      // σ = F/A_wall → A_wall_needed = F/σ; A_wall = 2(L+W)·depth + 2A
+      const F = M * a_design;
+      const Aw_needed = Math.max(1e-6, F / Math.max(1e-9, sigma_allow));
+      const depth_needed = Math.max(0.05, (Aw_needed - 2*A) / Math.max(2*(L+W), 1e-6));
+      if(depth_needed > depth){ set('depth_m', depth_needed); }
+    }
+    // 7) DCE stroke clamp
+    const a_nm = +inputs.a_nm.value || 1;
+    const cap_pm = Math.min(50, 0.1 * a_nm * 1000); // pm
+    if((+inputs.deltaA_pm.value) > cap_pm){ set('deltaA_pm', cap_pm); }
+    return changed;
+  }
+
+    // Save handler uses latest editor snapshot
+    document.getElementById('saveProfile').onclick = async () => {
+      const d = (editor.getDerived && editor.getDerived()) || PhysicsCore.compute(buildTupleFromInputs());
+      const t = buildTupleFromInputs();
+      if(d.status === 'fail' || !d.packingOK || !d.volumeOK || (t.drive.tauCurvMode==='hull' && t.ship.length_m < d.L_min_for_R2star) || !d.structureOK){
+        alert('Design not saveable: fix Packing/Volume/Structure and/or meet Hull R2 band (increase Length or click "Use Q_target").');
+        return;
+      }
+      const thumbnail = await editor.capture();
+      const profile = ProfileStore.prepareForSave(t, thumbnail);
+      ProfileStore.save(profile);
+      await ProfileStore.downloadProfileHTML(profile.id);
+    };
+    // Use Q_target button sets Q and re-profiles
+    document.getElementById('btnUseQTarget').onclick = () => {
+      const d = editor.getDerived && editor.getDerived();
+      if(d && isFinite(d.Q_target_for_R2star)){
+        inputs.Q.value = String(d.Q_target_for_R2star.toFixed(0));
+        editor.setProfile(buildTupleFromInputs());
+      }
+    };
+    // Prime the editor/UI once at load
+    (function prime(){ editor.setProfile(buildTupleFromInputs()); })();
+    function q(s){return document.querySelector(s);}    
+    function fmt(x){ if(x==null||!isFinite(x)) return '—'; const a=Math.abs(x); if(a>=1e6||a<1e-2) return x.toExponential(2); return x.toLocaleString(undefined,{maximumFractionDigits:3}); }
+  </script>
+</body>
+</html>

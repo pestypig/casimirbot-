@@ -22,6 +22,39 @@ export interface StaticCasimirResult {
 }
 
 /**
+ * Small-perturbation mapping from cavity gap (meters) to resonant frequency (GHz).
+ * Capped sensitivity via gammaGeo keeps ω excursions realistic for nanogaps.
+ */
+export function omega0_from_gap(
+  d_m: number,
+  base_f0_GHz: number,
+  geom: "parallel_plate" | "cpw" = "cpw",
+  gammaGeo = 1e-3,
+): number {
+  const omega0 = 2 * Math.PI * base_f0_GHz * 1e9;
+  const chi = gammaGeo * (geom === "parallel_plate" ? 1.2 : 1);
+  const d_ref = 100e-9;
+  const omega = omega0 * (1 + chi * (d_ref / Math.max(d_m, 1e-9) - 1));
+  return omega / (2 * Math.PI) / 1e9;
+}
+
+/**
+ * Derivative dω/dd for the same perturbative model (rad/s per meter).
+ */
+export function domega0_dd(
+  d_m: number,
+  f0_GHz: number,
+  geom: "parallel_plate" | "cpw" = "cpw",
+  gammaGeo = 1e-3,
+): number {
+  const omega0 = 2 * Math.PI * f0_GHz * 1e9;
+  const chi = gammaGeo * (geom === "parallel_plate" ? 1.2 : 1);
+  const d_ref = 100e-9;
+  const denom = Math.max(d_m * d_m, 1e-18);
+  return -omega0 * chi * d_ref / denom;
+}
+
+/**
  * Calculate Casimir energy using exact scientific formulas
  * Unit conventions:
  * - gap: nm

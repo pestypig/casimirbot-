@@ -36,14 +36,28 @@ export type FuelGaugeProps = {
 export function computeEffectiveLyPerHour(
   mode: string, duty=0, gammaGeo=0, q=0, zeta=0, tsRatio=0
 ) {
+  // Normalize mode (be tolerant of case and synonyms coming from pipeline)
+  const m = String(mode || "").toLowerCase();
+  const canonical =
+    m === "hover" ? "hover" :
+    m === "cruise" ? "cruise" :
+    m === "emergency" ? "emergency" :
+    m === "standby" ? "standby" :
+    m === "nearzero" || m === "near-zero" || m === "near_zero" ? "nearzero" :
+    m === "taxi" ? "taxi" :
+    // default to hover if unrecognized (safer than 0 speed)
+    "hover";
+
   // Base FRACTIONS of c (keeps us subluminal by construction)
   const baseFrac: Record<string, number> = {
-    Hover:     0.001,  // 0.1% c
-    Cruise:    0.010,  // 1.0% c
-    Emergency: 0.015,  // 1.5% c
-    Standby:   0
+    hover:     0.001,  // 0.1% c
+    nearzero:  0.0005, // 0.05% c (zero-β hover-climb)
+    taxi:      0.0001, // 0.01% c (maneuvering)
+    cruise:    0.010,  // 1.0% c
+    emergency: 0.015,  // 1.5% c
+    standby:   0
   };
-  let v = (baseFrac[mode] ?? 0) * C_LY_PER_HOUR;
+  let v = (baseFrac[canonical] ?? 0) * C_LY_PER_HOUR;
 
   // gentle scaling with current tuning (kept bounded)
   const g = Math.min(40, Math.max(10, gammaGeo || 26));
@@ -63,17 +77,40 @@ export function computeEffectiveLyPerHour(
 
 /** Derive safe continuous window (hours) using constraints/budgets. */
 function computeSafeWindowHours(mode: string, zeta=0, tsRatio=0, frOk?: boolean, natarioOk?: boolean, curvatureOk?: boolean, powerMW?: number, pMaxMW?: number) {
-  const base: Record<string, number> = { Hover: 24, Cruise: 8, Emergency: 2, Standby: 168 };
-  const baseWin = base[mode] ?? 0;
+  const m = String(mode || "").toLowerCase();
+  const canonical =
+    m === "hover" ? "hover" :
+    m === "cruise" ? "cruise" :
+    m === "emergency" ? "emergency" :
+    m === "standby" ? "standby" :
+    m === "nearzero" || m === "near-zero" || m === "near_zero" ? "nearzero" :
+    m === "taxi" ? "taxi" :
+    "hover";
 
-  const fZ  = clamp01(zeta / 0.84);
-  const fT  = clamp01(tsRatio / 100);
+  const base: Record<string, number> = {
+    hover: 24,
+    nearzero: 12, // conservative continuous window while climbing
+    taxi: 6,
+    cruise: 8,
+    emergency: 2,
+    standby: 168,
+  };
+  const baseWin = base[canonical] ?? base.hover;
+
+  // Sane defaults to avoid 0 or NaN windows when telemetry is missing
+  const zetaSafe = Number.isFinite(zeta) && zeta > 0 ? zeta : 0.84; // assume nominal margin if unknown
+  const tsSafe   = Number.isFinite(tsRatio) && tsRatio > 0 ? tsRatio : 100; // assume nominal thermal ratio if unknown
+
+  const fZ  = clamp01(zetaSafe / 0.84);
+  const fT  = clamp01(tsSafe / 100);
   const fFR = frOk === false ? 0.6 : 1.0;
   const fNa = natarioOk === false ? 0.7 : 1.0;
   const fCu = curvatureOk === false ? 0.7 : 1.0;
   const fPw = pMaxMW && powerMW ? clamp01(pMaxMW / Math.max(1e-9, powerMW)) : 1.0; // throttle if near cap
 
-  return baseWin * clamp01(fZ * fT * fFR * fNa * fCu * fPw);
+  const product = fZ * fT * fFR * fNa * fCu * fPw;
+  const scale = Number.isFinite(product) ? clamp01(product) : 1.0; // treat unknown as neutral
+  return baseWin * scale;
 }
 
 export function FuelGauge(props: FuelGaugeProps) {

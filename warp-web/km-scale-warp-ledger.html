@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>KM-Scale Warp Ledger · Potato Threshold Narrative</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #0f172a;
+      --card: #111a27;
+      --line: #1f2937;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --accent: #22d3ee;
+      --ok: #4ade80;
+      --warn: #facc15;
+      --fail: #f87171;
+      font-size: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 32px 20px 60px;
+      display: grid;
+      gap: 20px;
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    h1 { font-size: 1.4rem; }
+    h2 { font-size: 1.2rem; }
+    h3 { font-size: 1.05rem; }
+    p { margin: 0; }
+    .page-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .page-header .headline {
+      flex: 1;
+      min-width: 220px;
+    }
+    .page-header select {
+      background: #0b1222;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-size: 0.9rem;
+    }
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .badge strong { color: var(--text); }
+    .badge.ok { border-color: rgba(74, 222, 128, 0.35); color: var(--ok); }
+    .badge.warn { border-color: rgba(250, 204, 21, 0.35); color: var(--warn); }
+    .badge.fail { border-color: rgba(248, 113, 113, 0.35); color: var(--fail); }
+    .color-warp { color: #38bdf8; }
+    .color-payload { color: #fbbf24; }
+    .color-body { color: #c084fc; }
+    .color-collapse { color: #f472b6; }
+    .section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+    .section > header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    .control-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    label.control {
+      display: grid;
+      gap: 6px;
+      font-size: 0.9rem;
+    }
+    select, .toggle, button.choice, input[type="number"], input[type="text"] {
+      width: 100%;
+      background: var(--card);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .toggle input { accent-color: var(--accent); }
+    .inline-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    button.choice {
+      flex: 1;
+      min-width: 120px;
+      cursor: pointer;
+      border-radius: 999px;
+      transition: border-color 0.15s ease, color 0.15s ease;
+    }
+    button.choice.active {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+    .card .title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+    .card .equation {
+      font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.85rem;
+      color: #cbd5f5;
+      background: rgba(20, 30, 50, 0.65);
+      border-radius: 8px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .card .description {
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .card .value {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .banner {
+      display: none;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      background: rgba(250, 204, 21, 0.08);
+      color: #facc15;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .banner.show { display: block; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(14, 24, 38, 0.8);
+      color: var(--muted);
+    }
+    .tag.proxy { border-color: rgba(34, 211, 238, 0.5); color: var(--accent); }
+    .tag.method { border-color: rgba(148, 163, 184, 0.4); }
+    .tag.lit { border-color: rgba(125, 211, 252, 0.4); color: #7dd3fc; cursor: help; }
+    .control-mode-note { display: none; font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+    body.reader-mode .reference-controls { display: none; }
+    body.reader-mode .control-mode-note { display: block; }
+    dl.metrics {
+      display: grid;
+      gap: 6px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin: 0;
+    }
+    dl.metrics dt {
+      font-size: 0.8rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    dl.metrics dd {
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    dl.var-key {
+      display: grid;
+      margin: 0;
+      padding: 10px;
+      background: rgba(12, 18, 30, 0.7);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+    dl.var-key dt {
+      font-weight: 600;
+      color: var(--text);
+    }
+    dl.var-key dd {
+      margin: 0 0 4px 0;
+      line-height: 1.35;
+    }
+    .two-col {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    details {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0;
+      overflow: hidden;
+    }
+    details summary {
+      padding: 14px 18px;
+      cursor: pointer;
+      list-style: none;
+      font-weight: 600;
+    }
+    details summary::marker,
+    details summary::-webkit-details-marker { display: none; }
+    details[open] summary { border-bottom: 1px solid var(--line); }
+    details .content {
+      padding: 16px 18px 20px;
+      display: grid;
+      gap: 18px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    th { color: var(--muted); font-weight: 500; }
+    @media (max-width: 700px) {
+      .page-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="page-header">
+      <div class="headline">
+        We compare <strong>lazy-mass curvature</strong> (nature) vs <strong>strobed-mass curvature</strong> (drive) at km-scale. Choose references; we’ll fill in the math.
+      </div>
+      <label style="display:grid;gap:6px;font-size:0.85rem;">
+        κ unit
+        <select id="unitMode">
+          <option value="cu">Curvature Unit (CU · 1 CU = 1×10⁻²⁰ m⁻²)</option>
+          <option value="si">SI (1/m²)</option>
+        </select>
+      </label>
+    </header>
+
+    <div class="badge-row" id="statusBadges">
+      <!-- badges injected -->
+    </div>
+
+    <section class="section">
+      <header>
+        <h2>Reference picks</h2>
+        <span class="muted">Each pick feeds the GR time-sliced energy proxy: warp flux sets κ<sub>drive</sub>, payload sets γ bookkeeping, body class anchors κ<sub>body</sub>, collapse regimen frames the tiny benchmarking curvature and info ledger.</span>
+      </header>
+      <div class="muted" style="font-size:0.9rem;">
+        <p>Think of the preset stack as a comparison scaffold:</p>
+        <ul style="margin:6px 0 12px 16px;padding:0 0 0 12px;">
+          <li><strong>Warp preset</strong> constrains the cycle-averaged GR proxy by balancing flux, duty, and Q<sub>L</sub>.</li>
+          <li><strong>Payload mass</strong> ties into γ so field bookkeeping stays physical while curvature stays proxy.</li>
+          <li><strong>Body class</strong> contributes the composition-only rounding scale and κ<sub>body</sub> benchmark.</li>
+          <li><strong>Collapse regimen</strong> + λ/duration supply the local causality/energy yardstick (and optional bits) orthogonal to κ.</li>
+        </ul>
+        <p>This keeps the narrative aligned: one GR-compatible drive proxy contrasted with nature’s curvature and a collapse benchmark.</p>
+        <div class="inline-row" style="gap:12px;flex-wrap:wrap;">
+          <span class="muted"><span class="color-warp">●</span> Warp flux</span>
+          <span class="muted"><span class="color-payload">●</span> Payload γ</span>
+          <span class="muted"><span class="color-body">●</span> Body composition</span>
+          <span class="muted"><span class="color-collapse">●</span> Collapse regimen</span>
+        </div>
+      </header>
+      <div class="inline-row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <span class="muted">Switch to reader mode to hide controls and just follow the narrative.</span>
+        <button id="toggleReader" class="btn">Switch to reader mode</button>
+      </div>
+      <p class="control-mode-note">Reader mode hides these controls. Re-enter explore mode to adjust presets or toggles.</p>
+      <div class="reference-controls">
+        <div class="control-grid">
+          <label class="control">
+            Warp preset
+            <span class="muted">Flux vs constraints gate the GR proxy and fix κ<sub>drive</sub>.</span>
+            <select id="warpPreset"></select>
+          </label>
+          <label class="control">
+            Payload mass
+            <span class="muted">Field bookkeeping (γ-band) is separate from curvature.</span>
+            <select id="payloadPreset"></select>
+          </label>
+          <label class="control">
+            Body class
+            <span class="muted">Composition sets both rounding scale and κ<sub>body</sub>.</span>
+            <select id="bodyClass"></select>
+          </label>
+          <label class="control">
+            Collapse regimen
+            <span class="muted">Local causality & collapse energy craft a tiny κ benchmark.</span>
+            <select id="collapsePreset"></select>
+          </label>
+          <label class="control">
+            Gain model
+            <span class="muted">How the geometry/storage factor &#120083; enters &kappa;<sub>drive</sub>.</span>
+            <select id="gainModel">
+              <option value="gammaQ">&gamma;&times;Q (normalized)</option>
+              <option value="flat">Flat (&#120083; = 1)</option>
+            </select>
+          </label>
+        </div>
+        <div class="inline-row">
+          <label class="toggle">
+            <input type="checkbox" id="toggleOverlap" />
+            include overlap λ = 100 s⁻¹ (optional locality stretch)
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="toggleBits" checked />
+            compute Landauer bits @ T_eff = 310 K (info ledger)
+          </label>
+          <span class="muted" style="flex:1;min-width:160px;">Collapse duration presets</span>
+          <div class="inline-row" id="durationButtons"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Falsifiability Lab &mdash; scaling proofs</h2>
+        <span class="muted">Each row is a slope you can test: change one knob, curvature must scale as predicted. If it doesn&rsquo;t, the proxy is falsified for that configuration.</span>
+      </header>
+      <div class="card">
+        <div class="title">F1&ndash;F4 &mdash; Linear scalings</div>
+        <span class="tag method">Prediction vs measurement</span>
+        <table id="tableFalsify">
+          <thead>
+            <tr>
+              <th>Test</th>
+              <th>Variation</th>
+              <th>R<sub>pred</sub></th>
+              <th>R<sub>meas</sub></th>
+              <th>&Delta; (%)</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <p class="muted">Definitions: R = &kappa;&prime;/&kappa;. Predictions assume the <strong>averaging regime</strong> (TS&gg;1, &epsilon;&ll;1) and hold other knobs fixed while the specified knob is varied.</p>
+      </div>
+      <div class="card">
+        <div class="title">F5 &mdash; Homogenization window (TS / &epsilon;)</div>
+        <span class="tag method">Validity check</span>
+        <p class="description">Dial a hypothetical pulse-stretch factor &eta;, recompute &epsilon;&prime;=&eta;&middot;&epsilon; and N&times;&prime;=N&times;/&eta;, and declare validity from the averaging badge. This does not change &kappa;, only the <strong>legitimacy</strong> of using the proxy.</p>
+        <div class="inline-row">
+          <label class="control" style="max-width:220px;">
+            Pulse-stretch &eta;
+            <select id="etaTS">
+              <option value="1">&eta; = 1 (baseline)</option>
+              <option value="5">&eta; = 5</option>
+              <option value="10">&eta; = 10</option>
+              <option value="20">&eta; = 20</option>
+            </select>
+          </label>
+          <div class="badge" id="tsVerdict">&mdash;</div>
+        </div>
+        <dl class="metrics">
+          <dt>&epsilon;&prime;</dt><dd id="tsEpsP"></dd>
+          <dt>N&times;&prime;</dt><dd id="tsNCrossP"></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="title">F6 &mdash; QI guardrail (&zeta;)</div>
+        <span class="tag method">Bounded knob</span>
+        <p class="description">Sweep duty toward the Ford&ndash;Roman cap: d&prime;<sub>eff</sub> = min(d<sub>eff</sub>&middot;&eta;<sub>d</sub>, 3&times;10<sup>&minus;5</sup>). &kappa; must rise linearly with d<sub>eff</sub> until &zeta;&rarr;1, after which the auto-solver (or operator) must refuse further increase.</p>
+        <div class="inline-row">
+          <label class="control" style="max-width:220px;">
+            Duty scale &eta;<sub>d</sub>
+            <select id="etaDuty">
+              <option value="0.5">0.5&times;</option>
+              <option value="1" selected>1&times;</option>
+              <option value="1.5">1.5&times;</option>
+              <option value="2">2&times;</option>
+            </select>
+          </label>
+          <div class="badge" id="qiVerdict">&mdash;</div>
+        </div>
+        <dl class="metrics">
+          <dt>d&prime;<sub>eff</sub></dt><dd id="qiDEffP"></dd>
+          <dt>&zeta;&prime;</dt><dd id="qiZetaP"></dd>
+          <dt>R = &kappa;&prime;/&kappa;</dt><dd id="qiRatio"></dd>
+        </dl>
+      </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Warp bubble green zone</h2>
+        <span class="muted">Why the selected warp preset starts in the safe operating band.</span>
+      </header>
+      <div class="card">
+        <span class="tag method">Definition</span>
+        <p class="description"><strong>What “green zone” means here:</strong> operate the Casimir tile array so that (i) average power stays fixed at P<sub>avg</sub>=83.3 MW, (ii) q<sub>mech</sub>≤1 (≤50 pm stroke), (iii) ζ=d<sub>eff</sub>/3×10⁻⁵ ≤1, (iv) γ<sub>VdB</sub>∈[10⁵,10⁶], (v) Q<sub>L</sub>∈[5×10⁸,10⁹], and (vi) TS≫1. Meeting this set keeps the drive mechanically, electromagnetically, and GR-proxy safe before comparing to lazy mass or collapse benchmarks.</p>
+        <p class="description"><strong>Closed-form solvers (fixed P<sub>avg</sub>=83.3 MW):</strong> with area scale s = A/A₀ the drive throttle and pocket gain follow</p>
+        <div class="equation">q<sub>mech</sub> = (P<sub>avg</sub>·Q<sub>L</sub>)/(A_*·s)·(d<sub>0</sub>/d<sub>eff</sub>)  γ<sub>VdB</sub> = (C_* /(Q<sub>L</sub>·s))·(d<sub>0</sub>/d<sub>eff</sub>)·(M<sub>-</sub>/1405)</div>
+        <dl class="var-key">
+          <dt>A_* ≈ 8.81×10¹⁶ W</dt><dd>Baseline power-handling constant for the array.</dd>
+          <dt>C_* ≈ 1.35×10¹⁴</dt><dd>Pocket gain constant for the Needle geometry.</dd>
+          <dt>d<sub>0</sub></dt><dd>Baseline duty 2.5×10⁻⁵ before auto-tuning.</dd>
+        </dl>
+        <p class="description">Baseline Needle (s=1, Q<sub>L</sub>=10⁹, d<sub>eff</sub>=2.5×10⁻⁵, M<sub>-</sub>=1.405 t) lands near q≈0.945 and γ≈1.35×10⁵.</p>
+      </div>
+      <div class="card">
+        <div class="title">Green-zone bounds</div>
+        <ul class="description" style="margin:0;padding-left:18px;">
+          <li>Q<sub>L</sub> ∈ [5×10⁸, 1×10⁹]</li>
+          <li>q<sub>mech</sub> ∈ [0.3, 1.0] (≤50 pm stroke)</li>
+          <li>d<sub>eff</sub> ≤ 3.0×10⁻⁵ (ζ ≤ 1)</li>
+          <li>γ<sub>VdB</sub> ∈ [10⁵, 10⁶]</li>
+          <li>TS ≫ 1 (many light-crossings per control tick)</li>
+        </ul>
+        <p class="description"><strong>Scaling rules:</strong> hold P<sub>avg</sub> and adjust q ∝ 1/(s·d<sub>eff</sub>). If q creeps above 1 at smaller s, first raise d<sub>eff</sub> toward its ζ-limit, then lower Q<sub>L</sub>, or accept a different P<sub>avg</sub>. γ tracks M<sub>-</sub> via γ ∝ M<sub>-</sub>/(s·Q<sub>L</sub>·d<sub>eff</sub>).</p>
+      </div>
+      <div class="card">
+        <div class="title">Current solution snapshot</div>
+        <p class="description">Everything you select above is auto-solved inside these bounds.</p>
+        <dl class="metrics">
+          <dt>q<sub>mech</sub></dt><dd id="greenQ"></dd>
+          <dt>γ<sub>VdB</sub></dt><dd id="greenGamma"></dd>
+          <dt>Q<sub>L</sub></dt><dd id="greenQL"></dd>
+          <dt>d<sub>eff</sub></dt><dd id="greenDE"></dd>
+          <dt>ζ</dt><dd id="greenZeta"></dd>
+          <dt>TS</dt><dd id="greenTS"></dd>
+        </dl>
+        <p class="description"><strong>Playbook:</strong> choose s and Q<sub>L</sub> in-range → enforce q≤1 by nudging d<sub>eff</sub> or Q<sub>L</sub> → set M<sub>-</sub> and verify γ in-band → confirm ζ≤1, TS≫1, and mechanical stroke ≤50 pm. The solver applies those steps automatically, so every preset begins inside the green zone.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Step A — Potato threshold (solve Π = 1)</h2>
+        <span class="muted">Above this radius, self-gravity rounds the class material.</span>
+    </header>
+    <div class="card">
+      <span class="tag method">Method · strength vs gravity</span>
+      <p class="description"><strong>Scientific-method snapshot:</strong> start from the classic strength-vs-self-gravity criterion (Holsapple 2007; Lineweaver & Norman 2010) to solve for the size where rubble can no longer sustain shear.</p>
+      <div class="equation">R<sub>Π=1</sub> = √((3 σ<sub>y</sub>) / (4 π G ρ²))</div>
+      <dl class="var-key">
+        <dt>R<sub>Π=1</sub></dt><dd>Threshold radius where Π = 1 (potato-to-sphere transition).</dd>
+        <dt>σ<sub>y</sub></dt><dd>Yield strength of the bulk material.</dd>
+        <dt>G</dt><dd>Newton’s gravitational constant.</dd>
+        <dt>ρ</dt><dd>Bulk density of the material class.</dd>
+      </dl>
+      <p class="description"><strong>How the preset instantiates it:</strong> select a material class → plug its (ρ, σ<sub>y</sub>) into the expression → the R<sub>Π=1</sub> shown below is the radius band where irregular bodies become hydrostatic.</p>
+      <p class="description">Treat the result as an estimate: cohesion, rotation, and thermal history smear the transition, e.g., rock/ice bodies round out around ≈200–300 km.</p>
+      <dl class="metrics">
+        <dt class="color-body">Density ρ (kg/m³)</dt><dd class="color-body" id="bodyDensity"></dd>
+        <dt class="color-body">Yield σ<sub>y</sub> (Pa)</dt><dd class="color-body" id="bodyYield"></dd>
+        <dt class="color-body">R<sub>Π=1</sub> (km)</dt><dd class="color-body" id="radiusPi"></dd>
+      </dl>
+      </div>
+    </section>
+    <section class="section">
+      <header>
+        <h2>Step B &mdash; Lazy-mass curvature density</h2>
+        <span class="muted">Matter alone sets &kappa;<sub>body</sub> = (8&pi;G/3c&sup2;)&rho;.</span>
+      </header>
+      <div class="card">
+        <span class="tag method">Method &middot; GR source term</span>
+        <p class="description"><strong>Scientific-method snapshot:</strong> adopt the Friedmann-style coupling (8&pi;G/3c&sup2;) from GR&#8217;s field equations to map mass-energy density into a curvature density yardstick.</p>
+        <div class="equation">&kappa;<sub>body</sub> = (8 &pi; G / 3 c&sup2;) &middot; &rho;</div>
+        <dl class="var-key">
+          <dt>&kappa;<sub>body</sub></dt><dd>Curvature density contributed by matter alone.</dd>
+          <dt>G</dt><dd>Newton&#8217;s gravitational constant.</dd>
+          <dt>c</dt><dd>Speed of light in vacuum.</dd>
+          <dt>&rho;</dt><dd>Bulk density for the selected material class.</dd>
+        </dl>
+        <p class="description"><strong>How the preset instantiates it:</strong> feed the same class density from Step&nbsp;A into this relation; the value displayed is nature&#8217;s per-area curvature benchmark for that material.</p>
+        <div class="value color-body" id="kappaBody"></div>
+        <p class="muted">Nature&#8217;s curvature density yardstick for this material class.</p>
+      </div>
+
+      <!-- B1 &mdash; Black-hole yardstick (Schwarzschild) -->
+      <div class="card">
+        <div class="title">B1 &mdash; Black-hole yardstick (Schwarzschild)</div>
+        <span class="tag method">Method &middot; Horizon scale</span>
+        <p class="description"><strong>Scientific-method snapshot:</strong> use the Schwarzschild radius as a curvature yardstick that links mass to a canonical length scale for collapse. It anchors the &ldquo;curvature unit&rdquo; intuition behind the table in Step&nbsp;B.</p>
+        <div class="equation">R<sub>s</sub> = &#8201;2GM/c<sup>2</sup>, &#8201; D<sub>BH</sub>=2R<sub>s</sub></div>
+        <dl class="var-key">
+          <dt>R<sub>s</sub></dt><dd>Schwarzschild radius for mass M.</dd>
+          <dt>D<sub>BH</sub></dt><dd>Horizon diameter = 2R<sub>s</sub> (&approx; 5.9&nbsp;km for 1&nbsp;M<sub>&odot;</sub>).</dd>
+          <dt>G, c</dt><dd>Gravitational constant and speed of light.</dd>
+        </dl>
+        <p class="description">Interpretation: collapse proofs tell us that once light-cones tip enough to form a trapped surface, null rays focus and an event horizon forms. We use this as a <em>yardstick</em> to keep all curvature densities on one scale.</p>
+        <p class="muted">This card is a benchmark only; it does not alter &kappa;<sub>body</sub>. It clarifies the curvature unit against a familiar 1&nbsp;M<sub>&odot;</sub> &rarr; &approx;6&nbsp;km horizon scale.</p>
+      </div>
+    </section>
+    <section class="section">
+      <header>
+        <h2>Step C &mdash; GR-valid curvature proxy (cycle-averaged &lang;T<sub>&mu;&nu;</sub>&rang;)</h2>
+        <span class="muted">Auto-solved to keep q=1, &gamma;<sub>VdB</sub>&isin;[10<sup>5</sup>,10<sup>6</sup>], &zeta;&le;1, TS&gg;1 so one-LC averaging is defensible.</span>
+      </header>
+      <div class="card">
+        <div class="inline-row" style="gap:6px;flex-wrap:wrap;">
+          <span class="tag method">Method &middot; Cycle-averaged drive</span>
+          <span class="tag proxy">Proxy</span>
+          <span class="tag lit" title="Isaacson high-frequency GR &rarr; effective &lang;T&mu;&nu;&rang;; Green&ndash;Wald backreaction; Huneau&ndash;Luk proof of Burnett.">Literature</span>
+          <span class="tag lit" title="Brill&ndash;Hartle geons (wave energy holds geometry); Szybka &amp; Wyr&#281;bowski (2016) show averaging formalisms agree.">Historical precedents</span>
+        </div>
+        <p class="description"><strong>Scientific-method snapshot:</strong> treat the array&rsquo;s power flux as an effective energy density (Needle constants A<sub>*</sub>, C<sub>*</sub>) and feed it through Einstein coupling, assuming TS&gg;1 so strobed updates are rapid compared to light-crossings. High-frequency GR shows rapidly oscillating sources converge to solutions governed by the cycle-averaged &lang;T<sub>&mu;&nu;</sub>&rang;; full pulse-lattice numerics remain future work.</p>
+        <div class="equation">&kappa;<sub>drive</sub> &asymp; (8&pi;G / c<sup>5</sup>) &middot; (P<sub>avg</sub>/A) &middot; d<sub>eff</sub> &middot; &#120083;</div>
+        <span class="tag method" id="unitsNote">Units sanity: (W&middot;m<sup>&minus;2</sup>)/c &rarr; J&middot;m<sup>&minus;3</sup>; (8&pi;G/c<sup>4</sup>)&middot;(J&middot;m<sup>&minus;3</sup>) &rarr; m<sup>&minus;2</sup>.</span>
+        <dl class="var-key">
+          <dt>&kappa;<sub>drive</sub></dt><dd>Cycle-averaged curvature density from the warp drive proxy.</dd>
+          <dt>P<sub>avg</sub></dt><dd>Average input power into the drive array.</dd>
+          <dt>A</dt><dd>Effective illuminated area (scaled by s = A/A<sub>0</sub>).</dd>
+          <dt>d<sub>eff</sub></dt><dd>Effective duty factor after auto-tuning.</dd>
+          <dt>&#120083;</dt><dd>Geometry/storage gain (concave blue-shift &gamma; and burst-storage Q).</dd>
+          <dt>G, c</dt><dd>Gravitational constant and speed of light respectively.</dd>
+        </dl>
+        <p class="description"><strong>How the preset instantiates it:</strong> the auto-solver selects (Q<sub>L</sub>, d<sub>eff</sub>, M<sub>&minus;</sub>) within the green-zone bounds so the proxy stays GR-consistent. The outcome below is the curvature density that lines up with the same &kappa; units used in Steps B &amp; D.</p>
+        <p class="description"><strong>GR fits the quantum scale by agreeing on units and averages:</strong> lazy mass, strobed drive, and collapse proxies all land in &kappa; (m<sup>&minus;2</sup>). TS&gg;1 keeps actuation slower than L/c, &gamma;=1 keeps strokes microscopic, q=1 holds mechanical sanity, &zeta; stays in band, and array area makes P/A the controllable lever.</p>
+        <p class="description">Design alternatives (continuous scalar-field T<sub>&mu;&nu;</sub>, Israel-junction &ldquo;drum skins,&rdquo; IR-memory gravity) reach the same averaged regime &mdash; useful future routes when reviewers ask &ldquo;what else?&rdquo;</p>
+        <dl class="metrics">
+          <dt class="color-warp">Preset</dt><dd class="color-warp" id="warpLabel"></dd>
+          <dt class="color-warp">s = A/A<sub>0</sub></dt><dd class="color-warp" id="metricScale"></dd>
+          <dt class="color-warp">Q<sub>L</sub></dt><dd class="color-warp" id="metricQL"></dd>
+          <dt class="color-warp">d<sub>eff</sub></dt><dd class="color-warp" id="metricDE"></dd>
+          <dt class="color-warp">&#120083; (model)</dt><dd class="color-warp" id="metricGain"></dd>
+          <dt class="color-payload">Payload M<sub>&minus;</sub> (kg)</dt><dd class="color-payload" id="metricMass"></dd>
+        </dl>
+        <dl class="metrics">
+          <dt class="color-warp">&tau;<sub>pulse</sub> (s)</dt><dd class="color-warp" id="metricTauPulse"></dd>
+          <dt class="color-warp">&tau;<sub>LC</sub> (s)</dt><dd class="color-warp" id="metricTauLC"></dd>
+          <dt class="color-warp">&epsilon; = &tau;<sub>pulse</sub>/&tau;<sub>LC</sub></dt><dd class="color-warp" id="metricEpsilon"></dd>
+          <dt class="color-warp">N<sub>&times;</sub> = &tau;<sub>LC</sub>/&tau;<sub>pulse</sub></dt><dd class="color-warp" id="metricNcross"></dd>
+        </dl>
+        <p class="description">Averaging check: &epsilon; &ll; 1 and N<sub>&times;</sub> &gg; 1 keep us in the proven high-frequency regime.</p>
+        <div class="badge-row">
+          <span class="badge" id="averagingBadge">&mdash;</span>
+        </div>
+        <div class="value color-warp" id="kappaDrive"></div>
+        <div class="badge-row" id="statusBadgesStep"></div>
+        <div id="proxyWarning" class="banner"></div>
+      </div>
+
+      <!-- C1 &mdash; Null focusing &amp; trapped surfaces (Raychaudhuri &rarr; averaged source) -->
+      <div class="card">
+        <div class="title">C1 &mdash; Null focusing &amp; trapped surfaces</div>
+        <span class="tag method">Method &middot; Raychaudhuri</span>
+        <p class="description"><strong>Scientific-method snapshot:</strong> the Raychaudhuri equation for a null congruence k<sup>a</sup> underpins collapse and horizon formation. With negligible vorticity,</p>
+        <div class="equation">d&theta;/d&lambda; = -&frac12;&thinsp;&theta;<sup>2</sup> - &sigma;<sub>ab</sub>&sigma;<sup>ab</sup> - R<sub>ab</sub>k<sup>a</sup>k<sup>b</sup></div>
+        <p class="description">Integrating along generators ties the <em>accumulated</em> focusing to the integral of R<sub>ab</sub>k<sup>a</sup>k<sup>b</sup>, i.e., via Einstein, to an averaged energy flux. Trapped surfaces imply focusing in finite affine time &mdash; the black-hole side of the ledger. Our proxy respects that by feeding GR only the <em>cycle-average</em> &lang;T<sub>&mu;&nu;</sub>&rang; that a null geodesic samples over many strobes.</p>
+      </div>
+
+      <!-- C2 &mdash; High-frequency GR averaging (Isaacson/Green&ndash;Wald/Huneau&ndash;Luk) -->
+      <div class="card">
+        <div class="title">C2 &mdash; High-frequency limit &rarr; &lang;T<sub>&mu;&nu;</sub>&rang;</div>
+        <span class="tag lit">Literature</span>
+        <p class="description">In the &epsilon; &equiv; &tau;<sub>pulse</sub>/&tau;<sub>LC</sub> &rarr; 0 limit, fast oscillatory sources backreact as a smooth effective stress: the metric responds to &lang;T<sub>&mu;&nu;</sub>&rang;. This justifies treating sector-strobed tiles as a GR-valid proxy when TS = &tau;<sub>LC</sub>/&tau;<sub>pulse</sub> &gg; 1.</p>
+        <dl class="metrics">
+          <dt class="color-warp">&tau;<sub>pulse</sub></dt><dd class="color-warp" id="metricTauPulse"></dd>
+          <dt class="color-warp">&tau;<sub>LC</sub></dt><dd class="color-warp" id="metricTauLC"></dd>
+          <dt class="color-warp">TS = &tau;<sub>LC</sub>/&tau;<sub>pulse</sub></dt><dd class="color-warp" id="metricNcross"></dd>
+        </dl>
+        <p class="muted">TS &gg; 1 &rArr; many light-crossings per control tick; GR &ldquo;sees&rdquo; the average.</p>
+      </div>
+
+      <!-- C3 &mdash; Duty gating &amp; Ford&ndash;Roman sampling -->
+      <div class="card">
+        <div class="title">C3 &mdash; Duty gating &amp; Ford&ndash;Roman sampling</div>
+        <span class="tag method">Method &middot; Quantum-inequality</span>
+        <p class="description">Sector strobing reduces the source seen by GR from instantaneous &rho; to &rho;&#772; = d<sub>eff</sub>&middot;&rho;. Sampling-time constraints (Ford&ndash;Roman) are enforced by the auto-solver so &zeta;&le;1 holds while curvature is computed from the <em>averaged</em> density that feeds the Nat&aacute;rio shift.</p>
+        <dl class="var-key">
+          <dt>d<sub>eff</sub></dt><dd>Ship-wide duty (local d divided by sector count S).</dd>
+          <dt>&zeta;</dt><dd>Quantum-inequality margin (&le;1 in the green zone).</dd>
+        </dl>
+        <p class="muted">This is the &ldquo;leverage without violation&rdquo; lever: large local spikes, tiny global average.</p>
+      </div>
+
+      <!-- C4 &mdash; Light-cone homogenization check -->
+      <div class="card">
+        <div class="title">C4 &mdash; Light-cone homogenization</div>
+        <span class="tag method">Check &middot; Scale separation</span>
+        <p class="description">The page already computes &tau;<sub>pulse</sub>, &tau;<sub>LC</sub> and TS. This card formalizes the rule-of-thumb: <strong>&epsilon;=&tau;<sub>pulse</sub>/&tau;<sub>LC</sub>&ll;1</strong> and <strong>TS&gg;1</strong> keep us in the Isaacson/Green&ndash;Wald regime where the proxy is valid. If TS falls, the banner warns and &kappa;<sub>drive</sub> should not be used as a stand-in.</p>
+      </div>
+    </section>
+
+
+    <section class="section">
+      <header>
+      <h2>Step D — Apples-to-apples efficiencies</h2>
+      <span class="muted">Compare drive curvature density to the class benchmark.</span>
+    </header>
+    <div class="card">
+      <span class="tag method">Method · Dimensionless check</span>
+      <p class="description"><strong>Scientific-method snapshot:</strong> divide two curvature densities to form a unitless diagnostic—an immediate comparison across “lazy” matter and engineered drive solutions.</p>
+      <div class="equation">𝓔<sub>potato</sub> = <span class="color-warp">κ<sub>drive</sub></span> / <span class="color-body">κ<sub>body</sub></span></div>
+      <dl class="var-key">
+        <dt>𝓔<sub>potato</sub></dt><dd>Efficiency comparing drive curvature to lazy-mass curvature.</dd>
+        <dt>κ<sub>drive</sub></dt><dd>Cycle-averaged curvature from the drive proxy.</dd>
+        <dt>κ<sub>body</sub></dt><dd>Curvature density for the selected material class.</dd>
+      </dl>
+      <div class="value" id="effPotato"></div>
+      <p class="description" id="effPotatoNote"></p>
+    </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Method provenance</h2>
+        <span class="muted">Trace which ingredients are first-principles vs Needle-specific engineering.</span>
+      </header>
+      <div class="card">
+        <div class="two-col">
+          <div>
+            <span class="tag method">Derived from literature</span>
+            <ul class="description" style="margin:10px 0 0 0;padding-left:18px;">
+              <li>Strength vs gravity threshold (Holsapple 2007; Lineweaver & Norman 2010).</li>
+              <li>Density→curvature scaling via Friedmann / Einstein equations.</li>
+              <li>High-frequency GR averaging (Isaacson; Green–Wald; Huneau–Luk) supporting cycle-averaged ⟨T<sub>μν</sub>⟩.</li>
+              <li>Penrose gravitational lifetime τ≈ℏ/E<sub>G</sub> and light-cone bounds.</li>
+              <li>Landauer limit and energy-to-bits conversion.</li>
+            </ul>
+          </div>
+          <div>
+            <span class="tag method">Needle-specific solvers</span>
+            <ul class="description" style="margin:10px 0 0 0;padding-left:18px;">
+              <li>Constants A_* and C_* tying power flux to q<sub>mech</sub> and γ<sub>VdB</sub>.</li>
+              <li>Auto-solver enforcing q≤1, γ band, ζ≤1, TS≫1 for each preset.</li>
+              <li>Geometry/storage gain 𝓖 and payload mapping M<sub>-</sub> → γ.</li>
+              <li>Collapse overlap toggle (λ) to explore locality assumptions.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Collapse Lab — local “present” vs drive</h2>
+        <span class="muted">Collapse presets respect both CSL locality and GR light-cones.</span>
+      </header>
+    <p class="description"><strong>Time isn’t a universal “now”; it’s a local bandwidth.</strong> Each preset picks a collapse cadence τ, and the causal “present” is bounded to L<sub>present</sub> = min(r<sub>c</sub>, cτ). The B-time count N<sub>B</sub> = ⌊T/τ⌋ stacks those local becomings, giving a bridge between flowing-now and block-time pictures that still honors relativity.</p>
+    <div class="card">
+      <div class="title">D1 — Collapse rate</div>
+        <span class="tag method">Method · Penrose lifetime</span>
+        <p class="description"><strong>Scientific-method snapshot:</strong> adopt Penrose’s Orch-OR lifetime τ≈ℏ/E<sub>G</sub> to relate collapse cadence to gravitational self-energy, then count ticks over the chosen observation window.</p>
+      <div class="equation">E<sub>G</sub> = ℏ/τ, N<sub>B</sub> = ⌊T<sub>total</sub> / τ⌋</div>
+        <p class="description" style="margin-top:-4px;">Collapse frequency f = 1/τ captures the metronome (e.g., solar p-mode at 3.3 mHz when τ≈600 s).</p>
+        <dl class="var-key">
+          <dt>E<sub>G</sub></dt><dd>Gravitational self-energy associated with a single collapse event.</dd>
+          <dt>ℏ</dt><dd>Reduced Planck constant.</dd>
+          <dt>τ</dt><dd>Collapse timescale for the regimen.</dd>
+          <dt>N<sub>B</sub></dt><dd>Number of collapse events within the chosen duration.</dd>
+          <dt>T<sub>total</sub></dt><dd>Total observation duration preset.</dd>
+        </dl>
+        <dl class="metrics">
+          <dt class="color-collapse">t (ms)</dt><dd class="color-collapse" id="collapseTau"></dd>
+          <dt class="color-collapse">T<sub>total</sub> (s)</dt><dd class="color-collapse" id="collapseDuration"></dd>
+          <dt class="color-collapse">E<sub>G</sub> (J)</dt><dd class="color-collapse" id="collapseEg"></dd>
+          <dt class="color-collapse">N<sub>B</sub></dt><dd class="color-collapse" id="collapseNB"></dd>
+          <dt class="color-collapse">E<sub>tot</sub> (J)</dt><dd class="color-collapse" id="collapseEt"></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="title">D2 — Locality bounds</div>
+        <span class="tag method">Method · Light-cone check</span>
+        <p class="description">Respect both CSL locality and light-cone causality by bounding the spatial extent of the “present”.</p>
+        <div class="equation">L<sub>LC</sub> = cτ, L<sub>present</sub> = min(r<sub>c</sub>, cτ)</div>
+        <dl class="var-key">
+          <dt>L<sub>LC</sub></dt><dd>Light-crossing distance over the collapse time.</dd>
+          <dt>c</dt><dd>Speed of light in vacuum.</dd>
+          <dt>τ</dt><dd>Collapse timescale for the regimen.</dd>
+          <dt>L<sub>present</sub></dt><dd>Effective locality of the present, bounded by r<sub>c</sub> and cτ.</dd>
+          <dt>r<sub>c</sub></dt><dd>Collapse locality radius preset.</dd>
+        </dl>
+        <dl class="metrics">
+          <dt>r<sub>c</sub> (µm)</dt><dd id="collapseRc"></dd>
+          <dt>L<sub>LC</sub> (m)</dt><dd id="collapseLLC"></dd>
+          <dt>L<sub>present</sub> (m)</dt><dd id="collapseLPresent"></dd>
+          <dt>V<sub>c</sub> (m³)</dt><dd id="collapseVc"></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="title">D3 — Lazy-mass proxy for collapse</div>
+        <span class="tag method">Method · Energy-to-curvature</span>
+        <p class="description">Treat collapse energy in a local volume as an effective density, then translate it into curvature.</p>
+        <div class="equation">ρ<sub>eff,1</sub> = (E<sub>G</sub>/c²) / V<sub>c</sub>, κ<sub>collapse</sub> = (8πG/3c²)ρ<sub>eff,1</sub></div>
+        <dl class="var-key">
+          <dt>ρ<sub>eff,1</sub></dt><dd>Effective mass density for one collapse event.</dd>
+          <dt>E<sub>G</sub></dt><dd>Per-event collapse energy.</dd>
+          <dt>c</dt><dd>Speed of light.</dd>
+          <dt>V<sub>c</sub></dt><dd>Locality volume derived from r<sub>c</sub>.</dd>
+          <dt>κ<sub>collapse</sub></dt><dd>Curvature density associated with the collapse proxy.</dd>
+          <dt>λ</dt><dd>Optional overlap rate scaling the effective density (when enabled).</dd>
+        </dl>
+        <p class="description">Used here strictly as a scale benchmark—the model does not claim cognitive collapse sources macroscopic curvature.</p>
+        <dl class="metrics">
+          <dt>ρ<sub>eff,1</sub> (kg/m³)</dt><dd id="collapseRho"></dd>
+          <dt>κ<sub>collapse</sub></dt><dd id="kappaCollapse"></dd>
+          <dt>κ<sub>collapse</sub>(λ)</dt><dd id="kappaCollapseOverlap"></dd>
+          <dt class="color-collapse">Bits</dt><dd class="color-collapse" id="collapseBits"></dd>
+        </dl>
+      </div>
+      <div class="card">
+        <div class="title">D4 — Drive vs collapse</div>
+        <span class="tag method">Method · Scale separation</span>
+        <p class="description">Compare engineered curvature density directly against the collapse proxy to gauge separation of scales.</p>
+        <div class="equation">𝓔<sub>collapse</sub> = κ<sub>drive</sub> / κ<sub>collapse</sub></div>
+        <dl class="var-key">
+          <dt>𝓔<sub>collapse</sub></dt><dd>Efficiency ratio of drive curvature to collapse curvature.</dd>
+          <dt>κ<sub>drive</sub></dt><dd>Cycle-averaged drive curvature density.</dd>
+          <dt>κ<sub>collapse</sub></dt><dd>Collapse-proxy curvature density (with optional overlap variant).</dd>
+        </dl>
+        <dl class="metrics">
+          <dt>𝓔<sub>collapse</sub></dt><dd id="effCollapse"></dd>
+          <dt>𝓔<sub>collapse</sub>(λ)</dt><dd id="effCollapseOverlap"></dd>
+        </dl>
+        <p class="muted">
+          Collapse-benchmark curvature is extremely gentle in GR units, so efficiencies tend to be large. That is expected — it flags the scale separation.
+        </p>
+        <p class="description"><strong>Local determinism ≠ global control:</strong> even huge N<sub>B</sub> counts leave κ<sub>collapse</sub> microscopic. The ratios staying enormous simply show that cognition updates outcomes without sculpting spacetime geometry at macroscales.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <header>
+        <h2>Why the order matters</h2>
+      </header>
+      <div class="card">
+        <p><strong>Potato threshold</strong> collapses an entire class into a single size where gravity takes over.</p>
+        <p><strong>Density-only curvature</strong> is nature’s per-area yardstick; no radius required.</p>
+        <p><strong>Drive proxy</strong> puts km-scale engineering onto the same curvature scale, honoring Q, duty, and gain.</p>
+        <p><strong>Efficiencies</strong> keep the comparison dimensionless and honest.</p>
+        <p><strong>Collapse lab</strong> adds a third scale — the local present and its energy budget — while respecting light-crossing bounds.</p>
+        <p><strong>What this says about time and will:</strong> there is no global master clock. Decisions live inside their light-cone-limited bandwidth, ledgered by E<sub>G</sub>, bits, and κ. GR and quantum stories handshake by averaging fast strokes, acting locally, and reporting everything in the same curvature currency.</p>
+      </div>
+    </section>
+
+    <!-- =========================
+         Einstein–Maxwell in CU
+         ========================= -->
+    <section class="section" id="einsteinMaxwell">
+      <header>
+        <h2>Einstein–Maxwell in CU (fields → curvature)</h2>
+        <span class="muted">Map electromagnetic fields into curvature with the same GR coupling used in Step C.</span>
+      </header>
+
+      <div class="card">
+        <div class="title">EM → κ dictionary</div>
+        <span class="tag method">Einstein–Maxwell</span>
+        <p class="description">
+          We use the same energy→curvature coupling as Step C, applied to the electromagnetic energy density:
+        </p>
+        <div class="equation">
+          κ = (8πG/c⁴)·u, u<sub>EM</sub> = ½·ε₀·(E² + c²B²)
+        </div>
+        <dl class="var-key">
+          <dt>G, c</dt><dd>Gravitational constant and speed of light.</dd>
+          <dt>ε₀</dt><dd>Vacuum permittivity.</dd>
+          <dt>E, B</dt><dd>Electric field (V·m⁻¹) and magnetic flux density (T).</dd>
+        </dl>
+        <p class="muted">This keeps all sources—drive flux, matter density, and EM fields—on the same curvature currency.</p>
+      </div>
+
+      <div class="card">
+        <div class="title">Fields → curvature (interactive)</div>
+        <span class="tag method">u<sub>EM</sub> → κ</span>
+        <div class="control-grid">
+          <label class="control">
+            Electric field E (V·m⁻¹)
+            <input id="emE" type="number" step="1e4" value="1e6" />
+          </label>
+          <label class="control">
+            Magnetic field B (T)
+            <input id="emB" type="number" step="0.01" value="1.0" />
+          </label>
+        </div>
+        <dl class="metrics">
+          <dt>u<sub>EM</sub> (J·m⁻³)</dt><dd id="emUDens"></dd>
+          <dt>κ<sub>EM</sub></dt><dd id="kappaEM"></dd>
+        </dl>
+        <p class="muted">Scaling: with B fixed, E→λE gives κ→κ + (λ²−1)·(4πGε₀/c⁴)·E². With E fixed, B→λB gives κ→κ + (λ²−1)·(4πGε₀/c²)·B².</p>
+      </div>
+
+      <div class="card">
+        <div class="title">Coulomb calibration (point charge)</div>
+        <span class="tag method">Analytic check</span>
+        <p class="description">
+          For a charge q at radius r (B=0), the curvature from its electric field is:
+        </p>
+        <div class="equation">
+          κ<sub>C</sub>(r) = G q² / (4π ε₀ c⁴ r⁴)
+        </div>
+        <div class="control-grid">
+          <label class="control">
+            Charge q (in units of e)
+            <input id="coulombQe" type="number" step="0.1" value="1" />
+          </label>
+          <label class="control">
+            Radius r (nm)
+            <input id="coulombRnm" type="number" step="0.1" value="1.0" />
+          </label>
+        </div>
+        <dl class="metrics">
+          <dt>q (C)</dt><dd id="coulombQAbs"></dd>
+          <dt>r (m)</dt><dd id="coulombRAbs"></dd>
+          <dt>κ<sub>C</sub></dt><dd id="kappaCoulomb"></dd>
+        </dl>
+        <p class="muted">Use this as a bench reference: κ scales ∝ r⁻⁴, giving a sharp, falsifiable slope.</p>
+      </div>
+    </section>
+
+    <!-- ===============================
+         Einstein-Maxwell Verification Suite
+         =============================== -->
+    <section class="section" id="emVerify">
+      <header>
+        <h2>Einstein-Maxwell verification suite</h2>
+        <span class="muted">Deeper checks that the κ(u<sub>EM</sub>) and κ(S) mappings reproduce the Einstein-Maxwell coupling used in Step C.</span>
+      </header>
+
+      <div class="card">
+        <div class="title">RN asymptotic check — charge term</div>
+        <span class="tag method">Exact coefficient</span>
+        <p class="description">
+          At large r, the Reissner-Nordström metric has g<sub>tt</sub>(r) &approx; 1 &minus; 2GM/(c<sup>2</sup> r) + GQ<sup>2</sup>/(4&pi; &epsilon;<sub>0</sub> c<sup>4</sup> r<sup>2</sup>).
+          The +Q<sup>2</sup>/r<sup>2</sup> term comes from the Coulomb-field energy outside radius r: M<sub>out</sub>(r) = Q<sup>2</sup>/(8&pi; &epsilon;<sub>0</sub> c<sup>2</sup> r).
+          This card evaluates g<sub>tt</sub> from the RN series and from the field energy to confirm they match.
+        </p>
+        <div class="control-grid">
+          <label class="control">
+            Charge q (in units of e)
+            <input id="rnQe" type="number" step="0.1" value="1" />
+          </label>
+          <label class="control">
+            Mass M (kg)
+            <input id="rnMkg" type="number" step="1" value="0" />
+          </label>
+          <label class="control">
+            Radius r (m)
+            <input id="rnR" type="number" step="1e-9" value="1" />
+          </label>
+        </div>
+        <div class="inline-row" style="gap:8px;flex-wrap:wrap;">
+          <button id="rnMatchBtn" class="choice">Match &kappa; at R<sub>out</sub></button>
+          <span class="muted">Uses current &kappa;<sub>drive</sub> and the exotic shell's outer radius.</span>
+        </div>
+        <dl class="metrics">
+          <dt>Q (C)</dt><dd id="rnQAbs"></dd>
+          <dt>u<sub>EM</sub>(r) (J·m<sup>&minus;3</sup>)</dt><dd id="rnUDens"></dd>
+          <dt>κ<sub>EM</sub>(r)</dt><dd id="rnKappaLocal"></dd>
+          <dt>M<sub>out</sub>(r) (kg)</dt><dd id="rnMout"></dd>
+          <dt>g<sub>tt</sub> (RN series)</dt><dd id="rnGttRN"></dd>
+          <dt>g<sub>tt</sub> (from energy)</dt><dd id="rnGttEnergy"></dd>
+          <dt>|Δg<sub>tt</sub>|</dt><dd id="rnDelta"></dd>
+          <dt>Verdict</dt><dd><span class="badge" id="rnVerdict">—</span></dd>
+        </dl>
+        <p class="muted">Stay in the weak-field regime (r well outside any horizon) so higher-order terms remain negligible.</p>
+      </div>
+
+      <div class="card">
+        <div class="title">Plane-wave identity — u vs S</div>
+        <span class="tag method">Linearized Einstein-Maxwell</span>
+        <p class="description">
+          For a plane wave, E = cB so u<sub>EM</sub> = &epsilon;<sub>0</sub>E<sup>2</sup> and S = c·u<sub>EM</sub>.
+          The Step C couplings give κ<sub>u</sub> = (8&pi;G/c<sup>4</sup>)u and κ<sub>S</sub> = (8&pi;G/c<sup>5</sup>)S. They must agree.
+        </p>
+        <div class="control-grid">
+          <label class="control">
+            Field amplitude E (V·m<sup>&minus;1</sup>) — plane wave implies B = E/c
+            <input id="pwE" type="number" step="1e4" value="1e6" />
+          </label>
+        </div>
+        <div class="inline-row" style="gap:8px;flex-wrap:wrap;">
+          <button id="pwMatchBtn" class="choice">Match &kappa; (plane wave)</button>
+          <span class="muted">Solves E from &kappa;<sub>drive</sub> = (8&pi;G/c<sup>4</sup>)&nbsp;&middot;&nbsp;u.</span>
+        </div>
+        <dl class="metrics">
+          <dt>u<sub>EM</sub> (J·m<sup>&minus;3</sup>)</dt><dd id="pwUDens"></dd>
+          <dt>S (W·m<sup>&minus;2</sup>)</dt><dd id="pwS"></dd>
+          <dt>κ<sub>u</sub> = (8&pi;G/c<sup>4</sup>)u</dt><dd id="pwKappaU"></dd>
+          <dt>κ<sub>S</sub> = (8&pi;G/c<sup>5</sup>)S</dt><dd id="pwKappaS"></dd>
+          <dt>Ratio κ<sub>u</sub>/κ<sub>S</sub></dt><dd id="pwRatio"></dd>
+          <dt>Verdict</dt><dd><span class="badge" id="pwVerdict">—</span></dd>
+        </dl>
+        <p class="muted">This identity mirrors the TS &raquo; 1 averaging guardrail: GR responds to the cycle-averaged stress-energy.</p>
+      </div>
+    </section>
+
+    <details>
+      <summary>References & notes</summary>
+      <div class="content">
+                <ul class="description" style="margin:0;padding-left:20px;gap:6px;display:grid;">
+          <li>Lineweaver, C. &amp; Norman, M. (2010). <em>The Potato Radius.</em> Strength-vs-gravity threshold for dwarf planets.</li>
+          <li>Holsapple, K. (2007). <em>Spin limits of Solar System bodies.</em> Cohesion and hydrostatic considerations.</li>
+          <li>Penrose, R. (1965). <em>Gravitational Collapse and Space&ndash;Time Singularities.</em> PRL 14:57&ndash;59 &mdash; trapped surfaces and null focusing as collapse criteria. (See also Penrose (1996) for &tau;&approx;&hbar;/E<sub>G</sub> context.)</li>
+          <li>Landauer, R. (1961); B&eacute;rut et&nbsp;al. (2012). Energy cost per bit: E &ge; k<sub>B</sub>T ln&nbsp;2.</li>
+          <li>Friedmann / Einstein coupling: H<sup>2</sup> = (8&pi;G/3)&rho; (with c restored) motivates &kappa;<sub>body</sub>.</li>
+          <li>Needle-specific constants A<sub>*</sub>, C<sub>*</sub> from internal Casimir-tile modeling; documented in project notebooks.</li>
+          <li>Isaacson (1968); Green &amp; Wald (2011, 2014); Huneau &amp; Luk (2024/25); Szybka &amp; Wyr&#281;bowski (2016) &mdash; rigorous high-frequency averaging giving effective &lang;T<sub>&mu;&nu;</sub>&rang;; used for the Step&nbsp;C proxy.</li>
+          <li><em>Time-sliced sector strobing functions as a GR-valid proxy</em> (project note): derivation of d<sub>eff</sub>, TS and the averaging window for the Nat&aacute;rio source.</li>
+          <li><em>Geometry-Amplified DCE in a Concave Micro-Resonator</em> (project note): &gamma;<sub>geo</sub>&middot;Q storage gain used in &#120083; (Step&nbsp;C).</li>
+          <li>Brill &amp; Hartle (1964) electromagnetic geons and related oscillatory metrics as historical precedents for wave-supported curvature.</li>
+          <li>Future design routes: scalar-field surrogate drives, Israel-junction &ldquo;drum skin&rdquo; shells, or IR-modified gravity with memory &mdash; all achieve similar effective averaging in the cited note.</li>
+          <li>Caveat retained: Einstein&rsquo;s equations remain pointwise; full Casimir pulse-lattice numerics are outstanding work.</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>Parallels (ice · rock · iron) & Collapse presets</summary>
+      <div class="content">
+        <div>
+          <h3>Celestial classes</h3>
+          <table id="tableBodies">
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th>ρ (kg/m³)</th>
+                <th>σ<sub>y</sub> (Pa)</th>
+                <th>R<sub>Π=1</sub> (km)</th>
+                <th>κ<sub>body</sub></th>
+                <th>𝓔<sub>potato</sub></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div>
+          <h3>Collapse regimens</h3>
+          <table id="tableCollapse">
+            <thead>
+              <tr>
+                <th>Preset</th>
+                <th>τ (ms)</th>
+                <th>r<sub>c</sub> (µm)</th>
+                <th>L<sub>present</sub> (m)</th>
+                <th>κ<sub>collapse</sub></th>
+                <th>N<sub>B</sub></th>
+                <th>𝓔<sub>collapse</sub></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <script>
+    // Physical constants and baselines
+    const G = 6.67430e-11;
+    const c = 2.99792458e8;
+    const HBAR = 1.054571817e-34;
+    const EPS0 = 8.8541878128e-12;
+    const E_CHARGE = 1.602176634e-19; // exact by SI definition
+    const WALL_THICKNESS = 0.50;      // exotic shell thickness (m), Mk-1 baseline
+    // MU0 = 1/(ε0 c²); not needed explicitly because u_EM uses ε0 and c
+    const KB = 1.380649e-23;
+    const LN2 = Math.log(2);
+
+    const A0 = 4.92e6;
+    const P_AVG = 83.3e6;
+    const d0 = 2.5e-5;
+    const D_EFF_MAX = 3.0e-5;
+    const D_EFF_MIN = 1.5e-5;
+    const QL_MIN = 5e8;
+    const QL_MAX = 1e9;
+    const A_STAR = 8.81e16;
+    const C_STAR = 1.35e14;
+    const T_MACRO = 1e-3;
+    const GAMMA_NORM = 1e5;
+    const QL_NORM = 5e8;
+    const TOL = 0.01;
+
+    const UNIT_FACTORS = {
+      cu: { label: 'CU', scale: 1e-20, suffix: ' CU' },
+      si: { label: '1/m²', scale: 1, suffix: ' 1/m²' }
+    };
+
+    const WARP_PRESETS = [
+      { id: 'compact', label: 'Compact hull (s = 0.8)', scale: 0.8, gain: 1 },
+      { id: 'baseline', label: 'Baseline Needle (s = 1.0)', scale: 1.0, gain: 1 },
+      { id: 'expanded', label: 'Expanded array (s = 1.5)', scale: 1.5, gain: 1 }
+    ];
+
+    const PAYLOAD_PRESETS = [
+      { id: 'light', label: '1.4 t', mass: 1400 },
+      { id: 'medium', label: '5.0 t', mass: 5000 },
+      { id: 'heavy', label: '10.0 t', mass: 10000 }
+    ];
+
+    const BODY_CLASSES = [
+      { id: 'ice', label: 'Ice world', rho: 1.0e3, sigma: 5.0e6 },
+      { id: 'rock', label: 'Rock world', rho: 3.0e3, sigma: 5.0e7 },
+      { id: 'iron', label: 'Iron-rich', rho: 7.5e3, sigma: 1.0e8 }
+    ];
+
+const COLLAPSE_PRESETS = [
+  { id: 'delta', label: 'δ (slow)', tau_ms: 250, rc_um: 0.1, phaseHz: null },
+  { id: 'gamma', label: 'γ (baseline)', tau_ms: 25, rc_um: 1.0, phaseHz: null },
+  { id: 'gammaHigh', label: 'γ-high (fast)', tau_ms: 12.5, rc_um: 0.5, phaseHz: null },
+  { id: 'solarFast', label: 'Solar (p-mode, 20 km)', tau_ms: 600000, rc_um: 2.0e10, phaseHz: 1/600 },
+  { id: 'solarGranule', label: 'Solar (granule, 1 Mm)', tau_ms: 600000, rc_um: 1.0e12, phaseHz: 1/600 }
+];
+
+const DURATIONS = [
+  { id: '10s', label: '10 s', seconds: 10 },
+  { id: '60s', label: '1 min', seconds: 60 },
+  { id: '600s', label: '10 min', seconds: 600 },
+  { id: '3600s', label: '1 h', seconds: 3600 }
+];
+
+    // DOM helpers
+    const $ = (id) => document.getElementById(id);
+    const unitModeEl = $('unitMode');
+    const warpPresetEl = $('warpPreset');
+    const payloadPresetEl = $('payloadPreset');
+    const bodyClassEl = $('bodyClass');
+    const collapsePresetEl = $('collapsePreset');
+    const gainModelEl = $('gainModel');
+    const toggleOverlapEl = $('toggleOverlap');
+    const toggleBitsEl = $('toggleBits');
+      const durationButtonsEl = $('durationButtons');
+      const toggleReaderEl = $('toggleReader');
+  
+      const statusBadgesTop = $('statusBadges');
+      const statusBadgesStep = $('statusBadgesStep');
+      const averagingBadgeEl = $('averagingBadge');
+
+    const badgeKeys = [
+      { key: 'TS', label: 'TS', ok: v => v > 10, warn: v => v > 5 },
+      { key: 'zeta', label: 'ζ', ok: v => v <= 1, warn: v => v <= 1.05 },
+      { key: 'q', label: 'q', ok: v => v <= 1, warn: v => v <= 1.1 },
+      { key: 'gamma', label: 'γ', ok: v => v >= 1e5 && v <= 1e6, warn: v => v >= 5e4 && v <= 2e6 }
+    ];
+
+    let state = {
+      warpPreset: 'baseline',
+      payloadPreset: 'light',
+      bodyClass: 'rock',
+      collapsePreset: 'gamma',
+      gainModel: 'gammaQ',
+      duration: '3600s',
+      unitMode: 'cu',
+      overlap: false,
+      showBits: true,
+      readerMode: false
+    };
+
+    // Keep last solved kappa and geometry for the auto-fill buttons
+    let __lastDriveKappa = NaN;
+    let __lastScale = 1.0;
+
+    const rEqFromArea = (A) => Math.sqrt(A / (4 * Math.PI));
+    const rOutFromScale = (s) => rEqFromArea(A0 * s) + 0.5 * WALL_THICKNESS;
+
+    // Utility formatters
+    const fmt = (value, digits = 2) => {
+      if (!Number.isFinite(value)) return '—';
+      if (Math.abs(value) >= 1e5 || Math.abs(value) < 1e-2) {
+        return value.toExponential(digits);
+      }
+      return value.toLocaleString(undefined, { maximumFractionDigits: digits });
+    };
+    const fmtInt = (value) => Number.isFinite(value) ? value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—';
+
+    const areaFromScale = (s) => A0 * s;
+    const qMech = (s, QL, dEff) => (P_AVG * QL) / (A_STAR * s) * (d0 / dEff);
+    const gammaVdB = (s, QL, dEff, M) => (C_STAR / (QL * s)) * (d0 / dEff) * (M / 1405);
+    const kappaDriveRaw = (s, dEff, Gg) => ((8 * Math.PI * G) / c ** 5) * (P_AVG / areaFromScale(s)) * dEff * Gg;
+    const kappaBody = (rho) => ((8 * Math.PI * G) / (3 * c ** 2)) * rho;
+    const potatoRadius = (rho, sigma) => Math.sqrt((3 * sigma) / (4 * Math.PI * G * rho * rho));
+    const timescaleSep = (s) => {
+      const A = areaFromScale(s);
+      const r = Math.sqrt(A / (4 * Math.PI));
+      const L = 2 * r;
+      const tau = L / c;
+      return T_MACRO / tau;
+    };
+    const zeta = (dEff) => dEff / D_EFF_MAX;
+
+    const EG = (tau) => HBAR / tau;
+    const Vc = (rc) => (4 / 3) * Math.PI * rc ** 3;
+    const rhoEff1 = (tau, rc) => EG(tau) / (c * c * Vc(rc));
+    const kappaCollapseRaw = (tau, rc) => ((8 * Math.PI * G) / (3 * c ** 2)) * rhoEff1(tau, rc);
+
+    function autoSolveDrive(s, massKg, gain) {
+      let QL = QL_MAX;
+      let dEff = d0;
+      let iteration = 0;
+
+      const clampQL = (value) => Math.max(QL_MIN, Math.min(QL_MAX, value));
+      const clampDE = (value) => Math.max(D_EFF_MIN, Math.min(D_EFF_MAX, value));
+
+      while (iteration < 6) {
+        iteration++;
+
+        let q = qMech(s, QL, dEff);
+        if (q > 1.0) {
+          dEff = D_EFF_MAX;
+          q = qMech(s, QL, dEff);
+        }
+        if (q > 1.0) {
+          const targetQL = (A_STAR * s / P_AVG) * (dEff / d0);
+          QL = clampQL(targetQL);
+        }
+
+        const gamma = gammaVdB(s, QL, dEff, massKg);
+        if (gamma < 1e5) {
+          const targetQL = (C_STAR / (1e5 * s)) * (d0 / dEff) * (massKg / 1405);
+          QL = clampQL(targetQL);
+        } else if (gamma > 1e6) {
+          const targetQL = (C_STAR / (1e6 * s)) * (d0 / dEff) * (massKg / 1405);
+          QL = clampQL(targetQL);
+        }
+
+        dEff = clampDE(dEff);
+
+        const newQ = qMech(s, QL, dEff);
+        const newGamma = gammaVdB(s, QL, dEff, massKg);
+        if (Math.abs(newQ - q) < 1e-4 && Math.abs(newGamma - gamma) < 1e-2) break;
+      }
+
+      const finalQ = qMech(s, QL, dEff);
+      const finalGamma = gammaVdB(s, QL, dEff, massKg);
+      const finalTS = timescaleSep(s);
+      const area = areaFromScale(s);
+      const tauLC = Math.sqrt(area / Math.PI) / c;
+      const tauPulse = T_MACRO * dEff;
+      const epsilon = tauLC > 0 ? tauPulse / tauLC : Infinity;
+      const Ncross = tauPulse > 0 ? tauLC / tauPulse : Infinity;
+      const gainEff = state.gainModel === 'gammaQ'
+        ? (finalGamma / GAMMA_NORM) * (QL / QL_NORM)
+        : gain;
+
+      return {
+        scale: s,
+        QL,
+        dEff,
+        gain,
+        gainEff,
+        mass: massKg,
+        q: finalQ,
+        gamma: finalGamma,
+        TS: finalTS,
+        zeta: zeta(dEff),
+        kappaDrive: kappaDriveRaw(s, dEff, gainEff),
+        tauLC,
+        tauPulse,
+        epsilon,
+        Ncross
+      };
+    }
+
+    function populateSelectors() {
+      warpPresetEl.innerHTML = WARP_PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+      payloadPresetEl.innerHTML = PAYLOAD_PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+      bodyClassEl.innerHTML = BODY_CLASSES.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+      collapsePresetEl.innerHTML = COLLAPSE_PRESETS.map(p => `<option value="${p.id}">${p.label}</option>`).join('');
+
+      WARP_PRESETS.forEach((preset, index) => {
+        if (preset.id === state.warpPreset) warpPresetEl.selectedIndex = index;
+      });
+      PAYLOAD_PRESETS.forEach((preset, index) => {
+        if (preset.id === state.payloadPreset) payloadPresetEl.selectedIndex = index;
+      });
+      BODY_CLASSES.forEach((preset, index) => {
+        if (preset.id === state.bodyClass) bodyClassEl.selectedIndex = index;
+      });
+      COLLAPSE_PRESETS.forEach((preset, index) => {
+        if (preset.id === state.collapsePreset) collapsePresetEl.selectedIndex = index;
+      });
+      if (gainModelEl) {
+        gainModelEl.value = state.gainModel;
+      }
+
+      durationButtonsEl.innerHTML = DURATIONS.map(d => `<button type="button" class="choice${d.id === state.duration ? ' active' : ''}" data-id="${d.id}">${d.label}</button>`).join('');
+    }
+
+    function bindControls() {
+      unitModeEl.addEventListener('change', () => {
+        state.unitMode = unitModeEl.value;
+        render();
+      });
+      warpPresetEl.addEventListener('change', () => {
+        state.warpPreset = warpPresetEl.value;
+        render();
+      });
+      payloadPresetEl.addEventListener('change', () => {
+        state.payloadPreset = payloadPresetEl.value;
+        render();
+      });
+      bodyClassEl.addEventListener('change', () => {
+        state.bodyClass = bodyClassEl.value;
+        render();
+      });
+      collapsePresetEl.addEventListener('change', () => {
+        state.collapsePreset = collapsePresetEl.value;
+        render();
+      });
+      if (gainModelEl) {
+        gainModelEl.addEventListener('change', () => {
+          state.gainModel = gainModelEl.value;
+          render();
+        });
+      }
+      toggleOverlapEl.addEventListener('change', () => {
+        state.overlap = toggleOverlapEl.checked;
+        render();
+      });
+      toggleBitsEl.addEventListener('change', () => {
+        state.showBits = toggleBitsEl.checked;
+        render();
+      });
+      durationButtonsEl.addEventListener('click', (event) => {
+        const btn = event.target.closest('button[data-id]');
+        if (!btn) return;
+        state.duration = btn.dataset.id;
+        render();
+      });
+      if (toggleReaderEl) {
+        toggleReaderEl.addEventListener('click', () => {
+          state.readerMode = !state.readerMode;
+          render();
+        });
+      }
+    }
+
+    function formatKappa(value) {
+      const unit = UNIT_FACTORS[state.unitMode];
+      const scaled = value / unit.scale;
+      return `${fmt(scaled, 3)} ${unit.suffix}`;
+    }
+
+    function updateBadges(data) {
+      const fragments = [];
+      badgeKeys.forEach(({ key, label, ok, warn }) => {
+        const value = data[key];
+        if (value == null) return;
+        let status = 'fail';
+        if (ok(value)) status = 'ok';
+        else if (warn(value)) status = 'warn';
+        fragments.push(`<span class="badge ${status}"><strong>${label}</strong>${fmt(value, key === 'gamma' ? 0 : 2)}</span>`);
+      });
+      const html = fragments.join('');
+      statusBadgesTop.innerHTML = html;
+      statusBadgesStep.innerHTML = html;
+    }
+
+    function updateGreenSnapshot(drive) {
+      const setText = (id, value) => {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = value;
+      };
+      setText('greenQ', fmt(drive.q, 3));
+      setText('greenGamma', fmt(drive.gamma, 0));
+      setText('greenQL', drive.QL ? drive.QL.toExponential(2) : '—');
+      setText('greenDE', drive.dEff ? drive.dEff.toExponential(2) : '—');
+      setText('greenZeta', fmt(drive.zeta, 3));
+      setText('greenTS', fmt(drive.TS, 2));
+    }
+
+    function updateProxyWarning(drive) {
+      const banner = $('proxyWarning');
+      if (!banner) return;
+      const alerts = [];
+      if (drive.TS <= 10) alerts.push('TS ≤ 10 (cycle period approaches light-crossing).');
+      if (drive.zeta >= 1) alerts.push('ζ = d_eff/(3×10⁻⁵) has hit its limit.');
+      else if (drive.zeta >= 0.98) alerts.push('ζ close to limit; strokes nearly maximal.');
+      if (drive.q > 1) alerts.push('q_mech > 1 (mechanical stroke exceeds target).');
+      if (Number.isFinite(drive.epsilon)) {
+        if (drive.epsilon >= 0.02) alerts.push('ε = τ_pulse/τ_LC ≳ 0.02 (pulses not much faster than light-crossing).');
+        else if (drive.epsilon >= 0.01) alerts.push('ε trending upward; watch averaging assumption.');
+      }
+      if (Number.isFinite(drive.Ncross) && drive.Ncross <= 100) {
+        alerts.push('N× = τ_LC/τ_pulse ≤ 100 (few pulses per crossing).');
+      }
+      if (alerts.length > 0) {
+        banner.textContent = `Caution: averaging assumption at risk — ${alerts.join(' ')}`;
+        banner.classList.add('show');
+      } else {
+        banner.textContent = '';
+        banner.classList.remove('show');
+      }
+    }
+
+    function updateAveragingMetrics(drive) {
+      const setText = (id, value) => {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = value;
+      };
+      setText('metricTauPulse', Number.isFinite(drive.tauPulse) ? fmt(drive.tauPulse, 6) : '—');
+      setText('metricTauLC', Number.isFinite(drive.tauLC) ? fmt(drive.tauLC, 6) : '—');
+      setText('metricEpsilon', Number.isFinite(drive.epsilon) ? fmt(drive.epsilon, 3) : '—');
+      setText('metricNcross', Number.isFinite(drive.Ncross) ? fmt(drive.Ncross, 0) : '—');
+      if (!averagingBadgeEl) return;
+      let level = 'ok';
+      let message = 'PASS: ε and N× in green band.';
+      if (!Number.isFinite(drive.epsilon) || drive.epsilon <= 0 || !Number.isFinite(drive.Ncross)) {
+        level = 'warn';
+        message = 'Check duty or geometry: ε undefined.';
+      } else if (drive.epsilon >= 0.02 || drive.Ncross <= 50) {
+        level = 'fail';
+        message = `Risk: ε=${fmt(drive.epsilon, 3)}, N×=${fmt(drive.Ncross, 0)}`;
+      } else if (drive.epsilon >= 0.01 || drive.Ncross <= 100) {
+        level = 'warn';
+        message = `Caution: ε=${fmt(drive.epsilon, 3)}, N×=${fmt(drive.Ncross, 0)}`;
+      } else {
+        message = `PASS: ε=${fmt(drive.epsilon, 3)}, N×=${fmt(drive.Ncross, 0)}`;
+      }
+      averagingBadgeEl.className = `badge ${level}`;
+      averagingBadgeEl.textContent = message;
+    }
+
+    function renderStepA(body) {
+      $('bodyDensity').textContent = fmt(body.rho, 0);
+      $('bodyYield').textContent = body.sigma.toExponential(2);
+      const radiusKm = potatoRadius(body.rho, body.sigma) / 1000;
+      $('radiusPi').textContent = fmt(radiusKm, 2);
+      return radiusKm;
+    }
+
+    function renderStepB(body) {
+      const kBody = kappaBody(body.rho);
+      $('kappaBody').textContent = formatKappa(kBody);
+      return kBody;
+    }
+
+    function renderStepC(preset, drive) {
+      $('warpLabel').textContent = WARP_PRESETS.find(p => p.id === state.warpPreset)?.label || preset.label;
+      $('metricScale').textContent = fmt(drive.scale, 2);
+      $('metricQL').textContent = drive.QL.toExponential(2);
+      $('metricDE').textContent = drive.dEff.toExponential(2);
+      $('metricGain').textContent = fmt(drive.gainEff, 2);
+      $('metricMass').textContent = fmt(drive.mass, 0);
+      $('kappaDrive').textContent = formatKappa(drive.kappaDrive);
+      __lastDriveKappa = drive.kappaDrive;
+      __lastScale = drive.scale;
+      updateBadges({
+        TS: drive.TS,
+        zeta: drive.zeta,
+        q: drive.q,
+        gamma: drive.gamma
+      });
+      updateGreenSnapshot(drive);
+      updateAveragingMetrics(drive);
+      updateProxyWarning(drive);
+      return drive.kappaDrive;
+    }
+
+    function renderStepD(kDrive, kBody) {
+      const efficiency = kDrive / kBody;
+      $('effPotato').textContent = fmt(efficiency, 3);
+      const note = $('effPotatoNote');
+      if (note) {
+        if (!Number.isFinite(efficiency)) note.textContent = 'No comparison available (check presets).';
+        else if (efficiency > 1.05) note.innerHTML = '<strong>Result:</strong> <span class=\"color-warp\">κ<sub>drive</sub></span> outpaces <span class=\"color-body\">κ<sub>body</sub></span> (𝓔<sub>potato</sub> &gt; 1).';
+        else if (efficiency < 0.95) note.innerHTML = '<strong>Result:</strong> <span class=\"color-body\">κ<sub>body</sub></span> dominates the proxy (𝓔<sub>potato</sub> &lt; 1).';
+        else note.innerHTML = '<strong>Result:</strong> <span class=\"color-warp\">κ<sub>drive</sub></span> and <span class=\"color-body\">κ<sub>body</sub></span> land in the same band (𝓔<sub>potato</sub> ≈ 1).';
+      }
+      return efficiency;
+    }
+
+    // ---------- Einstein–Maxwell in CU ----------
+    const uEM = (E, B) => 0.5 * EPS0 * (E * E + (c * c) * B * B);
+    const kappaFromUDens = (u) => ((8 * Math.PI * G) / (c ** 4)) * u;
+    const kappaFromFlux = (S) => ((8 * Math.PI * G) / (c ** 5)) * S;
+    const kappaEM = (E, B) => kappaFromUDens(uEM(E, B));
+    const kappaCoulomb = (qC, rM) => (G * qC * qC) / (4 * Math.PI * EPS0 * (c ** 4) * (rM ** 4));
+    const uEMCoulombAtRadius = (qC, rM) => {
+      if (!(rM > 0)) return NaN;
+      const E = qC / (4 * Math.PI * EPS0 * rM * rM);
+      return 0.5 * EPS0 * E * E;
+    };
+    const massOutsideRadius = (qC, rM) => {
+      if (!(rM > 0)) return NaN;
+      return (qC * qC) / (8 * Math.PI * EPS0 * (c ** 2) * rM);
+    };
+    const gttRN = (massKg, qC, rM) => {
+      if (!(rM > 0)) return NaN;
+      return 1 - (2 * G * massKg) / (c * c * rM) + (G * qC * qC) / (4 * Math.PI * EPS0 * (c ** 4) * rM * rM);
+    };
+    const gttFromEnergy = (massKg, qC, rM) => {
+      if (!(rM > 0)) return NaN;
+      const mOut = massOutsideRadius(qC, rM);
+      if (!Number.isFinite(mOut)) return NaN;
+      return 1 - (2 * G * (massKg - mOut)) / (c * c * rM);
+    };
+
+    function renderEinsteinMaxwell() {
+      const E = parseFloat(($('emE')?.value) || '0');
+      const B = parseFloat(($('emB')?.value) || '0');
+      const qUnits = parseFloat(($('coulombQe')?.value) || '0');
+      const rNm = parseFloat(($('coulombRnm')?.value) || '0');
+
+      const u = uEM(E, B);
+      const kEM = kappaFromUDens(u);
+      $('emUDens').textContent = fmt(u, 3);
+      $('kappaEM').textContent = formatKappa(kEM);
+
+      const qC = qUnits * E_CHARGE;
+      const rM = rNm * 1e-9;
+      const kC = (rM > 0) ? kappaCoulomb(qC, rM) : NaN;
+      $('coulombQAbs').textContent = fmt(qC, 3);
+      $('coulombRAbs').textContent = fmt(rM, 9);
+      $('kappaCoulomb').textContent = Number.isFinite(kC) ? formatKappa(kC) : '—';
+
+      const bind = (id) => {
+        const el = $(id);
+        if (!el) return;
+        if (!el._bound) {
+          el.addEventListener('input', () => renderEinsteinMaxwell());
+          el._bound = true;
+        }
+      };
+      ['emE', 'emB', 'coulombQe', 'coulombRnm'].forEach(bind);
+    }
+
+    function renderEMVerify() {
+      const qUnits = parseFloat(($('rnQe')?.value) || '0');
+      const massKg = parseFloat(($('rnMkg')?.value) || '0');
+      const radius = parseFloat(($('rnR')?.value) || '0');
+      const qC = qUnits * E_CHARGE;
+      const rnSet = (id, value, digits = 3) => {
+        const el = $(id);
+        if (!el) return;
+        if (id === 'rnKappaLocal' && Number.isFinite(value)) {
+          el.textContent = formatKappa(value);
+        } else {
+          el.textContent = fmt(value, digits);
+        }
+      };
+      const rnBadge = $('rnVerdict');
+      if ($('rnQAbs')) $('rnQAbs').textContent = fmt(qC, 3);
+      const uLocal = uEMCoulombAtRadius(qC, radius);
+      rnSet('rnUDens', uLocal);
+      const kLocal = Number.isFinite(uLocal) ? kappaFromUDens(uLocal) : NaN;
+      if ($('rnKappaLocal')) $('rnKappaLocal').textContent = Number.isFinite(kLocal) ? formatKappa(kLocal) : '—';
+      const mOut = massOutsideRadius(qC, radius);
+      rnSet('rnMout', mOut, 6);
+      const gRN = gttRN(massKg, qC, radius);
+      rnSet('rnGttRN', gRN, 12);
+      const gEnergy = gttFromEnergy(massKg, qC, radius);
+      rnSet('rnGttEnergy', gEnergy, 12);
+      const delta = Number.isFinite(gRN) && Number.isFinite(gEnergy) ? Math.abs(gRN - gEnergy) : NaN;
+      rnSet('rnDelta', delta, 12);
+      if (rnBadge) {
+        if (!Number.isFinite(delta)) {
+          rnBadge.className = 'badge warn';
+          rnBadge.textContent = 'WARN: invalid inputs';
+        } else if (delta <= 1e-12) {
+          rnBadge.className = 'badge ok';
+          rnBadge.textContent = 'PASS: coefficients match';
+        } else if (delta <= 1e-9) {
+          rnBadge.className = 'badge warn';
+          rnBadge.textContent = 'CAUTION: weak-field limit';
+        } else {
+          rnBadge.className = 'badge fail';
+          rnBadge.textContent = 'FAIL: mismatch';
+        }
+      }
+      ['rnQe', 'rnMkg', 'rnR'].forEach((id) => {
+        const el = $(id);
+        if (el && !el._bound) {
+          el.addEventListener('input', renderEMVerify);
+          el._bound = true;
+        }
+      });
+
+      const rnMatchBtn = $('rnMatchBtn');
+      if (rnMatchBtn && !rnMatchBtn._bound) {
+        rnMatchBtn.addEventListener('click', () => {
+          const kappa = __lastDriveKappa;
+          const scale = __lastScale;
+          if (!Number.isFinite(kappa) || kappa <= 0) return;
+          if (!Number.isFinite(scale) || scale <= 0) return;
+          const rOut = rOutFromScale(scale);
+          const K = (4 * Math.PI * EPS0 * (c ** 4)) / G;
+          const Q = Math.sqrt(K * kappa * (rOut ** 4));
+          const qElectrons = Q / E_CHARGE;
+          if ($('rnR')) $('rnR').value = rOut.toFixed(6);
+          if ($('rnMkg')) $('rnMkg').value = '0';
+          if ($('rnQe')) $('rnQe').value = qElectrons.toExponential(6);
+          renderEMVerify();
+        });
+        rnMatchBtn._bound = true;
+      }
+
+      const pwMatchBtn = $('pwMatchBtn');
+      if (pwMatchBtn && !pwMatchBtn._bound) {
+        pwMatchBtn.addEventListener('click', () => {
+          const kappa = __lastDriveKappa;
+          if (!Number.isFinite(kappa) || kappa <= 0) return;
+          const neededE = Math.sqrt((kappa * (c ** 4)) / (8 * Math.PI * G * EPS0));
+          if ($('pwE')) $('pwE').value = neededE.toPrecision(6);
+          renderEMVerify();
+        });
+        pwMatchBtn._bound = true;
+      }
+
+      const planeWaveInput = $('pwE');
+      const E0 = parseFloat((planeWaveInput?.value) || '0');
+      const B0 = E0 / c;
+      const uPlane = uEM(E0, B0);
+      const SPlane = c * uPlane;
+      if ($('pwUDens')) $('pwUDens').textContent = fmt(uPlane, 3);
+      if ($('pwS')) $('pwS').textContent = fmt(SPlane, 3);
+      const kappaU = kappaFromUDens(uPlane);
+      const kappaS = kappaFromFlux(SPlane);
+      if ($('pwKappaU')) $('pwKappaU').textContent = Number.isFinite(kappaU) ? formatKappa(kappaU) : '—';
+      if ($('pwKappaS')) $('pwKappaS').textContent = Number.isFinite(kappaS) ? formatKappa(kappaS) : '—';
+      const ratio = kappaS !== 0 ? kappaU / kappaS : NaN;
+      if ($('pwRatio')) $('pwRatio').textContent = fmt(ratio, 6);
+      const pwBadge = $('pwVerdict');
+      if (pwBadge) {
+        if (!Number.isFinite(ratio)) {
+          pwBadge.className = 'badge warn';
+          pwBadge.textContent = 'WARN: invalid inputs';
+        } else if (Math.abs(ratio - 1) <= 1e-12) {
+          pwBadge.className = 'badge ok';
+          pwBadge.textContent = 'PASS: κu = κS';
+        } else if (Math.abs(ratio - 1) <= 1e-9) {
+          pwBadge.className = 'badge warn';
+          pwBadge.textContent = 'CAUTION: numerical drift';
+        } else {
+          pwBadge.className = 'badge fail';
+          pwBadge.textContent = 'FAIL: mismatch';
+        }
+      }
+      if (planeWaveInput && !planeWaveInput._bound) {
+        planeWaveInput.addEventListener('input', renderEMVerify);
+        planeWaveInput._bound = true;
+      }
+    }
+
+    function renderCollapse(preset, durationSeconds, kDrive) {
+      const tau_s = preset.tau_ms / 1000;
+      const rc_m = preset.rc_um / 1e6;
+      const Eg = EG(tau_s);
+      const NB = Math.floor(durationSeconds / tau_s);
+      const Etot = NB * Eg;
+      const llc = c * tau_s;
+      const lpresent = Math.min(rc_m, llc);
+      const volume = Vc(rc_m);
+      const rho1 = rhoEff1(tau_s, rc_m);
+      const kCollapse = kappaCollapseRaw(tau_s, rc_m);
+      const lambda = state.overlap ? 100 : 0;
+      const rhoOverlap = lambda > 0 ? rho1 * lambda * tau_s : NaN;
+      const kCollapseOverlap = lambda > 0 ? ((8 * Math.PI * G) / (3 * c ** 2)) * rhoOverlap : NaN;
+
+      $('collapseTau').textContent = fmt(preset.tau_ms, 1);
+      $('collapseDuration').textContent = fmt(durationSeconds, 0);
+      $('collapseEg').textContent = fmt(Eg, 3);
+      $('collapseNB').textContent = fmtInt(NB);
+      $('collapseEt').textContent = fmt(Etot, 3);
+      const freq = preset.phaseHz ?? (tau_s > 0 ? 1 / tau_s : NaN);
+      const collapseFreqEl = $('collapseFreq');
+      if (collapseFreqEl) {
+        collapseFreqEl.textContent = Number.isFinite(freq) ? `${fmt(freq, 5)} Hz${preset.phaseHz ? ' (3.3 mHz)' : ''}` : '—';
+      }
+
+      $('collapseRc').textContent = fmt(preset.rc_um, 3);
+      $('collapseLLC').textContent = fmt(llc, 6);
+      $('collapseLPresent').textContent = fmt(lpresent, 6);
+      $('collapseVc').textContent = fmt(volume, 3);
+
+      $('collapseRho').textContent = fmt(rho1, 3);
+      $('kappaCollapse').textContent = formatKappa(kCollapse);
+      $('kappaCollapseOverlap').textContent = lambda > 0 ? formatKappa(kCollapseOverlap) : '—';
+
+      if (state.showBits) {
+        const bits = Etot > 0 ? Etot / (KB * 310 * LN2) : NaN;
+        $('collapseBits').textContent = fmt(bits, 2);
+      } else {
+        $('collapseBits').textContent = '—';
+      }
+
+      const effCollapse = kDrive / kCollapse;
+      $('effCollapse').textContent = fmt(effCollapse, 3);
+
+      if (lambda > 0 && Number.isFinite(kCollapseOverlap) && kCollapseOverlap > 0) {
+        $('effCollapseOverlap').textContent = fmt(kDrive / kCollapseOverlap, 3);
+      } else {
+        $('effCollapseOverlap').textContent = '—';
+      }
+
+      return {
+        kCollapse,
+        kCollapseOverlap,
+        NB
+      };
+    }
+
+    function verdict(pred, meas) {
+      const denom = Math.max(1e-30, Math.abs(pred));
+      const delta = Math.abs(meas - pred) / denom;
+      if (delta <= TOL) return { tag: 'ok', text: `PASS (Δ=${fmt(delta * 100, 2)}%)` };
+      if (delta <= 5 * TOL) return { tag: 'warn', text: `WARN (Δ=${fmt(delta * 100, 2)}%)` };
+      return { tag: 'fail', text: `FAIL (Δ=${fmt(delta * 100, 2)}%)` };
+    }
+
+    function renderFalsifiability(drive) {
+      const kBase = drive.kappaDrive;
+      const s = drive.scale;
+      const dE = drive.dEff;
+      const Gg = drive.gainEff;
+
+      const rows = [];
+
+      // F1: Duty/Sectors
+      {
+        const factor = 0.5;
+        const kNew = kappaDriveRaw(s, dE * factor, Gg);
+        const rPred = factor;
+        const rMeas = kBase !== 0 ? kNew / kBase : NaN;
+        const v = verdict(rPred, rMeas);
+        const diffPct = Number.isFinite(rPred) && Math.abs(rPred) > 0 ? Math.abs((rMeas - rPred) / rPred) * 100 : NaN;
+        rows.push(['F1 duty', 'd<sub>eff</sub>&rarr;0.5&middot;d<sub>eff</sub> (S&rarr;2S)', rPred, rMeas, diffPct, v]);
+      }
+      // F2: Flux/Area
+      {
+        const factor = 2;
+        const kNew = kappaDriveRaw(s * factor, dE, Gg);
+        const rPred = 1 / factor;
+        const rMeas = kBase !== 0 ? kNew / kBase : NaN;
+        const v = verdict(rPred, rMeas);
+        const diffPct = Number.isFinite(rPred) && Math.abs(rPred) > 0 ? Math.abs((rMeas - rPred) / rPred) * 100 : NaN;
+        rows.push(['F2 flux', 'A&rarr;2A (P/A halves)', rPred, rMeas, diffPct, v]);
+      }
+      // F3: Geometry gain
+      {
+        const factor = 2;
+        const kNew = kappaDriveRaw(s, dE, Gg * factor);
+        const rPred = factor;
+        const rMeas = kBase !== 0 ? kNew / kBase : NaN;
+        const v = verdict(rPred, rMeas);
+        const diffPct = Number.isFinite(rPred) && Math.abs(rPred) > 0 ? Math.abs((rMeas - rPred) / rPred) * 100 : NaN;
+        rows.push(['F3 geometry', '&#120083;&rarr;2&#120083; (&gamma;&times;Q&times;2)', rPred, rMeas, diffPct, v]);
+      }
+      // F4: Storage Q
+      {
+        const factor = 0.5;
+        const kNew = kappaDriveRaw(s, dE, Gg * factor);
+        const rPred = factor;
+        const rMeas = kBase !== 0 ? kNew / kBase : NaN;
+        const v = verdict(rPred, rMeas);
+        const diffPct = Number.isFinite(rPred) && Math.abs(rPred) > 0 ? Math.abs((rMeas - rPred) / rPred) * 100 : NaN;
+        rows.push(['F4 storage', '&#120083;&rarr;0.5&#120083; (Q&times;0.5)', rPred, rMeas, diffPct, v]);
+      }
+
+      const tbody = $('tableFalsify')?.querySelector('tbody');
+      if (tbody) {
+        tbody.innerHTML = rows.map(([name, variation, rPred, rMeas, diffPct, v]) => `
+          <tr>
+            <td>${name}</td>
+            <td>${variation}</td>
+            <td>${fmt(rPred, 3)}</td>
+            <td>${fmt(rMeas, 3)}</td>
+            <td>${fmt(diffPct, 2)}</td>
+            <td><span class="badge ${v.tag}">${v.text}</span></td>
+          </tr>
+        `).join('');
+      }
+
+      const etaTSel = $('etaTS');
+      if (etaTSel) {
+        const eta = parseFloat(etaTSel.value || '1');
+        const epsP = drive.epsilon * eta;
+        const nXP = drive.Ncross > 0 ? drive.Ncross / eta : NaN;
+        $('tsEpsP').textContent = fmt(epsP, 3);
+        $('tsNCrossP').textContent = fmt(nXP, 0);
+        const badge = $('tsVerdict');
+        if (badge) {
+          if (!Number.isFinite(epsP) || !Number.isFinite(nXP)) {
+            badge.className = 'badge warn';
+            badge.textContent = 'WARN: undefined ε′/N×′';
+          } else if (epsP >= 0.02 || nXP <= 50) {
+            badge.className = 'badge fail';
+            badge.textContent = `FAIL: ε′=${fmt(epsP, 3)}, N×′=${fmt(nXP, 0)} (averaging invalid)`;
+          } else if (epsP >= 0.01 || nXP <= 100) {
+            badge.className = 'badge warn';
+            badge.textContent = `CAUTION: ε′=${fmt(epsP, 3)}, N×′=${fmt(nXP, 0)}`;
+          } else {
+            badge.className = 'badge ok';
+            badge.textContent = `PASS: ε′=${fmt(epsP, 3)}, N×′=${fmt(nXP, 0)}`;
+          }
+        }
+        etaTSel.onchange = () => render();
+      }
+
+      const etaDutySel = $('etaDuty');
+      if (etaDutySel) {
+        const etaDuty = parseFloat(etaDutySel.value || '1');
+        const dEffPrime = Math.min(dE * etaDuty, D_EFF_MAX);
+        const zetaPrime = zeta(dEffPrime);
+        $('qiDEffP').textContent = dEffPrime.toExponential(2);
+        $('qiZetaP').textContent = fmt(zetaPrime, 3);
+        const kNew = kappaDriveRaw(s, dEffPrime, Gg);
+        const rMeas = kBase !== 0 ? kNew / kBase : NaN;
+        $('qiRatio').textContent = fmt(rMeas, 3);
+        const badge = $('qiVerdict');
+        if (badge) {
+          const expected = dE !== 0 ? dEffPrime / dE : NaN;
+          const diff = Number.isFinite(expected) && Math.abs(expected) > 0 ? Math.abs((rMeas - expected) / expected) : Infinity;
+          if (zetaPrime > 1 + 1e-6) {
+            badge.className = 'badge fail';
+            badge.textContent = 'FAIL: ζ>1 (should throttle)';
+          } else if (diff <= 5 * TOL) {
+            badge.className = 'badge ok';
+            badge.textContent = 'PASS: linear until ζ→1';
+          } else {
+            badge.className = 'badge warn';
+            badge.textContent = 'WARN: non-linear drift';
+          }
+        }
+        etaDutySel.onchange = () => render();
+      }
+    }
+
+    function renderParallels(kDrive) {
+      const unit = UNIT_FACTORS[state.unitMode];
+      const bodyRows = BODY_CLASSES.map(body => {
+        const Rpi = potatoRadius(body.rho, body.sigma) / 1000;
+        const kB = kappaBody(body.rho);
+        const efficiency = kDrive / kB;
+        return `<tr>
+          <td>${body.label}</td>
+          <td>${fmt(body.rho, 0)}</td>
+          <td>${body.sigma.toExponential(2)}</td>
+          <td>${fmt(Rpi, 2)}</td>
+          <td>${fmt(kB / unit.scale, 3)} ${unit.label}</td>
+          <td>${fmt(efficiency, 3)}</td>
+        </tr>`;
+      }).join('');
+      $('tableBodies').querySelector('tbody').innerHTML = bodyRows;
+
+      const durationSeconds = DURATIONS.find(d => d.id === state.duration)?.seconds ?? 3600;
+      const collapseRows = COLLAPSE_PRESETS.map(preset => {
+        const tau_s = preset.tau_ms / 1000;
+        const rc_m = preset.rc_um / 1e6;
+        const llc = c * tau_s;
+        const lpresent = Math.min(rc_m, llc);
+        const kCollapse = kappaCollapseRaw(tau_s, rc_m);
+        const NB = Math.floor(durationSeconds / tau_s);
+        const efficiency = kDrive / kCollapse;
+        return `<tr>
+          <td>${preset.label}</td>
+          <td>${fmt(preset.tau_ms, 1)}</td>
+          <td>${fmt(preset.rc_um, 2)}</td>
+          <td>${fmt(lpresent, 6)}</td>
+          <td>${fmt(kCollapse / unit.scale, 3)} ${unit.label}</td>
+          <td>${fmtInt(NB)}</td>
+          <td>${fmt(efficiency, 3)}</td>
+        </tr>`;
+      }).join('');
+      $('tableCollapse').querySelector('tbody').innerHTML = collapseRows;
+    }
+
+    function render() {
+      document.body.classList.toggle('reader-mode', state.readerMode);
+      if (toggleReaderEl) {
+        toggleReaderEl.textContent = state.readerMode ? 'Switch to explore mode' : 'Switch to reader mode';
+      }
+      populateSelectors();
+      toggleOverlapEl.checked = state.overlap;
+      toggleBitsEl.checked = state.showBits;
+      Array.from(durationButtonsEl.querySelectorAll('button.choice')).forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.id === state.duration);
+      });
+
+      const warpPreset = WARP_PRESETS.find(p => p.id === state.warpPreset) || WARP_PRESETS[1];
+      const payload = PAYLOAD_PRESETS.find(p => p.id === state.payloadPreset) || PAYLOAD_PRESETS[0];
+      const body = BODY_CLASSES.find(p => p.id === state.bodyClass) || BODY_CLASSES[1];
+      const collapsePreset = COLLAPSE_PRESETS.find(p => p.id === state.collapsePreset) || COLLAPSE_PRESETS[1];
+      const durationSeconds = DURATIONS.find(d => d.id === state.duration)?.seconds ?? 3600;
+
+      const drive = autoSolveDrive(warpPreset.scale, payload.mass, warpPreset.gain);
+      const kBody = renderStepB(body);
+      renderStepA(body);
+      const kDrive = renderStepC(warpPreset, drive);
+      renderStepD(kDrive, kBody);
+      renderCollapse(collapsePreset, durationSeconds, kDrive);
+      renderFalsifiability(drive);
+      renderParallels(kDrive);
+      renderEinsteinMaxwell();
+      renderEMVerify();
+    }
+
+    (function init() {
+      populateSelectors();
+      bindControls();
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 // client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
-import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu, AlertTriangle, Target, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,11 +17,55 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
+import { useVacuumContract } from "@/hooks/useVacuumContract";
 import SnapshotProbe from '@/dev/SnapshotProbe';
 import DataNamesPanel from '@/dev/DataNamesPanel';
+import SpectrumTunerPanel from "@/components/SpectrumTunerPanel";
+import type { Provenance } from "@/components/SpectrumTunerPanel";
+import ParametricSweepPanel from "@/components/ParametricSweepPanel";
+import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
+import usePhaseBridge from "@/hooks/use-phase-bridge";
+import NearZeroWidget from "@/components/NearZeroWidget";
+import VacuumGapHeatmap from "@/components/VacuumGapHeatmap";
+import SweepReplayControls from "@/components/SweepReplayControls";
+import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
+import VacuumContractBadge from "@/components/VacuumContractBadge";
+import { downloadCSV } from "@/utils/csv";
+import { computeTidalEij, type V3 } from "@/lib/tidal";
+import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
 
-// Greens bridge: auto-publish φ from pipeline/metrics so the Greens cards populate
-type V3 = [number, number, number];
+type PumpStatus = "idle" | "ok" | "warn" | "hazard";
+
+type PumpStability = {
+  status: PumpStatus;
+  gapNm?: number;
+  phaseDeg?: number;
+  modDepthPct?: number;
+  pumpFreqGHz?: number;
+  detuneMHz?: number;
+  detuneOverKappa?: number;
+  kappaMHz?: number;
+  kappaEffMHz?: number;
+  rhoRaw?: number;
+  rhoEst?: number;
+  issues: string[];
+  f0GHz?: number;
+  recommendation: {
+    gapNm: number;
+    phaseDeg: number;
+    modDepthPct: number;
+    detuneMHz: number;
+    pumpFreqGHz?: number;
+    rhoTarget: number;
+  };
+};
+
+const PUMP_PHASE_BIAS_KEY = "helix:pumpPhaseBiasDeg";
+const clampPhaseBiasDeg = (value: number) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(-10, Math.min(10, value));
+};
+// Greens bridge: auto-publish  from pipeline/metrics so the Greens cards populate
 const poissonG = (r: number) => 1 / (4 * Math.PI * Math.max(r, 1e-6));
 function computePhi(positions: V3[], rho: number[], kernel = poissonG, normalize = true) {
   const N = positions.length, out = new Float32Array(N);
@@ -44,107 +88,177 @@ function computePhi(positions: V3[], rho: number[], kernel = poissonG, normalize
 }
 
 /**
- * GreensLivePanel — proves we are rendering *live* values from the pipeline.
- * - Shows kernel, normalization, φ stats, data source (CLIENT/SERVER)
- * - Mirrors operational mode, FR duty, τ_LC, burst/dwell, sectorization
+ * GreensLivePanel  proves we are rendering *live* values from the pipeline.
+ * - Shows kernel, normalization,  stats, data source (CLIENT/SERVER)
+ * - Mirrors operational mode, FR duty, tauLC, burst/dwell, sectorization
  * - Flashes a LIVE badge and updates "updated X ms ago" timestamp on changes
  */
 function GreensLivePanel() {
   const qc = useQueryClient();
-  // 1) Live pipeline (mode, timing knobs, derived duty, τ_LC) — refetch 1s in hook
+  // 1) Live pipeline (mode, timing knobs, derived duty, tauLC)  refetch 1s in hook
   const { data: live } = useEnergyPipeline({ refetchInterval: 1000 });
-  // 2) System metrics (for LC/timing fallbacks) — refetch 1s
+  // 2) System metrics (for LC/timing fallbacks)  refetch 1s
   const { data: metrics } = useQuery({ queryKey: ["/api/helix/metrics"], refetchInterval: 1000 });
   // 3) Green's potential payload (cache+event live feed)
   const greens = useGreens();
 
   // 4) Derived snapshot (single source of truth other panels share)
   const derived = qc.getQueryData(["helix:pipeline:derived"]) as any | undefined;
+  const tidal = qc.getQueryData<{ norm: number; eigenvalues: [number, number, number]; source?: string }>(["helix:pipeline:tidal"]);
 
   // ---- helpers ----
   const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  type Prov<T> = { val?: T, from?: "metrics" | "derived" | "live" | "none" };
-  const prov = <T,>(val?: T, from: Prov<T>["from"] = "none"): Prov<T> => ({ val, from });
+  type Prov<T> = { val?: T; from?: Provenance };
+  function prov<T>(val?: T, from?: Provenance): Prov<T> {
+    return { val, from };
+  }
   const isNum = (x: any): x is number => typeof x === "number" && Number.isFinite(x);
   const toMs = (v?: number, unit: "ms" | "s" | "us" = "ms") =>
     isNum(v) ? (unit === "s" ? v * 1000 : unit === "us" ? v / 1000 : v) : undefined;
   const saneMs = (v?: number) => (isNum(v) && v > 0 ? v : undefined);
 
-  // Returns timing with explicit **priority** and **unit coercion**
+  // Returns timing with explicit priority and unit coercion
   function pickTiming(): {
-    tauLC: Prov<number | undefined>, burst: Prov<number | undefined>, dwell: Prov<number | undefined>,
-    sectorsTotal: Prov<number | undefined>, sectorsConcurrent: Prov<number | undefined>
+    tauLC: Prov<number | undefined>;
+    burst: Prov<number | undefined>;
+    dwell: Prov<number | undefined>;
+    sectorsTotal: Prov<number | undefined>;
+    sectorsConcurrent: Prov<number | undefined>;
   } {
-    const lcM = (metrics as any)?.lightCrossing ?? {};
-    const lcL = (live as any)?.lightCrossing ?? {};
+    const lcMetrics = (metrics as any)?.lightCrossing ?? {};
+    const lcLive = (live as any)?.lightCrossing ?? {};
 
-    // τ_LC priority: metrics(lightCrossing) → derived → live(lightCrossing/flat)
-    const tauFromMetrics = saneMs(
-      toMs(lcM.tauLC_ms, "ms") ?? toMs(lcM.tau_ms, "ms") ?? toMs(lcM.tauLC_s, "s")
-    );
-    const tauFromDerived = saneMs(derived?.τ_LC_ms);
-    const tauFromLive    = saneMs(
-      toMs((live as any)?.tau_LC_ms, "ms") ?? toMs((live as any)?.tauLC_ms, "ms") ??
-      toMs(lcL.tauLC_ms, "ms") ?? toMs(lcL.tau_ms, "ms") ?? toMs(lcL.tauLC_s, "s")
-    );
-  const tauLC = tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics")
-        : tauFromDerived !== undefined ? prov(tauFromDerived, "derived")
-        : tauFromLive !== undefined ? prov(tauFromLive, "live")
-        : prov<number | undefined>(undefined, "none");
+    function prefer<T>(...values: (T | undefined)[]): T | undefined {
+      for (const value of values) {
+        if (value !== undefined) return value;
+      }
+      return undefined;
+    }
 
-    // burst / dwell priority mirrors τ_LC
-    const burst = ((): Prov<number | undefined> => {
-      const m = saneMs(toMs(lcM.burst_ms, "ms"));
-      const d = saneMs(derived?.burst_ms);
-      const l = saneMs(toMs((live as any)?.burst_ms, "ms") ?? toMs(lcL.burst_ms, "ms"));
-  return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov<number | undefined>(undefined, "none");
-    })();
-  const dwell = ((): Prov<number | undefined> => {
-      const m = saneMs(toMs(lcM.dwell_ms, "ms") ?? toMs(lcM.sectorPeriod_ms, "ms"));
-      const d = saneMs(derived?.dwell_ms ?? derived?.sectorPeriod_ms);
-      const l = saneMs(toMs((live as any)?.dwell_ms, "ms") ?? toMs((live as any)?.sectorPeriod_ms, "ms") ?? toMs(lcL.dwell_ms, "ms") ?? toMs(lcL.sectorPeriod_ms, "ms"));
-  return m !== undefined ? prov(m, "metrics") : d !== undefined ? prov(d, "derived") : l !== undefined ? prov(l, "live") : prov<number | undefined>(undefined, "none");
-    })();
+    const toNumber = (value: unknown) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : undefined;
+    };
 
-    // sectors: prefer metrics root (activeSectors/totalSectors), then derived, then live
+    const tauFromMetrics = saneMs(prefer(
+      toMs(toNumber(lcMetrics.tauLC_ms), "ms"),
+      toMs(toNumber(lcMetrics.tau_ms), "ms"),
+      toMs(toNumber(lcMetrics.tauLC_s), "s"),
+    ));
+
+    const tauFromDerived = saneMs(prefer(
+      toNumber(derived?.tauLC_ms),
+      toNumber(derived?.tautauLC_ms),
+    ));
+
+    const tauFromLive = saneMs(prefer(
+      toMs(toNumber((live as any)?.tautauLC_ms), "ms"),
+      toMs(toNumber((live as any)?.tauLC_ms), "ms"),
+      toMs(toNumber(lcLive.tauLC_ms), "ms"),
+      toMs(toNumber(lcLive.tau_ms), "ms"),
+      toMs(toNumber(lcLive.tauLC_s), "s"),
+    ));
+
+    const tauLC =
+      tauFromMetrics !== undefined ? prov(tauFromMetrics, "metrics") :
+      tauFromDerived !== undefined ? prov(tauFromDerived, "derived") :
+      tauFromLive !== undefined ? prov(tauFromLive, "live") :
+      prov<number | undefined>(undefined);
+
+    const burstMetrics = saneMs(toMs(toNumber(lcMetrics.burst_ms), "ms"));
+    const burstDerived = saneMs(toNumber(derived?.burst_ms));
+    const burstLive = saneMs(prefer(
+      toMs(toNumber((live as any)?.burst_ms), "ms"),
+      toMs(toNumber(lcLive.burst_ms), "ms"),
+    ));
+
+    const burst =
+      burstMetrics !== undefined ? prov(burstMetrics, "metrics") :
+      burstDerived !== undefined ? prov(burstDerived, "derived") :
+      burstLive !== undefined ? prov(burstLive, "live") :
+      prov<number | undefined>(undefined);
+
+    const dwellMetrics = saneMs(prefer(
+      toMs(toNumber(lcMetrics.dwell_ms), "ms"),
+      toMs(toNumber(lcMetrics.sectorPeriod_ms), "ms"),
+    ));
+
+    const dwellDerived = saneMs(prefer(
+      toNumber(derived?.dwell_ms),
+      toNumber(derived?.sectorPeriod_ms),
+    ));
+
+    const dwellLive = saneMs(prefer(
+      toMs(toNumber((live as any)?.dwell_ms), "ms"),
+      toMs(toNumber((live as any)?.sectorPeriod_ms), "ms"),
+      toMs(toNumber(lcLive.dwell_ms), "ms"),
+      toMs(toNumber(lcLive.sectorPeriod_ms), "ms"),
+    ));
+
+    const dwell =
+      dwellMetrics !== undefined ? prov(dwellMetrics, "metrics") :
+      dwellDerived !== undefined ? prov(dwellDerived, "derived") :
+      dwellLive !== undefined ? prov(dwellLive, "live") :
+      prov<number | undefined>(undefined);
+
+    const sectorsTotalMetrics = toNumber((metrics as any)?.totalSectors);
+    const sectorsTotalDerived = toNumber(derived?.sectorsTotal);
+    const sectorsTotalLive = toNumber((live as any)?.sectorsTotal ?? (live as any)?.sectorCount);
+
     const sectorsTotal =
-      isNum((metrics as any)?.totalSectors) ? prov((metrics as any).totalSectors, "metrics")
-      : isNum(derived?.sectorsTotal) ? prov(derived.sectorsTotal, "derived")
-      : isNum(((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) as any) ? prov(((live as any)?.sectorsTotal ?? (live as any)?.sectorCount) as any, "live")
-      : prov<number | undefined>(undefined, "none");
+      sectorsTotalMetrics !== undefined ? prov(sectorsTotalMetrics, "metrics") :
+      sectorsTotalDerived !== undefined ? prov(sectorsTotalDerived, "derived") :
+      sectorsTotalLive !== undefined ? prov(sectorsTotalLive, "live") :
+      prov<number | undefined>(undefined);
+
+    const sectorsConcurrentMetrics = toNumber((metrics as any)?.activeSectors);
+    const sectorsConcurrentDerived = toNumber(derived?.sectorsConcurrent);
+    const sectorsConcurrentLive = toNumber((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors);
+
     const sectorsConcurrent =
-      isNum((metrics as any)?.activeSectors) ? prov((metrics as any).activeSectors, "metrics")
-      : isNum(derived?.sectorsConcurrent) ? prov(derived.sectorsConcurrent, "derived")
-      : isNum((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors) ? prov((live as any)?.sectorsConcurrent ?? (live as any)?.concurrentSectors, "live")
-      : prov(undefined, "none");
+      sectorsConcurrentMetrics !== undefined ? prov(sectorsConcurrentMetrics, "metrics") :
+      sectorsConcurrentDerived !== undefined ? prov(sectorsConcurrentDerived, "derived") :
+      sectorsConcurrentLive !== undefined ? prov(sectorsConcurrentLive, "live") :
+      prov<number | undefined>(undefined);
 
-  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  const mode = (derived?.mode ?? (live as any)?.currentMode ?? (metrics as any)?.currentMode ?? "hover") as string;
-
-    // Return the provenance-wrapped timing values
     return { tauLC, burst, dwell, sectorsTotal, sectorsConcurrent };
   }
 
-  const toF32 = (a: Float32Array | number[] | undefined) =>
-    !a ? undefined : (a instanceof Float32Array ? a : new Float32Array(a));
-  const fmtPct = (x: number) => `${(x * 100).toFixed(3)}%`;
-  const fexp = (x: number) => (Math.abs(x) < 1e-3 || Math.abs(x) > 1e3 ? x.toExponential(3) : x.toFixed(6));
+  const toF32 = (values: Float32Array | number[] | undefined) =>
+    !values ? undefined : (values instanceof Float32Array ? values : new Float32Array(values));
+
+  const fmtPct = (value: number) => `${(value * 100).toFixed(3)}%`;
+
+  const fmtExpLocal = (value: number) =>
+    Math.abs(value) < 1e-3 || Math.abs(value) > 1e3
+      ? value.toExponential(3)
+      : value.toFixed(6);
+
   const fmtSI = (ms?: number) => {
-    if (!Number.isFinite(ms)) return "—";
-    if (ms! < 1) return `${(ms! * 1000).toFixed(1)} µs`;
-    if (ms! < 1000) return `${ms!.toFixed(2)} ms`;
-    return `${(ms! / 1000).toFixed(2)} s`;
-  };
-  const stat = (arr: Float32Array) => {
-    let min = Infinity, max = -Infinity, sum = 0, sum2 = 0;
-    const N = arr.length;
-    for (let i = 0; i < N; i++) { const v = arr[i]; if (v < min) min = v; if (v > max) max = v; sum += v; sum2 += v*v; }
-    const mean = sum / Math.max(1, N);
-    const varPop = Math.max(0, (sum2 / Math.max(1, N)) - mean*mean);
-    const std = Math.sqrt(varPop);
-    return { N, min, max, mean, std };
+    if (!Number.isFinite(ms)) return "-";
+    const value = ms as number;
+    if (value < 1) return `${(value * 1000).toFixed(1)} us`;
+    if (value < 1000) return `${value.toFixed(2)} ms`;
+    return `${(value / 1000).toFixed(2)} s`;
   };
 
+  const stat = (array: Float32Array) => {
+    let min = Infinity;
+    let max = -Infinity;
+    let sum = 0;
+    let sumSq = 0;
+    const length = array.length;
+    for (let i = 0; i < length; i++) {
+      const value = array[i];
+      if (value < min) min = value;
+      if (value > max) max = value;
+      sum += value;
+      sumSq += value * value;
+    }
+    const mean = sum / Math.max(1, length);
+    const variance = Math.max(0, (sumSq / Math.max(1, length)) - mean * mean);
+    return { N: length, min, max, mean, std: Math.sqrt(variance) };
+  };
   // ---- stable, physics-grounded reads ----
   const source = greens?.source ?? "none";
   const kind = greens?.kind ?? "poisson";
@@ -152,6 +266,8 @@ function GreensLivePanel() {
   const mHelm = Number(greens?.m ?? 0);
   const phi = toF32(greens?.phi);
   const phiStat = phi ? stat(phi) : undefined;
+  const tidalNorm = tidal?.norm;
+  const tidalLeadEigen = tidal?.eigenvalues?.[0];
 
   const mode = (derived?.mode ?? (live as any)?.currentMode ?? (metrics as any)?.currentMode ?? "hover") as string;
   const dutyFR =
@@ -161,7 +277,7 @@ function GreensLivePanel() {
 
   // unified, normalized timing and sectorization (with provenance)
   const T = pickTiming();
-  const τ_LC_ms = T.tauLC.val;
+  const tauLC_ms = T.tauLC.val;
   const burst_ms = T.burst.val;
   const dwell_ms = T.dwell.val;
   // Panel-local duty from timing & sectorization (metrics-first, physics-grounded)
@@ -181,27 +297,27 @@ function GreensLivePanel() {
     ? Math.abs(dutyFR_calc - (dutyFR_fallback as number))
     : undefined;
   const dutyConsistent = !isNum(dutyDelta) || dutyDelta < 5e-4; 
-  const r_b_over_tau = (isNum(burst_ms) && isNum(τ_LC_ms) && τ_LC_ms! > 0) ? (burst_ms! / τ_LC_ms!) : undefined;
+  const r_b_over_tau = (isNum(burst_ms) && isNum(tauLC_ms) && tauLC_ms! > 0) ? (burst_ms! / tauLC_ms!) : undefined;
   const sectorsTotal = T.sectorsTotal.val;
   const sectorsConcurrent = T.sectorsConcurrent.val;
 
   // Reciprocity computed on normalized ms values, but prefer derived if present
   const reciprocity = derived?.reciprocity ?? (() => {
-    if (isNum(burst_ms) && isNum(τ_LC_ms)) {
-      return burst_ms < τ_LC_ms
-        ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
-        : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+    if (isNum(burst_ms) && isNum(tauLC_ms)) {
+      return burst_ms < tauLC_ms
+        ? { status: "BROKEN_INSTANT", message: "burst < tauLC (instant non-reciprocal)" }
+        : { status: "PASS_AVG", message: "burst >= tauLC (average reciprocal)" };
     }
-    return { status: "UNKNOWN", message: "missing burst/τ_LC" };
+    return { status: "UNKNOWN", message: "missing burst/tauLC" };
   })();
 
-  const dutyFrom = isNum(dutyFR_calc) ? "calc" : (Number.isFinite(dutyFR_fallback) ? "derived" : "—");
+  const dutyFrom = isNum(dutyFR_calc) ? "calc" : (Number.isFinite(dutyFR_fallback) ? "derived" : "");
   // Development-only diagnostic: log duty components and compare to pipeline-provided values
   if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV) {
     React.useEffect(() => {
       try {
         // Keep this debug tidy and scoped to dev only
-        console.debug('[GreensLivePanel · duty-debug]', {
+        console.debug('[GreensLivePanel duty-debug]', {
           burst_ms, dwell_ms, sectorsTotal, sectorsConcurrent,
           dutyFR_calc, dutyFR_fallback, dutyFR_display,
           derivedDuty: derived?.dutyEffectiveFR,
@@ -222,7 +338,7 @@ function GreensLivePanel() {
     const max = phiStat?.max ?? NaN;
     const src = source ?? "none";
     const k = kind ?? "poisson";
-    const newSig = `${src}|${k}|${normalized?'1':'0'}|N=${N}|μ=${mean.toFixed(6)}|${min.toFixed(6)}..${max.toFixed(6)}`;
+    const newSig = `${src}|${k}|${normalized?'1':'0'}|N=${N}|=${mean.toFixed(6)}|${min.toFixed(6)}..${max.toFixed(6)}`;
     if (newSig && newSig !== sig) {
       setSig(newSig);
       setLastAt(Date.now());
@@ -247,7 +363,7 @@ function GreensLivePanel() {
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${flash ? "bg-emerald-400 shadow-[0_0_0_3px] shadow-emerald-400/40" : "bg-emerald-600/70"}`} />
           <span className="text-xs font-semibold tracking-wide uppercase text-emerald-300/90">
-            LIVE • {source === "server" ? "SERVER" : source === "client" ? "CLIENT" : "UNKNOWN"} SOURCE
+            LIVE  {source === "server" ? "SERVER" : source === "client" ? "CLIENT" : "UNKNOWN"} SOURCE
           </span>
         </div>
         <div className="text-xs tabular-nums text-slate-400">
@@ -255,17 +371,17 @@ function GreensLivePanel() {
         </div>
       </div>
 
-      {/* provenance row — makes it undeniable which path feeds the panel */}
+      {/* provenance row  makes it undeniable which path feeds the panel */}
       <div className="mb-3 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
         <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">Duty: {dutyFrom}</span>
         <span className={`rounded-full px-2 py-0.5 ${dutyConsistent ? "bg-emerald-600/30 text-emerald-200" : "bg-amber-600/30 text-amber-200"}`}>
           consistency: {isNum(dutyDelta) ? `${(dutyDelta*100).toFixed(3)}%` : "n/a"}
         </span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">τ_LC: {T.tauLC.from ?? "—"}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? "—"}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? "—"}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_total: {T.sectorsTotal.from ?? "—"}</span>
-        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from ?? "—"}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">tauLC: {T.tauLC.from ?? ""}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">burst: {T.burst.from ?? ""}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">dwell: {T.dwell.from ?? ""}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_total: {T.sectorsTotal.from ?? ""}</span>
+        <span className="rounded-full bg-slate-800/70 px-2 py-0.5 text-slate-300">S_live: {T.sectorsConcurrent.from ?? ""}</span>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -274,19 +390,29 @@ function GreensLivePanel() {
           <div className="text-xs uppercase tracking-wide text-slate-400">Kernel</div>
           <div className="font-mono text-sm">
             {kind === "helmholtz" ? `Helmholtz (m=${mHelm})` : "Poisson"}
-            {normalized ? " · norm" : ""}
+            {normalized ? "  norm" : ""}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
             <div className="text-slate-400">N (tiles)</div>
             <div className="font-mono">{phiStat?.N ?? 0}</div>
-            <div className="text-slate-400">φ_min</div>
-            <div className="font-mono">{fexp(phiStat!.min)}</div>
-            <div className="text-slate-400">φ_max</div>
-            <div className="font-mono">{fexp(phiStat!.max)}</div>
-            <div className="text-slate-400">φ_mean</div>
-            <div className="font-mono">{fexp(phiStat!.mean)}</div>
-            <div className="text-slate-400">φ_std</div>
-            <div className="font-mono">{fexp(phiStat!.std)}</div>
+            <div className="text-slate-400">_min</div>
+            <div className="font-mono">{fmtExpLocal(phiStat!.min)}</div>
+            <div className="text-slate-400">_max</div>
+            <div className="font-mono">{fmtExpLocal(phiStat!.max)}</div>
+            <div className="text-slate-400">_mean</div>
+            <div className="font-mono">{fmtExpLocal(phiStat!.mean)}</div>
+            <div className="text-slate-400">_std</div>
+            <div className="font-mono">{fmtExpLocal(phiStat!.std)}</div>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+            <div className="text-slate-400">?E? (Weyl)</div>
+            <div className="font-mono">
+              {Number.isFinite(tidalNorm) ? (tidalNorm as number).toExponential(3) : "-"}
+            </div>
+            <div className="text-slate-400">eig (|?|max)</div>
+            <div className="font-mono">
+              {Number.isFinite(tidalLeadEigen) ? (tidalLeadEigen as number).toExponential(2) : "-"}
+            </div>
           </div>
         </div>
 
@@ -304,12 +430,12 @@ function GreensLivePanel() {
                 ? `(burst/dwell)*(S_live/S_total) = (${burst_ms!.toFixed(3)}ms/${dwell_ms!.toFixed(3)}ms)*(${sectorsConcurrent}/${sectorsTotal})`
                 : "missing timing/sectors"
             }>
-              {Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : "—"}
+              {Number.isFinite(dutyFR_display) ? fmtPct(dutyFR_display!) : ""}
             </div>
             <div className="text-slate-400">S_total</div>
-            <div className="font-mono">{sectorsTotal ?? "—"}</div>
+            <div className="font-mono">{sectorsTotal ?? ""}</div>
             <div className="text-slate-400">S_live</div>
-            <div className="font-mono">{sectorsConcurrent ?? "—"}</div>
+            <div className="font-mono">{sectorsConcurrent ?? ""}</div>
           </div>
           {/* duty bar */}
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
@@ -324,8 +450,8 @@ function GreensLivePanel() {
         <div className="rounded-xl bg-slate-800/40 p-4">
           <div className="text-xs uppercase tracking-wide text-slate-400">Light-Crossing</div>
           <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-            <div className="text-slate-400">τ_LC</div>
-            <div className="font-mono">{fmtSI(τ_LC_ms)}</div>
+            <div className="text-slate-400">tauLC</div>
+            <div className="font-mono">{fmtSI(tauLC_ms)}</div>
             <div className="text-slate-400">burst</div>
             <div className="font-mono">{fmtSI(burst_ms)}</div>
             <div className="text-slate-400">dwell</div>
@@ -335,17 +461,17 @@ function GreensLivePanel() {
               {reciprocity?.status ?? "UNKNOWN"}
             </div>
           </div>
-          {isNum(burst_ms) && isNum(τ_LC_ms) && (
+          {isNum(burst_ms) && isNum(tauLC_ms) && (
             <div className="mt-3">
               <div className="h-2 w-full overflow-hidden rounded-full bg-slate-700/50">
                 <div
-                  className={`h-full ${burst_ms! < τ_LC_ms! ? "bg-amber-400/80" : "bg-emerald-500/80"}`}
-                  style={{ width: `${Math.max(0, Math.min(100, (burst_ms! / Math.max(1, τ_LC_ms!)) * 100))}%` }}
-                  title={`burst / τ_LC = ${r_b_over_tau?.toFixed(3) ?? "—"}`}
+                  className={`h-full ${burst_ms! < tauLC_ms! ? "bg-amber-400/80" : "bg-emerald-500/80"}`}
+                  style={{ width: `${Math.max(0, Math.min(100, (burst_ms! / Math.max(1, tauLC_ms!)) * 100))}%` }}
+                  title={`burst / tauLC = ${r_b_over_tau?.toFixed(3) ?? ""}`}
                 />
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                burst / τ_LC = {r_b_over_tau ? `×${r_b_over_tau.toFixed(1)}` : "—"} ({mode})
+                burst / tauLC = {r_b_over_tau ? `${r_b_over_tau.toFixed(1)}` : ""} ({mode})
               </div>
             </div>
           )}
@@ -364,33 +490,55 @@ function useGreensBridge() {
   });
 
   useEffect(() => {
-    // 1) Server already provided φ?
-    const srv = pipelineState?.greens;
-    if (srv?.phi && (srv.phi as number[]).length) {
-      const payload = {
-        kind: srv.kind ?? "poisson",
-        m: srv.m ?? 0,
-        normalize: srv.normalize !== false,
-        phi: srv.phi instanceof Float32Array ? srv.phi : new Float32Array(srv.phi),
-        size: (srv.phi as number[]).length,
-        source: "server" as const,
-      };
-      qc.setQueryData(["helix:pipeline:greens"], payload);
-      try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
-      return;
+    // 1) Server already provided ?
+    const srv = pipelineState?.greens as (GreensPayload | Record<string, unknown> | null | undefined);
+    const tiles =
+      ((systemMetrics as any)?.tileData ??
+        (systemMetrics as any)?.tiles) as { pos: V3; t00: number }[] | undefined;
+    if (srv && typeof srv === "object" && "phi" in srv) {
+      const phiRaw = (srv as { phi?: unknown }).phi;
+      const phiArray =
+        phiRaw instanceof Float32Array
+          ? phiRaw
+          : Array.isArray(phiRaw)
+            ? new Float32Array(phiRaw)
+            : (phiRaw && typeof (phiRaw as ArrayBufferLike).byteLength === "number"
+                ? new Float32Array(phiRaw as ArrayBufferLike)
+                : null);
+      if (phiArray instanceof Float32Array && phiArray.length > 0) {
+        const payload: GreensPayload = {
+          kind: (srv as GreensPayload).kind ?? "poisson",
+          m: (srv as GreensPayload).m ?? 0,
+          normalize: (srv as GreensPayload).normalize !== false,
+          phi: phiArray,
+          size: phiArray.length,
+          source: "server",
+        };
+        qc.setQueryData(["helix:pipeline:greens"], payload);
+        try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
+        if (Array.isArray(tiles) && tiles.length === payload.size) {
+          const positions = tiles.map((t) => t.pos as V3);
+          const tidal = computeTidalEij(phiArray, positions);
+          const tidalPayload = { ...tidal, source: "server" as const };
+          qc.setQueryData(["helix:pipeline:tidal"], tidalPayload);
+          try { window.dispatchEvent(new CustomEvent("helix:tidal", { detail: tidalPayload })); } catch {}
+        }
+        return;
+      }
     }
 
     // 2) Otherwise derive on the client from metrics tile data (prefer tileData; fallback to tiles)
-    const tiles =
-      ((systemMetrics as any)?.tileData ??
-       (systemMetrics as any)?.tiles) as { pos: V3; t00: number }[] | undefined;
     if (Array.isArray(tiles) && tiles.length > 0) {
-      const positions = tiles.map(t => t.pos);
+      const positions = tiles.map((t) => t.pos as V3);
       const rho = tiles.map(t => t.t00);
       const phi = computePhi(positions, rho, poissonG, true);
       const payload = { kind: "poisson" as const, m: 0, normalize: true, phi, size: phi.length, source: "client" as const };
       qc.setQueryData(["helix:pipeline:greens"], payload);
       try { window.dispatchEvent(new CustomEvent("helix:greens", { detail: payload })); } catch {}
+      const tidal = computeTidalEij(phi, positions);
+      const tidalPayload = { ...tidal, source: "client" as const };
+      qc.setQueryData(["helix:pipeline:tidal"], tidalPayload);
+      try { window.dispatchEvent(new CustomEvent("helix:tidal", { detail: tidalPayload })); } catch {}
     }
   }, [qc, pipelineState?.greens, (systemMetrics as any)?.tileData, (systemMetrics as any)?.tiles]);
 }
@@ -409,9 +557,9 @@ const buildLiveDesc = (
       ? snap!.P_avg_MW! * 1e6
       : undefined;
   const P = fmtPowerUnitFromW(watts);
-  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : "— kg";
-  const Z = Number.isFinite(snap?.zeta) ? `ζ=${snap!.zeta!.toFixed(3)}` : "ζ=—";
-  return `${P} • ${M} • ${Z}`;
+  const M = Number.isFinite(snap?.M_exotic_kg) ? `${snap!.M_exotic_kg!.toFixed(0)} kg` : " kg";
+  const Z = Number.isFinite(snap?.zeta) ? `=${snap!.zeta!.toFixed(3)}` : "=";
+  return `${P}  ${M}  ${Z}`;
 };
 
 // Mode select items built outside component to prevent re-renders
@@ -462,11 +610,19 @@ function sanitizeServerUniforms(raw: any, version: number) {
   const gammaVdB_mass = toNumber(raw.gammaVanDenBroeck_mass ?? raw.gammaVanDenBroeck ?? raw.gammaVdB, gammaVdB_vis);
   const gammaGeo = Math.max(1, toNumber(raw.gammaGeo, 26));
   const q = Math.max(1e-12, toNumber(raw.qSpoilingFactor ?? raw.deltaAOverA, 1));
-  const dFR = Math.max(1e-12, toNumber(raw.dutyEffectiveFR, 0.01 / Math.max(1, toNumber(raw.sectorCount, 400))));
+  const dFR_raw = toNumber(raw.dutyEffectiveFR, 0.01 / Math.max(1, toNumber(raw.sectorCount, 400)));
+  const dFR_phys = Math.max(1e-12, dFR_raw);
   const viewAvg = (raw.viewAvg ?? true) ? true : false;
+  const rawView = (raw && typeof raw === "object") ? raw.view : undefined;
+  const floors = {
+    dFR_view_min: 1e-4,
+    vizFloorThetaGR: 1e-9,
+    vizFloorRhoGR: 1e-18,
+    vizFloorThetaDrive: 1e-6,
+  };
 
-  // Canonical expected θ (renderer flavor: uses γ_VdB_vis and √d_FR when viewAvg=true)
-  const thetaScaleExpected = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * (viewAvg ? Math.sqrt(dFR) : 1);
+  // Canonical expected  (renderer flavor: uses _VdB_vis and d_FR when viewAvg=true)
+  const thetaScaleExpected = Math.pow(gammaGeo, 3) * q * gammaVdB_vis * (viewAvg ? Math.sqrt(dFR_phys) : 1);
 
   // Keep only physics + scheduling + geometry + timing
   const out = {
@@ -481,7 +637,7 @@ function sanitizeServerUniforms(raw: any, version: number) {
     sectorCount: Math.max(1, toNumber(raw.sectorCount, 400)),
     sectors: Math.max(1, toNumber(raw.sectors, 1)),
     dutyCycle: Math.max(0, toNumber(raw.dutyCycle, 0.01)),
-    dutyEffectiveFR: dFR,
+    dutyEffectiveFR: dFR_phys,
     currentMode: String(raw.currentMode ?? "hover").toLowerCase() as "hover" | "cruise" | "emergency" | "standby",
 
     // timing (for FR derivations / panels)
@@ -500,6 +656,23 @@ function sanitizeServerUniforms(raw: any, version: number) {
     // helpful derived for checkpoint UIs
     thetaScaleExpected,
 
+    view: {
+      ...(rawView ?? {}),
+      dFR_view_min: Number.isFinite(rawView?.dFR_view_min)
+        ? Math.max(0, Number(rawView?.dFR_view_min))
+        : floors.dFR_view_min,
+      vizFloorThetaGR: Number.isFinite(rawView?.vizFloorThetaGR)
+        ? Math.max(0, Number(rawView?.vizFloorThetaGR))
+        : floors.vizFloorThetaGR,
+      vizFloorRhoGR: Number.isFinite(rawView?.vizFloorRhoGR)
+        ? Math.max(0, Number(rawView?.vizFloorRhoGR))
+        : floors.vizFloorRhoGR,
+      vizFloorThetaDrive: Number.isFinite(rawView?.vizFloorThetaDrive)
+        ? Math.max(0, Number(rawView?.vizFloorThetaDrive))
+        : floors.vizFloorThetaDrive,
+      autoNormalize: rawView?.autoNormalize ?? true,
+    },
+
     // bus meta
     __src: "server" as const,
     __version: version,
@@ -509,6 +682,7 @@ function sanitizeServerUniforms(raw: any, version: number) {
 }
 
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
+import { SectorGridRing } from "@/components/SectorGridRing";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { checkpoint } from "@/lib/checkpoints";
@@ -523,7 +697,7 @@ import { useResonatorAutoDuty } from "@/hooks/useResonatorAutoDuty";
 import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
-import WarpEngineContainer from "@/components/WarpEngineContainer";
+import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 
 // Mode-specific RF burst fractions now sourced from MODE_CONFIGS
 
@@ -560,15 +734,15 @@ const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Num
 
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
 
-const fmt = (v: unknown, digits = 3, fallback = "—") => (isFiniteNumber(v) ? v.toFixed(digits) : fallback);
+const fmt = (v: unknown, digits = 3, fallback = "") => (isFiniteNumber(v) ? v.toFixed(digits) : fallback);
 
-const fexp = (v: unknown, digits = 1, fallback = "—") => (isFiniteNumber(v) ? v.toExponential(digits) : fallback);
+const fexp = (v: unknown, digits = 1, fallback = "") => (isFiniteNumber(v) ? v.toExponential(digits) : fallback);
 
 const fint = (v: unknown, fallback = "0") => (isFiniteNumber(v) ? Math.round(v).toLocaleString() : fallback);
 
 const fmtPowerUnit = (mw?: number) => {
   const x = Number(mw);
-  if (!Number.isFinite(x)) return "—";
+  if (!Number.isFinite(x)) return "";
   if (x >= 1) return `${x.toFixed(1)} MW`;
   if (x >= 1e-3) return `${(x * 1e3).toFixed(1)} kW`;
   return `${(x * 1e6).toFixed(1)} W`;
@@ -595,7 +769,7 @@ type GreensPayload = {
 };
 
 const fmtExp = (v: unknown, digits = 3) =>
-  (typeof v === "number" && Number.isFinite(v)) ? v.toExponential(digits) : "—";
+  (typeof v === "number" && Number.isFinite(v)) ? v.toExponential(digits) : "";
 
 function stats(arr: ArrayLike<number>) {
   let min = Infinity, max = -Infinity, sum = 0;
@@ -618,7 +792,7 @@ const MAINFRAME_ZONES = {
   PHASE_DIAGRAM: "Phase Diagram AI",
   RESONANCE_SCHEDULER: "Resonance Scheduler",
   LOG_TERMINAL: "Log + Document Terminal",
-  WARP_VISUALIZER: "Natário Warp Bubble",
+  WARP_VISUALIZER: "Natrio Warp Bubble",
 };
 
 interface EnergyPipelineState {
@@ -647,7 +821,11 @@ interface EnergyPipelineState {
   gammaVanDenBroeck_mass?: number;
   qMechanical?: number; // used in ShellOutlineVisualizer + HUD calc
   sagDepth_nm?: number; // used in WarpVisualizer parameters
+  // Add live geometry fields used by SpectrumTunerPanel inputs
+  gap_nm?: number;
+  sag_nm?: number;
   overallStatus?: string; // used in "System Status"
+  dutyEffectiveFR?: number;
 }
 
 interface SystemMetrics {
@@ -678,6 +856,22 @@ interface SystemMetrics {
     epsilonTilt: number;
     betaTiltVec: [number, number, number];
   };
+  // Optional nested timing structure from backend metrics
+  lightCrossing?: {
+    tauLC_ms?: number;
+    tau_ms?: number;
+    tauLC_s?: number;
+    sectorPeriod_ms?: number;
+    burst_ms?: number;
+    dwell_ms?: number;
+    sectorsTotal?: number;
+    activeSectors?: number;
+  };
+  // Optional environment snapshot
+  env?: {
+    atmDensity_kg_m3?: number | null;
+    altitude_m?: number | null;
+  };
 }
 
 interface ChatMessage {
@@ -701,10 +895,16 @@ const formatMsgTime = (ts?: Date | string) => {
 };
 
 export default function HelixCore() {
-  // Auto-publish φ from server pipeline/metrics into the shared cache/event bus
+  // Auto-publish  from server pipeline/metrics into the shared cache/event bus
   useGreensBridge();
+  // Publish a single authoritative phase (warp:phase) for the renderer + overlays
+  usePhaseBridge({ publishHz: 60, damp: 0.15 });
+  const vacuumContract = useVacuumContract({
+    id: "helix-core",
+    label: "Helix Vacuum Stack",
+  });
 
-  // Bridge: external “helix:greens” → publish via luma-bus (no direct engine calls)
+  // Bridge: external helix:greens  publish via luma-bus (no direct engine calls)
   useEffect(() => {
     const handler = (ev: CustomEvent) => {
       const detail: any = (ev && (ev as any).detail) || {};
@@ -726,7 +926,9 @@ export default function HelixCore() {
 
   const queryClient = useQueryClient();
 
-  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+const [selectedSector, setSelectedSector] = useState<string | null>(null);
+const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
+const [ringActiveSector, setRingActiveSector] = useState<number>(0);
   const [mainframeLog, setMainframeLog] = useState<string[]>([
     "[HELIX-CORE] System initialized",
     "[HELIX-CORE] Needle Hull mainframe ready",
@@ -744,6 +946,16 @@ export default function HelixCore() {
   const commandAbortRef = useRef<AbortController | null>(null);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
+  const [pumpPhaseBiasDeg, setPumpPhaseBiasDeg] = useState<number>(() => {
+    const stored = localStorage.getItem(PUMP_PHASE_BIAS_KEY);
+    return stored !== null ? clampPhaseBiasDeg(Number(stored)) : 0;
+  });
+  useEffect(() => {
+    localStorage.setItem(PUMP_PHASE_BIAS_KEY, pumpPhaseBiasDeg.toString());
+  }, [pumpPhaseBiasDeg]);
+  const openParametricSweepStub = useCallback(() => {
+    console.info("[helix-core] Gap x Phase x Omega sweep stub pending implementation");
+  }, []);
   const [visualizersInitialized, setVisualizersInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -778,7 +990,7 @@ export default function HelixCore() {
   const [solarTick, setSolarTick] = useState(0);
   const solarBodiesForRoutes = useMemo(() => getSolarBodiesAsPc(), [solarTick]);
 
-  // 🔗 NEW: compute barycenter wobble path once (AU polyline with per-vertex alpha)
+  //  NEW: compute barycenter wobble path once (AU polyline with per-vertex alpha)
   const baryPath = React.useMemo(
     () => computeBarycenterPolylineAU({ daysPast: 3650, daysFuture: 3650, stepDays: 20, fade: true }),
     []
@@ -796,7 +1008,7 @@ export default function HelixCore() {
       const { originPx, pxPerPc } = calibrateToImage(img.naturalWidth, img.naturalHeight, SVG_CALIB);
       setGalaxyCalibration({ originPx, pxPerPc });
       if (DEV)
-        console.log("🗺️ Galaxy calibration:", {
+        console.log(" Galaxy calibration:", {
           imageSize: { w: img.naturalWidth, h: img.naturalHeight },
           sunPixel: originPx,
           scale: `${pxPerPc.toFixed(4)} px/pc`,
@@ -861,7 +1073,7 @@ export default function HelixCore() {
         ts: number;
       }>;
       const d = e.detail || { level: "info", tag: "DEBUG", msg: "unknown", ts: Date.now() };
-      const from = d.data?.from ? ` ← ${String(d.data.from).replace(/^at\s+/, "")}` : "";
+      const from = d.data?.from ? `  ${String(d.data.from).replace(/^at\s+/, "")}` : "";
       const val = d.data?.value !== undefined ? ` value=${JSON.stringify(d.data.value)}` : "";
       const line = `[LOCK] ${d.tag}: ${d.msg}${val}${from}`;
       // keep last 200 lines
@@ -883,9 +1095,9 @@ export default function HelixCore() {
   useEffect(() => {
     const a = (systemMetrics as any)?.thetaAudit;
     if (!a) return;
-    const pct = a.expected ? ((a.used / a.expected) * 100).toFixed(1) : "—";
+    const pct = a.expected ? ((a.used / a.expected) * 100).toFixed(1) : "";
     setMainframeLog((prev) =>
-      [...prev, `[AUDIT] θ-scale expected=${a.expected.toExponential(2)} used=${a.used.toExponential(2)} (${pct}%)`].slice(
+      [...prev, `[AUDIT] -scale expected=${a.expected.toExponential(2)} used=${a.used.toExponential(2)} (${pct}%)`].slice(
         -200
       )
     );
@@ -902,7 +1114,7 @@ export default function HelixCore() {
 
     const sanitized = sanitizeServerUniforms(wu, version);
     const sig = JSON.stringify(stableWU(sanitized));
-    if (sig === lastWUHashRef.current) return;   // 🔇 nothing meaningful changed
+    if (sig === lastWUHashRef.current) return;   //  nothing meaningful changed
 
     lastWUHashRef.current = sig; // Update the stored hash
     publish("warp:uniforms", sanitized);
@@ -910,7 +1122,7 @@ export default function HelixCore() {
 
   // Auto-duty controller - automatically runs resonance scheduler on mode changes
   useResonatorAutoDuty({
-    mode: (pipeline?.currentMode ?? "hover") as "standby" | "hover" | "cruise" | "emergency",
+    mode: (pipeline?.currentMode ?? "hover") as "standby" | "hover" | "taxi" | "nearzero" | "cruise" | "emergency",
     duty: pipeline?.dutyCycle ?? 0.14,
     sectors: systemMetrics?.activeSectors ?? 1,
     freqGHz: pipeline?.modulationFreq_GHz ?? 15,
@@ -925,7 +1137,7 @@ export default function HelixCore() {
 
   // Unified, defensive mode fallback for the whole page
   const serverMode = (pipeline?.currentMode ?? (systemMetrics as any)?.currentMode ?? "hover") as ModeKey;
-  const effectiveMode = (optimisticMode ?? serverMode) as "standby" | "hover" | "cruise" | "emergency";
+  const effectiveMode = (optimisticMode ?? serverMode) as ModeKey;
 
   // Watch for server mode actually changing; bump nonce so children can re-init
   const prevServerModeRef = useRef<string>(serverMode);
@@ -993,6 +1205,380 @@ export default function HelixCore() {
     localBurstFrac: MODE_CONFIGS[effectiveMode as ModeKey]?.localBurstFrac ?? 0.01, // mode-aware burst duty
   });
 
+  // Drive Sync Store: bridge scheduler phase and mode presets
+  const ds = useDriveSyncStore();
+  const ridgePresets = ds.ridgePresets ?? [];
+  const setRidgePresets = ds.setRidgePresets;
+
+  const { data: pipelineSnapshot, sweepResults = [], publishSweepControls } = useEnergyPipeline();
+  const sweepRuntime = (pipelineSnapshot as any)?.sweep as SweepRuntime | undefined;
+  const sweepActive = !!sweepRuntime?.active;
+  const sweepCancelRequested = !!sweepRuntime?.cancelRequested;
+  const [sweepTopN, setSweepTopN] = useState<number>(8);
+  const [selectedSweep, setSelectedSweep] = useState<VacuumGapSweepRow | null>(null);
+
+  const pumpStability = useMemo<PumpStability | null>(() => {
+    const liveRow =
+      sweepRuntime?.last ??
+      (sweepResults.length ? (sweepResults[sweepResults.length - 1] as Partial<VacuumGapSweepRow>) : null);
+    if (!liveRow) return null;
+
+    const pick = (value: unknown): number | undefined => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : undefined;
+    };
+
+    const gapNm = pick(liveRow.d_nm);
+    const mFrac = pick((liveRow as any).m);
+    const phaseDeg = pick((liveRow as any).phi_deg);
+    const pumpFreqGHz = pick((liveRow as any).Omega_GHz);
+    const detuneMHz = pick((liveRow as any).detune_MHz);
+    const kappaMHz = pick((liveRow as any).kappa_MHz);
+    const kappaEffMHz = pick((liveRow as any).kappaEff_MHz);
+    const rhoRaw = pick((liveRow as any).pumpRatio);
+
+    const modDepthPct = mFrac != null ? mFrac * 100 : undefined;
+    const phiRad = phaseDeg != null ? (phaseDeg * Math.PI) / 180 : undefined;
+    const cosPhi = phiRad != null ? Math.cos(phiRad) : undefined;
+
+    const rhoEst =
+      cosPhi != null &&
+      kappaMHz != null &&
+      kappaEffMHz != null &&
+      Math.abs(cosPhi) > 1e-3 &&
+      kappaMHz !== 0
+        ? (1 - kappaEffMHz / kappaMHz) / cosPhi
+        : rhoRaw;
+
+    const detuneOverKappa =
+      detuneMHz != null && kappaMHz != null && kappaMHz !== 0 ? detuneMHz / kappaMHz : undefined;
+
+    const issues: string[] = [];
+    let status: PumpStatus = "ok";
+
+    if (kappaMHz == null || kappaMHz <= 0) {
+      status = "idle";
+      issues.push(" unavailable");
+    } else {
+      if (kappaEffMHz == null) {
+        issues.push("_eff unknown");
+      } else if (kappaEffMHz <= 0) {
+        status = "hazard";
+        issues.push("_eff  0 (threshold)");
+      }
+
+      const rhoAbs = rhoEst != null ? Math.abs(rhoEst) : undefined;
+      if (rhoAbs != null) {
+        if (rhoAbs >= 0.95) {
+          status = "hazard";
+          issues.push("  0.95");
+        } else if (rhoAbs >= 0.9 && status !== "hazard") {
+          status = "warn";
+          issues.push(" approaching threshold");
+        } else if (rhoAbs >= 0.8 && status === "ok") {
+          status = "warn";
+        }
+      }
+
+      if (detuneOverKappa != null && Math.abs(detuneOverKappa) < 0.2 && status !== "hazard") {
+        status = "warn";
+        issues.push("|| < 0.2 ");
+      }
+    }
+
+    const uniqueIssues = Array.from(new Set(issues));
+
+    const kappaAbs = kappaMHz != null ? Math.abs(kappaMHz) : undefined;
+    const detuneTargetMHz =
+      kappaAbs != null ? Number((kappaAbs * 0.65).toFixed(3)) : 9;
+    const f0GHz =
+      pumpFreqGHz != null
+        ? detuneMHz != null
+          ? (pumpFreqGHz - detuneMHz / 1000) / 2
+          : pumpFreqGHz / 2
+        : undefined;
+    const pumpTargetGHz =
+      f0GHz != null ? Number((2 * f0GHz + detuneTargetMHz / 1000).toFixed(6)) : undefined;
+
+    return {
+      status,
+      gapNm,
+      phaseDeg,
+      modDepthPct,
+      pumpFreqGHz,
+      detuneMHz,
+      detuneOverKappa,
+      kappaMHz,
+      kappaEffMHz,
+      rhoRaw,
+      rhoEst,
+      issues: uniqueIssues,
+      f0GHz,
+      recommendation: {
+        gapNm: 20,
+        phaseDeg: -10,
+        modDepthPct: 0.8,
+        detuneMHz: detuneTargetMHz,
+        pumpFreqGHz: pumpTargetGHz,
+        rhoTarget: 0.85,
+      },
+    } as PumpStability;
+  }, [sweepRuntime?.last, sweepResults]);
+
+  const fmtRatio = (value?: number) =>
+    Number.isFinite(value ?? NaN) ? Number(value).toFixed(3) : "--";
+  const fmtMHz = (value?: number) =>
+    Number.isFinite(value ?? NaN) ? `${Number(value).toFixed(3)} MHz` : "--";
+  const fmtGHz = (value?: number) =>
+    Number.isFinite(value ?? NaN) ? `${Number(value).toFixed(3)} GHz` : "--";
+  const fmtPct = (value?: number) =>
+    Number.isFinite(value ?? NaN) ? `${Number(value).toFixed(2)} %` : "--";
+
+  const applyWorkingPoint = useCallback(async () => {
+    if (!pumpStability) return;
+    const { recommendation } = pumpStability;
+    try {
+      const sweepCfg: DynamicConfig["sweep"] = {
+        gaps_nm: [recommendation.gapNm],
+        mod_depth_pct: [recommendation.modDepthPct],
+        phase_deg: [recommendation.phaseDeg],
+      };
+      if (recommendation.pumpFreqGHz != null) {
+        sweepCfg.pump_freq_GHz = [recommendation.pumpFreqGHz];
+      }
+      const payload: Partial<DynamicConfig> = {
+        gap_nm: recommendation.gapNm,
+        mod_depth_pct: recommendation.modDepthPct,
+        phase_deg: recommendation.phaseDeg,
+        sweep: sweepCfg,
+      };
+      if (recommendation.pumpFreqGHz != null) {
+        payload.pump_freq_GHz = recommendation.pumpFreqGHz;
+      }
+      await publishSweepControls(payload);
+      toast({
+        title: "Safe working point applied",
+        description: `gap ${recommendation.gapNm} nm | phi ${recommendation.phaseDeg.toFixed(1)} deg | m ${recommendation.modDepthPct.toFixed(2)}%`,
+      });
+    } catch (err) {
+      console.error("[HELIX] Failed to apply SWP-A:", err);
+      toast({
+        title: "Failed to apply SWP",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }, [pumpStability, publishSweepControls]);
+
+  const nudgeDetune = useCallback(async () => {
+    if (!pumpStability || !pumpStability.recommendation.pumpFreqGHz) return;
+    const targetGHz = pumpStability.recommendation.pumpFreqGHz;
+    try {
+      const payload: Partial<DynamicConfig> = {
+        pump_freq_GHz: targetGHz,
+      };
+      if (pumpStability.recommendation.phaseDeg != null) {
+        payload.phase_deg = pumpStability.recommendation.phaseDeg;
+      }
+      await publishSweepControls(payload);
+      toast({
+        title: "Detune nudged",
+        description: `Delta set to ${pumpStability.recommendation.detuneMHz.toFixed(2)} MHz (~0.65 kappa)`,
+      });
+    } catch (err) {
+      console.error("[HELIX] Failed to nudge detune:", err);
+      toast({
+        title: "Failed to adjust detune",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }, [pumpStability, publishSweepControls]);
+
+  const trimDepth = useCallback(async () => {
+    if (!pumpStability) return;
+    const current = pumpStability.modDepthPct ?? pumpStability.recommendation.modDepthPct;
+    const targetDepth = Number(
+      Math.max(0.1, Math.min(current, pumpStability.recommendation.modDepthPct)).toFixed(3),
+    );
+    try {
+      const payload: Partial<DynamicConfig> = {
+        mod_depth_pct: targetDepth,
+      };
+      await publishSweepControls(payload);
+      toast({
+        title: "Modulation depth trimmed",
+        description: `m -> ${targetDepth.toFixed(2)}%`,
+      });
+    } catch (err) {
+      console.error("[HELIX] Failed to trim depth:", err);
+      toast({
+        title: "Failed to trim depth",
+        description: err instanceof Error ? err.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  }, [pumpStability, publishSweepControls]);
+
+  const pumpStatusMeta = pumpStability
+    ? pumpStability.status === "hazard"
+      ? { label: "limit", className: "bg-rose-500/20 text-rose-200", icon: <AlertTriangle className="h-3 w-3" /> }
+      : pumpStability.status === "warn"
+      ? { label: "guard", className: "bg-amber-500/20 text-amber-200", icon: <AlertTriangle className="h-3 w-3" /> }
+      : pumpStability.status === "ok"
+      ? { label: "stable", className: "bg-emerald-500/20 text-emerald-300", icon: <CheckCircle2 className="h-3 w-3" /> }
+      : { label: "idle", className: "bg-slate-700/60 text-slate-300", icon: <Gauge className="h-3 w-3" /> }
+    : null;
+
+  const bestPerGap = useMemo(() => {
+    const map = new Map<number, VacuumGapSweepRow>();
+    for (const row of sweepResults) {
+      const prev = map.get(row.d_nm);
+      if (!prev || row.G > prev.G) {
+        map.set(row.d_nm, row);
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.d_nm - b.d_nm);
+  }, [sweepResults]);
+
+  const topByGain = useMemo(() => {
+    if (!sweepResults.length) return [];
+    return [...sweepResults]
+      .sort((a, b) => b.G - a.G)
+      .slice(0, Math.max(1, sweepTopN));
+  }, [sweepResults, sweepTopN]);
+
+  const runSweepWithHardware = useCallback(() => {
+    const payload = { sweep: { activeSlew: true } } as Partial<DynamicConfig>;
+    publishSweepControls(payload);
+  }, [publishSweepControls]);
+
+  const cancelSweep = useCallback(async () => {
+    try {
+      await apiRequest("POST", "/api/helix/pipeline/cancel-sweep", {});
+    } catch (err) {
+      console.error("[HELIX] Failed to cancel sweep:", err);
+    }
+  }, []);
+
+  const exportSweepCSV = useCallback(() => {
+    if (!sweepResults.length) return;
+    downloadCSV(sweepResults);
+  }, [sweepResults]);
+
+  const captureRidge = useCallback(() => {
+    if (!sweepResults.length) {
+      setRidgePresets([]);
+      return;
+    }
+    const base = bestPerGap.length ? bestPerGap : topByGain;
+    const chosen = base.slice(0, Math.max(1, sweepTopN));
+    const presets: RidgePreset[] = chosen.map((row) => {
+      const qlLabel = Number.isFinite(row.QL)
+        ? (row.QL as number).toExponential(2)
+        : Number.isFinite(row.QL_base)
+        ? (row.QL_base as number).toExponential(2)
+        : '--';
+
+      return {
+        d_nm: row.d_nm,
+        Omega_GHz: row.Omega_GHz,
+        phi_deg: row.phi_deg,
+        m_pct: row.m * 100,
+        note: `G=${row.G.toFixed(2)} dB, QL=${qlLabel}`,
+      };
+    });
+    setRidgePresets(presets);
+  }, [bestPerGap, topByGain, sweepResults, sweepTopN, setRidgePresets]);
+
+  useEffect(() => {
+    if (!sweepResults.length) {
+      setSelectedSweep(null);
+      return;
+    }
+    if (!selectedSweep) {
+      setSelectedSweep(sweepResults[0]);
+      return;
+    }
+    const stillPresent = sweepResults.find(
+      (row) =>
+        row.d_nm === selectedSweep.d_nm &&
+        row.m === selectedSweep.m &&
+        row.Omega_GHz === selectedSweep.Omega_GHz &&
+        row.phi_deg === selectedSweep.phi_deg,
+    );
+    if (!stillPresent) {
+      setSelectedSweep(sweepResults[0]);
+    }
+  }, [sweepResults, selectedSweep]);
+
+  // Follow scheduler phase  drive sync phase (only when phaseMode="scheduler")
+  useEffect(() => {
+    if (ds.phaseMode !== "scheduler") return;
+    const total = Math.max(1, Math.floor(totalSectors || 400));
+    const idxSrc = Number.isFinite(systemMetrics?.currentSector)
+      ? Number(systemMetrics!.currentSector)
+      : Number.isFinite(lc?.sectorIdx)
+        ? Number(lc!.sectorIdx)
+        : 0;
+    const wrapped = ((idxSrc % total) + total) % total;
+    const basePhase = wrapped / total;
+    const biasFraction = clampPhaseBiasDeg(pumpPhaseBiasDeg) / 360;
+    let phase01 = basePhase + biasFraction;
+    phase01 = phase01 - Math.floor(phase01);
+    if (phase01 < 0) {
+      phase01 += 1;
+    }
+    if (typeof ds.setPhase === "function") {
+      ds.setPhase(phase01);
+    }
+    if (typeof ds.setPumpPhaseDeg === "function") {
+      ds.setPumpPhaseDeg(phase01 * 360);
+    }
+  }, [ds.phaseMode, ds.setPumpPhaseDeg, pumpPhaseBiasDeg, systemMetrics?.currentSector, lc?.sectorIdx, totalSectors]);
+
+  // Apply per-mode presets into drive sync (when followMode lock is enabled)
+  useEffect(() => {
+    if (!ds.locks?.followMode) return;
+    const mode = String(effectiveMode).toLowerCase();
+    switch (mode) {
+      case "nearzero":
+        // Zero- hover-climb: dual lobes 180 apart, slightly tighter and higher floor for stability
+        if (typeof ds.setSplit === "function") ds.setSplit(true, 0.5);
+        if (typeof ds.setSigma === "function") ds.setSigma(0.20);
+        if (typeof ds.setFloor === "function") ds.setFloor(0.18);
+        break;
+      case "hover":
+        // Gentle bulge: single lobe, a bit broader with modest floor
+        if (typeof ds.setSplit === "function") ds.setSplit(false);
+        if (typeof ds.setSigma === "function") ds.setSigma(0.30);
+        if (typeof ds.setFloor === "function") ds.setFloor(0.12);
+        break;
+      case "cruise":
+        // Coherent sweep: single lobe, medium width and a low floor
+        if (typeof ds.setSplit === "function") ds.setSplit(false);
+        if (typeof ds.setSigma === "function") ds.setSigma(0.25);
+        if (typeof ds.setFloor === "function") ds.setFloor(0.10);
+        break;
+      default:
+        // leave user settings as-is for other modes (standby/emergency/etc.)
+        break;
+    }
+  }, [effectiveMode, ds.locks?.followMode]);
+
+  // Push q and  (zeta) into drive sync store when available
+  useEffect(() => {
+    const qLive = isFiniteNumber(pipeline?.qSpoilingFactor)
+      ? pipeline!.qSpoilingFactor!
+      : (isFiniteNumber((systemMetrics as any)?.qSpoilingFactor) ? Number((systemMetrics as any).qSpoilingFactor) : undefined);
+    if (typeof qLive === "number" && typeof ds.setQ === "function") ds.setQ(qLive);
+
+    const zLive = isFiniteNumber(systemMetrics?.fordRoman?.value)
+      ? Number(systemMetrics!.fordRoman!.value)
+      : (isFiniteNumber((pipeline as any)?.zeta) ? Number((pipeline as any).zeta) : undefined);
+    if (typeof zLive === "number" && typeof ds.setZeta === "function") ds.setZeta(zLive);
+  }, [pipeline?.qSpoilingFactor, (systemMetrics as any)?.qSpoilingFactor, systemMetrics?.fordRoman?.value, (pipeline as any)?.zeta]);
+
   const qSpoilUI = isFiniteNumber(pipeline?.qSpoilingFactor) ? pipeline!.qSpoilingFactor! : modeCfg.qSpoilingFactor ?? 1;
 
   const dutyEffectiveFR = useMemo(() => {
@@ -1014,6 +1600,174 @@ export default function HelixCore() {
   const isStandby = String(effectiveMode).toLowerCase() === "standby";
   const dutyEffectiveFR_safe = isStandby ? 0 : dutyEffectiveFR;
   const dutyUI_safe = isStandby ? 0 : dutyUI;
+  // Canonical FR duty for child panels: prefer Energy panel's displayed value; fallback to computed safe
+  const frDutyForPanels = dutyEffectiveFR_safe;
+  const rawLocalBurstFrac = isFiniteNumber((pipeline as any)?.localBurstFrac)
+    ? Number((pipeline as any).localBurstFrac)
+    : modeCfg.localBurstFrac ?? 0.01;
+  const localBurstFrac = clamp01(rawLocalBurstFrac);
+  const nearZeroGuards = useMemo(
+    () => ({
+      q: isFiniteNumber(pipeline?.qSpoilingFactor) ? pipeline!.qSpoilingFactor! : NaN,
+      zeta: isFiniteNumber(systemMetrics?.fordRoman?.value)
+        ? Number(systemMetrics!.fordRoman.value)
+        : isFiniteNumber(pipeline?.zeta)
+        ? pipeline!.zeta!
+        : NaN,
+      stroke_pm: isFiniteNumber((pipeline as any)?.stroke_pm)
+        ? Number((pipeline as any).stroke_pm)
+        : isFiniteNumber((systemMetrics as any)?.stroke_pm)
+        ? Number((systemMetrics as any).stroke_pm)
+        : NaN,
+      // Treat non-positive TS ratios as missing to avoid false red-limit trips
+      TS:
+        isFiniteNumber(pipeline?.TS_ratio) && Number(pipeline!.TS_ratio!) > 0
+          ? Number(pipeline!.TS_ratio!)
+          : isFiniteNumber((systemMetrics as any)?.timeScaleRatio) && Number((systemMetrics as any).timeScaleRatio) > 0
+          ? Number((systemMetrics as any).timeScaleRatio)
+          : NaN,
+    }),
+    [
+      pipeline?.qSpoilingFactor,
+      pipeline?.zeta,
+      (pipeline as any)?.stroke_pm,
+      pipeline?.TS_ratio,
+      systemMetrics?.fordRoman?.value,
+      (systemMetrics as any)?.stroke_pm,
+      (systemMetrics as any)?.timeScaleRatio,
+    ]
+  );
+  const nearZeroThermal = useMemo(() => {
+    const P_diss =
+      isFiniteNumber(pipeline?.P_loss_raw) && isFiniteNumber(pipeline?.N_tiles)
+        ? pipeline!.P_loss_raw! * pipeline!.N_tiles!
+        : undefined;
+    const Q_reject = isFiniteNumber((systemMetrics as any)?.energyOutput)
+      ? Number((systemMetrics as any).energyOutput)
+      : isFiniteNumber(pipeline?.P_avg)
+      ? pipeline!.P_avg! * 1e6
+      : undefined;
+    const headroom = isFiniteNumber((pipeline as any)?.E_headroom_J)
+      ? Number((pipeline as any).E_headroom_J)
+      : undefined;
+    if (P_diss == null && Q_reject == null && headroom == null) return undefined;
+    return {
+      P_diss_W: P_diss,
+      Q_reject_W: Q_reject,
+      E_headroom_J: headroom,
+    };
+  }, [pipeline?.P_loss_raw, pipeline?.N_tiles, (systemMetrics as any)?.energyOutput, pipeline?.P_avg, (pipeline as any)?.E_headroom_J]);
+  const tauLCSeconds = isFiniteNumber(lc?.tauLC_ms) ? (lc!.tauLC_ms! / 1000) : undefined;
+  const nearZeroBurst = useMemo(() => {
+    const dwellMs = isFiniteNumber(lc?.dwell_ms) ? Number(lc!.dwell_ms!) : undefined;
+    const burstMs = isFiniteNumber((lc as any)?.burst_ms) ? Number((lc as any).burst_ms) : undefined;
+    const fracLive = (Number.isFinite(dwellMs) && Number.isFinite(burstMs) && (dwellMs as number) > 0)
+      ? Math.max(0, Math.min(1, (burstMs as number) / (dwellMs as number)))
+      : undefined;
+    return {
+      dwell_s: Number.isFinite(dwellMs) ? (dwellMs as number) / 1000 : undefined,
+      // Prefer live burst fraction from metrics when present; fallback to mode/pipeline localBurstFrac
+      frac: Number.isFinite(fracLive) ? (fracLive as number) : localBurstFrac,
+    };
+  }, [lc?.dwell_ms, (lc as any)?.burst_ms, localBurstFrac]);
+  const dutyForEase = isFiniteNumber(pipeline?.dutyCycle) ? pipeline!.dutyCycle! : modeCfg.dutyCycle ?? 0.12;
+  const burstForDwell = localBurstFrac;
+  const handleNearZeroAction = useCallback(
+    async (action: "ease" | "dwell" | "drop") => {
+      if (effectiveMode !== "nearzero") {
+        setMainframeLog((prev) => [...prev, `[NEARZERO] Ignored ${action} (mode inactive)`].slice(-200));
+        return;
+      }
+      try {
+        if (action === "drop") {
+          setMainframeLog((prev) => [...prev, "[NEARZERO] Advisory -> switching to Hover"].slice(-200));
+          console.info("[HELIX] Near-Zero advisory requested mode drop to hover");
+          switchMode.mutate("hover");
+          return;
+        }
+        if (action === "ease") {
+          const nextDuty = Math.max(0, dutyForEase * 0.92);
+          await apiRequest("POST", "/api/helix/pipeline/update", { dutyCycle: nextDuty });
+          setMainframeLog((prev) => [...prev, `[NEARZERO] Duty eased to ${(nextDuty * 100).toFixed(2)}%`].slice(-200));
+        } else if (action === "dwell") {
+          const nextFrac = Math.max(0.0005, burstForDwell * 0.9);
+          await apiRequest("POST", "/api/helix/pipeline/update", { localBurstFrac: nextFrac });
+          setMainframeLog((prev) => [...prev, `[NEARZERO] Burst fraction trimmed to ${(nextFrac * 100).toFixed(2)}%`].slice(-200));
+        }
+        refetchMetrics();
+      } catch (error) {
+        console.error("[NEARZERO] control action failed:", error);
+        toast({
+          title: "Near-Zero control failed",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    },
+    [effectiveMode, dutyForEase, burstForDwell, switchMode, refetchMetrics, toast, setMainframeLog]
+  );
+  const tauLcMs = lc?.tauLC_ms;
+  const tauLcUs = isFiniteNumber(tauLcMs) ? tauLcMs * 1000 : undefined;
+  const hasMetricsTau =
+    isFiniteNumber(systemMetrics?.lightCrossing?.tauLC_ms) ||
+    isFiniteNumber(systemMetrics?.lightCrossing?.tau_ms) ||
+    isFiniteNumber(systemMetrics?.lightCrossing?.tauLC_s);
+  const sectorsProv =
+    Number.isFinite(systemMetrics?.totalSectors) && Number(systemMetrics?.totalSectors) > 0
+      ? ("metrics" as const)
+      : Number.isFinite((pipeline as any)?.sectorsTotal) && Number((pipeline as any)?.sectorsTotal) > 0
+      ? ("live" as const)
+      : ("derived" as const);
+  const qSpoilLive = isFiniteNumber(pipeline?.qSpoilingFactor) ? pipeline!.qSpoilingFactor! : undefined;
+  const spectrumInputs = useMemo(
+    () => ({
+      a_nm: isFiniteNumber(pipeline?.gap_nm) ? pipeline!.gap_nm! : undefined,
+      sagDepth_nm: isFiniteNumber(pipeline?.sag_nm) ? pipeline!.sag_nm! : undefined,
+      gammaGeo: isFiniteNumber(pipeline?.gammaGeo) ? pipeline!.gammaGeo! : undefined,
+      Q0: isFiniteNumber(pipeline?.qMechanical) ? pipeline!.qMechanical! : undefined,
+      qCavity: isFiniteNumber(pipeline?.qCavity) ? pipeline!.qCavity! : undefined,
+      qSpoilingFactor: qSpoilLive ?? qSpoilUI,
+      modulationFreq_GHz: isFiniteNumber(pipeline?.modulationFreq_GHz) ? pipeline!.modulationFreq_GHz! : undefined,
+      duty: localBurstFrac,
+      sectors: totalSectors,
+      lightCrossing_us: tauLcUs,
+      prov: {
+        a_nm: pipeline?.gap_nm !== undefined ? ("live" as const) : undefined,
+        sagDepth_nm: pipeline?.sag_nm !== undefined ? ("live" as const) : undefined,
+        gammaGeo: pipeline?.gammaGeo !== undefined ? ("live" as const) : undefined,
+        Q0: pipeline?.qMechanical !== undefined ? ("live" as const) : undefined,
+        qCavity: pipeline?.qCavity !== undefined ? ("live" as const) : undefined,
+        qSpoilingFactor: qSpoilLive !== undefined ? ("live" as const) : ("derived" as const),
+        modulationFreq_GHz: pipeline?.modulationFreq_GHz !== undefined ? ("live" as const) : undefined,
+        duty: (pipeline as any)?.localBurstFrac !== undefined ? ("live" as const) : ("derived" as const),
+        sectors: sectorsProv,
+        lightCrossing_us: tauLcUs !== undefined ? (hasMetricsTau ? ("metrics" as const) : ("derived" as const)) : undefined,
+      },
+    }),
+    [pipeline, qSpoilLive, qSpoilUI, localBurstFrac, totalSectors, tauLcUs, hasMetricsTau, sectorsProv]
+  );
+
+  // Resolve authoritative light-crossing for Shell Outline: prefer server/derived/live timing, fallback to local loop
+  const lcForOutline = useMemo(() => {
+    // Prefer the strobing timeline (loop) for LC, then fallback to metrics/live
+    const m = (systemMetrics as any)?.lightCrossing || {};
+    const tauFromLoop = Number.isFinite(lc?.tauLC_ms) ? Number(lc!.tauLC_ms) : undefined;
+    const tauFromMetrics = Number.isFinite(m.tauLC_ms) ? Number(m.tauLC_ms)
+                        : (Number.isFinite(m.tau_ms) ? Number(m.tau_ms)
+                        : (Number.isFinite(m.tauLC_s) ? Number(m.tauLC_s) * 1000 : undefined));
+    const tau = tauFromLoop ?? tauFromMetrics;
+
+    const dwell = Number.isFinite(m.dwell_ms) ? Number(m.dwell_ms)
+                : (Number.isFinite((systemMetrics as any)?.sectorPeriod_ms) ? Number((systemMetrics as any).sectorPeriod_ms)
+                : (Number.isFinite(lc?.dwell_ms) ? Number(lc!.dwell_ms) : undefined));
+    const burst = Number.isFinite(m.burst_ms) ? Number(m.burst_ms)
+                : (Number.isFinite((lc as any)?.burst_ms) ? Number((lc as any).burst_ms) : undefined);
+    return {
+      tauLC_ms: tau,
+      dwell_ms: dwell,
+      burst_ms: burst,
+    } as { tauLC_ms?: number; dwell_ms?: number; burst_ms?: number };
+  }, [systemMetrics, lc?.tauLC_ms, lc?.dwell_ms, (lc as any)?.burst_ms]);
 
   if (import.meta.env?.DEV) {
     console.table({
@@ -1051,7 +1805,7 @@ export default function HelixCore() {
   })();
 
   // Calculate view mass fraction for REAL renderer (one sector's worth vs full hull)
-  const viewMassFracReal = tilesPerSectorSafe / totalTilesSafe; // ≈ 1/400 for single sector
+  const viewMassFracReal = tilesPerSectorSafe / totalTilesSafe; //  1/400 for single sector
 
   const burstLocal = (() => {
     const b = Number(lc?.burst_ms),
@@ -1074,6 +1828,19 @@ export default function HelixCore() {
 
   // If server emitted 0 but we're not in Standby, prefer computed
   const serverAvgTiles = Number(systemMetrics?.activeTiles);
+  const activeFraction = totalSectorsSafe > 0 ? concurrentSectorsSafe / totalSectorsSafe : 0;
+  const ringCurrentSector = Number.isFinite(systemMetrics?.currentSector)
+    ? Number(systemMetrics!.currentSector)
+    : (Number.isFinite(lc?.sectorIdx) ? Number(lc!.sectorIdx) : 0);
+  const ringBurstMs = Number.isFinite(lcForOutline.burst_ms)
+    ? (lcForOutline.burst_ms as number)
+    : (Number.isFinite(lc?.burst_ms) ? Number(lc!.burst_ms) : undefined);
+  const ringDwellMs = Number.isFinite(lcForOutline.dwell_ms)
+    ? (lcForOutline.dwell_ms as number)
+    : (Number.isFinite(lc?.dwell_ms) ? Number(lc!.dwell_ms) : undefined);
+  const ringTauMs = Number.isFinite(lcForOutline.tauLC_ms)
+    ? (lcForOutline.tauLC_ms as number)
+    : (Number.isFinite(lc?.tauLC_ms) ? Number(lc!.tauLC_ms) : undefined);
   const avgTilesSafe =
     !isStandby && Number.isFinite(serverAvgTiles) && serverAvgTiles > 0 ? Math.floor(serverAvgTiles) : computedAvgTiles;
 
@@ -1083,10 +1850,10 @@ export default function HelixCore() {
     burstLocal,
   };
 
-  // 🎛️ RAF gating for smooth transitions
+  //  RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
 
-  // ===== Green's Potential (φ = G * ρ) — live hookup =====
+  // ===== Green's Potential ( = G * )  live hookup =====
   const [greens, setGreens] = useState<GreensPayload | null>(() => {
     const cached = queryClient.getQueryData<GreensPayload>(["helix:pipeline:greens"]);
     return cached ?? null;
@@ -1143,10 +1910,10 @@ export default function HelixCore() {
   const gTarget = gTargets[currentMode] ?? 0;
   const R_geom = Math.cbrt(hull.a * hull.b * hull.c);
 
-  // ε (dimensionless) used by shaders + viz overlays
+  //  (dimensionless) used by shaders + viz overlays
   const epsilonTilt = Math.min(5e-7, Math.max(0, (gTarget * R_geom) / (c * c)));
 
-  // β direction (Purple arrow) — prefer live metrics, fallback to canonical "nose down"
+  //  direction (Purple arrow)  prefer live metrics, fallback to canonical "nose down"
   const betaTiltVecRaw = systemMetrics?.shiftVector?.betaTiltVec ?? [0, -1, 0];
   const betaNorm = Math.hypot(betaTiltVecRaw[0], betaTiltVecRaw[1], betaTiltVecRaw[2]) || 1;
   const betaTiltVecN: [number, number, number] = [
@@ -1177,20 +1944,20 @@ export default function HelixCore() {
   // Defer checkpoint calls to avoid render-time state updates
   React.useEffect(() => {
     checkpoint({
-      id: "θ-expected",
+      id: "-expected",
       side: "REAL",
       stage: "expect",
       pass: true,
-      msg: `θ_expected=${expREAL.toExponential()}`,
+      msg: `_expected=${expREAL.toExponential()}`,
       expect: expREAL,
     });
 
     checkpoint({
-      id: "θ-used",
+      id: "-used",
       side: "REAL",
       stage: "expect",
       pass: true,
-      msg: `θ_used=${usedREAL.toExponential()}`,
+      msg: `_used=${usedREAL.toExponential()}`,
       expect: usedREAL,
     });
   }, [expREAL, usedREAL]);
@@ -1203,6 +1970,35 @@ export default function HelixCore() {
     dutyCycle: dutyUI_safe,
     viewMassFraction: 1.0,
   }
+
+  // DEBUG: broadcast current physics bundle every second so detached panels (AlcubierrePanel)
+  // can compare what they computed from the raw pipeline vs our canonical derivation here.
+  React.useEffect(() => {
+    let raf: number; let lastSig = ""; let lastEmit = 0;
+    const tick = () => {
+      const now = performance.now();
+      if (now - lastEmit > 1000) { // throttle to ~1 Hz
+        const payload = { showPhys, realPhys, ts: Date.now() };
+        const sig = JSON.stringify([
+          showPhys.gammaGeo,
+          showPhys.qSpoilingFactor,
+          showPhys.gammaVanDenBroeck_vis,
+          showPhys.dutyEffectiveFR,
+          realPhys.gammaGeo,
+          realPhys.q,
+          realPhys.gammaVdB,
+          realPhys.dFR
+        ]);
+        if (sig !== lastSig) {
+          lastSig = sig; lastEmit = now;
+          try { window.dispatchEvent(new CustomEvent('helix:phys:bundle', { detail: payload })); } catch {}
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [showPhys, realPhys]);
 
   const baseShared = {
     hull:
@@ -1223,7 +2019,7 @@ export default function HelixCore() {
     sectorCount: totalSectors,
     sectors: concurrentSectors,
 
-    // ✅ attach Purple shift vector + curvature knobs to BOTH renderers
+    //  attach Purple shift vector + curvature knobs to BOTH renderers
     epsilonTilt,
     betaTiltVec: betaTiltVecN,
     curvatureGainDec: 0.0,
@@ -1355,17 +2151,18 @@ export default function HelixCore() {
 
     try {
       const cur = Math.max(0, Math.floor(cs)) % total;
-      fn({ sectorCount: total, currentSector: cur, split: cur });
+      const splitPayload = effectiveMode === "nearzero" ? 0.5 : cur;
+      fn({ sectorCount: total, currentSector: cur, split: splitPayload });
     } catch (err) {
       console.warn("setStrobingState threw; skipped this tick:", err);
     }
-  }, [totalSectors, systemMetrics?.currentSector, lc?.sectorIdx]);
+  }, [totalSectors, systemMetrics?.currentSector, lc?.sectorIdx, effectiveMode]);
 
-  // Color mapper (blue→active; red if ζ breach)
+  // Color mapper (blueactive; red if  breach)
   const sectorColor = React.useCallback(
     (i: number) => {
-      const ζ = systemMetrics?.fordRoman?.value ?? 0.0;
-      const limitBreach = ζ >= 1.0;
+      const fordRomanValue = systemMetrics?.fordRoman?.value ?? 0.0;
+      const limitBreach = fordRomanValue >= 1.0;
       const v = trail[i] ?? 0;
       if (limitBreach) {
         return `rgba(239, 68, 68, ${0.2 + 0.8 * v})`; // red
@@ -1476,13 +2273,16 @@ export default function HelixCore() {
             </div>
           </div>
 
+          <VacuumContractBadge contract={vacuumContract} className="mb-4" />
+
           {/* === Quick Operational Mode Switch (global) === */}
           <div className="mb-4">
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: "standby", label: "Standby", hint: "Field idle" },
                 { key: "hover", label: "Hover", hint: "Gentle bulge" },
-                { key: "cruise", label: "Cruise", hint: "Coherent 400× strobe" },
+                { key: "nearzero", label: "Near-Zero", hint: "Zero-beta hover-climb" },
+                { key: "cruise", label: "Cruise", hint: "Coherent 400-sector sweep" },
                 { key: "emergency", label: "Emergency", hint: "Max response" },
               ] as const).map((m) => {
                 const isActive = effectiveMode === m.key;
@@ -1508,7 +2308,10 @@ export default function HelixCore() {
                           });
                         });
                         refetchMetrics();
-                        setMainframeLog((prev) => [...prev, `[MODE] Quick switch → ${m.key}`]);
+                        setMainframeLog((prev) => [...prev, `[MODE] Quick switch -> ${m.key}`]);
+                        if (m.key === "nearzero") {
+                          console.info("[HELIX] Quick switch requested Near-Zero mode");
+                        }
                       }
                     }}
                   >
@@ -1520,29 +2323,41 @@ export default function HelixCore() {
             </div>
           </div>
 
-
+          <NearZeroWidget
+            className="mb-6"
+            mode={effectiveMode}
+            env={systemMetrics?.env}
+            guards={nearZeroGuards}
+            thermal={nearZeroThermal}
+            frDuty={frDutyForPanels}
+            QL={isFiniteNumber(pipeline?.qCavity) ? pipeline!.qCavity! : undefined}
+            burst={nearZeroBurst}
+            tauLC_s={tauLCSeconds}
+            sectorsTotal={totalSectors}
+            onAction={handleNearZeroAction}
+          />
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                Warp Bubble • Shell Outline (ρ=1±Δ)
+                Warp Bubble  Shell Outline (=1)
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm">
-                    <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                    <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                     <p className="mb-2">
-                      Three ρ-surfaces (inner/center/outer) bound the wall thickness set by the Natário bell. Inner curves skew
+                      Three -surfaces (inner/center/outer) bound the wall thickness set by the Natrio bell. Inner curves skew
                       toward compression (orange), outer toward expansion (blue). Violet denotes interior tilt direction.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                    <p className="text-xs italic">Contours show where space would lean—enough to guide, never to tear.</p>
+                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                    <p className="text-xs italic">Contours show where space would leanenough to guide, never to tear.</p>
                   </TooltipContent>
                 </Tooltip>
               </CardTitle>
-              <CardDescription>Wireframe of inner/center/outer Natário wall (ellipsoidal), with interior shift vector.</CardDescription>
+              <CardDescription>Wireframe of inner/center/outer Natrio wall (ellipsoidal), with interior shift vector.</CardDescription>
             </CardHeader>
             <CardContent>
               <ShellOutlineVisualizer
@@ -1567,10 +2382,11 @@ export default function HelixCore() {
                   mode: effectiveMode,
                   dutyCycle: dutyUI_safe,
                   sectors: totalSectors,
+                  sectorCount: totalSectors,
                   gammaGeo: pipeline?.gammaGeo ?? 26,
                   qSpoil: qSpoilUI,
                   qCavity: pipeline?.qCavity ?? 1e9,
-                  // 🔽 NEW: mechanical chain
+                  //  NEW: mechanical chain
                   qMechanical: pipeline?.qMechanical ?? 1,
                   modulationHz: (pipeline?.modulationFreq_GHz ?? 15) * 1e9,
                   mech: {
@@ -1578,9 +2394,13 @@ export default function HelixCore() {
                     mechZeta: undefined, // infer from qMechanical if omitted
                     mechCoupling: 0.65, // tweak visual strength 0..1
                   },
-                  // 🔽 Ford-Roman window + light-crossing data
-                  dutyEffectiveFR: dutyEffectiveFR_safe,
-                  lightCrossing: lc,
+                  //  Ford-Roman window + light-crossing data
+                  dutyEffectiveFR: (Number.isFinite(frDutyForPanels as any) ? clamp01(frDutyForPanels as number) : 0),
+                  lightCrossing: {
+                    tauLC_ms: Number.isFinite((lcForOutline as any)?.tauLC_ms) ? Number((lcForOutline as any).tauLC_ms) : undefined,
+                    dwell_ms: Number.isFinite((lcForOutline as any)?.dwell_ms) ? Number((lcForOutline as any).dwell_ms) : undefined,
+                    burst_ms: Number.isFinite((lcForOutline as any)?.burst_ms) ? Number((lcForOutline as any).burst_ms) : undefined,
+                  },
                   zeta: pipeline?.zeta,
                 }}
               />
@@ -1598,8 +2418,8 @@ export default function HelixCore() {
                 return (
                   <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-slate-300 font-mono">
                     <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">Q_mech = {qMech.toFixed(3)}</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">ζ ≈ {zeta.toExponential(2)}</span>
-                    <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">f₀ = {(f0 / 1e9).toFixed(2)} GHz</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">  {zeta.toExponential(2)}</span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">f = {(f0 / 1e9).toFixed(2)} GHz</span>
                     <span className="px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700">A_rel = {Arel.toFixed(2)}</span>
                   </div>
                 );
@@ -1610,7 +2430,7 @@ export default function HelixCore() {
         {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
-          <AlcubierrePanel />
+          <AlcubierrePanel ringPulseIndex={tileHoverSector} onRingActiveIndex={setRingActiveSector} />
         </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
@@ -1623,12 +2443,12 @@ export default function HelixCore() {
                     <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm">
-                    <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                    <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                     <p className="mb-2">
-                      The sweep rate across sectors is chosen so no disturbance outruns the grid's τ_LC. This timeline compares
+                      The sweep rate across sectors is chosen so no disturbance outruns the grid's tauLC. This timeline compares
                       modulation (Hz), sector period, and light-crossing to ensure the "average" shell is GR-valid.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
                     <p className="text-xs italic">Go slowly enough to remain whole; move steadily enough to arrive.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -1660,12 +2480,12 @@ export default function HelixCore() {
                     <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm">
-                    <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                    <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                     <p className="mb-2">
                       Core operational mode controls power output, exotic matter generation, and sector strobing patterns. Each mode
                       balances performance with Ford-Roman compliance and energy efficiency.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
                     <p className="text-xs italic">Power serves purpose. Choose the mode that serves the moment.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -1683,12 +2503,12 @@ export default function HelixCore() {
                         <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-sm">
-                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                         <p className="mb-2">
                           Each mode represents a different balance of power output, sector strobing frequency, and exotic matter
                           requirements based on mission requirements.
                         </p>
-                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
                         <p className="text-xs italic">The wise captain chooses not the fastest path, but the path that arrives intact.</p>
                       </TooltipContent>
                     </Tooltip>
@@ -1754,7 +2574,7 @@ export default function HelixCore() {
                 {/* Active Tiles Panel with helper strings */}
                 {(() => {
                   const frPctLabel = Number.isFinite(dutyEffectiveFR_safe) ? ` (${(dutyEffectiveFR_safe * 100).toFixed(3)}%)` : "";
-                  const localOnLabel = Number.isFinite(activeTiles?.burstLocal) ? `${(activeTiles.burstLocal * 100).toFixed(2)}%` : "—";
+                  const localOnLabel = Number.isFinite(activeTiles?.burstLocal) ? `${(activeTiles.burstLocal * 100).toFixed(2)}%` : "";
 
                   return (
                     <div className="grid grid-cols-2 gap-4">
@@ -1766,9 +2586,9 @@ export default function HelixCore() {
                               <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-sm">
-                              <div className="font-medium text-yellow-300 mb-1">🧠 Basis</div>
+                              <div className="font-medium text-yellow-300 mb-1"> Basis</div>
                               <p className="mb-2">
-                                <strong>FR-avg</strong> uses ship-wide Ford–Roman duty across {totalSectors} sectors;{" "}
+                                <strong>FR-avg</strong> uses ship-wide FordRoman duty across {totalSectors} sectors;{" "}
                                 <strong>Instant</strong> shows tiles energized in the current live sector window (
                                 {Math.max(1, Math.floor(concurrentSectors))} / {totalSectors}, local ON {localOnLabel}).
                               </p>
@@ -1783,18 +2603,18 @@ export default function HelixCore() {
                             <TooltipTrigger asChild>
                               <span className="ml-2 text-xs text-slate-400 underline decoration-dotted cursor-help">FR-avg{frPctLabel}</span>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-sm">Ship-averaged (Ford–Roman) duty used by the energy pipeline.</TooltipContent>
+                            <TooltipContent side="top" className="max-w-sm">Ship-averaged (FordRoman) duty used by the energy pipeline.</TooltipContent>
                           </Tooltip>
                         </p>
 
                         {/* Instantaneous energized tiles */}
                         <p className="text-sm font-mono text-emerald-400 mt-1">
-                          {Number.isFinite(activeTiles?.instantTilesSmooth) ? Math.round(activeTiles!.instantTilesSmooth!).toLocaleString() : "—"}
+                          {Number.isFinite(activeTiles?.instantTilesSmooth) ? Math.round(activeTiles!.instantTilesSmooth!).toLocaleString() : ""}
                           <span className="ml-2 text-xs text-slate-400">instant</span>
                         </p>
 
                         <p className="text-xs text-slate-500">
-                          {`${Math.max(1, Math.floor(concurrentSectors))} live • ${totalSectors} total • ${localOnLabel} local ON`}
+                          {`${Math.max(1, Math.floor(concurrentSectors))} live  ${totalSectors} total  ${localOnLabel} local ON`}
                         </p>
                       </div>
 
@@ -1807,7 +2627,7 @@ export default function HelixCore() {
                               <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-xs">
-                              <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                              <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                               <p className="mb-2">Average electrical power (ship-wide) from pipeline FR duty.</p>
                             </TooltipContent>
                           </Tooltip>
@@ -1827,12 +2647,12 @@ export default function HelixCore() {
                           <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                         </TooltipTrigger>
                         <TooltipContent side="top" className="max-w-sm">
-                          <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                          <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                           <p className="mb-2">
                             Negative energy density required to curve spacetime according to the Alcubierre metric. Lower values
                             indicate more feasible warp drives.
                           </p>
-                          <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                          <div className="font-medium text-cyan-300 mb-1"> Zen</div>
                           <p className="text-xs italic">The mountain that appears impossible to move requires only the gentlest persistent pressure.</p>
                         </TooltipContent>
                       </Tooltip>
@@ -1859,7 +2679,7 @@ export default function HelixCore() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span className="cursor-help underline decoration-dotted">
-                            γ<sub>VdB</sub>:{" "}
+                            <sub>VdB</sub>:{" "}
                             {fexp(
                               (pipelineState as any)?.gammaVanDenBroeck_vis ??
                                 pipeline?.gammaVanDenBroeck_vis ??
@@ -1873,10 +2693,10 @@ export default function HelixCore() {
                         <TooltipContent side="top" className="max-w-sm">
                           <div className="space-y-1">
                             <div className="font-semibold">
-                              γ<sub>VdB</sub> (Van den Broeck pocket amplification)
+                              <sub>VdB</sub> (Van den Broeck pocket amplification)
                             </div>
                             <p>
-                              From Alcubierre's metric modified by Van den Broeck — the "folded pocket" lets a meter-scale cabin sit
+                              From Alcubierre's metric modified by Van den Broeck  the "folded pocket" lets a meter-scale cabin sit
                               inside a kilometer-scale effective bubble without paying the bubble's full energy cost.
                             </p>
                             <p className="opacity-80">
@@ -1900,26 +2720,73 @@ export default function HelixCore() {
                         <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="right" className="max-w-sm">
-                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                         <p className="mb-2">
                           The fundamental frequency at which Casimir tiles oscillate. Higher frequencies increase power output but
                           require more precise timing control.
                         </p>
-                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
-                        <p className="text-xs italic">Resonance is not about power—it's about timing.</p>
+                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                        <p className="text-xs italic">Resonance is not about powerit's about timing.</p>
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      id="modulation"
-                      type="number"
-                      value={modulationFrequency}
-                      onChange={(e) => setModulationFrequency(Number(e.target.value))}
-                      className="bg-slate-950 border-slate-700 text-slate-100"
-                    />
-                    <span className="flex items-center text-sm text-slate-400">GHz</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-[10rem] flex-1 items-center gap-2">
+                      <Input
+                        id="modulation"
+                        type="number"
+                        value={modulationFrequency}
+                        onChange={(e) => setModulationFrequency(Number(e.target.value))}
+                        className="bg-slate-950 border-slate-700 text-slate-100 flex-1"
+                      />
+                      <span className="flex items-center text-sm text-slate-400">GHz</span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="text-xs"
+                      onClick={openParametricSweepStub}
+                      disabled
+                      aria-disabled
+                      title="Gap x Phase x Omega sweep launcher (coming soon)"
+                    >
+                      GapPhase sweep
+                    </Button>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="pump-phase-bias" className="text-slate-200">
+                      Pump phase bias
+                    </Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-sm">
+                        <p className="text-xs">
+                          Applies a constant offset before scheduler-followed phases are published to the drive.
+                        </p>
+                        <p className="text-xs text-slate-300">
+                          Useful for +/-10 deg dithers during pump alignment and stored locally per browser.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="pump-phase-bias"
+                      type="number"
+                      min={-10}
+                      max={10}
+                      step={0.1}
+                      value={pumpPhaseBiasDeg}
+                      onChange={(e) => setPumpPhaseBiasDeg(clampPhaseBiasDeg(Number(e.target.value)))}
+                      className="bg-slate-950 border-slate-700 text-slate-100 w-28"
+                    />
+                    <span className="flex items-center text-sm text-slate-400">deg</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Clamped to +/-10 deg and persisted locally.</p>
                 </div>
 
                 <Button
@@ -1985,7 +2852,7 @@ export default function HelixCore() {
           </Card>
 
           {/* ====== SECONDARY GRID (rest of the panels) ====== */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             {/* Left column: Compliance, Amplification, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
@@ -2002,7 +2869,7 @@ export default function HelixCore() {
                     <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
                       <span className="text-sm">Ford-Roman Inequality</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">ζ = {fmt(pipelineState?.zeta ?? systemMetrics?.fordRoman?.value, 3, "0.032")}</span>
+                        <span className="font-mono text-sm"> = {fmt(pipelineState?.zeta ?? systemMetrics?.fordRoman?.value, 3, "0.032")}</span>
                         <Badge
                           className={`${
                             pipelineState?.fordRomanCompliance ?? (systemMetrics?.fordRoman?.status === "PASS")
@@ -2016,9 +2883,9 @@ export default function HelixCore() {
                     </div>
 
                     <div className="flex justify-between items-center p-3 bg-slate-950 rounded-lg">
-                      <span className="text-sm">Natário Zero-Expansion</span>
+                      <span className="text-sm">Natrio Zero-Expansion</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm">∇·ξ = {fmt(systemMetrics?.natario?.value, 3, "0")}</span>
+                        <span className="font-mono text-sm"> = {fmt(systemMetrics?.natario?.value, 3, "0")}</span>
                         <Badge
                           className={`${
                             pipelineState?.natarioConstraint ?? (systemMetrics?.natario?.status === "VALID")
@@ -2071,14 +2938,14 @@ export default function HelixCore() {
                     <div className="mt-4 p-3 bg-slate-950 rounded-lg">
                       <p className="text-xs text-slate-400 mb-2">Energy Pipeline Values:</p>
                       <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-300">
-                        <div>U_static: {fexp(pipelineState?.U_static, 2, "—")} J</div>
-                        <div>U_geo: {fexp(pipelineState?.U_geo, 2, "—")} J</div>
-                        <div>U_Q: {fexp(pipelineState?.U_Q, 2, "—")} J</div>
-                        <div>U_cycle: {fexp(pipelineState?.U_cycle, 2, "—")} J</div>
-                        <div>P_loss: {fmt(pipelineState?.P_loss_raw, 3, "—")} W/tile</div>
-                        <div>N_tiles: {fexp(pipelineState?.N_tiles, 2, "—")}</div>
+                        <div>U_static: {fexp(pipelineState?.U_static, 2, "")} J</div>
+                        <div>U_geo: {fexp(pipelineState?.U_geo, 2, "")} J</div>
+                        <div>U_Q: {fexp(pipelineState?.U_Q, 2, "")} J</div>
+                        <div>U_cycle: {fexp(pipelineState?.U_cycle, 2, "")} J</div>
+                        <div>P_loss: {fmt(pipelineState?.P_loss_raw, 3, "")} W/tile</div>
+                        <div>N_tiles: {fexp(pipelineState?.N_tiles, 2, "")}</div>
                         <div className="col-span-2 text-yellow-300 border-t border-slate-700 pt-2 mt-1">
-                          γ_VdB (visual): {fexp(pipelineState?.gammaVanDenBroeck_vis ?? pipelineState?.gammaVanDenBroeck, 2, "—")} (Van den
+                          _VdB (visual): {fexp(pipelineState?.gammaVanDenBroeck_vis ?? pipelineState?.gammaVanDenBroeck, 2, "")} (Van den
                           Broeck)
                         </div>
                       </div>
@@ -2093,20 +2960,53 @@ export default function HelixCore() {
               {/* Curvature Key */}
               <CurvatureKey />
 
-              {/* Shift Vector • Interior Gravity */}
+              {/* Shift Vector  Interior Gravity */}
               <ShiftVectorPanel
                 mode={pipelineState?.currentMode || "hover"}
-                shift={systemMetrics?.shiftVector ? ({
-                  ...(systemMetrics.shiftVector as any),
-                  gTarget: (systemMetrics.shiftVector as any).gTarget ?? 0.980665,
-                  R_geom: (systemMetrics.shiftVector as any).R_geom ?? 179.14162298838383,
-                  gEff_check: (systemMetrics.shiftVector as any).gEff_check ?? 0.980665,
-                } as any) : undefined}
+                shift={systemMetrics?.shiftVector as any}
               />
             </div>
 
             {/* Middle Column - Casimir Tile Grid & Physics Field */}
             <div className="space-y-4">
+              {systemMetrics && (
+                <div className="rounded-lg border border-white/10 bg-black/40 p-3">
+                  <div className="flex items-center justify-between px-1 pb-2">
+                    <div className="text-[12px] font-medium text-white/90">Sector Ring HUD</div>
+                    <div className="text-[11px] text-white/60">
+                      {Math.max(1, Math.floor(concurrentSectorsSafe))}/{Math.max(1, Math.floor(totalSectorsSafe))} sectors
+                    </div>
+                  </div>
+                  <div className="flex justify-center">
+                    <div className="h-48 w-48">
+                      <SectorGridRing
+                        sectorsTotal={Math.max(1, Math.floor(totalSectorsSafe))}
+                        sectorsConcurrent={Math.max(1, Math.floor(concurrentSectorsSafe))}
+                        currentSector={ringCurrentSector}
+                        thicknessRx={0.018}
+                        alpha={0.78}
+                        gain={1.1}
+                        hueDeg={210}
+                        showPhaseStreaks
+                        streakLen={2}
+                        emaAlpha={0.45}
+                        floorLevel={0.04}
+                        pulseSector={tileHoverSector ?? null}
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 px-1 text-[11px] text-white/60">
+                    <div>Active fraction: {(activeFraction * 100).toFixed(5)}%</div>
+                    <div>
+                      Sweep:{" "}
+                      {Number.isFinite(systemMetrics?.strobeHz)
+                        ? Number(systemMetrics!.strobeHz).toLocaleString()
+                        : ""}{" "}
+                      Hz
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Casimir Tile Grid - Canvas Component */}
               {systemMetrics && (
                 <CasimirTileGridPanel
@@ -2122,6 +3022,8 @@ export default function HelixCore() {
                   }}
                   width={320}
                   height={170}
+                  onSectorFocus={setTileHoverSector}
+                  pulseSector={ringActiveSector}
                 />
               )}
 
@@ -2143,8 +3045,231 @@ export default function HelixCore() {
 
             {/* Right Column - Terminal & Inspector */}
             <div className="space-y-4">
-              {/* ===== Green's Potential (φ = G * ρ) — Live Panel ===== */}
+              {/* ===== Green's Potential ( = G * )  Live Panel ===== */}
               <GreensLivePanel />
+              <SpectrumTunerPanel inputs={spectrumInputs} />
+              <ParametricSweepPanel />
+              {/* Vacuum-gap Sweep card */}
+              <Card className="bg-slate-900/50 border-slate-800">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    Vacuum-gap Sweep (Nb3Sn / DCE)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm">
+                        <div className="font-medium text-yellow-300 mb-1">What you are seeing</div>
+                        <p className="mb-2">
+                          Heatmap shows maximum parametric gain (dB) per cell over phase and depth for each pair (gap d, pump Omega).
+                          Use Top-N to capture a ridge of best setpoints as presets. CSV lets you export full rows for offline analysis.
+                        </p>
+                        <div className="font-medium text-cyan-300 mb-1">Safety</div>
+                        <p className="text-xs">
+                          Backend guards against runaway with thresholds on gain (about 15 dB) and QL windows. Hardware slewing is a
+                          no-op unless your pump driver is wired.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </CardTitle>
+                  <CardDescription>Gain(d, Omega) heatmap / Ridge capture / CSV / Replay / Optional HW slewing</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      onClick={sweepActive ? cancelSweep : runSweepWithHardware}
+                      variant="default"
+                      className={sweepActive ? "bg-rose-600 hover:bg-rose-700" : "bg-cyan-600 hover:bg-cyan-700"}
+                      disabled={sweepCancelRequested}
+                    >
+                      {sweepActive
+                        ? sweepCancelRequested
+                          ? "Stopping..."
+                          : "Stop Sweep"
+                        : "Run Sweep (HW Slew)"}
+                    </Button>
+                    <Button onClick={exportSweepCSV} variant="outline" disabled={!sweepResults.length}>
+                      Export CSV
+                    </Button>
+                    <div className="ml-auto flex items-center gap-2">
+                      <Label className="text-xs text-slate-300">Top-N</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={64}
+                        value={sweepTopN}
+                        onChange={(event) =>
+                          setSweepTopN(Math.max(1, Math.min(64, Number(event.target.value) || 1)))
+                        }
+                        className="h-8 w-20 bg-slate-950 border-slate-700 text-slate-100"
+                      />
+                      <Button onClick={captureRidge} variant="outline" disabled={!sweepResults.length}>
+                        Capture Ridge
+                      </Button>
+                      {ridgePresets.length ? (
+                        <span className="text-xs text-slate-400">{ridgePresets.length} preset(s)</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {pumpStability ? (
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-300">
+                          <Gauge className="h-4 w-4 text-cyan-300" />
+                          Pump Guardrails
+                        </div>
+                        {pumpStatusMeta ? (
+                          <span
+                            className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${pumpStatusMeta.className}`}
+                          >
+                            {pumpStatusMeta.icon}
+                            <span>{pumpStatusMeta.label.toUpperCase()}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] font-mono text-slate-300 md:grid-cols-4">
+                        <div>
+                          <div className="text-slate-500">rho_est</div>
+                          <div>{fmtRatio(pumpStability.rhoEst)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">rho_raw</div>
+                          <div>{fmtRatio(pumpStability.rhoRaw)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">kappa_eff</div>
+                          <div>
+                            {pumpStability.kappaEffMHz != null && pumpStability.kappaEffMHz > 0
+                              ? fmtMHz(pumpStability.kappaEffMHz)
+                              : "THRESHOLD"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Delta / kappa</div>
+                          <div>{fmtRatio(pumpStability.detuneOverKappa)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Delta live</div>
+                          <div>{fmtMHz(pumpStability.detuneMHz)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">m live</div>
+                          <div>{fmtPct(pumpStability.modDepthPct)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">phi live</div>
+                          <div>
+                            {Number.isFinite(pumpStability.phaseDeg ?? NaN)
+                              ? `${Number(pumpStability.phaseDeg).toFixed(1)} deg`
+                              : "--"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">gap live</div>
+                          <div>
+                            {Number.isFinite(pumpStability.gapNm ?? NaN)
+                              ? `${Number(pumpStability.gapNm).toFixed(0)} nm`
+                              : "--"}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">pump live</div>
+                          <div>{fmtGHz(pumpStability.pumpFreqGHz)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">Delta target</div>
+                          <div>{fmtMHz(pumpStability.recommendation.detuneMHz)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">m target</div>
+                          <div>{fmtPct(pumpStability.recommendation.modDepthPct)}</div>
+                        </div>
+                        <div>
+                          <div className="text-slate-500">phi target</div>
+                          <div>{`${pumpStability.recommendation.phaseDeg.toFixed(1)} deg`}</div>
+                        </div>
+                      </div>
+                      {pumpStability.issues.length ? (
+                        <div className="mt-2 space-y-1 text-[11px] text-amber-300">
+                          {pumpStability.issues.map((issue) => (
+                            <div key={issue} className="flex items-center gap-1">
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>{issue}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-300">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>Within guard band</span>
+                        </div>
+                      )}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          onClick={applyWorkingPoint}
+                          className="bg-cyan-600 hover:bg-cyan-700"
+                        >
+                          Apply SWP-A
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={nudgeDetune}
+                          disabled={!pumpStability.recommendation.pumpFreqGHz}
+                          className="border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/10"
+                        >
+                          Delta -&gt; +0.6 kappa
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={trimDepth}
+                          className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                        >
+                          Reduce depth
+                        </Button>
+                        <div className="ml-auto flex items-center gap-1 text-[11px] text-slate-400">
+                          <Target className="h-3 w-3" />
+                          rho_target ~ {pumpStability.recommendation.rhoTarget.toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  <VacuumGapSweepHUD className="mt-2" />
+                  <ScrollArea className="w-full">
+                    <div className="min-w-[680px]">
+                      <VacuumGapHeatmap
+                        rows={sweepResults}
+                        onCellClick={(cell) => {
+                          const match = sweepResults
+                            .filter((row) => row.d_nm === cell.d_nm && row.Omega_GHz === cell.Omega_GHz)
+                            .sort((a, b) => b.G - a.G)[0];
+                          setSelectedSweep(match ?? null);
+                        }}
+                      />
+                    </div>
+                  </ScrollArea>
+                  {selectedSweep ? (
+                    <div className="mt-1 p-3 rounded-lg border border-slate-800 bg-slate-950 text-xs font-mono">
+                      d={selectedSweep.d_nm.toFixed(1)} nm; Omega={selectedSweep.Omega_GHz.toFixed(3)} GHz; phi=
+                      {selectedSweep.phi_deg.toFixed(2)} deg; m={(selectedSweep.m * 100).toFixed(2)}%; G=
+                      {selectedSweep.G.toFixed(2)} dB; QL={
+                        Number.isFinite(selectedSweep.QL)
+                          ? (selectedSweep.QL as number).toExponential(2)
+                          : Number.isFinite(selectedSweep.QL_base)
+                          ? (selectedSweep.QL_base as number).toExponential(2)
+                          : "--"
+                      }{" "}
+                      {selectedSweep.stable ? "stable" : "unstable"}
+                      {selectedSweep.notes?.length ? (
+                        <div className="mt-1 text-slate-400">Notes: {selectedSweep.notes.join("; ")}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <SweepReplayControls rows={sweepResults} onStep={(row) => setSelectedSweep(row)} />
+                </CardContent>
+              </Card>
               {/* Log + Document Terminal */}
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader>
@@ -2400,16 +3525,16 @@ export default function HelixCore() {
               {/* Mission Fuel / Range Gauge */}
               <FuelGauge
                 mode={String(pipelineState?.currentMode || "hover").replace(/^./, (c: string) => c.toUpperCase())}
-                powerMW={pipelineState?.P_avg || 83.3}
-                zeta={pipelineState?.zeta}
-                tsRatio={pipelineState?.TS_ratio || 5.03e4}
-                frOk={pipelineState?.fordRomanCompliance || true}
-                natarioOk={pipelineState?.natarioConstraint || true}
-                curvatureOk={pipelineState?.curvatureLimit || true}
+                powerMW={pipelineState?.P_avg ?? 83.3}
+                zeta={pipelineState?.zeta ?? 0}
+                tsRatio={pipelineState?.TS_ratio ?? 5.03e4}
+                frOk={pipelineState?.fordRomanCompliance ?? true}
+                natarioOk={pipelineState?.natarioConstraint ?? true}
+                curvatureOk={pipelineState?.curvatureLimit ?? true}
                 freqGHz={15.0}
-                duty={dutyUI}
-                gammaGeo={pipelineState?.gammaGeo || 26}
-                qFactor={pipelineState?.qCavity || 1e9}
+                duty={frDutyForPanels}
+                gammaGeo={pipelineState?.gammaGeo ?? 26}
+                qFactor={pipelineState?.qCavity ?? 1e9}
                 pMaxMW={120}
               />
 
@@ -2417,9 +3542,9 @@ export default function HelixCore() {
               <TripPlayer
                 plan={{ distanceLy: 0.5, cruiseDuty: 0.14, cruiseMode: "Cruise", hoverMode: "Hover", stationKeepHours: 2 }}
                 getState={() => ({
-                  zeta: pipelineState?.zeta,
-                  tsRatio: pipelineState?.TS_ratio || 5.03e4,
-                  powerMW: pipelineState?.P_avg || 83.3,
+                  zeta: pipelineState?.zeta ?? 0,
+                  tsRatio: pipelineState?.TS_ratio ?? 5.03e4,
+                  powerMW: pipelineState?.P_avg ?? 83.3,
                   freqGHz: 15.0,
                 })}
                 setMode={(mode) => {
@@ -2464,12 +3589,12 @@ export default function HelixCore() {
                         <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent side="top" className="max-w-sm">
-                        <div className="font-medium text-yellow-300 mb-1">🧠 Theory</div>
+                        <div className="font-medium text-yellow-300 mb-1"> Theory</div>
                         <p className="mb-2">
                           Interactive navigation system supporting both galactic-scale (parsec) and solar system (AU) mission planning.
                           Routes calculate energy requirements and travel time based on current warp bubble parameters.
                         </p>
-                        <div className="font-medium text-cyan-300 mb-1">🧘 Zen</div>
+                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
                         <p className="text-xs italic">The path reveals itself to those who take the first step.</p>
                       </TooltipContent>
                     </Tooltip>
@@ -2541,12 +3666,12 @@ export default function HelixCore() {
                             dash: [2, 3],
                             composite: "screen",
                           }}
-                          backgroundPolylineGain={50} // ~0.005 AU wobble → ~0.25 AU visual; visible even when zoomed out
+                          backgroundPolylineGain={50} // ~0.005 AU wobble  ~0.25 AU visual; visible even when zoomed out
                         />
                       </div>
                     </div>
                   ) : !galaxyCalibration ? (
-                    <div className="h-40 grid place-items-center text-xs text-slate-400">Loading galactic coordinate system…</div>
+                    <div className="h-40 grid place-items-center text-xs text-slate-400">Loading galactic coordinate system</div>
                   ) : useDeepZoom ? (
                     <div className="relative">
                       <GalaxyDeepZoom dziUrl="/galaxy_tiles.dzi" width={800} height={400} onViewerReady={setDeepZoomViewer} />
@@ -2601,11 +3726,11 @@ export default function HelixCore() {
                           aria-label={`Remove ${id}`}
                           title={`Remove ${id}`}
                         >
-                          ×
+                          
                         </button>
                       </span>
                     ))}
-                    {route.length === 0 && <span className="text-xs text-slate-500">No waypoints yet — tap bodies on the map to add them.</span>}
+                    {route.length === 0 && <span className="text-xs text-slate-500">No waypoints yet  tap bodies on the map to add them.</span>}
                   </div>
 
                   <RouteSteps
@@ -2692,6 +3817,7 @@ export default function HelixCore() {
           <div className="mt-8">
             <HelixCasimirAmplifier
               readOnly
+              cohesive={false}
               metricsEndpoint="/api/helix/metrics"
               stateEndpoint="/api/helix/pipeline"
               fieldEndpoint="/api/helix/displacement"
@@ -2706,21 +3832,133 @@ export default function HelixCore() {
               <Atom className="w-5 h-5" />
               Warp Field Visualization
             </h2>
-            <WarpEngineContainer />
+            <p className="text-xs text-slate-400 mb-4">
+              Warp engine idle &mdash; rerouting panel to the Metric Amplification Pocket diagnostic.
+            </p>
+            {(() => {
+              const rawUniforms = (systemMetrics as any)?.warpUniforms;
+              const pipelineAny = pipeline as any;
+              const pickNumber = (...values: unknown[]) => {
+                for (const value of values) {
+                  const num = Number(value);
+                  if (Number.isFinite(num)) return num;
+                }
+                return undefined;
+              };
+              const deriveDuty = (source: any) => {
+                if (!source || typeof source !== "object") return undefined;
+                const sectorsTotal = pickNumber(
+                  source?.sectorsTotal,
+                  source?.sectorCount,
+                  source?.totalSectors,
+                  source?.lightCrossing?.sectorCount,
+                  source?.lightCrossing?.sectorsTotal
+                );
+                const sectorsLive = pickNumber(
+                  source?.sectorsConcurrent,
+                  source?.sectorStrobing,
+                  source?.activeSectors,
+                  source?.lightCrossing?.activeSectors
+                );
+                const localBurst = pickNumber(
+                  source?.localBurstFrac,
+                  source?.burstFraction,
+                  source?.dutyCycle
+                );
+                if (
+                  sectorsTotal !== undefined &&
+                  sectorsLive !== undefined &&
+                  localBurst !== undefined
+                ) {
+                  const total = Math.max(1, Math.round(sectorsTotal));
+                  const live = Math.max(1, Math.round(sectorsLive));
+                  const burst = Math.max(0, Math.min(1, Number(localBurst)));
+                  return Math.max(0, Math.min(1, burst * (live / total)));
+                }
+                return undefined;
+              };
+
+              const gammaGeoSafe = Math.max(
+                1,
+                pickNumber(
+                  pipeline?.gammaGeo,
+                  rawUniforms?.gammaGeo,
+                  rawUniforms?.gammaGeo_avg
+                ) ?? 26
+              );
+              const qSafe = Math.max(
+                1e-12,
+                pickNumber(
+                  pipeline?.qSpoilingFactor,
+                  pipelineAny?.deltaAOverA,
+                  pipeline?.qCavity,
+                  rawUniforms?.qSpoilingFactor,
+                  rawUniforms?.deltaAOverA,
+                  rawUniforms?.qCavity
+                ) ?? 1
+              );
+              const gammaVdBSafe = Math.max(
+                1,
+                pickNumber(
+                  pipeline?.gammaVanDenBroeck_vis,
+                  pipeline?.gammaVanDenBroeck,
+                  pipelineAny?.gammaVdB,
+                  rawUniforms?.gammaVanDenBroeck_vis,
+                  rawUniforms?.gammaVanDenBroeck,
+                  rawUniforms?.gammaVdB
+                ) ?? 1
+              );
+              const dutySafe = Math.max(
+                1e-12,
+                pickNumber(
+                  dutyEffectiveFR_safe,
+                  pipeline?.dutyEffectiveFR,
+                  rawUniforms?.dutyEffectiveFR,
+                  rawUniforms?.dFR
+                ) ??
+                  deriveDuty(rawUniforms) ??
+                  deriveDuty(pipelineAny) ??
+                  1e-12
+              );
+              const viewAvgSafe =
+                typeof pipelineAny?.viewAvg === "boolean"
+                  ? Boolean(pipelineAny.viewAvg)
+                  : typeof rawUniforms?.viewAvg === "boolean"
+                    ? Boolean(rawUniforms.viewAvg)
+                    : true;
+
+              return (
+                <MetricAmplificationPocket
+                  className="rounded-md overflow-hidden border border-slate-800/40 bg-slate-950/60"
+                  gammaGeo={gammaGeoSafe}
+                  q={qSafe}
+                  gammaVdB_vis={gammaVdBSafe}
+                  dFR={dutySafe}
+                  viewAvg={viewAvgSafe}
+                  height={380}
+                />
+              );
+            })()}
           </div>
         </div>
       </div>
-      {/* --- Dev-only: end-to-end snapshot visibility (server → adapter → engine) --- */}
+      {/* --- Dev-only: end-to-end snapshot visibility (server  adapter  engine) --- */}
       {import.meta.env.DEV && (
         <div className="mt-8">
           <SnapshotProbe />
         </div>
       )}
 
-      {/* Data Names/DAG panel — visible in all builds */}
+      {/* Data Names/DAG panel - visible in all builds */}
       <div className="mt-6">
         <DataNamesPanel />
       </div>
     </TooltipProvider>
   );
 }
+
+
+
+
+
+

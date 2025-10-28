@@ -296,7 +296,10 @@ export const SliceViewer: React.FC<SliceViewerProps> = ({
       let strobeSign = 1;
       if (instantStrobe && sectors >= 1) {
         const S = Math.max(1, sectors);
-        const splitIdx = Math.max(0, Math.min(S - 1, Math.floor(split)));
+        const splitNorm = (typeof split === "number" && Number.isFinite(split))
+          ? (split < 1 ? split * S : split)
+          : S / 2;
+        const splitIdx = Math.max(0, Math.min(S - 1, Math.floor(splitNorm)));
         const u = (phi % (2 * Math.PI)) / (2 * Math.PI);        // [0,1)
         const k = Math.floor(u * S);                             // sector index at this φ
         const distToSplit = (k - splitIdx + 0.5);                // sector units

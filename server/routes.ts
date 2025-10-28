@@ -1,9 +1,13 @@
 import type { Express, Response } from "express";
+import express from "express";
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { scuffemService } from "./services/scuffem";
 import { fileManager } from "./services/fileManager";
-import { simulationParametersSchema } from "@shared/schema";
+import { simulationParametersSchema, sweepSpecSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
 import targetValidationRoutes from "./routes/target-validation.js";
 import { getHorizonsElements } from "./utils/horizons-proxy";
@@ -448,6 +452,201 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  const serveHalobankTimeline = (req: express.Request, res: Response) => {
+    res.type("application/javascript");
+    res.sendFile("halobank-spore-timeline.js", { root: process.cwd() }, (err) => {
+      if (err) {
+        console.log(`[/halobank timeline] Error serving module: ${err.message}`);
+        if (!res.headersSent) {
+          res.status(404).type("text/plain").send(`Timeline module not found: ${err.message}`);
+        }
+      } else {
+        console.log(`[/halobank timeline] Served ${req.originalUrl}`);
+      }
+    });
+  };
+
+  // Support requests for the timeline module from any nested halobank page copy
+  app.get("*", (req: express.Request, res: Response, next: express.NextFunction) => {
+    if (req.path?.toLowerCase().endsWith("halobank-spore-timeline.js")) {
+      serveHalobankTimeline(req, res);
+      return;
+    }
+    next();
+  });
+
+  // ---- Warp Creator micro-site (no-build static) ---------------------------
+  // Serve the warp-web assets under a dedicated /warp prefix to avoid clashes
+  // with the main app's /css or /js. The HTML uses relative paths (./css, ./js)
+  // so mounting the whole folder at /warp makes those resolve to /warp/css, /warp/js.
+  // Resolve warp-web root robustly across different runtime CWDs (dev/prod/replit)
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  function hasWarpWeb(dir: string) {
+    try {
+      return fs.existsSync(dir)
+        && (fs.existsSync(path.join(dir, 'creator.html')) || fs.existsSync(path.join(dir, 'spore-pedia.html')));
+    } catch { return false; }
+  }
+  function findWarpRoot(): { root: string; attempts: string[] } {
+    const attempts: string[] = [];
+    const seen = new Set<string>();
+    const push = (p: string) => { const r = path.resolve(p); if (!seen.has(r)) { attempts.push(r); seen.add(r); } };
+
+    const bases = [
+      process.cwd(),
+      path.resolve(process.cwd(), 'client/src'), // explicit client/src base for warp-web in source tree
+      __dirname,
+      path.resolve(__dirname, '..'),
+      path.resolve(__dirname, '../..'),
+      path.resolve(process.cwd(), '..'),
+    ];
+    function searchChildrenForWarpWeb(base: string, maxDepth = 2): string | null {
+      try {
+        const stack: Array<{ dir: string; depth: number }> = [{ dir: base, depth: 0 }];
+        while (stack.length) {
+          const { dir, depth } = stack.shift()!;
+          if (depth > maxDepth) continue;
+          let entries: string[] = [];
+          try { entries = fs.readdirSync(dir).map(e => path.join(dir, e)); } catch { continue; }
+          for (const e of entries) {
+            const name = path.basename(e);
+            let stat: fs.Stats | null = null;
+            try { stat = fs.statSync(e); } catch { continue; }
+            if (stat && stat.isDirectory()) {
+              const candidate = path.join(e, 'warp-web');
+              push(candidate);
+              if (hasWarpWeb(candidate)) return candidate;
+              // Also enqueue child for further search
+              stack.push({ dir: e, depth: depth + 1 });
+            }
+          }
+        }
+      } catch {}
+      return null;
+    }
+    for (const base of bases) {
+      // walk up to 6 levels from each base and test '<level>/warp-web'
+      let d = path.resolve(base);
+      for (let i = 0; i < 6; i++) {
+        const candidate = path.join(d, 'warp-web');
+        push(candidate);
+        if (hasWarpWeb(candidate)) return { root: candidate, attempts };
+        // also check potential monorepo layouts
+        const alt1 = path.join(d, 'apps', 'warp-web'); push(alt1); if (hasWarpWeb(alt1)) return { root: alt1, attempts };
+        const alt2 = path.join(d, 'packages', 'warp-web'); push(alt2); if (hasWarpWeb(alt2)) return { root: alt2, attempts };
+        d = path.dirname(d);
+        const parent = path.dirname(d);
+        if (parent === d) break;
+      }
+      // If not found walking up, try a shallow child search from the base
+      const childHit = searchChildrenForWarpWeb(base, 2);
+      if (childHit) return { root: childHit, attempts };
+    }
+    // Fall back to first attempt
+    return { root: attempts[0] || path.join(process.cwd(), 'warp-web'), attempts };
+  }
+  const found = findWarpRoot();
+  const warpRoot = found.root;
+  const warpAttempts = found.attempts;
+  if (!hasWarpWeb(warpRoot)) {
+    console.warn(`[warp] Could not locate warp-web site. Tried (${found.attempts.length}):\n - ` + found.attempts.join('\n - '));
+    console.warn(`[warp] Using fallback root: ${warpRoot}`);
+  } else {
+    console.log(`[warp] Serving warp-web from: ${warpRoot}`);
+  }
+  app.use('/warp', express.static(warpRoot));
+
+  // Replit compatibility: allow overriding warp-web root explicitly via env
+  // e.g., WARP_WEB_ROOT=/home/runner/workspace/warp-web
+  const overrideRoot = process.env.WARP_WEB_ROOT;
+  if (overrideRoot && fs.existsSync(overrideRoot)) {
+    console.log(`[warp] Replit override detected: WARP_WEB_ROOT=${overrideRoot}`);
+    app.use('/warp', express.static(overrideRoot));
+  }
+
+  // Debug the resolved root at runtime
+  app.get('/warp/_debug-root', (req, res) => {
+    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+    res.json({
+      resolvedRoot: root,
+      overrideRoot: overrideRoot || null,
+      exists: fs.existsSync(root),
+      attempts: warpAttempts,
+      cwd: process.cwd(),
+      __dirname
+    });
+  });
+
+  // Landing → Spore‑pedia
+  app.get(["/warp", "/warp/", "/warp/spore-pedia"], (req, res) => {
+    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+    res.sendFile('spore-pedia.html', { root }, (err) => {
+      if (err) {
+        console.log(`[/warp] ❌ Error serving spore-pedia.html from ${root}: ${err.message}`);
+        res.status(404).send(`Spore-pedia not found (root=${root}): ${err.message}`);
+      } else {
+        console.log(`[/warp] ✅ Served /warp/spore-pedia`);
+      }
+    });
+  });
+
+  // Creator page
+  app.get("/warp/creator", (req, res) => {
+    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+    res.sendFile('creator.html', { root }, (err) => {
+      if (err) {
+        console.log(`[/warp] ❌ Error serving creator.html from ${root}: ${err.message}`);
+        res.status(404).send(`Creator not found (root=${root}): ${err.message}`);
+      } else {
+        console.log(`[/warp] ✅ Served /warp/creator`);
+      }
+    });
+  });
+
+  // KM-scale warp ledger lab (standalone path under root)
+  app.get("/km-scale-warp-ledger", (req, res) => {
+    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+    res.sendFile('km-scale-warp-ledger.html', { root }, (err) => {
+      if (err) {
+        console.log(`[warp-ledger] ❌ Error serving km-scale-warp-ledger.html from ${root}: ${err.message}`);
+        res.status(404).send(`KM-scale warp ledger not found (root=${root}): ${err.message}`);
+      } else {
+        console.log(`[warp-ledger] ✅ Served /km-scale-warp-ledger`);
+      }
+    });
+  });
+
+  // Generic: /warp/:page → serve <page>.html from warp-web (e.g., /warp/creator2)
+  app.get('/warp/:page', (req, res, next) => {
+    const page = req.params.page;
+    // Avoid catching known API/static prefixes
+    if (!page || page.includes('.') || page === 'css' || page === 'js' || page === '_debug-root') return next();
+    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+    const fileName = `${page}.html`;
+    const filePath = path.join(root, fileName);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(fileName, { root }, (err) => {
+        if (err) {
+          console.log(`[/warp] ❌ Error serving ${fileName} from ${root}: ${err.message}`);
+          res.status(404).send(`Page not found: ${fileName} (root=${root})`);
+        } else {
+          console.log(`[/warp] ✅ Served /warp/${page}`);
+        }
+      });
+    } else {
+      res.status(404).send(`Page not found: ${fileName} (root=${root})`);
+    }
+  });
+
+  // Convenience redirects for bare routes if someone visits /spore-pedia or /creator
+  app.get('/spore-pedia', (_req, res) => res.redirect(302, '/warp/spore-pedia'));
+  app.get('/creator', (_req, res) => res.redirect(302, '/warp/creator'));
+
+  // Helpful tip for hosted environments
+  if (process.env.REPL_ID && !hasWarpWeb(warpRoot) && !overrideRoot) {
+    console.warn('[warp] Replit detected but warp-web path unresolved. Set env WARP_WEB_ROOT to your absolute path, e.g. /home/runner/workspace/warp-web');
+  }
+
   // ---- Helix core: prefer .ts in dev, fall back to .js in prod --------------
   async function importHelixCore() {
     try {
@@ -475,8 +674,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getPipelineState,
     getDisplacementField,
     updatePipelineParams,
+    cancelVacuumGapSweep,
     switchOperationalMode,
-    getEnergySnapshot
+    getEnergySnapshot,
+    getCurvatureBrick,
+    getPhaseBiasTable,
+    getSpectrumLog,
+    postSpectrumLog,
+    orchestrateParametricSweep,
+    publish: publishHelixEvent,
   } = core;
 
   // Helpful startup log to confirm dynamic import succeeded and which build was loaded
@@ -499,9 +705,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Alias for HelixCasimirAmplifier component compatibility
   app.get("/api/helix/displacement", getDisplacementField);
   app.post("/api/helix/pipeline/update", updatePipelineParams);
+  app.post("/api/helix/sweep/run", async (req, res) => {
+    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+    const specInput =
+      body && typeof body.spec === "object"
+        ? (body.spec as Record<string, unknown>)
+        : (body as Record<string, unknown>);
+    const parsed = sweepSpecSchema.safeParse(specInput);
+    if (!parsed.success) {
+      res.status(400).json({ error: "invalid-spec", details: parsed.error.flatten() });
+      return;
+    }
+
+    res.setHeader("Content-Type", "application/x-ndjson; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.flushHeaders?.();
+
+    const abortController = new AbortController();
+    req.on("close", () => abortController.abort());
+
+    try {
+      const iterator = orchestrateParametricSweep(parsed.data, { signal: abortController.signal });
+      for await (const event of iterator) {
+        if (res.writableEnded) break;
+        res.write(JSON.stringify(event) + "\n");
+        if (event.type === "point") {
+          try {
+            publishHelixEvent?.("parametricSweepStep", event.payload);
+          } catch (err) {
+            console.warn("[routes] parametric sweep bus publish failed:", err);
+          }
+        }
+        if (event.type === "abort") {
+          break;
+        }
+      }
+      if (!res.writableEnded) {
+        res.end();
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (abortController.signal.aborted) {
+        if (!res.writableEnded) {
+          res.end();
+        }
+        return;
+      }
+      if (res.headersSent) {
+        res.write(JSON.stringify({ type: "abort", payload: { reason: message } }) + "\n");
+        res.end();
+      } else {
+        res.status(500).json({ error: "sweep-failed", message });
+      }
+    }
+  });
+  app.post("/api/helix/pipeline/cancel-sweep", cancelVacuumGapSweep);
   app.post("/api/helix/pipeline/mode", switchOperationalMode);
   // Alias for HelixCasimirAmplifier component mode switching
   app.post("/api/helix/mode", switchOperationalMode);
+  app.get("/api/helix/curvature-brick", getCurvatureBrick);
+  app.post("/api/helix/curvature-brick", getCurvatureBrick);
+  app.get("/api/helix/phase-bias", getPhaseBiasTable);
+  app.get("/api/helix/spectrum", getSpectrumLog);
+  app.post("/api/helix/spectrum", postSpectrumLog);
 
   return httpServer;
 }

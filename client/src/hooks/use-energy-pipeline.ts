@@ -3,8 +3,15 @@ import { startTransition } from "react";
 import * as React from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { publish } from "@/lib/luma-bus";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { getModeWisdom } from "@/lib/luma-whispers";
+import type {
+  VacuumGapSweepRow,
+  DynamicConfig,
+  SweepRuntime,
+  SweepPointExtended,
+  GateAnalytics,
+} from "@shared/schema";
 
 // Greens function types
 export type GreensKind = "poisson" | "helmholtz";
@@ -34,7 +41,7 @@ export interface EnergyPipelineState {
   taxi_target_mps?: number;
 
   // Mode parameters
-  currentMode: 'hover' | 'taxi' | 'cruise' | 'emergency' | 'standby';
+  currentMode: 'hover' | 'taxi' | 'nearzero' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
   sectorStrobing: number;
   qSpoilingFactor: number;
@@ -53,21 +60,93 @@ export interface EnergyPipelineState {
   // Scheduling truth
   sectorCount?: number;
   concurrentSectors?: number;
+  tilesPerSector?: number;
+  activeSectors?: number;
+  activeTiles?: number;
+  activeFraction?: number;
+  S_live?: number;
+  sectors?: number;
+  tiles?: {
+    active?: number;
+    total?: number;
+    tileArea_cm2?: number;
+    hullArea_m2?: number;
+    [key: string]: unknown;
+  };
+  currentSector?: number;
+  __sectors?: unknown;
+  __fr?: unknown;
+  __mockData?: boolean;
   
   // FR duty direct
   dutyEffectiveFR?: number;
-  
+  dutyEffective_FR?: number;    // legacy alias
+  dutyShip?: number;            // legacy alias
+  dutyFR?: number;              // legacy alias
+  dutyBurst?: number;           // legacy alias
+  dutyUsed?: number;            // legacy alias
+  dutyFR_slice?: number;        // legacy alias
+  dutyFR_ship?: number;         // legacy alias
+  dutyEff?: number;             // legacy alias
+  dutyGate?: number;            // legacy alias
+  deltaAOverA?: number;         // alias for qSpoilingFactor
+  strobeHz?: number;
+  phase01?: number;
+  phaseSign?: number;
+  phaseMode?: string;
+  pumpPhase_deg?: number;
+  phaseFreeze?: boolean;
+
   // Physics parameters
   gammaGeo: number;
   qMechanical: number;
   qCavity: number;
   gammaVanDenBroeck: number;
+  gammaVdB?: number;            // legacy alias
+  gamma_vdb?: number;           // legacy alias
   exoticMassTarget_kg: number;
+  geomCoupling?: number;        // χ coupling factor for parametric sweeps
+  pumpEff?: number;             // η pump transduction efficiency (0..1)
   
   // Visual vs mass split (server emits both)
   gammaVanDenBroeck_vis?: number;
   gammaVanDenBroeck_mass?: number;
-  
+  gammaVdB_vis?: number;        // legacy alias
+  sigma?: number;               // legacy alias
+  q?: number;                   // legacy alias
+  qSpoil?: number;              // legacy alias
+  greens?: GreensPayload | null | Record<string, unknown>;
+  lightCrossing?: unknown;
+  lc?: unknown;
+  natario?: unknown;
+  warp?: unknown;
+  stressEnergy?: unknown;
+  P_avg_W?: number;             // alias for power in watts
+
+  // Hull parameters for UI overlays
+  hull?: {
+    // Client-friendly axes (semi-major lengths of ellipsoid)
+    a?: number;
+    b?: number;
+    c?: number;
+    // Server canonical box dimensions
+    Lx_m?: number;
+    Ly_m?: number;
+    Lz_m?: number;
+    wallWidth_m?: number;
+    wallThickness_m?: number;
+  };
+  bubble?: {
+    R?: number;
+    sigma?: number;
+    beta?: number;
+    dutyGate?: number;
+  };
+  R?: number;
+  radius?: number;
+  driveDir?: [number, number, number];
+  bubbleStatus?: "NOMINAL" | "WARNING" | "CRITICAL";
+
   // Optional: targets if you want to show them
   P_target_W?: number;
   
@@ -82,15 +161,116 @@ export interface EnergyPipelineState {
   M_exotic_raw: number;     // Raw physics exotic mass (before calibration)
   massCalibration: number;  // Mass calibration factor
   TS_ratio: number;
+  TS_long?: number;
+  TS_geom?: number;
   zeta: number;
   N_tiles: number;
+  hullArea_m2?: number;
   
   // System status
   fordRomanCompliance: boolean;
   natarioConstraint: boolean;
   curvatureLimit: boolean;
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+  modelMode?: 'calibrated' | 'raw';
+  atmDensity_kg_m3?: number | null;
+  altitude_m?: number | null;
+  dynamicConfig?: DynamicConfig | null;
+  vacuumGapSweepResults?: VacuumGapSweepRow[];
+  vacuumGapSweepRowsTotal?: number;
+  vacuumGapSweepRowsDropped?: number;
+  sweep?: SweepRuntime | null;
+  gateAnalytics?: GateAnalytics | null;
 }
+
+const MAX_SWEEP_ROWS = 2000;
+const MAX_STREAM_SWEEP_ROWS = 5000;
+const SWEEP_RESULTS_QUERY_KEY = ["helix:sweep:results"] as const;
+
+const adaptVacuumRowToExtended = (row: VacuumGapSweepRow): SweepPointExtended => {
+  const modulationPct = Number.isFinite(row.m) ? row.m * 100 : row.m ?? 0;
+  const pumpFreq = Number.isFinite(row.Omega_GHz) ? row.Omega_GHz : 0;
+  const gLinear = Number.isFinite(row.G) ? 10 ** (row.G / 10) : undefined;
+  const abortReason =
+    row.abortReason ??
+    (Array.isArray(row.notes) && row.notes.length ? row.notes.join("; ") : null);
+  return {
+    gap_nm: row.d_nm,
+    pumpFreq_GHz: pumpFreq,
+    modulationDepth_pct: modulationPct,
+    pumpPhase_deg: row.phi_deg,
+    kappa_Hz: row.kappa_Hz,
+    kappaEff_Hz: row.kappaEff_Hz,
+    kappa_MHz: row.kappa_MHz,
+    kappaEff_MHz: row.kappaEff_MHz,
+    detune_MHz: row.detune_MHz,
+    pumpRatio: row.pumpRatio,
+    G_dB: row.G,
+    G_lin: gLinear,
+    QL: row.QL,
+    QL_base: row.QL_base,
+    stable: row.stable,
+    status: row.status,
+    plateau: row.plateau ? true : row.crest ?? false,
+    abortReason,
+    ts: Date.now(),
+  };
+};
+
+const appendStreamRow = (row: SweepPointExtended) => {
+  const prev =
+    (queryClient.getQueryData(SWEEP_RESULTS_QUERY_KEY) as SweepPointExtended[] | undefined) ?? [];
+  const next = [...prev, row].slice(-MAX_STREAM_SWEEP_ROWS);
+  queryClient.setQueryData(SWEEP_RESULTS_QUERY_KEY, next);
+};
+
+export function useSweepResults() {
+  return useQuery<SweepPointExtended[]>({
+    queryKey: SWEEP_RESULTS_QUERY_KEY,
+    queryFn: async () =>
+      (queryClient.getQueryData(SWEEP_RESULTS_QUERY_KEY) as SweepPointExtended[] | undefined) ?? [],
+    initialData: () =>
+      (queryClient.getQueryData(SWEEP_RESULTS_QUERY_KEY) as SweepPointExtended[] | undefined) ?? [],
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+}
+
+type SweepResultsMeta = {
+  total: number;
+  dropped: number;
+};
+
+const EMPTY_SWEEP_META: SweepResultsMeta = { total: 0, dropped: 0 };
+
+const trimSweepRows = (rows?: VacuumGapSweepRow[] | null): VacuumGapSweepRow[] => {
+  if (!Array.isArray(rows) || rows.length === 0) return [];
+  if (rows.length <= MAX_SWEEP_ROWS) return rows;
+  return rows.slice(-MAX_SWEEP_ROWS);
+};
+
+const deriveSweepMeta = (
+  state: Pick<
+    EnergyPipelineState,
+    "vacuumGapSweepRowsTotal" | "vacuumGapSweepRowsDropped" | "vacuumGapSweepResults"
+  > | undefined,
+  visibleCount: number,
+): SweepResultsMeta => {
+  if (!state) {
+    return visibleCount > 0 ? { total: visibleCount, dropped: 0 } : EMPTY_SWEEP_META;
+  }
+  const total =
+    typeof state.vacuumGapSweepRowsTotal === "number"
+      ? state.vacuumGapSweepRowsTotal
+      : visibleCount;
+  const dropped =
+    typeof state.vacuumGapSweepRowsDropped === "number"
+      ? Math.max(0, state.vacuumGapSweepRowsDropped)
+      : Math.max(0, total - visibleCount);
+  return { total, dropped };
+};
 
 // Server emits per-tile stress–energy samples for φ = G · ρ
 export type TileDatum = {
@@ -123,6 +303,10 @@ export interface SystemMetrics {
     sectorsTotal?: number;
     activeSectors?: number;
   };
+  env?: {
+    atmDensity_kg_m3?: number | null;
+    altitude_m?: number | null;
+  };
 }
 
 // Helix metrics interface (some callers read directly from here)
@@ -135,6 +319,7 @@ export interface HelixMetrics {
   tiles?: TileDatum[];
   // lightCrossing may be a simple numeric or the structured SystemMetrics lighting object
   lightCrossing?: SystemMetrics['lightCrossing'] | number;
+  env?: SystemMetrics['env'];
 }
 
 // Shared physics constants from pipeline backend
@@ -244,14 +429,159 @@ export function useEnergyPipeline(options?: {
   refetchOnWindowFocus?: boolean;
   refetchInterval?: number;
 }) {
-  return useQuery({
+  const selectPipelineState = React.useCallback(
+    (raw: EnergyPipelineState): EnergyPipelineState => {
+      if (!raw) return raw;
+      const rows = Array.isArray(raw.vacuumGapSweepResults)
+        ? raw.vacuumGapSweepResults
+        : [];
+      const visibleCount = rows.length;
+      const totalFromServer =
+        typeof raw.vacuumGapSweepRowsTotal === "number"
+          ? raw.vacuumGapSweepRowsTotal
+          : visibleCount;
+      const total = Math.max(totalFromServer, visibleCount);
+
+      if (visibleCount > MAX_SWEEP_ROWS) {
+        const trimmed = rows.slice(-MAX_SWEEP_ROWS);
+        return {
+          ...raw,
+          vacuumGapSweepResults: trimmed,
+          vacuumGapSweepRowsTotal: total,
+          vacuumGapSweepRowsDropped: total - trimmed.length,
+        };
+      }
+
+      const dropped =
+        typeof raw.vacuumGapSweepRowsDropped === "number"
+          ? Math.max(0, raw.vacuumGapSweepRowsDropped)
+          : Math.max(0, total - visibleCount);
+
+      if (
+        raw.vacuumGapSweepRowsTotal === total &&
+        raw.vacuumGapSweepRowsDropped === dropped
+      ) {
+        return raw;
+      }
+
+      return {
+        ...raw,
+        vacuumGapSweepRowsTotal: total,
+        vacuumGapSweepRowsDropped: dropped,
+      };
+    },
+    [],
+  );
+
+  const query = useQuery<EnergyPipelineState>({
     queryKey: ['/api/helix/pipeline'],
-    queryFn: async () =>
-      (await apiRequest('GET', '/api/helix/pipeline')).json(),
-    refetchInterval: options?.refetchInterval ?? 1000, // Refresh every second
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/helix/pipeline');
+      const json = await response.json();
+      return json as EnergyPipelineState;
+    },
+    select: selectPipelineState,
+    refetchInterval: (queryInstance) => {
+      if (typeof options?.refetchInterval === "number") {
+        return options.refetchInterval;
+      }
+      const snapshot = queryInstance.state?.data as EnergyPipelineState | undefined;
+      const sweepActive = !!snapshot?.sweep?.active;
+      return sweepActive ? 600 : 1000;
+    },
     staleTime: options?.staleTime,
     refetchOnWindowFocus: options?.refetchOnWindowFocus,
   });
+
+  const [sweepResults, setSweepResults] = React.useState<VacuumGapSweepRow[]>([]);
+  const [sweepMeta, setSweepMeta] = React.useState<SweepResultsMeta>(EMPTY_SWEEP_META);
+
+  React.useEffect(() => {
+    const state = query.data;
+    if (!state) return;
+    const rows = Array.isArray(state.vacuumGapSweepResults)
+      ? state.vacuumGapSweepResults
+      : [];
+    setSweepResults(rows);
+    setSweepMeta(deriveSweepMeta(state, rows.length));
+    if (rows.length) {
+      const existing =
+        (queryClient.getQueryData(SWEEP_RESULTS_QUERY_KEY) as SweepPointExtended[] | undefined) ??
+        [];
+      if (existing.length === 0) {
+        queryClient.setQueryData(
+          SWEEP_RESULTS_QUERY_KEY,
+          rows.map(adaptVacuumRowToExtended).slice(-MAX_STREAM_SWEEP_ROWS),
+        );
+      }
+    }
+  }, [query.data]);
+
+  React.useEffect(() => {
+    const ids = [
+      subscribe("vacuumGapSweepResults", (rows: VacuumGapSweepRow[] | undefined) => {
+        if (!Array.isArray(rows)) return;
+        const trimmed = trimSweepRows(rows);
+        setSweepResults(trimmed);
+        setSweepMeta({
+          total: rows.length,
+          dropped: Math.max(0, rows.length - trimmed.length),
+        });
+        queryClient.setQueryData(
+          SWEEP_RESULTS_QUERY_KEY,
+          trimmed.map(adaptVacuumRowToExtended).slice(-MAX_STREAM_SWEEP_ROWS),
+        );
+      }),
+      subscribe("vacuumGapSweepStep", (row: VacuumGapSweepRow | undefined) => {
+        if (!row) return;
+        setSweepResults((prev) => {
+          if (prev.length >= MAX_SWEEP_ROWS) {
+            const next = prev.slice(-(MAX_SWEEP_ROWS - 1));
+            next.push(row);
+            return next;
+          }
+          return [...prev, row];
+        });
+        setSweepMeta((prev) => {
+          const total = prev.total + 1;
+          const dropped = Math.max(0, total - MAX_SWEEP_ROWS);
+          return { total, dropped };
+        });
+        appendStreamRow(adaptVacuumRowToExtended(row));
+      }),
+      subscribe("parametricSweepStep", (row: SweepPointExtended | undefined) => {
+        if (!row) return;
+        appendStreamRow(row);
+      }),
+    ];
+    return () => {
+      ids.forEach((id) => unsubscribe(id));
+    };
+  }, []);
+
+  const publishSweepControls = React.useCallback(async (payload: Partial<DynamicConfig>) => {
+    try {
+      await apiRequest('POST', '/api/helix/pipeline/update', { dynamicConfig: payload });
+      startTransition(() => {
+        queryClient.invalidateQueries({ predicate: q =>
+          Array.isArray(q.queryKey) &&
+          (q.queryKey[0] === '/api/helix/pipeline' || q.queryKey[0] === '/api/helix/metrics')
+        });
+      });
+    } catch (err) {
+      console.error("[HELIX] Failed to publish sweep controls:", err);
+    }
+  }, []);
+
+  return {
+    ...query,
+    sweepResults,
+    sweepResultsTotal: sweepMeta.total,
+    sweepResultsDropped: sweepMeta.dropped,
+    sweepResultsLimit: MAX_SWEEP_ROWS,
+    sweepResultsOverLimit: sweepMeta.total > MAX_SWEEP_ROWS,
+    publishSweepControls,
+  };
 }
 
 // Hook to update pipeline parameters
@@ -314,12 +644,13 @@ export function useSwitchMode() {
 }
 
 // --- Types
-export type ModeKey = "standby" | "hover" | "taxi" | "cruise" | "emergency";
+export type ModeKey = "standby" | "hover" | "taxi" | "nearzero" | "cruise" | "emergency";
 
 export type ModeConfig = {
   name: string;
   color: string;
   description?: string;
+  hint?: string;
 
   // UI duty knob (not FR-averaged)
   dutyCycle: number;
@@ -340,6 +671,20 @@ export type ModeConfig = {
 
   // Legacy fields for backward compatibility
   qSpoilingFactor?: number;
+
+  envCaps?: {
+    rho_pad: number;
+    v_pad: number;
+    rho_strat: number;
+    v_strat: number;
+  };
+  guards?: {
+    q: { amber: number; red: number };
+    zeta: { amber: number; red: number };
+    stroke_pm: { amber: number; red: number };
+    TS: { amber: number; red: number };
+  };
+  actionGuards?: { T_guard_amber_s: number; T_guard_red_s: number };
 };
 
 // Mode configurations for UI display (synchronized with backend)
@@ -379,6 +724,31 @@ export const MODE_CONFIGS: Record<ModeKey, ModeConfig> = {
     powerTarget_W: 83.3e6,       // inherits hover power budget
     sectorStrobing: 1,
     qSpoilingFactor: 1,
+  },
+  nearzero: {
+    name: "Near-Zero",
+    color: "text-amber-300",
+    description: "Zero-β hover-climb regime",
+    hint: "Zero-β hover-climb",
+    dutyCycle: 0.12,
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.0075,
+    sectorStrobing: 1,
+    qSpoilingFactor: 1,
+    envCaps: {
+      rho_pad: 0.1,
+      v_pad: 30,
+      rho_strat: 1e-4,
+      v_strat: 100,
+    },
+    guards: {
+      q: { amber: 0.9, red: 1.0 },
+      zeta: { amber: 0.95, red: 1.0 },
+      stroke_pm: { amber: 45, red: 50 },
+      TS: { amber: 100, red: 50 },
+    },
+    actionGuards: { T_guard_amber_s: 120, T_guard_red_s: 30 },
   },
   cruise: {
     name: "Cruise",

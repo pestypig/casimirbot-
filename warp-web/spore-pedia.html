@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spore-pedia · Warp Creator</title>
+  <link rel="stylesheet" href="./css/base.css" />
+</head>
+<body class="page">
+  <header class="header">
+    <h1>Spore-pedia</h1>
+    <div class="actions">
+      <a class="btn primary" href="./creator.html">+ New Creation</a>
+      <button id="importJson" class="btn">Import .warp.json</button>
+      <button id="clearAll" class="btn danger">Clear All (local)</button>
+    </div>
+  </header>
+  <main class="container">
+    <div id="grid" class="grid"></div>
+  </main>
+  <script src="./js/profile-store.js"></script>
+  <script>
+    const grid = document.getElementById('grid');
+    function cardHTML(p) {
+      const d = p.derived || {};
+      return `
+        <article class="card">
+          <img class="thumb" src="${p.thumbnail || ''}" alt="${p.name}" />
+          <div class="card-body">
+            <div class="title">${p.name}</div>
+            <div class="meta">@${p.author || 'anon'}</div>
+            <div class="row">
+              <span>Length</span><span>${(p.ship?.length_m ?? '—')} m</span>
+            </div>
+            <div class="row">
+              <span>Tiles</span><span>${fmtNum(p.ship?.N ?? d.N)}</span>
+            </div>
+            <div class="row">
+              <span>P_ship</span><span>${fmtNum(d.P_ship_MW)} MW</span>
+            </div>
+            <div class="row">
+              <span>Status</span><span class="pill ${d.status || 'warn'}">${d.status || '—'}</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn" onclick="ProfileStore.downloadProfileHTML('${p.id}')">Open / Download</button>
+            <button class="btn" onclick="ProfileStore.exportJSON('${p.id}')">JSON</button>
+            <button class="btn danger" onclick="ProfileStore.remove('${p.id}'); location.reload()">Delete</button>
+          </div>
+        </article>
+      `;
+    }
+    function fmtNum(x){ if(x==null||!isFinite(x)) return '—'; const a=Math.abs(x); if(a>=1e6||a<1e-2) return x.toExponential(2); return x.toLocaleString(undefined,{maximumFractionDigits:3}); }
+    function render() {
+      const list = ProfileStore.list();
+      grid.innerHTML = list.length ? list.map(cardHTML).join('') : '<p>No creations yet. Make one → <a href="./creator.html">Warp Creator</a>.</p>';
+    }
+    document.getElementById('clearAll').onclick = () => { if(confirm('Delete all local profiles?')) { ProfileStore.clearAll(); render(); } };
+    document.getElementById('importJson').onclick = async () => {
+      const inp = document.createElement('input'); inp.type='file'; inp.accept='.json,.warp.json';
+      inp.onchange = async () => {
+        const f = inp.files[0]; if(!f) return;
+        const text = await f.text(); const obj = JSON.parse(text);
+        ProfileStore.save(obj, {overwrite:true}); render();
+      };
+      inp.click();
+    };
+    render();
+  </script>
+</body>
+</html>

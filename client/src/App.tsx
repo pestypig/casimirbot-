@@ -14,6 +14,7 @@ import Why from "@/pages/why";
 import StartPortal from "@/pages/start";
 import StationPage from "@/pages/station";
 import NotFound from "@/pages/not-found";
+import PotatoThresholdLab from "@/pages/potato-threshold-lab";
 
 function Router() {
   return (
@@ -23,6 +24,7 @@ function Router() {
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
+      <Route path="/potato-threshold-lab" component={PotatoThresholdLab} />
       <Route path="/why" component={Why} />
       <Route path="/station/:role" component={StationPage} />
       <Route path="/optimist-station" component={StationPage} />

@@ -2,6 +2,7 @@
 Unit tests for dynamic Casimir calculations
 Tests duty cycles, Q-enhancement, and period calculations
 """
+import math
 import numpy as np
 import json
 import requests
@@ -153,6 +154,38 @@ def test_exotic_mass_targets():
     print(f"  Per tile: {mass_per_tile:.1f} kg, {power_per_tile:.3e} MW")
     print(f"  Total: {mass_total:.2e} kg, {power_total:.2e} MW")
     return True
+
+def test_q_loaded_formula():
+    """Ensure loaded Q follows parallel sum of intrinsic and coupling Q."""
+    qi = 1e7
+    qc = 5e5
+    ql = 1.0 / (1.0 / qi + 1.0 / qc)
+    assert abs(ql - 1.0 / (1.0 / qi + 1.0 / qc)) < 1e-12
+    assert abs(ql - (qi * qc) / (qi + qc)) < 1e-6
+
+def test_parametric_gain_phase_bias_proxy():
+    """Low-level scaffold check for phase-dependent degenerate gain."""
+    kappa = 2e5
+    delta = 0.0
+    g = 0.25 * kappa
+    g_th = kappa / 2.0
+    gain = lambda phi: 1.0 / ((1.0 - (g / g_th) * math.cos(phi)) ** 2 + (delta / kappa) ** 2)
+    assert gain(0.0) > gain(math.pi)
+    assert 10.0 * math.log10(gain(0.0)) < 15.0
+
+def test_qint_nb3sn_monotonic_cooling():
+    """Pragmatic Nb3Sn scaffold should increase Qi when cooled."""
+    def qi_nb3sn(T_K, f_GHz):
+        Tc = 18.0
+        B = 2.1 * Tc
+        T_anchor = 2.0
+        f_anchor = 6.0
+        T_use = max(T_K, 0.3)
+        temp_factor = math.exp(B * (1.0 / T_use - 1.0 / T_anchor)) * (T_anchor / T_use)
+        freq_factor = (f_anchor / max(f_GHz, 0.1)) ** 2
+        Qi = 3e7 * temp_factor * freq_factor
+        return max(1e4, min(2e10, Qi))
+    assert qi_nb3sn(2.0, 6.0) < qi_nb3sn(1.5, 6.0)
 
 if __name__ == "__main__":
     print("Running dynamic Casimir tests...")

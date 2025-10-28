@@ -10,6 +10,10 @@ const MODEL_MODE: 'calibrated' | 'raw' =
 import { HBAR } from "./physics-const.js";
 import { C } from "./utils/physics-const-safe";
 
+// Keep tau_LC (wall / c) aligned with modulation dwell unless overridden
+const DEFAULT_MODULATION_FREQ_GHZ = 15;
+const DEFAULT_WALL_THICKNESS_M = C / (DEFAULT_MODULATION_FREQ_GHZ * 1e9);
+
 // Performance guardrails for billion-tile calculations
 const TILE_EDGE_MAX = 2048;          // safe cap for any "edge" dimension fed into dynamic helpers
 const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish helpers (use aggregate)
@@ -17,10 +21,42 @@ const DYN_TILECOUNT_HARD_SKIP = 5e7; // >50M tiles → skip dynamic per-tile-ish
 // Production-quiet logging toggle
 const DEBUG_PIPE = process.env.NODE_ENV !== 'production' && (process.env.HELIX_DEBUG?.includes('pipeline') ?? false);
 import { calculateNatarioMetric } from '../modules/dynamic/natario-metric.js';
-import { calculateDynamicCasimirWithNatario } from '../modules/dynamic/dynamic-casimir.js';
-import { calculateCasimirEnergy } from '../modules/sim_core/static-casimir.js';
+import {
+  calculateDynamicCasimirWithNatario,
+  runVacuumGapSweep,
+  defaultSweepConfigFromDynamic,
+  computeSweepPoint,
+  detectPlateau,
+  type DynamicConfigLike,
+} from '../modules/dynamic/dynamic-casimir.js';
+import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
+import { calculateCasimirEnergy, omega0_from_gap } from '../modules/sim_core/static-casimir.js';
 import { toPipelineStressEnergy } from '../modules/dynamic/stress-energy-equations.js';
 import warpBubbleModule from '../modules/warp/warp-module.js';
+import { DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "../shared/schema.js";
+import type {
+  DynamicCasimirSweepConfig,
+  DynamicConfig,
+  VacuumGapSweepRow,
+  SweepPoint,
+  SweepRuntime,
+  GateAnalytics,
+} from "../shared/schema.js";
+import { appendPhaseCalibrationLog } from "./utils/phase-calibration.js";
+import { slewPump } from "./instruments/pump.js";
+
+export type MutableDynamicConfig = DynamicConfigLike;
+
+export interface ScheduleSweepRequest {
+  activeSlew: boolean;
+  reason?: string;
+}
+
+export interface PipelineRunOptions {
+  sweepMode?: "auto" | "skip" | "force" | "async";
+  scheduleSweep?: (request: ScheduleSweepRequest) => void;
+  sweepReason?: string;
+}
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
 export type HullAxes = { a: number; b: number; c: number };
@@ -53,6 +89,56 @@ export interface FieldSample {
   sgn: number;                   // sector sign (+/-)
   disp: number;                  // scalar displacement magnitude used
   dA?: number;                   // proper area element at sample (m^2) — from metric
+}
+
+export interface FieldSampleBuffer {
+  length: number;
+  x: Float32Array;
+  y: Float32Array;
+  z: Float32Array;
+  nx: Float32Array;
+  ny: Float32Array;
+  nz: Float32Array;
+  rho: Float32Array;
+  bell: Float32Array;
+  sgn: Float32Array;
+  disp: Float32Array;
+  dA: Float32Array;
+}
+
+const FIELD_SAMPLE_POOL_CAP = 1_000_000;
+let sampleBufferCapacity = 0;
+let sampleX = new Float32Array(0);
+let sampleY = new Float32Array(0);
+let sampleZ = new Float32Array(0);
+let sampleNX = new Float32Array(0);
+let sampleNY = new Float32Array(0);
+let sampleNZ = new Float32Array(0);
+let sampleRho = new Float32Array(0);
+let sampleBell = new Float32Array(0);
+let sampleSgn = new Float32Array(0);
+let sampleDisp = new Float32Array(0);
+let sampleDA = new Float32Array(0);
+
+function ensureFieldSampleCapacity(required: number) {
+  if (required > FIELD_SAMPLE_POOL_CAP) {
+    throw new Error(`field sample request exceeds pool cap (${required} > ${FIELD_SAMPLE_POOL_CAP})`);
+  }
+  if (required <= sampleBufferCapacity) return;
+  const nextBase = sampleBufferCapacity > 0 ? Math.min(FIELD_SAMPLE_POOL_CAP, sampleBufferCapacity * 2) : Math.min(FIELD_SAMPLE_POOL_CAP, 1024);
+  const next = Math.max(required, nextBase);
+  sampleX = new Float32Array(next);
+  sampleY = new Float32Array(next);
+  sampleZ = new Float32Array(next);
+  sampleNX = new Float32Array(next);
+  sampleNY = new Float32Array(next);
+  sampleNZ = new Float32Array(next);
+  sampleRho = new Float32Array(next);
+  sampleBell = new Float32Array(next);
+  sampleSgn = new Float32Array(next);
+  sampleDisp = new Float32Array(next);
+  sampleDA = new Float32Array(next);
+  sampleBufferCapacity = next;
 }
 
 export interface FieldRequest {
@@ -88,10 +174,10 @@ export interface EnergyPipelineState {
   modulationFreq_GHz: number;
 
   // Hull geometry
-  hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
+  hull?: { Lx_m: number; Ly_m: number; Lz_m: number; wallThickness_m?: number }; // Paper-authentic stack ~1 m; default auto-tunes to modulation dwell
 
   // Mode parameters
-  currentMode: 'hover' | 'cruise' | 'emergency' | 'standby';
+  currentMode: 'hover' | 'taxi' | 'nearzero' | 'cruise' | 'emergency' | 'standby';
   dutyCycle: number;
   dutyShip: number;           // Ship-wide effective duty (promoted from any)
   sectorCount: number;        // Total sectors (always 400)
@@ -159,6 +245,16 @@ export interface EnergyPipelineState {
 
   // Model mode for client consistency
   modelMode?: 'calibrated' | 'raw';
+
+  // Environment telemetry (optional; surfaced to /metrics)
+  atmDensity_kg_m3?: number | null;
+  altitude_m?: number | null;
+
+  // Dynamic sweep cache
+  dynamicConfig?: MutableDynamicConfig | null;
+  vacuumGapSweepResults?: VacuumGapSweepRow[];
+  sweep?: SweepRuntime;
+  gateAnalytics?: GateAnalytics | null;
 }
 
 // Physical constants
@@ -182,6 +278,528 @@ export const PAPER_GEO = { PACKING: 0.88, RADIAL_LAYERS: 10 } as const;
 export const PAPER_DUTY = { TOTAL_SECTORS, BURST_DUTY_LOCAL } as const;
 export const PAPER_Q    = { Q_BURST } as const;
 export const PAPER_VDB  = { GAMMA_VDB } as const;
+const SWEEP_HISTORY_MAX = 2000;
+const sweepHistory: VacuumGapSweepRow[] = [];
+
+const ACTIVE_SLEW_LIMITS = {
+  gaps: 12,
+  modDepth: 3,
+  phase: 9,
+  pump: 3,
+  delayMs: 5,
+} as const;
+
+function resolveActiveSlewLimit(value: unknown, fallback: number, min = 1, max?: number) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  const upper = Number.isFinite(max ?? NaN) ? Math.max(min, Number(max)) : undefined;
+  const clamped = Math.floor(Math.max(min, upper != null ? Math.min(num, upper) : num));
+  return clamped;
+}
+
+function pickRepresentativeValues(values: number[], limit: number): number[] {
+  if (!Array.isArray(values)) return [];
+  const unique = Array.from(new Set(values.map((v) => Number(v)))).filter((v) => Number.isFinite(v));
+  unique.sort((a, b) => a - b);
+  if (unique.length <= limit) {
+    return unique.slice();
+  }
+  if (limit <= 0) return [];
+  if (limit === 1) {
+    return [unique[Math.floor(unique.length / 2)]];
+  }
+  const step = (unique.length - 1) / (limit - 1);
+  const result: number[] = [];
+  for (let i = 0; i < limit; i++) {
+    const idx = Math.round(i * step);
+    const boundedIdx = Math.min(unique.length - 1, Math.max(0, idx));
+    const value = unique[boundedIdx];
+    if (!result.includes(value)) {
+      result.push(value);
+    }
+  }
+  if (result.length < limit) {
+    for (const value of unique) {
+      if (!result.includes(value)) {
+        result.push(value);
+        if (result.length >= limit) break;
+      }
+    }
+  }
+  result.sort((a, b) => a - b);
+  return result.slice(0, limit);
+}
+
+function appendSweepRows(rows: VacuumGapSweepRow[]) {
+  if (!rows.length) return;
+  sweepHistory.push(...rows);
+  if (sweepHistory.length > SWEEP_HISTORY_MAX) {
+    sweepHistory.splice(0, sweepHistory.length - SWEEP_HISTORY_MAX);
+  }
+}
+
+const SWEEP_TOP_LIMIT = 10;
+
+function toSweepPoint(row: VacuumGapSweepRow): SweepPoint {
+  return {
+    d_nm: row.d_nm,
+    m: row.m,
+    phi_deg: row.phi_deg,
+    Omega_GHz: row.Omega_GHz,
+    G: row.G,
+    QL: row.QL ?? row.QL_base ?? undefined,
+    stable: row.stable,
+    status: row.status,
+    detune_MHz: row.detune_MHz,
+    kappa_MHz: row.kappa_MHz,
+    kappaEff_MHz: row.kappaEff_MHz,
+    pumpRatio: row.pumpRatio,
+    plateau: !!row.plateau,
+  };
+}
+
+function upsertTopRows(
+  rows: VacuumGapSweepRow[],
+  candidate: VacuumGapSweepRow,
+  limit = SWEEP_TOP_LIMIT,
+): VacuumGapSweepRow[] {
+  const next = rows.concat(candidate);
+  next.sort((a, b) => {
+    const gainDiff = b.G - a.G;
+    if (Math.abs(gainDiff) > 1e-6) return gainDiff;
+    const qlA = a.QL ?? a.QL_base ?? 0;
+    const qlB = b.QL ?? b.QL_base ?? 0;
+    return qlB - qlA;
+  });
+  if (next.length > limit) {
+    next.length = limit;
+  }
+  return next;
+}
+
+function ensureDefaultSweepConfig(state: EnergyPipelineState) {
+  if (!state.dynamicConfig) state.dynamicConfig = {};
+  if (!state.dynamicConfig.sweep) {
+    const sweepDefaults = DEFAULT_GEOMETRY_SWEEP;
+    state.dynamicConfig.sweep = {
+      ...sweepDefaults,
+      gaps_nm: [...sweepDefaults.gaps_nm],
+      mod_depth_pct: sweepDefaults.mod_depth_pct ? [...sweepDefaults.mod_depth_pct] : [],
+      pump_freq_GHz:
+        typeof sweepDefaults.pump_freq_GHz === "string"
+          ? sweepDefaults.pump_freq_GHz
+          : sweepDefaults.pump_freq_GHz
+          ? [...sweepDefaults.pump_freq_GHz]
+          : [],
+      phase_deg: sweepDefaults.phase_deg ? [...sweepDefaults.phase_deg] : [],
+      plateau: sweepDefaults.plateau ? { ...sweepDefaults.plateau } : undefined,
+    };
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+}
+
+const roundToStep = (value: number, step: number) =>
+  step > 0 ? Math.round(value / step) * step : value;
+
+type RidgeScore = {
+  key: { d_nm: number; m: number; Omega_GHz: number };
+  plateauWidth: number;
+  Gcrest: number;
+  QL: number;
+  crestPhiDeg: number;
+};
+
+function rankRidges(rows: VacuumGapSweepRow[]): RidgeScore[] {
+  const groups = new Map<string, VacuumGapSweepRow[]>();
+  for (const row of rows) {
+    const key = `${row.d_nm}|${row.m}|${row.Omega_GHz}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(row);
+  }
+
+  const scored: RidgeScore[] = [];
+  for (const bucket of groups.values()) {
+    const crest = bucket.find((r) => r.crest) ?? bucket.reduce((best, row) => (row.G > best.G ? row : best), bucket[0]);
+    if (!crest) continue;
+    scored.push({
+      key: { d_nm: crest.d_nm, m: crest.m, Omega_GHz: crest.Omega_GHz },
+      plateauWidth: crest.plateau?.width_deg ?? 0,
+      Gcrest: crest.G,
+      QL: crest.QL ?? crest.QL_base ?? 0,
+      crestPhiDeg: crest.phi_deg,
+    });
+  }
+
+  scored.sort((a, b) => {
+    const widthDiff = b.plateauWidth - a.plateauWidth;
+    if (Math.abs(widthDiff) > 1e-6) return widthDiff;
+    const gainDiff = b.Gcrest - a.Gcrest;
+    if (Math.abs(gainDiff) > 1e-6) return gainDiff;
+    return (b.QL ?? 0) - (a.QL ?? 0);
+  });
+  return scored;
+}
+
+export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Promise<VacuumGapSweepRow[] | void> {
+  ensureDefaultSweepConfig(state);
+
+  if (!state.sweep) {
+    state.sweep = { active: false, top: [], last: null };
+  } else {
+    state.sweep.top ??= [];
+    state.sweep.last ??= null;
+  }
+  const sweepRuntime = state.sweep;
+
+  const dynamicConfig = state.dynamicConfig;
+  const runCfg = defaultSweepConfigFromDynamic(dynamicConfig);
+  if (!runCfg) {
+    sweepRuntime.active = false;
+    sweepRuntime.cancelRequested = false;
+    return;
+  }
+
+  let gateAnalytics: GateAnalytics | null = null;
+  const gateAnalyticsSink = (analytics: GateAnalytics | null) => {
+    gateAnalytics = analytics ?? null;
+  };
+
+  if (runCfg.activeSlew) {
+    const hardwareProfile = (state.dynamicConfig?.sweep as any)?.hardwareProfile ?? {};
+    const gapLimit = resolveActiveSlewLimit(
+      hardwareProfile?.gapLimit,
+      ACTIVE_SLEW_LIMITS.gaps,
+      1,
+      runCfg.gaps_nm.length,
+    );
+    const modDepthLimit = resolveActiveSlewLimit(
+      hardwareProfile?.modDepthLimit,
+      ACTIVE_SLEW_LIMITS.modDepth,
+      1,
+      runCfg.mod_depth_pct.length,
+    );
+    const phaseLimit = resolveActiveSlewLimit(
+      hardwareProfile?.phaseLimit,
+      ACTIVE_SLEW_LIMITS.phase,
+      1,
+      runCfg.phase_deg.length,
+    );
+    const pumpLimit = resolveActiveSlewLimit(
+      hardwareProfile?.pumpLimit,
+      ACTIVE_SLEW_LIMITS.pump,
+      1,
+      runCfg.pump_freq_GHz.length || 1,
+    );
+
+    runCfg.gaps_nm = pickRepresentativeValues(runCfg.gaps_nm, gapLimit);
+    runCfg.mod_depth_pct = pickRepresentativeValues(runCfg.mod_depth_pct, modDepthLimit);
+    runCfg.phase_deg = pickRepresentativeValues(runCfg.phase_deg, phaseLimit);
+    if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
+      runCfg.pump_freq_GHz = pickRepresentativeValues(runCfg.pump_freq_GHz, pumpLimit);
+    }
+
+    const requestedDelay =
+      hardwareProfile?.delayMs ?? hardwareProfile?.slewDelayMs ?? runCfg.slewDelayMs ?? ACTIVE_SLEW_LIMITS.delayMs;
+    runCfg.slewDelayMs = Math.max(0, Number.isFinite(requestedDelay) ? Number(requestedDelay) : ACTIVE_SLEW_LIMITS.delayMs);
+
+    const sweepConfig = state.dynamicConfig?.sweep;
+    if (sweepConfig) {
+      sweepConfig.slewDelayMs = runCfg.slewDelayMs;
+      sweepConfig.hardwareProfile = {
+        ...(sweepConfig.hardwareProfile ?? {}),
+        gapLimit,
+        modDepthLimit,
+        phaseLimit,
+        pumpLimit,
+        delayMs: runCfg.slewDelayMs,
+      };
+      sweepConfig.gaps_nm = [...runCfg.gaps_nm];
+      sweepConfig.mod_depth_pct = [...runCfg.mod_depth_pct];
+      sweepConfig.phase_deg = [...runCfg.phase_deg];
+      if (Array.isArray(runCfg.pump_freq_GHz) && sweepConfig.pump_freq_GHz !== "auto") {
+        sweepConfig.pump_freq_GHz = [...runCfg.pump_freq_GHz];
+      }
+      sweepConfig.activeSlew = true;
+    }
+    sweepRuntime.activeSlew = true;
+  } else if (sweepRuntime) {
+    sweepRuntime.activeSlew = false;
+  }
+
+  const geometry = runCfg.geometry ?? "cpw";
+  const gammaGeo = runCfg.gamma_geo ?? state.gammaGeo ?? 1e-3;
+  const base_f0 =
+    runCfg.base_f0_GHz ??
+    (typeof (dynamicConfig as any)?.base_f0_GHz === "number"
+      ? (dynamicConfig as any).base_f0_GHz
+      : state.modulationFreq_GHz
+      ? state.modulationFreq_GHz / 2
+      : 6);
+  const Qc = runCfg.Qc ?? state.qCavity ?? 5e5;
+  const T_K = runCfg.T_K ?? state.temperature_K ?? 2;
+
+  const ctx = { geom: geometry, gammaGeo, base_f0_GHz: base_f0, Qc, T_K };
+  const phaseLog =
+    Array.isArray(dynamicConfig?.phase_deg)
+      ? (dynamicConfig?.phase_deg as number[])[0] ?? 0
+      : (dynamicConfig?.phase_deg as number) ?? 0;
+  const pumpArray = Array.isArray(runCfg.pump_freq_GHz)
+    ? runCfg.pump_freq_GHz
+    : typeof runCfg.pump_freq_GHz === "number"
+    ? [runCfg.pump_freq_GHz]
+    : [];
+  const pumpLogBase = pumpArray.length ? pumpArray[0] : base_f0 * 2;
+
+  const logSweep = async (
+    rows: VacuumGapSweepRow[],
+    meta: Record<string, unknown>,
+    pumpHz?: number,
+  ) => {
+    if (!rows.length) return;
+    const pumpForLog = pumpHz ?? pumpLogBase;
+    try {
+      await appendPhaseCalibrationLog({
+        phase_deg_set: phaseLog,
+        pump_freq_GHz: pumpForLog,
+        rows: rows.slice(0, 512),
+        meta: {
+          geometry,
+          gamma_geo: gammaGeo,
+          base_f0_GHz: base_f0,
+          ...meta,
+        },
+      });
+    } catch (err) {
+      if (DEBUG_PIPE) console.warn("[PIPELINE] phase-calibration log append failed:", err);
+    }
+  };
+
+  if (runCfg.activeSlew) {
+    const delayMs =
+      Number.isFinite(runCfg.slewDelayMs) && runCfg.slewDelayMs != null
+        ? Math.max(0, runCfg.slewDelayMs)
+        : 50;
+    const modDepthList =
+      runCfg.mod_depth_pct && runCfg.mod_depth_pct.length ? runCfg.mod_depth_pct : [0.5];
+    const phaseList = runCfg.phase_deg && runCfg.phase_deg.length ? runCfg.phase_deg : [0];
+    const pumpListForGap = (d_nm: number) => {
+      if (runCfg.pumpStrategy === "auto") {
+        const d_m = d_nm * 1e-9;
+        const f0_auto = omega0_from_gap(d_m, base_f0, geometry, gammaGeo);
+        return [2 * f0_auto];
+      }
+      if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
+        return runCfg.pump_freq_GHz;
+      }
+      if (typeof runCfg.pump_freq_GHz === "number") {
+        return [runCfg.pump_freq_GHz];
+      }
+      return [2 * base_f0];
+    };
+
+    let totalSteps = 0;
+    for (const d_nm of runCfg.gaps_nm) {
+      const pumpList = pumpListForGap(d_nm);
+      totalSteps += modDepthList.length * pumpList.length * phaseList.length;
+    }
+    sweepRuntime.active = totalSteps > 0;
+    sweepRuntime.startedAt = Date.now();
+    sweepRuntime.completedAt = undefined;
+    sweepRuntime.cancelRequested = false;
+    sweepRuntime.cancelled = false;
+    sweepRuntime.iter = 0;
+    sweepRuntime.total = totalSteps;
+    sweepRuntime.etaMs = totalSteps > 0 ? undefined : 0;
+    sweepRuntime.slewDelayMs = delayMs;
+    sweepRuntime.top = [];
+    sweepRuntime.last = null;
+
+    if (totalSteps <= 0) {
+      state.vacuumGapSweepResults = [];
+      state.gateAnalytics = gateAnalytics;
+      return;
+    }
+
+    const hardwareRows: VacuumGapSweepRow[] = [];
+    let topRows: VacuumGapSweepRow[] = [];
+    let lastAcceptedRow: VacuumGapSweepRow | null = null;
+    let cancelled = false;
+    state.vacuumGapSweepResults = [];
+
+    outer: for (const d_nm of runCfg.gaps_nm) {
+      const pumpList = pumpListForGap(d_nm);
+      for (const m_pct of modDepthList) {
+        const m = m_pct / 100;
+        for (const pumpHz of pumpList) {
+          const phaseRows: VacuumGapSweepRow[] = [];
+          for (const phase of phaseList) {
+            if (state.sweep?.cancelRequested) {
+              cancelled = true;
+              break outer;
+            }
+
+            await slewPump({ f_Hz: pumpHz * 1e9, m, phi_deg: phase });
+            const row = computeSweepPoint({ d_nm, m, Omega_GHz: pumpHz, phi_deg: phase }, ctx);
+
+            sweepRuntime.iter = (sweepRuntime.iter ?? 0) + 1;
+            sweepRuntime.last = toSweepPoint(row);
+            if (sweepRuntime.total && sweepRuntime.iter) {
+              const elapsed = Date.now() - (sweepRuntime.startedAt ?? Date.now());
+              const remaining = Math.max(0, sweepRuntime.total - sweepRuntime.iter);
+              sweepRuntime.etaMs =
+                sweepRuntime.iter > 0
+                  ? Math.max(
+                      0,
+                      Math.round(
+                        (elapsed / Math.max(1, sweepRuntime.iter)) * remaining,
+                      ),
+                    )
+                  : undefined;
+            } else {
+              sweepRuntime.etaMs = undefined;
+            }
+
+            if (row.G > (runCfg.maxGain_dB ?? 15) && (row.QL ?? Infinity) < (runCfg.minQL ?? 1e3)) {
+              continue;
+            }
+
+            phaseRows.push(row);
+            hardwareRows.push(row);
+            appendSweepRows([row]);
+            topRows = upsertTopRows(topRows, row);
+            sweepRuntime.top = topRows.map(toSweepPoint);
+            lastAcceptedRow = row;
+            state.vacuumGapSweepResults = hardwareRows.slice();
+            if (delayMs > 0) await sleep(delayMs);
+          }
+          if (cancelled) {
+            break outer;
+          }
+          if (phaseRows.length) {
+            phaseRows.sort((a, b) => a.phi_deg - b.phi_deg);
+            detectPlateau(phaseRows, runCfg);
+            sweepRuntime.top = topRows.map(toSweepPoint);
+            const latest = lastAcceptedRow ?? phaseRows[phaseRows.length - 1];
+            sweepRuntime.last = latest ? toSweepPoint(latest) : sweepRuntime.last ?? null;
+          }
+        }
+      }
+    }
+
+    sweepRuntime.active = false;
+    sweepRuntime.cancelRequested = false;
+    sweepRuntime.cancelled = cancelled;
+    sweepRuntime.top = topRows.map(toSweepPoint);
+    if (!cancelled) {
+      sweepRuntime.completedAt = Date.now();
+      sweepRuntime.etaMs = 0;
+    } else {
+      sweepRuntime.completedAt = undefined;
+    }
+
+    if (runCfg.gateSchedule && runCfg.gateSchedule.length) {
+      const { analytics } = assignGateSummaries(
+        hardwareRows,
+        runCfg.gateSchedule,
+        runCfg.gateRouting,
+        runCfg.gateOptions ?? {},
+      );
+      gateAnalyticsSink(analytics ?? null);
+    } else {
+      assignGateSummaries(hardwareRows, undefined, undefined, runCfg.gateOptions ?? {});
+      gateAnalyticsSink(null);
+    }
+
+    state.vacuumGapSweepResults = hardwareRows.slice();
+    state.gateAnalytics = gateAnalytics;
+    await logSweep(
+      hardwareRows,
+      {
+        activeSlew: true,
+        slewDelayMs: delayMs,
+        totalSteps,
+        cancelled,
+      },
+      hardwareRows.length ? hardwareRows[hardwareRows.length - 1].Omega_GHz : undefined,
+    );
+    return hardwareRows;
+  }
+
+  sweepRuntime.active = false;
+  sweepRuntime.cancelRequested = false;
+
+  const coarseCfg = {
+    ...runCfg,
+    geometry,
+    gamma_geo: gammaGeo,
+    base_f0_GHz: base_f0,
+    Qc,
+    T_K,
+    gateAnalyticsSink,
+  };
+
+  const coarseRows = runVacuumGapSweep(coarseCfg);
+  if (!coarseRows.length) {
+    state.vacuumGapSweepResults = [];
+    state.gateAnalytics = gateAnalytics;
+    return;
+  }
+
+  appendSweepRows(coarseRows);
+  state.vacuumGapSweepResults = coarseRows.slice();
+
+  const ridgeScores = rankRidges(coarseRows);
+  const topRidges = ridgeScores.slice(0, 5);
+  const microRows: VacuumGapSweepRow[] = [];
+
+  if (topRidges.length) {
+    const microTemplate = DEFAULT_PHASE_MICRO_SWEEP.phase_deg ?? [];
+    const microStep =
+      DEFAULT_PHASE_MICRO_SWEEP.phaseMicroStep_deg ??
+      runCfg.phaseMicroStep_deg ??
+      0.25;
+
+    for (const ridge of topRidges) {
+      const crestPhi = roundToStep(ridge.crestPhiDeg, microStep);
+      const phase_deg =
+        microTemplate.length > 0
+          ? microTemplate.map((offset) => crestPhi + offset)
+          : runCfg.phase_deg && runCfg.phase_deg.length
+          ? [...runCfg.phase_deg]
+          : [crestPhi];
+      const microCfg = {
+        ...coarseCfg,
+        gaps_nm: [ridge.key.d_nm],
+        mod_depth_pct: [ridge.key.m * 100],
+        pump_freq_GHz: [ridge.key.Omega_GHz],
+        pumpStrategy: undefined,
+        phase_deg,
+      };
+      const rows = runVacuumGapSweep(microCfg);
+      if (!rows.length) continue;
+      appendSweepRows(rows);
+      microRows.push(...rows);
+    }
+  }
+
+  const allRows = coarseRows.concat(microRows);
+  state.vacuumGapSweepResults = allRows;
+  state.gateAnalytics = gateAnalytics;
+  const crestPump = topRidges[0]?.key.Omega_GHz;
+  await logSweep(
+    allRows,
+    {
+      activeSlew: false,
+      coarseRows: coarseRows.length,
+      microRows: microRows.length,
+    },
+    crestPump,
+  );
+  return allRows;
+}
 
 // ── Metric imports (induced surface metric on hull)
 import {
@@ -192,6 +810,8 @@ import {
 // NOTE: All P_target_* values are in **watts** (W).
 const MODE_POLICY = {
   hover:     { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
+  taxi:      { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
+  nearzero:  { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
   cruise:    { S_live: 1 as const,     P_target_W: 83.3e6,   M_target_kg: 1405 },
   emergency: { S_live: 2 as const,     P_target_W: 297.5e6,  M_target_kg: 1405 },
   standby:   { S_live: 0 as const,     P_target_W: 0,        M_target_kg: 0     },
@@ -223,6 +843,26 @@ export const MODE_CONFIGS = {
     sectorsConcurrent: 1,
     localBurstFrac: 0.01,
     zeta_max: 1.0 // standard quantum bound (Ford-Roman limit)
+  },
+  taxi: {
+    dutyCycle: 0.14,
+    sectorStrobing: 1,
+    qSpoilingFactor: 1,
+    description: "Ground ops posture; translation suppressed",
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.01,
+    zeta_max: 1.0
+  },
+  nearzero: {
+    dutyCycle: 0.12,
+    sectorStrobing: 1,
+    qSpoilingFactor: 1,
+    description: "Zero-beta hover-climb regime",
+    sectorsTotal: 400,
+    sectorsConcurrent: 1,
+    localBurstFrac: 0.0075,
+    zeta_max: 1.0
   },
   cruise: {
     dutyCycle: 0.005,
@@ -285,14 +925,14 @@ export function initializePipelineState(): EnergyPipelineState {
     gap_nm: 1.0,
     sag_nm: 16,
     temperature_K: 20,
-    modulationFreq_GHz: 15,
+    modulationFreq_GHz: DEFAULT_MODULATION_FREQ_GHZ,
 
     // Hull geometry (actual 1.007 km needle dimensions)
     hull: {
       Lx_m: 1007,  // length (needle axis)
       Ly_m: 264,   // width  
       Lz_m: 173,   // height
-      wallThickness_m: 1.0  // Paper-authentic: ~1.0m (0.3 booster + 0.5 lattice + 0.2 service)
+      wallThickness_m: DEFAULT_WALL_THICKNESS_M  // Matches 15 GHz dwell (~0.02 m); override for paper 1 m stack
     },
 
     // Mode defaults (hover)
@@ -335,7 +975,23 @@ export function initializePipelineState(): EnergyPipelineState {
     fordRomanCompliance: true,
     natarioConstraint: true,
     curvatureLimit: true,
-    overallStatus: 'NOMINAL'
+    overallStatus: 'NOMINAL',
+
+    atmDensity_kg_m3: null,
+    altitude_m: null,
+
+    dynamicConfig: null,
+    vacuumGapSweepResults: [],
+    gateAnalytics: null,
+    sweep: {
+      active: false,
+      status: 'idle',
+      top: [],
+      last: null,
+      cancelRequested: false,
+      cancelled: false,
+      activeSlew: false,
+    },
   };
 }
 
@@ -351,7 +1007,10 @@ function calculateStaticCasimir(gap_nm: number, area_m2: number): number {
 // Cache removed - surfaceAreaEllipsoidMetric is called directly for accuracy
 
 // Main pipeline calculation
-export async function calculateEnergyPipeline(state: EnergyPipelineState): Promise<EnergyPipelineState> {
+export async function calculateEnergyPipeline(
+  state: EnergyPipelineState,
+  opts: PipelineRunOptions = {},
+): Promise<EnergyPipelineState> {
   // --- Surface area & tile count from actual hull dims ---
   const tileArea_m2 = state.tileArea_cm2 * CM2_TO_M2;
 
@@ -382,7 +1041,12 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.U_static = calculateStaticCasimir(state.gap_nm, tileArea_m2);
 
   // 3) Apply mode config EARLY (right after reading currentMode)
-  const ui = MODE_CONFIGS[state.currentMode];
+  const modeConfig = MODE_CONFIGS[state.currentMode];
+  if (!modeConfig) {
+    if (DEBUG_PIPE) console.warn("[PIPELINE_UI] Unknown mode", state.currentMode, "- defaulting to hover");
+    state.currentMode = 'hover';
+  }
+  const ui = modeConfig ?? MODE_CONFIGS.hover;
   state.dutyCycle = ui.dutyCycle;
   state.qSpoilingFactor = ui.qSpoilingFactor;
   // keep sector policy from resolveSLive just below; don't touch sectorCount here
@@ -431,7 +1095,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.gammaGeo = Math.max(1, Math.min(1e3, state.gammaGeo));
 
   // Clamp modulationFreq_GHz to prevent divide-by-zero in TS calculations
-  state.modulationFreq_GHz = Math.max(0.001, Math.min(1000, state.modulationFreq_GHz ?? 15));
+  state.modulationFreq_GHz = Math.max(0.001, Math.min(1000, state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ));
 
   // Clamp gap_nm to physically reasonable range for Casimir calculations
   state.gap_nm = Math.max(0.1, Math.min(1000, state.gap_nm));
@@ -444,7 +1108,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.U_Q   = state.U_geo * state.qMechanical;  // ✅ apply qMechanical from start
 
   // 6) Power — raw first, then power-only calibration via qMechanical
-  const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? 15) * 1e9;
+  const omega = 2 * Math.PI * (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9;
   const Q = state.qCavity ?? PAPER_Q.Q_BURST;
   const P_tile_raw = Math.abs(state.U_Q) * omega / Q; // J/s per tile during ON
   let   P_total_W  = P_tile_raw * state.N_tiles * d_eff;        // ship average
@@ -642,7 +1306,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   const L_geom = Math.cbrt(Lx_m * Ly_m * Lz_m);             // geometric mean (volume-equivalent length)
 
   // Recompute f_m and T_m in this scope (fix scope bug)
-  const f_m_ts = (state.modulationFreq_GHz ?? 15) * 1e9; // Hz
+  const f_m_ts = (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9; // Hz
   const T_m_ts = 1 / f_m_ts;                              // s
 
   const T_long = L_long / C;   // s
@@ -653,7 +1317,7 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   state.TS_ratio = state.TS_long;    // keep existing field = conservative
 
   // Wall-scale TS (often more relevant than hull-scale)
-  const w = state.hull?.wallThickness_m ?? 1.0;
+  const w = state.hull?.wallThickness_m ?? DEFAULT_WALL_THICKNESS_M;
   const T_wall = w / C;
   (state as any).TS_wall = T_wall / T_m_ts;
 
@@ -723,9 +1387,9 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
   });
 
   // --- Construct light-crossing packet (filled correctly below) ---
-  const f_m = (state.modulationFreq_GHz ?? 15) * 1e9;     // Hz
+  const f_m = (state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ) * 1e9;     // Hz
   const T_m_s = 1 / f_m;                                  // s
-  const tauLC_s = (state.hull?.wallThickness_m ?? 1.0) / C;
+  const tauLC_s = (state.hull?.wallThickness_m ?? DEFAULT_WALL_THICKNESS_M) / C;
   const lightCrossing = {
     tauLC_ms: tauLC_s * 1e3,
     burst_ms: PAPER_DUTY.BURST_DUTY_LOCAL * T_m_s * 1e3,
@@ -817,6 +1481,39 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
     if (DEBUG_PIPE) console.warn('Dynamic Casimir calculation failed:', e);
   }
 
+  // Vacuum-gap sweep (optional) for pump bias tuning
+  try {
+    if (state.sweep) {
+      state.sweep.activeSlew = Boolean(state.dynamicConfig?.sweep?.activeSlew);
+    }
+    const sweepMode = opts.sweepMode ?? "auto";
+    const wantsActiveSlew = Boolean(state.dynamicConfig?.sweep?.activeSlew);
+    const canSchedule = typeof opts.scheduleSweep === "function";
+    const shouldSkipSweep = sweepMode === "skip";
+    const shouldForceSweep = sweepMode === "force";
+    const shouldSchedule =
+      !shouldForceSweep &&
+      !shouldSkipSweep &&
+      wantsActiveSlew &&
+      canSchedule &&
+      (sweepMode === "async" || sweepMode === "auto");
+
+    if (shouldSkipSweep) {
+      // Explicitly skipped by caller
+    } else if (shouldForceSweep) {
+      await orchestrateVacuumGapSweep(state);
+    } else if (shouldSchedule) {
+      opts.scheduleSweep?.({
+        activeSlew: true,
+        reason: opts.sweepReason ?? "pipeline-run",
+      });
+    } else {
+      await orchestrateVacuumGapSweep(state);
+    }
+  } catch (err) {
+    if (DEBUG_PIPE) console.warn("Vacuum-gap sweep skipped:", err);
+  }
+
   // Calculate stress-energy tensor from pipeline parameters
   try {
     const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 };
@@ -863,14 +1560,14 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
       // **CRITICAL FIX**: Pass calibrated pipeline mass to avoid independent calculation
       exoticMassTarget_kg: state.M_exotic, // Use calibrated mass (1405 kg) from pipeline
       dynamicConfig: {
-        modulationFreqGHz: state.modulationFreq_GHz ?? 15,
+        modulationFreqGHz: state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ,
         strokeAmplitudePm: 50,
         burstLengthUs: 10,
         cycleLengthUs: 1000,
         cavityQ: state.qCavity ?? 1e9,
         sectorCount: state.sectorCount ?? 400,
         sectorDuty: state.dutyEffective_FR ?? 2.5e-5, // warp module payload
-        pulseFrequencyGHz: state.modulationFreq_GHz ?? 15,
+        pulseFrequencyGHz: state.modulationFreq_GHz ?? DEFAULT_MODULATION_FREQ_GHZ,
         lightCrossingTimeNs: tauLC_s * 1e9,
         shiftAmplitude: 50e-12,
         expansionTolerance: 1e-12,
@@ -896,15 +1593,40 @@ export async function calculateEnergyPipeline(state: EnergyPipelineState): Promi
 }
 
 // Mode switching function
-export async function switchMode(state: EnergyPipelineState, newMode: EnergyPipelineState['currentMode']): Promise<EnergyPipelineState> {
+export async function switchMode(
+  state: EnergyPipelineState,
+  newMode: EnergyPipelineState['currentMode'],
+  opts: PipelineRunOptions = {},
+): Promise<EnergyPipelineState> {
   state.currentMode = newMode;
-  return await calculateEnergyPipeline(state);
+  return await calculateEnergyPipeline(state, opts);
 }
 
 // Parameter update function
-export async function updateParameters(state: EnergyPipelineState, params: Partial<EnergyPipelineState>): Promise<EnergyPipelineState> {
+export async function updateParameters(
+  state: EnergyPipelineState,
+  params: Partial<EnergyPipelineState>,
+  opts: PipelineRunOptions = {},
+): Promise<EnergyPipelineState> {
+  if (params.dynamicConfig) {
+    const incoming = params.dynamicConfig as MutableDynamicConfig;
+    const current = state.dynamicConfig ?? {};
+    const nextDynamic: MutableDynamicConfig = {
+      ...current,
+      ...incoming,
+    };
+    if (incoming.sweep || current.sweep) {
+      nextDynamic.sweep = {
+        ...(current.sweep ?? {}),
+        ...(incoming.sweep ?? {}),
+      };
+    }
+    state.dynamicConfig = nextDynamic;
+    delete (params as any).dynamicConfig;
+  }
+
   Object.assign(state, params);
-  return await calculateEnergyPipeline(state);
+  return await calculateEnergyPipeline(state, opts);
 }
 
 // Export current pipeline state for external access
@@ -933,7 +1655,7 @@ export async function computeEnergySnapshot(sim: any) {
     gap_nm: sim.gap ?? 1,
     sag_nm: sim.sagDepth ?? 16,
     temperature_K: sim.temperature ?? 20,
-    modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? 15,
+    modulationFreq_GHz: sim.dynamicConfig?.modulationFreqGHz ?? DEFAULT_MODULATION_FREQ_GHZ,
     currentMode: sim.mode ?? 'hover',
     gammaGeo: sim.amps?.gammaGeo ?? 26,
     qMechanical: sim.amps?.qMechanical ?? 1,
@@ -942,7 +1664,8 @@ export async function computeEnergySnapshot(sim: any) {
     qSpoilingFactor: sim.amps?.qSpoilingFactor ?? 1,
     dutyCycle: sim.dynamicConfig?.dutyCycle ?? 0.14,
     sectorCount: sim.dynamicConfig?.sectorCount ?? 400,
-    exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405
+    exoticMassTarget_kg: sim.exoticMassTarget_kg ?? 1405,
+    dynamicConfig: sim.dynamicConfig ?? null,
   };
 
   // Run the unified pipeline calculation
@@ -1037,7 +1760,7 @@ export async function computeEnergySnapshot(sim: any) {
 
     // optional: hull/wall for overlays
     hull: result.hull,
-    wallWidth_m: result.hull?.wallThickness_m ?? 1.0,
+    wallWidth_m: result.hull?.wallThickness_m ?? DEFAULT_WALL_THICKNESS_M,
 
     // meta
     __src: 'server',
@@ -1190,7 +1913,11 @@ export async function computeEnergySnapshot(sim: any) {
  * Sample the Natário bell displacement on an ellipsoidal shell using the same math as the renderer.
  * Returns ~ nTheta*nPhi points, suitable for JSON compare or CSV export.
  */
-export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSample[] {
+/**
+ * Sample the Natário bell displacement on an ellipsoidal shell using the same math as the renderer.
+ * Returns typed buffers suitable for JSON compare or CSV export without allocating per-sample objects.
+ */
+export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRequest = {}): FieldSampleBuffer {
   // Hull geometry: convert from Needle Hull format to ellipsoid axes
   const hullGeom = state.hull ?? { Lx_m: state.shipRadius_m * 2, Ly_m: state.shipRadius_m * 2, Lz_m: state.shipRadius_m * 2 }; // fallback only
   const a = hullGeom.Lx_m / 2;  // Semi-axis X (length/2)
@@ -1203,35 +1930,35 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
   const sectors = Math.max(1, Math.floor(req.sectors ?? state.sectorCount ?? TOTAL_SECTORS));
   const split   = Number.isFinite(req.split as number) ? Math.max(0, Math.floor(req.split!)) : Math.floor(sectors / 2);
 
+  const totalSamples = nTheta * nPhi;
+  ensureFieldSampleCapacity(totalSamples);
+
   // Canonical bell width in *ellipsoidal* radius units: wρ = w_m / a_eff.
   // Use harmonic-mean effective radius to match viewer/renderer ρ-units.
   const aEff = 3 / (1/axes.a + 1/axes.b + 1/axes.c);  // ✅ harmonic mean (matches viewer)
   const w_m = req.wallWidth_m ?? Math.max(1e-6, (state.sag_nm ?? 16) * 1e-9); // meters
   const w_rho = Math.max(1e-6, w_m / aEff);
 
-  // Match renderer's gain chain (display-focused): disp ∝ γ_geo^3 * q_spoil * bell * sgn
+  // Match renderer's gain chain (display-focused): disp ~ γ_geo^3 * q_spoil * bell * sgn
   const gammaGeo   = state.gammaGeo ?? 26;
   const qSpoil     = state.qSpoilingFactor ?? 1;
   const geoAmp     = Math.pow(gammaGeo, 3);               // *** cubic, same as pipeline ***
   const vizGain    = 1.0;                                 // keep physics-scale here; renderer may apply extra gain
 
-  const samples: FieldSample[] = [];
+  let idx = 0;
 
   for (let i = 0; i < nTheta; i++) {
     const theta = (i / nTheta) * 2 * Math.PI;      // [-π, π] ring index
     // --- Smooth sector strobing (matches renderer exactly) ---
     const u = (theta < 0 ? theta + 2 * Math.PI : theta) / (2 * Math.PI);
     const sectorIdx = Math.floor(u * sectors);
-    // Distance from current split boundary in sector units
     const distToSplit = (sectorIdx - split + 0.5);
-    // Wider width => softer transition across boundary
     const strobeWidth = 0.75;                 // same as renderer
     const softSign = (x: number) => Math.tanh(x); // smooth ±1 transition
     const sgn = softSign(-distToSplit / strobeWidth); // smooth sector sign
 
     for (let j = 0; j < nPhi; j++) {
       const phi = -Math.PI / 2 + (j / (nPhi - 1)) * Math.PI; // [-π/2, π/2]
-      // Base shell point (ρ≈1). Optional radial offset in meters.
       const onShell: [number, number, number] = [
         axes.a * Math.cos(phi) * Math.cos(theta),
         axes.b * Math.sin(phi),
@@ -1259,22 +1986,49 @@ export function sampleDisplacementField(state: EnergyPipelineState, req: FieldRe
       const bell = Math.exp(- (sd / w_rho) * (sd / w_rho)); // Natário canonical bell
 
       // --- Soft front/back polarity (if needed) ---
-      // For future implementation: calculate normal vectors and use softSign for smooth polarity
       const front = 1.0; // placeholder - can add soft polarity later if needed
 
       // --- Physics-consistent amplitude with soft clamp ---
       let disp = vizGain * geoAmp * qSpoil * wallWin * bell * sgn * front;
 
-      // Soft clamp (same as renderer to avoid flat shelves)
       const maxPush = 0.10;
       const softness = 0.6;
       disp = maxPush * Math.tanh(disp / (softness * maxPush));
 
-      // Calculate proper area element from metric at this surface point
       const { dA } = firstFundamentalForm(axes.a, axes.b, axes.c, theta, phi);
 
-      samples.push({ p, rho, bell, n, sgn, disp, dA });
+      sampleX[idx] = p[0];
+      sampleY[idx] = p[1];
+      sampleZ[idx] = p[2];
+      sampleNX[idx] = n[0];
+      sampleNY[idx] = n[1];
+      sampleNZ[idx] = n[2];
+      sampleRho[idx] = rho;
+      sampleBell[idx] = bell;
+      sampleSgn[idx] = sgn;
+      sampleDisp[idx] = disp;
+      sampleDA[idx] = dA;
+      idx += 1;
     }
   }
-  return samples;
+
+  return {
+    length: idx,
+    x: sampleX.subarray(0, idx),
+    y: sampleY.subarray(0, idx),
+    z: sampleZ.subarray(0, idx),
+    nx: sampleNX.subarray(0, idx),
+    ny: sampleNY.subarray(0, idx),
+    nz: sampleNZ.subarray(0, idx),
+    rho: sampleRho.subarray(0, idx),
+    bell: sampleBell.subarray(0, idx),
+    sgn: sampleSgn.subarray(0, idx),
+    disp: sampleDisp.subarray(0, idx),
+    dA: sampleDA.subarray(0, idx),
+  };
 }
+
+
+
+
+

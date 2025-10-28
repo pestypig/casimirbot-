@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
-import { simulationParametersSchema, SimulationParameters } from "@shared/schema";
+import { simulationParametersSchema, SimulationParameters, type DynamicConfig } from "@shared/schema";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 interface ParameterPanelProps {
   onSubmit: (parameters: SimulationParameters) => void;
@@ -60,6 +61,11 @@ export default function ParameterPanel({
   onParameterChange
 }: ParameterPanelProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const { publishSweepControls } = useEnergyPipeline({
+    refetchInterval: 0,
+    refetchOnWindowFocus: false,
+    staleTime: 5_000,
+  });
 
   const form = useForm<SimulationParameters>({
     resolver: zodResolver(simulationParametersSchema),
@@ -101,6 +107,13 @@ export default function ParameterPanel({
     const data = form.getValues();
     onGenerateOnly(data);
   };
+
+  const [gapSweepInput, setGapSweepInput] = useState(() => {
+    const initial = form.getValues().dynamicConfig?.gap_nm;
+    if (Array.isArray(initial)) return initial.join(",");
+    if (typeof initial === "number") return String(initial);
+    return "";
+  });
 
   return (
     <Card>
@@ -245,6 +258,43 @@ export default function ParameterPanel({
                   </FormItem>
                 )}
               />
+
+              <FormItem>
+                <FormLabel>Vacuum Gap Sweep (nm)</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="e.g., 60,80,100,120"
+                    value={gapSweepInput}
+                    onChange={(e) => setGapSweepInput(e.target.value)}
+                    onBlur={() => {
+                      const raw = gapSweepInput.trim();
+                      if (!raw) {
+                        form.setValue("dynamicConfig.gap_nm", undefined);
+                        return;
+                      }
+                      if (raw.includes(",")) {
+                        const gaps = raw
+                          .split(",")
+                          .map((s) => Number(s.trim()))
+                          .filter((x) => Number.isFinite(x) && x > 0);
+                        if (gaps.length) {
+                          form.setValue("dynamicConfig.gap_nm", gaps);
+                          publishSweepControls({ sweep: { gaps_nm: gaps } as DynamicConfig["sweep"] });
+                          setGapSweepInput(gaps.join(","));
+                        }
+                      } else {
+                        const value = Number(raw);
+                        if (Number.isFinite(value) && value > 0) {
+                          form.setValue("dynamicConfig.gap_nm", value);
+                          publishSweepControls({ gap_nm: value });
+                          setGapSweepInput(String(value));
+                        }
+                      }
+                    }}
+                  />
+                </FormControl>
+                <FormDescription>Comma-separated nanometer gaps for backend sweep</FormDescription>
+              </FormItem>
 
               <FormField
                 control={form.control}

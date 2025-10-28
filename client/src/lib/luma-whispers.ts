@@ -1,9 +1,11 @@
 // lib/luma-whispers.ts - Collection of zen whispers for different contexts
 import { publish } from "./luma-bus";
+import type { ModeKey } from "@/hooks/use-energy-pipeline";
 
 // Zen whispers for different operational modes
 export const MODE_WHISPERS = {
   'Hover': "Form first. Speed follows.",
+  'Near-Zero': "Center your split; climb with patience.",
   'Cruise': "Timing matched. Take the interval; apply thrust.",
   'Emergency': "Breathe once. Choose the useful distance.",
   'Standby': "Meet change with correct posture. The rest aligns."
@@ -43,12 +45,14 @@ export function whisperCustom(text: string) {
 }
 
 // Get wisdom for mode changes
-export function getModeWisdom(mode: 'hover' | 'cruise' | 'emergency' | 'standby'): string {
+export function getModeWisdom(mode: ModeKey): string {
   const modeWisdom = {
     hover: "Form first. Speed follows.",
+    nearzero: "Hold the split at half; lift comes with patience.",
     cruise: "Steady rhythm creates distance.",
     emergency: "Power serves purpose, not pride.",
-    standby: "In stillness, all possibilities rest."
+    standby: "In stillness, all possibilities rest.",
+    taxi: "Ground pace finds the seam before the leap."
   };
   
   return modeWisdom[mode] || "Balance in all things.";

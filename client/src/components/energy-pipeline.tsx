@@ -7,8 +7,10 @@
 import { useEffect, useMemo, startTransition, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import NearZeroWidget from "@/components/NearZeroWidget";
 import { CheckCircle, XCircle, Zap, Target, Calculator, TrendingUp, Activity } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
 
@@ -93,7 +95,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // Prefer *live* pipeline; fall back to `results` snapshot
   const live = pipelineState ?? results ?? {};
-  const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "taxi" | "cruise" | "emergency";
+  const mode = (live?.currentMode ?? "hover") as "standby" | "hover" | "taxi" | "nearzero" | "cruise" | "emergency";
 
   // Try to use canonical FR duty from pipeline; otherwise reconstruct a reasonable fallback
   const dutyEffectiveFR: number = useMemo(() => {
@@ -146,6 +148,60 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
 
   // UI duty (for display only)
   const dutyUI = isFiniteNum(live?.dutyCycle) ? live.dutyCycle : 0.14;
+  const nearZeroLocalBurst = useMemo(() => {
+    const val = Number((live as any)?.localBurstFrac ?? (live as any)?.dutyCycle);
+    return clamp01(Number.isFinite(val) ? val : 0.01);
+  }, [live]);
+  const tauLCSeconds = useMemo(() => {
+    const metricsTau = Number((systemMetrics as any)?.lightCrossing?.tauLC_ms);
+    if (Number.isFinite(metricsTau)) return metricsTau / 1000;
+    const liveTau = Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms);
+    if (Number.isFinite(liveTau)) return liveTau / 1000;
+    return undefined;
+  }, [systemMetrics, live]);
+  const nearZeroBurst = useMemo(() => {
+    const dwellMs = Number((systemMetrics as any)?.lightCrossing?.dwell_ms ?? (live as any)?.dwell_ms);
+    const burstMs = Number((systemMetrics as any)?.lightCrossing?.burst_ms ?? (live as any)?.burst_ms);
+    const fracLive = (Number.isFinite(burstMs) && Number.isFinite(dwellMs) && dwellMs > 0)
+      ? clamp01(burstMs / dwellMs)
+      : undefined;
+    return {
+      dwell_s: Number.isFinite(dwellMs) ? dwellMs / 1000 : undefined,
+      // Prefer live burst fraction when available; fallback to mode/pipeline local burst fraction
+      frac: Number.isFinite(fracLive) ? (fracLive as number) : nearZeroLocalBurst,
+    };
+  }, [systemMetrics, live, nearZeroLocalBurst]);
+  const totalSectors = useMemo(() => {
+    const fromMetrics = Number((systemMetrics as any)?.totalSectors ?? (systemMetrics as any)?.lightCrossing?.sectorsTotal);
+    if (Number.isFinite(fromMetrics) && fromMetrics > 0) return Math.floor(fromMetrics);
+    const fromLive = Number((live as any)?.sectorsTotal ?? (live as any)?.sectorCount);
+    if (Number.isFinite(fromLive) && fromLive > 0) return Math.floor(fromLive);
+    return 400;
+  }, [systemMetrics, live]);
+  const nearZeroGuards = useMemo(
+    () => ({
+      q: isFiniteNum((live as any)?.qSpoilingFactor) ? Number((live as any).qSpoilingFactor) : NaN,
+      zeta: isFiniteNum((systemMetrics as any)?.fordRoman?.value)
+        ? Number((systemMetrics as any).fordRoman.value)
+        : isFiniteNum(live?.zeta)
+        ? (live?.zeta as number)
+        : NaN,
+      stroke_pm: isFiniteNum((live as any)?.stroke_pm)
+        ? Number((live as any).stroke_pm)
+        : isFiniteNum((systemMetrics as any)?.stroke_pm)
+        ? Number((systemMetrics as any).stroke_pm)
+        : NaN,
+      // Treat non-positive TS ratios as missing to avoid false red trips
+      TS:
+        isFiniteNum(live?.TS_ratio) && Number(live!.TS_ratio as number) > 0
+          ? (live!.TS_ratio as number)
+          : isFiniteNum((systemMetrics as any)?.timeScaleRatio) && Number((systemMetrics as any).timeScaleRatio) > 0
+          ? Number((systemMetrics as any).timeScaleRatio)
+          : NaN,
+    }),
+    [live, systemMetrics]
+  );
+    // Note: removed stray PowerShell snippet that slipped into source.
 
   // Canonical physics parameters (align with Helix-Core assumptions)
   const fGHz = isFiniteNum(live?.modulationFreq_GHz) ? live.modulationFreq_GHz : 15;
@@ -217,23 +273,59 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   // --- Share derived values globally for other panels (unchanged) ---
   useEffect(() => {
     // Light-crossing: prefer server/metrics, else derive from geometry (≈ diameter/c)
-    const tau_LC_ms =
-      Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms) ??
-      Number((systemMetrics as any)?.lightCrossing?.tauLC_ms) ??
-      (Number.isFinite((live as any)?.shipRadius_m)
-        ? ms((2 * Number((live as any)?.shipRadius_m)) / C_M_PER_S)
-        : undefined);
-    const sectorPeriod_ms =
-      Number((live as any)?.sectorPeriod_ms) ??
-      Number((systemMetrics as any)?.lightCrossing?.sectorPeriod_ms);
+    const lightCrossing = (systemMetrics as any)?.lightCrossing ?? {};
 
-    queryClient.setQueryData(["helix:pipeline:derived"], {
+    const tau_LC_ms = (() => {
+      const liveTau = Number((live as any)?.tau_LC_ms ?? (live as any)?.tauLC_ms);
+      if (Number.isFinite(liveTau)) return liveTau;
+      const metricsTau = Number(lightCrossing?.tauLC_ms);
+      if (Number.isFinite(metricsTau)) return metricsTau;
+      if (Number.isFinite((live as any)?.shipRadius_m)) {
+        return ms((2 * Number((live as any)?.shipRadius_m)) / C_M_PER_S);
+      }
+      return undefined;
+    })();
+
+    const dwell_ms = (() => {
+      const liveDwell = Number((live as any)?.dwell_ms ?? (live as any)?.sectorPeriod_ms);
+      if (Number.isFinite(liveDwell)) return liveDwell;
+      const metricsDwell = Number(lightCrossing?.dwell_ms ?? lightCrossing?.sectorPeriod_ms);
+      if (Number.isFinite(metricsDwell)) return metricsDwell;
+      return undefined;
+    })();
+
+    const burst_ms = (() => {
+      const liveBurst = Number((live as any)?.burst_ms);
+      if (Number.isFinite(liveBurst)) return liveBurst;
+      const metricsBurst = Number(lightCrossing?.burst_ms);
+      if (Number.isFinite(metricsBurst)) return metricsBurst;
+      return undefined;
+    })();
+
+    const sectorPeriod_ms = (() => {
+      const liveSector = Number((live as any)?.sectorPeriod_ms);
+      if (Number.isFinite(liveSector)) return liveSector;
+      const metricsSector = Number(lightCrossing?.sectorPeriod_ms);
+      if (Number.isFinite(metricsSector)) return metricsSector;
+      return dwell_ms;
+    })();
+
+    const tsRatioDerived = (() => {
+      if (isFiniteNum(TS_ratio)) return TS_ratio;
+      if (isFiniteNum(dwell_ms) && isFiniteNum(tau_LC_ms) && tau_LC_ms! > 0) {
+        return dwell_ms! / tau_LC_ms!;
+      }
+      return undefined;
+    })();
+
+    queryClient.setQueryData(["helix:pipeline:derived"], (prev: any) => ({
+      ...prev,
       mode,
       dutyUI,
       dutyEffectiveFR,
-  P_tile_on_W: P_tile_on,
-  P_total_W: P_avg_W, // canonical pipeline value (may be undefined)
-  P_total_W_local: P_total_W_local, // dev-only local calculation for reconciliation
+      P_tile_on_W: P_tile_on,
+      P_total_W: P_avg_W, // canonical pipeline value (may be undefined)
+      P_total_W_local, // dev-only local calculation for reconciliation
       tau_Q_ms: τ_Q_ms,
       τ_Q_ms,
       tau_LC_ms,
@@ -246,20 +338,23 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
       sectorsConcurrent: (live as any)?.sectorsConcurrent ?? (systemMetrics as any)?.activeSectors,
       // timing mirror for HUDs
       sectorPeriod_ms,
-      burst_ms: (live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms,
-      dwell_ms: (live as any)?.dwell_ms ?? (systemMetrics as any)?.lightCrossing?.dwell_ms,
+      burst_ms,
+      dwell_ms,
       localBurstFrac: (live as any)?.localBurstFrac ?? (live as any)?.dutyCycle,
+      TS_ratio: tsRatioDerived,
       // instantaneous reciprocity indicator for consumers
       reciprocity: (() => {
-        const b = Number((live as any)?.burst_ms ?? (systemMetrics as any)?.lightCrossing?.burst_ms);
-        if (Number.isFinite(b) && Number.isFinite(tau_LC_ms))
-          return b < (tau_LC_ms as number)
+        if (Number.isFinite(burst_ms) && Number.isFinite(tau_LC_ms)) {
+          const burstVal = burst_ms as number;
+          const tauVal = tau_LC_ms as number;
+          return burstVal < tauVal
             ? { status: "BROKEN_INSTANT", message: "burst < τ_LC → inst. non-reciprocal" }
             : { status: "PASS_AVG", message: "burst ≥ τ_LC → avg. reciprocal" };
+        }
         return { status: "UNKNOWN", message: "missing burst/τ_LC" };
       })(),
-    });
-  }, [mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms, live, N, fGHz, γ_geo, Q, systemMetrics, queryClient]);
+    }));
+  }, [mode, dutyUI, dutyEffectiveFR, P_tile_on, P_avg_W, τ_Q_ms, live, N, fGHz, γ_geo, Q, systemMetrics, queryClient, P_total_W_local, TS_ratio]);
 
   // ========================================================================
   //                       GREEN'S FUNCTION (NEW)
@@ -385,20 +480,21 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Zap className="h-5 w-5" />
-            Complete Energy Pipeline (T_μν → Metric)
-            <Badge variant="outline" className="ml-2">{mode.toUpperCase()}</Badge>
-            {allowModeSwitch && (
-              <div className="ml-3 flex gap-2">
-                {(["standby","hover","taxi","cruise","emergency"] as const).map(m => (
-                  <button
-                    key={m}
-                    className={`px-2 py-0.5 rounded text-xs border ${
+        <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Zap className="h-5 w-5" />
+              Complete Energy Pipeline (T_μν → Metric)
+              <Badge variant="outline" className="ml-2">{mode.toUpperCase()}</Badge>
+              {allowModeSwitch && (
+                <div className="ml-3 flex gap-2">
+                  {(["standby","hover","taxi","nearzero","cruise","emergency"] as const).map(m => (
+                    <button
+                      key={m}
+                      className={`px-2 py-0.5 rounded text-xs border ${
                       m===mode ? "bg-cyan-600 border-cyan-500" : "bg-slate-900 border-slate-700"
                     }`}
-                    onClick={()=>{
+                      onClick={()=>{
                       if (m===mode) return;
                       startTransition(() => {
                         switchMode.mutate(m, {
@@ -413,12 +509,26 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                       });
                     }}
                   >
-                    {m}
+                      {m}
                   </button>
                 ))}
               </div>
             )}
           </CardTitle>
+          </div>
+          <div className="w-full lg:w-[360px]">
+            <NearZeroWidget
+              className="w-full"
+              mode={mode}
+              env={(systemMetrics as any)?.env as any}
+              guards={nearZeroGuards}
+              QL={Number.isFinite((pipelineState as any)?.qCavity) ? Number((pipelineState as any)?.qCavity) : undefined}
+              frDuty={dutyEffectiveFR}
+              burst={nearZeroBurst}
+              tauLC_s={tauLCSeconds}
+              sectorsTotal={totalSectors}
+            />
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -506,7 +616,7 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 <Activity className="h-4 w-4" />
                 7. Green's Potential (φ = G * ρ)
                 {greenPhi.source !== "none" ? (
-                  <Badge variant="outline" className="ml-2">{greenPhi.source.toUpperCase()}</Badge>
+                    <Badge variant="outline" className="ml-2">{greenPhi.source.toUpperCase()}</Badge>
                 ) : null}
               </h4>
               <div className="bg-muted rounded-lg p-4">
@@ -537,9 +647,9 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 </div>
 
                 <div className="mt-3 flex gap-2">
-                  <button
+                    <button
                     className="px-2 py-1 text-xs rounded bg-slate-900 border border-slate-700"
-                    onClick={publishGreens}
+                      onClick={publishGreens}
                     disabled={greenPhi.phi.length === 0}
                     title="Publish φ to renderer (broadcast + cache)"
                   >
@@ -621,3 +731,17 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

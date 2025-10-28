@@ -14,6 +14,18 @@ declare global {
     __strobeListeners?: Set<(p:{sectorCount:number;currentSector:number;split?:number})=>void>;
     __addStrobingListener?: (fn:(p:{sectorCount:number;currentSector:number;split?:number})=>void)=>()=>void;
     setStrobingState?: (p:{sectorCount:number;currentSector:number;split?:number})=>void;
+    helix?: {
+      timing?: {
+        dwell_ms?: number;
+        burst_ms?: number;
+        tauLC_ms?: number;
+        sectorsTotal?: number;
+        sectorsConcurrent?: number;
+      };
+      shiftVector?: {
+        betaTiltVec?: [number, number, number];
+      };
+    };
     // engine + scene
     WarpEngine?: new (canvas: HTMLCanvasElement) => any;
     sceneScale?: number;

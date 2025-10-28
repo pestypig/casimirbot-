@@ -1,7 +1,8 @@
+import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { z } from "zod";
 // Use built-in fetch when available (Node ≥18), fallback to node-fetch
-import { 
+import {
   initializePipelineState, 
   calculateEnergyPipeline, 
   switchMode,
@@ -10,13 +11,22 @@ import {
   getGlobalPipelineState,
   setGlobalPipelineState,
   sampleDisplacementField,
-  MODE_CONFIGS
+  MODE_CONFIGS,
+  orchestrateVacuumGapSweep
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
-import type { EnergyPipelineState } from "./energy-pipeline";
-import { writePhaseCalibration } from "./utils/phase-calibration.js";
+import type { EnergyPipelineState, ScheduleSweepRequest } from "./energy-pipeline";
+import { computeSweepPointExtended, stability_check } from "../modules/dynamic/dynamic-casimir.js";
+import { omega0_from_gap, domega0_dd } from "../modules/sim_core/static-casimir.js";
+import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-calibration.js";
 // ROBUST speed of light import: handle named/default or missing module gracefully
 import { C } from './utils/physics-const-safe';
+import { buildCurvatureBrick, serializeBrick, type CurvBrickParams } from "./curvature-brick";
+import { dynamicConfigSchema, vacuumGapSweepConfigSchema, sweepSpecSchema } from "../shared/schema.js";
+import type { SweepSpec, SweepProgressEvent, SweepGuardSpec, RangeSpec } from "../shared/schema.js";
+import { getSpectrumSnapshots, postSpectrum } from "./metrics/spectrum.js";
+import type { SpectrumSnapshot } from "./metrics/spectrum.js";
+import { slewPump } from "./instruments/pump.js";
 
 /**
  * Monotonic sequence for pipeline snapshots served via GET /api/helix/pipeline.
@@ -35,19 +45,426 @@ class Mutex {
 }
 const pipeMutex = new Mutex();
 
+type SweepJob = {
+  id: string;
+  activeSlew: boolean;
+  reason: string;
+  enqueuedAt: number;
+};
+
+const sweepQueue: SweepJob[] = [];
+let activeSweepJob: SweepJob | null = null;
+
+function ensureSweepRuntime(state: EnergyPipelineState): NonNullable<EnergyPipelineState["sweep"]> {
+  if (!state.sweep) {
+    state.sweep = {
+      active: false,
+      status: "idle",
+      top: [],
+      last: null,
+      cancelRequested: false,
+      cancelled: false,
+      activeSlew: false,
+    };
+  } else {
+    state.sweep.status ??= "idle";
+    state.sweep.top ??= [];
+    state.sweep.last ??= null;
+    state.sweep.cancelRequested ??= false;
+    state.sweep.cancelled ??= false;
+  }
+  return state.sweep;
+}
+
+function enqueueSweepJob(
+  state: EnergyPipelineState,
+  request: ScheduleSweepRequest & { reason: string },
+): SweepJob {
+  const runtime = ensureSweepRuntime(state);
+  const job: SweepJob = {
+    id: randomUUID(),
+    activeSlew: request.activeSlew,
+    reason: request.reason ?? "pipeline",
+    enqueuedAt: Date.now(),
+  };
+
+  if (runtime.status === "running" && !runtime.cancelRequested) {
+    runtime.cancelRequested = true;
+  }
+
+  sweepQueue.push(job);
+
+  if (activeSweepJob) {
+    const nextJob = sweepQueue[0] ?? null;
+    if (nextJob) {
+      runtime.nextJobId = nextJob.id;
+      runtime.nextJobQueuedAt = nextJob.enqueuedAt;
+      runtime.nextJobActiveSlew = nextJob.activeSlew;
+    }
+  } else {
+    runtime.status = "queued";
+    runtime.jobId = job.id;
+    runtime.queuedAt = job.enqueuedAt;
+    runtime.startedAt = undefined;
+    runtime.completedAt = undefined;
+    runtime.iter = 0;
+    runtime.total = undefined;
+    runtime.etaMs = undefined;
+    runtime.cancelRequested = false;
+    runtime.cancelled = false;
+    runtime.error = undefined;
+    runtime.top = [];
+    runtime.last = null;
+    runtime.nextJobId = undefined;
+    runtime.nextJobQueuedAt = undefined;
+    runtime.nextJobActiveSlew = undefined;
+  }
+
+  runtime.activeSlew = job.activeSlew;
+
+  triggerSweepWorker();
+  return job;
+}
+
+function triggerSweepWorker() {
+  if (activeSweepJob || sweepQueue.length === 0) return;
+  setImmediate(runNextSweepJob);
+}
+
+async function runNextSweepJob() {
+  if (activeSweepJob || sweepQueue.length === 0) return;
+  const job = sweepQueue.shift()!;
+  activeSweepJob = job;
+  try {
+    await pipeMutex.lock(async () => {
+      const state = getGlobalPipelineState();
+      const runtime = ensureSweepRuntime(state);
+      runtime.status = "running";
+      runtime.jobId = job.id;
+      runtime.queuedAt = runtime.queuedAt ?? job.enqueuedAt;
+      runtime.startedAt = Date.now();
+      runtime.cancelRequested = false;
+      runtime.cancelled = false;
+      runtime.active = true;
+      runtime.error = undefined;
+      runtime.activeSlew = job.activeSlew;
+      const nextJob = sweepQueue[0] ?? null;
+      if (nextJob) {
+        runtime.nextJobId = nextJob.id;
+        runtime.nextJobQueuedAt = nextJob.enqueuedAt;
+        runtime.nextJobActiveSlew = nextJob.activeSlew;
+      } else {
+        runtime.nextJobId = undefined;
+        runtime.nextJobQueuedAt = undefined;
+        runtime.nextJobActiveSlew = undefined;
+      }
+      setGlobalPipelineState(state);
+    });
+
+    const state = getGlobalPipelineState();
+    await orchestrateVacuumGapSweep(state);
+
+    await pipeMutex.lock(async () => {
+      const stateAfter = getGlobalPipelineState();
+      const runtime = ensureSweepRuntime(stateAfter);
+      const cancelled = !!runtime.cancelled;
+      runtime.status = cancelled ? "cancelled" : "completed";
+      runtime.active = false;
+      runtime.completedAt = Date.now();
+      runtime.cancelRequested = false;
+      runtime.activeSlew = job.activeSlew;
+      const nextJob = sweepQueue[0] ?? null;
+      if (nextJob) {
+        runtime.nextJobId = nextJob.id;
+        runtime.nextJobQueuedAt = nextJob.enqueuedAt;
+        runtime.nextJobActiveSlew = nextJob.activeSlew;
+      } else {
+        runtime.nextJobId = undefined;
+        runtime.nextJobQueuedAt = undefined;
+        runtime.nextJobActiveSlew = undefined;
+      }
+      if (!cancelled) {
+        runtime.etaMs = 0;
+      }
+      setGlobalPipelineState(stateAfter);
+    });
+  } catch (err) {
+    await pipeMutex.lock(async () => {
+      const stateErr = getGlobalPipelineState();
+      const runtime = ensureSweepRuntime(stateErr);
+      runtime.status = "failed";
+      runtime.active = false;
+      runtime.completedAt = Date.now();
+      runtime.cancelRequested = false;
+      runtime.cancelled = false;
+      runtime.error = err instanceof Error ? err.message : String(err);
+      const nextJob = sweepQueue[0] ?? null;
+      if (nextJob) {
+        runtime.nextJobId = nextJob.id;
+        runtime.nextJobQueuedAt = nextJob.enqueuedAt;
+        runtime.nextJobActiveSlew = nextJob.activeSlew;
+      } else {
+        runtime.nextJobId = undefined;
+        runtime.nextJobQueuedAt = undefined;
+        runtime.nextJobActiveSlew = undefined;
+      }
+      setGlobalPipelineState(stateErr);
+    });
+  } finally {
+    activeSweepJob = null;
+    triggerSweepWorker();
+  }
+}
+
 // Simple server-side event publisher (placeholder for future WebSocket integration)
-function publish(event: string, payload: any) {
+export function publish(event: string, payload: any) {
   // TODO: Integrate with WebSocket broadcaster when available
   console.log(`[SERVER-EVENT] ${event}:`, payload);
 }
 
+const DEFAULT_SWEEP_GUARDS: Required<Pick<SweepGuardSpec, "maxGain_dB" | "minQL" | "maxQL" | "qlDropPct">> & {
+  timeoutMs?: number;
+  abortOnGain?: boolean;
+} = {
+  maxGain_dB: 15,
+  minQL: 1e3,
+  maxQL: 2e9,
+  qlDropPct: 50,
+  timeoutMs: undefined,
+  abortOnGain: false,
+};
+
+const RANGE_STEP_LIMIT = 50_000;
+
+const clampPrecision = (value: number, digits = 12) =>
+  Number.isFinite(value) ? Number.parseFloat(value.toFixed(digits)) : value;
+
+function expandRange(range: RangeSpec): number[] {
+  const start = Number(range.start);
+  const stop = Number(range.stop);
+  const step = Number(range.step);
+  if (!Number.isFinite(start) || !Number.isFinite(stop) || !Number.isFinite(step) || step === 0) {
+    return [];
+  }
+
+  const direction = step > 0 ? 1 : -1;
+  if (direction > 0 && start > stop) return [];
+  if (direction < 0 && start < stop) return [];
+
+  const epsilon = Math.abs(step) * 1e-6 + 1e-12;
+  const values: number[] = [];
+  let current = start;
+  let iterations = 0;
+
+  while (iterations < RANGE_STEP_LIMIT) {
+    if (direction > 0) {
+      if (current > stop + epsilon) break;
+    } else if (current < stop - epsilon) {
+      break;
+    }
+    values.push(clampPrecision(current));
+    current += step;
+    iterations += 1;
+  }
+
+  if (values.length === 0 && Math.abs(stop - start) <= epsilon) {
+    values.push(clampPrecision(stop));
+  }
+
+  return values;
+}
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+};
+
+function normalizeSweepGuards(
+  guards?: SweepGuardSpec,
+): SweepGuardSpec & { timeoutMs?: number; abortOnGain?: boolean } {
+  return {
+    maxGain_dB: toFiniteNumber(guards?.maxGain_dB) ?? DEFAULT_SWEEP_GUARDS.maxGain_dB,
+    minQL: toFiniteNumber(guards?.minQL) ?? DEFAULT_SWEEP_GUARDS.minQL,
+    maxQL: toFiniteNumber(guards?.maxQL) ?? DEFAULT_SWEEP_GUARDS.maxQL,
+    qlDropPct: toFiniteNumber(guards?.qlDropPct) ?? DEFAULT_SWEEP_GUARDS.qlDropPct,
+    timeoutMs: toFiniteNumber(guards?.timeoutMs),
+    abortOnGain: typeof guards?.abortOnGain === "boolean" ? guards.abortOnGain : DEFAULT_SWEEP_GUARDS.abortOnGain,
+  };
+}
+
+export async function* orchestrateParametricSweep(
+  specInput: SweepSpec,
+  opts: { signal?: AbortSignal } = {},
+): AsyncGenerator<SweepProgressEvent> {
+  const parsed = sweepSpecSchema.safeParse(specInput);
+  if (!parsed.success) {
+    const error = parsed.error.flatten();
+    throw new Error(
+      `invalid-sweep-spec: ${JSON.stringify({ fieldErrors: error.fieldErrors, formErrors: error.formErrors })}`,
+    );
+  }
+  const spec = parsed.data;
+
+  const gapValues = expandRange(spec.gap_nm);
+  const freqValues = expandRange(spec.pumpFreq_GHz);
+  const depthValues = expandRange(spec.modulationDepth_pct);
+  const phaseValues = expandRange(spec.pumpPhase_deg);
+
+  const total =
+    gapValues.length * freqValues.length * depthValues.length * Math.max(phaseValues.length, 1);
+  yield { type: "init", payload: { total, spec } };
+  if (total === 0) {
+    yield { type: "done", payload: { resultsCount: 0, elapsedMs: 0 } };
+    return;
+  }
+
+  const guards = normalizeSweepGuards(spec.guards);
+  const shouldActuate = spec.hardware !== false && spec.measureOnly !== true;
+  const { signal } = opts;
+
+  const state = (getGlobalPipelineState() ?? {}) as Partial<EnergyPipelineState> & Record<string, unknown>;
+  const sweepCfg = ((state?.dynamicConfig as any)?.sweep ?? {}) as Record<string, unknown>;
+  const geometry =
+    sweepCfg.geometry === "parallel_plate" ? "parallel_plate" : "cpw";
+  const gammaGeo =
+    toFiniteNumber(sweepCfg.gamma_geo) ?? toFiniteNumber((state as any)?.gammaGeo) ?? 1e-3;
+  const baseF0_GHz =
+    toFiniteNumber(sweepCfg.base_f0_GHz) ?? (toFiniteNumber(state?.modulationFreq_GHz) ?? 15) / 2;
+  const Qc = Math.max(
+    1,
+    toFiniteNumber(sweepCfg.Qc) ??
+      toFiniteNumber((state as any)?.qCavity) ??
+      toFiniteNumber((state as any)?.qMechanical) ??
+      5e5,
+  );
+  const Qint = Math.max(
+    1,
+    toFiniteNumber((state as any)?.qMechanical) ?? toFiniteNumber((state as any)?.qCavity) ?? 2e9,
+  );
+
+  const startTs = Date.now();
+  const timeoutAt =
+    typeof guards.timeoutMs === "number" && guards.timeoutMs > 0
+      ? startTs + guards.timeoutMs
+      : null;
+
+  let resultsCount = 0;
+  let abortEvent: SweepProgressEvent | null = null;
+
+  outer: for (const gap of gapValues) {
+    if (signal?.aborted) {
+      abortEvent = { type: "abort", payload: { reason: "client-aborted" } };
+      break;
+    }
+    if (timeoutAt && Date.now() > timeoutAt) {
+      abortEvent = { type: "abort", payload: { reason: "timeout" } };
+      break;
+    }
+
+    const gapMeters = gap * 1e-9;
+    const f0_GHz = omega0_from_gap(gapMeters, baseF0_GHz, geometry, gammaGeo);
+    const w0 = 2 * Math.PI * f0_GHz * 1e9;
+    const dw_dd = domega0_dd(gapMeters, f0_GHz, geometry, gammaGeo);
+
+    for (const depth of depthValues) {
+      if (signal?.aborted) {
+        abortEvent = { type: "abort", payload: { reason: "client-aborted" } };
+        break outer;
+      }
+      if (timeoutAt && Date.now() > timeoutAt) {
+        abortEvent = { type: "abort", payload: { reason: "timeout" } };
+        break outer;
+      }
+
+      for (const freq of freqValues) {
+        if (shouldActuate) {
+          try {
+            await slewPump({ freq_GHz: freq, depth_pct: depth, phi_deg: phaseValues[0] ?? 0 });
+          } catch (err) {
+            console.warn("[helix-core] pump slew (freq/depth) failed:", err);
+          }
+          if (signal?.aborted) {
+            abortEvent = { type: "abort", payload: { reason: "client-aborted" } };
+            break outer;
+          }
+        }
+
+        for (const phase of phaseValues) {
+          if (timeoutAt && Date.now() > timeoutAt) {
+            abortEvent = { type: "abort", payload: { reason: "timeout" } };
+            break outer;
+          }
+          if (signal?.aborted) {
+            abortEvent = { type: "abort", payload: { reason: "client-aborted" } };
+            break outer;
+          }
+
+          if (shouldActuate) {
+            try {
+              await slewPump({ phi_deg: phase });
+            } catch (err) {
+              console.warn("[helix-core] pump slew (phase) failed:", err);
+            }
+          }
+
+          const row = computeSweepPointExtended({
+            gap_nm: gap,
+            modulationDepth_pct: depth,
+            pumpFreq_GHz: freq,
+            pumpPhase_deg: phase,
+            w0,
+            dw_dd,
+            Qc,
+            Qint,
+          });
+          const guardCheck = stability_check(row, guards);
+          row.stable = guardCheck.pass;
+          row.abortReason = guardCheck.reason ?? null;
+
+          yield { type: "point", payload: row };
+          resultsCount += 1;
+
+          if (!guardCheck.pass && guardCheck.abortSweep) {
+            abortEvent = {
+              type: "abort",
+              payload: { reason: guardCheck.reason ?? "guard-tripped", at: row },
+            };
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  if (abortEvent) {
+    yield abortEvent;
+    return;
+  }
+
+  const elapsedMs = Date.now() - startTs;
+  yield { type: "done", payload: { resultsCount, elapsedMs } };
+}
+
 // Schema for pipeline parameter updates
+const vacuumGapSweepUpdateSchema = vacuumGapSweepConfigSchema
+  .partial()
+  .extend({
+    gaps_nm: vacuumGapSweepConfigSchema.shape.gaps_nm.optional(),
+  });
+
+const dynamicConfigUpdateSchema = dynamicConfigSchema
+  .partial()
+  .extend({
+    sweep: vacuumGapSweepUpdateSchema.optional(),
+  });
+
 const UpdateSchema = z.object({
   tileArea_cm2: z.number().min(0.01).max(10_000).optional(),
   gap_nm: z.number().min(0.1).max(1000).optional(),
   sag_nm: z.number().min(0).max(1000).optional(),
   temperature_K: z.number().min(0).max(400).optional(),
   modulationFreq_GHz: z.number().min(0.001).max(1000).optional(),
+  dynamicConfig: dynamicConfigUpdateSchema.optional(),
 /* BEGIN STRAY_DUPLICATED_BLOCK - commented out to fix top-level parse errors
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -767,6 +1184,14 @@ export function getSystemMetrics(req: Request, res: Response) {
     totalSectors,
     activeSectors: concurrent,
     activeFraction,
+    env: {
+      atmDensity_kg_m3: Number.isFinite((s as any).atmDensity_kg_m3)
+        ? Number((s as any).atmDensity_kg_m3)
+        : null,
+      altitude_m: Number.isFinite((s as any).altitude_m)
+        ? Number((s as any).altitude_m)
+        : null,
+    },
     sectorStrobing: concurrent,   // concurrent (live) sectors
     currentSector: sweepIdx,
 
@@ -894,11 +1319,21 @@ export async function updatePipelineParams(req: Request, res: Response) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid parameters", issues: parsed.error.issues });
     }
-    const newState = await pipeMutex.lock(async () => {
+    const { nextState: newState, scheduledJob } = await pipeMutex.lock<{
+      nextState: EnergyPipelineState;
+      scheduledJob: SweepJob | null;
+    }>(async () => {
+      let pendingJob: SweepJob | null = null;
       const curr = getGlobalPipelineState();
-      const next = await updateParameters(curr, parsed.data);
+      const next = await updateParameters(curr, parsed.data, {
+        sweepMode: "async",
+        sweepReason: "pipeline-update",
+        scheduleSweep: (request) => {
+          pendingJob = enqueueSweepJob(curr, { ...request, reason: request.reason ?? "pipeline-update" });
+        },
+      });
       setGlobalPipelineState(next);
-      return next;
+      return { nextState: next, scheduledJob: pendingJob };
     });
 
     // Write calibration for phase diagram integration
@@ -912,9 +1347,56 @@ export async function updatePipelineParams(req: Request, res: Response) {
 
     publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(parsed.data), ts: Date.now() });
 
-    res.json(newState);
+    if (scheduledJob) {
+      const isCurrentJob = newState.sweep?.jobId === scheduledJob.id;
+      const responsePayload = {
+        ...newState,
+        sweepJob: {
+          id: scheduledJob.id,
+          status: isCurrentJob ? newState.sweep?.status ?? "queued" : "queued",
+          activeSlew: scheduledJob.activeSlew,
+          reason: scheduledJob.reason,
+          enqueuedAt: scheduledJob.enqueuedAt,
+          queuedBehindActive: !isCurrentJob && newState.sweep?.status === "running",
+        },
+      };
+      res.status(202).json(responsePayload);
+    } else {
+      res.json(newState);
+    }
   } catch (error) {
     res.status(400).json({ error: "Failed to update parameters", details: error instanceof Error ? error.message : "Unknown error" });
+  }
+}
+
+export async function cancelVacuumGapSweep(_req: Request, res: Response) {
+  try {
+    const sweepState = await pipeMutex.lock(async () => {
+      const state = getGlobalPipelineState();
+      const runtime = ensureSweepRuntime(state);
+      runtime.cancelRequested = true;
+      runtime.nextJobId = undefined;
+      runtime.nextJobQueuedAt = undefined;
+      runtime.nextJobActiveSlew = undefined;
+      runtime.status = runtime.active ? "running" : "cancelled";
+      runtime.error = undefined;
+      if (!runtime.active) {
+        runtime.cancelled = true;
+      }
+      sweepQueue.length = 0;
+      setGlobalPipelineState(state);
+      return {
+        active: !!runtime.active,
+        cancelRequested: !!runtime.cancelRequested,
+        cancelled: !!runtime.cancelled,
+        status: runtime.status,
+        jobId: runtime.jobId,
+      };
+    });
+    res.json({ ok: true, ...sweepState });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "cancel-sweep-failed";
+    res.status(500).json({ ok: false, error: message });
   }
 }
 
@@ -922,7 +1404,7 @@ export async function updatePipelineParams(req: Request, res: Response) {
 export async function switchOperationalMode(req: Request, res: Response) {
   try {
     const { mode } = req.body;
-    if (!['hover','taxi','cruise','emergency','standby'].includes(mode)) {
+    if (!['hover','taxi','nearzero','cruise','emergency','standby'].includes(mode)) {
       return res.status(400).json({ error: "Invalid mode" });
     }
     const newState = await pipeMutex.lock(async () => {
@@ -964,7 +1446,7 @@ export function getDisplacementField(req: Request, res: Response) {
     const q = req.query;
     const sectors = q.sectors ? Number(q.sectors) : s.sectorCount;
     const split = q.split ? Number(q.split) : Math.floor(s.sectorCount/2);
-    const data = sampleDisplacementField(s, {
+    const field = sampleDisplacementField(s, {
       nTheta: q.nTheta ? Number(q.nTheta) : undefined,
       nPhi: q.nPhi ? Number(q.nPhi) : undefined,
       sectors, split,
@@ -972,7 +1454,7 @@ export function getDisplacementField(req: Request, res: Response) {
       shellOffset: q.shellOffset ? Number(q.shellOffset) : undefined,
     });
     res.json({
-      count: data.length,
+      count: field.length,
       axes: s.hull,
       w_m: (s.sag_nm ?? 16) * 1e-9,
       rhoMetric: "harmonic",   // ✅ matches viewer/shader conversion
@@ -985,12 +1467,212 @@ export function getDisplacementField(req: Request, res: Response) {
         sectorCount: s.sectorCount,
         concurrentSectors: s.concurrentSectors
       },
-      data
+      data: {
+        length: field.length,
+        x: field.x,
+        y: field.y,
+        z: field.z,
+        nx: field.nx,
+        ny: field.ny,
+        nz: field.nz,
+        rho: field.rho,
+        bell: field.bell,
+        sgn: field.sgn,
+        disp: field.disp,
+        dA: field.dA,
+      }
     });
   } catch (e) {
     console.error("field endpoint error:", e);
     res.status(500).json({ error: "field sampling failed" });
   }
+}
+
+const parseNumberParam = (value: unknown, fallback: number) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const num = Number(value);
+    if (Number.isFinite(num)) return num;
+  }
+  return fallback;
+};
+
+const parseBooleanParam = (value: unknown, fallback: boolean) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const lowered = value.toLowerCase();
+    if (["1", "true", "yes", "on"].includes(lowered)) return true;
+    if (["0", "false", "no", "off"].includes(lowered)) return false;
+  }
+  return fallback;
+};
+
+const parseDimsParam = (value: unknown, fallback: [number, number, number]) => {
+  if (Array.isArray(value) && value.length === 3) {
+    const tuple = value.map((v) => parseNumberParam(v, NaN));
+    if (tuple.every((n) => Number.isFinite(n) && n > 0)) return tuple as [number, number, number];
+  }
+  if (typeof value === "string") {
+    const normalized = value.replace(/x/gi, ",");
+    const parts = normalized.split(",").map((p) => parseNumberParam(p.trim(), NaN));
+    if (parts.length === 3 && parts.every((n) => Number.isFinite(n) && n > 0)) {
+      return parts as [number, number, number];
+    }
+  }
+  return fallback;
+};
+
+const dimsForQuality = (quality: string | undefined): [number, number, number] => {
+  switch ((quality ?? "").toLowerCase()) {
+    case "low":
+      return [96, 96, 96];
+    case "medium":
+      return [128, 128, 128];
+    case "high":
+      return [160, 160, 160];
+    default:
+      return [128, 128, 128];
+  }
+};
+
+export function getCurvatureBrick(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const hull = state.hull ?? { Lx_m: 1007, Ly_m: 264, Lz_m: 173, wallThickness_m: 0.45 };
+    const bounds: CurvBrickParams["bounds"] = {
+      min: [-hull.Lx_m / 2, -hull.Ly_m / 2, -hull.Lz_m / 2],
+      max: [hull.Lx_m / 2, hull.Ly_m / 2, hull.Lz_m / 2],
+    };
+
+    const query = req.method === "GET" ? req.query : { ...req.query, ...(typeof req.body === "object" ? req.body : {}) };
+
+    const qualityDims = dimsForQuality(typeof query.quality === "string" ? query.quality : undefined);
+    const dims = parseDimsParam(query.dims, qualityDims);
+    const phase01 = parseNumberParam(query.phase01, 0);
+    const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
+    const splitEnabled = parseBooleanParam(query.splitEnabled, false);
+    const splitFrac = parseNumberParam(query.splitFrac, 0.5);
+    const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
+    const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
+    const tauLCDerived = hull ? Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C : 0.000001;
+    const tauLC = Math.max(parseNumberParam(query.tauLC_s, tauLCDerived), 1e-9);
+    const modulationHzState = parseNumberParam(state.modulationFreq_GHz, 15) * 1e9;
+    const TmDefault = modulationHzState > 0 ? 1 / modulationHzState : 1 / (15e9);
+    const Tm = Math.max(parseNumberParam(query.Tm_s, TmDefault), 1e-15);
+    const beta0 = parseNumberParam(query.beta0, 1);
+    const betaMax = parseNumberParam(query.betaMax, 12);
+    const zeta = parseNumberParam(query.zeta, 0.84);
+    const q = parseNumberParam(query.q ?? state.qSpoilingFactor, state.qSpoilingFactor ?? 1);
+    const gammaGeo = parseNumberParam(query.gammaGeo ?? state.gammaGeo, state.gammaGeo ?? 26);
+    const gammaVdB = parseNumberParam(query.gammaVdB ?? state.gammaVanDenBroeck, state.gammaVanDenBroeck ?? 1e11);
+    const ampBase = parseNumberParam(query.ampBase, 0);
+    const clampQI = parseBooleanParam(query.clampQI, true);
+
+    const params: Partial<CurvBrickParams> = {
+      dims,
+      bounds,
+      phase01,
+      sigmaSector,
+      splitEnabled,
+      splitFrac,
+      dutyFR: Math.max(dutyFR, 1e-8),
+      tauLC_s: tauLC,
+      Tm_s: Tm,
+      beta0,
+      betaMax,
+      zeta,
+      q,
+      gammaGeo,
+      gammaVdB,
+      ampBase,
+      clampQI,
+    };
+
+    const brick = buildCurvatureBrick(params);
+    const payload = serializeBrick(brick);
+    res.json(payload);
+  } catch (err) {
+    console.error("[helix-core] curvature brick error:", err);
+    const message = err instanceof Error ? err.message : "Failed to build curvature brick";
+    res.status(500).json({ error: message });
+  }
+}
+
+export function getPhaseBiasTable(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const state = getGlobalPipelineState();
+    const rows = state.vacuumGapSweepResults ?? [];
+    const env = {
+      T_K: state.temperature_K,
+      Ppump_dBm: (state as any)?.pumpPower_dBm ?? (state as any)?.pump_dBm,
+    };
+    const entries = reducePhaseCalLogToLookup(rows ?? [], env);
+    res.json({ entries });
+  } catch (err) {
+    console.error("[helix-core] phase bias lookup failed:", err);
+    res.status(500).json({ error: "phase-bias-lookup-failed" });
+  }
+}
+
+export function getSpectrumLog(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    res.json({ snapshots: getSpectrumSnapshots() });
+  } catch (err) {
+    console.error("[helix-core] spectrum log error:", err);
+    res.status(500).json({ error: "spectrum-log-failed" });
+  }
+}
+
+export function postSpectrumLog(req: Request, res: Response) {
+  if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+
+  const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : null;
+  if (!body) {
+    res.status(400).json({ error: "invalid-body" });
+    return;
+  }
+
+  const coerce = (value: unknown) => (typeof value === "number" ? value : Number(value));
+  const snapshot: SpectrumSnapshot = {
+    d_nm: coerce(body.d_nm),
+    m: coerce(body.m),
+    Omega_GHz: coerce(body.Omega_GHz),
+    phi_deg: coerce(body.phi_deg),
+    Nminus: coerce(body.Nminus),
+    Nplus: coerce(body.Nplus),
+    RBW_Hz: coerce(body.RBW_Hz),
+    P_ref_W: body.P_ref_W !== undefined ? coerce(body.P_ref_W) : undefined,
+    T_ref_K: body.T_ref_K !== undefined ? coerce(body.T_ref_K) : undefined,
+    timestamp: typeof body.timestamp === "string" ? body.timestamp : undefined,
+  };
+
+  const required = [
+    snapshot.d_nm,
+    snapshot.m,
+    snapshot.Omega_GHz,
+    snapshot.phi_deg,
+    snapshot.Nminus,
+    snapshot.Nplus,
+    snapshot.RBW_Hz,
+  ];
+  if (required.some((v) => !Number.isFinite(v))) {
+    res.status(400).json({ error: "invalid-snapshot" });
+    return;
+  }
+
+  const stored = postSpectrum(snapshot);
+  res.status(201).json(stored);
 }
 
 // NEW: expose exact computeEnergySnapshot result for client verification

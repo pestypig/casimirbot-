@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Check, onCheck, Side, Stage } from "@/lib/checkpoints";
 
 interface CheckpointViewerProps {
@@ -19,15 +19,12 @@ export default function CheckpointViewer({
   maxHistory = 100,
 }: CheckpointViewerProps) {
   const [checks, setChecks] = useState<Check[]>([]);
-  const subscribedRef = useRef(false);
 
   // quick lookups for filtering
   const sideSet = useMemo(() => new Set<Side>(sides), [sides]);
   const stageSet = useMemo(() => new Set<Stage>(stages), [stages]);
 
   useEffect(() => {
-    if (subscribedRef.current) return;
-
     const handler = (check: Check) => {
       // filter by props
       if (!sideSet.has(check.side) || !stageSet.has(check.stage)) return;
@@ -40,8 +37,8 @@ export default function CheckpointViewer({
       });
     };
 
-    onCheck(handler);
-    subscribedRef.current = true;
+    const off = onCheck(handler);
+    return () => off();
   }, [maxHistory, sideSet, stageSet]);
 
   // Group by stage+side (latest first already)

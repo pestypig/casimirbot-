@@ -7,6 +7,53 @@ import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 
 const G = 6.67430e-11; // m^3 kg^-1 s^-2
 
+/**
+ * Pragmatic internal-Q model for Nb3Sn cavities.
+ * Replace anchors with measured Rs/Q data when available.
+ */
+export function Qint_nb3sn(args: {
+  T_K: number;
+  f_GHz: number;
+  roughness_m?: number;
+  thickness_m?: number;
+  Rres_nOhm?: number;
+  Tc_K?: number;
+  Qi_anchor?: number;
+  f_anchor_GHz?: number;
+  T_anchor_K?: number;
+}): number {
+  const {
+    T_K,
+    f_GHz,
+    roughness_m = 0,
+    thickness_m = 200e-9,
+    Tc_K = 18,
+    Qi_anchor = 3e7,
+    f_anchor_GHz = 6,
+    T_anchor_K = 2,
+  } = args;
+
+  // Effective gap factor in Kelvin (2Δ/kb ≈ 4.2 · Tc; use Δ/kb ≈ 2.1 · Tc)
+  const B = 2.1 * Tc_K;
+  const T_use = Math.max(T_K, 0.3);
+  const tempFactor = Math.exp(B * (1 / T_use - 1 / T_anchor_K)) * (T_anchor_K / T_use);
+  const freqFactor = Math.pow(f_anchor_GHz / Math.max(f_GHz, 0.1), 2);
+
+  // Surface roughness penalty: ~0.2 per nm
+  const rough_nm = roughness_m * 1e9;
+  const roughFactor = Math.max(0.1, Math.min(1.0, 1 - 0.2 * rough_nm));
+
+  // Thickness scaling around 200 nm (~5% per ±100 nm)
+  const thicknessFactor = Math.max(
+    0.8,
+    Math.min(1.2, 1 + 0.05 * ((thickness_m - 200e-9) / 100e-9)),
+  );
+
+  let Qi = Qi_anchor * tempFactor * freqFactor * roughFactor * thicknessFactor;
+  Qi = Math.max(1e4, Math.min(2e10, Qi));
+  return Qi;
+}
+
 // ---------- Casimir baseline (volume energy density) ----------
 /** ρ₀(a) = −π² ħ c / (720 a⁴)  (J/m³), a in meters */
 export function casimirEnergyDensity(a_m: number): number {

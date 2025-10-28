@@ -3,7 +3,44 @@ import { UseFormReturn } from "react-hook-form";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SimulationParameters } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { SimulationParameters, DEFAULT_GEOMETRY_SWEEP, DEFAULT_PHASE_MICRO_SWEEP } from "@shared/schema";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
+
+const parseNumberList = (value: string): number[] =>
+  value
+    .split(/[,\s]+/)
+    .map((token) => Number(token))
+    .filter((num) => Number.isFinite(num));
+
+const parseRange = (value: string): number[] | null => {
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?):(-?\d+(?:\.\d+)?):(-?\d+(?:\.\d+)?)/i);
+  if (!match) return null;
+  const [, startStr, endStr, stepStr] = match;
+  const start = Number(startStr);
+  const end = Number(endStr);
+  const step = Number(stepStr);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(step) || step === 0) {
+    return [];
+  }
+  const out: number[] = [];
+  if (step > 0) {
+    for (let v = start; v <= end + 1e-9; v += step) {
+      out.push(Number(v.toFixed(9)));
+    }
+  } else {
+    for (let v = start; v >= end - 1e-9; v += step) {
+      out.push(Number(v.toFixed(9)));
+    }
+  }
+  return out;
+};
+
+const parseListOrRange = (value: string): number[] => {
+  const fromRange = parseRange(value);
+  if (fromRange && fromRange.length) return fromRange;
+  return parseNumberList(value);
+};
 
 interface DynamicControlsProps {
   form: UseFormReturn<SimulationParameters>;
@@ -12,6 +49,11 @@ interface DynamicControlsProps {
 
 export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
   if (!isVisible) return null;
+  const { publishSweepControls } = useEnergyPipeline({
+    refetchInterval: 0,
+    refetchOnWindowFocus: false,
+    staleTime: 5_000,
+  });
 
   return (
     <Card className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-blue-200 dark:border-blue-700">
@@ -43,12 +85,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="0.1" 
                         placeholder="15" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="pr-12"
                       />
                     </FormControl>
@@ -69,12 +111,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="0.1" 
                         placeholder="50" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="pr-12"
                       />
                     </FormControl>
@@ -105,12 +147,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="0.1" 
                         placeholder="10" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="pr-12"
                       />
                     </FormControl>
@@ -131,12 +173,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="1" 
                         placeholder="1000" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="pr-12"
                       />
                     </FormControl>
@@ -166,12 +208,12 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                 <div className="relative">
                   <FormControl>
                     <Input 
-                      type="number" 
+                      type="text" 
                       step="1000000" 
                       placeholder="1000000000" 
                       {...field}
                       value={field.value || ""}
-                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                      onChange={(e) => field.onChange(e.target.value)}
                       className="pr-12"
                     />
                   </FormControl>
@@ -184,6 +226,154 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
               </FormItem>
             )}
           />
+        </div>
+
+        {/* DCE Pump Sweep */}
+        <div className="space-y-4">
+          <h4 className="font-medium text-blue-900 dark:text-blue-100 flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Pump Sweep Controls
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="dynamicConfig.mod_depth_pct"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Modulation Depth (%)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="0.1,0.2,0.5 or 0.1:2:0.1"
+                      {...field}
+                      value={Array.isArray(field.value) ? field.value.join(", ") : field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      onBlur={(e) => {
+                        const list = parseListOrRange(e.target.value);
+                        if (list.length) {
+                          publishSweepControls({ mod_depth_pct: list });
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Comma list or start:stop:step (e.g. 0.1:2:0.1)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="dynamicConfig.pump_freq_GHz"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Pump Frequency (GHz)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="auto or 29.8,30.1 or 25:35:0.5"
+                      {...field}
+                      value={Array.isArray(field.value) ? field.value.join(", ") : field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim();
+                        if (!raw) return;
+                        if (raw.toLowerCase() === "auto") {
+                          publishSweepControls({ pump_freq_GHz: "auto" as any });
+                          return;
+                        }
+                        const list = parseListOrRange(raw);
+                        if (list.length) {
+                          publishSweepControls({ pump_freq_GHz: list });
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Comma list, range, or <code>auto</code> to center at 2*f<sub>0</sub>
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="dynamicConfig.phase_deg"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm">Pump Phase Bias (deg)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="text"
+                      placeholder="-10:10:1 or -2,0,2"
+                      {...field}
+                      value={Array.isArray(field.value) ? field.value.join(", ") : field.value ?? ""}
+                      onChange={(e) => field.onChange(e.target.value)}
+                      onBlur={(e) => {
+                        const list = parseListOrRange(e.target.value);
+                        if (list.length) {
+                          publishSweepControls({ phase_deg: list });
+                        }
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Specify exploration phases (list or range)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                publishSweepControls({
+                  sweep: {
+                    ...DEFAULT_GEOMETRY_SWEEP,
+                    gaps_nm: [...DEFAULT_GEOMETRY_SWEEP.gaps_nm],
+                    mod_depth_pct: DEFAULT_GEOMETRY_SWEEP.mod_depth_pct
+                      ? [...DEFAULT_GEOMETRY_SWEEP.mod_depth_pct]
+                      : [],
+                    pump_freq_GHz:
+                      typeof DEFAULT_GEOMETRY_SWEEP.pump_freq_GHz === "string"
+                        ? DEFAULT_GEOMETRY_SWEEP.pump_freq_GHz
+                        : DEFAULT_GEOMETRY_SWEEP.pump_freq_GHz
+                        ? [...DEFAULT_GEOMETRY_SWEEP.pump_freq_GHz]
+                        : [],
+                    phase_deg: DEFAULT_GEOMETRY_SWEEP.phase_deg
+                      ? [...DEFAULT_GEOMETRY_SWEEP.phase_deg]
+                      : [],
+                    plateau: DEFAULT_GEOMETRY_SWEEP.plateau
+                      ? { ...DEFAULT_GEOMETRY_SWEEP.plateau }
+                      : undefined,
+                    phaseMicroStep_deg: DEFAULT_GEOMETRY_SWEEP.phaseMicroStep_deg,
+                  },
+                })
+              }
+            >
+              Load Geometry Sweep (20-400 nm)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                publishSweepControls({
+                  sweep: {
+                    phase_deg: [...(DEFAULT_PHASE_MICRO_SWEEP.phase_deg ?? [])],
+                    phaseMicroStep_deg: DEFAULT_PHASE_MICRO_SWEEP.phaseMicroStep_deg,
+                  } as any,
+                })
+              }
+            >
+              Load Phase Micro Sweep (+/-2 deg, 0.25 deg)
+            </Button>
+          </div>
         </div>
 
         {/* Physics Preview */}
@@ -241,7 +431,7 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="1" 
                         min="1"
                         max="1000"
@@ -268,14 +458,14 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="1e-6" 
                         min="1e-6"
                         max="1"
                         placeholder="2.5e-5" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="text-xs h-8"
                       />
                     </FormControl>
@@ -295,14 +485,14 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
                   <div className="relative">
                     <FormControl>
                       <Input 
-                        type="number" 
+                        type="text" 
                         step="1" 
                         min="1"
                         max="1000"
                         placeholder="100" 
                         {...field}
                         value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                        onChange={(e) => field.onChange(e.target.value)}
                         className="text-xs h-8 pr-8"
                       />
                     </FormControl>
@@ -331,3 +521,8 @@ export function DynamicControls({ form, isVisible }: DynamicControlsProps) {
     </Card>
   );
 }
+
+
+
+
+

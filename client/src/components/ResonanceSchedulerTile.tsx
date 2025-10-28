@@ -1,9 +1,10 @@
 import React, { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
+import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 
 type Props = {
-  mode: 'standby'|'hover'|'cruise'|'emergency';
+  mode: 'standby'|'hover'|'taxi'|'nearzero'|'cruise'|'emergency';
   duty: number;
   sectors: number;
   freqGHz: number;
@@ -28,6 +29,12 @@ export default function ResonanceSchedulerTile({
     hull,
     wallWidth_m,
   });
+  const { sweepResults } = useEnergyPipeline({
+    refetchInterval: 2000,
+    refetchOnWindowFocus: false,
+    staleTime: 2000,
+  });
+  const latestSweep = sweepResults.length ? sweepResults[sweepResults.length - 1] : undefined;
 
   const bars = useMemo(() => {
     const S = Math.max(1, lightLoop.sectorCount);
@@ -65,7 +72,12 @@ export default function ResonanceSchedulerTile({
         </div>
 
         {/* Timeline */}
-        <div className="h-28 rounded-lg bg-slate-950 p-2 overflow-hidden border border-slate-800">
+        <div className="h-28 rounded-lg bg-slate-950 p-2 overflow-hidden border border-slate-800 relative">
+          {latestSweep && (
+            <div className="absolute right-2 top-2 px-2 py-1 rounded bg-slate-900/80 text-slate-100 text-[10px] border border-slate-700">
+              d={latestSweep.d_nm.toFixed(0)} nm | Omega={latestSweep.Omega_GHz.toFixed(2)} GHz | phi={latestSweep.phi_deg.toFixed(1)} deg | G={latestSweep.G.toFixed(1)} dB
+            </div>
+          )}
           <div className="flex gap-1 h-full items-end">
             {bars.map((i) => {
               const active = i === lightLoop.sectorIdx;

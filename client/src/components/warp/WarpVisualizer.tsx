@@ -210,9 +210,13 @@
       const off = (window as any).__addStrobingListener?.(({ sectorCount, currentSector, split }:{sectorCount:number;currentSector:number;split?:number;})=>{
         if (!engineRef.current) return
         const s = Math.max(1, Math.floor(sectorCount||1))
+        const splitValue = (typeof split === 'number' && Number.isFinite(split))
+          ? (split < 1 ? split * s : split)
+          : s / 2;
+        const splitIdx = Math.max(0, Math.min(s - 1, Math.floor(splitValue)));
         gatedUpdateUniforms(engineRef.current, withoutPhysics({
           sectors: s,
-          split: (typeof split === 'number' && Number.isFinite(split)) ? Math.max(0, Math.min(s-1, Math.floor(split))) : Math.floor(s/2),
+          split: splitIdx,
           sectorIdx: Math.max(0, currentSector % s)
         }), 'visualizer')
         engineRef.current.requestRewarp?.()

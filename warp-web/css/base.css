@@ -1,0 +1,37 @@
+:root{ --bg:#0b1020; --fg:#e6e9ef; --muted:#94a3b8; --card:#11172d; --accent:#7cafff; --ok:#18c29c; --warn:#ffc857; --fail:#ff6b6b; }
+*{ box-sizing:border-box }
+html,body{ height:100% }
+body{ margin:0; font:14px/1.4 ui-sans-serif,system-ui,Segoe UI,Roboto; color:var(--fg); background:var(--bg) }
+.page{ display:flex; flex-direction:column }
+.header{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #1e2545; background:#0d1430; position:sticky; top:0; z-index:5 }
+.header h1{ margin:0; font-size:18px }
+.actions{ display:flex; gap:8px }
+.btn{ padding:8px 12px; border:1px solid #2a335f; background:#141b39; color:var(--fg); border-radius:8px; cursor:pointer }
+.btn.primary{ border-color:#4d6bd6; background:#20306b }
+.btn.danger{ border-color:#7a1b1b; background:#401717 }
+.container{ padding:16px 20px; max-width:1200px; width:100%; margin:0 auto }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px }
+.card{ background:var(--card); border:1px solid #1e2545; border-radius:12px; overflow:hidden; display:flex; flex-direction:column }
+.card .thumb{ width:100%; aspect-ratio:16/9; object-fit:cover; background:#0f1430 }
+.card-body{ padding:12px; display:flex; flex-direction:column; gap:6px }
+.card-body .title{ font-weight:600 }
+.card-body .meta{ color:var(--muted); font-size:12px }
+.row, .minirow{ display:flex; justify-content:space-between; gap:10px; align-items:center }
+.card-actions{ padding:12px; display:flex; gap:8px; border-top:1px solid #1e2545 }
+.split{ display:grid; grid-template-columns: 1.2fr 1fr; gap:16px }
+.panel{ background:var(--card); border:1px solid #1e2545; border-radius:12px; padding:12px; min-height:200px }
+.panel.scroll{ max-height: calc(100vh - 120px); overflow:auto }
+.grid2{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:10px }
+label{ display:flex; flex-direction:column; gap:4px; color:var(--muted); font-size:12px }
+input{ padding:8px; border-radius:8px; border:1px solid #273158; background:#101735; color:var(--fg) }
+canvas{ width:100%; height:420px; display:block; border-radius:8px; background:#0e1430; border:1px solid #1e2545 }
+.pre{ background:#0e1430; padding:10px; border-radius:8px; border:1px solid #1e2545; overflow:auto }
+.gates{ display:flex; flex-direction:column; gap:6px }
+.gate-row{ display:flex; gap:8px; flex-wrap:wrap }
+.pill{ padding:2px 8px; border-radius:999px; background:#243054; border:1px solid #2a335f }
+.pill.ok{ background:#113b33; border-color:#1d6f5e }
+.pill.warn{ background:#3b3511; border-color:#6f5e1d }
+.pill.fail{ background:#3b1111; border-color:#6f1d1d }
+.results .row{ border-bottom:1px dashed #23305b; padding:6px 0 }
+.hero{ width:100%; max-width:900px; border-radius:12px; border:1px solid #1e2545; background:#0e1430; margin-bottom:12px }
+.bullets{ margin:8px 0 0 18px }

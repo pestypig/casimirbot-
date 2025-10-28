@@ -1,9 +1,9 @@
 {
   "tile_area_cm2": 25,
   "ship_radius_m": 86.5,
-  "P_target_W": 100000000,
+  "P_target_W": 83300000,
   "M_target_kg": 1405,
   "zeta_target": 0.5,
-  "timestamp": "2025-09-03T19:38:42.834Z",
-  "source": "mode_change"
+  "timestamp": "2025-10-27T23:04:27.374Z",
+  "source": "pipeline_update"
 }

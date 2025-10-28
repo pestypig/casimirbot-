@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calculator, Zap, Atom, Settings } from "lucide-react";
 import { zenLongToast } from "@/lib/zen-long-toasts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS } from "@/hooks/use-energy-pipeline";
+import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, type EnergyPipelineState } from "@/hooks/use-energy-pipeline";
 
 interface LiveEnergyPipelineProps {
   // Physics parameters
@@ -50,9 +50,9 @@ export function LiveEnergyPipeline({
   const { data: pipelineState } = useEnergyPipeline();  // authoritative operational values
   const switchMode = useSwitchMode(); 
 
-  const P = pipelineState || {};
+  const P: Partial<EnergyPipelineState> = pipelineState ?? {};
   const live = {
-    currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"cruise"|"emergency",
+    currentMode: (P.currentMode ?? selectedMode ?? "hover") as "standby"|"hover"|"nearzero"|"cruise"|"emergency",
     dutyCycle:    Number.isFinite(P.dutyCycle) ? P.dutyCycle! : duty ?? 0.14,
     sectorStrobing: Number.isFinite(P.sectorStrobing) ? P.sectorStrobing! : (Number.isFinite(P.concurrentSectors) ? Number(P.concurrentSectors) : 1),
     qSpoilingFactor: Number.isFinite(P.qSpoilingFactor) ? P.qSpoilingFactor! : 1,
@@ -530,3 +530,4 @@ export function LiveEnergyPipeline({
     </Card>
   );
 }
+
