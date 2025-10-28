@@ -928,7 +928,6 @@ export default function HelixCore() {
 
 const [selectedSector, setSelectedSector] = useState<string | null>(null);
 const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
-const [ringActiveSector, setRingActiveSector] = useState<number>(0);
   const [mainframeLog, setMainframeLog] = useState<string[]>([
     "[HELIX-CORE] System initialized",
     "[HELIX-CORE] Needle Hull mainframe ready",
@@ -2430,7 +2429,7 @@ const [ringActiveSector, setRingActiveSector] = useState<number>(0);
         {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
-          <AlcubierrePanel ringPulseIndex={tileHoverSector} onRingActiveIndex={setRingActiveSector} />
+          <AlcubierrePanel />
         </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
@@ -3023,7 +3022,7 @@ const [ringActiveSector, setRingActiveSector] = useState<number>(0);
                   width={320}
                   height={170}
                   onSectorFocus={setTileHoverSector}
-                  pulseSector={ringActiveSector}
+                  pulseSector={ringCurrentSector}
                 />
               )}
 

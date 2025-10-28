@@ -10,7 +10,6 @@ import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle"
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState } from "./Hull3DRenderer.ts";
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
-import SectorGridRing from "./SectorGridRing";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 
 // === helpers: math & smoothing =================================================
@@ -611,7 +610,7 @@ function makeGrid(res: number) {
   return new Float32Array(verts);
 }
 
-export default function AlcubierrePanel({ className, ringPulseIndex, onRingActiveIndex }: { className?: string; ringPulseIndex?: number | null; onRingActiveIndex?: React.Dispatch<React.SetStateAction<number>> }) {
+export default function AlcubierrePanel({ className }: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
   const hullRendererRef = useRef<Hull3DRenderer | null>(null);
@@ -722,24 +721,6 @@ const trimSharedPhysicsDb = useHull3DSharedStore((s) => s.trimPhysicsDb);
 const showSectorGridOverlay = useHull3DSharedStore(
   (s) => s.overlays.sectorGrid3D.enabled
 );
-const sectorGridTotal =
-  sharedSectorState.weightsInstant.length ||
-  sharedSectorState.weightsAverage.length;
-const sectorGridWeights = useMemo(() => {
-  if (!showSectorGridOverlay) return undefined;
-  const source =
-    sharedSectorState.weightsAverage.length > 0
-      ? sharedSectorState.weightsAverage
-      : sharedSectorState.weightsInstant;
-  return source.length ? Array.from(source) : undefined;
-}, [
-  showSectorGridOverlay,
-  sharedSectorState.weightsAverage,
-  sharedSectorState.weightsInstant,
-]);
-const sectorGridCurrent = Number.isFinite(sharedSectorState.activeIndex)
-  ? sharedSectorState.activeIndex
-  : undefined;
 
 useEffect(() => {
   if (typeof window !== "undefined") {
@@ -3600,22 +3581,6 @@ const res = 256;
         {/* Viewer fills the remaining fixed-height space and remains stable */}
         <div className="relative w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-slate-800 bg-black/70">
           <canvas ref={canvasRef} className="w-full h-full block" />
-        {planarVizMode === 3 && showSectorGridOverlay && sectorGridTotal > 0 && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <SectorGridRing
-              sectorsTotal={Math.max(1, sectorGridTotal)}
-              sectorsConcurrent={Math.max(1, Math.floor(liveSectors))}
-              currentSector={sectorGridCurrent}
-              weights={sectorGridWeights}
-              emaAlpha={0.35}
-              showPhaseStreaks
-              streakLen={2}
-              pulseSector={typeof ringPulseIndex === "number" ? ringPulseIndex : null}
-              onResolvedIndex={onRingActiveIndex ? (idx: number) => onRingActiveIndex(idx) : undefined}
-              className="pointer-events-none h-full w-full"
-            />
-          </div>
-        )}
         {planarVizMode === 2 && (
           <div className="pointer-events-none absolute top-2 left-2 w-14 h-14 rounded-full border border-emerald-700/60 bg-slate-900/30">
             <div
