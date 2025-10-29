@@ -24,6 +24,7 @@ import {
 import { toHUDModel, si, zetaStatusColor } from "@/lib/hud-adapter";
 import CavitySideView from "./CavitySideView"; // legacy single canvas view
 import CavityFrameView from "./CavityFrameView"; // frame-of-view cavity visualization
+import { FractionalCoherenceRail } from "./FractionalCoherenceRail";
 import ResultViewer from "./ResultViewer";
 import InfoDot from "./InfoDot";
 import StatusBanner from "./StatusBanner";
@@ -43,6 +44,7 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { useFractionalCoherence } from "@/hooks/useFractionalCoherence";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { downloadCSV } from "@/utils/csv";
 import { apiRequest } from "@/lib/queryClient";
@@ -51,6 +53,7 @@ import SweepReplayControls from "./SweepReplayControls";
 import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
+import { sendDriveNudge, publishWhisper } from "@/lib/luma-whispers";
 import type { VacuumGapSweepRow, DynamicConfig, RidgePreset, SweepRuntime } from "@shared/schema";
 
 const HEATMAP_MAX_ROWS = 1500;
@@ -594,6 +597,9 @@ export default function HelixCasimirAmplifier({
     id: "helix-casimir",
     label: "Helix Casimir Vacuum",
   });
+  const fractional = useFractionalCoherence();
+  const lastCoherenceNudgeRef = useRef<number>(0);
+  const drivePhaseRef = useRef<number>(0);
 
   // Use HUD adapter for drift-proof field access (cast to any for flexible server shapes)
   const _metricsAny: any = metrics;
@@ -801,6 +807,110 @@ export default function HelixCasimirAmplifier({
     }
     return state?.dutyCycle ?? metrics?.dutyGlobal ?? 0; // last resort
   })();
+
+  const dutyForSamples = (() => {
+    const fromState = Number(state?.dutyCycle);
+    if (Number.isFinite(fromState)) {
+      return Math.max(0, Math.min(1, fromState));
+    }
+    const fallback = Number(d_eff);
+    if (Number.isFinite(fallback)) {
+      return Math.max(0, Math.min(1, fallback));
+    }
+    return 0.1;
+  })();
+  const coherenceSampleRateState = Number((_stateAny?.coherence?.sampleRateHz));
+  const coherenceSampleRateMetrics = Number((_metricsAny?.coherence?.sampleRateHz));
+  const pumpPhaseDeg = Number((_stateAny?.pumpPhase_deg ?? _metricsAny?.pumpPhase_deg));
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const freqHz = f;
+    if (!Number.isFinite(freqHz) || freqHz <= 0) {
+      publishWhisper("drive:samples", { flush: true });
+      return;
+    }
+
+    const MIN_FS = 4_096;
+    const MAX_FS = 262_144;
+    const clampFs = (value: number): number => {
+      if (!Number.isFinite(value) || value <= 0) return MIN_FS;
+      return Math.max(MIN_FS, Math.min(MAX_FS, value));
+    };
+
+    const primaryFs =
+      Number.isFinite(coherenceSampleRateState) && coherenceSampleRateState > 0
+        ? coherenceSampleRateState
+        : Number.isFinite(coherenceSampleRateMetrics) && coherenceSampleRateMetrics > 0
+          ? coherenceSampleRateMetrics
+          : Math.max(freqHz / 64, 16_384);
+
+    const fsHz = clampFs(primaryFs);
+
+    const amplitude = Math.max(0.01, Math.min(0.9, dutyForSamples));
+    if (amplitude <= 1e-4) {
+      publishWhisper("drive:samples", { fs: fsHz, f0: freqHz, flush: true });
+      return;
+    }
+
+    const chunkMs = 12;
+    const samplesPerChunk = Math.max(256, Math.round((fsHz * chunkMs) / 1000));
+    if (!Number.isFinite(samplesPerChunk) || samplesPerChunk <= 0) {
+      publishWhisper("drive:samples", { fs: fsHz, f0: freqHz, flush: true });
+      return;
+    }
+
+    let phase = Number.isFinite(pumpPhaseDeg) ? (pumpPhaseDeg * Math.PI) / 180 : drivePhaseRef.current;
+    let cancelled = false;
+
+    const emit = () => {
+      const chunk = new Float32Array(samplesPerChunk);
+      const omega = 2 * Math.PI * freqHz;
+      for (let idx = 0; idx < samplesPerChunk; idx++) {
+        const t = idx / fsHz;
+        const theta = phase + omega * t;
+        chunk[idx] =
+          amplitude *
+          (0.72 * Math.sin(theta) + 0.18 * Math.sin(theta * 1.5 + 0.4) + 0.1 * Math.sin(theta * 2.5 - 1.1));
+      }
+      phase += omega * (samplesPerChunk / fsHz);
+      if (!Number.isFinite(phase)) {
+        phase = 0;
+      } else {
+        phase = phase % (2 * Math.PI);
+      }
+      drivePhaseRef.current = phase;
+      publishWhisper("drive:samples", {
+        fs: fsHz,
+        f0: freqHz,
+        samples: chunk,
+        windowMs: chunkMs,
+        hopMs: chunkMs / 2,
+      });
+    };
+
+    try {
+      emit();
+    } catch (err) {
+      console.error("[HelixCasimirAmplifier] initial drive sample emit failed", err);
+    }
+
+    const intervalMs = Math.max(4, Math.round(chunkMs));
+    const timer = window.setInterval(() => {
+      if (cancelled) return;
+      try {
+        emit();
+      } catch (err) {
+        console.error("[HelixCasimirAmplifier] drive sample emit failed", err);
+      }
+    }, intervalMs);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [f, dutyForSamples, coherenceSampleRateState, coherenceSampleRateMetrics, pumpPhaseDeg]);
 
   const derived = useMemo(() => {
     if (!state || !metrics) {
@@ -1143,6 +1253,28 @@ export default function HelixCasimirAmplifier({
     };
     // include lc-derived values in the deps so gating/duty react to the loop
   }, [state, metrics, omega, qCav, gateOn, d_eff]);
+
+  useEffect(() => {
+    const cp = fractional.CP;
+    const emaCp = fractional.EMA.CP;
+    const ifc = fractional.IFC ?? null;
+    const emaIfc = fractional.EMA.IFC ?? ifc;
+    if (cp == null || emaCp == null) return;
+    if (!Number.isFinite(cp) || !Number.isFinite(emaCp) || emaCp <= 0) return;
+    const drop = cp < 0.7 * emaCp;
+    const contrastSpike =
+      ifc != null &&
+      emaIfc != null &&
+      Number.isFinite(ifc) &&
+      Number.isFinite(emaIfc) &&
+      ifc > 1.2 * Math.max(emaIfc, 1e-12);
+    if (!drop || !contrastSpike) return;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - lastCoherenceNudgeRef.current < 5_000) return;
+    sendDriveNudge({ kind: "modulationDepth", deltaPct: -2 });
+    sendDriveNudge({ kind: "phaseTrimDeg", delta: Math.random() < 0.5 ? -0.5 : 0.5 });
+    lastCoherenceNudgeRef.current = now;
+  }, [fractional.CP, fractional.EMA.CP, fractional.IFC, fractional.EMA.IFC]);
 
   const ampBaseCandidate = useMemo(() => {
     const candidates = [
@@ -2167,6 +2299,9 @@ export default function HelixCasimirAmplifier({
               <Badge variant="outline" className="justify-center">N = {fmtNum(derived?.N_tiles_internal ?? 0, "", 0)}</Badge>
               <Badge variant="outline" className="justify-center">P = {fmtNum(P_MW_badge, "MW", 2)}</Badge>
               <Badge variant="outline" className="justify-center">M = {fmtNum(M_kg_badge, "kg", 0)}</Badge>
+            </div>
+            <div className="mt-4">
+              <FractionalCoherenceRail state={fractional} compact />
             </div>
 
             {/* Debug info for troubleshooting N=0, P=0, M=0 issues */}

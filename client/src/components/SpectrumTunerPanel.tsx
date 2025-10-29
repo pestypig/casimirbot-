@@ -45,7 +45,7 @@ export type SpectrumLiveInputs = {
   qSpoilingFactor?: number;   // UI proxy; can reflect ports/roughness etc.
   modulationFreq_GHz?: number;// Ω / 2π in GHz
 
-  duty?: number;              // 0..1 fractional
+  duty?: number;              // 0..1 fractional (local burst duty)
   sectors?: number;           // sector count (S)
   lightCrossing_us?: number;  // light-crossing time of the tile (for the time plot scale)
 
@@ -315,7 +315,7 @@ export default function SpectrumTunerPanel({
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <div className="flex items-center justify-between">
-                <span>duty</span>
+                <span>burst duty</span>
                 <span className="font-mono">{(100 * duty).toFixed(2)}%</span>
               </div>
               <div className="flex items-center justify-between">
@@ -374,7 +374,7 @@ export default function SpectrumTunerPanel({
               )}
               {showTimeLoop && (
                 <div>
-                  FR average with envelope g(t): duty d = {(100 * duty).toFixed(2)}%, sectors S = {sectors}
+                  FR average with envelope g(t): burst duty d = {(100 * duty).toFixed(2)}%, sectors S = {sectors}
                 </div>
               )}
             </div>

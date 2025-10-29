@@ -11,6 +11,8 @@ import type {
   SweepRuntime,
   SweepPointExtended,
   GateAnalytics,
+  QiStats,
+  PhaseScheduleTelemetry,
 } from "@shared/schema";
 
 // Greens function types
@@ -122,6 +124,9 @@ export interface EnergyPipelineState {
   warp?: unknown;
   stressEnergy?: unknown;
   P_avg_W?: number;             // alias for power in watts
+  qi?: QiStats;
+  qiBadge?: "ok" | "near" | "violation";
+  phaseSchedule?: PhaseScheduleTelemetry;
 
   // Hull parameters for UI overlays
   hull?: {

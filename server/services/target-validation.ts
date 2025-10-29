@@ -6,6 +6,7 @@
 
 import { calculateNatarioWarpBubble, type NatarioWarpParams } from '../../modules/warp/natario-warp.js';
 import { C as SPEED_OF_LIGHT } from '../utils/physics-const-safe';
+import { fordRomanBound } from '../qi/qi-bounds.js';
 
 export interface TargetValidationParams {
   gapA: number;          // m (gap size)
@@ -205,7 +206,11 @@ function computeZetaMargin(params: TargetValidationParams): number {
   // Simplified calculation for demonstration
   // In practice, this would use the full Ford-Roman formulation
   const pulseEnergyDensity = 1e15; // J/m³ (simplified)
-  const quantumBound = 1e18;       // J⋅s/m³ (Ford-Roman bound)
+  const quantumBound = fordRomanBound({
+    tau_s_ms: t_burst * 1e3,
+    sampler: 'gaussian',
+    scalarFallback: 1e18,
+  });       // J⋅s/m³ (Ford-Roman bound)
   
   const zetaMargin = (pulseEnergyDensity * t_burst) / quantumBound;
   
@@ -230,3 +235,4 @@ export const DEFAULT_TARGET_PARAMS: TargetValidationParams = {
   t_cycle: 1e-3,      // 1 ms
   S: 400              // 400 sectors
 };
+

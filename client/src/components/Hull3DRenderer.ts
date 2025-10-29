@@ -1,4 +1,4 @@
-﻿import { subscribe, unsubscribe } from "@/lib/luma-bus";
+﻿import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 
 import { queryClient } from "@/lib/queryClient";
 
@@ -6254,6 +6254,10 @@ export class Hull3DRenderer {
 
 
 
+  private overlayPingBusId: string | null = null;
+
+
+
   private curvatureBusId: string | null = null;
 
 
@@ -7144,6 +7148,10 @@ export class Hull3DRenderer {
       this.updateOverlay3D(payload);
     });
 
+    this.overlayPingBusId = subscribe("hull3d:overlay:ping", () => {
+      this.publishOverlayState();
+    });
+
 
 
     this.curvatureBusId = subscribe("hull3d:curvature", (payload: any) => {
@@ -7424,6 +7432,21 @@ export class Hull3DRenderer {
         target.phase01 = wrapped < 0 ? wrapped + 1 : wrapped;
       }
     }
+  }
+
+
+
+  private publishOverlayState() {
+    const overlayHue = this.overlay3D.hue;
+    publish("hull3d:overlay", {
+      mode: this.overlay3D.mode,
+      mix: this.overlay3D.mix,
+      alpha: this.overlay3D.alpha,
+      thick: this.overlay3D.thick,
+      gain: this.overlay3D.gain,
+      hue: overlayHue,
+      phase01: this.overlay3D.phase01,
+    });
   }
 
 
@@ -17512,6 +17535,22 @@ export class Hull3DRenderer {
 
 
       this.overlay3DBusId = null;
+
+
+
+    }
+
+
+
+    if (this.overlayPingBusId) {
+
+
+
+      unsubscribe(this.overlayPingBusId);
+
+
+
+      this.overlayPingBusId = null;
 
 
 

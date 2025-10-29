@@ -65,6 +65,8 @@ export function LiveEnergyPipeline({
     M_exotic_kg:  Number.isFinite(P.M_exotic) ? P.M_exotic! : NaN,
     zeta:         Number.isFinite(P.zeta) ? P.zeta! : NaN,
     TS_ratio:     Number.isFinite(P.TS_ratio) ? P.TS_ratio! : NaN,
+    qi:           P.qi ?? null,
+    qiBadge:      (P.qiBadge ?? "ok") as "ok" | "near" | "violation",
   };
 
   // Guard MODE_CONFIGS lookups (prevents a crash if keys ever drift or arrive late)
@@ -91,6 +93,24 @@ export function LiveEnergyPipeline({
 
   // Current mode live description
   const liveDesc = buildLiveDesc(live.P_avg_MW, live.M_exotic_kg, live.zeta);
+  const qiStats = live.qi;
+  const qiBadge = live.qiBadge;
+  const qiMargin = Number(qiStats?.margin);
+  const qiAvg = Number(qiStats?.avg);
+  const qiBound = Number(qiStats?.bound);
+  const qiTauMs = Number(qiStats?.tau_s_ms);
+  const qiSampler = qiStats?.sampler;
+  const qiSamples = Number(qiStats?.samples ?? 0);
+  const qiBadgeVariant = qiBadge === "violation" ? "destructive" : qiBadge === "near" ? "secondary" : "default";
+  const qiToneClass =
+    qiBadge === "violation"
+      ? "text-red-500 dark:text-red-400"
+      : qiBadge === "near"
+      ? "text-amber-500 dark:text-amber-400"
+      : "text-emerald-500 dark:text-emerald-400";
+  const qiBadgeLabel = qiBadge === "violation" ? "Violation" : qiBadge === "near" ? "Guard" : "OK";
+  const hasQi = Boolean(qiStats);
+
 
   // Harden formatting
   const fmt = (v: unknown, d = "—", n?: number) => {
@@ -502,24 +522,43 @@ export function LiveEnergyPipeline({
             <div>
               <span className="text-muted-foreground">Power:</span>
               <div className="font-semibold text-green-600 dark:text-green-400">
-                {fmt(live.P_avg_MW, "—", 1)} MW
+                {fmt(live.P_avg_MW, "-", 1)} MW
               </div>
             </div>
             <div>
               <span className="text-muted-foreground">Exotic Mass:</span>
               <div className="font-semibold text-purple-600 dark:text-purple-400">
-                {fmt(live.M_exotic_kg, "—", 0)} kg
+                {fmt(live.M_exotic_kg, "-", 0)} kg
               </div>
             </div>
             <div>
               <span className="text-muted-foreground">Quantum Safety:</span>
-              <div className="font-semibold">ζ = {fmt(live.zeta, "—", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "✓" : "✗"}</div>
+              <div className="font-semibold">
+                zeta = {fmt(live.zeta, "-", 3)} {Number.isFinite(live.zeta) && live.zeta <= 1 ? "OK" : "WARN"}
+              </div>
             </div>
             <div>
               <span className="text-muted-foreground">Time-Scale:</span>
               <div className="font-semibold">
-                {fmt(live.TS_ratio, "—", 1)} {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "✓" : "✗"}
+                {fmt(live.TS_ratio, "-", 1)} {Number.isFinite(live.TS_ratio) && live.TS_ratio >= 100 ? "OK" : "WARN"}
               </div>
+            </div>
+            <div>
+              <span className="text-muted-foreground">QI Margin:</span>
+              <div className={`font-semibold flex items-center gap-2 ${qiToneClass}`}>
+                {Number.isFinite(qiMargin) ? qiMargin.toPrecision(3) : "N/A"}
+                {hasQi ? <Badge variant={qiBadgeVariant}>{qiBadgeLabel}</Badge> : null}
+              </div>
+              <div className="text-[11px] text-muted-foreground">
+                {hasQi
+                  ? `${qiSampler ?? "sampler"} | tau_s ${Number.isFinite(qiTauMs) ? qiTauMs.toFixed(1) : "N/A"} ms | samples ${qiSamples}`
+                  : "No QI telemetry"}
+              </div>
+              {hasQi ? (
+                <div className="text-[11px] text-muted-foreground">
+                  avg {Number.isFinite(qiAvg) ? qiAvg.toPrecision(3) : "N/A"} / bound {Number.isFinite(qiBound) ? qiBound.toPrecision(3) : "N/A"}
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">

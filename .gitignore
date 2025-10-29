@@ -43,3 +43,7 @@ coverage/
 attached_assets/*.png
 client/public/galaxymap.png
 dist/public/galaxymap.png
+
+# Calibration artifacts and local backups
+.cal/
+*.bak

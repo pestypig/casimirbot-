@@ -44,6 +44,14 @@ export function whisperCustom(text: string) {
   publish("luma:whisper", { text });
 }
 
+export function publishWhisper(topic: string, payload: any) {
+  publish(topic, payload);
+}
+
+export function sendDriveNudge(command: any) {
+  publish("drive:nudge", command);
+}
+
 // Get wisdom for mode changes
 export function getModeWisdom(mode: ModeKey): string {
   const modeWisdom = {

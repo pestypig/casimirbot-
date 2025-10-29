@@ -27,6 +27,7 @@ import {
   defaultSweepConfigFromDynamic,
   computeSweepPoint,
   detectPlateau,
+  getPumpCommandForQi,
   type DynamicConfigLike,
 } from '../modules/dynamic/dynamic-casimir.js';
 import { assignGateSummaries } from "../modules/dynamic/gates/index.js";
@@ -41,9 +42,19 @@ import type {
   SweepPoint,
   SweepRuntime,
   GateAnalytics,
+  GatePulse,
+  QiSettings,
+  QiStats,
+  PhaseScheduleTelemetry,
+  PumpCommand,
+  PumpTone,
 } from "../shared/schema.js";
 import { appendPhaseCalibrationLog } from "./utils/phase-calibration.js";
 import { slewPump } from "./instruments/pump.js";
+import { slewPumpMultiTone } from "./instruments/pump-multitone.js";
+import { computeSectorPhaseOffsets, applyPhaseScheduleToPulses } from "./energy/phase-scheduler.js";
+import { QiMonitor } from "./qi/qi-monitor.js";
+import { configuredQiScalarBound } from "./qi/qi-bounds.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
 
@@ -56,6 +67,83 @@ export interface PipelineRunOptions {
   sweepMode?: "auto" | "skip" | "force" | "async";
   scheduleSweep?: (request: ScheduleSweepRequest) => void;
   sweepReason?: string;
+}
+
+const parseEnvNumber = (value: string | undefined, fallback: number): number => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, 5);
+const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env.QI_GUARD, 0.05);
+const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
+const DEFAULT_QI_BOUND_SCALAR = configuredQiScalarBound();
+
+const DEFAULT_QI_SETTINGS: QiSettings = {
+  sampler: 'gaussian',
+  tau_s_ms: DEFAULT_QI_TAU_MS,
+  observerId: 'ship',
+  guardBand: DEFAULT_QI_GUARD,
+};
+
+const qiMonitor = new QiMonitor(DEFAULT_QI_SETTINGS, DEFAULT_QI_DT_MS, DEFAULT_QI_BOUND_SCALAR);
+
+const PUMP_EPOCH_ENV = Number(process.env.PUMP_EPOCH_MS);
+const GLOBAL_PUMP_EPOCH_MS = Number.isFinite(PUMP_EPOCH_ENV) ? PUMP_EPOCH_ENV : 0;
+const PUMP_TONE_ENABLE = process.env.PUMP_TONE_ENABLE === '1';
+const PUMP_CMD_MIN_INTERVAL_MS = Math.max(
+  0,
+  parseEnvNumber(process.env.PUMP_CMD_MIN_INTERVAL_MS, 250),
+);
+const PUMP_CMD_KEEPALIVE_MS = Math.max(
+  PUMP_CMD_MIN_INTERVAL_MS,
+  parseEnvNumber(process.env.PUMP_CMD_KEEPALIVE_MS, 2000),
+);
+let lastPublishedPumpHash = '';
+let lastPublishedPumpAt = 0;
+
+const SECTORS_TOTAL_ENV = Number(process.env.SECTORS_TOTAL);
+const DEFAULT_SECTORS_TOTAL = Number.isFinite(SECTORS_TOTAL_ENV)
+  ? Math.max(1, Math.floor(SECTORS_TOTAL_ENV))
+  : 32;
+
+const SECTOR_PERIOD_ENV = Number(process.env.SECTOR_PERIOD_MS);
+const DEFAULT_SECTOR_PERIOD_MS = Number.isFinite(SECTOR_PERIOD_ENV)
+  ? Math.max(1, SECTOR_PERIOD_ENV)
+  : 100;
+
+let pendingPumpCommand: PumpCommand | undefined;
+let lastPumpCommandSnapshot: PumpCommand | undefined;
+
+export function publishPumpCommand(cmd: PumpCommand): void {
+  if (!cmd) return;
+  pendingPumpCommand = cmd;
+  lastPumpCommandSnapshot = cmd;
+  if (PUMP_TONE_ENABLE) {
+    lastPublishedPumpHash = hashPumpCommand(cmd);
+    lastPublishedPumpAt = Date.now();
+  }
+}
+
+function roundToDigits(value: number | null | undefined, digits: number): number {
+  const v = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(v)) return 0;
+  const factor = 10 ** digits;
+  return Math.round(v * factor) / factor;
+}
+
+function hashPumpCommand(cmd: PumpCommand): string {
+  const tones = Array.isArray(cmd.tones)
+    ? [...cmd.tones]
+        .sort((a, b) => a.omega_hz - b.omega_hz)
+        .map((tone) => ({
+          f: roundToDigits(tone.omega_hz, 3),
+          d: roundToDigits(tone.depth, 3),
+          p: roundToDigits(tone.phase_deg, 1),
+        }))
+    : [];
+  const rho0 = roundToDigits(cmd.rho0 ?? 0, 3);
+  return JSON.stringify({ tones, rho0 });
 }
 
 // ---------- Ellipsoid helpers (match renderer math) ----------
@@ -214,6 +302,7 @@ export interface EnergyPipelineState {
   activeSectors: number;    // Currently active sectors
   activeTiles: number;      // Currently active tiles
   activeFraction: number;   // Active sectors / total sectors
+  phaseSchedule?: PhaseScheduleTelemetry;
 
   // Internal calculation helpers (optional fields)
   __sectors?: any;          // Sector calculation cache
@@ -224,6 +313,8 @@ export interface EnergyPipelineState {
   natarioConstraint: boolean;
   curvatureLimit: boolean;
   overallStatus: 'NOMINAL' | 'WARNING' | 'CRITICAL';
+  qi?: QiStats;
+  qiBadge?: 'ok' | 'near' | 'violation';
 
   // Strobing and timing properties
   strobeHz?: number;
@@ -1376,6 +1467,60 @@ export async function calculateEnergyPipeline(
 
   // Mode configuration already applied early in function - no need to duplicate
   state.sectorStrobing  = state.concurrentSectors;         // ✅ Legacy alias for UI compatibility
+  // Phase scheduler (PR-3): compute per-sector phase offsets and assign roles.
+  const totalSectors = Math.max(
+    1,
+    Number.isFinite(state.sectorCount) ? state.sectorCount : DEFAULT_SECTORS_TOTAL,
+  );
+  const sectorPeriodMs = Number.isFinite(state.sectorPeriod_ms)
+    ? Number(state.sectorPeriod_ms)
+    : DEFAULT_SECTOR_PERIOD_MS;
+  const phase01 =
+    sectorPeriodMs > 0 ? ((Date.now() % sectorPeriodMs) / sectorPeriodMs) : 0;
+  const tauMs = Number.isFinite(state.qi?.tau_s_ms)
+    ? Number(state.qi!.tau_s_ms)
+    : DEFAULT_QI_SETTINGS.tau_s_ms;
+  const sampler = state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
+
+  const phaseSchedule = computeSectorPhaseOffsets({
+    N: totalSectors,
+    sectorPeriod_ms: sectorPeriodMs,
+    phase01,
+    tau_s_ms: tauMs,
+    sampler,
+    negativeFraction: 0.4,
+    deltaPos_deg: 90,
+    neutral_deg: 45,
+  });
+
+  const roleSets = {
+    neg: new Set(phaseSchedule.negSectors),
+    pos: new Set(phaseSchedule.posSectors),
+  };
+
+  if (state.gateAnalytics && Array.isArray(state.gateAnalytics.pulses)) {
+    const scheduled = applyPhaseScheduleToPulses(
+      state.gateAnalytics.pulses,
+      phaseSchedule.phi_deg_by_sector,
+      roleSets,
+    );
+    state.gateAnalytics = {
+      ...state.gateAnalytics,
+      pulses: scheduled,
+    };
+  }
+
+  state.phaseSchedule = {
+    N: totalSectors,
+    sectorPeriod_ms: sectorPeriodMs,
+    phase01,
+    phi_deg_by_sector: phaseSchedule.phi_deg_by_sector,
+    negSectors: phaseSchedule.negSectors,
+    posSectors: phaseSchedule.posSectors,
+    sampler,
+    tau_s_ms: tauMs,
+    weights: phaseSchedule.weights,
+  };
 
   // UI field updates logging (after MODE_CONFIGS applied)
   if (DEBUG_PIPE) console.log("[PIPELINE_UI]", {
@@ -1589,7 +1734,123 @@ export async function calculateEnergyPipeline(
     if (DEBUG_PIPE) console.warn('Warp bubble calculation failed:', e);
   }
 
+  flushPendingPumpCommand();
+  updateQiTelemetry(state);
+
   return state;
+}
+
+function flushPendingPumpCommand(): void {
+  if (!pendingPumpCommand) return;
+  const next = pendingPumpCommand;
+  pendingPumpCommand = undefined;
+  void slewPumpMultiTone(next).catch((err) => {
+    if (!DEBUG_PIPE) return;
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn(`[pipeline] multi-tone pump slew failed: ${message}`);
+  });
+}
+
+function updateQiTelemetry(state: EnergyPipelineState) {
+  const stats = qiMonitor.tick(estimateEffectiveRhoFromState(state));
+  state.qi = stats;
+
+  if (PUMP_TONE_ENABLE) {
+    const cmd = getPumpCommandForQi(stats, { epoch_ms: GLOBAL_PUMP_EPOCH_MS });
+    if (cmd) {
+      const now = Date.now();
+      const hash = hashPumpCommand(cmd);
+      const since = Math.max(0, now - lastPublishedPumpAt);
+      const changed = hash !== lastPublishedPumpHash;
+      const pastMinInterval = since >= PUMP_CMD_MIN_INTERVAL_MS;
+      const keepAliveDue = since >= PUMP_CMD_KEEPALIVE_MS;
+
+      if ((changed && pastMinInterval) || (keepAliveDue && pastMinInterval)) {
+        publishPumpCommand(cmd);
+        lastPublishedPumpHash = hash;
+        lastPublishedPumpAt = now;
+      }
+    }
+  }
+
+  const guardFrac = DEFAULT_QI_SETTINGS.guardBand ?? 0;
+  const guardThreshold = Math.abs(stats.bound) * guardFrac;
+  let badge: 'ok' | 'near' | 'violation';
+
+  if (!Number.isFinite(stats.margin)) {
+    badge = 'violation';
+  } else if (stats.margin < 0) {
+    badge = 'violation';
+  } else if (stats.margin < guardThreshold) {
+    badge = 'near';
+  } else {
+    badge = 'ok';
+  }
+
+  state.qiBadge = badge;
+}
+
+function estimateEffectiveRhoFromState(state: EnergyPipelineState): number {
+  const nowMs = Date.now();
+  const pulses = state.gateAnalytics?.pulses;
+
+  if (Array.isArray(pulses) && pulses.length) {
+    let accum = 0;
+    for (const pulse of pulses) {
+      accum += rhoFromPulse(nowMs, pulse);
+    }
+    if (Number.isFinite(accum)) {
+      return accum;
+    }
+  }
+
+  if (lastPumpCommandSnapshot?.tones?.length) {
+    return rhoFromTones(
+      nowMs,
+      lastPumpCommandSnapshot.tones,
+      lastPumpCommandSnapshot.rho0 ?? 0,
+      lastPumpCommandSnapshot.epoch_ms,
+    );
+  }
+
+  const effDuty =
+    Number((state as any).dutyEffectiveFR ?? state.dutyEffective_FR ?? state.dutyCycle ?? 0);
+  if (!Number.isFinite(effDuty) || effDuty <= 0) return 0;
+  return -Math.abs(effDuty);
+}
+
+function rhoFromPulse(nowMs: number, pulse: GatePulse | undefined): number {
+  if (!pulse) return 0;
+  if (Array.isArray(pulse.tones) && pulse.tones.length) {
+    const baseRho = Number.isFinite(pulse.rho) ? Number(pulse.rho) : 0;
+    return rhoFromTones(nowMs, pulse.tones, baseRho);
+  }
+  return Number.isFinite(pulse.rho) ? Number(pulse.rho) : 0;
+}
+
+function rhoFromTones(
+  nowMs: number,
+  tones: PumpTone[],
+  rho0: number,
+  epochOverride?: number,
+): number {
+  if (!Array.isArray(tones) || tones.length === 0) {
+    return Number.isFinite(rho0) ? Number(rho0) : 0;
+  }
+  const epoch = Number.isFinite(epochOverride) ? Number(epochOverride) : GLOBAL_PUMP_EPOCH_MS;
+  const t_s = (nowMs - epoch) / 1000;
+  let acc = Number.isFinite(rho0) ? Number(rho0) : 0;
+  for (const tone of tones) {
+    if (!tone) continue;
+    const freqHz = Number(tone.omega_hz);
+    const depth = Number(tone.depth ?? 0);
+    if (!Number.isFinite(freqHz) || !Number.isFinite(depth) || depth === 0) continue;
+    const phaseDeg = Number.isFinite(tone.phase_deg) ? Number(tone.phase_deg) : 0;
+    const phaseRad = (phaseDeg * Math.PI) / 180;
+    const theta = 2 * Math.PI * freqHz * t_s + phaseRad;
+    acc += depth * Math.cos(theta);
+  }
+  return acc;
 }
 
 // Mode switching function

@@ -12,6 +12,17 @@ import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityO
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
 
+interface AlcubierrePanelProps {
+  className?: string;
+  onCanvasReady?: (
+    canvas: HTMLCanvasElement | null,
+    overlayCanvas?: HTMLCanvasElement | null,
+    overlayDom?: HTMLDivElement | null
+  ) => void;
+  overlayHudEnabled?: boolean;
+  onPlanarVizModeChange?: (mode: number) => void;
+}
+
 // === helpers: math & smoothing =================================================
 const clamp = (x: number, a = -Infinity, b = Infinity) => Math.max(a, Math.min(b, x));
 const sech2  = (x: number) => {
@@ -610,7 +621,12 @@ function makeGrid(res: number) {
   return new Float32Array(verts);
 }
 
-export default function AlcubierrePanel({ className }: { className?: string }) {
+export default function AlcubierrePanel({
+  className,
+  onCanvasReady,
+  overlayHudEnabled = false,
+  onPlanarVizModeChange,
+}: AlcubierrePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
   const hullRendererRef = useRef<Hull3DRenderer | null>(null);
@@ -624,9 +640,23 @@ export default function AlcubierrePanel({ className }: { className?: string }) {
   const progRef = useRef<WebGLProgram|null>(null);
   const vboRef  = useRef<WebGLBuffer|null>(null);
   const vcountRef = useRef<number>(0); // DEBUG: track vertex count
+
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const overlayDomRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!onCanvasReady) return;
+    onCanvasReady(canvasRef.current ?? null, overlayCanvasRef.current ?? null, overlayDomRef.current ?? null);
+    return () => {
+      onCanvasReady(null, null, null);
+    };
+  }, [onCanvasReady]);
   const lastDriveLogRef = useRef(0);
 
   const [planarVizMode, setPlanarVizMode] = useState<VizMode>(0); // 0 Î¸_GR, 1 Ï_GR, 2 Î¸_Drive
+  useEffect(() => {
+    onPlanarVizModeChange?.(planarVizMode);
+  }, [planarVizMode, onPlanarVizModeChange]);
   const [shaderMode, setShaderMode] = useState<ShaderMode>("main");
   const [glError, setGlError] = useState<string | null>(null);
   // Track if the user has manually selected a planarVizMode so we don't override later
@@ -3581,6 +3611,23 @@ const res = 256;
         {/* Viewer fills the remaining fixed-height space and remains stable */}
         <div className="relative w-full flex-1 min-h-0 rounded-lg overflow-hidden border border-slate-800 bg-black/70">
           <canvas ref={canvasRef} className="w-full h-full block" />
+          <canvas
+            ref={overlayCanvasRef}
+            className="absolute inset-0"
+            style={{
+              opacity: overlayHudEnabled ? 1 : 0,
+              pointerEvents: overlayHudEnabled ? "auto" : "none",
+            }}
+          />
+          <div
+            ref={overlayDomRef}
+            className="absolute inset-0"
+            style={{
+              pointerEvents: overlayHudEnabled ? "auto" : "none",
+              userSelect: overlayHudEnabled ? "text" : "none",
+            }}
+            aria-hidden="true"
+          />
         {planarVizMode === 2 && (
           <div className="pointer-events-none absolute top-2 left-2 w-14 h-14 rounded-full border border-emerald-700/60 bg-slate-900/30">
             <div

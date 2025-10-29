@@ -18,6 +18,9 @@ import type {
   GatePulse,
   GateRoute,
   GateAnalytics,
+  PumpCommand,
+  PumpTone,
+  QiStats,
 } from '../../shared/schema.js';
 import { assignGateSummaries, type GateEvaluationOptions } from './gates/index.js';
 
@@ -71,6 +74,99 @@ export function sidebandAsymmetryProxy(G_lin: number) {
 
 const noiseTempK = (G_lin: number, Pin_W = DEFAULT_PROBE_PIN_W, RBW = FALLBACK_RBW_HZ) =>
   ((G_lin - 1) * Math.max(Pin_W, 0)) / Math.max(BOLTZMANN * RBW, 1e-24);
+
+// --- Multi-tone helpers (PR-2) ----------------------------------------------
+export interface BiHarmonicSpec {
+  carrier_hz: number;
+  delta_hz: number;
+  carrier_depth: number;
+  compensator_depth: number;
+  base_phase_deg: number;
+  rho0?: number;
+  epoch_ms?: number;
+}
+
+export function emitBiHarmonic(spec: BiHarmonicSpec): PumpCommand {
+  const basePhase = spec.base_phase_deg ?? 0;
+  const tones: PumpTone[] = [
+    { omega_hz: spec.carrier_hz, depth: spec.carrier_depth, phase_deg: basePhase },
+    {
+      omega_hz: spec.carrier_hz + spec.delta_hz,
+      depth: spec.compensator_depth,
+      phase_deg: basePhase + 180,
+    },
+  ];
+  return {
+    tones,
+    rho0: spec.rho0,
+    epoch_ms: spec.epoch_ms,
+    issuedAt_ms: Date.now(),
+  };
+}
+
+export function biHarmonicFromTau(
+  tau_s_ms: number,
+  opts: Partial<BiHarmonicSpec> = {},
+): PumpCommand {
+  const tauMs = Math.max(1, Math.abs(Number.isFinite(tau_s_ms) ? tau_s_ms : 1));
+  const delta_hz = opts.delta_hz ?? 1000 / tauMs;
+  const envCarrier = Number(process.env.PUMP_CARRIER_HZ);
+  const envDepthNeg = Number(process.env.PUMP_DEPTH_NEG);
+  const envDepthPos = Number(process.env.PUMP_DEPTH_POS);
+  const spec: BiHarmonicSpec = {
+    carrier_hz: opts.carrier_hz ?? (Number.isFinite(envCarrier) ? envCarrier : 5_000),
+    delta_hz,
+    carrier_depth: opts.carrier_depth ?? (Number.isFinite(envDepthNeg) ? envDepthNeg : 0.6),
+    compensator_depth: opts.compensator_depth ?? (Number.isFinite(envDepthPos) ? envDepthPos : 0.4),
+    base_phase_deg: opts.base_phase_deg ?? 0,
+    rho0: opts.rho0 ?? 0,
+    epoch_ms: opts.epoch_ms,
+  };
+  return emitBiHarmonic(spec);
+}
+
+// ---- Minimal QI-aware controller (stateless, gentle nudges) ----------------
+/**
+ * Returns a PumpCommand using tau_s-driven beat frequency.
+ * Applies a light margin-based tweak to depths (no integral state).
+ * Guard with env PUMP_TONE_ENABLE=1 in the caller.
+ */
+export function getPumpCommandForQi(
+  qi: QiStats | undefined,
+  opts: { epoch_ms?: number; base_phase_deg?: number } = {},
+): PumpCommand | undefined {
+  if (!qi) return undefined;
+  const epoch_ms = opts.epoch_ms;
+  const base_phase_deg = opts.base_phase_deg ?? 0;
+
+  const base = biHarmonicFromTau(qi.tau_s_ms, {
+    epoch_ms,
+    base_phase_deg,
+  });
+
+  const margin = qi.margin;
+  const boundMag = Math.max(1e-6, Math.abs(qi.bound));
+  const thinBandThreshold = 0.05 * boundMag;
+  const thin = margin < thinBandThreshold;
+
+  if (thin && base.tones.length >= 2) {
+    const neg = base.tones[0];
+    const pos = base.tones[1];
+    const deficit = thinBandThreshold - margin;
+    const tweak = Math.min(0.08, Math.max(0.02, deficit / (boundMag + 1e-6))); // 2-8%
+    pos.depth = clamp01(pos.depth + tweak);
+    neg.depth = clamp01(neg.depth - 0.5 * tweak);
+  }
+
+  return base;
+}
+
+function clamp01(x: number): number {
+  if (!Number.isFinite(x)) return 0;
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  return x;
+}
 
 type PipeLike = Partial<{
   gammaGeo: number;

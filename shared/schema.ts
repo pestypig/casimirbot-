@@ -12,6 +12,82 @@ export type GateKind = z.infer<typeof gateKindSchema>;
 export const gateRouteRoleSchema = z.enum(["BUS", "SINK"]);
 export type GateRouteRole = z.infer<typeof gateRouteRoleSchema>;
 
+export const samplingKindSchema = z.enum(["gaussian", "lorentzian"]);
+export type SamplingKind = z.infer<typeof samplingKindSchema>;
+
+export const observerWorldlineSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  beta: z.number().optional(),
+});
+export type ObserverWorldline = z.infer<typeof observerWorldlineSchema>;
+
+export const qiSettingsSchema = z.object({
+  sampler: samplingKindSchema,
+  tau_s_ms: z.number().positive(),
+  observerId: z.string(),
+  guardBand: z.number().min(0).max(1).optional(),
+});
+export type QiSettings = z.infer<typeof qiSettingsSchema>;
+
+export const qiStatsSchema = z.object({
+  sampler: samplingKindSchema,
+  tau_s_ms: z.number().positive(),
+  observerId: z.string(),
+  dt_ms: z.number().positive(),
+  avg: z.number(),
+  bound: z.number(),
+  margin: z.number(),
+  window_ms: z.number().nonnegative(),
+  samples: z.number().int().nonnegative(),
+});
+export type QiStats = z.infer<typeof qiStatsSchema>;
+
+// ---- Phase schedule telemetry for HUD overlays -----------------
+export interface PhaseScheduleTelemetry {
+  /** Total sectors on the ring. */
+  N: number;
+  /** Full ring period in milliseconds. */
+  sectorPeriod_ms: number;
+  /** Current ring phase in [0, 1). */
+  phase01: number;
+  /** Per-sector phase offsets in degrees applied by the scheduler. */
+  phi_deg_by_sector: number[];
+  /** Sector indices tagged for negative lobes. */
+  negSectors: number[];
+  /** Sector indices tagged for positive payback. */
+  posSectors: number[];
+  /** Sampler used to compute the kernel weights. */
+  sampler: SamplingKind;
+  /** Sample window tau in milliseconds. */
+  tau_s_ms: number;
+  /**
+   * Optional sampler weights per sector (same ordering as sector index).
+   * When omitted, clients can recompute for visualization only.
+   */
+  weights?: number[];
+}
+
+
+export const pumpToneSchema = z.object({
+  omega_hz: z.number(),
+  depth: z.number(),
+  phase_deg: z.number(),
+});
+export type PumpTone = z.infer<typeof pumpToneSchema>;
+
+export const pumpCommandSchema = z.object({
+  tones: z.array(pumpToneSchema),
+  rho0: z.number().optional(),
+  issuedAt_ms: z.number().nonnegative(),
+  /**
+   * Optional global phase epoch (monotonic milliseconds) for tone coherence.
+   * Drivers fall back to their internal epoch when this is absent.
+   */
+  epoch_ms: z.number().nonnegative().optional(),
+});
+export type PumpCommand = z.infer<typeof pumpCommandSchema>;
+
 export const gatePulseSchema = z.object({
   id: z.string().optional(),
   inA: z.string(),
@@ -24,6 +100,12 @@ export const gatePulseSchema = z.object({
   kind: gateKindSchema,
   sink: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
+  /** Optional multi-tone payload for pumps that support concurrent carriers. */
+  tones: z.array(pumpToneSchema).optional(),
+  /** Optional sector ordinal used by phase schedulers / HUD overlays. */
+  sectorIndex: z.number().int().nonnegative().optional(),
+  /** Optional semantic role for visualization (e.g., negative, positive, neutral). */
+  role: z.enum(["neg", "pos", "neutral"]).optional(),
 });
 export type GatePulse = z.infer<typeof gatePulseSchema>;
 

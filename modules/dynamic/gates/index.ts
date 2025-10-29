@@ -6,7 +6,7 @@ import type {
   GateRouteRole,
   GateRoutingSummary,
   VacuumGapSweepRow,
-} from "../../shared/schema.js";
+} from "@shared/schema";
 
 const TWO_PI = 2 * Math.PI;
 const DEFAULT_PHASE_TOLERANCE_DEG = 0.5;

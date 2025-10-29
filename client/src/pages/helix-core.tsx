@@ -1,7 +1,7 @@
 // client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
-import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu, AlertTriangle, Target, CheckCircle2 } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu, AlertTriangle, Target, CheckCircle2, Video, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,21 +17,30 @@ import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
+import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
+import { useFractionalCoherence } from "@/hooks/useFractionalCoherence";
 import SnapshotProbe from '@/dev/SnapshotProbe';
 import DataNamesPanel from '@/dev/DataNamesPanel';
 import SpectrumTunerPanel from "@/components/SpectrumTunerPanel";
 import type { Provenance } from "@/components/SpectrumTunerPanel";
 import ParametricSweepPanel from "@/components/ParametricSweepPanel";
 import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
+import QiWidget from "@/components/QiWidget";
+import SectorLegend from "@/components/SectorLegend";
+import SectorRolesHud from "@/components/SectorRolesHud";
+import { PHASE_STREAK_BASE_HUE_DEG } from "@/constants/phase-streak";
 import usePhaseBridge from "@/hooks/use-phase-bridge";
 import NearZeroWidget from "@/components/NearZeroWidget";
 import VacuumGapHeatmap from "@/components/VacuumGapHeatmap";
 import SweepReplayControls from "@/components/SweepReplayControls";
 import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
+import DriveGuardsPanel from "@/components/DriveGuardsPanel";
+import { FractionalCoherenceRail } from "@/components/FractionalCoherenceRail";
 import { downloadCSV } from "@/utils/csv";
 import { computeTidalEij, type V3 } from "@/lib/tidal";
+import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
 
 type PumpStatus = "idle" | "ok" | "warn" | "hazard";
@@ -942,6 +951,31 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
     },
   ]);
   const [isProcessing, setIsProcessing] = useState(false);
+const [timeLapseCanvas, setTimeLapseCanvas] = useState<HTMLCanvasElement | null>(null);
+const [timeLapseOverlayCanvas, setTimeLapseOverlayCanvas] = useState<HTMLCanvasElement | null>(null);
+const [timeLapseOverlayDom, setTimeLapseOverlayDom] = useState<HTMLDivElement | null>(null);
+const [showSweepHud, setShowSweepHud] = useState(false);
+const [isThetaHullMode, setIsThetaHullMode] = useState(false);
+const handlePlanarVizModeChange = useCallback((mode: number) => {
+  setIsThetaHullMode(mode === 3);
+}, []);
+const timeLapseRecorder = useTimeLapseRecorder({
+  canvas: timeLapseCanvas,
+  overlayCanvas: timeLapseOverlayCanvas,
+  overlayDom: timeLapseOverlayDom,
+  overlayEnabled: showSweepHud,
+});
+const timeLapseUnlocked =
+  isThetaHullMode ||
+  timeLapseRecorder.isRecording ||
+  timeLapseRecorder.isProcessing ||
+  timeLapseRecorder.status === "error" ||
+  Boolean(timeLapseRecorder.result);
+useEffect(() => {
+  if (timeLapseRecorder.status === "complete" && showSweepHud) {
+    setShowSweepHud(false);
+  }
+}, [showSweepHud, timeLapseRecorder.status]);
   const commandAbortRef = useRef<AbortController | null>(null);
   const [activeMode, setActiveMode] = useState<"auto" | "manual" | "diagnostics" | "theory">("auto");
   const [modulationFrequency, setModulationFrequency] = useState(15); // Default 15 GHz
@@ -999,6 +1033,16 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
   const [galaxyCalibration, setGalaxyCalibration] = useState<{ originPx: { x: number; y: number }; pxPerPc: number } | null>(
     null
   );
+  const fractional = useFractionalCoherence();
+  const setSectorGrid3D = useHull3DSharedStore((state) => state.setSectorGrid3D);
+  useEffect(() => {
+    const cp = fractional.EMA.CP ?? fractional.CP ?? 0;
+    const alpha = Math.min(1, Math.max(0.1, Math.tanh(cp / 800)));
+    setSectorGrid3D((current) => ({
+      ...current,
+      alpha,
+    }));
+  }, [fractional.CP, fractional.EMA.CP, setSectorGrid3D]);
 
   // Load galaxy map and compute calibration
   useEffect(() => {
@@ -2274,6 +2318,12 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
 
           <VacuumContractBadge contract={vacuumContract} className="mb-4" />
 
+          <div className="mb-4">
+            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+              <FractionalCoherenceRail state={fractional} compact />
+            </div>
+          </div>
+
           {/* === Quick Operational Mode Switch (global) === */}
           <div className="mb-4">
             <div className="flex flex-wrap items-center gap-2">
@@ -2429,8 +2479,40 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
         {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
         <div className="mt-6">
           <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
-          <AlcubierrePanel />
+          <div className="relative">
+            <AlcubierrePanel
+              onCanvasReady={(canvas, overlay, overlayDom) => {
+                setTimeLapseCanvas(canvas ?? null);
+                setTimeLapseOverlayCanvas(overlay ?? null);
+                setTimeLapseOverlayDom(overlayDom ?? null);
+              }}
+              overlayHudEnabled={showSweepHud}
+              onPlanarVizModeChange={handlePlanarVizModeChange}
+            />
+            {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
+              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                  {timeLapseRecorder.currentFrame?.segment ?? "Time-Lapse"}
+                </div>
+                <div className="mt-1 whitespace-pre-line font-mono text-[11px] leading-tight text-slate-200">
+                  {(timeLapseRecorder.currentFrame?.overlayText ?? "Preparing telemetry...")
+                    .split(" | ")
+                    .join("\n")}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-400">
+                  {timeLapseRecorder.isProcessing
+                    ? "Finalizing video…"
+                    : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
+                </div>
+              </div>
+            )}
+            {timeLapseRecorder.status === "error" && timeLapseRecorder.error && (
+              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-rose-500/40 bg-slate-950/80 px-3 py-2 text-[11px] text-rose-200">
+                {timeLapseRecorder.error}
+              </div>
+            )}
         </div>
+      </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -2442,12 +2524,12 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
                     <HelpCircle className="w-4 h-4 text-slate-400 hover:text-cyan-400 cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-sm">
-                    <div className="font-medium text-yellow-300 mb-1"> Theory</div>
+                    <div className="font-medium text-yellow-300 mb-1">Theory</div>
                     <p className="mb-2">
                       The sweep rate across sectors is chosen so no disturbance outruns the grid's tauLC. This timeline compares
-                      modulation (Hz), sector period, and light-crossing to ensure the "average" shell is GR-valid.
+                      modulation (Hz), sector period, and light-crossing to ensure the average shell stays GR-valid.
                     </p>
-                    <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                    <div className="font-medium text-cyan-300 mb-1">Zen</div>
                     <p className="text-xs italic">Go slowly enough to remain whole; move steadily enough to arrive.</p>
                   </TooltipContent>
                 </Tooltip>
@@ -2466,7 +2548,132 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
             </CardContent>
           </Card>
 
+          {/* ====== Time-Lapse Demo ====== */}
+          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Video className="w-5 h-5 text-cyan-400" />
+                Time-Lapse Demo
+              </CardTitle>
+              <CardDescription>
+                Capture a scripted 10&nbsp;s pass of the current warp bubble view at 30&nbsp;fps (saves as WebM/MP4 depending on browser support).
+                The script walks the hull through three segments (stable &rarr; edge push &rarr; recovery) with curvature overlay enabled; during the edge push
+                the drive amps the field, the solver flags large positive/negative residuals, and those spikes show up as cyan/yellow over the underlying
+                I<sub>GR</sub> oranges and blues&mdash;letting you see expansion and contraction zones light up in real time.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className={timeLapseUnlocked ? "space-y-4" : "py-6"}>
+              {timeLapseUnlocked ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant={
+                        timeLapseRecorder.isRecording
+                          ? "destructive"
+                          : timeLapseRecorder.isProcessing
+                            ? "default"
+                            : "secondary"
+                      }
+                      onClick={() => {
+                        if (timeLapseRecorder.isRecording) {
+                          void timeLapseRecorder.stop();
+                        } else if (!timeLapseRecorder.isProcessing) {
+                          void timeLapseRecorder.start();
+                        }
+                      }}
+                      className="flex items-center gap-2"
+                      disabled={timeLapseRecorder.isProcessing}
+                    >
+                      <Video className="w-4 h-4" />
+                      {timeLapseRecorder.isRecording
+                        ? "Stop capture"
+                        : timeLapseRecorder.isProcessing
+                          ? "Finalizing video..."
+                          : "Start capture"}
+                    </Button>
+                    <div className="text-xs text-slate-400 basis-full">
+                      Opens the viewer, scripts the baseline sweep, and records frames plus metrics. First run may pause briefly while the browser spins up its encoder.
+                    </div>
+                    <Button
+                      variant={showSweepHud ? "default" : "outline"}
+                      onClick={() => setShowSweepHud((prev) => !prev)}
+                      className="flex items-center gap-2"
+                      aria-pressed={showSweepHud}
+                    >
+                      <Layers className="w-4 h-4" />
+                      {showSweepHud ? "SWEEP HUD On" : "SWEEP HUD"}
+                    </Button>
+                  </div>
 
+                  {(timeLapseRecorder.isRecording ||
+                    timeLapseRecorder.isProcessing ||
+                    timeLapseRecorder.status === "error") && (
+                    <div className="space-y-2 text-xs text-slate-300">
+                      <div className="flex items-center justify-between">
+                        <span>
+                          {timeLapseRecorder.status === "recording"
+                            ? "Capturing sequence"
+                            : timeLapseRecorder.status === "processing"
+                              ? "Finalizing video..."
+                              : "Time-lapse unavailable"}
+                        </span>
+                        <span>{Math.round(timeLapseRecorder.progress * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded bg-slate-800">
+                        <div
+                          className="h-full bg-cyan-400 transition-all duration-200"
+                          style={{ width: `${Math.round(timeLapseRecorder.progress * 100)}%` }}
+                        />
+                      </div>
+                      {timeLapseRecorder.error ? (
+                        <div className="text-rose-400">{timeLapseRecorder.error}</div>
+                      ) : null}
+                    </div>
+                  )}
+
+                  {timeLapseRecorder.result &&
+                    (() => {
+                      const result = timeLapseRecorder.result;
+                      const downloadLabel = result.videoMimeType.includes("mp4") ? "Download MP4" : "Download WebM";
+                      return (
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-300">
+                          <span>
+                            Complete: {result.frameCount} frames @ {result.fps} fps ({(result.durationMs / 1000).toFixed(1)}&nbsp;s)
+                          </span>
+                          <Button asChild size="sm" variant="outline">
+                            <a href={result.videoUrl} download={result.videoFileName}>
+                              {downloadLabel}
+                            </a>
+                          </Button>
+                          <Button asChild size="sm" variant="outline">
+                            <a href={result.metricsUrl} download="helix-time-lapse-metrics.json">
+                              Metrics JSON
+                            </a>
+                          </Button>
+                        </div>
+                      );
+                    })()}
+                </>
+              ) : (
+                <div className="flex items-start gap-3 rounded border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs text-slate-300">
+                  <Video className="mt-0.5 h-4 w-4 text-cyan-400" />
+                  <div className="space-y-2">
+                    <p className="font-semibold text-slate-200">
+                      Time-lapse capture is available in {"\u03B8"} (Hull 3D) mode.
+                    </p>
+                    <p className="text-slate-400">
+                      Switch the metric viewer above to {"\u03B8"} (Hull 3D) to prepare the 3D renderer before starting a scripted capture.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ====== Cycle-Averaged Drive Budget ====== */}
+          <div className="mb-4">
+            <DriveGuardsPanel />
+          </div>
 
           {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
           <Card className="bg-slate-900/50 border-slate-800 mb-4">
@@ -2985,7 +3192,7 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
                         thicknessRx={0.018}
                         alpha={0.78}
                         gain={1.1}
-                        hueDeg={210}
+                        hueDeg={PHASE_STREAK_BASE_HUE_DEG}
                         showPhaseStreaks
                         streakLen={2}
                         emaAlpha={0.45}
@@ -3235,6 +3442,11 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
                       </div>
                     </div>
                   ) : null}
+                  <QiWidget className="mt-3" />
+                  <div className="mt-3 flex flex-col items-center gap-2">
+                    <SectorLegend />
+                    <SectorRolesHud size={360} ringWidth={32} showQiWindow />
+                  </div>
                   <VacuumGapSweepHUD className="mt-2" />
                   <ScrollArea className="w-full">
                     <div className="min-w-[680px]">
@@ -3517,6 +3729,7 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
                       <Atom className="w-4 h-4" />
                       Theory Playback
                     </Button>
+
                   </div>
                 </CardContent>
               </Card>
@@ -3955,6 +4168,10 @@ const [tileHoverSector, setTileHoverSector] = useState<number | null>(null);
     </TooltipProvider>
   );
 }
+
+
+
+
 
 
 

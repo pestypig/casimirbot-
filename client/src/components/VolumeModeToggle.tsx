@@ -12,13 +12,31 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { publish } from "@/lib/luma-bus";
+import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { useGlobalPhase } from "@/hooks/useGlobalPhase";
+import { PHASE_STREAK_BASE_HUE } from "@/constants/phase-streak";
 
 export type VolumeViz = 0 | 1 | 2; // 0=θ_GR, 1=ρ_GR, 2=θ_Drive
 
 const THETA = "\u03B8";
 const RHO = "\u03C1";
+
+const OVERLAY_STATE_QUERY_KEY = ["hull3d:overlay:controls"] as const;
+
+type Overlay3DControlsSnapshot = {
+  mode: 0 | 1 | 2 | 3 | 4;
+  mix: number;
+  alpha: number;
+  thick: number;
+  gain: number;
+  hue: number;
+  phase01: number;
+  animate: boolean;
+  curvAlpha: number;
+  curvGain: number;
+  curvPalette: 0 | 1;
+  curvMargin: boolean;
+};
 
 const labels: Record<VolumeViz, { short: string; title: string }> = {
   2: {
@@ -120,26 +138,51 @@ function OverlaysBlock({ className }: { className?: string }) {
 }
 
 function Overlay3DControls({ className }: { className?: string }) {
-  const [mode, setMode] = React.useState<0 | 1 | 2 | 3 | 4>(0);
-  const [mix, setMix] = React.useState(0);
-  const [alpha, setAlpha] = React.useState(0.8);
-  const [thick, setThick] = React.useState(0.12);
-  const [gain, setGain] = React.useState(1.0);
-  const [hue, setHue] = React.useState(0.58);
-  const [animate, setAnimate] = React.useState(true);
-  const [curvAlpha, setCurvAlpha] = React.useState(0.45);
-  const [curvGain, setCurvGain] = React.useState(1.0);
-  const [curvPalette, setCurvPalette] = React.useState<0 | 1>(0);
-  const [curvMargin, setCurvMargin] = React.useState(false);
+  const queryClient = useQueryClient();
+  const savedOverlay = React.useMemo<Overlay3DControlsSnapshot | undefined>(() => {
+    return queryClient.getQueryData(OVERLAY_STATE_QUERY_KEY) as Overlay3DControlsSnapshot | undefined;
+  }, [queryClient]);
+
+  const [mode, setMode] = React.useState<0 | 1 | 2 | 3 | 4>(() => savedOverlay?.mode ?? 0);
+  const [mix, setMix] = React.useState(() => savedOverlay?.mix ?? 0);
+  const [alpha, setAlpha] = React.useState(() => savedOverlay?.alpha ?? 0.8);
+  const [thick, setThick] = React.useState(() => savedOverlay?.thick ?? 0.12);
+  const [gain, setGain] = React.useState(() => savedOverlay?.gain ?? 1.0);
+  const [hue, setHue] = React.useState(() => {
+    const storedHue = savedOverlay?.hue;
+    return typeof storedHue === "number" && Number.isFinite(storedHue)
+      ? storedHue
+      : PHASE_STREAK_BASE_HUE;
+  });
+  const [animate, setAnimate] = React.useState(() => savedOverlay?.animate ?? true);
+  const [curvAlpha, setCurvAlpha] = React.useState(() => savedOverlay?.curvAlpha ?? 0.45);
+  const [curvGain, setCurvGain] = React.useState(() => savedOverlay?.curvGain ?? 1.0);
+  const [curvPalette, setCurvPalette] = React.useState<0 | 1>(() => savedOverlay?.curvPalette ?? 0);
+  const [curvMargin, setCurvMargin] = React.useState(() => savedOverlay?.curvMargin ?? false);
   const phaseAnim = useGlobalPhase({ mode: "auto", periodMs: 8000, damp: 0.12, publishBus: false });
-  const [phase01, setPhase01] = React.useState(0);
+  const [phase01, setPhase01] = React.useState(() => savedOverlay?.phase01 ?? 0);
 
   const phaseToSend = React.useMemo(
     () => (animate ? phaseAnim : phase01),
     [animate, phaseAnim, phase01]
   );
 
-  React.useEffect(() => {
+  const emitOverlayState = React.useCallback(() => {
+    const snapshot: Overlay3DControlsSnapshot = {
+      mode,
+      mix,
+      alpha,
+      thick,
+      gain,
+      hue,
+      phase01: phaseToSend,
+      animate,
+      curvAlpha,
+      curvGain,
+      curvPalette,
+      curvMargin,
+    };
+
     if (mode === 4) {
       publish("hull3d:overlay", {
         mode: 0,
@@ -169,7 +212,43 @@ function Overlay3DControls({ className }: { className?: string }) {
       });
       publish("hull3d:overlay:curvature", { enabled: false });
     }
-  }, [mode, mix, alpha, thick, gain, hue, phaseToSend, curvGain, curvAlpha, curvPalette, curvMargin]);
+
+    queryClient.setQueryData(OVERLAY_STATE_QUERY_KEY, (prev) => {
+      if (prev && typeof prev === "object") {
+        const prevSnapshot = prev as Overlay3DControlsSnapshot;
+        if (
+          prevSnapshot.mode === snapshot.mode &&
+          prevSnapshot.mix === snapshot.mix &&
+          prevSnapshot.alpha === snapshot.alpha &&
+          prevSnapshot.thick === snapshot.thick &&
+          prevSnapshot.gain === snapshot.gain &&
+          prevSnapshot.hue === snapshot.hue &&
+          prevSnapshot.phase01 === snapshot.phase01 &&
+          prevSnapshot.animate === snapshot.animate &&
+          prevSnapshot.curvAlpha === snapshot.curvAlpha &&
+          prevSnapshot.curvGain === snapshot.curvGain &&
+          prevSnapshot.curvPalette === snapshot.curvPalette &&
+          prevSnapshot.curvMargin === snapshot.curvMargin
+        ) {
+          return prevSnapshot;
+        }
+      }
+      return snapshot;
+    });
+  }, [mode, mix, alpha, thick, gain, hue, phaseToSend, animate, curvAlpha, curvGain, curvPalette, curvMargin, queryClient]);
+
+  React.useEffect(() => {
+    emitOverlayState();
+  }, [emitOverlayState]);
+
+  React.useEffect(() => {
+    const handlerId = subscribe("hull3d:overlay:ping", () => {
+      emitOverlayState();
+    });
+    return () => {
+      unsubscribe(handlerId);
+    };
+  }, [emitOverlayState]);
 
   return (
     <div
@@ -244,7 +323,9 @@ function Overlay3DControls({ className }: { className?: string }) {
               min={0}
               max={1}
               step={0.005}
-              onValueChange={([value]) => setHue(value)}
+              onValueChange={([value]) => {
+                setHue(value);
+              }}
             />
 
             <span className="text-[11px] text-slate-400">Animate phase</span>
