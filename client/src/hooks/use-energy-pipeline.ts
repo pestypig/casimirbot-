@@ -8,6 +8,7 @@ import { getModeWisdom } from "@/lib/luma-whispers";
 import type {
   VacuumGapSweepRow,
   DynamicConfig,
+  DynamicCasimirSweepConfig,
   SweepRuntime,
   SweepPointExtended,
   GateAnalytics,
@@ -190,6 +191,355 @@ export interface EnergyPipelineState {
 
 const MAX_SWEEP_ROWS = 2000;
 const MAX_STREAM_SWEEP_ROWS = 5000;
+
+const ACTIVE_SLEW_DEFAULT_MOD_DEPTH_CAP_PCT = 0.8;
+const ACTIVE_SLEW_MIN_MOD_DEPTH_PCT = 0.005;
+const ACTIVE_SLEW_ABSOLUTE_MIN_MOD_DEPTH_PCT = 0.001;
+const ACTIVE_SLEW_TARGET_RHO = 0.85;
+const ACTIVE_SLEW_MAX_GAIN_DB = 12;
+const ACTIVE_SLEW_HARDWARE_GUARDS = {
+  gapLimit: 6,
+  modDepthLimit: 2,
+  phaseLimit: 6,
+  pumpLimit: 2,
+  delayMs: 8,
+} as const;
+const TWO_PHASE_DEFAULT_GAPS = [20, 100, 170, 250, 320, 400] as const;
+const TWO_PHASE_DEFAULT_MOD_DEPTHS = [0.1, 0.5] as const;
+const TWO_PHASE_DEFAULT_PHASES = [-10, -6, -2, 2, 6, 10] as const;
+
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const toNumberArray = (value: unknown): number[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => Number(entry))
+      .filter((num): num is number => Number.isFinite(num));
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? [num] : [];
+};
+
+const pickNumber = (value: unknown): number | undefined => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+};
+
+const dedupeNumeric = (values: number[], digits: number): number[] => {
+  if (!values.length) return [];
+  const scale = 10 ** digits;
+  const unique = new Set<number>();
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    const rounded = Math.round(value * scale) / scale;
+    if (!Number.isFinite(rounded)) continue;
+    unique.add(rounded);
+  }
+  return Array.from(unique).sort((a, b) => a - b);
+};
+
+type ActiveSlewGuardContext = {
+  pipeline?: EnergyPipelineState;
+  sweepResults: VacuumGapSweepRow[];
+};
+
+const guardActiveSlewPayload = (
+  payload: Partial<DynamicConfig>,
+  context: ActiveSlewGuardContext,
+): Partial<DynamicConfig> => {
+  if (!payload || typeof payload !== "object") return payload;
+  const sweepPayload = payload.sweep;
+  if (!sweepPayload || sweepPayload.activeSlew !== true) {
+    return payload;
+  }
+
+  const pipeline = context.pipeline;
+  const dynamicConfig = (pipeline as any)?.dynamicConfig as DynamicConfig | undefined;
+  const runtimeSweep = pipeline?.sweep as SweepRuntime | undefined;
+
+  const baseSweep: Partial<DynamicCasimirSweepConfig> = {
+    ...(dynamicConfig?.sweep ?? {}),
+    ...sweepPayload,
+  };
+
+  const twoPhaseRequested = baseSweep.twoPhase === true;
+  const allowMeasurementSeed = !twoPhaseRequested || Boolean(runtimeSweep?.activeSlew);
+
+  const lastRow =
+    allowMeasurementSeed
+      ? ((runtimeSweep?.last as VacuumGapSweepRow | undefined) ??
+        (context.sweepResults.length
+          ? (context.sweepResults[context.sweepResults.length - 1] as VacuumGapSweepRow)
+          : undefined))
+      : undefined;
+
+  const measuredRho = allowMeasurementSeed ? pickNumber((lastRow as any)?.pumpRatio) : undefined;
+  const measuredModDepthFrac = allowMeasurementSeed ? pickNumber((lastRow as any)?.m) : undefined;
+  const measuredModDepthPct =
+    typeof measuredModDepthFrac === "number" ? measuredModDepthFrac * 100 : undefined;
+  const measuredKappaEffMHz = allowMeasurementSeed ? pickNumber((lastRow as any)?.kappaEff_MHz) : undefined;
+  const measuredGapNm = allowMeasurementSeed ? pickNumber((lastRow as any)?.d_nm) : undefined;
+  const measuredPhaseDeg = allowMeasurementSeed ? pickNumber((lastRow as any)?.phi_deg) : undefined;
+  const measuredPumpGHz = allowMeasurementSeed ? pickNumber((lastRow as any)?.Omega_GHz) : undefined;
+
+  const modDepthInputs = [
+    ...toNumberArray(baseSweep.mod_depth_pct),
+    ...toNumberArray(dynamicConfig?.mod_depth_pct),
+    ...toNumberArray(payload.mod_depth_pct),
+  ];
+  if (typeof measuredModDepthPct === "number") {
+    modDepthInputs.push(measuredModDepthPct);
+  }
+  if (!modDepthInputs.length) {
+    modDepthInputs.push(ACTIVE_SLEW_DEFAULT_MOD_DEPTH_CAP_PCT);
+  }
+
+  let modDepthCap = ACTIVE_SLEW_DEFAULT_MOD_DEPTH_CAP_PCT;
+  const maxSpecified = modDepthInputs.length ? Math.max(...modDepthInputs) : undefined;
+  if (Number.isFinite(maxSpecified)) {
+    modDepthCap = Math.min(modDepthCap, maxSpecified as number);
+  }
+  if (typeof measuredModDepthPct === "number" && measuredModDepthPct > 0) {
+    modDepthCap = Math.min(modDepthCap, measuredModDepthPct);
+  }
+
+  if (
+    typeof measuredRho === "number" &&
+    measuredRho > 0 &&
+    typeof measuredModDepthPct === "number" &&
+    measuredModDepthPct > 0
+  ) {
+    if (measuredRho > ACTIVE_SLEW_TARGET_RHO) {
+      const scaled = measuredModDepthPct * (ACTIVE_SLEW_TARGET_RHO / measuredRho);
+      if (scaled > 0) {
+        modDepthCap = Math.min(
+          modDepthCap,
+          Math.max(ACTIVE_SLEW_ABSOLUTE_MIN_MOD_DEPTH_PCT, scaled),
+        );
+      }
+    }
+  }
+
+  if (typeof measuredKappaEffMHz === "number" && measuredKappaEffMHz <= 0) {
+    modDepthCap = Math.min(modDepthCap, ACTIVE_SLEW_MIN_MOD_DEPTH_PCT);
+  }
+
+  modDepthCap = Math.max(ACTIVE_SLEW_ABSOLUTE_MIN_MOD_DEPTH_PCT, modDepthCap);
+  const depthFloor = Math.max(
+    ACTIVE_SLEW_ABSOLUTE_MIN_MOD_DEPTH_PCT,
+    Math.min(ACTIVE_SLEW_MIN_MOD_DEPTH_PCT, modDepthCap),
+  );
+
+  const modDepthDigits = modDepthCap < 0.1 ? 4 : 3;
+  let trimmedModDepths = dedupeNumeric(
+    modDepthInputs.map((value) => clampNumber(value, depthFloor, modDepthCap)),
+    modDepthDigits,
+  );
+  trimmedModDepths = dedupeNumeric(
+    [...trimmedModDepths, modDepthCap],
+    modDepthDigits,
+  );
+
+  const gapInputs = [
+    ...toNumberArray(baseSweep.gaps_nm),
+    ...toNumberArray(dynamicConfig?.gap_nm),
+    ...toNumberArray(payload.gap_nm),
+  ].filter((value) => value > 0);
+  if (typeof measuredGapNm === "number" && measuredGapNm > 0) {
+    gapInputs.push(measuredGapNm);
+  }
+  let safeGaps = dedupeNumeric(gapInputs, 2);
+  if (!safeGaps.length && typeof measuredGapNm === "number" && measuredGapNm > 0) {
+    safeGaps = [Number(measuredGapNm.toFixed(2))];
+  }
+
+  const phaseInputs = [
+    ...toNumberArray(baseSweep.phase_deg),
+    ...toNumberArray(dynamicConfig?.phase_deg),
+    ...toNumberArray(payload.phase_deg),
+  ];
+  if (typeof measuredPhaseDeg === "number") {
+    phaseInputs.push(measuredPhaseDeg);
+  }
+  const safePhaseList = dedupeNumeric(phaseInputs, 2);
+
+  const pumpSources = [
+    baseSweep.pump_freq_GHz,
+    dynamicConfig?.pump_freq_GHz,
+    payload.pump_freq_GHz,
+    payload.sweep?.pump_freq_GHz,
+  ];
+  const pumpAuto = twoPhaseRequested || pumpSources.some((value) => value === "auto");
+  const pumpInputs = twoPhaseRequested
+    ? []
+    : pumpSources
+        .filter((value) => value !== "auto")
+        .flatMap((value) => toNumberArray(value));
+  if (!twoPhaseRequested && typeof measuredPumpGHz === "number" && measuredPumpGHz > 0) {
+    pumpInputs.push(measuredPumpGHz);
+  }
+  const pumpDigits = 6;
+  const pumpList = pumpAuto ? [] : dedupeNumeric(pumpInputs, pumpDigits);
+
+  const guardHardwareLimit = (value: unknown, guard: number, available: number) => {
+    const numeric = Number(value);
+    const fallback = available > 0 ? available : guard;
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return Math.max(1, Math.min(guard, fallback));
+    }
+    return Math.max(1, Math.min(Math.floor(numeric), guard, fallback));
+  };
+
+  const baseHardwareProfile = {
+    ...(dynamicConfig?.sweep?.hardwareProfile ?? {}),
+    ...(baseSweep.hardwareProfile ?? {}),
+  } as Record<string, unknown>;
+
+  const gainCandidates = [
+    ACTIVE_SLEW_MAX_GAIN_DB,
+    Number(baseSweep.maxGain_dB),
+    Number(dynamicConfig?.sweep?.maxGain_dB),
+  ].filter((value) => Number.isFinite(value) && value > 0) as number[];
+  const maxGainGuard =
+    gainCandidates.length > 0
+      ? Math.min(...gainCandidates, ACTIVE_SLEW_MAX_GAIN_DB)
+      : ACTIVE_SLEW_MAX_GAIN_DB;
+
+  let resolvedGaps: number[];
+  if (twoPhaseRequested) {
+    resolvedGaps = dedupeNumeric(Array.from(TWO_PHASE_DEFAULT_GAPS, (value) => Number(value)), 2);
+  } else {
+    resolvedGaps = safeGaps.length ? safeGaps : toNumberArray(baseSweep.gaps_nm);
+    if (!resolvedGaps.length && typeof measuredGapNm === "number" && measuredGapNm > 0) {
+      resolvedGaps = [Number(measuredGapNm.toFixed(2))];
+    }
+    if (!resolvedGaps.length) {
+      resolvedGaps = [20];
+    }
+    resolvedGaps = dedupeNumeric(resolvedGaps, 2);
+  }
+
+  let resolvedModDepths: number[];
+  if (twoPhaseRequested) {
+    resolvedModDepths = dedupeNumeric(
+      Array.from(TWO_PHASE_DEFAULT_MOD_DEPTHS, (value) =>
+        Number(value.toFixed(modDepthDigits)),
+      ),
+      modDepthDigits,
+    );
+  } else {
+    resolvedModDepths = trimmedModDepths.length
+      ? trimmedModDepths
+      : toNumberArray(baseSweep.mod_depth_pct);
+    if (!resolvedModDepths.length) {
+      resolvedModDepths = [Number(modDepthCap.toFixed(modDepthDigits))];
+    }
+    resolvedModDepths = dedupeNumeric(resolvedModDepths, modDepthDigits);
+  }
+
+  let resolvedPhases: number[];
+  if (twoPhaseRequested) {
+    resolvedPhases = dedupeNumeric(
+      Array.from(TWO_PHASE_DEFAULT_PHASES, (value) => Number(value)),
+      2,
+    );
+  } else {
+    resolvedPhases = safePhaseList.length ? safePhaseList : toNumberArray(baseSweep.phase_deg);
+    if (!resolvedPhases.length && typeof measuredPhaseDeg === "number") {
+      resolvedPhases = [Number(measuredPhaseDeg.toFixed(1))];
+    }
+    if (!resolvedPhases.length) {
+      resolvedPhases = [0];
+    }
+    resolvedPhases = dedupeNumeric(resolvedPhases, 2);
+  }
+
+  let resolvedPump: DynamicCasimirSweepConfig["pump_freq_GHz"];
+  if (pumpAuto) {
+    resolvedPump = "auto";
+  } else {
+    let pumpValues = pumpList.length ? pumpList : toNumberArray(baseSweep.pump_freq_GHz);
+    if (!pumpValues.length && typeof measuredPumpGHz === "number" && measuredPumpGHz > 0) {
+      pumpValues = [Number(measuredPumpGHz.toFixed(pumpDigits))];
+    }
+    pumpValues = dedupeNumeric(pumpValues, pumpDigits);
+    resolvedPump = pumpValues.length ? pumpValues : "auto";
+  }
+
+  const pumpCountForHardware =
+    resolvedPump === "auto"
+      ? 1
+      : Array.isArray(resolvedPump)
+      ? resolvedPump.length
+      : 1;
+
+  const safeHardwareProfile = {
+    gapLimit: guardHardwareLimit(
+      baseHardwareProfile.gapLimit,
+      ACTIVE_SLEW_HARDWARE_GUARDS.gapLimit,
+      resolvedGaps.length,
+    ),
+    modDepthLimit: guardHardwareLimit(
+      baseHardwareProfile.modDepthLimit,
+      ACTIVE_SLEW_HARDWARE_GUARDS.modDepthLimit,
+      resolvedModDepths.length,
+    ),
+    phaseLimit: guardHardwareLimit(
+      baseHardwareProfile.phaseLimit,
+      ACTIVE_SLEW_HARDWARE_GUARDS.phaseLimit,
+      resolvedPhases.length,
+    ),
+    pumpLimit: guardHardwareLimit(
+      baseHardwareProfile.pumpLimit,
+      ACTIVE_SLEW_HARDWARE_GUARDS.pumpLimit,
+      pumpCountForHardware,
+    ),
+    delayMs: Math.max(
+      Number.isFinite(Number(baseHardwareProfile.delayMs))
+        ? Number(baseHardwareProfile.delayMs)
+        : 0,
+      ACTIVE_SLEW_HARDWARE_GUARDS.delayMs,
+    ),
+  };
+
+  const sanitizedSweep = {
+    ...baseSweep,
+    activeSlew: true,
+    hardwareProfile: safeHardwareProfile,
+    maxGain_dB: maxGainGuard,
+  } as DynamicCasimirSweepConfig;
+
+  sanitizedSweep.twoPhase = twoPhaseRequested ? true : baseSweep.twoPhase;
+  sanitizedSweep.gaps_nm = resolvedGaps;
+  sanitizedSweep.mod_depth_pct = resolvedModDepths;
+  sanitizedSweep.phase_deg = resolvedPhases;
+  sanitizedSweep.pump_freq_GHz = resolvedPump;
+
+  const nextPayload: Partial<DynamicConfig> = {
+    ...payload,
+    sweep: sanitizedSweep,
+  };
+
+  if (resolvedModDepths.length === 1) {
+    nextPayload.mod_depth_pct = resolvedModDepths[0];
+  } else if (resolvedModDepths.length > 1) {
+    nextPayload.mod_depth_pct = resolvedModDepths;
+  }
+
+  if (resolvedGaps.length === 1) nextPayload.gap_nm = resolvedGaps[0];
+  else if (resolvedGaps.length > 1) nextPayload.gap_nm = resolvedGaps;
+
+  if (resolvedPhases.length === 1) nextPayload.phase_deg = resolvedPhases[0];
+  else if (resolvedPhases.length > 1) nextPayload.phase_deg = resolvedPhases;
+
+  if (resolvedPump === "auto") nextPayload.pump_freq_GHz = "auto";
+  else if (resolvedPump.length === 1) nextPayload.pump_freq_GHz = resolvedPump[0];
+  else if (resolvedPump.length > 1) nextPayload.pump_freq_GHz = resolvedPump;
+
+  return nextPayload;
+};
+
 const SWEEP_RESULTS_QUERY_KEY = ["helix:sweep:results"] as const;
 
 const adaptVacuumRowToExtended = (row: VacuumGapSweepRow): SweepPointExtended => {
@@ -565,8 +915,12 @@ export function useEnergyPipeline(options?: {
   }, []);
 
   const publishSweepControls = React.useCallback(async (payload: Partial<DynamicConfig>) => {
+    const guardedPayload = guardActiveSlewPayload(payload, {
+      pipeline: query.data,
+      sweepResults,
+    });
     try {
-      await apiRequest('POST', '/api/helix/pipeline/update', { dynamicConfig: payload });
+      await apiRequest('POST', '/api/helix/pipeline/update', { dynamicConfig: guardedPayload });
       startTransition(() => {
         queryClient.invalidateQueries({ predicate: q =>
           Array.isArray(q.queryKey) &&
@@ -576,7 +930,7 @@ export function useEnergyPipeline(options?: {
     } catch (err) {
       console.error("[HELIX] Failed to publish sweep controls:", err);
     }
-  }, []);
+  }, [query.data, sweepResults]);
 
   return {
     ...query,

@@ -565,6 +565,7 @@ export interface RunSweepConfig {
   Qc?: number;
   T_K?: number;
   activeSlew?: boolean;
+  twoPhase?: boolean;
   slewDelayMs?: number;
   maxGain_dB?: number;
   minQL?: number;
@@ -1132,5 +1133,6 @@ export function defaultSweepConfigFromDynamic(
       sweep?.T_K != null
         ? { bathTemperature_K: sweep.T_K }
         : undefined,
+    twoPhase: sweep?.twoPhase ?? (config as any)?.sweep?.twoPhase,
   };
 }

@@ -5,6 +5,7 @@ import { useLightCrossingLoop } from "./useLightCrossingLoop";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { queryClient } from "@/lib/queryClient";
+import { summarizeSweepGuard } from "@/lib/sweep-guards";
 import type { SweepPoint } from "@shared/schema";
 
 const OVERLAY_STATE_QUERY_KEY = ["hull3d:overlay:controls"] as const;
@@ -38,6 +39,7 @@ export type TLFrame = {
     QL: number | null;
     quadrature_dB: number | null;
     status: string | null;
+    guardReason: string | null;
   } | null;
   deltas: {
     rho: number | null;
@@ -1628,6 +1630,9 @@ export function useTimeLapseRecorder({
           : sweepStatusRaw !== STRING_FALLBACK
             ? sweepStatusRaw
             : fallbackStatus ?? STRING_FALLBACK;
+      const sweepGuardSummary = summarizeSweepGuard(sweepLast ?? fallbackSweepRow);
+      const sweepStatusDisplay =
+        sweepGuardSummary && sweepStatus === "UNSTABLE" ? "WARN" : sweepStatus;
 
       const sweepLines: string[] = [];
       if (sweepIter != null || sweepTotal != null) {
@@ -1654,7 +1659,10 @@ export function useTimeLapseRecorder({
         quadratureLabel = quadratureDb >= 0 ? `amp +${absQuad} dB` : `de-amp -${absQuad} dB`;
       }
       sweepLines.push(`quadrature ${quadratureLabel}`);
-      sweepLines.push(`status ${sweepStatus !== STRING_FALLBACK ? sweepStatus : "n/a"}`);
+      sweepLines.push(`status ${sweepStatusDisplay !== STRING_FALLBACK ? sweepStatusDisplay : "n/a"}`);
+      if (sweepGuardSummary) {
+        sweepLines.push(`guard ${sweepGuardSummary}`);
+      }
 
       const sweepNarrative = {
         iter: sweepIter,
@@ -1669,7 +1677,8 @@ export function useTimeLapseRecorder({
         pumpRatio,
         QL: qlValue,
         quadrature_dB: quadratureDb,
-        status: sweepStatus !== STRING_FALLBACK ? sweepStatus : fallbackStatus,
+        status: sweepStatusDisplay !== STRING_FALLBACK ? sweepStatusDisplay : fallbackStatus,
+        guardReason: sweepGuardSummary,
       };
 
       const deltaLines: string[] = [];
@@ -1957,3 +1966,4 @@ export function useTimeLapseRecorder({
 }
 
 export default useTimeLapseRecorder;
+

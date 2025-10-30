@@ -379,6 +379,8 @@ const ACTIVE_SLEW_LIMITS = {
   pump: 3,
   delayMs: 5,
 } as const;
+const TWO_PHASE_TARGET_RHO = 0.85;
+const TWO_PHASE_MIN_MOD_DEPTH_PCT = 0.001;
 
 function resolveActiveSlewLimit(value: unknown, fallback: number, min = 1, max?: number) {
   const num = Number(value);
@@ -430,6 +432,60 @@ function appendSweepRows(rows: VacuumGapSweepRow[]) {
 }
 
 const SWEEP_TOP_LIMIT = 10;
+
+function deriveMeasuredPumpFrequency(rows: VacuumGapSweepRow[]): number | undefined {
+  if (!Array.isArray(rows) || rows.length === 0) return undefined;
+  const candidates = rows.filter(
+    (row) => Number.isFinite(row.Omega_GHz) && typeof row.Omega_GHz === "number",
+  );
+  if (!candidates.length) return undefined;
+  const stable = candidates.filter((row) => row.stable !== false && row.status !== "UNSTABLE");
+  const source = stable.length ? stable : candidates;
+  const stats = new Map<number, { count: number; gainSum: number }>();
+  for (const row of source) {
+    const freq = Number(row.Omega_GHz);
+    if (!Number.isFinite(freq) || freq <= 0) continue;
+    const key = Number(freq.toFixed(6));
+    const entry = stats.get(key);
+    if (entry) {
+      entry.count += 1;
+      entry.gainSum += Number(row.G ?? 0);
+    } else {
+      stats.set(key, { count: 1, gainSum: Number(row.G ?? 0) });
+    }
+  }
+  if (!stats.size) {
+    const fallback = source[0]?.Omega_GHz;
+    return Number.isFinite(fallback) && (fallback ?? 0) > 0 ? Number(fallback) : undefined;
+  }
+  let bestKey: number | undefined;
+  let bestCount = -1;
+  let bestAvg = -Infinity;
+  for (const [key, value] of stats) {
+    const avg = value.gainSum / Math.max(1, value.count);
+    if (value.count > bestCount || (value.count === bestCount && avg > bestAvg)) {
+      bestKey = key;
+      bestCount = value.count;
+      bestAvg = avg;
+    }
+  }
+  if (bestKey != null) return bestKey;
+  const fallback = source[0]?.Omega_GHz;
+  return Number.isFinite(fallback) && (fallback ?? 0) > 0 ? Number(fallback) : undefined;
+}
+
+function dedupeNumericList(values: number[], digits = 4): number[] {
+  if (!Array.isArray(values) || !values.length) return [];
+  const scale = 10 ** digits;
+  const unique = new Set<number>();
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    const rounded = Math.round(value * scale) / scale;
+    if (!Number.isFinite(rounded)) continue;
+    unique.add(rounded);
+  }
+  return Array.from(unique).sort((a, b) => a - b);
+}
 
 function toSweepPoint(row: VacuumGapSweepRow): SweepPoint {
   return {
@@ -614,6 +670,9 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
         sweepConfig.pump_freq_GHz = [...runCfg.pump_freq_GHz];
       }
       sweepConfig.activeSlew = true;
+      if (runCfg.twoPhase !== undefined) {
+        (sweepConfig as any).twoPhase = runCfg.twoPhase;
+      }
     }
     sweepRuntime.activeSlew = true;
   } else if (sweepRuntime) {
@@ -673,14 +732,19 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
       Number.isFinite(runCfg.slewDelayMs) && runCfg.slewDelayMs != null
         ? Math.max(0, runCfg.slewDelayMs)
         : 50;
-    const modDepthList =
-      runCfg.mod_depth_pct && runCfg.mod_depth_pct.length ? runCfg.mod_depth_pct : [0.5];
+    let modDepthList =
+      runCfg.mod_depth_pct && runCfg.mod_depth_pct.length ? [...runCfg.mod_depth_pct] : [0.5];
     const phaseList = runCfg.phase_deg && runCfg.phase_deg.length ? runCfg.phase_deg : [0];
-    const pumpListForGap = (d_nm: number) => {
+
+    const autoPumpForGap = (d_nm: number) => {
+      const d_m = d_nm * 1e-9;
+      const f0_auto = omega0_from_gap(d_m, base_f0, geometry, gammaGeo);
+      return [2 * f0_auto];
+    };
+
+    const defaultPumpListForGap = (d_nm: number) => {
       if (runCfg.pumpStrategy === "auto") {
-        const d_m = d_nm * 1e-9;
-        const f0_auto = omega0_from_gap(d_m, base_f0, geometry, gammaGeo);
-        return [2 * f0_auto];
+        return autoPumpForGap(d_nm);
       }
       if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
         return runCfg.pump_freq_GHz;
@@ -691,11 +755,29 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
       return [2 * base_f0];
     };
 
-    let totalSteps = 0;
-    for (const d_nm of runCfg.gaps_nm) {
-      const pumpList = pumpListForGap(d_nm);
-      totalSteps += modDepthList.length * pumpList.length * phaseList.length;
+    let twoPhaseEnabled =
+      runCfg.twoPhase === true ||
+      (runCfg.twoPhase !== false && runCfg.pumpStrategy === "auto");
+    if (!modDepthList.length || !phaseList.length) {
+      twoPhaseEnabled = false;
     }
+
+    const primePumpResolver = twoPhaseEnabled ? autoPumpForGap : defaultPumpListForGap;
+    const computePhaseTotal = (resolver: (gap: number) => number[], depths: number[]) => {
+      let total = 0;
+      for (const d_nm of runCfg.gaps_nm) {
+        const pumpList = resolver(d_nm);
+        total += depths.length * pumpList.length * phaseList.length;
+      }
+      return total;
+    };
+
+    const primeSteps = computePhaseTotal(primePumpResolver, modDepthList);
+    const refineSteps = twoPhaseEnabled
+      ? runCfg.gaps_nm.length * modDepthList.length * phaseList.length
+      : 0;
+    let totalSteps = primeSteps + refineSteps;
+
     sweepRuntime.active = totalSteps > 0;
     sweepRuntime.startedAt = Date.now();
     sweepRuntime.completedAt = undefined;
@@ -714,70 +796,147 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
       return;
     }
 
-    const hardwareRows: VacuumGapSweepRow[] = [];
+    const primeRows: VacuumGapSweepRow[] = [];
+    const refineRows: VacuumGapSweepRow[] = [];
     let topRows: VacuumGapSweepRow[] = [];
     let lastAcceptedRow: VacuumGapSweepRow | null = null;
     let cancelled = false;
-    state.vacuumGapSweepResults = [];
 
-    outer: for (const d_nm of runCfg.gaps_nm) {
-      const pumpList = pumpListForGap(d_nm);
-      for (const m_pct of modDepthList) {
-        const m = m_pct / 100;
-        for (const pumpHz of pumpList) {
-          const phaseRows: VacuumGapSweepRow[] = [];
-          for (const phase of phaseList) {
-            if (state.sweep?.cancelRequested) {
-              cancelled = true;
-              break outer;
+    const updateEta = () => {
+      if (sweepRuntime.total && sweepRuntime.iter) {
+        const elapsed = Date.now() - (sweepRuntime.startedAt ?? Date.now());
+        const remaining = Math.max(0, sweepRuntime.total - sweepRuntime.iter);
+        sweepRuntime.etaMs =
+          sweepRuntime.iter > 0
+            ? Math.max(0, Math.round((elapsed / Math.max(1, sweepRuntime.iter)) * remaining))
+            : undefined;
+      } else {
+        sweepRuntime.etaMs = undefined;
+      }
+    };
+
+    const runPhase = async (
+      phaseLabel: "prime" | "refine",
+      pumpResolver: (gap: number) => number[],
+      rowsCollector: VacuumGapSweepRow[],
+      depths: number[],
+    ) => {
+      for (const d_nm of runCfg.gaps_nm) {
+        const pumpList = pumpResolver(d_nm);
+        if (!pumpList.length) continue;
+        for (const m_pct of depths) {
+          const m = m_pct / 100;
+          for (const pumpHz of pumpList) {
+            const phaseRows: VacuumGapSweepRow[] = [];
+            for (const phase of phaseList) {
+              if (state.sweep?.cancelRequested) {
+                cancelled = true;
+                return;
+              }
+
+              await slewPump({ f_Hz: pumpHz * 1e9, m, phi_deg: phase });
+              const row = computeSweepPoint({ d_nm, m, Omega_GHz: pumpHz, phi_deg: phase }, ctx);
+
+              sweepRuntime.iter = (sweepRuntime.iter ?? 0) + 1;
+              sweepRuntime.last = toSweepPoint(row);
+              updateEta();
+
+              if (row.G > (runCfg.maxGain_dB ?? 15) && (row.QL ?? Infinity) < (runCfg.minQL ?? 1e3)) {
+                continue;
+              }
+
+              phaseRows.push(row);
+              rowsCollector.push(row);
+              appendSweepRows([row]);
+              topRows = upsertTopRows(topRows, row);
+              sweepRuntime.top = topRows.map(toSweepPoint);
+              lastAcceptedRow = row;
+              state.vacuumGapSweepResults = rowsCollector.slice();
+              if (delayMs > 0) await sleep(delayMs);
             }
-
-            await slewPump({ f_Hz: pumpHz * 1e9, m, phi_deg: phase });
-            const row = computeSweepPoint({ d_nm, m, Omega_GHz: pumpHz, phi_deg: phase }, ctx);
-
-            sweepRuntime.iter = (sweepRuntime.iter ?? 0) + 1;
-            sweepRuntime.last = toSweepPoint(row);
-            if (sweepRuntime.total && sweepRuntime.iter) {
-              const elapsed = Date.now() - (sweepRuntime.startedAt ?? Date.now());
-              const remaining = Math.max(0, sweepRuntime.total - sweepRuntime.iter);
-              sweepRuntime.etaMs =
-                sweepRuntime.iter > 0
-                  ? Math.max(
-                      0,
-                      Math.round(
-                        (elapsed / Math.max(1, sweepRuntime.iter)) * remaining,
-                      ),
-                    )
-                  : undefined;
-            } else {
-              sweepRuntime.etaMs = undefined;
+            if (cancelled) {
+              return;
             }
-
-            if (row.G > (runCfg.maxGain_dB ?? 15) && (row.QL ?? Infinity) < (runCfg.minQL ?? 1e3)) {
-              continue;
+            if (phaseRows.length) {
+              phaseRows.sort((a, b) => a.phi_deg - b.phi_deg);
+              detectPlateau(phaseRows, runCfg);
+              sweepRuntime.top = topRows.map(toSweepPoint);
+              const latest = lastAcceptedRow ?? phaseRows[phaseRows.length - 1];
+              sweepRuntime.last = latest ? toSweepPoint(latest) : sweepRuntime.last ?? null;
             }
-
-            phaseRows.push(row);
-            hardwareRows.push(row);
-            appendSweepRows([row]);
-            topRows = upsertTopRows(topRows, row);
-            sweepRuntime.top = topRows.map(toSweepPoint);
-            lastAcceptedRow = row;
-            state.vacuumGapSweepResults = hardwareRows.slice();
-            if (delayMs > 0) await sleep(delayMs);
-          }
-          if (cancelled) {
-            break outer;
-          }
-          if (phaseRows.length) {
-            phaseRows.sort((a, b) => a.phi_deg - b.phi_deg);
-            detectPlateau(phaseRows, runCfg);
-            sweepRuntime.top = topRows.map(toSweepPoint);
-            const latest = lastAcceptedRow ?? phaseRows[phaseRows.length - 1];
-            sweepRuntime.last = latest ? toSweepPoint(latest) : sweepRuntime.last ?? null;
           }
         }
       }
+    };
+
+    state.vacuumGapSweepResults = [];
+    await runPhase("prime", primePumpResolver, primeRows, modDepthList);
+
+    let derivedPumpGHz: number | undefined;
+    let refineModDepthList = modDepthList.slice();
+    if (!cancelled && twoPhaseEnabled) {
+      const rowsForScaling = primeRows.filter(
+        (row) =>
+          row &&
+          typeof row.pumpRatio === "number" &&
+          Number.isFinite(row.pumpRatio) &&
+          typeof row.m === "number" &&
+          row.m > 0,
+      );
+      if (rowsForScaling.length) {
+        let modDepthScale = 1;
+        for (const row of rowsForScaling) {
+          const rho = Number(row.pumpRatio);
+          if (!Number.isFinite(rho) || rho <= 0) continue;
+          if (rho > TWO_PHASE_TARGET_RHO) {
+            modDepthScale = Math.min(modDepthScale, TWO_PHASE_TARGET_RHO / rho);
+          }
+        }
+        if (modDepthScale < 1) {
+          refineModDepthList = dedupeNumericList(
+            modDepthList.map((pct) =>
+              Math.max(TWO_PHASE_MIN_MOD_DEPTH_PCT, pct * modDepthScale),
+            ),
+            4,
+          );
+        }
+      }
+      if (!refineModDepthList.length) {
+        refineModDepthList = [TWO_PHASE_MIN_MOD_DEPTH_PCT];
+      }
+      derivedPumpGHz = deriveMeasuredPumpFrequency(primeRows);
+      if (!Number.isFinite(derivedPumpGHz) || (derivedPumpGHz ?? 0) <= 0) {
+        twoPhaseEnabled = false;
+        sweepRuntime.total = primeSteps;
+        totalSteps = primeSteps;
+        updateEta();
+      } else {
+        const adjustedTotal =
+          primeSteps + runCfg.gaps_nm.length * refineModDepthList.length * phaseList.length;
+        sweepRuntime.total = adjustedTotal;
+        totalSteps = adjustedTotal;
+        updateEta();
+      }
+    }
+
+    if (!cancelled && twoPhaseEnabled && derivedPumpGHz != null) {
+      topRows = [];
+      state.vacuumGapSweepResults = [];
+      const pumpValue = Number(derivedPumpGHz);
+      await runPhase("refine", () => [pumpValue], refineRows, refineModDepthList);
+      if (!cancelled) {
+        if (state.dynamicConfig?.sweep) {
+          state.dynamicConfig.sweep.pump_freq_GHz = [pumpValue];
+        }
+        if (state.dynamicConfig?.sweep && refineModDepthList.length) {
+          state.dynamicConfig.sweep.mod_depth_pct = refineModDepthList.slice();
+        }
+      }
+    } else {
+      state.vacuumGapSweepResults = primeRows.slice();
+    }
+    if (state.dynamicConfig?.sweep) {
+      state.dynamicConfig.sweep.twoPhase = runCfg.twoPhase;
     }
 
     sweepRuntime.active = false;
@@ -791,32 +950,39 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
       sweepRuntime.completedAt = undefined;
     }
 
+    const finalRows =
+      !cancelled && twoPhaseEnabled && refineRows.length ? refineRows : primeRows;
+    const finalPump = finalRows.length ? finalRows[finalRows.length - 1].Omega_GHz : undefined;
+
     if (runCfg.gateSchedule && runCfg.gateSchedule.length) {
       const { analytics } = assignGateSummaries(
-        hardwareRows,
+        finalRows,
         runCfg.gateSchedule,
         runCfg.gateRouting,
         runCfg.gateOptions ?? {},
       );
       gateAnalyticsSink(analytics ?? null);
     } else {
-      assignGateSummaries(hardwareRows, undefined, undefined, runCfg.gateOptions ?? {});
+      assignGateSummaries(finalRows, undefined, undefined, runCfg.gateOptions ?? {});
       gateAnalyticsSink(null);
     }
 
-    state.vacuumGapSweepResults = hardwareRows.slice();
+    state.vacuumGapSweepResults = finalRows.slice();
     state.gateAnalytics = gateAnalytics;
+
     await logSweep(
-      hardwareRows,
+      finalRows,
       {
         activeSlew: true,
         slewDelayMs: delayMs,
-        totalSteps,
+        totalSteps: sweepRuntime.total ?? totalSteps,
         cancelled,
+        phaseA_rows: primeRows.length,
+        phaseB_rows: refineRows.length,
       },
-      hardwareRows.length ? hardwareRows[hardwareRows.length - 1].Omega_GHz : undefined,
+      finalPump,
     );
-    return hardwareRows;
+    return finalRows;
   }
 
   sweepRuntime.active = false;

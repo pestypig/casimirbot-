@@ -559,7 +559,8 @@ export default function HelixCasimirAmplifier({
   modeEndpoint = "/api/helix/mode",
   lightCrossing,
   cohesive = true,
-  readOnly = false
+  readOnly = false,
+  showDisplacementField = true
 }: {
   metricsEndpoint?: string;
   stateEndpoint?: string;
@@ -568,6 +569,7 @@ export default function HelixCasimirAmplifier({
   lightCrossing?: LightCrossing;
   cohesive?: boolean; // new flag to toggle unified layout
   readOnly?: boolean;
+  showDisplacementField?: boolean;
 }) {
   const ds = useDriveSyncStore();
   const { data: metrics } = usePollingSmart<HelixMetrics>(metricsEndpoint, {
@@ -742,7 +744,7 @@ export default function HelixCasimirAmplifier({
   }, []);
 
   const handleHardwareSlew = React.useCallback(() => {
-    const payload = { sweep: { activeSlew: true } } as Partial<DynamicConfig>;
+    const payload = { sweep: { activeSlew: true, twoPhase: true } } as Partial<DynamicConfig>;
     publishSweepControls(payload);
   }, [publishSweepControls]);
   const handleCancelSlew = React.useCallback(async () => {
@@ -2145,7 +2147,9 @@ export default function HelixCasimirAmplifier({
           </Card>
 
           {/* Displacement Heatmap */}
-          <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
+          {showDisplacementField && (
+            <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
+          )}
         </div>
       </div>
     );
@@ -2743,7 +2747,9 @@ export default function HelixCasimirAmplifier({
           </Card>
 
         {/* Displacement Field Heatmap */}
-        <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
+        {showDisplacementField && (
+          <DisplacementHeatmap endpoint={fieldEndpoint} metrics={metrics} state={state} />
+        )}
 
       </div>
     </div>

@@ -211,6 +211,38 @@ const toSci = (value: number | undefined, digits = 2) => {
 
 };
 
+const formatSecondsFriendly = (seconds: number) => {
+
+  if (!Number.isFinite(seconds)) return "n/a";
+
+  const abs = Math.abs(seconds);
+
+  if (abs === 0) return "0 s";
+
+  if (abs >= 1) return `${seconds.toFixed(2)} s`;
+
+  if (abs >= 1e-3) return `${(seconds * 1e3).toFixed(2)} ms`;
+
+  if (abs >= 1e-6) return `${(seconds * 1e6).toFixed(2)} us`;
+
+  if (abs >= 1e-9) return `${(seconds * 1e9).toFixed(2)} ns`;
+
+  if (abs >= 1e-12) return `${(seconds * 1e12).toFixed(2)} ps`;
+
+  if (abs >= 1e-15) return `${(seconds * 1e15).toFixed(2)} fs`;
+
+  return `${seconds.toExponential(2)} s`;
+
+};
+
+const describeTau = (label: string, seconds: number) => {
+
+  if (!Number.isFinite(seconds)) return `${label} = n/a`;
+
+  return `${label} = ${toSci(seconds, 2)} s (${formatSecondsFriendly(seconds)})`;
+
+};
+
 const firstFinite = (...values: Array<unknown>): number => {
 
   for (const value of values) {
@@ -946,55 +978,7 @@ export default function DriveGuardsPanel() {
 
 
 
-  const ts = (() => {
-
-
-
-    if (Number.isFinite(pipe?.TS_ratio)) return pipe!.TS_ratio as number;
-
-
-
-    if (Number.isFinite(pipe?.TS_long)) return pipe!.TS_long as number;
-
-
-
-    const burst = Number(pipe?.lightCrossing?.burst_ms ?? pipe?.burst_ms);
-
-
-
-    const dwell = Number(pipe?.lightCrossing?.dwell_ms ?? pipe?.dwell_ms);
-
-
-
-    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
-
-
-
-      const tauLC = Number(pipe?.lightCrossing?.tauLC_ms ?? pipe?.tau_LC_ms);
-
-
-
-      if (Number.isFinite(tauLC) && tauLC > 0) {
-
-
-
-        return (tauLC / dwell) * (dwell / burst);
-
-
-
-      }
-
-
-
-    }
-
-
-
-    return NaN;
-
-
-
-  })();
+  
 
 
 
@@ -1158,6 +1142,20 @@ export default function DriveGuardsPanel() {
 
 
 
+  const kappaEffDisplay =
+
+    Number.isFinite(kappaEffMHz)
+
+      ? kappaEffMHz <= 0
+
+        ? "below floor (unstable)"
+
+        : `${kappaEffMHz.toFixed(2)} MHz`
+
+      : "? ";
+
+
+
   const loadedQL = Number(latestSweep?.QL ?? latestSweep?.QL_base);
 
 
@@ -1296,6 +1294,78 @@ export default function DriveGuardsPanel() {
 
 
 
+  const tauPulseSeconds = Number.isFinite(tauPulseUs) ? tauPulseUs * 1e-6 : NaN;
+
+
+
+  const tauLCSeconds = Number.isFinite(tauLCUs) ? tauLCUs * 1e-6 : NaN;
+
+
+
+  const ts = (() => {
+
+
+
+    if (Number.isFinite(tauLCUs) && Number.isFinite(tauPulseUs) && tauPulseUs > 0) {
+
+
+
+      return tauLCUs / tauPulseUs;
+
+
+
+    }
+
+
+
+    if (Number.isFinite(pipe?.TS_ratio)) return pipe!.TS_ratio as number;
+
+
+
+    if (Number.isFinite(pipe?.TS_long)) return pipe!.TS_long as number;
+
+
+
+    const burst = Number(pipe?.lightCrossing?.burst_ms ?? pipe?.burst_ms);
+
+
+
+    const dwell = Number(pipe?.lightCrossing?.dwell_ms ?? pipe?.dwell_ms);
+
+
+
+    if (Number.isFinite(burst) && Number.isFinite(dwell) && dwell > 0) {
+
+
+
+      const tauLC = Number(pipe?.lightCrossing?.tauLC_ms ?? pipe?.tau_LC_ms);
+
+
+
+      if (Number.isFinite(tauLC) && tauLC > 0) {
+
+
+
+        return (tauLC / dwell) * (dwell / burst);
+
+
+
+      }
+
+
+
+    }
+
+
+
+    return NaN;
+
+
+
+  })();
+
+
+
   const epsilonFromTimes =
 
     Number.isFinite(tauPulseUs) && Number.isFinite(tauLCUs) && tauLCUs > 0
@@ -1370,7 +1440,7 @@ export default function DriveGuardsPanel() {
 
     Number.isFinite(epsilonEffective) && Number.isFinite(ts)
 
-      ? `epsilon ${epsilonDisplay}, TS ${tsDisplay} -> ${averagingStatus.message}`
+      ? `epsilon=${epsilonDisplay}, TS=${tsDisplay} (tau_LC/tau_pulse) -> ${averagingStatus.message}`
 
       : "Awaiting duty & light-crossing telemetry";
 
@@ -1378,9 +1448,9 @@ export default function DriveGuardsPanel() {
 
   const averagingBadgeSubtext =
 
-    Number.isFinite(tauPulseUs) && Number.isFinite(tauLCUs)
+    Number.isFinite(tauPulseSeconds) && Number.isFinite(tauLCSeconds)
 
-      ? `tau_pulse ${toSci(tauPulseUs, 2)} us, tau_LC ${toSci(tauLCUs, 2)} us`
+      ? `${describeTau("tau_pulse", tauPulseSeconds)} | ${describeTau("tau_LC", tauLCSeconds)}`
 
       : "Need tau_pulse and tau_LC from Spectrum Tuner";
 
@@ -1503,6 +1573,26 @@ export default function DriveGuardsPanel() {
       ? "border-slate-700 bg-slate-900/40 text-slate-500"
 
       : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200";
+
+
+
+  const scoreboardBadgeText = (() => {
+
+    if (!Number.isFinite(kappaBody)) return "Scoreboard pick body";
+
+    if (kappaMuted || !zetaOk) return "Scoreboard gated";
+
+    if (Number.isFinite(kappaRatio)) return `Scoreboard E_potato=${kappaRatioDisplay}`;
+
+    return "Scoreboard awaiting";
+
+  })();
+
+
+
+  const scoreboardValueDisplay =
+
+    Number.isFinite(kappaRatio) && !kappaMuted && zetaOk ? kappaRatioDisplay : "guarded";
 
 
 
@@ -1990,7 +2080,7 @@ export default function DriveGuardsPanel() {
 
 
 
-      value: Number.isFinite(kappaEffMHz) ? `${kappaEffMHz.toFixed(2)} MHz` : "? ",
+      value: kappaEffDisplay,
 
 
 
@@ -2601,7 +2691,7 @@ export default function DriveGuardsPanel() {
 
 
 
-      <CardHeader className="space-y-3">
+      <CardHeader className="space-y-4">
 
 
 
@@ -2629,11 +2719,11 @@ export default function DriveGuardsPanel() {
 
 
 
-            ? "First-read ladder: narrative chips introduce each guardrail, why it matters, and what success looks like."
+            ? "Read mode surfaces narrative guidance for each guard."
 
 
 
-            : "Unified guard panel linking geometry, parametric gain, averaging, and the curvature ledger."}
+            : "Status first; physics cards explain why the proxy stays lawful."}
 
 
 
@@ -2641,91 +2731,83 @@ export default function DriveGuardsPanel() {
 
 
 
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200">
+
+
+
+          <Badge className={`border ${averagingBadgeTone}`}>
+
+
+
+            {`Averaging epsilon=${epsilonDisplay}, TS=${tsDisplay}`}
+
+
+
+          </Badge>
+
+
+
+          <Badge
+
+            className={
+
+              zetaOk
+
+                ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-200"
+
+                : "border border-amber-500/40 bg-amber-500/10 text-amber-200"
+
+            }
+
+          >
+
+
+
+            {Number.isFinite(zeta) ? `Duty/QI zeta=${toFixed(zeta, 3)} (auto<=1)` : "Duty/QI awaiting"}
+
+
+
+          </Badge>
+
+
+
+          <Badge className="border border-cyan-500/40 bg-cyan-500/10 text-cyan-200">
+
+
+
+            {Number.isFinite(curvature.kappa) ? `Drive proxy kappa_drive=${kappaDriveDisplay}` : "Drive proxy pending"}
+
+
+
+          </Badge>
+
+
+
+          <Badge className={`border ${ratioBadgeClass}`}>
+
+
+
+            {scoreboardBadgeText}
+
+
+
+          </Badge>
+
+
+
+        </div>
+
+
+
         <div className="rounded-lg border border-slate-800/80 bg-slate-950/50 p-4 space-y-3">
 
 
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <p className="text-sm text-slate-200">
 
 
 
-            <p className="text-sm text-slate-200">
-
-
-
-              <span className="font-semibold text-cyan-200">Thesis:</span>{" "}
-
-
-
-              <em>
-
-
-
-                Spacetime is a dynamical medium. We see it stretch (cosmic expansion), shear (frame-dragging), and ring (gravitational waves). In GR, what controls those deformations is the stress-energy that null geodesics sample, and when actuation is much faster than light-crossing, GR responds to the cycle-average &lt;T_mu nu&gt;. That is the bridge from "space is movable" to our drive proxy.
-
-
-
-              </em>
-
-
-
-            </p>
-
-
-
-            <div
-
-
-
-              id="ledger-averaging"
-
-
-
-              className={`flex w-full max-w-sm flex-col gap-1 rounded-md border px-3 py-2 text-xs ${averagingBadgeTone}`}
-
-
-
-            >
-
-
-
-              <div className="flex items-center gap-2 uppercase tracking-wide text-[11px]">
-
-
-
-                {averagingBadgeIcon}
-
-
-
-                <span>Averaging valid</span>
-
-
-
-              </div>
-
-
-
-              <div className="font-mono text-[11px]">{averagingBadgeText}</div>
-
-
-
-              <div className="text-[11px] text-slate-300">{averagingBadgeSubtext}</div>
-
-
-
-            </div>
-
-
-
-          </div>
-
-
-
-          <p className="text-xs text-slate-300">
-
-
-
-            <strong>Why this is allowed:</strong> GR already lets space change shape and flow. When the actuation timescale is much shorter than light-crossing (epsilon &lt;&lt; 1, TS &gt;&gt; 1), null rays integrate many strobes and the field equations respond to the average stress-energy <span className="font-mono">&lt;T_mu nu&gt;</span>. Our panel therefore reports <span className="font-mono">kappa_drive</span> from the cycle-averaged flux, gated by tile sub-threshold physics and the quantum-inequality margin zeta.
+            Space is dynamical; in the high-frequency regime (epsilon &lt;&lt; 1, TS &gt;&gt; 1) GR samples the cycle-average <span className="font-mono">&lt;T_mu nu&gt;</span>. We turn average power-per-area, duty, and geometry gain into the curvature proxy <span className="font-mono">kappa_drive</span> and compare it with nature&apos;s <span className="font-mono">kappa_body</span>.
 
 
 
@@ -2733,127 +2815,163 @@ export default function DriveGuardsPanel() {
 
 
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="font-mono text-xs text-slate-300">kappa_drive ~= (8*pi*G/c^5)*(P/A)*d_eff*mathcalG</div>
 
 
 
-            <GuardBadge
+          <div className="grid gap-3 md:grid-cols-3">
 
 
 
-              label="Parametric pump guard"
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
 
 
 
-              ok={paramGuardOk}
+              <div className="flex items-center justify-between text-xs font-semibold text-slate-100">
 
 
 
-              value={
+                <span>Permission to average</span>
 
 
 
-                Number.isFinite(lambdaEff) && Number.isFinite(lambdaMargin)
+                {averagingBadgeIcon}
 
 
 
-                  ? `lambda0 cos(phi) ${lambdaEffDisplay} / margin ${lambdaMarginDisplay}`
+              </div>
 
 
 
-                  : "Parametric sweep idle"
+              <ul className="mt-2 list-disc list-inside space-y-1 text-[11px] text-slate-300">
 
 
 
-              }
+                <li>Space moves: expansion, waves, and frame-dragging show geometry carries dynamics.</li>
 
 
 
-              description={`Keep |lambda0 cos(phi)| < 1 with ${toPercent(SUB_THRESHOLD_MARGIN, 2)} margin; rho cutoff ${toFixed(RHO_CUTOFF, 2)}.`}
+                <li>High-frequency GR: epsilon &lt;&lt; 1 and TS &gt;&gt; 1 push fields to the cycle-average (Isaacson, Green-Wald).</li>
 
 
 
-              readMode={readMode}
+                <li>{averagingBadgeText}</li>
 
 
 
-              readValue={
+              </ul>
 
 
 
-                Number.isFinite(lambdaMargin)
+              <div className="mt-2 font-mono text-[11px] text-slate-400">{averagingBadgeSubtext}</div>
 
 
 
-                  ? `Margin ${lambdaMarginDisplay}; rho ${rhoGuardDisplay}; cutoff ${toFixed(RHO_CUTOFF, 2)}`
+            </div>
 
 
 
-                  : "Awaiting sweep telemetry."
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
 
 
 
-              }
+              <div className="text-xs font-semibold text-slate-100">Guardrails</div>
 
 
 
-              readDescription="Sweep helpers enforce rho cutoff 0.9 and margin 0.02 so tiles stay sub-threshold before averaging."
+              <ul className="mt-2 list-disc list-inside space-y-1 text-[11px] text-slate-300">
 
 
 
-            />
+                <li className={paramGuardOk ? "text-emerald-300" : "text-amber-300"}>
 
 
 
-            <GuardBadge
+                  {`Parametric: rho < 0.9 and margin >= 2% (rho ${rhoGuardDisplay}, margin ${lambdaMarginDisplay}).`}
 
 
 
-              label="QI margin"
+                </li>
 
 
 
-              ok={zetaOk}
+                <li className={zetaOk ? "text-emerald-300" : "text-amber-300"}>
 
 
 
-              value={Number.isFinite(zeta) ? `zeta = ${toFixed(zeta, 3)}` : "zeta unknown"}
+                  {"QI cap: zeta <= 1 (solver freezes duty as zeta -> 1)."}
 
 
 
-              description="Ford-Roman sampling guard keeps zeta <= 1 before trusting the proxy."
+                </li>
 
 
 
-              readMode={readMode}
+                <li className={Number.isFinite(qMech) && qMech <= 1 ? "text-emerald-300" : "text-amber-300"}>
 
 
 
-              readValue={
+                  {`Mechanics: q_mech <= 1 (current ${toFixed(qMech, 2)}).`}
 
 
 
-                Number.isFinite(zeta)
+                </li>
 
 
 
-                  ? `Quantum-inequality margin ${toFixed(zeta, 3)}; solver freezes duty at one.`
+              </ul>
 
 
 
-                  : "Quantum-inequality margin unavailable."
+            </div>
 
 
 
-              }
+            <div className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
 
 
 
-              readDescription="Ledger Step C3: duty gating holds zeta <= 1 so the cycle-average stays lawful."
+              <div className="text-xs font-semibold text-slate-100">Scoreboard</div>
 
 
 
-            />
+              <div className={`mt-2 rounded-md border px-3 py-2 text-right font-mono text-sm ${ratioBadgeClass}`}>
+
+
+
+                <div>E_potato</div>
+
+
+
+                <div>{scoreboardValueDisplay}</div>
+
+
+
+              </div>
+
+
+
+              <div className="mt-2 text-[11px] text-slate-300">
+
+
+
+                {Number.isFinite(kappaBody)
+
+
+
+                  ? `kappa_drive ${kappaDriveDisplay} 1/m^2 | kappa_body ${kappaBodyDisplay} 1/m^2`
+
+
+
+                  : "Select a body class (rock, water, air, steel) to set kappa_body."}
+
+
+
+              </div>
+
+
+
+            </div>
 
 
 
@@ -2922,42 +3040,6 @@ export default function DriveGuardsPanel() {
 
 
             {readMode ? `Mode profile ${modeTitle[mode] ?? mode}` : `Mode: ${modeTitle[mode] ?? mode}`}
-
-
-
-          </Badge>
-
-
-
-          <Badge className="border border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
-
-
-
-            {readMode ? `Average duty ${toPercent(dEff, 3)}` : `d_eff ${toPercent(dEff, 3)}`}
-
-
-
-          </Badge>
-
-
-
-          <Badge className={`${zetaOk ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-300" : "border border-amber-500/40 bg-amber-500/10 text-amber-300"}`}>
-
-
-
-            {readMode ? `Ford-Roman ratio ${toFixed(zeta, 3)}` : `zeta ${toFixed(zeta, 3)}`}
-
-
-
-          </Badge>
-
-
-
-          <Badge className={`border ${averagingBadgeTone}`}>
-
-
-
-            {readMode ? `Timescale ${tsDisplay} / eps ${epsilonDisplay}` : `TS ${tsDisplay} / eps ${epsilonDisplay}`}
 
 
 
@@ -3197,7 +3279,7 @@ export default function DriveGuardsPanel() {
 
 
 
-              <h3 className="text-sm font-semibold text-slate-100">First-read ladder</h3>
+              <h3 className="text-sm font-semibold text-slate-100">First-read guide</h3>
 
 
 

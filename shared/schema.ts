@@ -181,6 +181,7 @@ export const vacuumGapSweepConfigSchema = z.object({
   base_f0_GHz: z.number().positive().optional(),
   T_K: z.number().positive().optional(),
   activeSlew: z.boolean().optional(),
+  twoPhase: z.boolean().optional(),
   slewDelayMs: z.number().nonnegative().optional(),
   hardwareProfile: z
     .object({

@@ -6,11 +6,15 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, type EnergyPipelineState as PipelineState } from "@/hooks/use-energy-pipeline";
-import type { SweepRuntime, SweepPoint } from "@shared/schema";
+import type { SweepRuntime, SweepPoint, VacuumGapSweepRow } from "@shared/schema";
+import { summarizeSweepGuard } from "@/lib/sweep-guards";
 
 type VacuumGapSweepHUDProps = {
   className?: string;
 };
+
+type SweepDisplayRow = SweepPoint | VacuumGapSweepRow;
+type MaybeSweepRow = SweepDisplayRow | null | undefined;
 
 const FALLBACK = "--";
 
@@ -37,12 +41,12 @@ function formatDegrees(value?: number | null): string {
   return `${Number(value).toFixed(2)} deg`;
 }
 
-function formatStatus(point: SweepPoint | null): string {
+function formatStatus(point: SweepDisplayRow | null): string {
   if (!point) return FALLBACK;
   return point.status ?? (point.stable ? "PASS" : "WARN");
 }
 
-function formatQuadrature(point: SweepPoint | null): string {
+function formatQuadrature(point: SweepDisplayRow | null): string {
   if (!point || !Number.isFinite(point.G)) return FALLBACK;
   const signed = formatSigned(point.G, 2, " dB");
   if (signed === FALLBACK) return signed;
@@ -62,7 +66,7 @@ function formatKappa(value?: number | null): string {
   return `${Number(value).toFixed(3)} MHz`;
 }
 
-function formatKappaEff(point: SweepPoint | null): string {
+function formatKappaEff(point: SweepDisplayRow | null): string {
   if (!point) return FALLBACK;
   const value = point.kappaEff_MHz;
   if (Number.isFinite(value) && Number(value) > 0) {
@@ -76,17 +80,37 @@ function formatRatio(value?: number | null): string {
   return Number(value).toFixed(3);
 }
 
+function coalesceSweepRows(primary: MaybeSweepRow, fallback: MaybeSweepRow): SweepDisplayRow | null {
+  if (!primary && !fallback) return null;
+  if (!primary) return (fallback ?? null) as SweepDisplayRow | null;
+  if (!fallback) return (primary ?? null) as SweepDisplayRow | null;
+
+  const base: Record<string, unknown> = {
+    ...(fallback as unknown as Record<string, unknown>),
+  };
+  Object.entries(primary as unknown as Record<string, unknown>).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      base[key] = value;
+    }
+  });
+  return base as unknown as SweepDisplayRow;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   RUNNING: "bg-emerald-500/20 text-emerald-300",
   STOPPING: "bg-amber-500/20 text-amber-300",
   CANCELLED: "bg-rose-500/20 text-rose-300",
   COMPLETE: "bg-cyan-500/20 text-cyan-300",
   IDLE: "bg-slate-700/40 text-slate-300",
+  PASS: "bg-emerald-500/20 text-emerald-200",
+  WARN: "bg-amber-500/20 text-amber-200",
+  UNSTABLE: "bg-rose-500/20 text-rose-200",
 };
 
 export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps) {
   const {
     data,
+    sweepResults,
     sweepResultsTotal,
     sweepResultsDropped,
     sweepResultsLimit,
@@ -94,7 +118,10 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
   const pipeline = data as PipelineState | undefined;
   const sweep = (pipeline?.sweep ?? null) as SweepRuntime | null;
   const top = Array.isArray(sweep?.top) ? (sweep?.top as SweepPoint[]) : [];
-  const rowsVisible = pipeline?.vacuumGapSweepResults?.length ?? 0;
+  const historyRows = Array.isArray(sweepResults)
+    ? (sweepResults as VacuumGapSweepRow[])
+    : [];
+  const rowsVisible = historyRows.length;
   const totalRows =
     typeof sweepResultsTotal === "number" ? sweepResultsTotal : rowsVisible;
   const droppedRows =
@@ -123,13 +150,32 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
     }
   }, [top]);
 
+  const renderRunSweepPrompt = () => {
+    const badgeClass = STATUS_STYLES.IDLE;
+    return (
+      <div className={cn("rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs", className)}>
+        <div className="flex items-center justify-between">
+          <div className="uppercase tracking-wide text-slate-400 text-[11px]">Vacuum-Gap Sweep</div>
+          <Badge className={cn("text-[11px] font-semibold", badgeClass)}>Awaiting Sweep</Badge>
+        </div>
+        <div className="mt-3 text-[11px] leading-relaxed text-slate-400">
+          Run <span className="text-slate-200 font-semibold">Run Sweep (HW Slew)</span> to populate this HUD with live telemetry.
+        </div>
+      </div>
+    );
+  };
+
+  if (!sweep) {
+    return renderRunSweepPrompt();
+  }
+
   const hasHistory =
-    (sweep?.iter ?? 0) > 0 ||
-    (sweep?.last != null) ||
+    (sweep.iter ?? 0) > 0 ||
+    sweep.last != null ||
     top.length > 0;
 
-  if (!sweep || (!sweep.active && !sweep.completedAt && !sweep.cancelled && !hasHistory)) {
-    return null;
+  if (!sweep.active && !sweep.completedAt && !sweep.cancelled && !hasHistory) {
+    return renderRunSweepPrompt();
   }
 
   const total = sweep.total ?? 0;
@@ -140,8 +186,22 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
       ? Math.max(0, Math.round(sweep.etaMs / 1000))
       : undefined;
 
-  const last = sweep.last ?? null;
+  const last = (sweep?.last ?? null) as SweepPoint | null;
   const best = top.length ? top[0] : null;
+  const latestHistoryRow: SweepDisplayRow | null = historyRows.length
+    ? historyRows[historyRows.length - 1]
+    : null;
+  const rowForMetrics: SweepDisplayRow | null =
+    // Prefer the measured history row so partially-populated sweep.last snapshots don't zero out fields mid-step.
+    coalesceSweepRows(latestHistoryRow, last) ??
+    (latestHistoryRow as SweepDisplayRow | null) ??
+    (last as SweepDisplayRow | null) ??
+    (best as SweepDisplayRow | null) ??
+    null;
+  const guardSummary = summarizeSweepGuard(rowForMetrics ?? best ?? null);
+
+  const statusValueRaw = formatStatus(rowForMetrics);
+  const statusValue = guardSummary && statusValueRaw === "UNSTABLE" ? "WARN" : statusValueRaw;
 
   let statusLabel = "IDLE";
   if (sweep.active) {
@@ -151,13 +211,21 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
   } else if (sweep.completedAt) {
     statusLabel = "COMPLETE";
   }
-  const badgeClass = STATUS_STYLES[statusLabel] ?? STATUS_STYLES.IDLE;
+  let displayStatusLabel = statusLabel;
+  if (displayStatusLabel === "IDLE") {
+    if (guardSummary) {
+      displayStatusLabel = "WARN";
+    } else if (statusValue && statusValue !== FALLBACK) {
+      displayStatusLabel = statusValue;
+    }
+  }
+  const badgeClass = STATUS_STYLES[displayStatusLabel] ?? STATUS_STYLES.IDLE;
 
   return (
     <div className={cn("rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs", className)}>
       <div className="flex items-center justify-between">
         <div className="uppercase tracking-wide text-slate-400 text-[11px]">Vacuum-Gap Sweep</div>
-        <Badge className={cn("text-[11px] font-semibold", badgeClass)}>{statusLabel}</Badge>
+        <Badge className={cn("text-[11px] font-semibold", badgeClass)}>{displayStatusLabel}</Badge>
       </div>
 
       <Progress className="mt-2" value={pct} />
@@ -168,27 +236,33 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
           {iter.toLocaleString()} / {total ? total.toLocaleString() : "?"}
         </div>
         <div>gap</div>
-        <div>{formatNumber(last?.d_nm, 0, " nm")}</div>
+        <div>{formatNumber(rowForMetrics?.d_nm, 0, " nm")}</div>
         <div>depth</div>
-        <div>{formatPercent(last?.m)}</div>
+        <div>{formatPercent(rowForMetrics?.m)}</div>
         <div>phase</div>
-        <div>{formatDegrees(last?.phi_deg)}</div>
+        <div>{formatDegrees(rowForMetrics?.phi_deg)}</div>
         <div>pump</div>
-        <div>{formatNumber(last?.Omega_GHz, 3, " GHz")}</div>
+        <div>{formatNumber(rowForMetrics?.Omega_GHz, 3, " GHz")}</div>
         <div>detune</div>
-        <div>{formatSigned(last?.detune_MHz, 3, " MHz")}</div>
+        <div>{formatSigned(rowForMetrics?.detune_MHz, 3, " MHz")}</div>
         <div>kappa</div>
-        <div>{formatKappa(last?.kappa_MHz)}</div>
+        <div>{formatKappa(rowForMetrics?.kappa_MHz)}</div>
         <div>kappa_eff</div>
-        <div>{formatKappaEff(last)}</div>
+        <div>{formatKappaEff(rowForMetrics)}</div>
         <div>rho (g/g_th)</div>
-        <div>{formatRatio(last?.pumpRatio)}</div>
+        <div>{formatRatio(rowForMetrics?.pumpRatio)}</div>
         <div>quadrature</div>
-        <div>{formatQuadrature(last)}</div>
+        <div>{formatQuadrature(rowForMetrics)}</div>
         <div>Q<sub>L</sub></div>
-        <div>{formatQL(last?.QL)}</div>
+        <div>{formatQL(rowForMetrics?.QL)}</div>
         <div>status</div>
-        <div>{formatStatus(last)}</div>
+        <div>{statusValue}</div>
+        {guardSummary ? (
+          <>
+            <div>guard</div>
+            <div className="text-amber-300">{guardSummary}</div>
+          </>
+        ) : null}
         <div>ETA</div>
         <div>
           {sweep.active

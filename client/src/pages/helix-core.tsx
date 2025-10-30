@@ -1,4 +1,4 @@
-// client/src/pages/helix-core.tsx
+﻿// client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
 import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu, AlertTriangle, Target, CheckCircle2, Video, Layers } from "lucide-react";
@@ -12,6 +12,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -20,15 +29,13 @@ import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, Mode
 import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
 import { useFractionalCoherence } from "@/hooks/useFractionalCoherence";
-import SnapshotProbe from '@/dev/SnapshotProbe';
-import DataNamesPanel from '@/dev/DataNamesPanel';
 import SpectrumTunerPanel from "@/components/SpectrumTunerPanel";
 import type { Provenance } from "@/components/SpectrumTunerPanel";
-import ParametricSweepPanel from "@/components/ParametricSweepPanel";
 import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
 import QiWidget from "@/components/QiWidget";
 import SectorLegend from "@/components/SectorLegend";
 import SectorRolesHud from "@/components/SectorRolesHud";
+import CavityMechanismPanel from "@/components/CavityMechanismPanel";
 import { PHASE_STREAK_BASE_HUE_DEG } from "@/constants/phase-streak";
 import usePhaseBridge from "@/hooks/use-phase-bridge";
 import NearZeroWidget from "@/components/NearZeroWidget";
@@ -42,6 +49,19 @@ import { downloadCSV } from "@/utils/csv";
 import { computeTidalEij, type V3 } from "@/lib/tidal";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
+import DeepMixingSolarView from "@/components/DeepMixingSolarView";
+import {
+  DeepMixingAutopilot,
+  DEEP_MIXING_AUTOPILOT_STATES,
+  DEEP_MIXING_DEFAULT_TELEMETRY,
+  DEEP_MIXING_TARGETS,
+  controlStep as deepMixingControlStep,
+  deltaTIndexFromValue,
+  vrSetpointForPreset,
+  DeepMixingAutopilotState,
+  DeepMixingTelemetry,
+  DeepMixingPreset,
+} from "@/lib/deepMixingPreset";
 
 type PumpStatus = "idle" | "ok" | "warn" | "hazard";
 
@@ -70,6 +90,17 @@ type PumpStability = {
 };
 
 const PUMP_PHASE_BIAS_KEY = "helix:pumpPhaseBiasDeg";
+
+const DEEP_MIXING_STATE_BADGE: Record<DeepMixingAutopilotState, string> = {
+  PLAN: "bg-cyan-500/20 text-cyan-200",
+  PROXOPS: "bg-amber-500/20 text-amber-200",
+  ACTUATE: "bg-emerald-500/20 text-emerald-200",
+  FEEDBACK: "bg-blue-500/20 text-blue-200",
+  SAFE: "bg-rose-500/20 text-rose-200",
+};
+
+const DEEP_MIXING_SECONDS_PER_YEAR = 365.25 * 86400;
+
 const clampPhaseBiasDeg = (value: number) => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(-10, Math.min(10, value));
@@ -696,9 +727,7 @@ import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/comp
 import AmplificationPanel from "@/components/AmplificationPanel";
 import { checkpoint } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
-import { PhysicsFieldSampler } from "@/components/PhysicsFieldSampler";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
-import { CurvatureKey } from "@/components/CurvatureKey";
 import { ShellOutlineVisualizer } from "@/components/ShellOutlineVisualizer";
 import LightSpeedStrobeScale from "@/components/LightSpeedStrobeScale";
 import HelixCasimirAmplifier from "@/components/HelixCasimirAmplifier";
@@ -794,6 +823,8 @@ function stats(arr: ArrayLike<number>) {
 }
 
 // Mainframe zones configuration
+const SHOW_LOG_TERMINAL = false;
+
 const MAINFRAME_ZONES = {
   TILE_GRID: "Casimir Tile Grid",
   ENERGY_PANEL: "Energy Control Panel",
@@ -1008,6 +1039,130 @@ useEffect(() => {
 
   const [optimisticMode, setOptimisticMode] = useState<ModeKey | null>(null);
   const [route, setRoute] = useState<string[]>(["SOL", "ORI_OB1", "VEL_OB2", "SOL"]);
+  const [deepMixingPlan, setDeepMixingPlan] = useState<DeepMixingPreset>(() => DeepMixingAutopilot);
+  const [deepMixingTargetIndex, setDeepMixingTargetIndex] = useState(() => deltaTIndexFromValue(DeepMixingAutopilot.targetDeltaT_Myr));
+  const [deepMixingState, setDeepMixingState] = useState<DeepMixingAutopilotState>("PLAN");
+  const [deepMixingTelemetry, setDeepMixingTelemetry] = useState<DeepMixingTelemetry>(DEEP_MIXING_DEFAULT_TELEMETRY);
+  const [enforceLuminosityGuard, setEnforceLuminosityGuard] = useState(true);
+  const [enforceHeAshGuard, setEnforceHeAshGuard] = useState(true);
+  const [deepMixingDocOpen, setDeepMixingDocOpen] = useState(false);
+  const deepMixingSequence = useMemo(() => DEEP_MIXING_AUTOPILOT_STATES.filter((state) => state !== "SAFE"), []);
+  const deepMixingControlPreview = useMemo(
+    () => deepMixingControlStep(deepMixingPlan, deepMixingTelemetry),
+    [deepMixingPlan, deepMixingTelemetry]
+  );
+  const deepMixingVrSetpoint = useMemo(() => vrSetpointForPreset(deepMixingPlan), [deepMixingPlan]);
+  const deepMixingMmPerYear = useMemo(
+    () => deepMixingVrSetpoint * DEEP_MIXING_SECONDS_PER_YEAR * 1000,
+    [deepMixingVrSetpoint]
+  );
+  const deepMixingFleetTotals = useMemo(() => {
+    const total = deepMixingPlan.fleet.actuators + deepMixingPlan.fleet.diagnostics;
+    if (total <= 0) {
+      return { total: 0, actuatorsPct: 0, diagnosticsPct: 0, idlePct: 100 };
+    }
+    const actuatorsPct = (deepMixingPlan.fleet.actuators / total) * 100;
+    const diagnosticsPct = (deepMixingPlan.fleet.diagnostics / total) * 100;
+    const idlePct = Math.max(0, 100 - actuatorsPct - diagnosticsPct);
+    return { total, actuatorsPct, diagnosticsPct, idlePct };
+  }, [deepMixingPlan.fleet.actuators, deepMixingPlan.fleet.diagnostics]);
+  const deepMixingLumFraction = useMemo(() => {
+    const guard = deepMixingPlan.guardrails.dLogL_per_Myr_max;
+    if (!Number.isFinite(guard) || guard <= 0) return null;
+    return deepMixingTelemetry.dLogL_per_Myr / guard;
+  }, [deepMixingPlan.guardrails.dLogL_per_Myr_max, deepMixingTelemetry.dLogL_per_Myr]);
+  const deepMixingTcFraction = useMemo(() => {
+    const guard = deepMixingPlan.guardrails.dLogTc_per_Myr_max;
+    if (!Number.isFinite(guard) || guard <= 0) return null;
+    return deepMixingTelemetry.dLogTc_per_Myr / guard;
+  }, [deepMixingPlan.guardrails.dLogTc_per_Myr_max, deepMixingTelemetry.dLogTc_per_Myr]);
+  const deepMixingProjectedDeltaTLabel = useMemo(() => {
+    if (deepMixingPlan.targetDeltaT_Myr >= 1000) {
+      return `${(deepMixingPlan.targetDeltaT_Myr / 1000).toFixed(2)} Gyr`;
+    }
+    if (deepMixingPlan.targetDeltaT_Myr >= 100) {
+      return `${(deepMixingPlan.targetDeltaT_Myr / 1000).toFixed(2)} Gyr`;
+    }
+    return `${deepMixingPlan.targetDeltaT_Myr.toFixed(0)} Myr`;
+  }, [deepMixingPlan.targetDeltaT_Myr]);
+  const updateDeepMixingGuardrails = useCallback(
+    (luminosity: boolean, heAsh: boolean) => {
+      setDeepMixingPlan((prev) => ({
+        ...prev,
+        guardrails: {
+          ...prev.guardrails,
+          dLogL_per_Myr_max: luminosity ? DeepMixingAutopilot.guardrails.dLogL_per_Myr_max : Number.POSITIVE_INFINITY,
+          dLogTc_per_Myr_max: heAsh ? DeepMixingAutopilot.guardrails.dLogTc_per_Myr_max : Number.POSITIVE_INFINITY,
+        },
+      }));
+    },
+    []
+  );
+  const handleDeepMixingTargetChange = useCallback((index: number) => {
+    const safeIndex = Math.max(0, Math.min(DEEP_MIXING_TARGETS.length - 1, Math.round(index)));
+    const option = DEEP_MIXING_TARGETS[safeIndex];
+    setDeepMixingTargetIndex(option.index);
+    setDeepMixingPlan((prev) => ({
+      ...prev,
+      targetDeltaT_Myr: option.deltaT_Myr,
+      epsilon: option.epsilon,
+    }));
+  }, []);
+  const advanceDeepMixingState = useCallback(() => {
+    setDeepMixingState((current) => {
+      if (!deepMixingSequence.length) return current;
+      if (current === "SAFE") return deepMixingSequence[0];
+      const idx = deepMixingSequence.indexOf(current);
+      if (idx === -1) return deepMixingSequence[0];
+      const next = deepMixingSequence[(idx + 1) % deepMixingSequence.length];
+      return next;
+    });
+  }, [deepMixingSequence]);
+  const handleApplyDeepMixingTrim = useCallback(() => {
+    setDeepMixingPlan((prev) => ({
+      ...prev,
+      duty: Number(deepMixingControlPreview.duty.toFixed(3)),
+      cadenceDays: Number(deepMixingControlPreview.cadenceDays.toFixed(2)),
+    }));
+    if (deepMixingControlPreview.enteredSafe) {
+      setDeepMixingState("SAFE");
+    } else if (deepMixingState === "PLAN") {
+      setDeepMixingState("PROXOPS");
+    }
+  }, [deepMixingControlPreview, deepMixingState]);
+  const deepMixingTelemetryScenarios = useMemo(() => {
+    const guardLum =
+      Number.isFinite(deepMixingPlan.guardrails.dLogL_per_Myr_max) && deepMixingPlan.guardrails.dLogL_per_Myr_max > 0
+        ? deepMixingPlan.guardrails.dLogL_per_Myr_max
+        : 1e-3;
+    const guardTc =
+      Number.isFinite(deepMixingPlan.guardrails.dLogTc_per_Myr_max) && deepMixingPlan.guardrails.dLogTc_per_Myr_max > 0
+        ? deepMixingPlan.guardrails.dLogTc_per_Myr_max
+        : 1e-3;
+    return {
+      nominal: {
+        dLogL_per_Myr: guardLum * 0.2,
+        dLogTc_per_Myr: guardTc * 0.18,
+        seismicGrowth: -0.02,
+        neutrinoDelta: -2e-4,
+        achievedEpsilon: deepMixingPlan.epsilon * 0.95,
+      },
+      guardrail: {
+        dLogL_per_Myr: guardLum * 1.4,
+        dLogTc_per_Myr: guardTc * 1.35,
+        seismicGrowth: 0.05,
+        neutrinoDelta: 0.0025,
+        achievedEpsilon: deepMixingPlan.epsilon * 0.98,
+      },
+      boost: {
+        dLogL_per_Myr: guardLum * 0.7,
+        dLogTc_per_Myr: guardTc * 0.65,
+        seismicGrowth: -0.01,
+        neutrinoDelta: -6e-4,
+        achievedEpsilon: deepMixingPlan.epsilon * 0.72,
+      },
+    };
+  }, [deepMixingPlan.epsilon, deepMixingPlan.guardrails.dLogL_per_Myr_max, deepMixingPlan.guardrails.dLogTc_per_Myr_max]);
 
   // Fade memory for trailing glow (per-sector intensity 0..1)
   const [trail, setTrail] = useState<number[]>(() => Array(400).fill(0));
@@ -1255,6 +1410,18 @@ useEffect(() => {
 
   const { data: pipelineSnapshot, sweepResults = [], publishSweepControls } = useEnergyPipeline();
   const sweepRuntime = (pipelineSnapshot as any)?.sweep as SweepRuntime | undefined;
+  const hasSweepTelemetry = Boolean(
+    (sweepResults?.length ?? 0) > 0 ||
+      (sweepRuntime?.iter ?? 0) > 0 ||
+      sweepRuntime?.completedAt ||
+      sweepRuntime?.active ||
+      (sweepRuntime?.top?.length ?? 0) > 0 ||
+      sweepRuntime?.last,
+  );
+  const sweepButtonsLocked = !hasSweepTelemetry;
+  const startTimeLapseDisabled =
+    timeLapseRecorder.isProcessing ||
+    (!timeLapseRecorder.isRecording && sweepButtonsLocked);
   const sweepActive = !!sweepRuntime?.active;
   const sweepCancelRequested = !!sweepRuntime?.cancelRequested;
   const [sweepTopN, setSweepTopN] = useState<number>(8);
@@ -1492,7 +1659,7 @@ useEffect(() => {
   }, [sweepResults, sweepTopN]);
 
   const runSweepWithHardware = useCallback(() => {
-    const payload = { sweep: { activeSlew: true } } as Partial<DynamicConfig>;
+    const payload = { sweep: { activeSlew: true, twoPhase: true } } as Partial<DynamicConfig>;
     publishSweepControls(payload);
   }, [publishSweepControls]);
 
@@ -2501,7 +2668,7 @@ useEffect(() => {
                 </div>
                 <div className="mt-1 text-[10px] text-slate-400">
                   {timeLapseRecorder.isProcessing
-                    ? "Finalizing video…"
+                    ? "Finalizing videoâ€¦"
                     : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
                 </div>
               </div>
@@ -2562,7 +2729,18 @@ useEffect(() => {
                 I<sub>GR</sub> oranges and blues&mdash;letting you see expansion and contraction zones light up in real time.
               </CardDescription>
             </CardHeader>
-            <CardContent className={timeLapseUnlocked ? "space-y-4" : "py-6"}>
+            <CardContent className={timeLapseUnlocked ? "space-y-4" : "space-y-4 py-6"}>
+              {!hasSweepTelemetry && (
+                <div className="flex items-start gap-3 rounded border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-xs text-cyan-100">
+                  <Gauge className="mt-0.5 h-4 w-4 text-cyan-300" />
+                  <div className="space-y-1">
+                    <p className="font-semibold text-cyan-200">Run Sweep (HW Slew) before capturing.</p>
+                    <p className="text-slate-200">
+                      Kick off the vacuum-gap sweep to seed the SWEEP HUD telemetry that the time-lapse capture overlays frame by frame.
+                    </p>
+                  </div>
+                </div>
+              )}
               {timeLapseUnlocked ? (
                 <>
                   <div className="flex flex-wrap items-center gap-3">
@@ -2575,14 +2753,15 @@ useEffect(() => {
                             : "secondary"
                       }
                       onClick={() => {
+                        if (!timeLapseRecorder.isRecording && sweepButtonsLocked) return;
                         if (timeLapseRecorder.isRecording) {
                           void timeLapseRecorder.stop();
                         } else if (!timeLapseRecorder.isProcessing) {
                           void timeLapseRecorder.start();
                         }
                       }}
-                      className="flex items-center gap-2"
-                      disabled={timeLapseRecorder.isProcessing}
+                      className="flex items-center gap-2 disabled:bg-slate-900 disabled:text-slate-600 disabled:border-slate-800 disabled:shadow-none"
+                      disabled={startTimeLapseDisabled}
                     >
                       <Video className="w-4 h-4" />
                       {timeLapseRecorder.isRecording
@@ -2596,9 +2775,13 @@ useEffect(() => {
                     </div>
                     <Button
                       variant={showSweepHud ? "default" : "outline"}
-                      onClick={() => setShowSweepHud((prev) => !prev)}
-                      className="flex items-center gap-2"
+                      onClick={() => {
+                        if (sweepButtonsLocked) return;
+                        setShowSweepHud((prev) => !prev);
+                      }}
+                      className="flex items-center gap-2 disabled:bg-slate-900 disabled:text-slate-600 disabled:border-slate-800 disabled:shadow-none"
                       aria-pressed={showSweepHud}
+                      disabled={sweepButtonsLocked}
                     >
                       <Layers className="w-4 h-4" />
                       {showSweepHud ? "SWEEP HUD On" : "SWEEP HUD"}
@@ -2658,11 +2841,10 @@ useEffect(() => {
                 <div className="flex items-start gap-3 rounded border border-slate-800 bg-slate-900/60 px-4 py-3 text-xs text-slate-300">
                   <Video className="mt-0.5 h-4 w-4 text-cyan-400" />
                   <div className="space-y-2">
-                    <p className="font-semibold text-slate-200">
-                      Time-lapse capture is available in {"\u03B8"} (Hull 3D) mode.
-                    </p>
+                    <p className="font-semibold text-slate-200">Time-lapse capture is available in {"\u03B8"} (Hull 3D) mode.</p>
                     <p className="text-slate-400">
-                      Switch the metric viewer above to {"\u03B8"} (Hull 3D) to prepare the 3D renderer before starting a scripted capture.
+                      Switch the metric viewer above to {"\u03B8"} (Hull 3D) and run <span className="text-slate-200 font-semibold">Run Sweep (HW Slew)</span> in the
+                      Vacuum-Gap panel before starting the scripted capture so the SWEEP HUD feeds real telemetry during the demo.
                     </p>
                   </div>
                 </div>
@@ -3059,7 +3241,7 @@ useEffect(() => {
 
           {/* ====== SECONDARY GRID (rest of the panels) ====== */}
           <div className="grid grid-cols-1 gap-4">
-            {/* Left column: Compliance, Amplification, Shift Vector */}
+            {/* Left column: Compliance, Quantum Inequality, Amplification, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
               <Card className="bg-slate-900/50 border-slate-800">
@@ -3160,11 +3342,17 @@ useEffect(() => {
                 </CardContent>
               </Card>
 
+              {/* Quantum Inequality panel and visual */}
+              <div className="space-y-3">
+                <QiWidget />
+                <div className="flex flex-col items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/60 p-3">
+                  <SectorLegend />
+                  <SectorRolesHud size={360} ringWidth={32} showQiWindow />
+                </div>
+              </div>
+
               {/* Amplification Panel */}
               <AmplificationPanel readOnly />
-
-              {/* Curvature Key */}
-              <CurvatureKey />
 
               {/* Shift Vector  Interior Gravity */}
               <ShiftVectorPanel
@@ -3233,9 +3421,6 @@ useEffect(() => {
                 />
               )}
 
-              {/* Physics Field Sampler for Validation */}
-              <PhysicsFieldSampler />
-
               {/* Resonance Scheduler (auto, mode-coupled) */}
               <ResonanceSchedulerTile
                 mode={effectiveMode}
@@ -3254,7 +3439,6 @@ useEffect(() => {
               {/* ===== Green's Potential ( = G * )  Live Panel ===== */}
               <GreensLivePanel />
               <SpectrumTunerPanel inputs={spectrumInputs} />
-              <ParametricSweepPanel />
               {/* Vacuum-gap Sweep card */}
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="pb-3">
@@ -3442,11 +3626,7 @@ useEffect(() => {
                       </div>
                     </div>
                   ) : null}
-                  <QiWidget className="mt-3" />
-                  <div className="mt-3 flex flex-col items-center gap-2">
-                    <SectorLegend />
-                    <SectorRolesHud size={360} ringWidth={32} showQiWindow />
-                  </div>
+                  <CavityMechanismPanel className="mt-3" />
                   <VacuumGapSweepHUD className="mt-2" />
                   <ScrollArea className="w-full">
                     <div className="min-w-[680px]">
@@ -3479,108 +3659,126 @@ useEffect(() => {
                     </div>
                   ) : null}
                   <SweepReplayControls rows={sweepResults} onStep={(row) => setSelectedSweep(row)} />
-                </CardContent>
-              </Card>
-              {/* Log + Document Terminal */}
-              <Card className="bg-slate-900/50 border-slate-800">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Terminal className="w-5 h-5 text-orange-400" />
-                    {MAINFRAME_ZONES.LOG_TERMINAL}
-                  </CardTitle>
-                  <CardDescription>Mainframe command interface</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Tabs defaultValue="chat" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="chat">AI Chat</TabsTrigger>
-                      <TabsTrigger value="logs">System Logs</TabsTrigger>
-                    </TabsList>
+              </CardContent>
+            </Card>
+            {/* ====== CASIMIR AMPLIFIER: Complete Physics Pipeline Visualization ====== */}
+            <div className="mt-8">
+              <HelixCasimirAmplifier
+                readOnly
+                cohesive={false}
+                showDisplacementField={false}
+                metricsEndpoint="/api/helix/metrics"
+                stateEndpoint="/api/helix/pipeline"
+                fieldEndpoint="/api/helix/displacement"
+                modeEndpoint="/api/helix/mode"
+                lightCrossing={lc}
+              />
+            </div>
+            {SHOW_LOG_TERMINAL && (
+              <>
+                {/* Log + Document Terminal */}
+                <Card className="bg-slate-900/50 border-slate-800">
+                  <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Terminal className="w-5 h-5 text-orange-400" />
+                        {MAINFRAME_ZONES.LOG_TERMINAL}
+                      </CardTitle>
+                      <CardDescription>Mainframe command interface</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <Tabs defaultValue="chat" className="w-full">
+                        <TabsList className="grid w-full grid-cols-2">
+                          <TabsTrigger value="chat">AI Chat</TabsTrigger>
+                          <TabsTrigger value="logs">System Logs</TabsTrigger>
+                        </TabsList>
 
-                    <TabsContent value="chat" className="space-y-3">
-                      <ScrollArea className="h-64 bg-slate-950 rounded-lg p-3" ref={scrollRef}>
-                        <div className="space-y-3">
-                          {chatMessages.map((msg, i) => (
-                            <div key={i} className={`space-y-1 ${msg.role === "user" ? "text-right" : ""}`}>
-                              <div
-                                className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
-                                  msg.role === "user"
-                                    ? "bg-cyan-600/20 text-cyan-100"
-                                    : msg.role === "system"
-                                    ? "bg-purple-600/20 text-purple-100"
-                                    : "bg-slate-800 text-slate-100"
-                                }`}
-                              >
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
-                    {msg.functionCall && (
-                                  <div className="mt-2 pt-2 border-t border-slate-700 text-xs">
-                                    <p className="text-yellow-400">Function: {msg.functionCall.name}</p>
-                                    <pre className="mt-1 text-slate-300">{JSON.stringify(msg.functionCall.result, null, 2)}</pre>
+                        <TabsContent value="chat" className="space-y-3">
+                          <ScrollArea className="h-64 bg-slate-950 rounded-lg p-3" ref={scrollRef}>
+                            <div className="space-y-3">
+                              {chatMessages.map((msg, i) => (
+                                <div key={i} className={`space-y-1 ${msg.role === "user" ? "text-right" : ""}`}>
+                                  <div
+                                    className={`inline-block max-w-[80%] p-3 rounded-lg text-sm ${
+                                      msg.role === "user"
+                                        ? "bg-cyan-600/20 text-cyan-100"
+                                        : msg.role === "system"
+                                        ? "bg-purple-600/20 text-purple-100"
+                                        : "bg-slate-800 text-slate-100"
+                                    }`}
+                                  >
+                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    {msg.functionCall && (
+                                      <div className="mt-2 pt-2 border-t border-slate-700 text-xs">
+                                        <p className="text-yellow-400">Function: {msg.functionCall.name}</p>
+                                        <pre className="mt-1 text-slate-300">{JSON.stringify(msg.functionCall.result, null, 2)}</pre>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                      <div className="text-xs text-slate-500">{formatMsgTime(msg.timestamp)}</div>
+                                  <div className="text-xs text-slate-500">{formatMsgTime(msg.timestamp)}</div>
+                                </div>
+                              ))}
+                              {isProcessing && (
+                                <div className="text-center">
+                                  <Badge variant="outline" className="animate-pulse">
+                                    <Cpu className="w-3 h-3 mr-1" />
+                                    Processing...
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
-                          ))}
-                          {isProcessing && (
-                            <div className="text-center">
-                              <Badge variant="outline" className="animate-pulse">
-                                <Cpu className="w-3 h-3 mr-1" />
-                                Processing...
-                              </Badge>
+                          </ScrollArea>
+
+                          <div className="flex gap-2">
+                            <Input
+                              value={commandInput}
+                              onChange={(e) => setCommandInput(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && sendCommand()}
+                              placeholder="Ask HELIX-CORE..."
+                              className="bg-slate-950 border-slate-700 text-slate-100"
+                              disabled={isProcessing}
+                            />
+                            <Button onClick={sendCommand} disabled={isProcessing || !commandInput.trim()} className="bg-cyan-600 hover:bg-cyan-700">
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="logs" className="space-y-3">
+                          <ScrollArea className="h-64 bg-slate-950 rounded-lg p-3">
+                            <div className="font-mono text-xs space-y-1">
+                              {mainframeLog.map((log, i) => (
+                                <div
+                                  key={i}
+                                  className={
+                                    log.includes("[FUNCTION]")
+                                      ? "text-yellow-400"
+                                      : log.includes("[RESULT]")
+                                      ? "text-purple-400"
+                                      : log.includes("[TILE]")
+                                      ? "text-cyan-400"
+                                      : log.includes("[DATA]")
+                                      ? "text-blue-400"
+                                      : log.includes("[LOCK]")
+                                      ? "text-rose-400"
+                                      : log.includes("[ENGINE]")
+                                      ? "text-amber-400"
+                                      : "text-green-400"
+                                  }
+                                >
+                                  {log}
+                                </div>
+                              ))}
                             </div>
-                          )}
-                        </div>
-                      </ScrollArea>
+                          </ScrollArea>
+                        </TabsContent>
+                      </Tabs>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
 
-                      <div className="flex gap-2">
-                        <Input
-                          value={commandInput}
-                          onChange={(e) => setCommandInput(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && sendCommand()}
-                          placeholder="Ask HELIX-CORE..."
-                          className="bg-slate-950 border-slate-700 text-slate-100"
-                          disabled={isProcessing}
-                        />
-                        <Button onClick={sendCommand} disabled={isProcessing || !commandInput.trim()} className="bg-cyan-600 hover:bg-cyan-700">
-                          <Send className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="logs" className="space-y-3">
-                      <ScrollArea className="h-64 bg-slate-950 rounded-lg p-3">
-                        <div className="font-mono text-xs space-y-1">
-                          {mainframeLog.map((log, i) => (
-                            <div
-                              key={i}
-                              className={
-                                log.includes("[FUNCTION]")
-                                  ? "text-yellow-400"
-                                  : log.includes("[RESULT]")
-                                  ? "text-purple-400"
-                                  : log.includes("[TILE]")
-                                  ? "text-cyan-400"
-                                  : log.includes("[DATA]")
-                                  ? "text-blue-400"
-                                  : log.includes("[LOCK]")
-                                  ? "text-rose-400"
-                                  : log.includes("[ENGINE]")
-                                  ? "text-amber-400"
-                                  : "text-green-400"
-                              }
-                            >
-                              {log}
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </TabsContent>
-                  </Tabs>
-                </CardContent>
-              </Card>
-
-              {/* Operations Toolbar (moved here) */}
+              {/* Operations Toolbar (hidden) */}
+              {false && (
               <Card className="bg-slate-900/50 border-slate-800">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
@@ -3733,6 +3931,7 @@ useEffect(() => {
                   </div>
                 </CardContent>
               </Card>
+              )}
 
               {/* Mission Fuel / Range Gauge */}
               <FuelGauge
@@ -4020,150 +4219,200 @@ useEffect(() => {
                       } as HelixPerf
                     }
                   />
+                  {mapMode === "solar" && (
+                    <div className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/70 p-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-cyan-200">Deep Mixing (Sun) â€” Autopilot</div>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Slow, distributed wave-driven circulation at the tachocline. Fleet ships act as timed actuators and diagnostics.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={`text-[11px] font-semibold ${DEEP_MIXING_STATE_BADGE[deepMixingState]}`}>
+                            {deepMixingState}
+                          </Badge>
+                          <Dialog open={deepMixingDocOpen} onOpenChange={setDeepMixingDocOpen}>
+                            <DialogTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="text-cyan-300 hover:text-cyan-100"
+                                title="Learn the physics"
+                              >
+                                <HelpCircle className="h-4 w-4" />
+                                <span className="sr-only">Learn the physics</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl">
+                              <DialogHeader>
+                                <DialogTitle>Deep Mixing (Sun) â€” Autopilot</DialogTitle>
+                                <DialogDescription>
+                                  Mission deck and guardrails for the tachocline circulation preset.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <div className="h-[65vh] overflow-hidden rounded border border-slate-800">
+                                <iframe
+                                  title="Deep Mixing plan"
+                                  src="/docs/deep-mixing-plan.html"
+                                  className="h-full w-full bg-black"
+                                  loading="lazy"
+                                />
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] font-semibold uppercase text-slate-400">
+                          Lifetime Gain Target
+                        </Label>
+                        <Slider
+                          value={[deepMixingTargetIndex]}
+                          min={0}
+                          max={DEEP_MIXING_TARGETS.length - 1}
+                          step={1}
+                          onValueChange={(value) => handleDeepMixingTargetChange(value[0] ?? deepMixingTargetIndex)}
+                          className="mt-3"
+                          aria-label="Lifetime gain target"
+                        />
+                        <div className="mt-2 flex justify-between text-[11px] text-slate-400">
+                          {DEEP_MIXING_TARGETS.map((option) => (
+                            <span
+                              key={option.index}
+                              className={option.index === deepMixingTargetIndex ? "text-cyan-300 font-medium" : undefined}
+                            >
+                              {option.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="flex items-center justify-between rounded border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+                          <div>
+                            <div className="text-[11px] font-medium text-slate-200">Luminosity guardrail</div>
+                            <div className="text-[10px] text-slate-400">â‰¤0.1% per Myr</div>
+                          </div>
+                          <Switch
+                            checked={enforceLuminosityGuard}
+                            onCheckedChange={(checked) => {
+                              setEnforceLuminosityGuard(checked);
+                              updateDeepMixingGuardrails(checked, enforceHeAshGuard);
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between rounded border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+                          <div>
+                            <div className="text-[11px] font-medium text-slate-200">He-ash export cap</div>
+                            <div className="text-[10px] text-slate-400">Hold delta T / T within guard</div>
+                          </div>
+                          <Switch
+                            checked={enforceHeAshGuard}
+                            onCheckedChange={(checked) => {
+                              setEnforceHeAshGuard(checked);
+                              updateDeepMixingGuardrails(enforceLuminosityGuard, checked);
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+                        <div className="overflow-hidden rounded-md border border-slate-800/70 bg-black/40">
+                          <DeepMixingSolarView ringSegments={720} phasingMarkers={16} routeIds={["SUN"]} />
+                        </div>
+                        <div className="space-y-3 text-[11px] text-slate-300">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono">
+                            <span>Îµ target</span>
+                            <span>{deepMixingPlan.epsilon.toExponential(2)}</span>
+                            <span>Îµ achieved</span>
+                            <span>
+                              {deepMixingTelemetry.achievedEpsilon > 0
+                                ? deepMixingTelemetry.achievedEpsilon.toExponential(2)
+                                : "â€”"}
+                            </span>
+                            <span>vr setpoint</span>
+                            <span>
+                              {Number.isFinite(deepMixingMmPerYear)
+                                ? `${deepMixingMmPerYear.toFixed(2)} mm/yr`
+                                : "â€”"}
+                            </span>
+                            <span>pulse cadence</span>
+                            <span>{deepMixingPlan.cadenceDays.toFixed(2)} d</span>
+                            <span>duty phase</span>
+                            <span>{(deepMixingPlan.duty * 100).toFixed(1)} %</span>
+                            <span>delta L guard</span>
+                            <span>
+                              {deepMixingLumFraction != null
+                                ? `${Math.max(0, deepMixingLumFraction * 100).toFixed(1)} % cap`
+                                : "off"}
+                            </span>
+                            <span>delta Tc guard</span>
+                            <span>
+                              {deepMixingTcFraction != null
+                                ? `${Math.max(0, deepMixingTcFraction * 100).toFixed(1)} % cap`
+                                : "off"}
+                            </span>
+                            <span>Fleet split</span>
+                            <span>
+                              {deepMixingFleetTotals.total > 0
+                                ? `${deepMixingFleetTotals.actuatorsPct.toFixed(0)}% act / ${deepMixingFleetTotals.diagnosticsPct.toFixed(
+                                    0
+                                  )}% diag / ${deepMixingFleetTotals.idlePct.toFixed(0)}% idle`
+                                : "configure"}
+                            </span>
+                            <span>Projected delta t</span>
+                            <span>{deepMixingProjectedDeltaTLabel}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeepMixingTelemetry({ ...deepMixingTelemetryScenarios.nominal })}
+                            >
+                              Nominal telemetry
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeepMixingTelemetry({ ...deepMixingTelemetryScenarios.guardrail })}
+                            >
+                              Guardrail breach
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeepMixingTelemetry({ ...deepMixingTelemetryScenarios.boost })}
+                            >
+                              Build epsilon
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" onClick={advanceDeepMixingState}>
+                              Advance state
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setDeepMixingState("SAFE")}>
+                              Stand down
+                            </Button>
+                            <Button size="sm" variant="secondary" onClick={handleApplyDeepMixingTrim}>
+                              Apply control trim
+                            </Button>
+                          </div>
+                          <div className="rounded border border-slate-800/60 bg-slate-900/40 px-3 py-2 text-[10px] text-slate-400">
+                            Next trim -&gt; duty {(deepMixingControlPreview.duty * 100).toFixed(1)} %, cadence{" "}
+                            {deepMixingControlPreview.cadenceDays.toFixed(2)} d{" "}
+                            {deepMixingControlPreview.enteredSafe ? "(SAFE posture recommended)" : ""}
+                          </div>
+                          <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                            sequence: {deepMixingSequence.join(" -> ")} -&gt; SAFE
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            </div>
-          </div>
-
-          {/* ====== CASIMIR AMPLIFIER: Complete Physics Pipeline Visualization ====== */}
-          <div className="mt-8">
-            <HelixCasimirAmplifier
-              readOnly
-              cohesive={false}
-              metricsEndpoint="/api/helix/metrics"
-              stateEndpoint="/api/helix/pipeline"
-              fieldEndpoint="/api/helix/displacement"
-              modeEndpoint="/api/helix/mode"
-              lightCrossing={lc}
-            />
-          </div>
-
-          {/* Warp Engine Visualization */}
-          <div className="bg-card border rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Atom className="w-5 h-5" />
-              Warp Field Visualization
-            </h2>
-            <p className="text-xs text-slate-400 mb-4">
-              Warp engine idle &mdash; rerouting panel to the Metric Amplification Pocket diagnostic.
-            </p>
-            {(() => {
-              const rawUniforms = (systemMetrics as any)?.warpUniforms;
-              const pipelineAny = pipeline as any;
-              const pickNumber = (...values: unknown[]) => {
-                for (const value of values) {
-                  const num = Number(value);
-                  if (Number.isFinite(num)) return num;
-                }
-                return undefined;
-              };
-              const deriveDuty = (source: any) => {
-                if (!source || typeof source !== "object") return undefined;
-                const sectorsTotal = pickNumber(
-                  source?.sectorsTotal,
-                  source?.sectorCount,
-                  source?.totalSectors,
-                  source?.lightCrossing?.sectorCount,
-                  source?.lightCrossing?.sectorsTotal
-                );
-                const sectorsLive = pickNumber(
-                  source?.sectorsConcurrent,
-                  source?.sectorStrobing,
-                  source?.activeSectors,
-                  source?.lightCrossing?.activeSectors
-                );
-                const localBurst = pickNumber(
-                  source?.localBurstFrac,
-                  source?.burstFraction,
-                  source?.dutyCycle
-                );
-                if (
-                  sectorsTotal !== undefined &&
-                  sectorsLive !== undefined &&
-                  localBurst !== undefined
-                ) {
-                  const total = Math.max(1, Math.round(sectorsTotal));
-                  const live = Math.max(1, Math.round(sectorsLive));
-                  const burst = Math.max(0, Math.min(1, Number(localBurst)));
-                  return Math.max(0, Math.min(1, burst * (live / total)));
-                }
-                return undefined;
-              };
-
-              const gammaGeoSafe = Math.max(
-                1,
-                pickNumber(
-                  pipeline?.gammaGeo,
-                  rawUniforms?.gammaGeo,
-                  rawUniforms?.gammaGeo_avg
-                ) ?? 26
-              );
-              const qSafe = Math.max(
-                1e-12,
-                pickNumber(
-                  pipeline?.qSpoilingFactor,
-                  pipelineAny?.deltaAOverA,
-                  pipeline?.qCavity,
-                  rawUniforms?.qSpoilingFactor,
-                  rawUniforms?.deltaAOverA,
-                  rawUniforms?.qCavity
-                ) ?? 1
-              );
-              const gammaVdBSafe = Math.max(
-                1,
-                pickNumber(
-                  pipeline?.gammaVanDenBroeck_vis,
-                  pipeline?.gammaVanDenBroeck,
-                  pipelineAny?.gammaVdB,
-                  rawUniforms?.gammaVanDenBroeck_vis,
-                  rawUniforms?.gammaVanDenBroeck,
-                  rawUniforms?.gammaVdB
-                ) ?? 1
-              );
-              const dutySafe = Math.max(
-                1e-12,
-                pickNumber(
-                  dutyEffectiveFR_safe,
-                  pipeline?.dutyEffectiveFR,
-                  rawUniforms?.dutyEffectiveFR,
-                  rawUniforms?.dFR
-                ) ??
-                  deriveDuty(rawUniforms) ??
-                  deriveDuty(pipelineAny) ??
-                  1e-12
-              );
-              const viewAvgSafe =
-                typeof pipelineAny?.viewAvg === "boolean"
-                  ? Boolean(pipelineAny.viewAvg)
-                  : typeof rawUniforms?.viewAvg === "boolean"
-                    ? Boolean(rawUniforms.viewAvg)
-                    : true;
-
-              return (
-                <MetricAmplificationPocket
-                  className="rounded-md overflow-hidden border border-slate-800/40 bg-slate-950/60"
-                  gammaGeo={gammaGeoSafe}
-                  q={qSafe}
-                  gammaVdB_vis={gammaVdBSafe}
-                  dFR={dutySafe}
-                  viewAvg={viewAvgSafe}
-                  height={380}
-                />
-              );
-            })()}
-          </div>
         </div>
       </div>
-      {/* --- Dev-only: end-to-end snapshot visibility (server  adapter  engine) --- */}
-      {import.meta.env.DEV && (
-        <div className="mt-8">
-          <SnapshotProbe />
         </div>
-      )}
-
-      {/* Data Names/DAG panel - visible in all builds */}
-      <div className="mt-6">
-        <DataNamesPanel />
       </div>
     </TooltipProvider>
   );

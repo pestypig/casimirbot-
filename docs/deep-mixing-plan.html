@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solar Deep-Mixing Plan</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #070b1d;
+        --bg-alt: rgba(26, 35, 58, 0.65);
+        --bg-card: rgba(10, 15, 30, 0.78);
+        --text: #f2f6ff;
+        --text-muted: rgba(242, 246, 255, 0.78);
+        --accent: #f8c15c;
+        --accent-soft: rgba(248, 193, 92, 0.16);
+        --border: rgba(142, 155, 195, 0.32);
+        --code-bg: rgba(18, 24, 46, 0.85);
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+          "Helvetica Neue", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(248, 193, 92, 0.08), transparent 55%),
+          linear-gradient(180deg, rgba(10, 15, 30, 0.92) 0%, rgba(3, 5, 15, 1) 100%);
+        color: var(--text);
+        line-height: 1.65;
+        padding-bottom: 5rem;
+      }
+
+      header {
+        background: linear-gradient(160deg, rgba(10, 10, 25, 0.8), rgba(17, 25, 48, 0.35));
+        padding: clamp(3rem, 5vw, 4.5rem) clamp(1.5rem, 6vw, 4rem);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        border-bottom: 1px solid var(--border);
+      }
+
+      header::after {
+        content: "";
+        position: absolute;
+        inset: -10% 10% auto;
+        height: clamp(12rem, 40vw, 22rem);
+        background: radial-gradient(circle, rgba(248, 193, 92, 0.3), transparent 65%);
+        z-index: 0;
+        opacity: 0.6;
+      }
+
+      .header-content {
+        position: relative;
+        z-index: 1;
+        max-width: 780px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: clamp(2.4rem, 5vw, 3.75rem);
+        margin-bottom: 1rem;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
+      }
+
+      .tagline {
+        font-size: clamp(1.1rem, 2vw, 1.35rem);
+        color: var(--text-muted);
+        margin: 0 auto 1.75rem;
+        max-width: 620px;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: clamp(1rem, 2.5vw, 1.75rem);
+        margin: clamp(2.5rem, 5vw, 3.5rem) auto 0;
+        padding: 0 clamp(0rem, 6vw, 1.5rem);
+      }
+
+      .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: clamp(1.2rem, 3vw, 1.8rem);
+        text-align: left;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
+      }
+
+      .stat-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, rgba(248, 193, 92, 0.12), transparent 55%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+      }
+
+      .stat-card:hover::after {
+        opacity: 1;
+      }
+
+      .stat-value {
+        font-size: clamp(1.75rem, 4vw, 2.5rem);
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .stat-label {
+        font-size: 0.95rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+      }
+
+      main {
+        max-width: 1080px;
+        margin: clamp(2.5rem, 6vw, 4rem) auto;
+        padding: 0 clamp(1.5rem, 5vw, 2.75rem);
+        display: grid;
+        gap: clamp(2rem, 3.5vw, 3rem);
+      }
+
+      section {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: clamp(1.8rem, 4vw, 2.4rem);
+        box-shadow: 0 25px 50px rgba(3, 6, 20, 0.18);
+      }
+
+      section h2 {
+        margin-top: 0;
+        font-size: clamp(1.6rem, 3vw, 2.1rem);
+        letter-spacing: -0.01em;
+      }
+
+      section h3 {
+        font-size: clamp(1.25rem, 2.4vw, 1.6rem);
+        margin-top: 2rem;
+      }
+
+      .section-intro {
+        font-size: 1.05rem;
+        color: var(--text-muted);
+      }
+
+      .definition-table,
+      .summary-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1.5rem;
+        font-size: 0.98rem;
+      }
+
+      .definition-table th,
+      .definition-table td,
+      .summary-table th,
+      .summary-table td {
+        padding: 0.9rem 1rem;
+        border-bottom: 1px solid rgba(142, 155, 195, 0.18);
+        vertical-align: top;
+      }
+
+      .definition-table th:first-child,
+      .definition-table td:first-child,
+      .summary-table th:first-child,
+      .summary-table td:first-child {
+        width: 28%;
+        font-weight: 600;
+        color: var(--accent);
+      }
+
+      .summary-table th {
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        font-weight: 500;
+      }
+
+      .process-list {
+        display: grid;
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+      }
+
+      .process-step {
+        background: var(--bg-alt);
+        border-radius: 16px;
+        padding: 1.4rem 1.6rem;
+        border: 1px solid rgba(248, 193, 92, 0.18);
+        position: relative;
+      }
+
+      .process-step h4 {
+        margin: 0;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-size: 0.9rem;
+      }
+
+      .process-step p {
+        margin: 0.75rem 0 0;
+        color: var(--text-muted);
+      }
+
+      .equation {
+        background: var(--code-bg);
+        border-radius: 14px;
+        padding: 1rem 1.4rem;
+        margin: 1.25rem 0;
+        font-family: "Fira Code", "SFMono-Regular", "Menlo", monospace;
+        font-size: 0.95rem;
+        color: #d6e4ff;
+        border: 1px solid rgba(142, 155, 195, 0.2);
+      }
+
+      .callout {
+        background: var(--accent-soft);
+        border: 1px solid rgba(248, 193, 92, 0.4);
+        border-radius: 16px;
+        padding: 1.3rem 1.6rem;
+        color: var(--accent);
+        margin-top: 1.5rem;
+        font-size: 1.05rem;
+      }
+
+      .two-column {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: clamp(1.4rem, 3vw, 2rem);
+        margin-top: 1.5rem;
+      }
+
+      ul {
+        margin: 0.5rem 0 0;
+        padding-left: 1.2rem;
+        color: var(--text-muted);
+      }
+
+      li + li {
+        margin-top: 0.35rem;
+      }
+
+      footer {
+        max-width: 1080px;
+        margin: 0 auto clamp(2rem, 5vw, 3rem);
+        padding: 0 clamp(1.5rem, 5vw, 2.75rem);
+        color: var(--text-muted);
+        font-size: 0.95rem;
+      }
+
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      @media (max-width: 640px) {
+        .definition-table th:first-child,
+        .definition-table td:first-child,
+        .summary-table th:first-child,
+        .summary-table td:first-child {
+          width: auto;
+        }
+
+        .definition-table,
+        .summary-table {
+          font-size: 0.92rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-content">
+        <h1>Deep-Mixing the Sun</h1>
+        <p class="tagline">
+          A first-time reader's guide to how a patient, well-controlled circulation inside the
+          Sun could postpone its red-giant future by hundreds of millions of years.
+        </p>
+        <div class="stats">
+          <article class="stat-card">
+            <div class="stat-value">0.5–0.7 Gyr</div>
+            <div class="stat-label">Main-sequence lifetime extension in the best case</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-value">3 mm/yr</div>
+            <div class="stat-label">Required downward drift at the tachocline</div>
+          </article>
+          <article class="stat-card">
+            <div class="stat-value">10<sup>-6</sup> L<sub>☉</sub></div>
+            <div class="stat-label">Approximate actuator power to keep the circulation tuned</div>
+          </article>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="big-idea">
+        <h2>🌞 The Big Idea</h2>
+        <p class="section-intro">
+          The Sun will swell into a red giant once its core runs out of hydrogen. Simply adding
+          fuel at the surface won't help—the new hydrogen needs to reach the core, where fusion
+          happens. Deep mixing slowly trades a trickle of envelope hydrogen with the helium “ash”
+          in the core, letting the Sun burn fresh fuel longer without upsetting its equilibrium.
+        </p>
+      </section>
+
+      <section id="definitions">
+        <h2>💧 Basic Definitions</h2>
+        <table class="definition-table">
+          <tbody>
+            <tr>
+              <td><strong>Hydrogen burn rate</strong> (<em>ṁ<sub>☉</sub></em>)</td>
+              <td>The mass of hydrogen the Sun converts to helium each second—about 6×10<sup>11</sup> kg.</td>
+            </tr>
+            <tr>
+              <td><strong>Envelope</strong></td>
+              <td>The outer 70% of the Sun by radius, still rich in unused hydrogen.</td>
+            </tr>
+            <tr>
+              <td><strong>Core</strong></td>
+              <td>The inner 25% by radius, where temperatures are high enough for sustained fusion.</td>
+            </tr>
+            <tr>
+              <td><strong>Tachocline</strong></td>
+              <td>The narrow boundary between the radiative and convective zones—our lever for controlled mixing.</td>
+            </tr>
+            <tr>
+              <td><strong>Mixing flux</strong> (<em>ṁ<sub>mix</sub></em>)</td>
+              <td>The mass of hydrogen we can transport downward each second across that boundary layer.</td>
+            </tr>
+            <tr>
+              <td><strong>Mixing fraction</strong> (ε = <em>ṁ<sub>mix</sub></em> / <em>ṁ<sub>☉</sub></em>)</td>
+              <td>How strong the artificial mixing is compared with the Sun’s own burn rate.</td>
+            </tr>
+            <tr>
+              <td><strong>Envelope fraction moved</strong> (α)</td>
+              <td>The total share of the Sun’s outer hydrogen that eventually reaches the core.</td>
+            </tr>
+            <tr>
+              <td><strong>Luminosity guardrail</strong></td>
+              <td>A safety rule: keep solar brightness changes under a thousandth per million years to avoid destabilizing the star.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="process">
+        <h2>⚙️ How the Process Works</h2>
+        <div class="process-list">
+          <div class="process-step">
+            <h4>Step 1 · Set up gentle circulation</h4>
+            <p>
+              Use carefully phased waves or currents at the tachocline to guide a slow river of
+              hydrogen downward. Orbiting actuators nudge existing solar oscillations rather than
+              forcing brute-force flows.
+            </p>
+          </div>
+          <div class="process-step">
+            <h4>Step 2 · Keep the motion smooth</h4>
+            <p>
+              The downflow must remain microscopic—millimeters per year—so the Sun can adjust its
+              structure gradually. Even so, the vast surface area moves enormous mass over
+              millions of years.
+            </p>
+          </div>
+          <div class="process-step">
+            <h4>Step 3 · Budget the energy</h4>
+            <p>
+              Because we tap into existing wave patterns, the actuation power can be minuscule:
+              only a millionth of the Sun’s luminosity is enough in the reversible limit.
+            </p>
+          </div>
+          <div class="process-step">
+            <h4>Step 4 · Close the control loop</h4>
+            <p>
+              A constellation of sensors tracks helioseismic modes and neutrino output, adjusting
+              the timing of the pulses to keep the burn rate and luminosity safely within guardrails.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="math">
+        <h2>🧮 What the Math Says</h2>
+        <p>
+          The lifetime extension scales with how much envelope hydrogen makes it to the core. If we
+          move a fraction α of the envelope mass inward, the added main-sequence time is:
+        </p>
+        <div class="equation">Δt ≈ (α · M<sub>envelope,H</sub>) / <em>ṁ<sub>☉</sub></em></div>
+        <p>
+          With an available reservoir of roughly 10<sup>30</sup> kg of hydrogen outside the core
+          and a burn rate of 6×10<sup>11</sup> kg/s, even small fractions pay off dramatically.
+        </p>
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>Envelope hydrogen reaching the core</th>
+              <th>Added lifetime</th>
+              <th>Interpretation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>0.01% (α = 10<sup>-4</sup>)</td>
+              <td>5–6 million years</td>
+              <td>Proof of concept without noticeable risk</td>
+            </tr>
+            <tr>
+              <td>0.1% (α = 10<sup>-3</sup>)</td>
+              <td>50–60 million years</td>
+              <td>A modest but measurable extension</td>
+            </tr>
+            <tr>
+              <td>1% (α = 10<sup>-2</sup>)</td>
+              <td>0.5–0.7 billion years</td>
+              <td>The optimistic steady-mixing ceiling</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="ships">
+        <h2>🚀 Role of the Interstellar Missions</h2>
+        <div class="two-column">
+          <div>
+            <h3>Precision Actuation</h3>
+            <ul>
+              <li>Ships cruise at ~1% of light speed, acting as metronomes and feedback nodes.</li>
+              <li>They release tiny packets of hydrogen to reinforce target oscillations at the tachocline.</li>
+              <li>Energy contributions keep the wave-control network operating for millions of years.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Diagnostics &amp; Sensing</h3>
+            <ul>
+              <li>Tracer isotopes reveal where the mixed material travels.</li>
+              <li>Continuous helioseismology and neutrino monitoring verify that luminosity stays within guardrails.</li>
+              <li>Adaptive algorithms tune the pulse cadence to maintain stability.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout">
+          Interstellar craft do not refuel the Sun—they orchestrate and monitor a patient,
+          self-sustaining circulation inside it.
+        </div>
+      </section>
+
+      <section id="summary">
+        <h2>🪐 Best-Case Snapshot</h2>
+        <table class="summary-table">
+          <tbody>
+            <tr>
+              <td>Hydrogen burn rate (<em>ṁ<sub>☉</sub></em>)</td>
+              <td>6×10<sup>11</sup> kg/s</td>
+              <td>The Sun’s baseline fusion consumption</td>
+            </tr>
+            <tr>
+              <td>Mixing strength (ε)</td>
+              <td>0.01</td>
+              <td>Artificial mixing equals 1% of the natural burn rate</td>
+            </tr>
+            <tr>
+              <td>Downflow speed at tachocline (v<sub>r</sub>)</td>
+              <td>≈ 1×10<sup>-10</sup> m/s</td>
+              <td>About 3 mm per year of inward drift</td>
+            </tr>
+            <tr>
+              <td>Effective diffusion coefficient (D<sub>eff</sub>)</td>
+              <td>≈ 10<sup>-3</sup> m²/s</td>
+              <td>Describes the smoothed transport</td>
+            </tr>
+            <tr>
+              <td>Actuator power fraction (η)</td>
+              <td>10<sup>-6</sup> – 10<sup>-5</sup> of L<sub>☉</sub></td>
+              <td>Energy to maintain the flow bias</td>
+            </tr>
+            <tr>
+              <td>Lifetime extension (Δt)</td>
+              <td>0.5 – 0.7 billion years</td>
+              <td>Delay to the red-giant transition</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          In plain English: gently stir the Sun for long enough and you gain hundreds of millions of
+          years of calm sunshine—no refueling needed, just precision and patience.
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      Drafted for the deep-mixing roadmap. Built as a static, shareable overview for mission
+      planners, systems designers, and curious readers.
+    </footer>
+  </body>
+</html>
