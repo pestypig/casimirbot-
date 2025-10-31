@@ -3233,9 +3233,16 @@ export default function DriveGuardsPanel() {
                 </div>
 
                 <p className="mt-1 text-xs text-slate-300">
-
-                  If averaging is valid and zeta &le; 1, E_potato = kappa_drive / kappa_body entering the ledger's green band marks the engineering condition for steering a local rest region.
-
+                  With the proof proxies above tying our curvature and stress estimates back to the field equations, we treat the kappa ratio as the ledger's local drift dial. E_potato is the dimensionless curvature efficiency pulled from the potato radius narrative: kappa_drive is our cycle-averaged curvature density, while kappa_body tracks the bulk density that forces rubble toward roundness once self-gravity wins. That potato threshold is the density-vs-yield point where roundness locks in, so the ratio measures curvature leverage: values above unity say the drive can outpace the material's own rounding gravity and steer the local geometry. When averaging is valid and zeta &le; 1, E_potato = kappa_drive / kappa_body sliding into the ledger's green band marks the engineering condition for steering a local rest region. See{" "}
+                  <a
+                    className="text-cyan-300 underline-offset-2 hover:text-cyan-200 hover:underline"
+                    href="/km-scale-warp-ledger"
+                    rel="noreferrer noopener"
+                    target="_blank"
+                  >
+                    the km-scale warp ledger
+                  </a>{" "}
+                  for the band derivation and operational notes.
                 </p>
 
               </div>

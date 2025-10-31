@@ -48,6 +48,9 @@ import type {
   PhaseScheduleTelemetry,
   PumpCommand,
   PumpTone,
+  HardwareSectorState,
+  HardwareQiSample,
+  HardwareSpectrumFrame,
 } from "../shared/schema.js";
 import { appendPhaseCalibrationLog } from "./utils/phase-calibration.js";
 import { slewPump } from "./instruments/pump.js";
@@ -57,6 +60,21 @@ import { QiMonitor } from "./qi/qi-monitor.js";
 import { configuredQiScalarBound } from "./qi/qi-bounds.js";
 
 export type MutableDynamicConfig = DynamicConfigLike;
+
+export interface SweepHistoryTotals {
+  visible: number;
+  total: number;
+  dropped: number;
+}
+
+export interface HardwareTruthSnapshot {
+  lastSweepRow?: VacuumGapSweepRow;
+  totals?: SweepHistoryTotals;
+  updatedAt?: number;
+  sectorState?: (HardwareSectorState & { updatedAt?: number }) | null;
+  qiSample?: (HardwareQiSample & { updatedAt?: number }) | null;
+  spectrumFrame?: (HardwareSpectrumFrame & { updatedAt?: number }) | null;
+}
 
 export interface ScheduleSweepRequest {
   activeSlew: boolean;
@@ -344,6 +362,9 @@ export interface EnergyPipelineState {
   // Dynamic sweep cache
   dynamicConfig?: MutableDynamicConfig | null;
   vacuumGapSweepResults?: VacuumGapSweepRow[];
+  vacuumGapSweepRowsTotal?: number;
+  vacuumGapSweepRowsDropped?: number;
+  hardwareTruth?: HardwareTruthSnapshot | null;
   sweep?: SweepRuntime;
   gateAnalytics?: GateAnalytics | null;
 }
@@ -369,8 +390,10 @@ export const PAPER_GEO = { PACKING: 0.88, RADIAL_LAYERS: 10 } as const;
 export const PAPER_DUTY = { TOTAL_SECTORS, BURST_DUTY_LOCAL } as const;
 export const PAPER_Q    = { Q_BURST } as const;
 export const PAPER_VDB  = { GAMMA_VDB } as const;
-const SWEEP_HISTORY_MAX = 2000;
+export const SWEEP_HISTORY_MAX = 2000;
 const sweepHistory: VacuumGapSweepRow[] = [];
+let sweepHistoryTotal = 0;
+let sweepHistoryDropped = 0;
 
 const ACTIVE_SLEW_LIMITS = {
   gaps: 12,
@@ -423,14 +446,24 @@ function pickRepresentativeValues(values: number[], limit: number): number[] {
   return result.slice(0, limit);
 }
 
-function appendSweepRows(rows: VacuumGapSweepRow[]) {
+export function appendSweepRows(rows: VacuumGapSweepRow[]) {
   if (!rows.length) return;
+  sweepHistoryTotal += rows.length;
   sweepHistory.push(...rows);
   if (sweepHistory.length > SWEEP_HISTORY_MAX) {
-    sweepHistory.splice(0, sweepHistory.length - SWEEP_HISTORY_MAX);
+    const over = sweepHistory.length - SWEEP_HISTORY_MAX;
+    sweepHistory.splice(0, over);
+    sweepHistoryDropped += over;
   }
 }
 
+export function getSweepHistoryTotals(): SweepHistoryTotals {
+  return {
+    visible: sweepHistory.length,
+    total: sweepHistoryTotal,
+    dropped: sweepHistoryDropped,
+  };
+}
 const SWEEP_TOP_LIMIT = 10;
 
 function deriveMeasuredPumpFrequency(rows: VacuumGapSweepRow[]): number | undefined {
@@ -1239,6 +1272,15 @@ export function initializePipelineState(): EnergyPipelineState {
 
     dynamicConfig: null,
     vacuumGapSweepResults: [],
+    vacuumGapSweepRowsTotal: 0,
+    vacuumGapSweepRowsDropped: 0,
+    hardwareTruth: {
+      totals: { visible: 0, total: 0, dropped: 0 },
+      updatedAt: 0,
+      sectorState: null,
+      qiSample: null,
+      spectrumFrame: null,
+    },
     gateAnalytics: null,
     sweep: {
       active: false,
@@ -1902,6 +1944,21 @@ export async function calculateEnergyPipeline(
 
   flushPendingPumpCommand();
   updateQiTelemetry(state);
+
+  try {
+    const tail = sweepHistory.slice(-SWEEP_HISTORY_MAX);
+    state.vacuumGapSweepResults = tail;
+    const lifetimes = getSweepHistoryTotals();
+    state.vacuumGapSweepRowsTotal = lifetimes.total;
+    state.vacuumGapSweepRowsDropped = lifetimes.dropped;
+    const prevTruth = state.hardwareTruth ?? {};
+    state.hardwareTruth = {
+      ...prevTruth,
+      totals: lifetimes,
+    };
+  } catch {
+    // non-fatal
+  }
 
   return state;
 }

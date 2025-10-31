@@ -8,6 +8,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, type EnergyPipelineState as PipelineState } from "@/hooks/use-energy-pipeline";
 import type { SweepRuntime, SweepPoint, VacuumGapSweepRow } from "@shared/schema";
 import { summarizeSweepGuard } from "@/lib/sweep-guards";
+import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
+import HardwareConnectButton from "./HardwareConnectButton";
 
 type VacuumGapSweepHUDProps = {
   className?: string;
@@ -107,6 +109,71 @@ const STATUS_STYLES: Record<string, string> = {
   UNSTABLE: "bg-rose-500/20 text-rose-200",
 };
 
+const VACUUM_SWEEP_PROFILE = JSON.stringify(
+  {
+    profileId: "demo-vacuum-sweep",
+    description: "Bench pump + piezo gap, emits flat VacuumGapSweepRow-compatible fields",
+    timebase: { source: "ptp", confidence: 0.9 },
+    streams: [
+      {
+        topic: "hardware/vacuum-gap-sweep",
+        ingest: {
+          type: "scpi",
+          endpoint: "tcp://10.42.0.20:5025",
+          pollMs: 500,
+          commands: [{ send: "READ:SWEEP:POINT?", field: "raw" }],
+        },
+        transform: {
+          flatten: {
+            "raw.d_nm": "d_nm",
+            "raw.m": "m",
+            "raw.Omega_GHz": "Omega_GHz",
+            "raw.phi_deg": "phi_deg",
+            "raw.kappa_Hz": "kappa_Hz",
+            "raw.kappaEff_Hz": "kappaEff_Hz",
+            "raw.detune_Hz": "detune_Hz",
+            "raw.pumpRatio": "pumpRatio",
+            "raw.gain_dB": "G",
+            "raw.QL": "QL",
+            "raw.noise_temp_K": "noiseTemp_K",
+            "raw.plateau": "plateau",
+          },
+        },
+        normalize: {
+          pre: "normalizeSweepRowUnitsAndKeys",
+          endpoint: "/api/helix/hardware/sweep-point",
+        },
+      },
+    ],
+  },
+  null,
+  2,
+);
+
+const VACUUM_GAP_HELP: HardwareConnectHelp = {
+  instruments: [
+    "Pump synthesizer",
+    "Piezo/electrostatic gap actuator",
+    "Cryo displacement sensor",
+  ],
+  feeds: [
+    "POST /api/helix/hardware/sweep-point (VacuumGapSweepRow flat)",
+    "Guarded on server before append",
+  ],
+  notes: [
+    "Rows must normalize to phi_deg, kappa_MHz, detune_MHz, pumpRatio, noiseTemp_K, plateau.width_deg",
+    "Guard parity with sim constants (RHO_CUTOFF, depth, phase bounds)",
+  ],
+  fileTypes: [".csv (one point per row)", ".json (row per object)"],
+  profiles: [
+    {
+      name: "Bench Sweep (SCPI)",
+      description: "Tek/Keysight + piezo stack via LabBridge",
+      json: VACUUM_SWEEP_PROFILE,
+    },
+  ],
+};
+
 export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps) {
   const {
     data,
@@ -131,6 +198,16 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
   const guardLimit =
     typeof sweepResultsLimit === "number" ? sweepResultsLimit : undefined;
   const trimmedForGuard = droppedRows > 0;
+
+  const hardwareController = useHardwareFeeds({
+    panelId: "vacuum-gap-sweep",
+    panelTitle: "Vacuum-Gap Sweep",
+    help: VACUUM_GAP_HELP,
+    fileIngest: {
+      endpoint: "/api/helix/hardware/sweep-point",
+      kind: "vacuum-sweep",
+    },
+  });
 
   const handleCancel = useCallback(async () => {
     try {
@@ -225,7 +302,10 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
     <div className={cn("rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs", className)}>
       <div className="flex items-center justify-between">
         <div className="uppercase tracking-wide text-slate-400 text-[11px]">Vacuum-Gap Sweep</div>
-        <Badge className={cn("text-[11px] font-semibold", badgeClass)}>{displayStatusLabel}</Badge>
+        <div className="flex items-center gap-2">
+          <HardwareConnectButton controller={hardwareController} />
+          <Badge className={cn("text-[11px] font-semibold", badgeClass)}>{displayStatusLabel}</Badge>
+        </div>
       </div>
 
       <Progress className="mt-2" value={pct} />

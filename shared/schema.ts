@@ -68,6 +68,65 @@ export interface PhaseScheduleTelemetry {
   weights?: number[];
 }
 
+export const phaseScheduleTelemetrySchema = z.object({
+  N: z.number().int().positive(),
+  sectorPeriod_ms: z.number().nonnegative(),
+  phase01: z.number(),
+  phi_deg_by_sector: z.array(z.number()),
+  negSectors: z.array(z.number().int().nonnegative()),
+  posSectors: z.array(z.number().int().nonnegative()),
+  sampler: samplingKindSchema,
+  tau_s_ms: z.number().nonnegative(),
+  weights: z.array(z.number()).optional(),
+});
+
+export const hardwareSectorStateSchema = z.object({
+  currentSector: z.coerce.number().int().nonnegative().optional(),
+  activeSectors: z.coerce.number().int().nonnegative().optional(),
+  sectorsConcurrent: z.coerce.number().int().positive().optional(),
+  dwell_ms: z.coerce.number().nonnegative().optional(),
+  burst_ms: z.coerce.number().nonnegative().optional(),
+  strobeHz: z.coerce.number().nonnegative().optional(),
+  timestamp: z.union([z.coerce.number(), z.string()]).optional(),
+  phaseScheduleTelemetry: phaseScheduleTelemetrySchema.optional(),
+  timebase: z
+    .object({
+      source: z.string(),
+      confidence: z.number().min(0).max(1).optional(),
+    })
+    .optional(),
+  provenance: z.string().optional(),
+  notes: z.array(z.string()).optional(),
+});
+export type HardwareSectorState = z.infer<typeof hardwareSectorStateSchema>;
+
+export const hardwareQiSampleSchema = z.object({
+  windowId: z.string(),
+  bounds: z
+    .object({
+      lower: z.coerce.number(),
+      upper: z.coerce.number(),
+    })
+    .optional(),
+  margin: z.coerce.number().optional(),
+  sectorHealth: z.array(z.coerce.number()).optional(),
+  timestamp: z.union([z.coerce.number(), z.string()]).optional(),
+  provenance: z.string().optional(),
+});
+export type HardwareQiSample = z.infer<typeof hardwareQiSampleSchema>;
+
+export const hardwareSpectrumFrameSchema = z.object({
+  panelId: z.string().optional(),
+  f_Hz: z.array(z.coerce.number()).min(1),
+  P_dBm: z.array(z.coerce.number()).min(1),
+  RBW_Hz: z.coerce.number().positive().optional(),
+  refLevel_dBm: z.coerce.number().optional(),
+  temperature_K: z.coerce.number().optional(),
+  timestamp: z.union([z.coerce.number(), z.string()]).optional(),
+  provenance: z.string().optional(),
+});
+export type HardwareSpectrumFrame = z.infer<typeof hardwareSpectrumFrameSchema>;
+
 
 export const pumpToneSchema = z.object({
   omega_hz: z.number(),

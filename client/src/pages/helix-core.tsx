@@ -724,7 +724,6 @@ function sanitizeServerUniforms(raw: any, version: number) {
 import { CasimirTileGridPanel } from "@/components/CasimirTileGridPanel";
 import { SectorGridRing } from "@/components/SectorGridRing";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import AmplificationPanel from "@/components/AmplificationPanel";
 import { checkpoint } from "@/lib/checkpoints";
 import { thetaScaleExpected, thetaScaleUsed } from "@/lib/expectations";
 import { ShiftVectorPanel } from "@/components/ShiftVectorPanel";
@@ -2060,6 +2059,83 @@ useEffect(() => {
     burstLocal,
   };
 
+  const modulationGHzCommanded = isFiniteNumber(modulationFrequency) ? modulationFrequency : undefined;
+  const strobeHzLive = isFiniteNumber(systemMetrics?.strobeHz) ? Number(systemMetrics!.strobeHz) : undefined;
+  const strobeGHzLive = strobeHzLive != null ? strobeHzLive / 1e9 : undefined;
+  const strobeDeltaPct =
+    strobeGHzLive != null && modulationGHzCommanded != null && modulationGHzCommanded > 0
+      ? ((strobeGHzLive - modulationGHzCommanded) / modulationGHzCommanded) * 100
+      : undefined;
+
+  const metricsLC = (systemMetrics?.lightCrossing ?? {}) as Partial<{
+    tauLC_ms: number;
+    tau_ms: number;
+    tauLC_s: number;
+    dwell_ms: number;
+    burst_ms: number;
+    sectorPeriod_ms: number;
+  }>;
+  const pipelineLC = ((pipelineState as any)?.lightCrossing ?? {}) as Partial<{
+    tauLC_ms: number;
+    tau_ms: number;
+    tauLC_s: number;
+    dwell_ms: number;
+    burst_ms: number;
+    sectorPeriod_ms: number;
+  }>;
+  const burstMsTelemetry =
+    isFiniteNumber(metricsLC.burst_ms)
+      ? metricsLC.burst_ms!
+      : isFiniteNumber(pipelineLC.burst_ms)
+      ? pipelineLC.burst_ms!
+      : isFiniteNumber((lc as any)?.burst_ms)
+      ? Number((lc as any).burst_ms)
+      : undefined;
+  const dwellMsTelemetry =
+    isFiniteNumber(metricsLC.dwell_ms)
+      ? metricsLC.dwell_ms!
+      : isFiniteNumber(pipelineLC.dwell_ms)
+      ? pipelineLC.dwell_ms!
+      : isFiniteNumber(lc?.dwell_ms)
+      ? Number(lc!.dwell_ms)
+      : undefined;
+  const tauLcMsTelemetry =
+    isFiniteNumber(metricsLC.tauLC_ms)
+      ? metricsLC.tauLC_ms!
+      : isFiniteNumber(metricsLC.tau_ms)
+      ? metricsLC.tau_ms!
+      : isFiniteNumber(metricsLC.tauLC_s)
+      ? metricsLC.tauLC_s! * 1000
+      : isFiniteNumber(pipelineLC.tauLC_ms)
+      ? pipelineLC.tauLC_ms!
+      : isFiniteNumber(lc?.tauLC_ms)
+      ? Number(lc!.tauLC_ms)
+      : undefined;
+  const sectorPeriodMsLive =
+    isFiniteNumber(systemMetrics?.sectorPeriod_ms)
+      ? Number(systemMetrics!.sectorPeriod_ms)
+      : isFiniteNumber(metricsLC.sectorPeriod_ms)
+      ? metricsLC.sectorPeriod_ms!
+      : isFiniteNumber(lc?.dwell_ms)
+      ? Number(lc!.dwell_ms)
+      : undefined;
+  const currentSectorLive = Number.isFinite(systemMetrics?.currentSector)
+    ? Number(systemMetrics!.currentSector)
+    : Number.isFinite(lc?.sectorIdx)
+    ? Number(lc!.sectorIdx)
+    : undefined;
+  const sectorStrobingLive = Number.isFinite(systemMetrics?.sectorStrobing)
+    ? Math.max(0, Math.floor(Number(systemMetrics!.sectorStrobing)))
+    : isFiniteNumber((pipeline as any)?.sectorsConcurrent)
+    ? Math.max(0, Math.floor(Number((pipeline as any).sectorsConcurrent)))
+    : isFiniteNumber(pipeline?.sectorStrobing)
+    ? Math.max(0, Math.floor(Number(pipeline!.sectorStrobing!)))
+    : Math.max(0, Math.floor(concurrentSectors));
+  const totalSectorsLive = Number.isFinite(systemMetrics?.totalSectors)
+    ? Math.max(0, Math.floor(Number(systemMetrics!.totalSectors)))
+    : totalSectors;
+  const showLegacyModulationControls = false;
+
   //  RAF gating for smooth transitions
   const rafGateRef = useRef<number | null>(null);
 
@@ -3098,150 +3174,168 @@ useEffect(() => {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="modulation" className="text-slate-200">
-                      Modulation Frequency
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-sm">
-                        <div className="font-medium text-yellow-300 mb-1"> Theory</div>
-                        <p className="mb-2">
-                          The fundamental frequency at which Casimir tiles oscillate. Higher frequencies increase power output but
-                          require more precise timing control.
-                        </p>
-                        <div className="font-medium text-cyan-300 mb-1"> Zen</div>
-                        <p className="text-xs italic">Resonance is not about powerit's about timing.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex min-w-[10rem] flex-1 items-center gap-2">
-                      <Input
-                        id="modulation"
-                        type="number"
-                        value={modulationFrequency}
-                        onChange={(e) => setModulationFrequency(Number(e.target.value))}
-                        className="bg-slate-950 border-slate-700 text-slate-100 flex-1"
-                      />
-                      <span className="flex items-center text-sm text-slate-400">GHz</span>
+                {showLegacyModulationControls && (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="modulation" className="text-slate-200">
+                          Modulation Frequency
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-sm">
+                            <div className="font-medium text-yellow-300 mb-1"> Theory</div>
+                            <p className="mb-2">
+                              The fundamental frequency at which Casimir tiles oscillate. Higher frequencies increase power output but
+                              require more precise timing control.
+                            </p>
+                            <div className="font-medium text-cyan-300 mb-1"> Zen</div>
+                            <p className="text-xs italic">Resonance is not about powerit's about timing.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex min-w-[10rem] flex-1 items-center gap-2">
+                          <Input
+                            id="modulation"
+                            type="number"
+                            value={modulationFrequency}
+                            onChange={(e) => setModulationFrequency(Number(e.target.value))}
+                            className="bg-slate-950 border-slate-700 text-slate-100 flex-1"
+                          />
+                          <span className="flex items-center text-sm text-slate-400">GHz</span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="text-xs"
+                          onClick={openParametricSweepStub}
+                          disabled
+                          aria-disabled
+                          title="Gap x Phase x Omega sweep launcher (coming soon)"
+                        >
+                          GapPhase sweep
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      className="text-xs"
-                      onClick={openParametricSweepStub}
-                      disabled
-                      aria-disabled
-                      title="Gap x Phase x Omega sweep launcher (coming soon)"
-                    >
-                      GapPhase sweep
-                    </Button>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="pump-phase-bias" className="text-slate-200">
+                          Pump phase bias
+                        </Label>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-sm">
+                            <p className="text-xs">
+                              Applies a constant offset before scheduler-followed phases are published to the drive.
+                            </p>
+                            <p className="text-xs text-slate-300">
+                              Useful for +/-10 deg dithers during pump alignment and stored locally per browser.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="pump-phase-bias"
+                          type="number"
+                          min={-10}
+                          max={10}
+                          step={0.1}
+                          value={pumpPhaseBiasDeg}
+                          onChange={(e) => setPumpPhaseBiasDeg(clampPhaseBiasDeg(Number(e.target.value)))}
+                          className="bg-slate-950 border-slate-700 text-slate-100 w-28"
+                        />
+                        <span className="flex items-center text-sm text-slate-400">deg</span>
+                      </div>
+                      <p className="text-xs text-slate-500">Clamped to +/-10 deg and persisted locally.</p>
+                    </div>
+                  </>
+                )}
+
+                <div className="rounded-lg border border-slate-800/60 bg-slate-950 p-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-500">Commanded Modulation</p>
+                      <p className="font-mono text-sm text-slate-100">
+                        {modulationGHzCommanded != null ? `${modulationGHzCommanded.toFixed(3)} GHz` : "n/a"}
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right">
+                      <p className="text-[10px] uppercase tracking-wide text-slate-500">Measured Sweep</p>
+                      <p className="font-mono text-sm text-cyan-300">
+                        {strobeGHzLive != null ? `${strobeGHzLive.toFixed(6)} GHz` : "n/a"}
+                      </p>
+                      {strobeDeltaPct != null && (
+                        <p className={`text-[10px] ${Math.abs(strobeDeltaPct) < 0.05 ? "text-emerald-400" : "text-amber-400"}`}>
+                          {"\u0394"} {strobeDeltaPct >= 0 ? "+" : ""}
+                          {strobeDeltaPct.toFixed(3)}%
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-xs text-slate-300 sm:grid-cols-3">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Burst</div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {burstMsTelemetry != null ? `${burstMsTelemetry.toFixed(3)} ms` : "n/a"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Dwell</div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {dwellMsTelemetry != null ? `${dwellMsTelemetry.toFixed(3)} ms` : "n/a"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">
+                        {"\u03C4"}LC
+                      </div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {tauLcMsTelemetry != null ? `${tauLcMsTelemetry.toFixed(3)} ms` : "n/a"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-xs text-slate-300 sm:grid-cols-3">
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Current Sector</div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {currentSectorLive != null && totalSectorsLive != null
+                          ? `${Math.max(0, currentSectorLive + 1)}/${totalSectorsLive}`
+                          : totalSectorsLive != null
+                          ? `n/a/${totalSectorsLive}`
+                          : currentSectorLive != null
+                          ? `${Math.max(0, currentSectorLive + 1)}/n/a`
+                          : "n/a"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Window</div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {sectorStrobingLive != null ? `${sectorStrobingLive} live` : "n/a"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] uppercase tracking-wide text-slate-500">Period</div>
+                      <div className="font-mono text-sm text-slate-100">
+                        {sectorPeriodMsLive != null ? `${sectorPeriodMsLive.toFixed(3)} ms` : "n/a"}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="pump-phase-bias" className="text-slate-200">
-                      Pump phase bias
-                    </Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <HelpCircle className="w-3 h-3 text-slate-400 hover:text-cyan-400 cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-sm">
-                        <p className="text-xs">
-                          Applies a constant offset before scheduler-followed phases are published to the drive.
-                        </p>
-                        <p className="text-xs text-slate-300">
-                          Useful for +/-10 deg dithers during pump alignment and stored locally per browser.
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="pump-phase-bias"
-                      type="number"
-                      min={-10}
-                      max={10}
-                      step={0.1}
-                      value={pumpPhaseBiasDeg}
-                      onChange={(e) => setPumpPhaseBiasDeg(clampPhaseBiasDeg(Number(e.target.value)))}
-                      className="bg-slate-950 border-slate-700 text-slate-100 w-28"
-                    />
-                    <span className="flex items-center text-sm text-slate-400">deg</span>
-                  </div>
-                  <p className="text-xs text-slate-500">Clamped to +/-10 deg and persisted locally.</p>
-                </div>
-
-                <Button
-                  className="w-full bg-gradient-to-r from-cyan-600 to-blue-600"
-                  onClick={async () => {
-                    setIsProcessing(true);
-                    try {
-                      const command = `Simulate a full pulse cycle at ${modulationFrequency} GHz`;
-                      const userMessage: ChatMessage = {
-                        role: "user",
-                        content: command,
-                        timestamp: new Date(),
-                      };
-                      setChatMessages((prev) => [...prev, userMessage]);
-
-                      if (commandAbortRef.current) {
-                        commandAbortRef.current.abort();
-                      }
-                      commandAbortRef.current = new AbortController();
-
-                      const response = await apiRequest(
-                        "POST",
-                        "/api/helix/command",
-                        {
-                          messages: chatMessages.concat({ role: "user", content: command }),
-                        },
-                        commandAbortRef.current.signal
-                      );
-
-                      const responseData = await response.json();
-                      const assistantMessage: ChatMessage = {
-                        role: "assistant",
-                        content: responseData.message.content,
-                        timestamp: new Date(),
-                      };
-
-                      if (responseData.functionResult) {
-                        assistantMessage.functionCall = {
-                          name: responseData.message.function_call.name,
-                          result: responseData.functionResult,
-                        };
-                        setMainframeLog((prev) => [...prev, `[PULSE] ${responseData.functionResult.log || "Cycle complete"}`].slice(-200));
-                        refetchMetrics();
-                      }
-
-                      setChatMessages((prev) => [...prev, assistantMessage]);
-                    } catch (error) {
-                      toast({
-                        title: "Pulse Sequence Error",
-                        description: error instanceof Error ? error.message : "Failed to execute",
-                        variant: "destructive",
-                      });
-                    } finally {
-                      setIsProcessing(false);
-                    }
-                  }}
-                  disabled={isProcessing}
-                >
-                  Execute Pulse Sequence
-                </Button>
               </div>
             </CardContent>
           </Card>
 
           {/* ====== SECONDARY GRID (rest of the panels) ====== */}
           <div className="grid grid-cols-1 gap-4">
-            {/* Left column: Compliance, Quantum Inequality, Amplification, Shift Vector */}
+            {/* Left column: Compliance, Quantum Inequality, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
               <Card className="bg-slate-900/50 border-slate-800">
@@ -3351,8 +3445,6 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Amplification Panel */}
-              <AmplificationPanel readOnly />
 
               {/* Shift Vector  Interior Gravity */}
               <ShiftVectorPanel

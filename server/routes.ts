@@ -20,6 +20,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   let wss: WebSocketServer | null = null;
   const connections = new Map<string, Set<WebSocket>>();
   const sseConnections = new Map<string, Set<Response>>();
+  const hardwareSseConnections = new Map<string, Set<Response>>();
 
   const broadcastWS = (simulationId: string, payload: any) => {
     const bucket = connections.get(simulationId);
@@ -33,6 +34,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
     if (bucket.size === 0) connections.delete(simulationId);
+  };
+
+  const broadcastHardware = (topic: string, payload: any) => {
+    const bucket = hardwareSseConnections.get(topic);
+    if (!bucket) return;
+    const data = `data: ${JSON.stringify(payload)}\n\n`;
+    for (const res of Array.from(bucket)) {
+      try { res.write(data); } catch { bucket.delete(res); }
+    }
+    if (bucket.size === 0) hardwareSseConnections.delete(topic);
   };
 
   const broadcastSSE = (simulationId: string, payload: any) => {
@@ -119,6 +130,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (b.size === 0) sseConnections.delete(id);
       }
     });
+  });
+
+  app.get("/api/helix/hardware/stream", (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders?.();
+
+    const topicParam = typeof req.query.topic === "string" && req.query.topic.trim().length > 0
+      ? req.query.topic.trim()
+      : "default";
+    const topic = topicParam;
+
+    let bucket = hardwareSseConnections.get(topic);
+    if (!bucket) {
+      bucket = new Set<Response>();
+      hardwareSseConnections.set(topic, bucket);
+    }
+    bucket.add(res);
+
+    res.write(`data: ${JSON.stringify({ type: "hello", topic })}\n\n`);
+
+    req.on("close", () => {
+      const b = hardwareSseConnections.get(topic);
+      if (b) {
+        b.delete(res);
+        if (b.size === 0) hardwareSseConnections.delete(topic);
+      }
+    });
+  });
+
+  app.options("/api/helix/hardware/stream", (req, res) => {
+    res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.status(200).end();
+  });
+
+  app.post("/api/helix/hardware/stream", (req, res) => {
+    const body = req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+    const panelIdRaw = typeof body.panelId === "string" && body.panelId.trim().length > 0 ? body.panelId.trim() : "default";
+    const payload = {
+      type: "profile",
+      topic: panelIdRaw,
+      profile: body.profile ?? null,
+      source: body.source ?? "bridge",
+      action: body.action ?? "connect",
+      ts: Date.now(),
+    };
+    broadcastHardware(panelIdRaw, payload);
+    res.status(200).json({ ok: true, topic: panelIdRaw });
   });
 
   // --- REST API -------------------------------------------------------------
@@ -674,6 +736,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getPipelineState,
     getDisplacementField,
     updatePipelineParams,
+    ingestHardwareSweepPoint,
+    ingestHardwareSectorState,
+    ingestHardwareQiSample,
     cancelVacuumGapSweep,
     switchOperationalMode,
     getEnergySnapshot,
@@ -683,6 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     postSpectrumLog,
     orchestrateParametricSweep,
     publish: publishHelixEvent,
+    registerHardwareBroadcast: registerHardwareBroadcastFn,
   } = core;
 
   // Helpful startup log to confirm dynamic import succeeded and which build was loaded
@@ -692,6 +758,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('[routes] Loaded helix-core module (version unknown)');
   }
 
+  if (typeof registerHardwareBroadcastFn === "function") {
+    try {
+      registerHardwareBroadcastFn(broadcastHardware);
+    } catch (err) {
+      console.warn("[routes] registerHardwareBroadcast failed:", err);
+    }
+  }
+
   app.post("/api/helix/command", handleHelixCommand);
   app.get("/api/helix/tiles/:sectorId", getTileStatus);
   app.get("/api/helix/metrics", getSystemMetrics);
@@ -699,6 +773,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Backwards-compatible alias: some clients (HelixCasimirAmplifier) request /api/helix/state
   app.get("/api/helix/state", getPipelineState);
   app.get("/api/helix/field", getDisplacementField);
+  app.options("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
+  app.post("/api/helix/hardware/sweep-point", ingestHardwareSweepPoint);
+  app.options("/api/helix/hardware/sector-state", ingestHardwareSectorState);
+  app.post("/api/helix/hardware/sector-state", ingestHardwareSectorState);
+  app.options("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
+  app.post("/api/helix/hardware/qi-sample", ingestHardwareQiSample);
   // NEW: expose exact computeEnergySnapshot result (GET returns current defaults; POST accepts optional { sim })
   app.get ("/api/helix/snapshot", getEnergySnapshot);
   app.post("/api/helix/snapshot", getEnergySnapshot);

@@ -61,6 +61,9 @@ export async function apiRequest(
         };
       }
       // Accept POSTs used by the UI with a no-op echo to avoid hard errors
+      if (method === 'POST' && url.startsWith('/api/helix/hardware/')) {
+        return { ok: true };
+      }
       if (method === 'POST' && (url.startsWith('/api/helix/pipeline') || url === '/api/helix/command' || url.startsWith('/api/helix/mode'))) {
         return { ok: true, url, method, received: data ?? null, mocked: true, ts: now };
       }

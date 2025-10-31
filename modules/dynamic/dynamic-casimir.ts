@@ -869,7 +869,7 @@ export function computeSweepPoint(
   return row;
 }
 
-function applyVacuumSweepGuardrails(row: VacuumGapSweepRow): boolean {
+export function applyVacuumSweepGuardrails(row: VacuumGapSweepRow): boolean {
   let include = true;
   const notes = row.notes ? [...row.notes] : [];
 

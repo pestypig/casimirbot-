@@ -16,6 +16,8 @@ import {
   ReferenceArea,
   ReferenceLine,
 } from "recharts";
+import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
+import HardwareConnectButton from "./HardwareConnectButton";
 
 /**
  * SpectrumTunerPanel.tsx
@@ -60,6 +62,48 @@ export type SpectrumTunerPanelProps = {
   className?: string;
 };
 
+const SPECTRUM_PROFILE = JSON.stringify(
+  {
+    profileId: "demo-spectrum",
+    description: "Live VNA CSV tail \u2192 REST frame",
+    streams: [
+      {
+        topic: "hardware/spectrum",
+        ingest: {
+          type: "file-tail",
+          path: "\\\\daq1\\logs\\vna\\live.csv",
+          delimiter: ",",
+          pollMs: 1500,
+        },
+        normalize: {
+          endpoint: "/api/helix/spectrum",
+          mapStatic: { center_GHz: 9.86, RBW_Hz: 1000, ref_dBm: 0 },
+          mapArray: { frequency_Hz: "f_Hz", power_dBm: "P_dBm" },
+        },
+      },
+    ],
+  },
+  null,
+  2,
+);
+
+const SPECTRUM_HELP: HardwareConnectHelp = {
+  instruments: ["VNA / RSA", "Thermometer", "Q loader"],
+  feeds: [
+    "POST /api/helix/spectrum (f_Hz[], P_dBm[])",
+    "Set inputs.prov to 'live' on active fields",
+  ],
+  notes: ["Panel is read-only; geometry shifts cutoff, other feeds reshape lines"],
+  fileTypes: [".csv", ".snp/.s2p/.sNp"],
+  profiles: [
+    {
+      name: "VNA Tail \u2192 REST frame",
+      description: "CSV tail through LabBridge",
+      json: SPECTRUM_PROFILE,
+    },
+  ],
+};
+
 // ---------------------------
 // Helpers
 // ---------------------------
@@ -89,7 +133,7 @@ function makeFreqAxis(N = 240) {
 // ---------------------------
 export default function SpectrumTunerPanel({
   title = "Spectrum Tuner (LIVE, Read-only)",
-  inputs,
+  inputs: inputsProp,
   className,
 }: SpectrumTunerPanelProps) {
   const [showGeom, setShowGeom] = useState(true);
@@ -98,10 +142,43 @@ export default function SpectrumTunerPanel({
   const [showDCE, setShowDCE] = useState(true);
   const [showTimeLoop, setShowTimeLoop] = useState(true);
 
+  const hardwareController = useHardwareFeeds({
+    panelId: "spectrum-tuner",
+    panelTitle: "Spectrum Tuner",
+    help: SPECTRUM_HELP,
+    fileIngest: {
+      endpoint: "/api/helix/spectrum",
+      kind: "spectrum",
+    },
+  });
+
+  const liveInputs = useMemo<SpectrumLiveInputs>(() => {
+    const base: SpectrumLiveInputs = { ...(inputsProp ?? {}) };
+    const prov = { ...(base.prov ?? {}) } as SpectrumLiveInputs["prov"];
+    if (hardwareController.isLive) {
+      const keys: (keyof SpectrumLiveInputs)[] = [
+        "a_nm",
+        "sagDepth_nm",
+        "gammaGeo",
+        "Q0",
+        "qCavity",
+        "qSpoilingFactor",
+        "modulationFreq_GHz",
+        "duty",
+        "sectors",
+        "lightCrossing_us",
+      ];
+      keys.forEach((key) => {
+        if (prov) prov[key] = "live";
+      });
+    }
+    return { ...base, prov };
+  }, [inputsProp, hardwareController.isLive]);
+
   // ---- Live inputs with safe fallbacks (display-only; never written upstream)
-  const a_nm = inputs?.a_nm ?? 1.0; // display-only baseline
-  const sag_nm = inputs?.sagDepth_nm ?? 0.016; // typical for your 0.984 nm case
-  const gammaGeoLive = inputs?.gammaGeo;
+  const a_nm = liveInputs.a_nm ?? 1.0; // display-only baseline
+  const sag_nm = liveInputs.sagDepth_nm ?? 0.016; // typical for your 0.984 nm case
+  const gammaGeoLive = liveInputs.gammaGeo;
 
   // Effective gap and gamma
   const a_eff_nm_geomOnly = a_nm - sag_nm;
@@ -112,22 +189,22 @@ export default function SpectrumTunerPanel({
   const x_cut = clamp01((a_nm / a_eff_nm) * 0.25 + 0.05); // heuristic mapping for viz
 
   // Q / lineshape
-  const Q0 = inputs?.Q0 ?? 1e9;
-  const qCavity = inputs?.qCavity ?? Q0;
-  const qSpoil = inputs?.qSpoilingFactor ?? 1.0;
+  const Q0 = liveInputs.Q0 ?? 1e9;
+  const qCavity = liveInputs.qCavity ?? Q0;
+  const qSpoil = liveInputs.qSpoilingFactor ?? 1.0;
   const Qvis = showMaterials ? qCavity * qSpoil : Q0;
   const lineWidth = 0.002 * Math.sqrt(1e9 / Math.max(1, Qvis)); // bigger when Q is smaller
 
   // Dynamic (DCE) parameters for visualization only
-  const f_mod_GHz = inputs?.modulationFreq_GHz ?? 15;
+  const f_mod_GHz = liveInputs.modulationFreq_GHz ?? 15;
   const omegaNorm = clamp01(f_mod_GHz / 30); // normalized to axis 0..1
   const etaDCE = showDCE ? Math.min(2, ((qSpoil * qCavity) / Math.max(1, Q0)) * 0.05) : 0; // proxy
 
   // Time loop
-  const duty = inputs?.duty ?? 0.01;
-  const sectors = inputs?.sectors ?? 400;
+  const duty = liveInputs.duty ?? 0.01;
+  const sectors = liveInputs.sectors ?? 400;
   const effDuty = showTimeLoop ? duty * (1 / Math.max(1, sectors)) : 1.0; // ship-wide effective duty
-  const lc_us = inputs?.lightCrossing_us ?? 0.3; // for scale only
+  const lc_us = liveInputs.lightCrossing_us ?? 0.3; // for scale only
 
   // Static pressure (for readout only; scaled)
   const P_static_rel = -K / Math.pow(a_eff_nm * 1e-9, 4);
@@ -180,12 +257,12 @@ export default function SpectrumTunerPanel({
   }, [showTimeLoop, duty, sectors, etaDCE, f_mod_GHz]);
 
   // Provenance badges mapping
-  const prov = inputs?.prov ?? {};
+  const prov = liveInputs.prov ?? {};
 
   return (
     <Card className={`w-full min-w-0 shadow-sm ${className ?? ""}`}>
       <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base flex items-center gap-2">
             <AudioWaveform className="h-4 w-4 text-primary" />
             {title}
@@ -198,8 +275,11 @@ export default function SpectrumTunerPanel({
               read-only
             </Badge>
           </CardTitle>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Info className="h-3.5 w-3.5" /> Geometry moves cutoff; other toggles reshape spectrum only
+          <div className="flex items-center gap-3">
+            <HardwareConnectButton controller={hardwareController} />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Info className="h-3.5 w-3.5" /> Geometry moves cutoff; other toggles reshape spectrum only
+            </div>
           </div>
         </div>
       </CardHeader>

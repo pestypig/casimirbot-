@@ -4,6 +4,8 @@ import { useMetrics } from "@/hooks/use-metrics";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { toHUDModel } from "@/lib/hud-adapter";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
+import HardwareConnectButton from "./HardwareConnectButton";
 
 type ScaleProps = {
   dwellMs?: number;
@@ -12,6 +14,54 @@ type ScaleProps = {
   sectorIdx?: number;
   sectorCount?: number;
   phase?: number;
+};
+
+const SECTOR_STATE_PROFILE = JSON.stringify(
+  {
+    profileId: "demo-sector-state",
+    description: "Sector strobe controller snapshot",
+    streams: [
+      {
+        topic: "hardware/sector-state",
+        ingest: {
+          type: "grpc",
+          endpoint: "grpc://strobe-controller.lab:50051",
+          method: "SectorStateService/GetSnapshot",
+          intervalMs: 200,
+        },
+        normalize: {
+          endpoint: "/api/helix/hardware/sector-state",
+          map: {
+            current_sector: "currentSector",
+            active_sectors: "activeSectors",
+            concurrency: "sectorsConcurrent",
+            dwell_ms: "dwell_ms",
+            burst_ms: "burst_ms",
+            strobe_hz: "strobeHz",
+            phase_schedule: "phaseScheduleTelemetry",
+          },
+        },
+      },
+    ],
+  },
+  null,
+  2,
+);
+
+const SECTOR_STATE_HELP: HardwareConnectHelp = {
+  instruments: ["Strobe controller", "Optical/atomic clock"],
+  feeds: [
+    "POST /api/helix/hardware/sector-state (currentSector, sectorsConcurrent, dwell_ms, burst_ms, strobeHz, phaseScheduleTelemetry)",
+  ],
+  notes: ["UI uses same loop as metrics; stream updates over WS/SSE bus"],
+  fileTypes: [".json snapshots"],
+  profiles: [
+    {
+      name: "Sector Strobe Snapshot",
+      description: "gRPC poll via LabBridge",
+      json: SECTOR_STATE_PROFILE,
+    },
+  ],
 };
 
 const pickNumber = (value: unknown): number | undefined => {
@@ -33,6 +83,15 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
   const { data: pipeline } = useEnergyPipeline();
   const queryClient = useQueryClient();
   const driveState = useDriveSyncStore();
+  const hardwareController = useHardwareFeeds({
+    panelId: "sector-state",
+    panelTitle: "Light-Speed vs Strobing Scale",
+    help: SECTOR_STATE_HELP,
+    fileIngest: {
+      endpoint: "/api/helix/hardware/sector-state",
+      kind: "sector-state",
+    },
+  });
 
   const derived = queryClient.getQueryData<any>(["helix:pipeline:derived"]);
 
@@ -201,10 +260,13 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
 
   return (
     <div className={`rounded-lg border bg-gradient-to-br ${modeTint} p-4`}>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-3">
         <div className="text-sm font-semibold">Light-Speed vs Strobing Scale</div>
-        <div className="text-xs text-slate-400">
-          Mode: <span className="uppercase">{(pipeline as any)?.currentMode ?? "-"}</span>
+        <div className="flex items-center gap-3">
+          <HardwareConnectButton controller={hardwareController} />
+          <div className="text-xs text-slate-400">
+            Mode: <span className="uppercase">{(pipeline as any)?.currentMode ?? "-"}</span>
+          </div>
         </div>
       </div>
 

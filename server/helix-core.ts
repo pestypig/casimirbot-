@@ -3,8 +3,8 @@ import { Request, Response } from "express";
 import { z } from "zod";
 // Use built-in fetch when available (Node ≥18), fallback to node-fetch
 import {
-  initializePipelineState, 
-  calculateEnergyPipeline, 
+  initializePipelineState,
+  calculateEnergyPipeline,
   switchMode,
   updateParameters,
   computeEnergySnapshot,
@@ -12,18 +12,40 @@ import {
   setGlobalPipelineState,
   sampleDisplacementField,
   MODE_CONFIGS,
-  orchestrateVacuumGapSweep
+  orchestrateVacuumGapSweep,
+  appendSweepRows,
+  getSweepHistoryTotals,
 } from "./energy-pipeline";
 // Import the type on a separate line to avoid esbuild/tsx parse grief
 import type { EnergyPipelineState, ScheduleSweepRequest } from "./energy-pipeline";
-import { computeSweepPointExtended, stability_check } from "../modules/dynamic/dynamic-casimir.js";
+import {
+  computeSweepPointExtended,
+  stability_check,
+  applyVacuumSweepGuardrails,
+} from "../modules/dynamic/dynamic-casimir.js";
 import { omega0_from_gap, domega0_dd } from "../modules/sim_core/static-casimir.js";
 import { writePhaseCalibration, reducePhaseCalLogToLookup } from "./utils/phase-calibration.js";
 // ROBUST speed of light import: handle named/default or missing module gracefully
 import { C } from './utils/physics-const-safe';
 import { buildCurvatureBrick, serializeBrick, type CurvBrickParams } from "./curvature-brick";
-import { dynamicConfigSchema, vacuumGapSweepConfigSchema, sweepSpecSchema } from "../shared/schema.js";
-import type { SweepSpec, SweepProgressEvent, SweepGuardSpec, RangeSpec } from "../shared/schema.js";
+import {
+  dynamicConfigSchema,
+  vacuumGapSweepConfigSchema,
+  sweepSpecSchema,
+  hardwareSectorStateSchema,
+  hardwareQiSampleSchema,
+  hardwareSpectrumFrameSchema,
+} from "../shared/schema.js";
+import type {
+  SweepSpec,
+  SweepProgressEvent,
+  SweepGuardSpec,
+  RangeSpec,
+  VacuumGapSweepRow,
+  HardwareSectorState,
+  HardwareQiSample,
+  HardwareSpectrumFrame,
+} from "../shared/schema.js";
 import { getSpectrumSnapshots, postSpectrum } from "./metrics/spectrum.js";
 import type { SpectrumSnapshot } from "./metrics/spectrum.js";
 import { slewPump } from "./instruments/pump.js";
@@ -44,6 +66,186 @@ class Mutex {
   }
 }
 const pipeMutex = new Mutex();
+
+type HardwareBroadcast = (topic: string, payload: unknown) => void;
+let hardwareBroadcast: HardwareBroadcast | null = null;
+
+export function registerHardwareBroadcast(fn: HardwareBroadcast | null) {
+  hardwareBroadcast = fn ?? null;
+}
+
+const zPlateauSummary = z
+  .object({
+    phi_min_deg: z.number(),
+    phi_max_deg: z.number(),
+    width_deg: z.number(),
+    G_ref_dB: z.number(),
+    Q_penalty_pct: z.number(),
+  })
+  .passthrough();
+const zSweepRow = z
+  .object({
+    d_nm: z.number().optional(),
+    m: z.number().optional(),
+    Omega_GHz: z.number().optional(),
+    phi_deg: z.number().optional(),
+    G: z.number().optional(),
+    QL: z.number().optional(),
+    QL_base: z.number().optional(),
+    stable: z.boolean().optional(),
+    status: z.enum(["PASS", "WARN", "UNSTABLE"]).optional(),
+    detune_MHz: z.number().optional(),
+    kappa_Hz: z.number().optional(),
+    kappaEff_Hz: z.number().optional(),
+    kappa_MHz: z.number().optional(),
+    kappaEff_MHz: z.number().optional(),
+    pumpRatio: z.number().optional(),
+    plateau: z.union([zPlateauSummary, z.null()]).optional(),
+    crest: z.boolean().optional(),
+    notes: z.array(z.string()).optional(),
+    Omega_rad_s: z.number().optional(),
+    dB_squeeze: z.number().optional(),
+    sidebandAsym: z.number().optional(),
+    noiseTemp_K: z.number().optional(),
+    deltaU_cycle_J: z.number().optional(),
+    deltaU_mode_J: z.number().optional(),
+    negEnergyProxy: z.number().optional(),
+    pumpPhase_deg: z.number().optional(),
+    g_lin: z.number().optional(),
+    // Hardware aliases
+    gap_nm: z.number().optional(),
+    modulationDepth_pct: z.number().optional(),
+    pumpFreq_GHz: z.number().optional(),
+  })
+  .passthrough();
+
+type SweepRowInput = z.infer<typeof zSweepRow>;
+
+const toFinite = (value: number | undefined, fallback = 0) =>
+  Number.isFinite(value) ? (value as number) : fallback;
+
+const toOptionalFinite = (value: number | undefined) =>
+  Number.isFinite(value) ? (value as number) : undefined;
+
+function num(x: unknown): number | undefined {
+  if (x == null || x === "") return undefined;
+  const n = Number(x);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function pick<T>(...vals: (T | undefined)[]): T | undefined {
+  for (const v of vals) {
+    if (v !== undefined) return v;
+  }
+  return undefined;
+}
+
+function toVacuumRow(payload: SweepRowInput): VacuumGapSweepRow {
+  const r: any = { ...payload };
+
+  // Phase normalization and mirroring
+  const phi = num(pick(r.phi_deg, r.pumpPhase_deg, r.phase_deg));
+  if (phi !== undefined) {
+    r.phi_deg = phi;
+    if (r.pumpPhase_deg === undefined) r.pumpPhase_deg = phi;
+  }
+
+  // Frequency and detune conversions
+  const kappaMHz = pick(num(r.kappa_MHz), r.kappa_Hz != null ? num(r.kappa_Hz / 1e6) : undefined);
+  if (kappaMHz !== undefined) r.kappa_MHz = kappaMHz;
+
+  const detuneMHz = pick(num(r.detune_MHz), r.detune_Hz != null ? num(r.detune_Hz / 1e6) : undefined);
+  if (detuneMHz !== undefined) r.detune_MHz = detuneMHz;
+
+  const omegaGHz = pick(num(r.Omega_GHz), num(r.pumpFreq_GHz), num(r.freq_GHz));
+  if (omegaGHz !== undefined) r.Omega_GHz = omegaGHz;
+
+  // Geometry and modulation depth
+  const gapNm = pick(num(r.d_nm), num(r.gap_nm));
+  if (gapNm !== undefined) r.d_nm = gapNm;
+
+  const depthPct = pick(num(r.depth_pct), num(r.modulationDepth_pct), num(r.mDepth_pct));
+  if (depthPct !== undefined) {
+    r.depth_pct = depthPct;
+    r.m = depthPct <= 1 ? depthPct : depthPct / 100;
+  } else {
+    const mCandidate = num(r.m);
+    if (mCandidate !== undefined) {
+      r.m = mCandidate <= 1 ? mCandidate : mCandidate / 100;
+      if (r.depth_pct === undefined) r.depth_pct = r.m * 100;
+    } else {
+      r.m = 0;
+    }
+  }
+
+  // Gains, Q, ratios
+  const gain = pick(num(r.G), num(r.gain_dB), num(r.gain));
+  if (gain !== undefined) r.G = gain;
+
+  const ql = pick(num(r.QL), num(r.q_loaded), num(r.qLoaded));
+  if (ql !== undefined) r.QL = ql;
+
+  const pumpRatio = pick(num(r.pumpRatio), num(r.pump_ratio));
+  if (pumpRatio !== undefined) r.pumpRatio = pumpRatio;
+
+  const rho = pick(num(r.rho), num(r.pumpRho));
+  if (rho !== undefined) r.rho = rho;
+
+  // Noise temperature and aliases
+  const noiseK = pick(num(r.noiseTemperature_K), num(r.noiseTemp_K), num(r.noise_temp_K));
+  if (noiseK !== undefined) {
+    r.noiseTemperature_K = noiseK;
+    r.noiseTemp_K = noiseK;
+  }
+
+  // Plateau aliases
+  const plateauWidth = pick(num(r.plateau?.width_deg), num(r.plateau_width_deg));
+  const plateauCenter = pick(num(r.plateau?.center_deg), num(r.plateau_center_deg));
+  if (plateauWidth !== undefined || plateauCenter !== undefined) {
+    r.plateau = {
+      ...(typeof r.plateau === "object" && r.plateau ? r.plateau : {}),
+      ...(plateauWidth !== undefined ? { width_deg: plateauWidth } : {}),
+      ...(plateauCenter !== undefined ? { center_deg: plateauCenter } : {}),
+    };
+  }
+
+  if (r.stable === undefined) r.stable = true;
+  if (r.status === undefined) r.status = "PASS";
+
+  const plateau = r.plateau ?? null;
+
+  const normalizedRow: VacuumGapSweepRow = {
+    d_nm: toFinite(r.d_nm),
+    m: toFinite(r.m),
+    Omega_GHz: toFinite(r.Omega_GHz),
+    phi_deg: toFinite(r.phi_deg),
+    G: toFinite(r.G),
+    QL: toOptionalFinite(r.QL),
+    stable: r.stable,
+    notes: Array.isArray(r.notes) ? r.notes : undefined,
+    QL_base: toOptionalFinite(r.QL_base),
+    Omega_rad_s: toOptionalFinite(r.Omega_rad_s),
+    detune_MHz: toOptionalFinite(r.detune_MHz),
+    kappaEff_Hz: toOptionalFinite(r.kappaEff_Hz),
+    kappa_MHz: toOptionalFinite(r.kappa_MHz),
+    kappaEff_MHz: toOptionalFinite(r.kappaEff_MHz),
+    pumpRatio: toOptionalFinite(r.pumpRatio),
+    status: r.status,
+    dB_squeeze: toOptionalFinite(r.dB_squeeze),
+    sidebandAsym: toOptionalFinite(r.sidebandAsym),
+    noiseTemp_K: toOptionalFinite(r.noiseTemp_K ?? r.noiseTemperature_K),
+    deltaU_cycle_J: toOptionalFinite(r.deltaU_cycle_J),
+    deltaU_mode_J: toOptionalFinite(r.deltaU_mode_J),
+    negEnergyProxy: toOptionalFinite(r.negEnergyProxy),
+    crest: r.crest ?? false,
+    plateau,
+    pumpPhase_deg: toFinite(r.pumpPhase_deg),
+    kappa_Hz: toOptionalFinite(r.kappa_Hz),
+    g_lin: toOptionalFinite(r.g_lin),
+  };
+
+  return { ...r, ...normalizedRow };
+}
 
 type SweepJob = {
   id: string;
@@ -1632,7 +1834,7 @@ export function getSpectrumLog(req: Request, res: Response) {
   }
 }
 
-export function postSpectrumLog(req: Request, res: Response) {
+export async function postSpectrumLog(req: Request, res: Response) {
   if (req.method === "OPTIONS") { setCors(res); return res.status(200).end(); }
   setCors(res);
   res.setHeader("Cache-Control", "no-store");
@@ -1640,6 +1842,44 @@ export function postSpectrumLog(req: Request, res: Response) {
   const body = (req.body && typeof req.body === "object") ? req.body as Record<string, unknown> : null;
   if (!body) {
     res.status(400).json({ error: "invalid-body" });
+    return;
+  }
+
+  if (Array.isArray((body as any).f_Hz) && Array.isArray((body as any).P_dBm)) {
+    const parsedFrame = hardwareSpectrumFrameSchema.safeParse(body);
+    if (!parsedFrame.success) {
+      res.status(400).json({ error: "invalid-spectrum-frame", details: parsedFrame.error.flatten() });
+      return;
+    }
+    const frame = parsedFrame.data as HardwareSpectrumFrame;
+    const now = Date.now();
+
+    try {
+      await pipeMutex.lock(async () => {
+        const current = getGlobalPipelineState();
+        const next: EnergyPipelineState = {
+          ...current,
+          hardwareTruth: {
+            ...(current.hardwareTruth ?? {}),
+            spectrumFrame: { ...frame, updatedAt: now },
+            updatedAt: now,
+          },
+        };
+        const updated = await calculateEnergyPipeline(next);
+        setGlobalPipelineState(updated);
+      });
+    } catch (err) {
+      console.error("[helix-core] ingest hardware spectrum frame failed:", err);
+      res.status(500).json({ error: "ingest-failed" });
+      return;
+    }
+
+    hardwareBroadcast?.("spectrum-tuner", {
+      type: "spectrum-frame",
+      frame,
+      ts: now,
+    });
+    res.status(201).json({ ok: true, points: frame.f_Hz.length });
     return;
   }
 
@@ -1672,7 +1912,208 @@ export function postSpectrumLog(req: Request, res: Response) {
   }
 
   const stored = postSpectrum(snapshot);
+  hardwareBroadcast?.("spectrum-tuner", {
+    type: "spectrum-snapshot",
+    snapshot,
+    ts: Date.now(),
+  });
   res.status(201).json(stored);
+}
+
+export async function ingestHardwareSweepPoint(req: Request, res: Response) {
+  if (req.method === "OPTIONS") {
+    setCors(res);
+    res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+    return res.status(200).end();
+  }
+
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+
+  const body = req.body && typeof req.body === "object" ? req.body : null;
+  if (!body) {
+    res.status(400).json({ error: "invalid-row", details: null });
+    return;
+  }
+
+  const parsed = zSweepRow.safeParse(body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid-row", details: parsed.error.flatten() });
+    return;
+  }
+
+  const row = toVacuumRow(parsed.data);
+  const include = applyVacuumSweepGuardrails(row);
+  if (!include) {
+    res.status(422).json({ ok: false, reason: "guardrails", row });
+    return;
+  }
+
+  const now = Date.now();
+  appendSweepRows([row]);
+  const totals = getSweepHistoryTotals();
+
+  try {
+    await pipeMutex.lock(async () => {
+      const current = getGlobalPipelineState();
+      const next: EnergyPipelineState = {
+        ...current,
+        vacuumGapSweepRowsTotal: totals.total,
+        vacuumGapSweepRowsDropped: totals.dropped,
+        hardwareTruth: {
+          ...(current.hardwareTruth ?? {}),
+          lastSweepRow: row,
+          totals,
+          updatedAt: now,
+        },
+      };
+      const updated = await calculateEnergyPipeline(next);
+      setGlobalPipelineState(updated);
+    });
+  } catch (err) {
+    console.error("[helix-core] ingest hardware sweep point failed:", err);
+    res.status(500).json({ error: "ingest-failed" });
+    return;
+  }
+
+  hardwareBroadcast?.("vacuum-gap-sweep", {
+    type: "sweep-point",
+    row,
+    totals,
+    ts: now,
+  });
+  res.status(200).json({ ok: true, totals });
+}
+
+export async function ingestHardwareSectorState(req: Request, res: Response) {
+  if (req.method === "OPTIONS") {
+    setCors(res);
+    res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+    return res.status(200).end();
+  }
+
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+
+  const body = req.body && typeof req.body === "object" ? req.body : null;
+  if (!body) {
+    res.status(400).json({ error: "invalid-sector-state" });
+    return;
+  }
+
+  const parsed = hardwareSectorStateSchema.safeParse(body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid-sector-state", details: parsed.error.flatten() });
+    return;
+  }
+
+  const payload = parsed.data as HardwareSectorState;
+  const now = Date.now();
+
+  try {
+    await pipeMutex.lock(async () => {
+      const current = getGlobalPipelineState();
+      const next: EnergyPipelineState = {
+        ...current,
+        hardwareTruth: {
+          ...(current.hardwareTruth ?? {}),
+          sectorState: { ...payload, updatedAt: now },
+          updatedAt: now,
+        },
+      };
+      const updated = await calculateEnergyPipeline(next);
+      if (payload.strobeHz != null && Number.isFinite(payload.strobeHz)) {
+        updated.strobeHz = payload.strobeHz;
+      }
+      if (payload.dwell_ms != null && Number.isFinite(payload.dwell_ms) && payload.dwell_ms > 0) {
+        updated.sectorPeriod_ms = payload.dwell_ms;
+      }
+      if (
+        payload.burst_ms != null &&
+        payload.dwell_ms != null &&
+        Number.isFinite(payload.dwell_ms) &&
+        payload.dwell_ms > 0
+      ) {
+        const duty = Math.max(0, Math.min(1, payload.burst_ms / payload.dwell_ms));
+        updated.dutyBurst = duty;
+        updated.dutyEffective_FR = duty;
+      }
+      if (payload.sectorsConcurrent != null && Number.isFinite(payload.sectorsConcurrent)) {
+        updated.sectorCount = Math.max(1, Math.round(payload.sectorsConcurrent));
+      }
+      if (payload.activeSectors != null && Number.isFinite(payload.activeSectors)) {
+        updated.activeSectors = Math.max(0, Math.round(payload.activeSectors));
+      }
+      setGlobalPipelineState(updated);
+    });
+  } catch (err) {
+    console.error("[helix-core] ingest hardware sector state failed:", err);
+    res.status(500).json({ error: "ingest-failed" });
+    return;
+  }
+
+  hardwareBroadcast?.("sector-state", {
+    type: "sector-state",
+    payload,
+    ts: now,
+  });
+  res.status(200).json({ ok: true });
+}
+
+export async function ingestHardwareQiSample(req: Request, res: Response) {
+  if (req.method === "OPTIONS") {
+    setCors(res);
+    res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+    return res.status(200).end();
+  }
+
+  setCors(res);
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Methods", "OPTIONS,POST");
+
+  const body = req.body && typeof req.body === "object" ? req.body : null;
+  if (!body) {
+    res.status(400).json({ error: "invalid-qi-sample" });
+    return;
+  }
+
+  const parsed = hardwareQiSampleSchema.safeParse(body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "invalid-qi-sample", details: parsed.error.flatten() });
+    return;
+  }
+
+  const sample = parsed.data as HardwareQiSample;
+  const now = Date.now();
+
+  try {
+    await pipeMutex.lock(async () => {
+      const current = getGlobalPipelineState();
+      const next: EnergyPipelineState = {
+        ...current,
+        hardwareTruth: {
+          ...(current.hardwareTruth ?? {}),
+          qiSample: { ...sample, updatedAt: now },
+          updatedAt: now,
+        },
+      };
+      const updated = await calculateEnergyPipeline(next);
+      setGlobalPipelineState(updated);
+    });
+  } catch (err) {
+    console.error("[helix-core] ingest hardware qi sample failed:", err);
+    res.status(500).json({ error: "ingest-failed" });
+    return;
+  }
+
+  hardwareBroadcast?.("qi-sample", {
+    type: "qi-sample",
+    payload: sample,
+    ts: now,
+  });
+  res.status(200).json({ ok: true });
 }
 
 // NEW: expose exact computeEnergySnapshot result for client verification

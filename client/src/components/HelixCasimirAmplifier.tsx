@@ -2204,6 +2204,38 @@ export default function HelixCasimirAmplifier({
     ? within(derived.M_total_calc, derived.M_total_report, 0.10, 1e-9)
     : true;
 
+  const formatCrosscheckMatch = (
+    calc: number | null | undefined,
+    report: number | null | undefined,
+    tolerancePct: number
+  ) => {
+    const calcValue = typeof calc === "number" ? calc : Number.NaN;
+    const reportValue = typeof report === "number" ? report : Number.NaN;
+
+    if (!Number.isFinite(reportValue) || Math.abs(reportValue) <= 1e-9) {
+      return "— awaiting reference";
+    }
+    if (!Number.isFinite(calcValue)) {
+      return "⚠ calculation missing";
+    }
+
+    const diffPct =
+      Math.abs(calcValue - reportValue) / Math.max(Math.abs(reportValue), 1e-9) * 100;
+    const status = diffPct <= tolerancePct ? "✓ Good" : "⚠ Check calibration";
+    return `${status} (${diffPct.toFixed(1)}% drift)`;
+  };
+
+  const powerMatchText = formatCrosscheckMatch(
+    derived.P_ship_avg_calc_MW,
+    derived.P_ship_avg_report_MW,
+    10
+  );
+  const massMatchText = formatCrosscheckMatch(
+    derived.M_total_calc,
+    derived.M_total_report,
+    10
+  );
+
   // Sectoring sanity
   const sectorTotal = (_metricsAny?.totalSectors ?? state.sectorStrobing ?? 0);
   const sectorOK = sectorTotal > 0 && Number.isFinite(sectorTotal);
@@ -2451,9 +2483,7 @@ export default function HelixCasimirAmplifier({
                   </div>
                   <div>P_ship (calc): {fmtNum(derived.P_ship_avg_calc_MW, "MW", 2)}</div>
                   <div>P_ship (report): {fmtNum(derived.P_ship_avg_report_MW, "MW", 2)}</div>
-                  <div className="text-xs text-slate-400">
-                    Match: {Math.abs((derived.P_ship_avg_calc_MW - derived.P_ship_avg_report_MW) / derived.P_ship_avg_report_MW * 100) < 10 ? "✓ Good" : "⚠ Check calibration"}
-                  </div>
+                  <div className="text-xs text-slate-400">Match: {powerMatchText}</div>
                 </div>
               </div>
               <div>
@@ -2462,9 +2492,7 @@ export default function HelixCasimirAmplifier({
                   <div>M_tile: {fmtNum(derived.M_tile, "kg", 6)}</div>
                   <div>M_total (calc): {fmtNum(derived.M_total_calc, "kg", 0)}</div>
                   <div>M_total (report): {fmtNum(derived.M_total_report, "kg", 0)}</div>
-                  <div className="text-xs text-slate-400">
-                    Match: {Math.abs((derived.M_total_calc - derived.M_total_report) / derived.M_total_report * 100) < 10 ? "✓ Good" : "⚠ Check calibration"}
-                  </div>
+                  <div className="text-xs text-slate-400">Match: {massMatchText}</div>
                 </div>
               </div>
             </div>
