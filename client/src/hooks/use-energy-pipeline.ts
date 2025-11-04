@@ -99,6 +99,7 @@ export interface EnergyPipelineState {
   phaseMode?: string;
   pumpPhase_deg?: number;
   phaseFreeze?: boolean;
+  negativeFraction?: number;   // share of sectors assigned to negative lobe (0..1)
 
   // Physics parameters
   gammaGeo: number;

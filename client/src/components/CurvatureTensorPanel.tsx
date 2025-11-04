@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { createProgram, makeGrid, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
+import {
+  AlcubierreParams,
+  Vec3,
+  theta as computeTheta,
+} from "@/physics/alcubierre";
 
 // --- helpers: mode-driven β and bubble R, vector utils -------------------------
 const fmtExp = (x:any) => {
@@ -207,19 +212,58 @@ export default function CurvatureTensorPanel({ className }: Props){
 
   const beta = useMemo(() => pickBetaFromMode(live, null), [live]);
   const R = useMemo(() => pickRFromLive(live, axesNorm), [live, axesNorm]);
+  const bubbleCenter = useMemo<Vec3>(() => {
+    const candidate =
+      (live as any)?.bubble?.center ??
+      (live as any)?.bubble?.centerMetric ??
+      (live as any)?.bubbleCenter ??
+      (live as any)?.center;
+    if (Array.isArray(candidate) && candidate.length >= 3) {
+      const cx = Number(candidate[0]);
+      const cy = Number(candidate[1]);
+      const cz = Number(candidate[2]);
+      return [
+        Number.isFinite(cx) ? cx : 0,
+        Number.isFinite(cy) ? cy : 0,
+        Number.isFinite(cz) ? cz : 0,
+      ] as Vec3;
+    }
+    if (candidate && typeof candidate === "object") {
+      const cx = Number((candidate as any).x);
+      const cy = Number((candidate as any).y);
+      const cz = Number((candidate as any).z);
+      if ([cx, cy, cz].every((n) => Number.isFinite(n))) {
+        return [cx, cy, cz] as Vec3;
+      }
+    }
+    return [0, 0, 0] as Vec3;
+  }, [live]);
+
+  const bubbleParams = useMemo<AlcubierreParams>(
+    () => ({
+      R: Math.max(1e-6, R),
+      sigma,
+      v: beta,
+      center: bubbleCenter,
+    }),
+    [R, sigma, beta, bubbleCenter]
+  );
   const driveDir = useMemo<[number,number,number]>(() => normalize3((live as any)?.driveDir ?? [1,0,0]), [live]);
 
   // --- adaptive height gain -----------------------------------------------------
   // Estimate peak |θ_York| near the shell: |β| * [σ/(2 tanh(σR))] * √d_FR
   const estThetaPeak = useMemo(() => {
-    const Rpos = Math.max(1e-3, R);
-    const tanhSR = Math.tanh(Math.max(1e-6, sigma * Rpos));
-    const dfPeak = sigma / (2 * Math.max(1e-6, tanhSR)); // ≈ σ/2 when σR >> 1
-    const op = opGate; // already √d_FR
-    const val = Math.abs(beta) * dfPeak * op;
+    const params = bubbleParams;
+    const op = opGate;
+    if (!(op > 0)) return 0;
+    const cx = params.center[0];
+    const cy = params.center[1];
+    const cz = params.center[2];
+    const ahead = computeTheta(cx + params.R, cy, cz, params);
+    const aft = computeTheta(cx - params.R, cy, cz, params);
+    const val = Math.max(Math.abs(ahead), Math.abs(aft)) * op;
     return Number.isFinite(val) ? Math.max(0, val) : 0;
-  }, [beta, sigma, R, opGate]);
-  // Choose gain so max height ≈ 20% of R (keeps in frame but clearly visible)
+  }, [bubbleParams, opGate]);
   const gain = useMemo(() => {
     const target = 0.20 * Math.max(1, R);
     if (!(estThetaPeak > 1e-12)) return 0.0;

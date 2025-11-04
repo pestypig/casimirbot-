@@ -96,6 +96,7 @@ const DEFAULT_QI_TAU_MS = parseEnvNumber(process.env.QI_TAU_MS, 5);
 const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env.QI_GUARD, 0.05);
 const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
 const DEFAULT_QI_BOUND_SCALAR = configuredQiScalarBound();
+const DEFAULT_NEGATIVE_FRACTION = 0.4;
 
 const DEFAULT_QI_SETTINGS: QiSettings = {
   sampler: 'gaussian',
@@ -290,6 +291,7 @@ export interface EnergyPipelineState {
   concurrentSectors: number; // Live concurrent sectors (1-2)
   sectorStrobing: number;     // Legacy alias for UI compatibility
   qSpoilingFactor: number;
+  negativeFraction: number;   // Share of sectors assigned to negative lobe (0..1)
 
   // Physics parameters
   gammaGeo: number;
@@ -1233,6 +1235,7 @@ export function initializePipelineState(): EnergyPipelineState {
     concurrentSectors: 1,    // Live concurrent sectors (default 1)
     sectorStrobing: 1,       // Legacy alias
     qSpoilingFactor: 1,
+    negativeFraction: DEFAULT_NEGATIVE_FRACTION,
 
     // Physics defaults (paper-backed)
     gammaGeo: 26,
@@ -1370,6 +1373,12 @@ export async function calculateEnergyPipeline(
   (state as any).viewMassFractionHint = S_live / Math.max(1, S_total);
   state.tilesPerSector  = Math.floor(state.N_tiles / Math.max(1, S_total));
   state.activeTiles     = state.tilesPerSector * S_live;
+  (state as any).tiles = {
+    total: state.N_tiles,
+    active: state.activeTiles,
+    tileArea_cm2: state.tileArea_cm2,
+    hullArea_m2: state.hullArea_m2,
+  };
 
   // Safety alias for consumers that assume ≥1 sectors for math
   (state as any).concurrentSectorsSafe = Math.max(1, state.concurrentSectors);
@@ -1689,6 +1698,10 @@ export async function calculateEnergyPipeline(
     ? Number(state.qi!.tau_s_ms)
     : DEFAULT_QI_SETTINGS.tau_s_ms;
   const sampler = state.qi?.sampler ?? DEFAULT_QI_SETTINGS.sampler;
+  const negativeFraction =
+    Number.isFinite(state.negativeFraction)
+      ? Math.max(0, Math.min(1, state.negativeFraction))
+      : DEFAULT_NEGATIVE_FRACTION;
 
   const phaseSchedule = computeSectorPhaseOffsets({
     N: totalSectors,
@@ -1696,7 +1709,7 @@ export async function calculateEnergyPipeline(
     phase01,
     tau_s_ms: tauMs,
     sampler,
-    negativeFraction: 0.4,
+    negativeFraction,
     deltaPos_deg: 90,
     neutral_deg: 45,
   });
@@ -2092,8 +2105,10 @@ export async function updateParameters(
   params: Partial<EnergyPipelineState>,
   opts: PipelineRunOptions = {},
 ): Promise<EnergyPipelineState> {
-  if (params.dynamicConfig) {
-    const incoming = params.dynamicConfig as MutableDynamicConfig;
+  const nextParams: Partial<EnergyPipelineState> = { ...params };
+
+  if (nextParams.dynamicConfig) {
+    const incoming = nextParams.dynamicConfig as MutableDynamicConfig;
     const current = state.dynamicConfig ?? {};
     const nextDynamic: MutableDynamicConfig = {
       ...current,
@@ -2106,10 +2121,14 @@ export async function updateParameters(
       };
     }
     state.dynamicConfig = nextDynamic;
-    delete (params as any).dynamicConfig;
+    delete (nextParams as any).dynamicConfig;
   }
 
-  Object.assign(state, params);
+  if (typeof nextParams.negativeFraction === "number" && Number.isFinite(nextParams.negativeFraction)) {
+    nextParams.negativeFraction = Math.max(0, Math.min(1, nextParams.negativeFraction));
+  }
+
+  Object.assign(state, nextParams);
   return await calculateEnergyPipeline(state, opts);
 }
 

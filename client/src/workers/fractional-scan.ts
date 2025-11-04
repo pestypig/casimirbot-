@@ -17,6 +17,41 @@ export type FractionalLine = {
   sidebands?: FractionalSidebands;
 };
 
+export type FractionalGridSpec = {
+  numeratorMax: number;
+  denominatorMax: number;
+  minRatio?: number;
+  maxRatio?: number;
+  minFrequencyHz?: number;
+  maxFrequencyHz?: number;
+  segmentCount?: number;
+};
+
+export type FractionalGridCell = {
+  p: number;
+  q: number;
+  ratio: number;
+  fHz: number;
+  coherence: number;
+  coherenceEff: number;
+  stability: number;
+  sigma: number;
+  phase: number;
+  amplitude: number;
+  snr: number;
+};
+
+export type FractionalGridPayload = {
+  cells: FractionalGridCell[];
+  rows: number;
+  cols: number;
+  numeratorMax: number;
+  denominatorMax: number;
+  f0: number;
+  fs: number;
+  timestamp: number;
+};
+
 export type FractionalScanConfig = {
   fs: number;
   f0: number;
@@ -24,6 +59,7 @@ export type FractionalScanConfig = {
   hopMs: number;
   ratios: number[];
   sidebandDeltaHz: number;
+  grid?: FractionalGridSpec | null;
 };
 
 type WorkerMessage =
@@ -36,6 +72,7 @@ type WorkerResponse = {
   IFC: number;
   SS: number;
   lines: FractionalLine[];
+  grid?: FractionalGridPayload | null;
 };
 
 const ctx: any = self as any;
@@ -75,12 +112,13 @@ function goertzel(samples: Float32Array, fs: number, f: number) {
     s2 = s1;
     s1 = s0;
   }
-  const real = s1 - s2 * Math.cos(omega);
+  const cos = Math.cos(omega);
+  const real = s1 - s2 * cos;
   const imag = s2 * sin;
   const power = real * real + imag * imag;
   const amplitude = Math.sqrt(power) / (samples.length / 2);
   const phase = Math.atan2(imag, real);
-  return { A: amplitude, P: power, phase };
+  return { A: amplitude, P: power, phase, real, imag };
 }
 
 function noiseFloor(samples: Float32Array) {
@@ -92,6 +130,179 @@ function noiseFloor(samples: Float32Array) {
     count++;
   }
   return count > 0 ? (0.8 * accum) / count + 1e-12 : 1e-12;
+}
+
+function normalizeAngle(angle: number) {
+  let value = angle;
+  while (value <= -Math.PI) value += 2 * Math.PI;
+  while (value > Math.PI) value -= 2 * Math.PI;
+  return value;
+}
+
+function clampSegmentCount(windowSize: number, requested: number) {
+  const maxSegmentsFromWindow = Math.max(3, Math.floor(windowSize / 128));
+  const bounded = Math.min(Math.max(3, requested), maxSegmentsFromWindow);
+  return bounded;
+}
+
+type GoertzelResult = ReturnType<typeof goertzel>;
+
+type CoherenceStats = {
+  R: number;
+  R_eff: number;
+  sigma: number;
+  sigmaNorm: number;
+  meanPhase: number;
+};
+
+function computeCoherenceStats(
+  samples: Float32Array,
+  fs: number,
+  f: number,
+  segments: number,
+  kernel: GoertzelResult,
+  noise: number,
+): CoherenceStats {
+  const safeNoise = Math.max(noise, 1e-12);
+  const maxSegments = clampSegmentCount(samples.length, segments);
+  const segmentSize = Math.floor(samples.length / maxSegments);
+  if (segmentSize < 24 || maxSegments < 3) {
+    const snr = kernel.A / safeNoise;
+    const fallback = Math.max(0, Math.min(1, snr / (snr + 1)));
+    return {
+      R: fallback,
+      R_eff: fallback * 0.5,
+      sigma: Math.PI / 2,
+      sigmaNorm: 0.5,
+      meanPhase: kernel.phase,
+    };
+  }
+
+  let sumRe = 0;
+  let sumIm = 0;
+  let count = 0;
+  let phases: number[] = [];
+
+  for (let idx = 0; idx < maxSegments; idx++) {
+    const start = idx * segmentSize;
+    const end = idx === maxSegments - 1 ? samples.length : start + segmentSize;
+    if (end - start < 16) continue;
+    const segmentView = samples.subarray(start, end);
+    const segmentKernel = goertzel(segmentView, fs, f);
+    phases.push(segmentKernel.phase);
+    sumRe += Math.cos(segmentKernel.phase);
+    sumIm += Math.sin(segmentKernel.phase);
+    count++;
+  }
+
+  if (count === 0) {
+    const snr = kernel.A / safeNoise;
+    const fallback = Math.max(0, Math.min(1, snr / (snr + 1)));
+    return {
+      R: fallback,
+      R_eff: fallback * 0.5,
+      sigma: Math.PI / 2,
+      sigmaNorm: 0.5,
+      meanPhase: kernel.phase,
+    };
+  }
+
+  const R = Math.sqrt(sumRe * sumRe + sumIm * sumIm) / count;
+  const meanPhase = Math.atan2(sumIm, sumRe);
+  let variance = 0;
+  if (count > 1) {
+    for (const phase of phases) {
+      const delta = normalizeAngle(phase - meanPhase);
+      variance += delta * delta;
+    }
+  }
+  const sigma = count > 1 ? Math.sqrt(variance / (count - 1)) : 0;
+  const sigmaNorm = Math.max(0, Math.min(1, sigma / Math.PI));
+  const R_eff = R * (1 - sigmaNorm);
+  return { R, R_eff, sigma, sigmaNorm, meanPhase };
+}
+
+function buildFractionalGrid(
+  samples: Float32Array,
+  fs: number,
+  f0: number,
+  noise: number,
+  spec: FractionalGridSpec,
+): FractionalGridPayload | null {
+  if (!Number.isFinite(f0) || f0 <= 0) return null;
+  const numeratorMax = Math.max(1, Math.floor(spec.numeratorMax));
+  const denominatorMax = Math.max(1, Math.floor(spec.denominatorMax));
+  if (!Number.isFinite(numeratorMax) || !Number.isFinite(denominatorMax)) return null;
+
+  const minRatio = spec.minRatio && spec.minRatio > 0 ? spec.minRatio : 0;
+  const maxRatio = spec.maxRatio && spec.maxRatio > 0 ? spec.maxRatio : Number.POSITIVE_INFINITY;
+  const maxFrequency =
+    spec.maxFrequencyHz && Number.isFinite(spec.maxFrequencyHz)
+      ? Math.min(spec.maxFrequencyHz, fs * 0.49)
+      : fs * 0.49;
+  const minFrequency =
+    spec.minFrequencyHz && Number.isFinite(spec.minFrequencyHz) && spec.minFrequencyHz > 0
+      ? spec.minFrequencyHz
+      : 0;
+  const segmentCount = spec.segmentCount && spec.segmentCount > 0 ? spec.segmentCount : 6;
+  const safeNoise = Math.max(noise, 1e-12);
+
+  const cells: FractionalGridCell[] = [];
+  for (let p = 1; p <= numeratorMax; p++) {
+    for (let q = 1; q <= denominatorMax; q++) {
+      const ratio = p / q;
+      const fHz = ratio * f0;
+      const ratioInBand = ratio >= minRatio && ratio <= maxRatio;
+      const freqInBand =
+        ratioInBand && Number.isFinite(fHz) && fHz >= minFrequency && fHz <= maxFrequency && fHz < fs * 0.495;
+
+      if (!freqInBand) {
+        cells.push({
+          p,
+          q,
+          ratio,
+          fHz,
+          coherence: 0,
+          coherenceEff: 0,
+          stability: 0,
+          sigma: Math.PI,
+          phase: 0,
+          amplitude: 0,
+          snr: 0,
+        });
+        continue;
+      }
+
+      const kernel = goertzel(samples, fs, fHz);
+      const stats = computeCoherenceStats(samples, fs, fHz, segmentCount, kernel, safeNoise);
+      const snr = kernel.A / safeNoise;
+      cells.push({
+        p,
+        q,
+        ratio,
+        fHz,
+        coherence: Math.max(0, Math.min(1, stats.R)),
+        coherenceEff: Math.max(0, Math.min(1, stats.R_eff)),
+        stability: Math.max(0, Math.min(1, 1 - stats.sigmaNorm)),
+        sigma: stats.sigma,
+        phase: stats.meanPhase,
+        amplitude: kernel.A,
+        snr,
+      });
+    }
+  }
+
+  const timestamp = typeof performance !== "undefined" ? performance.now() : Date.now();
+  return {
+    cells,
+    rows: numeratorMax,
+    cols: denominatorMax,
+    numeratorMax,
+    denominatorMax,
+    f0,
+    fs,
+    timestamp,
+  };
 }
 
 function snapshotWindow(): Float32Array | null {
@@ -128,7 +339,7 @@ function pushSamples(samples: Float32Array) {
 
 function analyse(samples: Float32Array) {
   if (!config) return;
-  const { fs, f0, ratios, sidebandDeltaHz } = config;
+  const { fs, f0, ratios, sidebandDeltaHz, grid } = config;
   const floor = noiseFloor(samples);
 
   let integerPower = 0;
@@ -180,7 +391,8 @@ function analyse(samples: Float32Array) {
   const SS = sbSymmetryCount > 0 ? sbSymmetrySum / sbSymmetryCount : 0;
   const CP = qualitySum * Math.exp(0.1 * phaseStability / Math.max(1, ratios.length));
 
-  const payload: WorkerResponse = { CP, IFC, SS, lines };
+  const gridPayload = grid ? buildFractionalGrid(samples, fs, f0, floor, grid) : null;
+  const payload: WorkerResponse = { CP, IFC, SS, lines, grid: gridPayload };
   ctx.postMessage(payload);
 }
 

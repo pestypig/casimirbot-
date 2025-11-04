@@ -1,5 +1,5 @@
 ﻿import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
-
+import { subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import { queryClient } from "@/lib/queryClient";
 
 
@@ -6270,6 +6270,22 @@ export class Hull3DRenderer {
 
 
 
+  private intentVector: [number, number, number] = [0, 0, 0];
+
+
+
+  private intentMagnitude = 0;
+
+
+
+  private vizIntent = { enabled: false, mag01: 0, rise01: 0 };
+
+
+
+  private intentBusUnsub: (() => void) | null = null;
+
+
+
   private phaseFeedActive = false;
 
 
@@ -7156,6 +7172,12 @@ export class Hull3DRenderer {
 
     this.curvatureBusId = subscribe("hull3d:curvature", (payload: any) => {
       this.handleCurvatureBrick(payload);
+    });
+
+
+
+    this.intentBusUnsub = subscribeDriveIntent((payload: DriveIntentState) => {
+      this.handleIntentUpdate(payload);
     });
 
 
@@ -10213,9 +10235,99 @@ export class Hull3DRenderer {
   }
 
 
+  private handleIntentUpdate(payload: DriveIntentState) {
+    this.intentVector[0] = payload.intent.x;
+    this.intentVector[1] = payload.intent.y;
+    this.intentVector[2] = payload.intent.z;
+    this.intentMagnitude = Math.max(0, Math.min(1, payload.nudge01));
+  }
 
 
+  private resolveIntentOffset(state: Hull3DRendererState): [number, number, number] | null {
+    const radius =
+      Math.max(Math.abs(state.axes[0]), Math.abs(state.axes[1]), Math.abs(state.axes[2])) *
+      this.domainScale;
+    if (!Number.isFinite(radius) || radius <= 1e-6) return null;
 
+    const maxOffset = Math.max(0, Math.min(1, this.intentMagnitude));
+    if (maxOffset <= 1e-6) return null;
+
+    const viz = this.vizIntent;
+    const offset: [number, number, number] = [0, 0, 0];
+    let hasOffset = false;
+
+    if (viz.enabled) {
+      const mag01 = Math.max(0, Math.min(1, viz.mag01));
+      const rise01 = Math.max(-1, Math.min(1, viz.rise01));
+      const baseScale = radius * maxOffset;
+      if (mag01 > 1e-4) {
+        const yaw = TWO_PI * (this.phaseSignEffective * state.phase01);
+        const dirX = Math.sin(yaw);
+        const dirZ = Math.cos(yaw);
+        const mag = baseScale * mag01;
+        offset[0] += dirX * mag;
+        offset[2] += dirZ * mag;
+        if (Math.abs(mag) > 1e-6) {
+          hasOffset = true;
+        }
+      }
+      if (Math.abs(rise01) > 1e-4) {
+        const rise = baseScale * (rise01 * 0.6);
+        offset[1] += rise;
+        if (Math.abs(rise) > 1e-6) {
+          hasOffset = true;
+        }
+      }
+    }
+
+    if (!hasOffset) {
+      const [ix, iy, iz] = this.intentVector;
+      const intentMag = Math.hypot(ix, iy, iz);
+      if (Number.isFinite(intentMag) && intentMag > 1e-5) {
+        const scale = (radius * maxOffset) / intentMag;
+        offset[0] = ix * scale;
+        offset[1] = iz * scale;
+        offset[2] = iy * scale;
+        hasOffset = true;
+      }
+    }
+
+    if (!hasOffset && maxOffset > 1e-6) {
+      const yaw = TWO_PI * (this.phaseSignEffective * state.phase01);
+      const baseScale = radius * maxOffset;
+      offset[0] = Math.sin(yaw) * baseScale;
+      offset[2] = Math.cos(yaw) * baseScale;
+      hasOffset = true;
+    }
+
+    return hasOffset ? offset : null;
+  }
+
+
+  private deriveIntentMatrices(viewProj: Float32Array, state: Hull3DRendererState) {
+    const baseInvViewProj = invert(identity(), viewProj) ?? identity();
+    const offset = this.resolveIntentOffset(state);
+    if (!offset) {
+      return {
+        baseViewProj: viewProj,
+        baseInvViewProj,
+        hullViewProj: viewProj,
+        hullInvViewProj: baseInvViewProj,
+      };
+    }
+    const model = identity();
+    model[12] = offset[0];
+    model[13] = offset[1];
+    model[14] = offset[2];
+    const hullViewProj = multiply(identity(), viewProj, model);
+    const hullInvViewProj = invert(identity(), hullViewProj) ?? baseInvViewProj;
+    return {
+      baseViewProj: viewProj,
+      baseInvViewProj,
+      hullViewProj,
+      hullInvViewProj,
+    };
+  }
 
 
   draw() {
@@ -10562,11 +10674,23 @@ export class Hull3DRenderer {
 
 
 
-    const viewProj = multiply(identity(), proj, view);
+    const baseViewProj = multiply(identity(), proj, view);
 
 
 
-    const invViewProj = invert(identity(), viewProj) ?? identity();
+    const intentMatrices = this.deriveIntentMatrices(baseViewProj, state);
+
+
+
+    const viewProj = intentMatrices.baseViewProj;
+
+
+
+    const invViewProj = intentMatrices.baseInvViewProj;
+
+
+
+    const hullInvViewProj = intentMatrices.hullInvViewProj;
 
 
 
@@ -11377,7 +11501,7 @@ export class Hull3DRenderer {
 
 
 
-        this.runDiagnosticProbe(state, camera, invViewProj);
+        this.runDiagnosticProbe(state, camera, hullInvViewProj);
 
 
 
@@ -13762,7 +13886,7 @@ export class Hull3DRenderer {
 
 
 
-        invViewProj,
+        invViewProj: invViewProj,
 
 
 
@@ -14694,11 +14818,23 @@ export class Hull3DRenderer {
 
 
 
-      const viewProj = multiply(identity(), proj, view);
+      const baseViewProj = multiply(identity(), proj, view);
 
 
 
-      const invViewProj = invert(identity(), viewProj) ?? identity();
+      const intentMatrices = this.deriveIntentMatrices(baseViewProj, state);
+
+
+
+      const viewProj = intentMatrices.baseViewProj;
+
+
+
+      const invViewProj = intentMatrices.baseInvViewProj;
+
+
+
+      const hullInvViewProj = intentMatrices.hullInvViewProj;
 
 
 
@@ -15122,7 +15258,7 @@ export class Hull3DRenderer {
 
 
 
-        invViewProj,
+        invViewProj: invViewProj,
 
 
 
@@ -16650,6 +16786,46 @@ export class Hull3DRenderer {
 
 
 
+  setVizIntent(viz: { enabled: boolean; mag01: number; rise01: number }) {
+
+
+
+    const next = {
+
+
+
+      enabled: !!viz?.enabled,
+
+
+
+      mag01: Number.isFinite(viz?.mag01) ? Math.max(0, Math.min(1, viz.mag01)) : 0,
+
+
+
+      rise01: Number.isFinite(viz?.rise01)
+
+
+
+        ? Math.max(-1, Math.min(1, viz.rise01))
+
+
+
+        : 0,
+
+
+
+    };
+
+
+
+    this.vizIntent = next;
+
+
+
+  }
+
+
+
 
 
 
@@ -17599,6 +17775,22 @@ export class Hull3DRenderer {
 
 
       this.phaseLegacyBusId = null;
+
+
+
+    }
+
+
+
+    if (this.intentBusUnsub) {
+
+
+
+      this.intentBusUnsub();
+
+
+
+      this.intentBusUnsub = null;
 
 
 

@@ -667,6 +667,7 @@ const UpdateSchema = z.object({
   temperature_K: z.number().min(0).max(400).optional(),
   modulationFreq_GHz: z.number().min(0.001).max(1000).optional(),
   dynamicConfig: dynamicConfigUpdateSchema.optional(),
+  negativeFraction: z.number().min(0).max(1).optional(),
 /* BEGIN STRAY_DUPLICATED_BLOCK - commented out to fix top-level parse errors
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -1521,13 +1522,17 @@ export async function updatePipelineParams(req: Request, res: Response) {
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid parameters", issues: parsed.error.issues });
     }
+    const params = { ...parsed.data };
+    if (typeof params.negativeFraction === "number") {
+      params.negativeFraction = Math.max(0, Math.min(1, params.negativeFraction));
+    }
     const { nextState: newState, scheduledJob } = await pipeMutex.lock<{
       nextState: EnergyPipelineState;
       scheduledJob: SweepJob | null;
     }>(async () => {
       let pendingJob: SweepJob | null = null;
       const curr = getGlobalPipelineState();
-      const next = await updateParameters(curr, parsed.data, {
+      const next = await updateParameters(curr, params, {
         sweepMode: "async",
         sweepReason: "pipeline-update",
         scheduleSweep: (request) => {
@@ -1547,7 +1552,7 @@ export async function updatePipelineParams(req: Request, res: Response) {
       zeta_target: 0.5
     }, 'pipeline_update');
 
-    publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(parsed.data), ts: Date.now() });
+    publish("warp:reload", { reason: "pipeline-update", keys: Object.keys(params), ts: Date.now() });
 
     if (scheduledJob) {
       const isCurrentJob = newState.sweep?.jobId === scheduledJob.id;
@@ -1756,7 +1761,7 @@ export function getCurvatureBrick(req: Request, res: Response) {
     const phase01 = parseNumberParam(query.phase01, 0);
     const sigmaSector = parseNumberParam(query.sigmaSector, 0.05);
     const splitEnabled = parseBooleanParam(query.splitEnabled, false);
-    const splitFrac = parseNumberParam(query.splitFrac, 0.5);
+    const splitFrac = parseNumberParam(query.splitFrac, 0.6);
     const dutyFRState = (state as any).dutyEffectiveFR ?? (state as any).dutyEffective_FR ?? state.dutyCycle;
     const dutyFR = parseNumberParam(query.dutyFR, parseNumberParam(dutyFRState, 0.0025));
     const tauLCDerived = hull ? Math.max(hull.Lx_m, hull.Ly_m, hull.Lz_m) / C : 0.000001;

@@ -1,7 +1,7 @@
 ﻿// client/src/pages/helix-core.tsx
 import React, { useState, useEffect, useRef, useMemo, Suspense, lazy, startTransition, useCallback } from "react";
 import { Link } from "wouter";
-import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, Cpu, AlertTriangle, Target, CheckCircle2, Video, Layers } from "lucide-react";
+import { Home, Activity, Gauge, Brain, Terminal, Atom, Send, Settings, HelpCircle, AlertTriangle, Target, CheckCircle2, Video, Layers, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { C as SPEED_OF_LIGHT } from '@/lib/physics-const';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +28,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEnergyPipeline, useSwitchMode, MODE_CONFIGS, fmtPowerUnitFromW, ModeKey, useGreens } from "@/hooks/use-energy-pipeline";
 import useTimeLapseRecorder from "@/hooks/useTimeLapseRecorder";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
-import { useFractionalCoherence } from "@/hooks/useFractionalCoherence";
+import {
+  useFractionalCoherence,
+  type FractionalGridCellState,
+} from "@/hooks/useFractionalCoherence";
 import SpectrumTunerPanel from "@/components/SpectrumTunerPanel";
 import type { Provenance } from "@/components/SpectrumTunerPanel";
 import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
@@ -45,11 +48,18 @@ import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
 import { FractionalCoherenceRail } from "@/components/FractionalCoherenceRail";
+import { FractionalCoherenceGrid } from "@/components/FractionalCoherenceGrid";
+import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
+import openAiLogo from "@/assets/open-ai-logo.svg";
+import githubLogo from "@/assets/git hub symbol.svg";
 import { downloadCSV } from "@/utils/csv";
 import { computeTidalEij, type V3 } from "@/lib/tidal";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
 import DeepMixingSolarView from "@/components/DeepMixingSolarView";
+import DeepMixSweetSpot from "@/components/deepmix/DeepMixSweetSpot";
+import LumaPanel from "@/components/LumaPanel";
+const DeepMixGlobePanel = lazy(() => import("@/components/deepmix/DeepMixGlobePanel"));
 import {
   DeepMixingAutopilot,
   DEEP_MIXING_AUTOPILOT_STATES,
@@ -100,6 +110,29 @@ const DEEP_MIXING_STATE_BADGE: Record<DeepMixingAutopilotState, string> = {
 };
 
 const DEEP_MIXING_SECONDS_PER_YEAR = 365.25 * 86400;
+
+const PANEL_HASHES = {
+  fractionalRail: "fractional-coherence-rail",
+  fractionalGrid: "fractional-coherence-grid",
+  quickMode: "mode-switch",
+  warpShell: "warp-shell",
+  lightSpeed: "light-speed-timeline",
+  timeLapse: "time-lapse-demo",
+  driveGuards: "drive-guards",
+  energyControl: "energy-control",
+  complianceHud: "compliance-hud",
+  vacuumSweep: "vacuum-gap-sweep",
+  lumaPanel: "helix-luma-panel",
+  mainframeTerminal: "mainframe-terminal",
+  operationsToolbar: "operations-toolbar",
+  missionPlanner: "mission-planner",
+} as const;
+
+const HASH_ALIASES: Record<string, string> = {
+  "ledger-averaging": PANEL_HASHES.driveGuards,
+  "ledger-shift": PANEL_HASHES.driveGuards,
+  "ledger-step-b": PANEL_HASHES.driveGuards,
+};
 
 const clampPhaseBiasDeg = (value: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -735,6 +768,7 @@ import ResonanceSchedulerTile from "@/components/ResonanceSchedulerTile";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useActiveTiles } from "@/hooks/use-active-tiles";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
 
 // Mode-specific RF burst fractions now sourced from MODE_CONFIGS
 
@@ -1021,6 +1055,73 @@ useEffect(() => {
   }, []);
   const [visualizersInitialized, setVisualizersInitialized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      return;
+    }
+
+    const pending = new Set<number>();
+    const MAX_ATTEMPTS = 20;
+    const RETRY_DELAY_MS = 100;
+
+    const clearPending = () => {
+      pending.forEach((id) => window.clearTimeout(id));
+      pending.clear();
+    };
+
+    const scrollToHash = (rawHash: string) => {
+      const normalized = (rawHash ?? "").replace(/^#/, "").trim().toLowerCase();
+      if (!normalized) {
+        return;
+      }
+
+      clearPending();
+
+      const targetSlug = HASH_ALIASES[normalized] ?? normalized;
+
+      let attempts = 0;
+      const findAndScroll = () => {
+        const target =
+          document.querySelector<HTMLElement>(`[data-panel-hash="${targetSlug}"]`) ??
+          document.getElementById(targetSlug);
+
+        if (target) {
+          target.scrollIntoView({ block: "start", behavior: "smooth" });
+          return;
+        }
+
+        if (attempts >= MAX_ATTEMPTS) {
+          return;
+        }
+
+        attempts += 1;
+        const timeoutId = window.setTimeout(() => {
+          pending.delete(timeoutId);
+          findAndScroll();
+        }, RETRY_DELAY_MS);
+
+        pending.add(timeoutId);
+      };
+
+      findAndScroll();
+    };
+
+    if (window.location.hash) {
+      scrollToHash(window.location.hash);
+    }
+
+    const handleHashChange = () => {
+      scrollToHash(window.location.hash);
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      clearPending();
+    };
+  }, []);
 
   // Mode change signal system
   const [renderNonce, setRenderNonce] = useState(0);
@@ -1422,6 +1523,45 @@ useEffect(() => {
     timeLapseRecorder.isProcessing ||
     (!timeLapseRecorder.isRecording && sweepButtonsLocked);
   const sweepActive = !!sweepRuntime?.active;
+  const handleFractionalPump = useCallback(
+    async (cells: FractionalGridCellState[], _meta: { f0: number; fs: number }) => {
+      if (!cells.length) return;
+      const freqGHz = cells
+        .map((cell) => cell.fHz / 1e9)
+        .filter((value) => Number.isFinite(value) && value > 0) as number[];
+      if (!freqGHz.length) {
+        toast({
+          title: "No pump targets selected",
+          description: "Fractional coherence candidates are outside the supported band.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const normalized = freqGHz.map((value) => Number(value.toFixed(6)));
+      const payload: Partial<DynamicConfig> = {
+        pump_freq_GHz: normalized.length === 1 ? normalized[0] : normalized,
+      };
+      try {
+        await publishSweepControls(payload);
+        const descriptor =
+          normalized.length === 1
+            ? `${normalized[0].toFixed(4)} GHz`
+            : normalized.map((value) => `${value.toFixed(4)} GHz`).join(", ");
+        toast({
+          title: "Pump targets updated",
+          description: descriptor,
+        });
+      } catch (err) {
+        console.error("[Helix] Failed to publish fractional pump targets", err);
+        toast({
+          title: "Pump update failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+          variant: "destructive",
+        });
+      }
+    },
+    [publishSweepControls],
+  );
   const sweepCancelRequested = !!sweepRuntime?.cancelRequested;
   const [sweepTopN, setSweepTopN] = useState<number>(8);
   const [selectedSweep, setSelectedSweep] = useState<VacuumGapSweepRow | null>(null);
@@ -1723,8 +1863,10 @@ useEffect(() => {
 
   // Follow scheduler phase  drive sync phase (only when phaseMode="scheduler")
   useEffect(() => {
-    if (ds.phaseMode !== "scheduler") return;
+    const ingestWedge = useFlightDirectorStore.getState().ingestSchedulerWedge;
     const total = Math.max(1, Math.floor(totalSectors || 400));
+    const nowTs =
+      typeof performance !== "undefined" ? performance.now() : Date.now();
     const idxSrc = Number.isFinite(systemMetrics?.currentSector)
       ? Number(systemMetrics!.currentSector)
       : Number.isFinite(lc?.sectorIdx)
@@ -1732,12 +1874,24 @@ useEffect(() => {
         : 0;
     const wrapped = ((idxSrc % total) + total) % total;
     const basePhase = wrapped / total;
+
+    if (typeof ingestWedge === "function") {
+      try {
+        ingestWedge(basePhase, nowTs);
+      } catch {
+        // non-fatal: flight director store may not be initialised yet
+      }
+    }
+
     const biasFraction = clampPhaseBiasDeg(pumpPhaseBiasDeg) / 360;
     let phase01 = basePhase + biasFraction;
     phase01 = phase01 - Math.floor(phase01);
     if (phase01 < 0) {
       phase01 += 1;
     }
+
+    if (ds.phaseMode !== "scheduler") return;
+
     if (typeof ds.setPhase === "function") {
       ds.setPhase(phase01);
     }
@@ -2534,13 +2688,43 @@ useEffect(() => {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
-              <Cpu className="w-8 h-8 text-cyan-400" />
+              <HelixMarkIcon className="w-8 h-8 text-cyan-400" strokeWidth={36} />
               <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">HELIX-CORE</h1>
                 <p className="text-sm text-slate-400">Needle Hull Mainframe System</p>
               </div>
             </div>
             <div className="flex gap-2">
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                className="border-[#22d3ee] bg-slate-950 text-[#22d3ee] hover:bg-[#22d3ee]/10"
+              >
+                <a
+                  href="https://github.com/pestypig/casimirbot-"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open CasimirBot GitHub repository"
+                >
+                  <img src={githubLogo} alt="" className="h-5 w-5" />
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="icon"
+                className="border-[#22d3ee] bg-slate-950 text-[#22d3ee] hover:bg-[#22d3ee]/10"
+              >
+                <a
+                  href="https://chatgpt.com/g/g-68e7078db5948191b77f265d4e25eacf-needle-hull-mk-1"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Open Needle Hull MK-1 Custom GPT"
+                >
+                  <img src={openAiLogo} alt="" className="h-5 w-5" />
+                </a>
+              </Button>
               <Link href="/why">
                 <Badge
                   variant="outline"
@@ -2561,14 +2745,32 @@ useEffect(() => {
 
           <VacuumContractBadge contract={vacuumContract} className="mb-4" />
 
-          <div className="mb-4">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
+          <section
+            id={PANEL_HASHES.lumaPanel}
+            data-panel-hash={PANEL_HASHES.lumaPanel}
+            className="mb-6"
+          >
+            <LumaPanel />
+          </section>
+
+          <div className="mb-4 space-y-3">
+            <div
+              id={PANEL_HASHES.fractionalRail}
+              data-panel-hash={PANEL_HASHES.fractionalRail}
+              className="rounded-lg border border-slate-800 bg-slate-900/60 p-3"
+            >
               <FractionalCoherenceRail state={fractional} compact />
+            </div>
+            <div id={PANEL_HASHES.fractionalGrid} data-panel-hash={PANEL_HASHES.fractionalGrid}>
+              <FractionalCoherenceGrid
+                state={fractional}
+                onSendToPump={handleFractionalPump}
+              />
             </div>
           </div>
 
           {/* === Quick Operational Mode Switch (global) === */}
-          <div className="mb-4">
+          <div id={PANEL_HASHES.quickMode} data-panel-hash={PANEL_HASHES.quickMode} className="mb-4">
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: "standby", label: "Standby", hint: "Field idle" },
@@ -2630,7 +2832,11 @@ useEffect(() => {
           />
 
           {/* ====== SHELL OUTLINE VIEWER (wireframe surfaces) ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <Card
+            id={PANEL_HASHES.warpShell}
+            data-panel-hash={PANEL_HASHES.warpShell}
+            className="bg-slate-900/50 border-slate-800 mb-4"
+          >
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 Warp Bubble  Shell Outline (=1)
@@ -2758,7 +2964,11 @@ useEffect(() => {
       </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <Card
+            id={PANEL_HASHES.lightSpeed}
+            data-panel-hash={PANEL_HASHES.lightSpeed}
+            className="bg-slate-900/50 border-slate-800 mb-4"
+          >
             <CardHeader>
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 c vs Strobing Timeline
@@ -2792,7 +3002,11 @@ useEffect(() => {
           </Card>
 
           {/* ====== Time-Lapse Demo ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <Card
+            id={PANEL_HASHES.timeLapse}
+            data-panel-hash={PANEL_HASHES.timeLapse}
+            className="bg-slate-900/50 border-slate-800 mb-4"
+          >
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Video className="w-5 h-5 text-cyan-400" />
@@ -2929,12 +3143,20 @@ useEffect(() => {
           </Card>
 
           {/* ====== Cycle-Averaged Drive Budget ====== */}
-          <div className="mb-4">
-            <DriveGuardsPanel />
+          <div
+            id={PANEL_HASHES.driveGuards}
+            data-panel-hash={PANEL_HASHES.driveGuards}
+            className="mb-4"
+          >
+            <DriveGuardsPanel panelHash={PANEL_HASHES.driveGuards} />
           </div>
 
           {/* ====== OPERATIONAL MODES / ENERGY CONTROL (below hero) ====== */}
-          <Card className="bg-slate-900/50 border-slate-800 mb-4">
+          <Card
+            id={PANEL_HASHES.energyControl}
+            data-panel-hash={PANEL_HASHES.energyControl}
+            className="bg-slate-900/50 border-slate-800 mb-4"
+          >
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Activity className="w-5 h-5 text-yellow-400" />
@@ -3338,7 +3560,11 @@ useEffect(() => {
             {/* Left column: Compliance, Quantum Inequality, Shift Vector */}
             <div className="space-y-4">
               {/* Metric Compliance HUD */}
-              <Card className="bg-slate-900/50 border-slate-800">
+              <Card
+                id={PANEL_HASHES.complianceHud}
+                data-panel-hash={PANEL_HASHES.complianceHud}
+                className="bg-slate-900/50 border-slate-800"
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Gauge className="w-5 h-5 text-green-400" />
@@ -3532,7 +3758,11 @@ useEffect(() => {
               <GreensLivePanel />
               <SpectrumTunerPanel inputs={spectrumInputs} />
               {/* Vacuum-gap Sweep card */}
-              <Card className="bg-slate-900/50 border-slate-800">
+              <Card
+                id={PANEL_HASHES.vacuumSweep}
+                data-panel-hash={PANEL_HASHES.vacuumSweep}
+                className="bg-slate-900/50 border-slate-800"
+              >
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
                     Vacuum-gap Sweep (Nb3Sn / DCE)
@@ -3769,7 +3999,11 @@ useEffect(() => {
             {SHOW_LOG_TERMINAL && (
               <>
                 {/* Log + Document Terminal */}
-                <Card className="bg-slate-900/50 border-slate-800">
+                <Card
+                  id={PANEL_HASHES.mainframeTerminal}
+                  data-panel-hash={PANEL_HASHES.mainframeTerminal}
+                  className="bg-slate-900/50 border-slate-800"
+                >
                   <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Terminal className="w-5 h-5 text-orange-400" />
@@ -3871,7 +4105,11 @@ useEffect(() => {
 
               {/* Operations Toolbar (hidden) */}
               {false && (
-              <Card className="bg-slate-900/50 border-slate-800">
+              <Card
+                id={PANEL_HASHES.operationsToolbar}
+                data-panel-hash={PANEL_HASHES.operationsToolbar}
+                className="bg-slate-900/50 border-slate-800"
+              >
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2">
                     <Settings className="w-5 h-5 text-cyan-400" />
@@ -4083,7 +4321,7 @@ useEffect(() => {
               />
 
               {/* Mission Planner - Galactic Maps */}
-              <Card>
+              <Card id={PANEL_HASHES.missionPlanner} data-panel-hash={PANEL_HASHES.missionPlanner}>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CardTitle className="text-sm font-semibold">Mission Planner</CardTitle>
@@ -4346,7 +4584,7 @@ useEffect(() => {
                               <div className="h-[65vh] overflow-hidden rounded border border-slate-800">
                                 <iframe
                                   title="Deep Mixing plan"
-                                  src="/docs/deep-mixing-plan.html"
+                                  src="/deep-mixing-plan"
                                   className="h-full w-full bg-black"
                                   loading="lazy"
                                 />
@@ -4498,6 +4736,14 @@ useEffect(() => {
                           </div>
                         </div>
                       </div>
+                      <section id="deep-mix-globe">
+                        <Suspense fallback={null}>
+                          <DeepMixGlobePanel />
+                        </Suspense>
+                      </section>
+                      <section id="deep-mix-sweet-spot">
+                        <DeepMixSweetSpot />
+                      </section>
                     </div>
                   )}
                 </CardContent>

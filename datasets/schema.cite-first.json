@@ -1,0 +1,9 @@
+{
+  "system": "string",
+  "input": "string",
+  "output": "string",
+  "references": [
+    { "id": 1, "bib": "string", "span": "string", "quote?": "string" }
+  ],
+  "meta": { "task": "cite_first", "topic": "physics", "style": "concise" }
+}

@@ -152,7 +152,7 @@ export function buildCurvatureBrick(input: Partial<CurvBrickParams>): CurvatureB
   const phase01 = wrap01(input.phase01 ?? 0);
   const sigmaSector = Math.max(input.sigmaSector ?? 0.05, 1e-3);
   const splitEnabled = input.splitEnabled ?? false;
-  const splitFrac = Math.max(0, Math.min(1, input.splitFrac ?? 0.5));
+  const splitFrac = Math.max(0, Math.min(1, input.splitFrac ?? 0.6));
   const dutyFR = Math.max(input.dutyFR ?? 0.0025, 1e-6);
   const tauLC = Math.max(input.tauLC_s ?? defaults.axes[0] / C, INV_TAU_FLOOR);
   const Tm = Math.max(input.Tm_s ?? 1 / (15e9), INV_TM_FLOOR);

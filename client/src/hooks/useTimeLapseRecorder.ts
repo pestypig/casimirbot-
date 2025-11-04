@@ -1215,13 +1215,18 @@ export function useTimeLapseRecorder({
     });
 
     recorder.addEventListener("error", (event) => {
-      const errEvent = event as unknown as { error?: DOMException | Error; message?: string };
-      const error = errEvent?.error;
-      recorderRejectRef.current?.(
-        error instanceof Error
-          ? error
-          : new Error(error?.message ?? errEvent?.message ?? "MediaRecorder failure")
-      );
+      const errEvent = event as unknown as { error?: unknown; message?: string };
+      const errorLike = errEvent?.error;
+      const knownError = errorLike instanceof Error ? errorLike : undefined;
+      const derivedMessage =
+        knownError?.message ??
+        (typeof errorLike === "object" && errorLike && "message" in errorLike
+          ? String((errorLike as { message?: unknown }).message ?? "")
+          : undefined) ??
+        errEvent?.message ??
+        "MediaRecorder failure";
+
+      recorderRejectRef.current?.(knownError ?? new Error(derivedMessage));
       cleanupRecorder();
     });
 

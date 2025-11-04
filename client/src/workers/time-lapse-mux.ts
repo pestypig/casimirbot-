@@ -21,7 +21,7 @@ async function ensureFFmpeg() {
   }
   if (!ffmpeg.loaded) {
     if (!loadingPromise) {
-      loadingPromise = ffmpeg.load();
+      loadingPromise = ffmpeg.load().then(() => undefined);
     }
     try {
       await loadingPromise;

@@ -7,7 +7,12 @@ import {
   sampleStream,
   type DriveSampleMessage,
 } from "@/lib/drive-samples-bridge";
-import type { FractionalScanConfig } from "@/workers/fractional-scan";
+import type {
+  FractionalScanConfig,
+  FractionalGridPayload,
+  FractionalGridSpec,
+  FractionalGridCell,
+} from "@/workers/fractional-scan";
 
 export type FractionalSidebands = {
   plus: number;
@@ -30,6 +35,7 @@ export type FractionalPayload = {
   IFC: number;
   SS: number;
   lines: FractionalLine[];
+  grid?: FractionalGridPayload | null;
 };
 
 export type FractionalEMA = {
@@ -45,6 +51,10 @@ export type FractionalCoherenceState = {
   SS: number | null;
   EMA: FractionalEMA;
   lastUpdated: number | null;
+  grid: FractionalGridState | null;
+  pins: FractionalRatioKey[];
+  togglePin: (key: FractionalRatioKey) => void;
+  setPins: (keys: FractionalRatioKey[]) => void;
 };
 
 const DEFAULT_RATIOS = Object.freeze([
@@ -63,6 +73,39 @@ const DEFAULT_WINDOW_MS = 48;
 const DEFAULT_HOP_MS = 24;
 const MIN_FS = 4_096;
 const MAX_FS = 262_144;
+const GRID_SPARKLINE_LEN = 6;
+const GRID_CELL_EMA_ALPHA = 0.25;
+const MAX_BASEBAND_HZ = 5_000_000;
+const DEFAULT_GRID_SPEC: FractionalGridSpec = Object.freeze({
+  numeratorMax: 12,
+  denominatorMax: 12,
+  minRatio: 0.25,
+  maxRatio: 4,
+  segmentCount: 6,
+});
+
+export type FractionalRatioKey = `${number}:${number}`;
+
+export type FractionalGridCellState = FractionalGridCell & {
+  key: FractionalRatioKey;
+  drift: number;
+  ema: number | null;
+  sparkline: number[];
+  pinned: boolean;
+  updatedAt: number;
+  basebandHz: number;
+};
+
+export type FractionalGridState = {
+  rows: number;
+  cols: number;
+  cells: FractionalGridCellState[];
+  updatedAt: number | null;
+  f0: number;
+  f0Display: number;
+  fs: number;
+  version: number;
+};
 
 function ema(prev: number | null, next: number, alpha = 0.2) {
   return prev == null ? next : alpha * next + (1 - alpha) * prev;
@@ -71,6 +114,92 @@ function ema(prev: number | null, next: number, alpha = 0.2) {
 function clampFs(fs: number) {
   if (!Number.isFinite(fs) || fs <= 0) return MIN_FS;
   return Math.max(MIN_FS, Math.min(MAX_FS, fs));
+}
+
+function coerceF0ForDsp(rawF0: number, fs: number) {
+  const safeFs = clampFs(fs);
+  const fallback = Math.max(32, Math.min(MAX_BASEBAND_HZ, safeFs / 8));
+  if (!Number.isFinite(rawF0) || rawF0 <= 0) {
+    return fallback;
+  }
+
+  let f = rawF0;
+  if (f >= safeFs * 0.45) {
+    const alias = f % safeFs;
+    if (alias === 0) {
+      f = safeFs / 4;
+    } else {
+      const nyquist = alias > safeFs / 2 ? safeFs - alias : alias;
+      f = nyquist;
+    }
+  }
+
+  if (!Number.isFinite(f) || f <= 0) {
+    return fallback;
+  }
+
+  if (f >= safeFs * 0.45) {
+    f = Math.max(32, safeFs / 4);
+  }
+
+  return Math.max(16, Math.min(f, MAX_BASEBAND_HZ));
+}
+
+function sanitizeGridSpec(spec?: FractionalGridSpec | null): FractionalGridSpec | null {
+  if (spec === null) return null;
+  const base = spec ?? DEFAULT_GRID_SPEC;
+  const numeratorMax = Math.max(1, Math.floor(base.numeratorMax ?? DEFAULT_GRID_SPEC.numeratorMax));
+  const denominatorMax = Math.max(
+    1,
+    Math.floor(base.denominatorMax ?? DEFAULT_GRID_SPEC.denominatorMax),
+  );
+  const minRatio =
+    typeof base.minRatio === "number" && Number.isFinite(base.minRatio) && base.minRatio > 0
+      ? base.minRatio
+      : DEFAULT_GRID_SPEC.minRatio;
+  const maxRatio =
+    typeof base.maxRatio === "number" && Number.isFinite(base.maxRatio) && base.maxRatio > 0
+      ? base.maxRatio
+      : DEFAULT_GRID_SPEC.maxRatio;
+  const minFrequencyHz =
+    typeof base.minFrequencyHz === "number" && Number.isFinite(base.minFrequencyHz) && base.minFrequencyHz > 0
+      ? base.minFrequencyHz
+      : undefined;
+  const maxFrequencyHz =
+    typeof base.maxFrequencyHz === "number" && Number.isFinite(base.maxFrequencyHz) && base.maxFrequencyHz > 0
+      ? base.maxFrequencyHz
+      : undefined;
+  const segmentCount =
+    typeof base.segmentCount === "number" && Number.isFinite(base.segmentCount) && base.segmentCount > 0
+      ? Math.min(24, Math.max(3, Math.floor(base.segmentCount)))
+      : DEFAULT_GRID_SPEC.segmentCount;
+
+  return {
+    numeratorMax,
+    denominatorMax,
+    minRatio,
+    maxRatio,
+    minFrequencyHz,
+    maxFrequencyHz,
+    segmentCount,
+  };
+}
+
+function gridSpecsEqual(
+  a: FractionalGridSpec | null | undefined,
+  b: FractionalGridSpec | null | undefined,
+) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return (
+    a.numeratorMax === b.numeratorMax &&
+    a.denominatorMax === b.denominatorMax &&
+    (a.minRatio ?? 0) === (b.minRatio ?? 0) &&
+    (a.maxRatio ?? 0) === (b.maxRatio ?? 0) &&
+    (a.minFrequencyHz ?? 0) === (b.minFrequencyHz ?? 0) &&
+    (a.maxFrequencyHz ?? 0) === (b.maxFrequencyHz ?? 0) &&
+    (a.segmentCount ?? 0) === (b.segmentCount ?? 0)
+  );
 }
 
 function deriveBasebandF0(pipeline: any): number | null {
@@ -118,6 +247,10 @@ function buildConfig(
     Number.isFinite(baseConfig?.sidebandDeltaHz) && (baseConfig?.sidebandDeltaHz ?? 0) > 0
       ? baseConfig!.sidebandDeltaHz!
       : Math.max(0.25, fs / 4096);
+  const gridSpec =
+    baseConfig && "grid" in baseConfig
+      ? sanitizeGridSpec(baseConfig?.grid)
+      : sanitizeGridSpec(DEFAULT_GRID_SPEC);
 
   return {
     fs,
@@ -126,6 +259,7 @@ function buildConfig(
     hopMs,
     ratios: Array.from(ratios),
     sidebandDeltaHz,
+    grid: gridSpec,
   };
 }
 
@@ -142,20 +276,27 @@ export function useFractionalCoherence(
   });
   const pipelineConfig = useMemo(() => {
     const pipelineAny = pipeline as any;
-    const fallbackF0 = typeof busMeta.f0 === "number" && Number.isFinite(busMeta.f0) && busMeta.f0 > 0 ? busMeta.f0 : 1_500;
-    const f0 = deriveBasebandF0(pipelineAny) ?? fallbackF0;
+    const basebandCandidate = deriveBasebandF0(pipelineAny);
+    const busF0Candidate =
+      typeof busMeta.f0 === "number" && Number.isFinite(busMeta.f0) && busMeta.f0 > 0
+        ? busMeta.f0
+        : null;
+    const physicalF0 = basebandCandidate ?? busF0Candidate ?? 1_500;
     const metaFs = busMeta.fs;
-    const sampleRate =
+    const sampleRateCandidate =
       pipelineAny?.coherence && Number.isFinite(pipelineAny.coherence.sampleRateHz)
         ? Number(pipelineAny.coherence.sampleRateHz)
         : typeof metaFs === "number" && Number.isFinite(metaFs) && metaFs > 0
           ? metaFs
           : NaN;
     const fs =
-      Number.isFinite(sampleRate) && sampleRate > 0
-        ? sampleRate
-        : Math.max(f0 * 16, 16_384);
-    return { f0, fs };
+      Number.isFinite(sampleRateCandidate) && sampleRateCandidate > 0
+        ? clampFs(sampleRateCandidate)
+        : clampFs(Math.max(physicalF0 * 16, 16_384));
+    const f0 = coerceF0ForDsp(physicalF0, fs);
+    const displayF0 =
+      Number.isFinite(physicalF0) && physicalF0 > 0 ? physicalF0 : f0;
+    return { f0, fs, displayF0 };
   }, [pipeline, busMeta.f0, busMeta.fs]);
 
   const [live, setLive] = useState<FractionalPayload | null>(null);
@@ -163,6 +304,11 @@ export function useFractionalCoherence(
   const [emaIFC, setEmaIFC] = useState<number | null>(null);
   const [emaSS, setEmaSS] = useState<number | null>(null);
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const cellStateRef = useRef<Map<FractionalRatioKey, FractionalGridCellState>>(new Map());
+  const [gridState, setGridState] = useState<FractionalGridState | null>(null);
+  const [pinnedKeys, setPinnedKeysState] = useState<FractionalRatioKey[]>([]);
+  const pinnedSetRef = useRef<Set<FractionalRatioKey>>(new Set());
+  const displayF0Ref = useRef<number>(pipelineConfig.displayF0);
 
   const workerRef = useRef<Worker | null>(null);
   const configRef = useRef<FractionalScanConfig | null>(null);
@@ -170,26 +316,81 @@ export function useFractionalCoherence(
   const lastFeedAtRef = useRef<number>(0);
   const ratiosKey = useMemo(() => ratios.join(","), [ratios]);
 
-  const reinitWorker = useCallback((config: FractionalScanConfig) => {
-    configRef.current = config;
-    if (!workerRef.current) {
-      if (typeof Worker === "undefined") return;
-      workerRef.current = new Worker(
-        new URL("../workers/fractional-scan.ts", import.meta.url),
-        { type: "module", name: "fractional-scan" },
-      );
-      workerRef.current.onmessage = (evt: MessageEvent<FractionalPayload>) => {
+  const syncGridPins = useCallback((next: Set<FractionalRatioKey>) => {
+    setGridState((prev) => {
+      if (!prev) return prev;
+      let mutated = false;
+      const nextCells = prev.cells.map((cell) => {
+        const pinned = next.has(cell.key);
+        if (cell.pinned === pinned) return cell;
+        mutated = true;
+        return { ...cell, pinned };
+      });
+      if (!mutated) return prev;
+      return { ...prev, cells: nextCells };
+    });
+  }, []);
+
+  const setPinnedCells = useCallback(
+    (keys: FractionalRatioKey[]) => {
+      const unique = Array.from(new Set(keys));
+      const nextSet = new Set(unique);
+      pinnedSetRef.current = nextSet;
+      setPinnedKeysState(unique);
+      syncGridPins(nextSet);
+    },
+    [syncGridPins],
+  );
+
+  const togglePin = useCallback(
+    (key: FractionalRatioKey) => {
+      setPinnedKeysState((prev) => {
+        const nextSet = new Set(prev);
+        if (nextSet.has(key)) {
+          nextSet.delete(key);
+        } else {
+          nextSet.add(key);
+        }
+        const nextList = Array.from(nextSet);
+        const nextPins = new Set(nextList);
+        pinnedSetRef.current = nextPins;
+        syncGridPins(nextPins);
+        return nextList;
+      });
+    },
+    [syncGridPins],
+  );
+
+  const reinitWorker = useCallback(
+    (config: FractionalScanConfig, displayF0?: number) => {
+      configRef.current = config;
+      displayF0Ref.current =
+        typeof displayF0 === "number" && Number.isFinite(displayF0) && displayF0 > 0
+          ? displayF0
+          : config.f0;
+      cellStateRef.current = new Map();
+      setGridState(null);
+      if (!workerRef.current) {
+        if (typeof Worker === "undefined") return;
+        workerRef.current = new Worker(
+          new URL("../workers/fractional-scan.ts", import.meta.url),
+          { type: "module", name: "fractional-scan" },
+        );
+      }
+      const worker = workerRef.current;
+      if (!worker) return;
+      worker.onmessage = (evt: MessageEvent<FractionalPayload>) => {
         const payload = evt.data;
         setLive(payload);
         setEmaCP((prev) => ema(prev, payload.CP));
         setEmaIFC((prev) => ema(prev, payload.IFC));
         setEmaSS((prev) => ema(prev, payload.SS));
-        setLastUpdated(typeof performance !== "undefined" ? performance.now() : Date.now());
+        const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+        setLastUpdated(now);
 
         const emaSnapshot = emaCP ?? payload.CP;
         if (emaSnapshot > 0) {
           const dip = payload.CP < 0.7 * emaSnapshot;
-          const now = typeof performance !== "undefined" ? performance.now() : Date.now();
           if (dip && now - lastWarnAtRef.current > 4_000) {
             publishWhisper("drive:coherence", {
               level: "warn",
@@ -202,10 +403,92 @@ export function useFractionalCoherence(
             lastWarnAtRef.current = now;
           }
         }
+
+        const gridPayload = payload.grid;
+        if (gridPayload && Array.isArray(gridPayload.cells)) {
+          const timestamp =
+            typeof gridPayload.timestamp === "number" && Number.isFinite(gridPayload.timestamp)
+              ? gridPayload.timestamp
+              : now;
+          const displayF0Current =
+            typeof displayF0Ref.current === "number" && Number.isFinite(displayF0Ref.current)
+              ? displayF0Ref.current
+              : gridPayload.f0;
+          const displayScale =
+            gridPayload.f0 > 0 ? displayF0Current / gridPayload.f0 : 1;
+          const nextCells: FractionalGridCellState[] = [];
+          const nextMap = new Map<FractionalRatioKey, FractionalGridCellState>();
+          for (const rawCell of gridPayload.cells) {
+            const key = `${rawCell.p}:${rawCell.q}` as FractionalRatioKey;
+            const prevCell = cellStateRef.current.get(key);
+            const coherenceEff = Math.max(
+              0,
+              Math.min(1, Number.isFinite(rawCell.coherenceEff) ? rawCell.coherenceEff : 0),
+            );
+            const drift = prevCell ? coherenceEff - prevCell.coherenceEff : 0;
+            const emaValue = ema(prevCell?.ema ?? null, coherenceEff, GRID_CELL_EMA_ALPHA);
+            const prevSparkline = prevCell?.sparkline ?? [];
+            const sparkline =
+              prevSparkline.length >= GRID_SPARKLINE_LEN
+                ? [...prevSparkline.slice(1), coherenceEff]
+                : [...prevSparkline, coherenceEff];
+              const normalizedCell: FractionalGridCellState = {
+                ...rawCell,
+                coherence: Math.max(
+                  0,
+                  Math.min(1, Number.isFinite(rawCell.coherence) ? rawCell.coherence : 0),
+                ),
+                coherenceEff,
+                stability: Math.max(
+                  0,
+                  Math.min(1, Number.isFinite(rawCell.stability) ? rawCell.stability : 0),
+                ),
+                snr: Number.isFinite(rawCell.snr) ? rawCell.snr : 0,
+                amplitude: Number.isFinite(rawCell.amplitude) ? rawCell.amplitude : 0,
+                sigma: Number.isFinite(rawCell.sigma) ? rawCell.sigma : 0,
+                phase: Number.isFinite(rawCell.phase) ? rawCell.phase : 0,
+                fHz: rawCell.fHz * displayScale,
+                key,
+                drift,
+                ema: emaValue,
+                sparkline,
+                pinned: pinnedSetRef.current.has(key),
+                updatedAt: timestamp,
+                basebandHz: rawCell.fHz,
+              };
+              nextCells.push(normalizedCell);
+              nextMap.set(key, normalizedCell);
+            }
+            cellStateRef.current = nextMap;
+
+          if (pinnedSetRef.current.size > 0) {
+            const filtered = Array.from(pinnedSetRef.current).filter((key) => nextMap.has(key));
+            if (filtered.length !== pinnedSetRef.current.size) {
+              const filteredSet = new Set(filtered);
+              pinnedSetRef.current = filteredSet;
+              setPinnedKeysState(filtered);
+            }
+          }
+
+          setGridState((prevGrid) => ({
+            rows: gridPayload.rows,
+            cols: gridPayload.cols,
+            cells: nextCells,
+            updatedAt: timestamp,
+            f0: gridPayload.f0,
+            f0Display: displayF0Current,
+            fs: gridPayload.fs,
+            version: prevGrid ? prevGrid.version + 1 : 1,
+          }));
+        } else if (gridPayload === null) {
+          cellStateRef.current = new Map();
+          setGridState(null);
+        }
       };
-    }
-    workerRef.current!.postMessage({ type: "init", config });
-  }, [emaCP]);
+      worker.postMessage({ type: "init", config });
+    },
+    [emaCP],
+  );
 
   const processSamples = useCallback(
     (payload: DriveSampleMessage) => {
@@ -242,8 +525,9 @@ export function useFractionalCoherence(
       if (!(chunk instanceof Float32Array)) return;
 
       const overrides: Partial<FractionalScanConfig> = {};
+      let physicalOverrideF0: number | null = null;
       if (typeof payload.f0 === "number" && Number.isFinite(payload.f0) && payload.f0 > 0) {
-        overrides.f0 = payload.f0;
+        physicalOverrideF0 = payload.f0;
       }
       if (typeof payload.fs === "number" && Number.isFinite(payload.fs) && payload.fs > 0) {
         overrides.fs = payload.fs;
@@ -260,6 +544,15 @@ export function useFractionalCoherence(
         payload.sidebandDeltaHz > 0
       ) {
         overrides.sidebandDeltaHz = payload.sidebandDeltaHz;
+      }
+
+      const baseFsForOverride =
+        typeof overrides.fs === "number" && Number.isFinite(overrides.fs) && overrides.fs > 0
+          ? overrides.fs
+          : configRef.current?.fs ?? pipelineConfig.fs;
+      if (physicalOverrideF0 != null) {
+        overrides.f0 = coerceF0ForDsp(physicalOverrideF0, baseFsForOverride ?? pipelineConfig.fs);
+        displayF0Ref.current = physicalOverrideF0;
       }
 
       const nextRatios =
@@ -281,6 +574,7 @@ export function useFractionalCoherence(
           !current ||
           current.ratios.length !== nextConfig.ratios.length ||
           current.ratios.some((value, idx) => value !== nextConfig.ratios[idx]);
+        const gridChanged = !gridSpecsEqual(current?.grid ?? null, nextConfig.grid ?? null);
         const changed =
           !current ||
           Math.abs(current.f0 - nextConfig.f0) > 1e-3 ||
@@ -288,9 +582,14 @@ export function useFractionalCoherence(
           current.windowMs !== nextConfig.windowMs ||
           current.hopMs !== nextConfig.hopMs ||
           current.sidebandDeltaHz !== nextConfig.sidebandDeltaHz ||
-          ratiosChanged;
+          ratiosChanged ||
+          gridChanged;
         if (changed) {
-          reinitWorker(nextConfig);
+          const nextDisplayF0 =
+            physicalOverrideF0 && physicalOverrideF0 > 0
+              ? physicalOverrideF0
+              : displayF0Ref.current;
+          reinitWorker(nextConfig, nextDisplayF0 ?? nextConfig.f0);
         }
       }
 
@@ -299,7 +598,7 @@ export function useFractionalCoherence(
       lastFeedAtRef.current =
         typeof performance !== "undefined" ? performance.now() : Date.now();
     },
-    [ratios, reinitWorker],
+    [ratios, reinitWorker, pipelineConfig.fs],
   );
 
   useEffect(() => {
@@ -313,7 +612,7 @@ export function useFractionalCoherence(
       ratios,
     );
     if (!config) return;
-    reinitWorker(config);
+    reinitWorker(config, pipelineConfig.displayF0);
 
     return () => {
       if (workerRef.current) {
@@ -321,9 +620,11 @@ export function useFractionalCoherence(
         workerRef.current = null;
       }
       configRef.current = null;
+      cellStateRef.current = new Map();
+      setGridState(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pipelineConfig.f0, pipelineConfig.fs, ratiosKey]);
+  }, [pipelineConfig.f0, pipelineConfig.fs, pipelineConfig.displayF0, ratiosKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -361,8 +662,12 @@ export function useFractionalCoherence(
       SS: live?.SS ?? null,
       EMA: { CP: emaCP, IFC: emaIFC, SS: emaSS },
       lastUpdated,
+      grid: gridState,
+      pins: pinnedKeys,
+      togglePin,
+      setPins: setPinnedCells,
     }),
-    [live, emaCP, emaIFC, emaSS, lastUpdated],
+    [live, emaCP, emaIFC, emaSS, lastUpdated, gridState, pinnedKeys, togglePin, setPinnedCells],
   );
 }
 

@@ -10,10 +10,17 @@ import { fileManager } from "./services/fileManager";
 import { simulationParametersSchema, sweepSpecSchema } from "@shared/schema";
 import { WebSocket, WebSocketServer } from "ws";
 import targetValidationRoutes from "./routes/target-validation.js";
+import { lumaRouter } from "./routes/luma";
+import { lumaHceRouter } from "./routes/luma-hce";
+import { hceRouter } from "./routes/hce";
 import { getHorizonsElements } from "./utils/horizons-proxy";
+import { orchestratorRouter } from "./routes/orchestrator";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+  app.use("/api/luma/ops", lumaHceRouter);
+  app.use("/api/luma", lumaRouter);
+  app.use("/api/orchestrator", orchestratorRouter);
 
   // --- Realtime plumbing ----------------------------------------------------
   // Support multiple WS subscribers per simulation + SSE fallback
@@ -479,6 +486,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Luma librarian (read-only AI helper)
+  app.use("/api/hce", hceRouter);
+
   // Add target validation routes
   app.use("/api", targetValidationRoutes);
 
@@ -653,23 +663,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Creator page
-  app.get("/warp/creator", (req, res) => {
-    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
-    res.sendFile('creator.html', { root }, (err) => {
-      if (err) {
-        console.log(`[/warp] ❌ Error serving creator.html from ${root}: ${err.message}`);
-        res.status(404).send(`Creator not found (root=${root}): ${err.message}`);
-      } else {
-        console.log(`[/warp] ✅ Served /warp/creator`);
-      }
+    app.get("/warp/creator", (req, res) => {
+      const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+      res.sendFile('creator.html', { root }, (err) => {
+        if (err) {
+          console.log(`[/warp] ❌ Error serving creator.html from ${root}: ${err.message}`);
+          res.status(404).send(`Creator not found (root=${root}): ${err.message}`);
+        } else {
+          console.log(`[/warp] ✅ Served /warp/creator`);
+        }
+      });
     });
-  });
 
-  // KM-scale warp ledger lab (standalone path under root)
-  app.get("/km-scale-warp-ledger", (req, res) => {
-    const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
-    res.sendFile('km-scale-warp-ledger.html', { root }, (err) => {
-      if (err) {
+    // Deep mixing plan (shares warp-web deployment so route stays stable)
+    app.get(["/deep-mixing-plan", "/deep-mixing-plan/"], (req, res) => {
+      const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+      res.sendFile('deep-mixing-plan.html', { root }, (err) => {
+        if (err) {
+          console.log(`[warp-ledger] ❌ Error serving deep-mixing-plan.html from ${root}: ${err.message}`);
+          res.status(404).send(`Deep-mixing plan not found (root=${root}): ${err.message}`);
+        } else {
+          console.log(`[warp-ledger] ✅ Served /deep-mixing-plan`);
+        }
+      });
+    });
+
+    // KM-scale warp ledger lab (standalone path under root)
+    app.get("/km-scale-warp-ledger", (req, res) => {
+      const root = overrideRoot && fs.existsSync(overrideRoot) ? overrideRoot : warpRoot;
+      res.sendFile('km-scale-warp-ledger.html', { root }, (err) => {
+        if (err) {
         console.log(`[warp-ledger] ❌ Error serving km-scale-warp-ledger.html from ${root}: ${err.message}`);
         res.status(404).send(`KM-scale warp ledger not found (root=${root}): ${err.message}`);
       } else {

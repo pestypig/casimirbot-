@@ -10,11 +10,17 @@ import Home from "@/pages/home";
 import Simulation from "@/pages/simulation";
 import Documentation from "@/pages/documentation";
 import HelixCore from "@/pages/helix-core";
+import NoiseGenAlias from "@/pages/noisegen";
 import Why from "@/pages/why";
 import StartPortal from "@/pages/start";
 import StationPage from "@/pages/station";
 import NotFound from "@/pages/not-found";
 import PotatoThresholdLab from "@/pages/potato-threshold-lab";
+import LumaPage from "@/pages/luma";
+import HelixObservablesPage from "@/pages/helix-observables";
+import IngestPage from "@/pages/ingest";
+import RagAdminPage from "@/pages/rag-admin";
+import CodeAdminPage from "@/pages/code-admin";
 
 function Router() {
   return (
@@ -24,7 +30,15 @@ function Router() {
       <Route path="/simulation" component={Simulation} />
       <Route path="/documentation" component={Documentation} />
       <Route path="/helix-core" component={HelixCore} />
+      <Route path="/helix-observables" component={HelixObservablesPage} />
+      <Route path="/helix/noise-gens" component={NoiseGenAlias} />
+      <Route path="/helix-noise-gens" component={NoiseGenAlias} />
+      <Route path="/noisegen" component={NoiseGenAlias} />
       <Route path="/potato-threshold-lab" component={PotatoThresholdLab} />
+      <Route path="/luma" component={LumaPage} />
+      <Route path="/rag/ingest" component={IngestPage} />
+      <Route path="/rag/admin" component={RagAdminPage} />
+      <Route path="/code-admin" component={CodeAdminPage} />
       <Route path="/why" component={Why} />
       <Route path="/station/:role" component={StationPage} />
       <Route path="/optimist-station" component={StationPage} />

@@ -1,10 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const docsDir = path.resolve(__dirname, "..", "docs");
 
 // Keep the dev server resilient: log unexpected errors instead of exiting
 process.on('uncaughtException', (err) => {
@@ -38,6 +44,9 @@ for (const sig of ['SIGINT','SIGTERM'] as const) {
 
 // Serve PDF files from attached_assets folder
 app.use('/attached_assets', express.static('attached_assets'));
+
+// Serve static mission documentation
+app.use('/docs', express.static(docsDir));
 
 // Cache headers for warp engine bundles
 app.use('/warp-engine*.js', (req, res, next) => {

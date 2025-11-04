@@ -1,8 +1,10 @@
 import { create, type StateCreator } from "zustand";
 import { publishDriveSplit, subscribeDriveSplit, type DriveSplitState } from "@/lib/drive-split-channel";
+import { publishDriveIntent, subscribeDriveIntent, type DriveIntentState } from "@/lib/drive-intent-channel";
 import type { RidgePreset } from "@shared/schema";
 
 export type PhaseMode = "scheduler" | "manual";
+export type AutophaserMode = "viz" | "assist" | "coupled";
 
 export type DriveSyncState = {
   // Phase / lobe geometry
@@ -14,6 +16,9 @@ export type DriveSyncState = {
   sectorFloor: number;        // baseline floor 0..1
   ampBase: number;            // base amplitude prior to geometry chain
   pumpPhaseDeg: number;       // physical pump φ (deg, wrapped 0..360)
+  autophaserMode: AutophaserMode; // visual-only, assist, coupled
+  intent: { x: number; y: number; z: number };
+  nudge01: number;            // 0..1 visual nudge (fraction of hull radius)
 
   // Amplitude shaping
   q: number;                  // spoiling factor multiplier
@@ -29,6 +34,9 @@ export type DriveSyncState = {
   setSplit: (on: boolean, frac?: number) => void;
   setSigma: (sigmaS: number) => void;
   setFloor: (f: number) => void;
+  setAutophaserMode: (mode: AutophaserMode) => void;
+  setIntent: (v: Partial<{ x: number; y: number; z: number }>) => void;
+  setNudge01: (v: number) => void;
   setQ: (q: number) => void;
   setZeta: (z: number) => void;
   setFollowMode: (on: boolean) => void;
@@ -47,6 +55,18 @@ const wrap01 = (value: number) => {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const clampUnit = (value: number) => {
+  const v = Number.isFinite(value) ? value : 0;
+  return Math.max(-1, Math.min(1, v));
+};
+const clampNudge = (value: number) => {
+  const v = Number.isFinite(value) ? value : 0;
+  return Math.max(0, Math.min(1, v));
+};
+
+const DEFAULT_SPLIT_FRAC = 0.6; // Mirrors server DEFAULT_NEGATIVE_FRACTION = 0.4
+const INTENT_DEADZONE = 0.18;
+const INTENT_EPS = 1e-4;
 
 const toDriveSplitPayload = (state: DriveSyncState): DriveSplitState => ({
   mode: state.splitEnabled ? "zeroBeta" : "single",
@@ -63,11 +83,14 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
   phase01: 0,
   phaseMode: "scheduler",
   splitEnabled: false,
-  splitFrac: 0.5,
+  splitFrac: DEFAULT_SPLIT_FRAC,
   sigmaSectors: 0.25,
   sectorFloor: 0.2,
   ampBase: 0,
   pumpPhaseDeg: 0,
+  autophaserMode: "viz",
+  intent: { x: 0, y: 0, z: 0 },
+  nudge01: 0.1,
   q: 1.0,
   zeta: 0.84,
   locks: { followMode: true },
@@ -102,6 +125,45 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
     publishDriveSplit(toDriveSplitPayload(next));
     return { sectorFloor };
   }),
+  setAutophaserMode: (mode: AutophaserMode) => set(() => ({ autophaserMode: mode })),
+  setIntent: (vec) => {
+    let publishPayload: DriveIntentState | null = null;
+    let changed = false;
+    set((prev) => {
+      const intent = {
+        x: clampUnit(vec?.x ?? prev.intent.x),
+        y: clampUnit(vec?.y ?? prev.intent.y),
+        z: clampUnit(vec?.z ?? prev.intent.z),
+      };
+      if (
+        Math.abs(intent.x - prev.intent.x) < INTENT_EPS &&
+        Math.abs(intent.y - prev.intent.y) < INTENT_EPS &&
+        Math.abs(intent.z - prev.intent.z) < INTENT_EPS
+      ) {
+        return prev;
+      }
+      publishPayload = { intent, nudge01: prev.nudge01 };
+      changed = true;
+      return { intent };
+    });
+    if (!changed || !publishPayload) return;
+    publishDriveIntent(publishPayload);
+  },
+  setNudge01: (value: number) => {
+    let publishPayload: DriveIntentState | null = null;
+    let changed = false;
+    set((prev) => {
+      const nudge01 = clampNudge(value);
+      if (Math.abs(nudge01 - prev.nudge01) < INTENT_EPS) {
+        return prev;
+      }
+      publishPayload = { intent: prev.intent, nudge01 };
+      changed = true;
+      return { nudge01 };
+    });
+    if (!changed || !publishPayload) return;
+    publishDriveIntent(publishPayload);
+  },
   setQ: (q: number) => set((prev) => {
     const qClamped = Math.max(0, q);
     const next = { ...prev, q: qClamped };
@@ -156,6 +218,10 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
 export const useDriveSyncStore = create<DriveSyncState>(creator);
 
 publishDriveSplit(toDriveSplitPayload(useDriveSyncStore.getState()));
+{
+  const initial = useDriveSyncStore.getState();
+  publishDriveIntent({ intent: initial.intent, nudge01: initial.nudge01 });
+}
 
 const EPS = 1e-6;
 
@@ -187,5 +253,22 @@ subscribeDriveSplit((payload) => {
       ? ((payload.pumpPhase_deg! % 360) + 360) % 360
       : current.pumpPhaseDeg,
     locks: current.locks ?? { followMode: true },
+  });
+});
+
+subscribeDriveIntent((payload) => {
+  const current = useDriveSyncStore.getState();
+  const nextIntent = payload.intent;
+  if (
+    Math.abs(current.intent.x - nextIntent.x) < INTENT_EPS &&
+    Math.abs(current.intent.y - nextIntent.y) < INTENT_EPS &&
+    Math.abs(current.intent.z - nextIntent.z) < INTENT_EPS &&
+    Math.abs(current.nudge01 - payload.nudge01) < INTENT_EPS
+  ) {
+    return;
+  }
+  useDriveSyncStore.setState({
+    intent: { ...nextIntent },
+    nudge01: payload.nudge01,
   });
 });

@@ -4,9 +4,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { useLightCrossingLoop } from "@/hooks/useLightCrossingLoop";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
+import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
+import DirectionPad from "@/components/DirectionPad";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState } from "./Hull3DRenderer.ts";
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
@@ -21,6 +23,36 @@ interface AlcubierrePanelProps {
   ) => void;
   overlayHudEnabled?: boolean;
   onPlanarVizModeChange?: (mode: number) => void;
+}
+
+function FlightDirectorStatusRow() {
+  const { enabled, mode, coupling } = useFlightDirectorStore(
+    (state) => ({
+      enabled: state.enabled,
+      mode: state.mode,
+      coupling: state.coupling,
+    }),
+    shallow
+  );
+  const yawRate = useFlightDirectorStore((state) => state.yawRate_dps);
+  const setEnabled = useFlightDirectorStore((state) => state.setEnabled);
+
+  return (
+    <div className="flex items-center gap-2 text-[0.65rem] text-slate-200">
+      <label className="inline-flex items-center gap-1">
+        <input
+          type="checkbox"
+          className="accent-emerald-500"
+          checked={enabled}
+          onChange={(event) => setEnabled(event.target.checked)}
+        />
+        Flight Director
+      </label>
+      <span className="text-[0.65rem] text-slate-400">
+        {mode} | {coupling} | {Math.round(yawRate)} deg/s
+      </span>
+    </div>
+  );
 }
 
 // === helpers: math & smoothing =================================================
@@ -653,7 +685,7 @@ export default function AlcubierrePanel({
   }, [onCanvasReady]);
   const lastDriveLogRef = useRef(0);
 
-  const [planarVizMode, setPlanarVizMode] = useState<VizMode>(0); // 0 Î¸_GR, 1 Ï_GR, 2 Î¸_Drive
+  const [planarVizMode, setPlanarVizMode] = useState<VizMode>(3); // 0 theta_GR, 1 rho_GR, 2 theta_Drive, 3 theta_Hull3D
   useEffect(() => {
     onPlanarVizModeChange?.(planarVizMode);
   }, [planarVizMode, onPlanarVizModeChange]);
@@ -662,6 +694,16 @@ export default function AlcubierrePanel({
   // Track if the user has manually selected a planarVizMode so we don't override later
   const [userVizLocked, setUserVizLocked] = useState(false);
   const [syncScheduler, setSyncScheduler] = useState(true);
+  const [vizIntentEnabled, setVizIntentEnabled] = useState(true);
+  const [vizRise, setVizRise] = useState(0);
+  const [vizPlanar, setVizPlanar] = useState(0);
+  const handleVizIntent = useCallback(
+    ({ rise, planar }: { rise: number; planar: number }) => {
+      setVizRise((prev) => (Math.abs(prev - rise) > 1e-3 ? rise : prev));
+      setVizPlanar((prev) => (Math.abs(prev - planar) > 1e-3 ? planar : prev));
+    },
+    []
+  );
 const [hullMode, setHullMode] = useState<Hull3DRendererMode>("instant");
 const [hullBlend, setHullBlend] = useState(0);
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
@@ -830,6 +872,25 @@ const res = 256;
       hullRendererRef.current.setVolumeViz(hullVolumeVizLive);
     }
   }, [hullVolumeVizLive]);
+
+  useEffect(() => {
+    const renderer = hullRendererRef.current;
+    if (!renderer) return;
+    const splitEnabled = Boolean(ds.splitEnabled);
+    const splitFrac =
+      typeof ds.splitFrac === "number" && Number.isFinite(ds.splitFrac) ? ds.splitFrac : 0.5;
+    const bias = splitEnabled ? Math.abs(splitFrac - 0.5) : 0;
+    const biasMag = Math.min(1, bias / 0.49);
+    const planarMag = vizIntentEnabled ? Math.max(0, Math.min(1, vizPlanar)) : 0;
+    const mag01 = planarMag > 1e-4 ? planarMag : biasMag;
+    const rise01 = vizIntentEnabled ? vizRise : 0;
+    const enabled = vizIntentEnabled && (mag01 > 1e-4 || Math.abs(rise01) > 1e-4);
+    renderer.setVizIntent({
+      enabled,
+      mag01,
+      rise01: Math.max(-1, Math.min(1, rise01)),
+    });
+  }, [vizIntentEnabled, vizRise, vizPlanar, ds.splitEnabled, ds.splitFrac]);
 
   const handleHullBlendChange = useCallback((value: number) => {
     const clamped = Math.min(Math.max(value, 0), 1);
@@ -2033,13 +2094,15 @@ const res = 256;
     hullStateRef.current = base;
   }, [axes, R, sigma, beta, ampChain, gate, gateRaw, dutyFR, gaussianSigma, sectorCenter01, totalSectors, liveSectors, ds.sectorFloor, lumpBoostExp, ds.splitEnabled, ds.splitFrac, syncMode, ds.phase01, showHullSectorRing, showHullGhostSlice, showHullSurfaceOverlay, betaOverlayEnabled, betaTargetMs2, betaComfortMs2, followHullPhase, hullVolumeVizLive, hullBlend, bubbleStatus, aspect, vizFloors.thetaGR, vizFloors.rhoGR, vizFloors.thetaDrive, overlayConfig, sharedPhase, sharedSampling, sharedPhysicsState, sharedComplianceState, sharedSectorState, sharedPaletteState]);
 
-  // When an operational mode that implies drive activity is set, default to Î¸(Drive)
-  // once, unless the user has already picked a planarVizMode explicitly.
+  // When an operational mode that implies drive activity is set, default to theta(Drive)
+  // once, unless the user has already picked a planarVizMode explicitly. Only override planar GR modes.
   useEffect(() => {
     if (userVizLocked) return;
     const m = String((live as any)?.currentMode || '').toLowerCase();
     const drivey = m === 'hover' || m === 'cruise' || m === 'emergency' || m === 'nearzero';
-    if (drivey && planarVizMode !== 2) setPlanarVizMode(2);
+    if (drivey && (planarVizMode === 0 || planarVizMode === 1)) {
+      setPlanarVizMode(2);
+    }
   }, [live, userVizLocked, planarVizMode]);
 
   // === WebGL init effect (runs once unless resolution changes) ===
@@ -3248,6 +3311,10 @@ const res = 256;
             </div>
           </div>
 
+          <div className="mt-3 w-full">
+            <DirectionPad className="w-full" onVizIntent={handleVizIntent} />
+          </div>
+
           <div className="ml-auto flex gap-1">
             <button
               title="${GREEK_THETA} (GR) - York time (trace of extrinsic curvature) in General Relativity"
@@ -3488,6 +3555,16 @@ const res = 256;
                   onChange={(event) => setFollowHullPhase(event.target.checked)}
                 />
                 Follow phase
+              </label>
+              <FlightDirectorStatusRow />
+              <label className="flex items-center gap-1 text-[0.65rem] text-slate-200">
+                <input
+                  type="checkbox"
+                  className="accent-emerald-500"
+                  checked={vizIntentEnabled}
+                  onChange={(event) => setVizIntentEnabled(event.target.checked)}
+                />
+                Show off-axis intent
               </label>
               <div className="flex items-center gap-2">
                 <button

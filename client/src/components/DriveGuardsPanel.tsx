@@ -1,40 +1,19 @@
 import { useMemo, useState } from "react";
-
-
-
-import type { ReactNode } from "react";
-
-
-
+import type { MouseEvent, ReactNode } from "react";
 import {
-
-
-
   Card,
-
-
-
   CardContent,
-
-
-
   CardDescription,
-
-
-
   CardHeader,
-
-
-
   CardTitle,
-
-
-
 } from "@/components/ui/card";
-
-
-
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+
+type DriveGuardsPanelProps = {
+  panelHash?: string;
+};
 
 
 
@@ -43,7 +22,9 @@ import { SUB_THRESHOLD_MARGIN, RHO_CUTOFF } from "@/lib/parametric-sweep";
 
 
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
-
+import { useCurvatureBrick } from "@/hooks/useCurvatureBrick";
+import { useCycleLedger, LEDGER_GUARD_THRESHOLD } from "@/hooks/useCycleLedger";
+import { CurvatureLedgerPanel } from "./CurvatureLedgerPanel";
 
 
 import { DefinitionChip, useTermRegistry } from "@/components/DefinitionChip";
@@ -107,6 +88,8 @@ const GRAVITATIONAL_CONSTANT = 6.6743e-11; // m^3 kg^-1 s^-2
 
 
 const Q_BURST = 1e9; // storage factor used by the pipeline audit
+
+const CM2_TO_M2 = 1e-4;
 
 
 
@@ -177,6 +160,18 @@ type ProofProxyRow = {
   statement: string;
   knob: ReactNode;
   reference: Reference;
+};
+
+type TileGeom = {
+  N_tiles: number | undefined;
+  hullArea_m2?: number | undefined;
+  tileArea_cm2?: number | undefined;
+};
+
+type TileAreaResult = {
+  aTile_m2: number;
+  provenance: "server" | "reconstructed" | "missing";
+  warn: string | null;
 };
 
 const clamp = (value: number, min: number, max: number) =>
@@ -274,7 +269,165 @@ const firstFinite = (...values: Array<unknown>): number => {
 
 
 
+function derivePerTileArea_m2(geom: TileGeom): TileAreaResult {
+  const aFromServer =
+    typeof geom.tileArea_cm2 === "number" && geom.tileArea_cm2 > 0
+      ? geom.tileArea_cm2 * CM2_TO_M2
+      : undefined;
 
+  if (aFromServer) {
+    return { aTile_m2: aFromServer, provenance: "server", warn: null };
+  }
+
+  if (
+    typeof geom.hullArea_m2 === "number" &&
+    geom.hullArea_m2 > 0 &&
+    typeof geom.N_tiles === "number" &&
+    geom.N_tiles > 0
+  ) {
+    const { hullArea_m2, N_tiles } = geom;
+    return {
+      aTile_m2: hullArea_m2 / N_tiles,
+      provenance: "reconstructed",
+      warn: null,
+    };
+  }
+
+  return {
+    aTile_m2: Number.NaN,
+    provenance: "missing",
+    warn: "Per-tile area unavailable (no tileArea_cm2 and cannot reconstruct hullArea/N_tiles).",
+  };
+}
+
+function requiredTilesForTarget(params: {
+  kappaDrive: number | undefined;
+  kappaBody: number | undefined;
+  N_tiles_now: number | undefined;
+  aTile_m2: number | undefined;
+}) {
+  const { kappaDrive, kappaBody, N_tiles_now, aTile_m2 } = params;
+
+  const driveMag = Number.isFinite(kappaDrive) ? Math.abs(kappaDrive as number) : Number.NaN;
+  const bodyMag = Number.isFinite(kappaBody) ? Math.abs(kappaBody as number) : Number.NaN;
+  const tilesNow = Number.isFinite(N_tiles_now) ? Math.abs(N_tiles_now as number) : Number.NaN;
+  const areaTile = Number.isFinite(aTile_m2) ? Math.abs(aTile_m2 as number) : Number.NaN;
+
+  const ok =
+    Number.isFinite(driveMag) &&
+    driveMag > 0 &&
+    Number.isFinite(bodyMag) &&
+    bodyMag > 0 &&
+    Number.isFinite(tilesNow) &&
+    tilesNow > 0 &&
+    Number.isFinite(areaTile) &&
+    areaTile > 0;
+
+  if (!ok) {
+    return { N_target: Number.NaN, A_target_m2: Number.NaN, Epotato: Number.NaN, deltaTiles: Number.NaN };
+  }
+
+  const Epotato = driveMag / bodyMag;
+  const N_target = tilesNow * Epotato;
+  const A_target_m2 = N_target * areaTile;
+  const deltaTiles = N_target - tilesNow;
+
+  return { N_target, A_target_m2, Epotato, deltaTiles };
+}
+
+/** ---------- CCS/QI summarizers (inline, no new files) ---------- */
+
+type QISummary = { hasQi: boolean; qiMin?: number; qiP05?: number; qiMean?: number };
+type AmpSummary = { hasData: boolean; bandOccupancy: number; edgeMass: number; steepness: number };
+
+/** Summarize Float32Array headroom: min, ~p05 (robust tail), mean */
+function summarizeQiHeadroom(arr?: Float32Array | number[]): QISummary {
+  if (!arr || !arr.length) return { hasQi: false };
+
+  const N = arr.length;
+  const stride = N > 1_000_000 ? 8 : N > 250_000 ? 4 : N > 50_000 ? 2 : 1;
+
+  const BINS = 64;
+  const bins = new Uint32Array(BINS);
+  let total = 0;
+  let min = Number.POSITIVE_INFINITY;
+  let sum = 0;
+
+  for (let i = 0; i < N; i += stride) {
+    let v = Number((arr as any)[i]);
+    if (!Number.isFinite(v)) continue;
+    if (v < 0) v = 0;
+    else if (v > 1) v = 1;
+    sum += v;
+    if (v < min) min = v;
+    const b = Math.min(BINS - 1, Math.max(0, Math.floor(v * (BINS - 1))));
+    bins[b] += 1;
+    total += 1;
+  }
+  if (total === 0 || !Number.isFinite(min)) return { hasQi: false };
+
+  const qiMean = sum / total;
+
+  // approximate p05 by scanning a 64-bin histogram CDF
+  const target = 0.05 * total;
+  let acc = 0,
+    p05Bin = 0;
+  for (let b = 0; b < BINS; b++) {
+    acc += bins[b];
+    if (acc >= target) {
+      p05Bin = b;
+      break;
+    }
+  }
+  const qiP05 = (p05Bin + 0.5) / BINS;
+
+  return { hasQi: true, qiMin: min, qiP05, qiMean };
+}
+
+/** Amplitude histogram proxy for wall “steepness” from data/min/max */
+function summarizeAmplitude(
+  data?: Float32Array | number[],
+  min?: number,
+  max?: number,
+): AmpSummary {
+  if (!data || !Number.isFinite(min) || !Number.isFinite(max) || (max as number) <= (min as number)) {
+    return { hasData: false, bandOccupancy: 0, edgeMass: 0, steepness: 0 };
+  }
+
+  const N = data.length;
+  if (!N) return { hasData: false, bandOccupancy: 0, edgeMass: 0, steepness: 0 };
+
+  const inv = 1 / ((max as number) - (min as number));
+  let band = 0,
+    edge = 0;
+
+  const stride = N > 1_000_000 ? 4 : N > 250_000 ? 2 : 1;
+
+  for (let i = 0; i < N; i += stride) {
+    const raw = Number((data as any)[i]);
+    const v = (raw - (min as number)) * inv; // normalize to [0..1]
+    if (!Number.isFinite(v)) continue;
+
+    // Nominal wall band occupancy: [0.30..0.70]
+    if (v >= 0.30 && v <= 0.70) band++;
+
+    // Edge mass near 0 or 1
+    if (v <= 0.15 || v >= 0.85) edge++;
+  }
+
+  const denom = Math.ceil(N / stride);
+  const bandOccupancy = denom ? band / denom : 0;
+  const edgeMass = denom ? edge / denom : 0;
+
+  // Thinner (steeper) walls => fewer samples in the wall band
+  const steepness = Math.max(0, Math.min(1, 1 - bandOccupancy));
+
+  return { hasData: true, bandOccupancy, edgeMass, steepness };
+}
+
+function fmt2(n?: number) {
+  return typeof n === "number" && Number.isFinite(n) ? n.toFixed(2) : "—";
+}
 const modeTitle: Record<string, string> = {
 
 
@@ -896,7 +1049,7 @@ function computeCurvatureProxy(pipeline: any, dEff: number) {
 
 
 
-export default function DriveGuardsPanel() {
+export default function DriveGuardsPanel({ panelHash }: DriveGuardsPanelProps = {}) {
 
 
 
@@ -909,6 +1062,9 @@ export default function DriveGuardsPanel() {
 
 
   const [readMode, setReadMode] = useState(false);
+
+  const { sample: curv } = useCurvatureBrick();
+  const cycleLedger = useCycleLedger();
 
 
 
@@ -973,6 +1129,53 @@ export default function DriveGuardsPanel() {
 
 
 
+
+  const amp = useMemo(
+    () => summarizeAmplitude(curv?.data as any, curv?.min as any, curv?.max as any),
+    [curv?.data, curv?.min, curv?.max],
+  );
+
+  const qi = useMemo(
+    () => summarizeQiHeadroom(curv?.qiMargin as Float32Array | number[] | undefined),
+    [curv?.qiMargin],
+  );
+
+  const ccsOk =
+    amp.hasData &&
+    amp.steepness >= 0.80 &&
+    (!qi.hasQi || (qi.qiP05 ?? 0) >= 0.10);
+
+  const ccsValue =
+    `S=${fmt2(amp.steepness)} occ=${fmt2(amp.bandOccupancy)}` +
+    (qi.hasQi ? ` QI_p05=${fmt2(qi.qiP05)}` : "");
+
+  const ccsDesc =
+    "CCS-Lite: steepness = 1 - occ([0.30..0.70] of normalized field). " +
+    "Healthy if steepness >= 0.80 and, if QI present, p05 >= 0.10.";
+
+  const ledgerRatioValue =
+    typeof cycleLedger.ratio === "number" && Number.isFinite(cycleLedger.ratio)
+      ? cycleLedger.ratio
+      : undefined;
+  const ledgerBadgeOk = cycleLedger.ok === null ? false : cycleLedger.ok === true;
+  const ledgerValue = ledgerRatioValue !== undefined
+    ? `ΔE drift ${toPercent(ledgerRatioValue, 3)}`
+    : "Ledger drift unavailable";
+  const ledgerDescription = `Ledger safe when |ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)}.`;
+  const ledgerSourceLabel =
+    cycleLedger.source === "server"
+      ? "server ledger"
+      : cycleLedger.source === "client"
+        ? "client aggregate"
+        : "telemetry";
+  const ledgerReadValue =
+    ledgerRatioValue !== undefined
+      ? `Per-cycle drift ${toPercent(ledgerRatioValue, 3)} via ${ledgerSourceLabel}.`
+      : "Awaiting ledger samples.";
+  const ledgerReadDescription =
+    ledgerRatioValue !== undefined
+      ? `|ΔE|/(|bus|+|sink|) <= ${toPercent(LEDGER_GUARD_THRESHOLD, 2)} keeps curvature bookkeeping tight. Latest: ΔE ${toSci(cycleLedger.latest?.dE, 2)} J (bus ${toSci(cycleLedger.latest?.bus, 2)} J, sink ${toSci(cycleLedger.latest?.sink, 2)} J).`
+      : "Ledger guard balances reversible (bus) and sink joules once samples arrive.";
 
   const zeta = Number(pipe?.zeta ?? pipe?.fordRoman?.value);
 
@@ -1594,9 +1797,336 @@ export default function DriveGuardsPanel() {
 
     Number.isFinite(kappaRatio) && !kappaMuted && zetaOk ? kappaRatioDisplay : "guarded";
 
+  const N_tiles_nowCandidate = firstFinite(
+
+    pipe?.tiles?.total,
+
+    pipe?.tiles?.N_tiles,
+
+    pipe?.N_tiles,
+
+    pipe?.totalTiles,
+
+    pipe?.tileCount,
+
+  );
 
 
-  const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
+
+  const hullAreaCandidate = firstFinite(
+
+    pipe?.tiles?.hullArea_m2,
+
+    pipe?.hullArea_m2,
+
+    pipe?.hullArea,
+
+    pipe?.hull?.area_m2,
+
+  );
+
+
+
+  const tileAreaCm2Candidate = firstFinite(
+
+    pipe?.tiles?.tileArea_cm2,
+
+    pipe?.tileArea_cm2,
+
+    pipe?.tileArea,
+
+    pipe?.tile?.area_cm2,
+
+  );
+
+
+
+  const N_tiles_now = Number.isFinite(N_tiles_nowCandidate) ? N_tiles_nowCandidate : Number.NaN;
+
+
+
+  const { aTile_m2, provenance: tileAreaProvenance, warn: tileAreaWarn } = derivePerTileArea_m2({
+
+    N_tiles: Number.isFinite(N_tiles_now) ? N_tiles_now : undefined,
+
+    hullArea_m2: Number.isFinite(hullAreaCandidate) ? hullAreaCandidate : undefined,
+
+    tileArea_cm2: Number.isFinite(tileAreaCm2Candidate) ? tileAreaCm2Candidate : undefined,
+
+  });
+
+
+
+  const tileInverse = requiredTilesForTarget({
+
+    kappaDrive: curvature.kappa,
+
+    kappaBody,
+
+    N_tiles_now: Number.isFinite(N_tiles_now) ? N_tiles_now : undefined,
+
+    aTile_m2: Number.isFinite(aTile_m2) ? aTile_m2 : undefined,
+
+  });
+
+
+
+  const hullPlatedArea_m2 =
+
+    Number.isFinite(N_tiles_now) && Number.isFinite(aTile_m2) ? N_tiles_now * aTile_m2 : Number.NaN;
+
+  const tilesForLiftThreshold =
+
+    Number.isFinite(tileInverse.N_target) && Number.isFinite(N_tiles_now)
+
+      ? Math.min(tileInverse.N_target, N_tiles_now)
+
+      : Number.NaN;
+
+  const liftTileRatio =
+
+    Number.isFinite(tilesForLiftThreshold) && Number.isFinite(N_tiles_now) && N_tiles_now > 0
+
+      ? tilesForLiftThreshold / N_tiles_now
+
+      : Number.NaN;
+
+  const platedAreaLiftMin =
+
+    Number.isFinite(hullPlatedArea_m2) && Number.isFinite(liftTileRatio)
+
+      ? hullPlatedArea_m2 * liftTileRatio
+
+      : Number.NaN;
+
+  const hullDims = pipe?.hull ?? {};
+
+  const hullLxCandidate = firstFinite(
+
+    (hullDims as any)?.Lx_m,
+
+    pipe?.hull_Lx_m,
+
+    pipe?.hullLx_m,
+
+  );
+
+  const hullLyCandidate = firstFinite(
+
+    (hullDims as any)?.Ly_m,
+
+    pipe?.hull_Ly_m,
+
+    pipe?.hullLy_m,
+
+  );
+
+  const hullLzCandidate = firstFinite(
+
+    (hullDims as any)?.Lz_m,
+
+    pipe?.hull_Lz_m,
+
+    pipe?.hullLz_m,
+
+  );
+
+  const hullVolumeDirect = firstFinite(
+
+    pipe?.hullVolume_m3,
+
+    (pipe?.hull as any)?.volume_m3,
+
+    (pipe?.hull as any)?.volume,
+
+    pipe?.hullVolume,
+
+  );
+
+  const hullVolumeEllipsoid =
+
+    Number.isFinite(hullLxCandidate) &&
+
+    Number.isFinite(hullLyCandidate) &&
+
+    Number.isFinite(hullLzCandidate)
+
+      ? (4 / 3) * Math.PI * (hullLxCandidate / 2) * (hullLyCandidate / 2) * (hullLzCandidate / 2)
+
+      : Number.NaN;
+
+  const hullVolumeCurrent =
+
+    Number.isFinite(hullVolumeDirect) && hullVolumeDirect > 0
+
+      ? hullVolumeDirect
+
+      : hullVolumeEllipsoid;
+
+  const hullVolumeLiftMin =
+
+    Number.isFinite(hullVolumeCurrent) && Number.isFinite(liftTileRatio)
+
+      ? hullVolumeCurrent * liftTileRatio
+
+      : Number.NaN;
+
+
+
+  const exoticMassNow = Number.isFinite(mass.mass) ? mass.mass : Number.NaN;
+
+
+
+  const exoticMassTarget =
+
+    Number.isFinite(exoticMassNow) &&
+
+    Number.isFinite(tileInverse.N_target) &&
+
+    Number.isFinite(N_tiles_now) &&
+
+    N_tiles_now > 0
+
+      ? (exoticMassNow * tileInverse.N_target) / N_tiles_now
+
+      : Number.NaN;
+
+
+
+  const exoticMassDelta =
+
+    Number.isFinite(exoticMassTarget) && Number.isFinite(exoticMassNow)
+
+      ? exoticMassTarget - exoticMassNow
+
+      : Number.NaN;
+
+  const exoticMassLiftMin =
+
+    Number.isFinite(exoticMassNow) && Number.isFinite(liftTileRatio)
+
+      ? exoticMassNow * liftTileRatio
+
+      : Number.NaN;
+
+
+
+  const formatInt = (value: number) =>
+
+    Number.isFinite(value) ? Math.round(value).toLocaleString() : "n/a";
+
+
+
+  const formatArea = (value: number) =>
+
+    Number.isFinite(value)
+
+      ? value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+
+      : "n/a";
+
+
+
+  const formatTileAreaCm2 = (value: number) =>
+
+    Number.isFinite(value)
+
+      ? (value / CM2_TO_M2).toLocaleString(undefined, { maximumFractionDigits: 2 })
+
+      : "n/a";
+
+
+
+  const formatSignedMass = (value: number) => {
+
+    if (!Number.isFinite(value)) return "n/a";
+
+    const magnitude = Math.abs(value).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+    if (value > 0) return `+${magnitude}`;
+
+    if (value < 0) return `-${magnitude}`;
+
+    return magnitude;
+
+  };
+
+  const formatVolume = (value: number) =>
+
+    Number.isFinite(value)
+
+      ? value.toLocaleString(undefined, { maximumFractionDigits: 1 })
+
+      : "n/a";
+
+
+
+  const deltaTilesBadgeClass = Number.isFinite(tileInverse.deltaTiles)
+
+    ? tileInverse.deltaTiles > 0
+
+      ? "bg-amber-700/80 text-amber-50"
+
+      : "bg-emerald-800/70 text-emerald-100"
+
+    : "bg-slate-700/80 text-slate-200";
+
+
+
+  const deltaTilesDisplay = Number.isFinite(tileInverse.deltaTiles)
+
+    ? (() => {
+
+        const deltaRounded = Math.round(tileInverse.deltaTiles);
+
+        if (deltaRounded > 0) return `+${deltaRounded.toLocaleString()}`;
+
+        return deltaRounded.toLocaleString();
+
+      })()
+
+    : "n/a";
+
+
+
+    const tilesAtBenchmarkDisplay = formatInt(tileInverse.N_target);
+
+  const liftTilesDisplay = formatInt(tilesForLiftThreshold);
+
+  const currentTilesDisplay = formatInt(N_tiles_now);
+
+  const hullPlatedDisplay = formatArea(hullPlatedArea_m2);
+
+  const tileAreaDisplay = formatTileAreaCm2(aTile_m2);
+
+  const massDeltaDisplay = formatSignedMass(exoticMassDelta);
+
+  const platedLiftDisplay = formatArea(platedAreaLiftMin);
+
+  const hullVolumeLiftDisplay = formatVolume(hullVolumeLiftMin);
+
+  const minExoticMassDisplay =
+    Number.isFinite(exoticMassLiftMin)
+      ? exoticMassLiftMin.toLocaleString(undefined, { maximumFractionDigits: 1 })
+      : "n/a";
+
+  const liftRatioDisplay =
+    Number.isFinite(liftTileRatio) && liftTileRatio >= 0
+      ? toPercent(liftTileRatio, 1)
+      : "n/a";
+
+  const inverseNarrative =
+    tilesAtBenchmarkDisplay !== "n/a"
+      ? `At present duty we need approx. ${tilesAtBenchmarkDisplay} tiles${
+          massDeltaDisplay !== "n/a" ? ` (Delta M_exotic = ${massDeltaDisplay} kg)` : ""
+        } to push kappa_drive to the kappa_body benchmark (E_potato ~ 1).`
+      : null;
+
+  const liftNarrative =
+    liftTilesDisplay !== "n/a" && platedLiftDisplay !== "n/a"
+      ? `Least-exotic lift envelope assumes constant per-tile physics: keeping roughly ${liftRatioDisplay} of the current tiles (~${liftTilesDisplay}) preserves kappa_drive >= kappa_body with plated area ${platedLiftDisplay} m^2 and exotic mass ${minExoticMassDisplay} kg.`
+      : null;
+const natarioTheta = Number(pipe?.thetaScaleExpected ?? pipe?.thetaCal ?? pipe?.thetaRaw);
 
 
 
@@ -2684,10 +3214,7 @@ export default function DriveGuardsPanel() {
 
 
   return (
-
-
-
-    <Card className="bg-slate-900/60 border-slate-800 text-slate-100">
+    <Card id={panelHash} data-panel-hash={panelHash} className="bg-slate-900/60 border-slate-800 text-slate-100">
 
 
 
@@ -2823,7 +3350,7 @@ export default function DriveGuardsPanel() {
 
 
 
-            <div className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
+            <div id="ledger-averaging" className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
 
 
 
@@ -2871,7 +3398,7 @@ export default function DriveGuardsPanel() {
 
 
 
-            <div className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
+            <div id="ledger-shift" className="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
 
 
 
@@ -3243,6 +3770,7 @@ export default function DriveGuardsPanel() {
                     the km-scale warp ledger
                   </a>{" "}
                   for the band derivation and operational notes.
+                  {inverseNarrative ? ` ${inverseNarrative}` : null}
                 </p>
 
               </div>
@@ -3265,11 +3793,111 @@ export default function DriveGuardsPanel() {
 
             </div>
 
+            <TooltipProvider delayDuration={120} skipDelayDuration={250}>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-200">
+
+                <MetricTooltipBadge
+
+                  label="Tiles @ κ_body"
+
+                  value={tilesAtBenchmarkDisplay}
+
+                  description="Tile census required to bring κ_drive up to the κ_body benchmark (E_potato ~ 1) while holding ship-averaged power, d_eff, and mathcalG fixed."
+
+                  className="bg-slate-700/80 hover:bg-slate-600/80"
+
+                />
+
+                <MetricTooltipBadge
+
+                  label="Δ tiles"
+
+                  value={deltaTilesDisplay}
+
+                  description="Margin between the live tile census and the κ_body threshold (E_potato ~ 1). Negative means concentrating the same power onto fewer tiles; positive means surplus tiles while staying above the benchmark."
+
+                  className={deltaTilesBadgeClass}
+
+                />
+
+                <MetricTooltipBadge
+
+                  label="ΔM_exotic"
+
+                  value={massDeltaDisplay}
+
+                  description="Change in the exotic mass proxy (M_exotic) if we move from the live tile census to the κ_body threshold. The proxy scales linearly with N_tiles."
+
+                  className="bg-slate-700/80 hover:bg-slate-600/80"
+
+                />
+
+                {tileAreaWarn && (
+                  <MetricTooltipBadge
+                    label="Tile size source"
+                    value={tileAreaProvenance ?? "n/a"}
+                    description={tileAreaWarn}
+                    className="bg-amber-800/70 text-amber-100 hover:bg-amber-700/70"
+                  />
+                )}
+              </div>
+            </TooltipProvider>
+
+            <div className="mt-2 text-xs text-slate-300/80">
+              <span>
+                Hull plated: {hullPlatedDisplay} m^2 ({currentTilesDisplay} tiles @ {tileAreaDisplay} cm^2)
+              </span>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-200">
+                <span className="font-semibold uppercase tracking-wide text-cyan-200">Inverse lift envelope</span>
+                <span className="text-[11px] text-slate-400">
+                  {liftTilesDisplay !== "n/a"
+                    ? `Tiles at lift: ${liftTilesDisplay} (${liftRatioDisplay} of current)`
+                    : "Tiles at lift unavailable"}
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Minimum plated footprint and hull volume that still let the drive meet the kappa_body benchmark, assuming today&apos;s duty, gains, and per-tile physics. Use it to gauge how small the exotic mass budget can go while keeping lift-effective curvature.
+              </p>
+              <TooltipProvider delayDuration={120} skipDelayDuration={250}>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-200">
+                  <MetricTooltipBadge
+                    label="Lift tiles"
+                    value={liftTilesDisplay}
+                    description="Tile census that keeps kappa_drive at or above kappa_body while minimizing exotic mass under the current gain and duty assumptions."
+                    className="bg-slate-700/80 hover:bg-slate-600/80"
+                  />
+                  <MetricTooltipBadge
+                    label="Min plated area"
+                    value={platedLiftDisplay}
+                    description="Plated hull area implied by the lift envelope. Scales directly with the tile fraction needed to stay at the curvature benchmark."
+                    className="bg-slate-700/80 hover:bg-slate-600/80"
+                  />
+                  <MetricTooltipBadge
+                    label="Min hull volume"
+                    value={hullVolumeLiftDisplay}
+                    description="Hull volume estimate assuming the current ellipsoidal proportions scaled by the lift tile fraction."
+                    className="bg-slate-700/80 hover:bg-slate-600/80"
+                  />
+                  <MetricTooltipBadge
+                    label="Min M_exotic (kg)"
+                    value={minExoticMassDisplay}
+                    description="Exotic mass proxy at the lift envelope. Assumes the proxy scales linearly with tile count and plated footprint."
+                    className="bg-slate-700/80 hover:bg-slate-600/80"
+                  />
+                </div>
+              </TooltipProvider>
+              {liftNarrative && (
+                <p className="mt-2 text-[11px] text-slate-400">{liftNarrative}</p>
+              )}
+            </div>
+
           </div>
 
         </section>
-
-
 
 
 
@@ -5320,7 +5948,11 @@ export default function DriveGuardsPanel() {
 
 
 
-          <div className="mt-3 grid gap-3 text-xs text-slate-300 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-3">
+            <CurvatureLedgerPanel />
+          </div>
+
+          <div className="mt-4 grid gap-3 text-xs text-slate-300 md:grid-cols-2 lg:grid-cols-3">
 
 
 
@@ -5473,6 +6105,78 @@ export default function DriveGuardsPanel() {
 
 
               readDescription="Protects ferrite stacks and prevents phase jitter from hardware backlash."
+
+
+
+            />
+
+
+
+            <GuardBadge
+
+
+
+              label="CCS-Stable"
+
+
+
+              ok={amp.hasData && ccsOk}
+
+
+
+              value={ccsValue}
+
+
+
+              description={ccsDesc}
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={ccsValue}
+
+
+
+              readDescription={ccsDesc}
+
+
+
+            />
+
+
+
+            <GuardBadge
+
+
+
+              label="Ledger-Zero"
+
+
+
+              ok={ledgerBadgeOk}
+
+
+
+              value={ledgerValue}
+
+
+
+              description={ledgerDescription}
+
+
+
+              readMode={readMode}
+
+
+
+              readValue={ledgerReadValue}
+
+
+
+              readDescription={ledgerReadDescription}
 
 
 
@@ -5756,6 +6460,69 @@ function BetweenPanels({
 
 
 
+function MetricTooltipBadge({
+  label,
+  value,
+  description,
+  className,
+}: {
+  label: string;
+  value: string;
+  description: ReactNode;
+  className?: string;
+}) {
+  const [manualOpen, setManualOpen] = useState(false);
+  const [autoOpen, setAutoOpen] = useState(false);
+
+  const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setManualOpen((prev) => {
+      const next = !prev;
+      if (!next) {
+        setAutoOpen(false);
+      }
+      return next;
+    });
+  };
+
+  const handleOpenChange = (next: boolean) => {
+    setAutoOpen(next);
+    if (!next) {
+      setManualOpen(false);
+    }
+  };
+
+  const open = manualOpen || autoOpen;
+
+  return (
+    <Tooltip open={open} onOpenChange={handleOpenChange} disableHoverableContent>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={handleClick}
+          className={cn(
+            "flex items-center gap-1 rounded px-2 py-1 text-slate-200 transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900",
+            className,
+          )}
+          aria-label={`${label} details`}
+        >
+          <span className="font-medium text-slate-300">{label}:</span>
+          <span className="font-mono text-[0.75rem] font-semibold leading-none">{value}</span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        className="max-w-xs border border-slate-800 bg-slate-950/95 text-left text-slate-100 shadow-lg"
+      >
+        <p className="text-sm font-semibold text-slate-50">{label}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-200">{description}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function GuardBadge({
 
 
@@ -5873,10 +6640,3 @@ function GuardBadge({
 
 
 }
-
-
-
-
-
-
-

@@ -1777,7 +1777,7 @@ export default function HelixCasimirAmplifier({
             <CardContent className="space-y-4 text-xs">
               {(() => {
                 const phasePct = Math.round(((ds.phase01 ?? 0) % 1) * 100);
-                const splitPct = Math.round((ds.splitFrac ?? 0.5) * 100);
+                const splitPct = Math.round((ds.splitFrac ?? 0.6) * 100);
                 return (
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-3">
@@ -1836,7 +1836,7 @@ export default function HelixCasimirAmplifier({
                            min={0}
                            max={1}
                            step={0.01}
-                           onValueChange={(v)=>ds.setSplit?.(true, v[0] ?? 0.5)}
+                           onValueChange={(v)=>ds.setSplit?.(true, v[0] ?? 0.6)}
                            disabled={!ds.splitEnabled || readOnly}
                          />
                       </div>
