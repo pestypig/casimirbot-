@@ -56,7 +56,6 @@ export default defineConfig({
         path.resolve(import.meta.dirname, "server"),
         path.resolve(import.meta.dirname, "shared"),
         path.resolve(import.meta.dirname, "modules"),
-        path.resolve(import.meta.dirname, "node_modules"),
       ],
       deny: ["**/.*"],
     },
