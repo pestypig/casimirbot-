@@ -41,7 +41,10 @@ export function LumaPanel() {
     try {
       const plan = await interpretSurfaceIntent(utterance);
       setLastPlan(plan);
-      const record = await executeHelixPlan(plan.planId, plan.plan, { broadcast: true });
+      const record = await executeHelixPlan(plan.planId, plan.plan, {
+        broadcast: true,
+        requireConfirmation: confirmMoveBubble,
+      });
       setLastPlanRecord(record);
       setPlanStatus(formatExecutionStatus(record));
       const summary = formatSurfaceResponse(plan, record);
@@ -297,4 +300,11 @@ function describeAction(action: HelixPlanAction) {
     default:
       return "unknown action";
   }
+}
+function confirmMoveBubble(action: Extract<HelixPlanAction, { op: "move_bubble" }>) {
+  if (typeof window === "undefined" || typeof window.confirm !== "function") return false;
+  const dx = action.dx.toFixed(2);
+  const dy = action.dy.toFixed(2);
+  const speed = (action.speed ?? 0).toFixed(2);
+  return window.confirm(`Execute move_bubble? dx=${dx}, dy=${dy}, speed=${speed}`);
 }

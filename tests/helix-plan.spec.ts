@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   helixPlanSchema,
@@ -45,6 +46,21 @@ describe("helix plan schema", () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts a plan carrying a plan_id", () => {
+    const plan: HelixPlan = {
+      version: HELIX_PLAN_VERSION,
+      plan_id: randomUUID(),
+      actions: [
+        {
+          op: "set_rc",
+          rc: 0.33,
+        },
+      ],
+    };
+
+    expect(() => helixPlanSchema.parse(plan)).not.toThrow();
   });
 });
 

@@ -38,7 +38,7 @@ const moveWarpBubbleSchema = z
     dx: z.number().min(-1).max(1),
     dy: z.number().min(-1).max(1),
     speed: z.number().min(0).max(1).default(0.2),
-    confirm: z.boolean().default(false),
+    confirm: z.boolean().default(true),
   })
   .strict();
 
@@ -72,6 +72,7 @@ export type HelixPlanAction = z.infer<typeof helixPlanActionSchema>;
 export const helixPlanSchema = z
   .object({
     version: z.literal(HELIX_PLAN_VERSION),
+    plan_id: z.string().uuid().optional(),
     intent: z.string().min(1).max(240).optional(),
     actions: z.array(helixPlanActionSchema).min(1).max(8),
   })
@@ -103,6 +104,7 @@ export const helixPlanJsonSchema = {
   required: ["version", "actions"],
   properties: {
     version: { type: "string", const: HELIX_PLAN_VERSION },
+    plan_id: { type: "string", format: "uuid" },
     intent: { type: "string", description: "High-level user goal (free text)" },
     actions: {
       type: "array",
@@ -174,7 +176,7 @@ export const helixPlanJsonSchema = {
         dx: { type: "number", minimum: -1, maximum: 1 },
         dy: { type: "number", minimum: -1, maximum: 1 },
         speed: { type: "number", minimum: 0, maximum: 1, default: 0.2 },
-        confirm: { type: "boolean", default: false },
+        confirm: { type: "boolean", default: true },
       },
     },
     Sweep: {

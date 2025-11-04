@@ -179,6 +179,19 @@ function resolveBurstFrac(live: any): number {
   }
 }
 
+const wrap01 = (value: number) => ((value % 1) + 1) % 1;
+
+const smallestPhaseDelta = (a: number, b: number) => {
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  let delta = ((a - b) % 1 + 1) % 1;
+  if (delta > 0.5) delta -= 1;
+  return delta;
+};
+
+const BUS_PHASE_DIFF_THRESHOLD = 0.05;
+const MAX_PHASE_HISTORY = 240;
+const PHASE_HISTORY_SAMPLE_MS = 120;
+
 // Mode-aware sector width in sectors (Ïƒ_sector). Server override if provided.
 function resolveSigmaSectors(live: any): number {
   // Accept broad override keys from server/view
@@ -478,6 +491,7 @@ function Hull3DDebugToggles({
 }) {
   const [ringOn, setRingOn] = useState<boolean>(() => {
     const w: any = (typeof window !== "undefined") ? window : {};
+    if (w.__hullShowRingOverlay === undefined) return true;
     return !!w.__hullShowRingOverlay;
   });
   const [grayOn, setGrayOn] = useState<boolean>(() => {
@@ -787,6 +801,21 @@ const sharedPhysicsState = sharedHullState.physics;
 const sharedComplianceState = sharedHullState.compliance;
 const sharedSectorState = sharedHullState.sector;
 const sharedPaletteState = sharedHullState.palette;
+const [busPhasePayload, setBusPhasePayload] = useState<{
+  phase01: number;
+  phaseCont?: number;
+  tsec_ms?: number;
+  pumpPhase_deg?: number;
+  sectorIndex?: number;
+  source?: string;
+  timestamp?: number;
+} | null>(null);
+const busPhaseHistoryRef = useRef<number[]>([]);
+const loopPhaseHistoryRef = useRef<number[]>([]);
+const lastPhaseSampleTimeRef = useRef<number>(0);
+const lastBusPhaseSampleRef = useRef<number | null>(null);
+const lastLoopPhaseSampleRef = useRef<number | null>(null);
+const [phaseHistoryTick, setPhaseHistoryTick] = useState(0);
 const sharedPhysicsLock = useHull3DSharedStore((s) => s.physics.locked);
 const toggleSharedPhysicsLock = useHull3DSharedStore((s) => s.togglePhysicsLock);
 const trimSharedPhysicsDb = useHull3DSharedStore((s) => s.trimPhysicsDb);
@@ -1094,13 +1123,17 @@ const res = 256;
   const loopSectorCount = Math.max(1, lightLoop.sectorCount || totalSectors);
   const loopSectorIdx = Number.isFinite(lightLoop.sectorIdx) ? lightLoop.sectorIdx : 0;
   const loopPhase = Number.isFinite(lightLoop.phase) ? lightLoop.phase : 0;
+  const loopPhaseTotal = Math.max(1, loopSectorCount);
+  const loopPhaseCycle = loopSectorIdx + loopPhase;
+  const loopPhase01 = wrap01(loopPhaseCycle / loopPhaseTotal);
 
   useEffect(() => {
     const handlePhase = (payload: any) => {
       const phaseRaw = Number(payload?.phase01);
       if (!Number.isFinite(phaseRaw)) return;
-      const wrapped = ((phaseRaw % 1) + 1) % 1;
-      const cont = Number(payload?.phaseCont);
+      const wrapped = wrap01(phaseRaw);
+      const contRaw = Number(payload?.phaseCont);
+      const phaseCont = Number.isFinite(contRaw) ? contRaw : wrapped;
       const signRaw = Number(payload?.phaseSign);
       const sectorsRaw = Number(payload?.sectorsTotal);
       const total = Number.isFinite(sectorsRaw) && sectorsRaw > 0
@@ -1118,10 +1151,42 @@ const res = 256;
         mode: "auto",
         source: mappedSource,
         phase01: wrapped,
-        phaseCont: Number.isFinite(cont) ? cont : wrapped,
+        phaseCont,
         sign: signRaw === -1 ? -1 : 1,
         wedgeIndex,
         nextWedgeIndex: nextIndex,
+      });
+      const tsecRaw = Number(payload?.Tsec_ms ?? payload?.tSec_ms ?? payload?.tsec_ms);
+      const pumpPhaseRaw = Number(payload?.pumpPhase_deg ?? payload?.pumpPhaseDeg ?? payload?.pumpPhase);
+      const sectorIdxRaw = Number(
+        payload?.sectorIdx ??
+        payload?.sectorIndex ??
+        payload?.sector ??
+        wedgeIndex
+      );
+      const timestampRaw = Number(payload?.timestamp ?? payload?.ts ?? payload?.t);
+      setBusPhasePayload((prev) => {
+        const next = {
+          phase01: wrapped,
+          phaseCont,
+          tsec_ms: Number.isFinite(tsecRaw) ? tsecRaw : undefined,
+          pumpPhase_deg: Number.isFinite(pumpPhaseRaw) ? pumpPhaseRaw : undefined,
+          sectorIndex: Number.isFinite(sectorIdxRaw) ? Math.max(0, Math.floor(sectorIdxRaw)) : undefined,
+          source: mappedSource,
+          timestamp: Number.isFinite(timestampRaw) ? timestampRaw : Date.now(),
+        };
+        if (
+          prev &&
+          prev.phase01 === next.phase01 &&
+          prev.phaseCont === next.phaseCont &&
+          prev.tsec_ms === next.tsec_ms &&
+          prev.pumpPhase_deg === next.pumpPhase_deg &&
+          prev.sectorIndex === next.sectorIndex &&
+          prev.source === next.source
+        ) {
+          return prev;
+        }
+        return next;
       });
     };
     const stableId = subscribe("warp:phase:stable", handlePhase);
@@ -1130,13 +1195,10 @@ const res = 256;
       if (stableId) unsubscribe(stableId);
       if (legacyId) unsubscribe(legacyId);
     };
-  }, [setSharedPhase, totalSectors]);
+  }, [setSharedPhase, setBusPhasePayload, totalSectors]);
 
   useEffect(() => {
     if (followHullPhase) return;
-    const total = Math.max(1, loopSectorCount);
-    const phaseCycle = loopSectorIdx + loopPhase;
-    const phase01 = ((phaseCycle / total) % 1 + 1) % 1;
     const dwellMsRaw = Number(lightLoop.dwell_ms);
     const dwell = Number.isFinite(dwellMsRaw) && dwellMsRaw > 0 ? dwellMsRaw : 1;
     const burstMsRaw = Number(lightLoop.burst_ms);
@@ -1148,15 +1210,179 @@ const res = 256;
     setSharedPhase({
       mode: "auto",
       source: "time",
-      phase01,
-      phaseCont: phaseCycle,
+      phase01: loopPhase01,
+      phaseCont: loopPhaseCycle,
       sign: 1,
-      wedgeIndex: ((loopSectorIdx % total) + total) % total,
-      nextWedgeIndex: ((loopSectorIdx + 1) % total + total) % total,
+      wedgeIndex: ((loopSectorIdx % loopPhaseTotal) + loopPhaseTotal) % loopPhaseTotal,
+      nextWedgeIndex: ((loopSectorIdx + 1) % loopPhaseTotal + loopPhaseTotal) % loopPhaseTotal,
       dutyWindow: [windowStart, windowEnd],
       damp: 0.15,
     });
-  }, [setSharedPhase, loopSectorCount, loopSectorIdx, loopPhase, lightLoop.dwell_ms, lightLoop.burst_ms, followHullPhase]);
+  }, [
+    setSharedPhase,
+    loopPhase01,
+    loopPhaseCycle,
+    loopPhaseTotal,
+    loopSectorIdx,
+    lightLoop.dwell_ms,
+    lightLoop.burst_ms,
+    followHullPhase,
+  ]);
+
+  const busPhase01 = Number.isFinite(sharedPhase?.phase01) ? sharedPhase.phase01 : null;
+  const busPhaseCont = Number.isFinite(sharedPhase?.phaseCont) ? sharedPhase.phaseCont : null;
+  const busPhaseSource = sharedPhase?.source ?? "time";
+  const busPhaseUpdatedAt = Number.isFinite(sharedPhase?.updatedAt ?? NaN)
+    ? sharedPhase?.updatedAt
+    : undefined;
+
+  useEffect(() => {
+    if (busPhaseCont == null || !Number.isFinite(loopPhaseCycle)) return;
+    const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (now - lastPhaseSampleTimeRef.current < PHASE_HISTORY_SAMPLE_MS) {
+      if (
+        lastBusPhaseSampleRef.current !== null &&
+        lastLoopPhaseSampleRef.current !== null &&
+        Math.abs(busPhaseCont - lastBusPhaseSampleRef.current) < 1e-6 &&
+        Math.abs(loopPhaseCycle - lastLoopPhaseSampleRef.current) < 1e-6
+      ) {
+        return;
+      }
+    } else {
+      lastPhaseSampleTimeRef.current = now;
+    }
+    const pushHistory = (ref: React.MutableRefObject<number[]>, value: number) => {
+      const history = ref.current;
+      history.push(value);
+      if (history.length > MAX_PHASE_HISTORY) {
+        history.splice(0, history.length - MAX_PHASE_HISTORY);
+      }
+    };
+    pushHistory(busPhaseHistoryRef, busPhaseCont);
+    pushHistory(loopPhaseHistoryRef, loopPhaseCycle);
+    lastBusPhaseSampleRef.current = busPhaseCont;
+    lastLoopPhaseSampleRef.current = loopPhaseCycle;
+    setPhaseHistoryTick((tick) => (tick + 1) % 1_000_000);
+  }, [busPhaseCont, loopPhaseCycle]);
+
+  const phaseSparkline = useMemo(() => {
+    const loopHistory = loopPhaseHistoryRef.current;
+    const busHistory = busPhaseHistoryRef.current;
+    const len = Math.min(loopHistory.length, busHistory.length);
+    if (len < 2) return null;
+    const loopSlice = loopHistory.slice(-len);
+    const busSlice = busHistory.slice(-len);
+    const minVal = Math.min(...loopSlice, ...busSlice);
+    const maxVal = Math.max(...loopSlice, ...busSlice);
+    const range = Math.max(maxVal - minVal, 1e-6);
+    const width = 120;
+    const height = 28;
+    const buildPath = (series: number[]) =>
+      series
+        .map((value, idx) => {
+          const x = (idx / (len - 1)) * width;
+          const norm = (value - minVal) / range;
+          const y = height - norm * height;
+          return `${idx === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(" ");
+    return {
+      width,
+      height,
+      loopPath: buildPath(loopSlice),
+      busPath: buildPath(busSlice),
+    };
+  }, [phaseHistoryTick]);
+
+  const busPhaseSummary = useMemo(() => {
+    const loopText = `Loop φ=${loopPhase01.toFixed(3)} cyc`;
+    if (busPhase01 == null) {
+      return {
+        text: `${loopText} | Bus φ=--`,
+        busText: "Bus φ=--",
+        loopText,
+        deltaText: "--",
+        diffCycles: null as number | null,
+        title: "Bus phase not yet received",
+      };
+    }
+    const diffCycles = smallestPhaseDelta(busPhase01, loopPhase01);
+    const diffText =
+      diffCycles == null
+        ? "--"
+        : `${diffCycles >= 0 ? "+" : "-"}${Math.abs(diffCycles).toFixed(2)} cyc`;
+    const busText = `Bus φ=${busPhase01.toFixed(3)} cyc${
+      busPhaseCont != null ? ` (cont ${busPhaseCont.toFixed(2)})` : ""
+    }`;
+    return {
+      text: `${busText} | Δφ=${diffText} | ${loopText}`,
+      busText,
+      loopText,
+      deltaText: diffText,
+      diffCycles,
+      title: `Bus φ=${(busPhase01 * 360).toFixed(1)}°, Loop φ=${(loopPhase01 * 360).toFixed(
+        1
+      )}°, Bus cont=${busPhaseCont != null ? busPhaseCont.toFixed(3) : "--"} cyc`,
+    };
+  }, [busPhase01, busPhaseCont, loopPhase01]);
+
+  const phaseDiffIndicator = useMemo(() => {
+    if (busPhaseSummary.diffCycles == null) return null;
+    const diffCycles = busPhaseSummary.diffCycles;
+    const diffAbs = Math.abs(diffCycles);
+    const relation =
+      diffAbs < 0.005 ? "aligned" : diffCycles > 0 ? "ahead" : "behind";
+    const text =
+      relation === "aligned"
+        ? "Bus aligned ±0.01 cycles"
+        : `Bus ${relation} by ${diffAbs.toFixed(2)} cycles`;
+    const highlight = diffAbs >= BUS_PHASE_DIFF_THRESHOLD;
+    const className = highlight
+      ? "bg-amber-900/70 text-amber-200 ring-1 ring-amber-400/60"
+      : "bg-emerald-900/50 text-emerald-200/90";
+    const title = `Loop φ=${loopPhase01.toFixed(4)} cyc · Bus φ=${
+      busPhase01 != null ? busPhase01.toFixed(4) : "--"
+    } cyc`;
+    return {
+      text,
+      className,
+      title,
+    };
+  }, [busPhaseSummary.diffCycles, busPhase01, loopPhase01]);
+
+  const busPayloadSummary = useMemo(() => {
+    if (!busPhasePayload) return null;
+    const tsec =
+      busPhasePayload.tsec_ms != null
+        ? `${busPhasePayload.tsec_ms.toFixed(2)} ms`
+        : "--";
+    const pump =
+      busPhasePayload.pumpPhase_deg != null
+        ? `${busPhasePayload.pumpPhase_deg.toFixed(1)}°`
+        : "--";
+    const sector =
+      busPhasePayload.sectorIndex != null
+        ? `sector ${busPhasePayload.sectorIndex}`
+        : "sector --";
+    const sourceLabel = busPhasePayload.source ?? busPhaseSource;
+    const updatedAt =
+      busPhasePayload.timestamp != null
+        ? new Date(busPhasePayload.timestamp).toISOString()
+        : busPhaseUpdatedAt != null
+          ? new Date(busPhaseUpdatedAt).toISOString()
+          : null;
+    const titleParts = [
+      `Tsec_ms=${busPhasePayload.tsec_ms ?? "--"}`,
+      `pumpPhase_deg=${busPhasePayload.pumpPhase_deg ?? "--"}`,
+      `sector=${busPhasePayload.sectorIndex ?? "--"}`,
+      `source=${sourceLabel}`,
+    ];
+    if (updatedAt) titleParts.push(`timestamp=${updatedAt}`);
+    return {
+      text: `Bus payload Tsec ${tsec} | pump φ ${pump} | ${sector}`,
+      title: titleParts.join(", "),
+    };
+  }, [busPhasePayload, busPhaseSource, busPhaseUpdatedAt]);
 
   useEffect(() => {
     const tauLCmsRaw = Number(lightLoop.tauLC_ms);
@@ -3174,11 +3400,93 @@ const res = 256;
               {sectorUtilSummary.text}
             </span>
             <span
-              className={cn("rounded px-2 py-1", lightCrossSummary.className)}
+              className={cn("rounded px-2 py-1 flex flex-col gap-1", lightCrossSummary.className)}
               title={lightCrossSummary.title}
             >
-              {lightCrossSummary.text}
+              <span>{lightCrossSummary.text}</span>
+              <span
+                className="flex flex-wrap items-center gap-1 font-mono text-emerald-100"
+                title={busPhaseSummary.title}
+              >
+                <span>{busPhaseSummary.busText}</span>
+                <span className="text-emerald-400/70">|</span>
+                <span>Δφ {busPhaseSummary.deltaText}</span>
+                <span className="text-emerald-400/70">|</span>
+                <span>{busPhaseSummary.loopText}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="ml-1 rounded bg-emerald-900/60 px-1 py-0.5 text-[0.55rem] uppercase tracking-wide text-emerald-200">
+                      Source: usePhaseBridge
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    align="center"
+                    className="max-w-xs text-xs text-slate-200"
+                  >
+                    Source: usePhaseBridge (server + metrics blend). Live channel:
+                    {" "}
+                    {busPhaseSource}
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+              {phaseSparkline && (
+                <div className="mt-1 flex flex-col gap-0.5">
+                  <svg
+                    viewBox={`0 0 ${phaseSparkline.width} ${phaseSparkline.height}`}
+                    width={phaseSparkline.width}
+                    height={phaseSparkline.height}
+                    className="h-7 w-28"
+                    role="img"
+                    aria-label="Loop vs bus phase sparkline"
+                  >
+                    <title>Loop vs bus phase history</title>
+                    <path
+                      d={phaseSparkline.loopPath}
+                      fill="none"
+                      stroke="rgba(56,189,248,0.75)"
+                      strokeWidth={1.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d={phaseSparkline.busPath}
+                      fill="none"
+                      stroke="rgba(251,191,36,0.9)"
+                      strokeWidth={1.4}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span className="flex items-center gap-3 text-[0.55rem] uppercase tracking-wide text-emerald-200/70">
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-1 w-3 rounded bg-sky-300" />
+                      Loop
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="inline-block h-1 w-3 rounded bg-amber-300" />
+                      Bus
+                    </span>
+                  </span>
+                </div>
+              )}
             </span>
+            {phaseDiffIndicator && (
+              <span
+                className={cn("rounded px-2 py-1 text-slate-200", phaseDiffIndicator.className)}
+                title={phaseDiffIndicator.title}
+              >
+                {phaseDiffIndicator.text}
+              </span>
+            )}
+            {busPayloadSummary && (
+              <span
+                className="rounded px-2 py-1 bg-slate-900/70 text-slate-200"
+                title={busPayloadSummary.title}
+              >
+                {busPayloadSummary.text}
+              </span>
+            )}
             <span
               className={cn("rounded px-2 py-1", zetaBadgeData.className)}
               title={zetaBadgeData.title}

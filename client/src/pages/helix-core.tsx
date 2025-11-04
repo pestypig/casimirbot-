@@ -2743,34 +2743,8 @@ useEffect(() => {
             </div>
           </div>
 
-          <VacuumContractBadge contract={vacuumContract} className="mb-4" />
-
-          <section
-            id={PANEL_HASHES.lumaPanel}
-            data-panel-hash={PANEL_HASHES.lumaPanel}
-            className="mb-6"
-          >
-            <LumaPanel />
-          </section>
-
-          <div className="mb-4 space-y-3">
-            <div
-              id={PANEL_HASHES.fractionalRail}
-              data-panel-hash={PANEL_HASHES.fractionalRail}
-              className="rounded-lg border border-slate-800 bg-slate-900/60 p-3"
-            >
-              <FractionalCoherenceRail state={fractional} compact />
-            </div>
-            <div id={PANEL_HASHES.fractionalGrid} data-panel-hash={PANEL_HASHES.fractionalGrid}>
-              <FractionalCoherenceGrid
-                state={fractional}
-                onSendToPump={handleFractionalPump}
-              />
-            </div>
-          </div>
-
           {/* === Quick Operational Mode Switch (global) === */}
-          <div id={PANEL_HASHES.quickMode} data-panel-hash={PANEL_HASHES.quickMode} className="mb-4">
+          <div id={PANEL_HASHES.quickMode} data-panel-hash={PANEL_HASHES.quickMode} className="mb-6">
             <div className="flex flex-wrap items-center gap-2">
               {([
                 { key: "standby", label: "Standby", hint: "Field idle" },
@@ -2817,6 +2791,69 @@ useEffect(() => {
             </div>
           </div>
 
+          <VacuumContractBadge contract={vacuumContract} className="mb-4" />
+
+        {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
+        <div className="mt-6">
+          <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
+          <div className="relative">
+            <AlcubierrePanel
+              onCanvasReady={(canvas, overlay, overlayDom) => {
+                setTimeLapseCanvas(canvas ?? null);
+                setTimeLapseOverlayCanvas(overlay ?? null);
+                setTimeLapseOverlayDom(overlayDom ?? null);
+              }}
+              overlayHudEnabled={showSweepHud}
+              onPlanarVizModeChange={handlePlanarVizModeChange}
+            />
+            {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
+              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
+                  {timeLapseRecorder.currentFrame?.segment ?? "Time-Lapse"}
+                </div>
+                <div className="mt-1 whitespace-pre-line font-mono text-[11px] leading-tight text-slate-200">
+                  {(timeLapseRecorder.currentFrame?.overlayText ?? "Preparing telemetry...")
+                    .split(" | ")
+                    .join("\n")}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-400">
+                  {timeLapseRecorder.isProcessing
+                    ? "Finalizing videoâ€¦"
+                    : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
+                </div>
+              </div>
+            )}
+            {timeLapseRecorder.status === "error" && timeLapseRecorder.error && (
+              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-rose-500/40 bg-slate-950/80 px-3 py-2 text-[11px] text-rose-200">
+                {timeLapseRecorder.error}
+              </div>
+            )}
+        </div>
+      </div>
+
+          <section
+            id={PANEL_HASHES.lumaPanel}
+            data-panel-hash={PANEL_HASHES.lumaPanel}
+            className="mb-6"
+          >
+            <LumaPanel />
+          </section>
+
+          <div className="mb-4 space-y-3">
+            <div
+              id={PANEL_HASHES.fractionalRail}
+              data-panel-hash={PANEL_HASHES.fractionalRail}
+              className="rounded-lg border border-slate-800 bg-slate-900/60 p-3"
+            >
+              <FractionalCoherenceRail state={fractional} compact />
+            </div>
+            <div id={PANEL_HASHES.fractionalGrid} data-panel-hash={PANEL_HASHES.fractionalGrid}>
+              <FractionalCoherenceGrid
+                state={fractional}
+                onSendToPump={handleFractionalPump}
+              />
+            </div>
+          </div>
           <NearZeroWidget
             className="mb-6"
             mode={effectiveMode}
@@ -2924,44 +2961,6 @@ useEffect(() => {
               })()}
             </CardContent>
           </Card>
-
-        {/* Alcubierre Viewer (single engine; toggle view between york|bubble) */}
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">Alcubierre Metric Viewer</h2>
-          <div className="relative">
-            <AlcubierrePanel
-              onCanvasReady={(canvas, overlay, overlayDom) => {
-                setTimeLapseCanvas(canvas ?? null);
-                setTimeLapseOverlayCanvas(overlay ?? null);
-                setTimeLapseOverlayDom(overlayDom ?? null);
-              }}
-              overlayHudEnabled={showSweepHud}
-              onPlanarVizModeChange={handlePlanarVizModeChange}
-            />
-            {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
-              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300">
-                  {timeLapseRecorder.currentFrame?.segment ?? "Time-Lapse"}
-                </div>
-                <div className="mt-1 whitespace-pre-line font-mono text-[11px] leading-tight text-slate-200">
-                  {(timeLapseRecorder.currentFrame?.overlayText ?? "Preparing telemetry...")
-                    .split(" | ")
-                    .join("\n")}
-                </div>
-                <div className="mt-1 text-[10px] text-slate-400">
-                  {timeLapseRecorder.isProcessing
-                    ? "Finalizing videoâ€¦"
-                    : `Capturing ${Math.round(timeLapseRecorder.progress * 100)}%`}
-                </div>
-              </div>
-            )}
-            {timeLapseRecorder.status === "error" && timeLapseRecorder.error && (
-              <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-rose-500/40 bg-slate-950/80 px-3 py-2 text-[11px] text-rose-200">
-                {timeLapseRecorder.error}
-              </div>
-            )}
-        </div>
-      </div>
 
           {/* ====== Light Speed vs Strobing Scale ====== */}
           <Card

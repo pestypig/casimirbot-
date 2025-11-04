@@ -176,11 +176,12 @@ export async function requestSurfacePlan(payload: {
   }
 
   const plan = helixPlanSchema.parse(parsed);
-  const planId = crypto.randomUUID();
+  const planId = plan.plan_id ?? crypto.randomUUID();
+  const normalizedPlan = plan.plan_id ? plan : { ...plan, plan_id: planId };
 
   return {
     planId,
-    plan,
+    plan: normalizedPlan,
     raw: json,
     tokenEstimate: promptEstimate,
     model: SURFACE_MODEL,
