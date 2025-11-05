@@ -1,5 +1,110 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+interface ApiRequestOptions {
+  allowUnauthorized?: boolean;
+}
+
+type FixedTuple3 = [number, number, number];
+
+const BASE64_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+const encodeBytesToBase64 = (bytes: Uint8Array): string => {
+  const globalScope = globalThis as {
+    btoa?: (value: string) => string;
+    Buffer?: {
+      from?: (
+        input: Uint8Array,
+      ) => { toString(encoding: string): string };
+    };
+  };
+
+  if (typeof globalScope.btoa === "function") {
+    let binary = "";
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode(...chunk);
+    }
+    return globalScope.btoa(binary);
+  }
+
+  const bufferFactory = globalScope.Buffer;
+  if (
+    bufferFactory &&
+    typeof bufferFactory.from === "function"
+  ) {
+    return bufferFactory.from(bytes).toString("base64");
+  }
+
+  let output = "";
+  let i = 0;
+  const { length } = bytes;
+  for (; i + 2 < length; i += 3) {
+    const chunk =
+      (bytes[i] << 16) |
+      (bytes[i + 1] << 8) |
+      bytes[i + 2];
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += BASE64_ALPHABET[(chunk >> 6) & 63];
+    output += BASE64_ALPHABET[chunk & 63];
+  }
+  const remaining = length - i;
+  if (remaining === 1) {
+    const chunk = bytes[i] << 16;
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += "==";
+  } else if (remaining === 2) {
+    const chunk =
+      (bytes[i] << 16) |
+      (bytes[i + 1] << 8);
+    output += BASE64_ALPHABET[(chunk >> 18) & 63];
+    output += BASE64_ALPHABET[(chunk >> 12) & 63];
+    output += BASE64_ALPHABET[(chunk >> 6) & 63];
+    output += "=";
+  }
+  return output;
+};
+
+const encodeFloat32ToBase64 = (values: Float32Array): string => {
+  const bytes = new Uint8Array(
+    values.buffer,
+    values.byteOffset,
+    values.byteLength,
+  );
+  return encodeBytesToBase64(bytes);
+};
+
+const buildCurvatureMock = (dims: FixedTuple3) => {
+  const total = dims[0] * dims[1] * dims[2];
+  const data = new Float32Array(total);
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < total; i++) {
+    const t = total > 1 ? i / (total - 1) : 0;
+    const value = Math.sin(t * Math.PI * 4) * 0.05;
+    data[i] = value;
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  if (!Number.isFinite(min)) min = 0;
+  if (!Number.isFinite(max)) max = 0;
+  return {
+    dims,
+    data: encodeFloat32ToBase64(data),
+    min,
+    max,
+  };
+};
+
+const CURVATURE_MOCKS = {
+  low: buildCurvatureMock([8, 8, 8]),
+  medium: buildCurvatureMock([12, 12, 12]),
+  high: buildCurvatureMock([16, 16, 16]),
+} as const;
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,14 +117,32 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
   signal?: AbortSignal,
+  options: ApiRequestOptions = {},
 ): Promise<Response> {
+  const normalizeUrlForMock = (input: string): string => {
+    if (!input) return input;
+    if (input.startsWith("/")) return input;
+    try {
+      const base =
+        typeof window !== "undefined" && window.location
+          ? `${window.location.protocol}//${window.location.host}`
+          : "http://localhost";
+      const parsed = new URL(input, base);
+      return `${parsed.pathname}${parsed.search}`;
+    } catch {
+      return input;
+    }
+  };
+  const normalizedUrl = normalizeUrlForMock(url);
+  const normalizedPath = normalizedUrl.split("?")[0] ?? normalizedUrl;
+
   // Helper: dev-only minimal mocks when backend isn't up.
   const shouldMock = () => {
     // Vite dev environment check
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV;
-      return Boolean(isDev) && url.startsWith('/api/helix');
+      return Boolean(isDev) && normalizedUrl.startsWith('/api/helix');
     } catch {
       return false;
     }
@@ -30,7 +153,7 @@ export async function apiRequest(
     // Very small, UI-friendly defaults to keep Helix Core page stable without backend
     const now = Date.now();
     const jsonFor = () => {
-      if (method === 'GET' && url === '/api/helix/pipeline') {
+      if (method === 'GET' && normalizedPath === '/api/helix/pipeline') {
         return {
           currentMode: 'hover',
           dutyEffectiveFR: 0.000025,
@@ -44,7 +167,7 @@ export async function apiRequest(
           updatedAt: now,
         };
       }
-      if (method === 'GET' && url === '/api/helix/metrics') {
+      if (method === 'GET' && normalizedPath === '/api/helix/metrics') {
         return {
           totalTiles: 0,
           activeTiles: 0,
@@ -60,11 +183,39 @@ export async function apiRequest(
           },
         };
       }
+      if (method === 'GET' && normalizedPath === '/api/helix/curvature-brick') {
+        const searchStart = normalizedUrl.indexOf("?");
+        const params = searchStart >= 0
+          ? new URLSearchParams(normalizedUrl.slice(searchStart + 1))
+          : undefined;
+        const qualityRaw = params?.get("quality")?.toLowerCase();
+        const quality =
+          qualityRaw === "low" || qualityRaw === "high"
+            ? qualityRaw
+            : "medium";
+        const mock = CURVATURE_MOCKS[quality];
+        const span = Math.max(mock.max - mock.min, 1e-6);
+        const residualScale = span * 0.25;
+        return {
+          dims: mock.dims,
+          voxelBytes: 4,
+          format: "r32f",
+          data: mock.data,
+          min: mock.min,
+          max: mock.max,
+          emaAlpha: 0.18,
+          residualMin: -residualScale,
+          residualMax: residualScale,
+          quality,
+          mock: true,
+          generatedAt: now,
+        };
+      }
       // Accept POSTs used by the UI with a no-op echo to avoid hard errors
-      if (method === 'POST' && url.startsWith('/api/helix/hardware/')) {
+      if (method === 'POST' && normalizedUrl.startsWith('/api/helix/hardware/')) {
         return { ok: true };
       }
-      if (method === 'POST' && (url.startsWith('/api/helix/pipeline') || url === '/api/helix/command' || url.startsWith('/api/helix/mode'))) {
+      if (method === 'POST' && (normalizedUrl.startsWith('/api/helix/pipeline') || normalizedUrl === '/api/helix/command' || normalizedUrl.startsWith('/api/helix/mode'))) {
         return { ok: true, url, method, received: data ?? null, mocked: true, ts: now };
       }
       return null;
@@ -89,6 +240,9 @@ export async function apiRequest(
     });
 
     if (!res.ok) {
+      if (options.allowUnauthorized && res.status === 401) {
+        return res;
+      }
       // Try dev mock on non-OK responses
       const mocked = makeMock();
       if (mocked) return mocked;
@@ -105,22 +259,52 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
+export function getQueryFn<T>({ on401: unauthorizedBehavior }: {
   on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
-      credentials: "include",
-    });
+}): QueryFunction<T> {
+  return async ({ queryKey, signal }) => {
+    const urlFromQueryKey = () => {
+      const firstString = queryKey.find(
+        (part): part is string => typeof part === "string" && part.length > 0,
+      );
+      if (firstString) return firstString;
+      return queryKey.join("/");
+    };
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    const url = urlFromQueryKey();
+    if (!url || typeof url !== "string" || url.length === 0) {
+      throw new Error("queryKey must include a request URL string");
     }
 
-    await throwIfResNotOk(res);
-    return await res.json();
+    const res = await apiRequest(
+      "GET",
+      url,
+      undefined,
+      signal,
+      { allowUnauthorized: unauthorizedBehavior === "returnNull" },
+    );
+
+    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+      return null as T;
+    }
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      return await res.json();
+    }
+
+    const text = await res.text();
+    if (!text) {
+      return null as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return text as unknown as T;
+    }
   };
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {

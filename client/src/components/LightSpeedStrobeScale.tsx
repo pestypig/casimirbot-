@@ -5,6 +5,7 @@ import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { toHUDModel } from "@/lib/hud-adapter";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
 import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
+import { useSectorStateBusRelay } from "@/hooks/useSectorStateBusRelay";
 import HardwareConnectButton from "./HardwareConnectButton";
 
 type ScaleProps = {
@@ -39,6 +40,10 @@ const SECTOR_STATE_PROFILE = JSON.stringify(
             burst_ms: "burst_ms",
             strobe_hz: "strobeHz",
             phase_schedule: "phaseScheduleTelemetry",
+            phase01: "phase01",
+            phase_cont: "phaseCont",
+            pump_deg: "pumpPhase_deg",
+            tau_lc_ms: "tauLC_ms",
           },
         },
       },
@@ -51,9 +56,12 @@ const SECTOR_STATE_PROFILE = JSON.stringify(
 const SECTOR_STATE_HELP: HardwareConnectHelp = {
   instruments: ["Strobe controller", "Optical/atomic clock"],
   feeds: [
-    "POST /api/helix/hardware/sector-state (currentSector, sectorsConcurrent, dwell_ms, burst_ms, strobeHz, phaseScheduleTelemetry)",
+    "POST /api/helix/hardware/sector-state (currentSector, sectorsConcurrent, dwell_ms, burst_ms, strobeHz, phaseScheduleTelemetry, phase01, phaseCont, pumpPhase_deg, tauLC_ms)",
   ],
-  notes: ["UI uses same loop as metrics; stream updates over WS/SSE bus"],
+  notes: [
+    "Bridge prefers hardware phase01/phaseCont, pumpPhase_deg, tauLC_ms when present for Alcubierre viewer",
+    "UI uses same loop as metrics; stream updates over WS/SSE bus",
+  ],
   fileTypes: [".json snapshots"],
   profiles: [
     {
@@ -92,6 +100,10 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
       kind: "sector-state",
     },
   });
+  const relayToggleId = React.useId();
+  const [relayEnabled, setRelayEnabled] = React.useState(false);
+
+  useSectorStateBusRelay(hardwareController, relayEnabled, { minPublishMs: 100 });
 
   const derived = queryClient.getQueryData<any>(["helix:pipeline:derived"]);
 
@@ -264,6 +276,20 @@ export default function LightSpeedStrobeScale(props: ScaleProps = {}) {
         <div className="text-sm font-semibold">Light-Speed vs Strobing Scale</div>
         <div className="flex items-center gap-3">
           <HardwareConnectButton controller={hardwareController} />
+          <label
+            htmlFor={relayToggleId}
+            className="flex items-center gap-2 text-xs text-slate-300"
+            title="Mirror sector timing frames onto the hardware:sector-state bus"
+          >
+            <input
+              id={relayToggleId}
+              type="checkbox"
+              checked={relayEnabled}
+              onChange={(event) => setRelayEnabled(event.target.checked)}
+              className="h-3.5 w-3.5 accent-sky-400"
+            />
+            Relay timing
+          </label>
           <div className="text-xs text-slate-400">
             Mode: <span className="uppercase">{(pipeline as any)?.currentMode ?? "-"}</span>
           </div>

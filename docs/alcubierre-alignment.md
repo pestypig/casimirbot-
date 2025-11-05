@@ -14,6 +14,7 @@ Canonical reference (ground truth)
   `theta = v_s (x_s / r_s) (df/dr_s)`.  
   Single-plane (x, rho) slice must show contraction (`theta < 0`) in front of the bubble and expansion (`theta > 0`) behind. Magnitude grows with thinner walls (larger `sigma`).
 - Eulerian energy density:  
+  > See: [Ford–Roman QI](docs/papers/ford-roman-qi-1995.md) and [Van den Broeck Warp Pocket](docs/papers/vanden-broeck-1999.md).
   `T^{00} = -(1 / 8 pi) (v_s^2 rho^2 / (4 r_s^2)) (df/dr_s)^2`.  
   Distribution is toroidal around the bubble wall with a node on the symmetry axis; thicker walls (smaller `sigma`) reduce the peak magnitude.
 - Physical reading from Alcubierre and Lobo: volume elements expand behind and contract in front; stress-energy lives in a torus. Violating classical energy conditions is expected. Natario solutions provide a divergence-free shift (`theta ~ 0`) for cross-checks.

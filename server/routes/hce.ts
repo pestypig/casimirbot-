@@ -18,6 +18,7 @@ import {
   getRun,
   hashSeedToUint32,
   initRun,
+  removeRun,
   sampleBranch,
 } from "../services/hce-core";
 import {
@@ -101,6 +102,29 @@ const createRateLimiter = (windowMs: number, max: number): RateLimiter => {
 const measureRateLimiter = createRateLimiter(5000, 8);
 const streamRateLimiter = createRateLimiter(10000, 6);
 
+const RUN_STALE_TTL_MS = 60_000;
+const runCleanupTimers = new Map<string, NodeJS.Timeout>();
+const activeRunStreams = new Map<string, number>();
+
+const clearRunCleanup = (runId: string) => {
+  const timer = runCleanupTimers.get(runId);
+  if (timer) {
+    clearTimeout(timer);
+    runCleanupTimers.delete(runId);
+  }
+};
+
+const scheduleRunCleanup = (runId: string) => {
+  clearRunCleanup(runId);
+  const timer = setTimeout(() => {
+    runCleanupTimers.delete(runId);
+    activeRunStreams.delete(runId);
+    removeRun(runId);
+  }, RUN_STALE_TTL_MS);
+  timer.unref?.();
+  runCleanupTimers.set(runId, timer);
+};
+
 hceRouter.use("/measure", measureRateLimiter);
 hceRouter.use("/stream", streamRateLimiter);
 
@@ -127,6 +151,8 @@ hceRouter.post(
       dt: body.dt ?? DEFAULT_HCE_CONFIG.dt,
     };
     const run = initRun(payload);
+    activeRunStreams.set(run.id, 0);
+    scheduleRunCleanup(run.id);
     const response: HceConfigResponse = {
       runId: run.id,
       branchCenters: run.centers.map((center) => Array.from(center)),
@@ -146,6 +172,9 @@ hceRouter.get("/stream", (req: Request, res: Response) => {
   if (!run) {
     return res.status(404).json({ error: "run not found" });
   }
+
+  clearRunCleanup(runId);
+  activeRunStreams.set(runId, (activeRunStreams.get(runId) ?? 0) + 1);
 
   const intervalMs = clampNumber(
     typeof req.query.interval === "string" ? Number(req.query.interval) : NaN,
@@ -246,6 +275,13 @@ hceRouter.get("/stream", (req: Request, res: Response) => {
     clearInterval(flushTimer);
     clearInterval(heartbeat);
     res.end();
+    const remaining = (activeRunStreams.get(runId) ?? 1) - 1;
+    if (remaining <= 0) {
+      activeRunStreams.delete(runId);
+      scheduleRunCleanup(runId);
+    } else {
+      activeRunStreams.set(runId, remaining);
+    }
   });
 
 });

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { apiRequest } from "./queryClient";
 
 /**
  * Smart polling:
@@ -134,14 +135,12 @@ export function usePollingSmart<T = any>(
         // Add debugging for fetch attempts
         console.log(`[usePollingSmart] Fetching: ${url}`);
 
-        const res = await fetch(url, { 
-          signal: ch.controller.signal,
-          // Add basic headers and timeout handling
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
+        const res = await apiRequest(
+          "GET",
+          url,
+          undefined,
+          ch.controller.signal,
+        );
 
         if (!res.ok) {
           const errorMsg = `HTTP ${res.status} ${res.statusText}`;
@@ -249,3 +248,4 @@ export function usePollingSmartImmediate(cb: () => void, intervalMs = 1000) {
     start: () => { if (idRef.current === null) idRef.current = window.setInterval(() => { try { cbRef.current(); } catch {} }, intervalMs); }
   };
 }
+

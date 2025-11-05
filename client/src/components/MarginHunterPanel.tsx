@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { gatedUpdateUniforms, withoutPhysics } from "@/lib/warp-uniforms-gate";
+import { TheoryBadge } from "./common/TheoryBadge";
+/**
+ * TheoryRefs:
+ *  - ford-roman-qi-1995: panel displays live FR duty vs QI ceiling
+ */
+
 
 /**
  * MarginHunterPanel — SHOW-only background optimizer
@@ -303,7 +309,16 @@ export default function MarginHunterPanel({
         <div className="rounded-xl border p-3">
           <div className="font-medium mb-1">Guardrails</div>
           <div>θ budget: <span className="font-mono">{budgets.thetaBudget.toExponential(2)}</span></div>
-          <div>FR duty max: <span className="font-mono">{(budgets.dutyFR_max*100).toFixed(3)}%</span></div>
+          <div>
+            <span className="flex items-center gap-2">
+              FR duty max
+              <TheoryBadge
+                refs={["ford-roman-qi-1995"]}
+                categoryAnchor="Quantum-Inequalities"
+              />
+            </span>
+            <span className="font-mono ml-1">{(budgets.dutyFR_max*100).toFixed(3)}%</span>
+          </div>
           <div>Sector cap: <span className="font-mono">{budgets.sectorCap}</span></div>
           <div>Sector total: <span className="font-mono">{sectorCount}</span></div>
         </div>

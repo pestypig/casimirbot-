@@ -3,6 +3,11 @@
  * Pipeline-true implementation with Natário metric support
  */
 
+/**
+ * TheoryRefs:
+ *  - ford-roman-qi-1995: negative-energy burst windowing respects QI
+ */
+
 import { calculateNatarioMetric, validateGRConsistency, type NatarioMetricResult } from './natario-metric.js';
 import { PHYSICS_CONSTANTS } from '../core/physics-constants.js';
 import { omega0_from_gap, domega0_dd } from '../sim_core/static-casimir.js';
@@ -558,6 +563,7 @@ export interface RunSweepConfig {
   mod_depth_pct: number[];
   pump_freq_GHz: number[];
   pumpStrategy?: "auto";
+  pumpFreqLimit_GHz?: number;
   phase_deg: number[];
   geometry?: "parallel_plate" | "cpw";
   gamma_geo?: number;
@@ -576,6 +582,7 @@ export interface RunSweepConfig {
     phaseLimit?: number;
     modDepthLimit?: number;
     pumpLimit?: number;
+    pumpFreqLimit_GHz?: number;
     delayMs?: number;
   };
   gateSchedule?: GatePulse[];

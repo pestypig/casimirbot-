@@ -15,12 +15,14 @@ import { lumaHceRouter } from "./routes/luma-hce";
 import { hceRouter } from "./routes/hce";
 import { getHorizonsElements } from "./utils/horizons-proxy";
 import { orchestratorRouter } from "./routes/orchestrator";
+import noiseGensRouter from "./routes/noise-gens";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   app.use("/api/luma/ops", lumaHceRouter);
   app.use("/api/luma", lumaRouter);
   app.use("/api/orchestrator", orchestratorRouter);
+  app.use(noiseGensRouter);
 
   // --- Realtime plumbing ----------------------------------------------------
   // Support multiple WS subscribers per simulation + SSE fallback

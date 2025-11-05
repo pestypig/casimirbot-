@@ -7,6 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import {
+/**
+ * TheoryRefs:
+ *  - vanden-broeck-1999: amplifier chain multiplicative gamma_VdB
+ */
+
   Activity,
   Zap,
   Sigma,
@@ -52,6 +57,7 @@ import VacuumGapHeatmap from "./VacuumGapHeatmap";
 import SweepReplayControls from "./SweepReplayControls";
 import VacuumGapSweepHUD from "@/components/VacuumGapSweepHUD";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
+import { TheoryBadge } from "./common/TheoryBadge";
 import { useVacuumContract } from "@/hooks/useVacuumContract";
 import { sendDriveNudge, publishWhisper } from "@/lib/luma-whispers";
 import type { VacuumGapSweepRow, DynamicConfig, RidgePreset, SweepRuntime } from "@shared/schema";
@@ -1734,7 +1740,18 @@ export default function HelixCasimirAmplifier({
               <div className="flex flex-wrap gap-2 text-[10px]">
                 <EquationChip label="γ_geo" value={derived.gammaGeo} />
                 <EquationChip label="q_mech" value={derived.qMech} />
-                <EquationChip label="γ_VdB" value={derived.gammaVdB} tooltip={`source: ${provenance.gammaVdB_source}`} />
+                <div className="inline-flex items-center gap-1">
+                  <EquationChip
+                    label="γ_VdB"
+                    value={derived.gammaVdB}
+                    tooltip={`source: ${provenance.gammaVdB_source}`}
+                  />
+                  <TheoryBadge
+                    refs={["vanden-broeck-1999"]}
+                    categoryAnchor="Geometry-Amplifiers"
+                  />
+                </div>
+
                 <EquationChip label="Q_cav" value={derived.qCav} />
                 <EquationChip label="N" value={derived.N_tiles_internal} />
                 <EquationChip label="d_eff" value={derived.d_eff} />

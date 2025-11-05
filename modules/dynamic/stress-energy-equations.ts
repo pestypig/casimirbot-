@@ -1,4 +1,9 @@
 /**
+ * TheoryRefs:
+ *  - vanden-broeck-1999: gamma_VdB feeds theta, T00 amplification product
+ */
+
+/**
  * Stress–Energy (pipeline-true) for Van den Broeck–Natário flow
  * No magic constants; reads γ_geo, Q, q_spoil, γ_VdB, duty from pipeline.
  */

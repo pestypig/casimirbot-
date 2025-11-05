@@ -20,7 +20,7 @@
     "paths": {
       "@/*": ["./client/src/*"],
       "@shared/*": ["./shared/*"],
-      "idb": ["./node_modules/idb/build/index.js"]
+      "idb": ["./node_modules/idb/build/index"]
     }
   }
 }

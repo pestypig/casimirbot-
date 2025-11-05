@@ -43,6 +43,10 @@ const DEFAULT_STATE: HelixExecutorState = { rc: 0.25, T: 0.2, peaks: [] };
 const STATE_STORAGE_KEY = "helix:plan-state:v1";
 const PLAN_LOG_KEY = "helix:plan-log:v1";
 const PLAN_LOG_LIMIT = 50;
+const NOISEGEN_TEMPO_KEY = "noisegen:tempo";
+const NOISEGEN_BAR_WINDOW_KEY = "noisegen:barWindow";
+const NOISEGEN_TEXTURE_KEY = "noisegen:kbTexture";
+const NOISEGEN_RENDER_TRIGGER_KEY = "noisegen:renderCover";
 
 const executedPlans = new Set<string>();
 let memoryState: HelixExecutorState = cloneState(DEFAULT_STATE);
@@ -199,6 +203,14 @@ async function runAction(
         detail: "explain actions are delegated to local RAG",
         state,
       };
+    case "set_tempo":
+      return applySetTempo(action, state, options);
+    case "set_bar_window":
+      return applySetBarWindow(action, state, options);
+    case "set_kb_texture":
+      return applySetKbTexture(action, state, options);
+    case "render_cover":
+      return applyRenderCover(action, state, options);
     default:
       return {
         status: "skipped",
@@ -299,6 +311,88 @@ function applyMoveBubble(
   return {
     status: "applied",
     detail: `bubble intent → (${target.x.toFixed(2)}, ${target.y.toFixed(2)})`,
+  };
+}
+
+function applySetTempo(
+  action: Extract<HelixPlanAction, { op: "set_tempo" }>,
+  state: HelixExecutorState,
+  options: ExecutePlanOptions,
+): ActionOutcome {
+  const dryRun = options.dryRun === true;
+  if (!dryRun) {
+    persistNoisegenSetting(NOISEGEN_TEMPO_KEY, action.tempo);
+  }
+  const detail = `tempo ${Math.round(action.tempo.bpm)} bpm ${action.tempo.timeSig}`;
+  return {
+    status: "applied",
+    detail: dryRun ? `${detail} (preview)` : detail,
+    state,
+  };
+}
+
+function applySetBarWindow(
+  action: Extract<HelixPlanAction, { op: "set_bar_window" }>,
+  state: HelixExecutorState,
+  options: ExecutePlanOptions,
+): ActionOutcome {
+  const dryRun = options.dryRun === true;
+  if (action.endBar <= action.startBar) {
+    return {
+      status: "skipped",
+      detail: "invalid bar window (end <= start)",
+      state,
+    };
+  }
+  if (!dryRun) {
+    persistNoisegenSetting(NOISEGEN_BAR_WINDOW_KEY, {
+      startBar: action.startBar,
+      endBar: action.endBar,
+    });
+  }
+  const detail = `bar window ${action.startBar}-${action.endBar} (exclusive)`;
+  return {
+    status: "applied",
+    detail: dryRun ? `${detail} (preview)` : detail,
+    state,
+  };
+}
+
+function applySetKbTexture(
+  action: Extract<HelixPlanAction, { op: "set_kb_texture" }>,
+  state: HelixExecutorState,
+  options: ExecutePlanOptions,
+): ActionOutcome {
+  const dryRun = options.dryRun === true;
+  if (!dryRun) {
+    if (action.kbId == null) {
+      persistNoisegenSetting(NOISEGEN_TEXTURE_KEY, null);
+    } else {
+      persistNoisegenSetting(NOISEGEN_TEXTURE_KEY, action.kbId);
+    }
+  }
+  const detail = action.kbId ? `kb texture ${action.kbId}` : "kb texture auto";
+  return {
+    status: "applied",
+    detail: dryRun ? `${detail} (preview)` : detail,
+    state,
+  };
+}
+
+function applyRenderCover(
+  _action: Extract<HelixPlanAction, { op: "render_cover" }>,
+  state: HelixExecutorState,
+  options: ExecutePlanOptions,
+): ActionOutcome {
+  const dryRun = options.dryRun === true;
+  if (!dryRun) {
+    const triggerToken = Date.now().toString(36);
+    persistNoisegenSetting(NOISEGEN_RENDER_TRIGGER_KEY, triggerToken);
+  }
+  return {
+    status: "applied",
+    detail: dryRun ? "render_cover (preview)" : "render cover requested",
+    state,
   };
 }
 
@@ -515,4 +609,19 @@ function driveSyncAvailable() {
     driveSyncAvailableCache = false;
   }
   return driveSyncAvailableCache;
+}
+
+function persistNoisegenSetting(key: string, value: unknown) {
+  if (!hasWindow()) return;
+  try {
+    if (value == null) {
+      window.localStorage.removeItem(key);
+    } else if (typeof value === "string") {
+      window.localStorage.setItem(key, value);
+    } else {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch (err) {
+    console.warn(`[helix-plan] failed to persist noisegen setting ${key}`, err);
+  }
 }

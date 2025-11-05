@@ -87,6 +87,10 @@ export const hardwareSectorStateSchema = z.object({
   dwell_ms: z.coerce.number().nonnegative().optional(),
   burst_ms: z.coerce.number().nonnegative().optional(),
   strobeHz: z.coerce.number().nonnegative().optional(),
+  phase01: z.coerce.number().optional(),
+  phaseCont: z.coerce.number().optional(),
+  pumpPhase_deg: z.coerce.number().optional(),
+  tauLC_ms: z.coerce.number().optional(),
   timestamp: z.union([z.coerce.number(), z.string()]).optional(),
   phaseScheduleTelemetry: phaseScheduleTelemetrySchema.optional(),
   timebase: z
@@ -248,6 +252,7 @@ export const vacuumGapSweepConfigSchema = z.object({
       phaseLimit: z.number().int().positive().max(360).optional(),
       modDepthLimit: z.number().int().positive().max(50).optional(),
       pumpLimit: z.number().int().positive().max(50).optional(),
+      pumpFreqLimit_GHz: z.number().positive().max(1_000).optional(),
       delayMs: z.number().nonnegative().optional(),
     })
     .optional(),

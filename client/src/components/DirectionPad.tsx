@@ -1,9 +1,16 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDriveSyncStore } from "@/store/useDriveSyncStore";
@@ -24,6 +31,79 @@ const shortestPhaseDelta01 = (targetFrac: number, currentFrac: number) => {
 };
 const DEFAULT_NEGATIVE_FRACTION = 0.4;
 const DEFAULT_THRUST_FRAC = 1 - DEFAULT_NEGATIVE_FRACTION;
+const KEY_DEADBAND = 0.08;
+const KEY_HYSTERESIS = 0.02;
+const ZERO_RATE_DPS = 0.1;
+const MIN_RAF_DT_S = 1 / 240;
+const MAX_RAF_DT_S = 1 / 30;
+const JERK_MULTIPLIER = 4; // jerk ~= 4 * accel per second by default
+
+type AxisProfileState = {
+  v_dps: number;
+  a_dps2: number;
+};
+
+const clampSymmetric = (value: number, limit: number) => clampRange(value, -limit, limit);
+
+const shapeAxis = (raw: number, deadband = KEY_DEADBAND) => {
+  const clamped = clampRange(raw, -1, 1);
+  if (Math.abs(clamped) <= deadband) return 0;
+  const sign = Math.sign(clamped);
+  const normalized = (Math.abs(clamped) - deadband) / Math.max(1e-6, 1 - deadband);
+  const curved = Math.pow(normalized, 0.85);
+  return clampRange(sign * curved, -1, 1);
+};
+
+const applyAxisHysteresis = (value: number, last: number, hysteresis = KEY_HYSTERESIS) => {
+  if (Math.abs(value - last) < hysteresis) {
+    return last;
+  }
+  return value;
+};
+
+const sCurveStep = (
+  prev: AxisProfileState,
+  targetRate_dps: number,
+  dt: number,
+  accelLimit_dps2: number,
+  jerkLimit_dps3: number,
+  rateLimit_dps: number
+): AxisProfileState => {
+  if (!Number.isFinite(dt) || dt <= 0) return prev;
+
+  const vMax = Math.max(0, rateLimit_dps);
+  const aMax = Math.max(0, accelLimit_dps2);
+  const jMax = Math.max(0, jerkLimit_dps3);
+
+  const vTarget = clampSymmetric(targetRate_dps, vMax);
+  let v = clampSymmetric(prev.v_dps, vMax);
+  let a = clampSymmetric(prev.a_dps2, aMax);
+
+  const reversing = Math.sign(vTarget) !== 0 && Math.sign(v) !== Math.sign(vTarget);
+  const needZero = reversing && Math.abs(v) > ZERO_RATE_DPS;
+  const vGoal = needZero ? 0 : vTarget;
+  const dir = Math.sign(vGoal - v);
+  const aGoal = dir * aMax;
+
+  if (jMax > 0) {
+    const deltaA = clampRange(aGoal - a, -jMax * dt, jMax * dt);
+    a = clampRange(a + deltaA, -aMax, aMax);
+  } else {
+    a = aGoal;
+  }
+
+  let vNext = v + a * dt;
+  if ((dir > 0 && vNext > vGoal) || (dir < 0 && vNext < vGoal)) {
+    vNext = vGoal;
+    a = 0;
+  }
+
+  if (!Number.isFinite(vNext)) {
+    return { v_dps: 0, a_dps2: 0 };
+  }
+
+  return { v_dps: clampSymmetric(vNext, vMax), a_dps2: clampSymmetric(a, aMax) };
+};
 
 const MANUAL_FLIGHT_KEY_NAMES = new Set([
   "w",
@@ -50,6 +130,45 @@ const MANUAL_FLIGHT_KEY_CODES = new Set([
   "ArrowLeft",
   "ArrowRight",
 ]);
+
+const SIMPLE_KEY_LAYOUT = [
+  {
+    label: "W",
+    keys: ["w", "arrowup"],
+    ariaLabel: "Forward (W or Up Arrow)",
+    className: "basis-14 sm:basis-16",
+  },
+  {
+    label: "A",
+    keys: ["a", "arrowleft"],
+    ariaLabel: "Strafe left (A or Left Arrow)",
+    className: "basis-14 sm:basis-16",
+  },
+  {
+    label: "S",
+    keys: ["s", "arrowdown"],
+    ariaLabel: "Reverse (S or Down Arrow)",
+    className: "basis-14 sm:basis-16",
+  },
+  {
+    label: "D",
+    keys: ["d", "arrowright"],
+    ariaLabel: "Strafe right (D or Right Arrow)",
+    className: "basis-14 sm:basis-16",
+  },
+  {
+    label: "SPACE",
+    keys: ["space"],
+    ariaLabel: "Lift (Space)",
+    className: "flex-1 basis-24",
+  },
+  {
+    label: "SHIFT",
+    keys: ["shift"],
+    ariaLabel: "Dip (Shift)",
+    className: "flex-1 basis-24",
+  },
+];
 
 type Heading = { label: string; frac: number };
 
@@ -124,16 +243,112 @@ function MiniRose({ phase01, splitFrac }: MiniRoseProps) {
   );
 }
 
+const HeadingBadge = React.memo(function HeadingBadge() {
+  const phase01 = useDriveSyncStore((state) => state.phase01);
+  const headingDeg = Math.round(degFromFrac(phase01));
+  const headingCard = cardinalFromFrac(phase01);
+  return (
+    <Badge>
+      {headingCard} | {headingDeg.toString().padStart(3, "0")} deg
+    </Badge>
+  );
+});
+
+type HeadingRoseControlsProps = {
+  splitFrac: number;
+  splitBiasPercent: number;
+  flightBias: number;
+  onBiasChange: (value: number) => void;
+  setHeading: (frac: number) => void;
+};
+
+const HeadingRoseControls = React.memo(function HeadingRoseControls({
+  splitFrac,
+  splitBiasPercent,
+  flightBias,
+  onBiasChange,
+  setHeading,
+}: HeadingRoseControlsProps) {
+  const phase01 = useDriveSyncStore((state) => state.phase01);
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-12 gap-3">
+        <div className="col-span-6 md:col-span-4 flex justify-center">
+          <MiniRose phase01={phase01} splitFrac={splitFrac} />
+        </div>
+        <div className="col-span-6 md:col-span-8 grid grid-cols-3 gap-2">
+          {HEADINGS.map((heading) => {
+            const isActive = Math.abs(shortestPhaseDelta01(heading.frac, phase01)) < 1e-3;
+            return (
+              <Button
+                key={heading.label}
+                variant={isActive ? "default" : "secondary"}
+                onClick={() => setHeading(heading.frac)}
+              >
+                {heading.label}
+              </Button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            Primary / secondary split (|bias| {splitBiasPercent}%)
+          </span>
+          <Badge variant="outline">
+            {Math.round(splitFrac * 100)}% / {Math.round((1 - splitFrac) * 100)}%
+          </Badge>
+        </div>
+        <Slider
+          min={0}
+          max={1}
+          step={0.01}
+          value={[flightBias]}
+          onValueChange={(values) => {
+            const value = Array.isArray(values) ? values[0] ?? flightBias : flightBias;
+            onBiasChange(value);
+          }}
+        />
+        <div className="text-[0.65rem] text-muted-foreground">
+          Scheduler negativeFraction receives {(100 - Math.round(splitFrac * 100))}% to mirror the opposite lobe.
+        </div>
+      </div>
+
+      <div className="text-[11px] text-muted-foreground leading-5">
+        <strong>Why it can look clockwise only:</strong> we start at 0 deg (north). Buttons on the right advance
+        phase, which renders clockwise; buttons on the left wrap across 360 deg. The rose shows both lobes, so the
+        wrap is visible and expected.
+      </div>
+    </div>
+  );
+});
+
+const DriveIntentReadout = React.memo(function DriveIntentReadout() {
+  const intent = useDriveSyncStore((state) => state.intent);
+  return (
+    <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
+      <div>
+        dX <span className="font-mono text-foreground">{intent.x.toFixed(2)}</span>
+      </div>
+      <div>
+        dY <span className="font-mono text-foreground">{intent.y.toFixed(2)}</span>
+      </div>
+      <div>
+        dZ <span className="font-mono text-foreground">{intent.z.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+});
+
 export default function DirectionPad({ className, onVizIntent }: DirectionPadProps) {
   const {
-    phase01: phase01State,
     splitFrac: splitFracState,
     sigmaSectors: sigmaSectorsState,
     sectorFloor: floorState,
     phaseMode: phaseModeState,
-    intent,
     nudge01,
-    setPhase,
     setPhaseMode,
     setSplit,
     setSigma: setSigmaStore,
@@ -142,14 +357,11 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     setNudge01,
   } = useDriveSyncStore(
     (state) => ({
-      phase01: state.phase01,
       splitFrac: state.splitFrac,
       sigmaSectors: state.sigmaSectors,
       sectorFloor: state.sectorFloor,
       phaseMode: state.phaseMode,
-      intent: state.intent,
       nudge01: state.nudge01,
-      setPhase: state.setPhase,
       setPhaseMode: state.setPhaseMode,
       setSplit: state.setSplit,
       setSigma: state.setSigma,
@@ -159,7 +371,140 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     }),
     shallow
   );
+  const setPhase = useDriveSyncStore((state) => state.setPhase);
   const mutatePipeline = useUpdatePipeline();
+  const [controlMode, setControlMode] = useState<"simple" | "advanced">("simple");
+  const handleModeChange = (value: string) => {
+    setControlMode(value === "advanced" ? "advanced" : "simple");
+  };
+  const pressedKeysRef = useRef<Set<string>>(new Set());
+  const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
+  const desiredYawAxisRef = useRef(0);
+  const yawProfileRef = useRef<AxisProfileState>({ v_dps: 0, a_dps2: 0 });
+  const lastYawAxisRef = useRef(0);
+  const resetYawProfile = useCallback(() => {
+    yawProfileRef.current = { v_dps: 0, a_dps2: 0 };
+    lastYawAxisRef.current = 0;
+  }, []);
+  const normalizeKey = useCallback((key: string) => {
+    if (key === " ") return "space";
+    if (key === "Spacebar") return "space";
+    return key.length === 1 ? key.toLowerCase() : key.toLowerCase();
+  }, []);
+  const syncPressedKeys = useCallback(() => {
+    setPressedKeys(new Set(pressedKeysRef.current));
+  }, []);
+  const updateIntentFromPressed = useCallback(() => {
+    const pressed = pressedKeysRef.current;
+    const lateralX =
+      (pressed.has("d") || pressed.has("arrowright") ? 1 : 0) -
+      (pressed.has("a") || pressed.has("arrowleft") ? 1 : 0);
+    const lateralY =
+      (pressed.has("w") || pressed.has("arrowup") ? 1 : 0) -
+      (pressed.has("s") || pressed.has("arrowdown") ? 1 : 0);
+    const verticalZ = (pressed.has("space") ? 1 : 0) - (pressed.has("shift") ? 1 : 0);
+    setIntent({ x: lateralX, y: lateralY, z: verticalZ });
+
+    const state = useFlightDirectorStore.getState();
+    state.setRise(clampRange(verticalZ, -1, 1));
+    const yawAxis = clampRange(
+      (pressed.has("d") || pressed.has("arrowright") ? 1 : 0) -
+        (pressed.has("a") || pressed.has("arrowleft") ? 1 : 0),
+      -1,
+      1
+    );
+    desiredYawAxisRef.current = yawAxis;
+    if (Math.abs(yawAxis) > 0) {
+      if (state.mode !== "MAN") {
+        state.setMode("MAN");
+      }
+    } else {
+      resetYawProfile();
+    }
+  }, [resetYawProfile, setIntent]);
+  const handleVirtualKeyPress = useCallback(
+    (rawKey: string) => {
+      const key = normalizeKey(rawKey);
+      if (!MANUAL_FLIGHT_KEY_NAMES.has(key)) {
+        return;
+      }
+      const pressed = pressedKeysRef.current;
+      if (!pressed.has(key)) {
+        pressed.add(key);
+        syncPressedKeys();
+        updateIntentFromPressed();
+      }
+    },
+    [normalizeKey, syncPressedKeys, updateIntentFromPressed]
+  );
+  const handleVirtualKeyRelease = useCallback(
+    (rawKey: string) => {
+      const key = normalizeKey(rawKey);
+      if (!MANUAL_FLIGHT_KEY_NAMES.has(key)) {
+        return;
+      }
+      const pressed = pressedKeysRef.current;
+      if (pressed.has(key)) {
+        pressed.delete(key);
+        syncPressedKeys();
+        updateIntentFromPressed();
+      }
+    },
+    [normalizeKey, syncPressedKeys, updateIntentFromPressed]
+  );
+  const renderKeyCap = (
+    label: string,
+    options: { keys: string[]; className?: string; ariaLabel?: string } = { keys: [] }
+  ) => {
+    const { keys, className, ariaLabel } = options;
+    const [primaryKey] = keys;
+    const isActive = keys.some((key) => pressedKeys.has(key));
+
+    const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (!event.isPrimary || !primaryKey) {
+        return;
+      }
+      event.preventDefault();
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // ignore pointer capture errors (older browsers)
+      }
+      handleVirtualKeyPress(primaryKey);
+    };
+
+    const releaseKey = (event: React.PointerEvent<HTMLButtonElement>) => {
+      if (!primaryKey) {
+        return;
+      }
+      handleVirtualKeyRelease(primaryKey);
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        // ignore pointer capture release errors
+      }
+    };
+
+    return (
+      <button
+        type="button"
+        aria-label={ariaLabel ?? label}
+        aria-pressed={isActive}
+        className={cn(
+          "flex h-11 min-w-[3rem] select-none items-center justify-center rounded-md border px-3 text-sm font-semibold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+          isActive ? "border-primary bg-primary text-primary-foreground shadow-inner" : "border-border bg-muted/50",
+          className
+        )}
+        onPointerDown={onPointerDown}
+        onPointerUp={releaseKey}
+        onPointerLeave={releaseKey}
+        onPointerCancel={releaseKey}
+        onContextMenu={(event) => event.preventDefault()}
+      >
+        {label}
+      </button>
+    );
+  };
 
   const flightEnabled = useFlightDirectorStore((state) => state.enabled);
   const flightMode = useFlightDirectorStore((state) => state.mode);
@@ -168,12 +513,6 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
   const flightBias = useFlightDirectorStore((state) => state.thrustBias01);
   const flightMaxYawRate = useFlightDirectorStore((state) => state.maxYawRate_dps);
   const flightMaxYawAccel = useFlightDirectorStore((state) => state.maxYawAccel_dps2);
-
-  const phase01 = useMemo(() => {
-    const value =
-      typeof phase01State === "number" && Number.isFinite(phase01State) ? phase01State : 0;
-    return wrap01(value);
-  }, [phase01State]);
 
   const splitFrac = useMemo(() => {
     const value =
@@ -199,20 +538,41 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     return clampRange(value, 0, 0.99);
   }, [floorState]);
 
-  const phaseRef = useRef(phase01);
+  const initialPhase = useDriveSyncStore.getState().phase01;
+  const phaseRef = useRef(Number.isFinite(initialPhase) ? wrap01(initialPhase) : 0);
   useEffect(() => {
-    phaseRef.current = phase01;
-  }, [phase01]);
+    const unsubscribe = useDriveSyncStore.subscribe((state) => {
+      const value = state.phase01;
+      const safe = Number.isFinite(value) ? wrap01(value) : 0;
+      phaseRef.current = safe;
+    });
+    return unsubscribe;
+  }, []);
 
   const phaseModeRef = useRef(phaseModeState);
   useEffect(() => {
     phaseModeRef.current = phaseModeState;
   }, [phaseModeState]);
 
-  const intentRef = useRef(intent);
+  const initialIntent = useDriveSyncStore.getState().intent;
+  const intentRef = useRef(initialIntent);
+  const onVizIntentRef = useRef(onVizIntent);
   useEffect(() => {
-    intentRef.current = intent;
-  }, [intent]);
+    onVizIntentRef.current = onVizIntent;
+  }, [onVizIntent]);
+  useEffect(() => {
+    const unsubscribe = useDriveSyncStore.subscribe((state) => {
+      const value = state.intent;
+      intentRef.current = value;
+      const cb = onVizIntentRef.current;
+      if (cb) {
+        const rise = clampRange(value.z, -1, 1);
+        const planar = clampRange(Math.hypot(value.x, value.y), 0, 1);
+        cb({ rise, planar });
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const state = useFlightDirectorStore.getState();
@@ -240,6 +600,8 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     state.setMode("MAN");
     state.zeroRate();
     state.setYawRateCmd(0);
+    desiredYawAxisRef.current = 0;
+    resetYawProfile();
   };
 
   const setHeading = (frac: number) => {
@@ -249,6 +611,8 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     state.setTargetYaw01(headingFrac);
     state.zeroRate();
     state.setYawRateCmd(0);
+    desiredYawAxisRef.current = 0;
+    resetYawProfile();
     if (phaseModeRef.current !== "manual") {
       setPhaseMode("manual");
       phaseModeRef.current = "manual";
@@ -262,10 +626,14 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     state.setMode(desired);
     if (desired === "HDG") {
       state.setTargetYaw01(phaseRef.current ?? 0);
+      desiredYawAxisRef.current = 0;
+      resetYawProfile();
     }
     if (desired === "MAN") {
       state.zeroRate();
       state.setYawRateCmd(0);
+      desiredYawAxisRef.current = 0;
+      resetYawProfile();
     }
   };
 
@@ -288,48 +656,10 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
   };
 
   useEffect(() => {
-    const pressed = new Set<string>();
-
-    const normalizeKey = (key: string) => {
-      if (key === " ") return "space";
-      if (key === "Spacebar") return "space";
-      return key.length === 1 ? key.toLowerCase() : key.toLowerCase();
-    };
-
     const isEditableTarget = (target: EventTarget | null) => {
       if (!(target instanceof HTMLElement)) return false;
       const tag = target.tagName;
       return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
-    };
-
-    const updateIntentFromKeys = () => {
-      const x =
-        (pressed.has("d") || pressed.has("arrowright") ? 1 : 0) -
-        (pressed.has("a") || pressed.has("arrowleft") ? 1 : 0);
-      const y =
-        (pressed.has("w") || pressed.has("arrowup") ? 1 : 0) -
-        (pressed.has("s") || pressed.has("arrowdown") ? 1 : 0);
-      const z =
-        (pressed.has("space") ? 1 : 0) -
-        (pressed.has("shift") ? 1 : 0);
-      setIntent({ x, y, z });
-
-      const state = useFlightDirectorStore.getState();
-      state.setRise(clampRange(z, -1, 1));
-      const yawAxis = clampRange(
-        (pressed.has("d") || pressed.has("arrowright") ? 1 : 0) -
-          (pressed.has("a") || pressed.has("arrowleft") ? 1 : 0),
-        -1,
-        1
-      );
-      if (Math.abs(yawAxis) > 0) {
-        if (state.mode !== "MAN") {
-          state.setMode("MAN");
-        }
-        state.setYawRateCmd(yawAxis * state.maxYawRate_dps);
-      } else {
-        state.setYawRateCmd(0);
-      }
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -342,6 +672,7 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
       ) {
         return;
       }
+
       const key = normalizeKey(event.key);
 
       if (key === "h") {
@@ -351,6 +682,8 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
         state.setTargetYaw01(phaseRef.current ?? 0);
         state.zeroRate();
         state.setYawRateCmd(0);
+        desiredYawAxisRef.current = 0;
+        resetYawProfile();
         return;
       }
       if (key === "m") {
@@ -359,6 +692,8 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
         state.setMode("MAN");
         state.zeroRate();
         state.setYawRateCmd(0);
+        desiredYawAxisRef.current = 0;
+        resetYawProfile();
         return;
       }
       if (key === "c") {
@@ -368,15 +703,14 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
         return;
       }
 
-      if (!MANUAL_FLIGHT_KEY_NAMES.has(key) && !MANUAL_FLIGHT_KEY_CODES.has(event.code)) {
+      const allowed =
+        MANUAL_FLIGHT_KEY_NAMES.has(key) || MANUAL_FLIGHT_KEY_CODES.has(event.code);
+      if (!allowed) {
         return;
       }
+
       event.preventDefault();
-      pressed.add(key);
-      if (event.key === "Shift") {
-        pressed.add(event.code);
-      }
-      updateIntentFromKeys();
+      handleVirtualKeyPress(event.key);
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
@@ -389,16 +723,16 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
       ) {
         return;
       }
+
       const key = normalizeKey(event.key);
-      if (!MANUAL_FLIGHT_KEY_NAMES.has(key) && !MANUAL_FLIGHT_KEY_CODES.has(event.code)) {
+      const allowed =
+        MANUAL_FLIGHT_KEY_NAMES.has(key) || MANUAL_FLIGHT_KEY_CODES.has(event.code);
+      if (!allowed) {
         return;
       }
+
       event.preventDefault();
-      pressed.delete(key);
-      if (event.key === "Shift") {
-        pressed.delete(event.code);
-      }
-      updateIntentFromKeys();
+      handleVirtualKeyRelease(event.key);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -406,13 +740,23 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
-      pressed.clear();
+      pressedKeysRef.current.clear();
+      syncPressedKeys();
       setIntent({ x: 0, y: 0, z: 0 });
+      desiredYawAxisRef.current = 0;
+      resetYawProfile();
       const state = useFlightDirectorStore.getState();
       state.setYawRateCmd(0);
       state.setRise(0);
     };
-  }, [setIntent]);
+  }, [
+    handleVirtualKeyPress,
+    handleVirtualKeyRelease,
+    normalizeKey,
+    resetYawProfile,
+    setIntent,
+    syncPressedKeys,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -421,288 +765,298 @@ export default function DirectionPad({ className, onVizIntent }: DirectionPadPro
     let raf = 0;
     let last = performance.now();
 
-    const tick = (now: number) => {
-      const dt = Math.max(0, (now - last) / 1000);
+    const step = (now: number) => {
+      const dtRaw = (now - last) / 1000;
       last = now;
+      const dtManual = clampRange(dtRaw, MIN_RAF_DT_S, MAX_RAF_DT_S);
+      const dtTick = Math.max(0, dtRaw);
 
       const state = useFlightDirectorStore.getState();
+      const manualActive = state.enabled && state.mode === "MAN";
+      const rawAxis = manualActive ? desiredYawAxisRef.current : 0;
+      const shapedAxis = shapeAxis(rawAxis);
+      const hysteresisAxis = applyAxisHysteresis(shapedAxis, lastYawAxisRef.current);
+      lastYawAxisRef.current = hysteresisAxis;
+
+      const rateLimit = Math.max(0, state.maxYawRate_dps);
+      const accelLimit = Math.max(0, state.maxYawAccel_dps2);
+      const jerkLimit = accelLimit > 0 ? accelLimit * JERK_MULTIPLIER : 0;
+      const desiredRate = hysteresisAxis * rateLimit;
+
+      yawProfileRef.current = sCurveStep(
+        yawProfileRef.current,
+        desiredRate,
+        dtManual,
+        accelLimit,
+        jerkLimit,
+        rateLimit
+      );
+
+      if (!manualActive && Math.abs(yawProfileRef.current.v_dps) < 1e-3) {
+        resetYawProfile();
+      }
+
+      state.setYawRateCmd(yawProfileRef.current.v_dps);
+
       if (state.enabled) {
         if (phaseModeRef.current !== "manual") {
           setPhaseMode("manual");
           phaseModeRef.current = "manual";
         }
         const current = phaseRef.current ?? 0;
-        const { nextYaw01 } = state.tick(dt, current);
+        const { nextYaw01 } = state.tick(dtTick, current);
         if (Number.isFinite(nextYaw01) && Math.abs(nextYaw01 - current) > 1e-6) {
           phaseRef.current = nextYaw01;
           setPhase(nextYaw01);
         }
       }
-      raf = window.requestAnimationFrame(tick);
+
+      raf = window.requestAnimationFrame(step);
     };
 
     raf = window.requestAnimationFrame((time) => {
       last = time;
-      tick(time);
+      step(time);
     });
+
     return () => {
       window.cancelAnimationFrame(raf);
     };
-  }, [setPhase, setPhaseMode]);
+  }, [resetYawProfile, setPhase, setPhaseMode]);
 
   const splitBiasPercent = Math.round(Math.abs(splitFrac - 0.5) * 200);
-  const headingDeg = Math.round(degFromFrac(phase01));
-  const headingCard = cardinalFromFrac(phase01);
 
   useEffect(() => {
-    if (!onVizIntent) return;
+    if (!onVizIntent) {
+      return;
+    }
     const current = intentRef.current;
     const rise = clampRange(current.z, -1, 1);
     const planar = clampRange(Math.hypot(current.x, current.y), 0, 1);
     onVizIntent({ rise, planar });
-  }, [onVizIntent]);
-
-  useEffect(() => {
-    if (!onVizIntent) return;
-    const rise = clampRange(intent.z, -1, 1);
-    const planar = clampRange(Math.hypot(intent.x, intent.y), 0, 1);
-    onVizIntent({ rise, planar });
-  }, [intent.x, intent.y, intent.z, onVizIntent]);
-
-  useEffect(() => {
-    if (!onVizIntent) return;
     return () => {
       onVizIntent({ rise: 0, planar: 0 });
     };
   }, [onVizIntent]);
 
   return (
-    <Card className={cn("p-3 space-y-3", className)}>
-      <div className="flex items-center justify-between gap-2">
+    <Card className={cn("p-3 space-y-4", className)}>
+      {controlMode === "simple" && (
+        <div className="sticky top-2 z-20 -mx-3 -mt-3 rounded-t-md border-b border-border/60 bg-card/95 px-3 pb-3 pt-3 shadow-sm supports-[backdrop-filter]:backdrop-blur">
+          <div className="text-center text-xs text-muted-foreground">
+            Tap or press W/A/S/D (or arrows) to steer laterally, Space lifts, Shift dips.
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+            {SIMPLE_KEY_LAYOUT.map(({ label, keys, className: keyClass, ariaLabel }) => (
+              <React.Fragment key={label}>
+                {renderKeyCap(label, {
+                  keys,
+                  className: keyClass,
+                  ariaLabel,
+                })}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Badge variant="secondary">Yaw (heading)</Badge>
-          <Badge>
-            {headingCard} | {headingDeg.toString().padStart(3, "0")} deg
-          </Badge>
+          <HeadingBadge />
         </div>
-        <div className="text-xs text-muted-foreground flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">Mode</span>
+          <Select value={controlMode} onValueChange={handleModeChange}>
+            <SelectTrigger className="h-8 w-[170px] text-xs">
+              <SelectValue placeholder="Select mode" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="simple">Simple controls</SelectItem>
+              <SelectItem value="advanced">Advanced controls</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {controlMode === "advanced" && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5" />
           Heading rotates the equatorial lobe pair; pitch and roll are not driven.
         </div>
-      </div>
+      )}
 
-      <div className="grid gap-3 xl:grid-cols-2 xl:items-start">
-        <div className="space-y-3">
-          <div className="rounded-md border border-dashed p-3 space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Flight Director
+      {controlMode === "simple" ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <DriveIntentReadout />
+            <Button variant="outline" size="sm" onClick={holdStation}>
+              Hold station
+            </Button>
+          </div>
+          <div className="text-[0.7rem] leading-5 text-muted-foreground">
+            Tap H to capture heading, M to return to manual, C to toggle scheduler coupling.
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-3 xl:grid-cols-2 xl:items-start">
+          <div className="space-y-3">
+            <div className="rounded-md border border-dashed p-3 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Flight Director
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {flightMode} | {flightCoupling} | {Math.round(flightYawRate)} deg/s
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {flightMode} | {flightCoupling} | {Math.round(flightYawRate)} deg/s
+                <Button
+                  variant={flightEnabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    const state = useFlightDirectorStore.getState();
+                    state.setEnabled(!state.enabled);
+                    if (!state.enabled) {
+                      state.setYawRateCmd(0);
+                      state.zeroRate();
+                    }
+                  }}
+                >
+                  {flightEnabled ? "Disable" : "Enable"}
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                    Mode
+                  </span>
+                  <ToggleGroup type="single" value={flightMode} onValueChange={onModeChange}>
+                    <ToggleGroupItem value="MAN">MAN (rate)</ToggleGroupItem>
+                    <ToggleGroupItem value="HDG">HDG (hold)</ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                    Coupling
+                  </span>
+                  <ToggleGroup type="single" value={flightCoupling} onValueChange={onCouplingChange}>
+                    <ToggleGroupItem value="decoupled">Decoupled</ToggleGroupItem>
+                    <ToggleGroupItem value="coupled">Coupled</ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
               </div>
-              <Button
-                variant={flightEnabled ? "default" : "outline"}
-                size="sm"
-                onClick={() => {
-                  const state = useFlightDirectorStore.getState();
-                  state.setEnabled(!state.enabled);
-                  if (!state.enabled) {
-                    state.setYawRateCmd(0);
-                    state.zeroRate();
-                  }
-                }}
-              >
-                {flightEnabled ? "Disable" : "Enable"}
-              </Button>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Max yaw rate</span>
+                    <span>{Math.round(flightMaxYawRate)} deg/s</span>
+                  </div>
+                  <Slider
+                    min={10}
+                    max={180}
+                    step={5}
+                    value={[flightMaxYawRate]}
+                    onValueChange={onYawRateLimitChange}
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span>Max yaw accel</span>
+                    <span>{Math.round(flightMaxYawAccel)} deg/s^2</span>
+                  </div>
+                  <Slider
+                    min={30}
+                    max={720}
+                    step={10}
+                    value={[flightMaxYawAccel]}
+                    onValueChange={onYawAccelLimitChange}
+                  />
+                </div>
+              </div>
+              <div className="text-[0.7rem] text-muted-foreground leading-5">
+                A/D (or Left/Right) command rate, W/S bias split, Space lifts, Shift dips. Tap H to capture heading,
+                M to return to manual, C to toggle scheduler coupling.
+              </div>
             </div>
+
+            <div className="space-y-2">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Flight intent
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    WASD / arrows steer laterally, Space lifts, Shift dips.
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={holdStation}>
+                  Hold station
+                </Button>
+              </div>
+              <DriveIntentReadout />
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Visual nudge</span>
+                  <Badge variant="outline">{Math.round(nudge01 * 100)}%</Badge>
+                </div>
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={[nudge01]}
+                  onValueChange={(values) => {
+                    const value = Array.isArray(values) ? values[0] ?? nudge01 : nudge01;
+                    setNudge01(value);
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                  Mode
-                </span>
-                <ToggleGroup type="single" value={flightMode} onValueChange={onModeChange}>
-                  <ToggleGroupItem value="MAN">MAN (rate)</ToggleGroupItem>
-                  <ToggleGroupItem value="HDG">HDG (hold)</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div className="space-y-1">
-                <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                  Coupling
-                </span>
-                <ToggleGroup type="single" value={flightCoupling} onValueChange={onCouplingChange}>
-                  <ToggleGroupItem value="decoupled">Decoupled</ToggleGroupItem>
-                  <ToggleGroupItem value="coupled">Coupled</ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Max yaw rate</span>
-                  <span>{Math.round(flightMaxYawRate)} deg/s</span>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>sigma (sectors)</span>
+                  <Badge variant="outline">{sigmaSectors.toFixed(2)}</Badge>
                 </div>
                 <Slider
-                  min={10}
-                  max={180}
-                  step={5}
-                  value={[flightMaxYawRate]}
-                  onValueChange={onYawRateLimitChange}
+                  min={0.25}
+                  max={8}
+                  step={0.25}
+                  value={[sigmaSectors]}
+                  onValueChange={(values) => {
+                    const value = Array.isArray(values) ? values[0] ?? sigmaSectors : sigmaSectors;
+                    setSigmaStore(clampRange(value, 0.25, 8));
+                  }}
                 />
               </div>
               <div>
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>Max yaw accel</span>
-                  <span>{Math.round(flightMaxYawAccel)} deg/s^2</span>
+                <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                  <span>Floor</span>
+                  <Badge variant="outline">{floor.toFixed(2)}</Badge>
                 </div>
                 <Slider
-                  min={30}
-                  max={720}
-                  step={10}
-                  value={[flightMaxYawAccel]}
-                  onValueChange={onYawAccelLimitChange}
+                  min={0}
+                  max={0.99}
+                  step={0.01}
+                  value={[floor]}
+                  onValueChange={(values) => {
+                    const value = Array.isArray(values) ? values[0] ?? floor : floor;
+                    setFloorStore(clampRange(value, 0, 0.99));
+                  }}
                 />
               </div>
             </div>
-            <div className="text-[0.7rem] text-muted-foreground leading-5">
-              A/D (or Left/Right) command rate, W/S bias split, Space lifts, Shift dips. Tap H to capture heading,
-              M to return to manual, C to toggle scheduler coupling.
-            </div>
           </div>
 
-          <div className="space-y-2">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Flight intent
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  WASD / arrows steer laterally, Space lifts, Shift dips.
-                </div>
-              </div>
-              <Button variant="outline" size="sm" onClick={holdStation}>
-                Hold station
-              </Button>
-            </div>
-            <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-              <div>
-                dX <span className="font-mono text-foreground">{intent.x.toFixed(2)}</span>
-              </div>
-              <div>
-                dY <span className="font-mono text-foreground">{intent.y.toFixed(2)}</span>
-              </div>
-              <div>
-                dZ <span className="font-mono text-foreground">{intent.z.toFixed(2)}</span>
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                <span>Visual nudge</span>
-                <Badge variant="outline">{Math.round(nudge01 * 100)}%</Badge>
-              </div>
-              <Slider
-                min={0}
-                max={1}
-                step={0.01}
-                value={[nudge01]}
-                onValueChange={(values) => {
-                  const value = Array.isArray(values) ? values[0] ?? nudge01 : nudge01;
-                  setNudge01(value);
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>sigma (sectors)</span>
-                <Badge variant="outline">{sigmaSectors.toFixed(2)}</Badge>
-              </div>
-              <Slider
-                min={0.25}
-                max={8}
-                step={0.25}
-                value={[sigmaSectors]}
-                onValueChange={(values) => {
-                  const value = Array.isArray(values) ? values[0] ?? sigmaSectors : sigmaSectors;
-                  setSigmaStore(clampRange(value, 0.25, 8));
-                }}
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>Floor</span>
-                <Badge variant="outline">{floor.toFixed(2)}</Badge>
-              </div>
-              <Slider
-                min={0}
-                max={0.99}
-                step={0.01}
-                value={[floor]}
-                onValueChange={(values) => {
-                  const value = Array.isArray(values) ? values[0] ?? floor : floor;
-                  setFloorStore(clampRange(value, 0, 0.99));
-                }}
-              />
-            </div>
-          </div>
+          <HeadingRoseControls
+            splitFrac={splitFrac}
+            splitBiasPercent={splitBiasPercent}
+            flightBias={flightBias}
+            onBiasChange={onBiasChange}
+            setHeading={setHeading}
+          />
         </div>
-
-        <div className="space-y-3">
-          <div className="grid grid-cols-12 gap-3">
-            <div className="col-span-6 md:col-span-4 flex justify-center">
-              <MiniRose phase01={phase01} splitFrac={splitFrac} />
-            </div>
-            <div className="col-span-6 md:col-span-8 grid grid-cols-3 gap-2">
-              {HEADINGS.map((heading) => {
-                const isActive = Math.abs(shortestPhaseDelta01(heading.frac, phase01)) < 1e-3;
-                return (
-                  <Button
-                    key={heading.label}
-                    variant={isActive ? "default" : "secondary"}
-                    onClick={() => setHeading(heading.frac)}
-                  >
-                    {heading.label}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Primary / secondary split (|bias| {splitBiasPercent}%)
-              </span>
-              <Badge variant="outline">
-                {Math.round(splitFrac * 100)}% / {Math.round((1 - splitFrac) * 100)}%
-              </Badge>
-            </div>
-            <Slider
-              min={0}
-              max={1}
-              step={0.01}
-              value={[flightBias]}
-              onValueChange={(values) => {
-                const value = Array.isArray(values) ? values[0] ?? flightBias : flightBias;
-                onBiasChange(value);
-              }}
-            />
-            <div className="text-[0.65rem] text-muted-foreground">
-              Scheduler negativeFraction receives {(100 - Math.round(splitFrac * 100))}% to mirror the opposite lobe.
-            </div>
-          </div>
-
-          <div className="text-[11px] text-muted-foreground leading-5">
-            <strong>Why it can look clockwise only:</strong> we start at 0 deg (north). Buttons on the
-            right advance phase, which renders clockwise; buttons on the left wrap across 360 deg. The
-            rose shows both lobes, so the wrap is visible and expected.
-          </div>
-        </div>
-      </div>
+      )}
     </Card>
   );
 }

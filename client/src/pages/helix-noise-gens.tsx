@@ -15,7 +15,7 @@ import { CoverCreator, COVER_DROPPABLE_ID } from "@/components/noise-gens/CoverC
 import { UploadOriginalsModal } from "@/components/noise-gens/UploadOriginalsModal";
 import { MoodLegend } from "@/components/noise-gens/MoodLegend";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
-import type { MoodPreset, Original, HelixPacket } from "@/types/noise-gens";
+import type { MoodPreset, Original, HelixPacket, TempoMeta } from "@/types/noise-gens";
 import { useToast } from "@/hooks/use-toast";
 
 type SessionUser = {
@@ -66,7 +66,20 @@ export default function HelixNoiseGensPage() {
   const [hasGenerations, setHasGenerations] = useState(false);
   const [includeHelixPacket, setIncludeHelixPacket] = useState(Boolean(readHelixPacket()));
   const [helixPacket, setHelixPacket] = useState<HelixPacket | null>(() => readHelixPacket());
+  const [sessionTempo, setSessionTempo] = useState<TempoMeta | null>(null);
   const { user } = useMockSession();
+
+  const selectOriginal = useCallback(
+    (original: Original) => {
+      setSelectedOriginal(original);
+      setSessionTempo((prev) => original.tempo ?? prev);
+      toast({
+        title: "Track selected",
+        description: `${original.title} is ready for mood blending.`,
+      });
+    },
+    [toast],
+  );
 
   useEffect(() => {
     const refresh = () => setHelixPacket(readHelixPacket());
@@ -104,25 +117,17 @@ export default function HelixNoiseGensPage() {
       if (!over || over.id !== COVER_DROPPABLE_ID) return;
       const original = active.data.current?.original as Original | undefined;
       if (original) {
-        setSelectedOriginal(original);
-        toast({
-          title: "Track selected",
-          description: `${original.title} is ready for mood blending.`,
-        });
+        selectOriginal(original);
       }
     },
-    [toast],
+    [selectOriginal],
   );
 
   const handleOriginalSelect = useCallback(
     (original: Original) => {
-      setSelectedOriginal(original);
-      toast({
-        title: "Track selected",
-        description: `${original.title} is ready for mood blending.`,
-      });
+      selectOriginal(original);
     },
-    [toast],
+    [selectOriginal],
   );
 
   const handleRequestSignIn = useCallback(() => {
@@ -219,6 +224,7 @@ export default function HelixNoiseGensPage() {
                 onOriginalSelected={handleOriginalSelect}
                 onGenerationsPresenceChange={setHasGenerations}
                 onMoodPresetsLoaded={setMoodPresets}
+                sessionTempo={sessionTempo}
               />
               <CoverCreator
                 includeHelixPacket={includeHelixPacket}
@@ -226,6 +232,7 @@ export default function HelixNoiseGensPage() {
                 selectedOriginal={selectedOriginal}
                 onClearSelection={() => setSelectedOriginal(null)}
                 moodPresets={moodPresets}
+                sessionTempo={sessionTempo}
               />
             </div>
             <MoodLegend presets={moodPresets} />

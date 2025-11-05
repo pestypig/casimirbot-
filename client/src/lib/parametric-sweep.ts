@@ -3,6 +3,8 @@
 // Uses a simple DCE gain scaffold: kappa = f0 / QL (Hz-bandwidth), Omega ~= 2 f0, and
 // parametric coupling g ~ 2 * pi * f0 * m. All units are SI unless suffixed.
 
+import { RHO_COS_GUARD_LIMIT } from "./sweep-guards";
+
 export type SweepRanges = {
   gap_nm: [number, number];
   Omega_GHz: [number, number];
@@ -331,6 +333,8 @@ export function simulatePoint(
 
   const phi_deg = sample.phase_deg + (phaseBias || 0);
   const phi = (phi_deg * Math.PI) / 180;
+  const lambdaCentral = lambda0 * Math.cos(phi);
+  const lambdaEffNominal = Math.abs(lambdaCentral);
 
   const Omega = sample.Omega_GHz * 1e9;
   const detune_Hz = Omega - 2 * f0;
@@ -364,6 +368,38 @@ export function simulatePoint(
       flags: {
         filtered: true,
         threshold: rhoOut >= 1,
+        linewidthCollapse: false,
+        clipped: false,
+        reason: "rho",
+      },
+    };
+  }
+
+  if (lambdaEffNominal >= RHO_COS_GUARD_LIMIT) {
+    const subThreshold = 1 - Math.min(lambdaEffNominal, 1);
+    return {
+      sample,
+      gain_lin: GAIN_FLOOR_LIN,
+      gain_dB: toDB(GAIN_FLOOR_LIN),
+      squeezed_dB: toDB(GAIN_FLOOR_LIN),
+      detune_MHz,
+      detuneNorm,
+      deltaOverKappa: detuneNorm,
+      QL,
+      kappa_MHz,
+      kappa_eff_MHz: Math.max(0, kappa_MHz * (1 - lambdaCentral)),
+      rho,
+      subThresholdMargin: subThreshold,
+      lambdaEff: lambdaEffNominal,
+      lambdaSign: Math.sign(1 - lambdaCentral) || 0,
+      stable: false,
+      gapIndex: sample.gapIndex,
+      omegaIndex: sample.omegaIndex,
+      phiIndex: sample.phaseIndex,
+      depthIndex: sample.depthIndex,
+      flags: {
+        filtered: true,
+        threshold: true,
         linewidthCollapse: false,
         clipped: false,
         reason: "rho",
@@ -419,7 +455,7 @@ export function simulatePoint(
   let gain_dB = rawGain_dB;
 
   const Gmin = (() => {
-    const lambda = lambda0 * Math.cos(phi);
+    const lambda = lambdaCentral;
     const a = 1 + lambda;
     const denom =
       a * a + (detune_Hz / Math.max(kappa_bw_Hz, 1e-30)) ** 2;
@@ -435,13 +471,14 @@ export function simulatePoint(
 
   const staySub =
     params.staySubThreshold ?? pipeline.staySubThreshold ?? true;
-  const lambdaCentral = lambda0 * Math.cos(phi);
-  const lambdaEff = Math.abs(lambdaCentral);
+  const lambdaEff = lambdaEffNominal;
   const subThresholdMargin = 1 - lambdaEff;
   const lambdaSign = Math.sign(1 - lambdaCentral) || 0;
-  const guardLambda = staySub && subThresholdMargin <= SUB_THRESHOLD_MARGIN;
+  const guardLambda =
+    staySub &&
+    (lambdaEff >= RHO_COS_GUARD_LIMIT || subThresholdMargin <= SUB_THRESHOLD_MARGIN);
   const guardGain = staySub && rawGain_dB > 12;
-  const guardRho = rho > 0.45;
+  const guardRho = staySub && rho >= RHO_COS_GUARD_LIMIT;
   const minDepth = pipeline.minDepth_pct ?? DEFAULT_MIN_DEPTH_PCT;
   const maxDepth = pipeline.maxDepth_pct ?? DEFAULT_MAX_DEPTH_PCT;
   const filteredByDepth =

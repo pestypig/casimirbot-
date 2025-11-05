@@ -1,4 +1,4 @@
-﻿import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
@@ -8,11 +8,16 @@ import { useFlightDirectorStore } from "@/store/useFlightDirectorStore";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import { shallow } from "zustand/shallow";
 import { VolumeModeToggle, type VolumeViz } from "@/components/VolumeModeToggle";
-import DirectionPad from "@/components/DirectionPad";
 import { subscribe, unsubscribe } from "@/lib/luma-bus";
 import { Hull3DRenderer, Hull3DRendererMode, Hull3DQualityPreset, Hull3DQualityOverrides, Hull3DRendererState, Hull3DVolumeViz, Hull3DOverlayState } from "./Hull3DRenderer.ts";
 import { CurvatureVoxProvider } from "./CurvatureVoxProvider";
 import { smoothSectorWeights } from "@/lib/sector-weights";
+import { TheoryBadge } from "./common/TheoryBadge";
+/**
+ * TheoryRefs:
+ *  - vanden-broeck-1999: UI exposes gamma_VdB with provenance
+ */
+
 
 interface AlcubierrePanelProps {
   className?: string;
@@ -23,6 +28,10 @@ interface AlcubierrePanelProps {
   ) => void;
   overlayHudEnabled?: boolean;
   onPlanarVizModeChange?: (mode: number) => void;
+  vizIntent?: {
+    rise: number;
+    planar: number;
+  };
 }
 
 function FlightDirectorStatusRow() {
@@ -672,6 +681,7 @@ export default function AlcubierrePanel({
   onCanvasReady,
   overlayHudEnabled = false,
   onPlanarVizModeChange,
+  vizIntent,
 }: AlcubierrePanelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
@@ -711,13 +721,21 @@ export default function AlcubierrePanel({
   const [vizIntentEnabled, setVizIntentEnabled] = useState(true);
   const [vizRise, setVizRise] = useState(0);
   const [vizPlanar, setVizPlanar] = useState(0);
-  const handleVizIntent = useCallback(
-    ({ rise, planar }: { rise: number; planar: number }) => {
-      setVizRise((prev) => (Math.abs(prev - rise) > 1e-3 ? rise : prev));
-      setVizPlanar((prev) => (Math.abs(prev - planar) > 1e-3 ? planar : prev));
-    },
-    []
-  );
+  const externalVizRise = vizIntent?.rise;
+  const externalVizPlanar = vizIntent?.planar;
+
+  useEffect(() => {
+    if (typeof externalVizRise === "number") {
+      setVizRise((prev) =>
+        Math.abs(prev - externalVizRise) > 1e-3 ? externalVizRise : prev
+      );
+    }
+    if (typeof externalVizPlanar === "number") {
+      setVizPlanar((prev) =>
+        Math.abs(prev - externalVizPlanar) > 1e-3 ? externalVizPlanar : prev
+      );
+    }
+  }, [externalVizRise, externalVizPlanar]);
 const [hullMode, setHullMode] = useState<Hull3DRendererMode>("instant");
 const [hullBlend, setHullBlend] = useState(0);
 const [hullVolumeVizLive, setHullVolumeVizLive] = useState<Hull3DVolumeViz>("theta_drive");
@@ -806,6 +824,7 @@ const [busPhasePayload, setBusPhasePayload] = useState<{
   phaseCont?: number;
   tsec_ms?: number;
   pumpPhase_deg?: number;
+  tauLC_ms?: number;
   sectorIndex?: number;
   source?: string;
   timestamp?: number;
@@ -1158,6 +1177,11 @@ const res = 256;
       });
       const tsecRaw = Number(payload?.Tsec_ms ?? payload?.tSec_ms ?? payload?.tsec_ms);
       const pumpPhaseRaw = Number(payload?.pumpPhase_deg ?? payload?.pumpPhaseDeg ?? payload?.pumpPhase);
+      const tauLcRaw = Number(
+        payload?.tauLC_ms ??
+        payload?.tauLc_ms ??
+        payload?.tau_lc_ms
+      );
       const sectorIdxRaw = Number(
         payload?.sectorIdx ??
         payload?.sectorIndex ??
@@ -1171,6 +1195,7 @@ const res = 256;
           phaseCont,
           tsec_ms: Number.isFinite(tsecRaw) ? tsecRaw : undefined,
           pumpPhase_deg: Number.isFinite(pumpPhaseRaw) ? pumpPhaseRaw : undefined,
+          tauLC_ms: Number.isFinite(tauLcRaw) ? Math.max(0, tauLcRaw) : undefined,
           sectorIndex: Number.isFinite(sectorIdxRaw) ? Math.max(0, Math.floor(sectorIdxRaw)) : undefined,
           source: mappedSource,
           timestamp: Number.isFinite(timestampRaw) ? timestampRaw : Date.now(),
@@ -1181,6 +1206,7 @@ const res = 256;
           prev.phaseCont === next.phaseCont &&
           prev.tsec_ms === next.tsec_ms &&
           prev.pumpPhase_deg === next.pumpPhase_deg &&
+          prev.tauLC_ms === next.tauLC_ms &&
           prev.sectorIndex === next.sectorIndex &&
           prev.source === next.source
         ) {
@@ -1356,6 +1382,10 @@ const res = 256;
       busPhasePayload.tsec_ms != null
         ? `${busPhasePayload.tsec_ms.toFixed(2)} ms`
         : "--";
+    const tauLC =
+      busPhasePayload.tauLC_ms != null
+        ? fmtTimeSmartMs(busPhasePayload.tauLC_ms)
+        : "--";
     const pump =
       busPhasePayload.pumpPhase_deg != null
         ? `${busPhasePayload.pumpPhase_deg.toFixed(1)}°`
@@ -1378,8 +1408,9 @@ const res = 256;
       `source=${sourceLabel}`,
     ];
     if (updatedAt) titleParts.push(`timestamp=${updatedAt}`);
+    titleParts.push(`tauLC_ms=${busPhasePayload.tauLC_ms ?? "--"}`);
     return {
-      text: `Bus payload Tsec ${tsec} | pump φ ${pump} | ${sector}`,
+      text: `Bus payload Tsec ${tsec} | \u03C4LC ${tauLC} | pump \u03B8 ${pump} | ${sector}`,
       title: titleParts.join(", "),
     };
   }, [busPhasePayload, busPhaseSource, busPhaseUpdatedAt]);
@@ -3112,27 +3143,36 @@ const res = 256;
 
   }, [lightLoop.tauLC_ms, lightLoop.burst_ms, lightLoop.dwell_ms]);
 
+  const lastZetaBadgeRef = useRef<{ value: number; limit: number } | null>(null);
   const zetaBadgeData = useMemo(() => {
     const rawValue = Number((sharedComplianceState as any)?.zeta?.value);
     const rawLimit = Number((sharedComplianceState as any)?.zeta?.limit);
-    const value = Number.isFinite(rawValue) ? rawValue : null;
-    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : null;
-    if (value === null || limit === null) {
+    const nextValue = Number.isFinite(rawValue) ? rawValue : null;
+    const nextLimit = Number.isFinite(rawLimit) && rawLimit > 0 ? rawLimit : null;
+
+    if (nextValue !== null && nextLimit !== null) {
+      lastZetaBadgeRef.current = { value: nextValue, limit: nextLimit };
+    }
+
+    const current = lastZetaBadgeRef.current;
+
+    if (!current) {
       return {
         text: "zeta value/limit --",
         className: "bg-slate-800/70 text-slate-200",
         title: "Ford-Roman zeta compliance unavailable",
       };
     }
-    const ratio = value / limit;
-    const text = `zeta ${value.toPrecision(3)}/${limit.toPrecision(3)} | ${ratio.toFixed(2)}x`;
+
+    const ratio = current.value / current.limit;
+    const text = `zeta ${current.value.toPrecision(3)}/${current.limit.toPrecision(3)} | ${ratio.toFixed(2)}x`;
     let className = "bg-emerald-800/70 text-emerald-100";
     if (ratio >= 1) className = "bg-rose-800/80 text-rose-100";
     else if (ratio >= 0.9) className = "bg-amber-800/80 text-amber-100";
     return {
       text,
       className,
-      title: `zeta=${value}, limit=${limit}, ratio=${ratio.toFixed(3)}`,
+      title: `zeta=${current.value}, limit=${current.limit}, ratio=${ratio.toFixed(3)}`,
     };
   }, [(sharedComplianceState as any)?.zeta?.value, (sharedComplianceState as any)?.zeta?.limit]);
 
@@ -3330,12 +3370,18 @@ const res = 256;
           )}
           {driveDiag && (
             <>
-              <MetricTooltipBadge
-                label="ampChain"
-                value={driveDiag.ampChain.toExponential(2)}
-                description="Product of Î³_geoÂ³, q, and Î³_VdB that scales the drive-mode York time response."
-                className="bg-emerald-800/70 hover:bg-emerald-700/80"
-              />
+              <div className="flex items-center gap-2">
+                <MetricTooltipBadge
+                  label="ampChain"
+                  value={driveDiag.ampChain.toExponential(2)}
+                  description="Product of I3_geoA3, q, and I3_VdB that scales the drive-mode York time response."
+                  className="bg-emerald-800/70 hover:bg-emerald-700/80"
+                />
+                <TheoryBadge
+                  refs={["vanden-broeck-1999"]}
+                  categoryAnchor="Geometry-Amplifiers"
+                />
+              </div>
               <MetricTooltipBadge
                 label="âˆšd_FR"
                 value={driveDiag.gate.toFixed(3)}
@@ -3617,10 +3663,6 @@ const res = 256;
               />
               <span className="font-mono text-[0.65rem] text-slate-300">{(ds.sectorFloor * 100).toFixed(0)}%</span>
             </div>
-          </div>
-
-          <div className="mt-3 w-full">
-            <DirectionPad className="w-full" onVizIntent={handleVizIntent} />
           </div>
 
           <div className="ml-auto flex gap-1">

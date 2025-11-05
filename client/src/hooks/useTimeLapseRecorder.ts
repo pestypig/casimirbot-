@@ -5,7 +5,7 @@ import { useLightCrossingLoop } from "./useLightCrossingLoop";
 import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { queryClient } from "@/lib/queryClient";
-import { summarizeSweepGuard } from "@/lib/sweep-guards";
+import { RHO_COS_GUARD_LIMIT, summarizeSweepGuard } from "@/lib/sweep-guards";
 import type { SweepPoint } from "@shared/schema";
 
 const OVERLAY_STATE_QUERY_KEY = ["hull3d:overlay:controls"] as const;
@@ -65,6 +65,13 @@ export type TimeLapseResult = {
   videoFileName: string;
   metricsBlob: Blob;
   metricsUrl: string;
+  metrics: {
+    targetFps: number;
+    achievedFps: number;
+    framesPushed: number;
+    framesDroppedEstimate: number;
+    p95FrameJitterMs: number;
+  };
 };
 
 export type TimeLapseSegmentKey = "stable" | "edge" | "recovery";
@@ -102,6 +109,8 @@ type RecorderReturn = {
 const DEFAULT_DURATION_MS = 10_000;
 const DEFAULT_FPS = 30;
 const PASS_TS_THRESHOLD = 100;
+const UI_UPDATE_HZ = 6;
+const UI_UPDATE_INTERVAL_MS = 1000 / UI_UPDATE_HZ;
 
 const STRING_FALLBACK = "n/a";
 
@@ -164,6 +173,140 @@ const formatQuadrature = (point: SweepPoint | null | undefined): string => {
   const signed = formatSigned(num, 2, " dB");
   if (signed === STRING_FALLBACK) return signed;
   return num >= 0 ? `amp ${signed}` : `de-amp ${signed}`;
+};
+
+type HudPayload = {
+  t: number;
+  TS: number | null;
+  tauLC_ms: number | null;
+  burst_ms: number | null;
+  dwell_ms: number | null;
+  rho: number | null;
+  QL: number | null;
+  deff: number | null;
+  sectors: { live: number | null; total: number | null };
+  gr: { burstVsTau: boolean; tsOk: boolean; qiOk: boolean };
+  shellOffset: number | null;
+};
+
+class FrameMeter {
+  private readonly target: number;
+  private lastTs = 0;
+  private readonly gaps: number[] = [];
+  public pushed = 0;
+  public dropped = 0;
+
+  constructor(targetFps: number) {
+    this.target = Math.max(1, targetFps);
+  }
+
+  push(ts: number) {
+    this.pushed += 1;
+    if (this.lastTs) {
+      const gap = ts - this.lastTs;
+      this.gaps.push(gap);
+      const ideal = 1000 / this.target;
+      if (gap > ideal * 1.5) {
+        const missed = Math.floor(gap / ideal) - 1;
+        if (missed > 0) {
+          this.dropped += missed;
+        }
+      }
+    }
+    this.lastTs = ts;
+  }
+
+  snapshot() {
+    const sorted = this.gaps.slice().sort((a, b) => a - b);
+    const p95Index = sorted.length ? Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95)) : 0;
+    const p95 = sorted.length ? sorted[p95Index] : 0;
+    const ideal = 1000 / this.target;
+    const jitter = p95 > ideal ? p95 - ideal : 0;
+    return {
+      pushed: this.pushed,
+      dropped: this.dropped,
+      p95JitterMs: jitter,
+    };
+  }
+}
+
+const makeHudCanvas = (width: number, height: number) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { alpha: true });
+  return { canvas, ctx };
+};
+
+const formatHudValue = (value: number | null, digits = 2) => {
+  if (value == null || !Number.isFinite(value)) return "--";
+  return value.toFixed(digits);
+};
+
+const ensureMicrotask = (fn: () => void) => {
+  if (typeof queueMicrotask === "function") {
+    queueMicrotask(fn);
+  } else {
+    void Promise.resolve().then(fn).catch(() => undefined);
+  }
+};
+
+const drawHud = (ctx: CanvasRenderingContext2D, payload: HudPayload) => {
+  const { width, height } = ctx.canvas;
+  if (!width || !height) return;
+
+  const panelWidth = Math.min(320, width - 16);
+  const padding = 8;
+  const lineHeight = 14;
+
+  const lines: Array<[string, string]> = [
+    ["t (s)", payload.t.toFixed(2)],
+    ["TS", payload.TS != null && Number.isFinite(payload.TS) ? payload.TS.toExponential(1) : "--"],
+    ["τlc (ms)", formatHudValue(payload.tauLC_ms, 3)],
+    ["burst/dwell", `${formatHudValue(payload.burst_ms, 2)} / ${formatHudValue(payload.dwell_ms, 2)}`],
+    ["ρ", formatHudValue(payload.rho, 2)],
+    ["Q_L", payload.QL != null && Number.isFinite(payload.QL) ? payload.QL.toExponential(1) : "--"],
+    ["d_eff", payload.deff != null && Number.isFinite(payload.deff) ? payload.deff.toExponential(1) : "--"],
+    [
+      "sectors",
+      `${payload.sectors.live ?? "--"}/${payload.sectors.total ?? "--"}`,
+    ],
+    [
+      "GR",
+      `${payload.gr.burstVsTau ? "PASS" : "WARN"} ${payload.gr.tsOk ? "PASS" : "WARN"} ${
+        payload.gr.qiOk ? "PASS" : "WARN"
+      }`,
+    ],
+    ["shell Δθ", formatHudValue(payload.shellOffset, 3)],
+  ];
+
+  const panelHeight = lines.length * lineHeight + padding * 2;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.save();
+
+  ctx.globalAlpha = 0.65;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(padding, padding, panelWidth, panelHeight);
+  ctx.globalAlpha = 1;
+
+  ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textBaseline = "top";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#fff";
+
+  let y = padding + 2;
+  const labelX = padding + 4;
+  const valueX = padding + 4 + 130;
+
+  for (const [label, value] of lines) {
+    ctx.fillText(label, labelX, y);
+    ctx.fillText(value, valueX, y);
+    y += lineHeight;
+  }
+
+  ctx.restore();
 };
 
 const pickSweepNumber = (...values: unknown[]): number | null => {
@@ -257,6 +400,164 @@ const pickNumber = <T,>(...values: T[]): number | null => {
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const GUARD_MARGIN = 0.02;
+const RHO_ACTIVE_LIMIT = Math.max(0, RHO_COS_GUARD_LIMIT - GUARD_MARGIN);
+const RHO_RECOVERY_TARGET = Math.max(0, Math.min(RHO_ACTIVE_LIMIT - 0.03, 0.9));
+
+const clampToActiveGuard = (value: unknown, limit = RHO_ACTIVE_LIMIT): number | undefined => {
+  if (value == null) {
+    return undefined;
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    return undefined;
+  }
+  return Math.max(0, Math.min(limit, num));
+};
+
+const enforceGuardLimits = (
+  params: Partial<EnergyPipelineState>,
+): Partial<EnergyPipelineState> => {
+  const safe: Record<string, unknown> = { ...params };
+  const clampField = (field: keyof EnergyPipelineState, limit = RHO_ACTIVE_LIMIT) => {
+    if (Object.prototype.hasOwnProperty.call(safe, field)) {
+      const clamped = clampToActiveGuard((safe as any)[field], limit);
+      if (clamped === undefined) {
+        delete (safe as any)[field];
+      } else {
+        (safe as any)[field] = clamped;
+      }
+    }
+  };
+  clampField("dutyCycle");
+  clampField("localBurstFrac");
+
+  if (Object.prototype.hasOwnProperty.call(safe, "modulationFreq_GHz")) {
+    const freqGHz = Number((safe as any).modulationFreq_GHz);
+    if (!Number.isFinite(freqGHz)) {
+      delete (safe as any).modulationFreq_GHz;
+    } else {
+      (safe as any).modulationFreq_GHz = Math.max(0.001, Math.min(1000, freqGHz));
+    }
+  }
+
+  const clampSectorInt = (field: "sectorStrobing" | "sectorsConcurrent") => {
+    if (Object.prototype.hasOwnProperty.call(safe, field)) {
+      const value = Number((safe as any)[field]);
+      if (!Number.isFinite(value)) {
+        delete (safe as any)[field];
+      } else {
+        (safe as any)[field] = Math.max(1, Math.min(10_000, Math.round(value)));
+      }
+    }
+  };
+  clampSectorInt("sectorStrobing");
+  clampSectorInt("sectorsConcurrent");
+
+  if (Object.prototype.hasOwnProperty.call(safe, "rhoTarget")) {
+    const clamped = clampToActiveGuard((safe as any).rhoTarget, RHO_ACTIVE_LIMIT);
+    if (clamped === undefined) {
+      delete (safe as any).rhoTarget;
+    } else {
+      (safe as any).rhoTarget = clamped;
+    }
+  }
+
+  return safe as Partial<EnergyPipelineState>;
+};
+
+const resolveSweepContext = (state: EnergyPipelineState | undefined) => {
+  const anyState = state as any;
+  const sweepRuntime = anyState?.sweep ?? null;
+  const sweepLast = (sweepRuntime?.last ?? null) as SweepPoint | null;
+  const sweepResults = Array.isArray(anyState?.vacuumGapSweepResults)
+    ? (anyState.vacuumGapSweepResults as SweepPoint[])
+    : [];
+  const sweepTop =
+    Array.isArray(sweepRuntime?.top) && sweepRuntime.top.length
+      ? (sweepRuntime.top[0] as SweepPoint)
+      : null;
+  const fallback =
+    sweepLast ?? sweepTop ?? (sweepResults.length ? sweepResults[sweepResults.length - 1] : null);
+  return {
+    sweepRuntime,
+    sweepLast,
+    fallback,
+  };
+};
+
+const buildRecoveryParams = (
+  pipeline: EnergyPipelineState | undefined,
+  baseline: Partial<EnergyPipelineState> | null,
+): Partial<EnergyPipelineState> => {
+  const pipelineAny = pipeline as any;
+  const baseDuty = clamp01(
+    pickNumber(
+      baseline?.dutyCycle,
+      pipeline?.dutyCycle,
+      pipelineAny?.dutyEffectiveFR,
+      pipelineAny?.dutyGate,
+      0.1,
+    ) ?? 0.1,
+  );
+  const baseBurst = clamp01(
+    pickNumber(
+      baseline?.localBurstFrac,
+      pipeline?.localBurstFrac,
+      baseline?.dutyCycle,
+      pipeline?.dutyCycle,
+      0.01,
+    ) ?? 0.01,
+  );
+  const baseStrobing = Math.max(
+    1,
+    Math.round(
+      pickNumber(
+        baseline?.sectorStrobing,
+        pipeline?.sectorStrobing,
+        pipeline?.sectorsConcurrent,
+        pipelineAny?.lightCrossing?.sectorCount,
+        1,
+      ) ?? 1,
+    ),
+  );
+  const baseConcurrent = Math.max(
+    1,
+    Math.round(
+      pickNumber(
+        baseline?.sectorsConcurrent,
+        pipeline?.sectorsConcurrent,
+        pipeline?.sectorStrobing,
+        pipelineAny?.activeSectors,
+        baseStrobing,
+      ) ?? baseStrobing,
+    ),
+  );
+  const freqGHz =
+    pickNumber(baseline?.modulationFreq_GHz, pipeline?.modulationFreq_GHz, 15) ?? 15;
+  const baselineRho = clampToActiveGuard(
+    pickNumber(
+      pipelineAny?.pump?.rho,
+      pipelineAny?.pump?.rho_est,
+      pipelineAny?.rho,
+      pipelineAny?.rho_est,
+    ),
+  );
+  const targetRho =
+    baselineRho != null
+      ? Math.min(RHO_RECOVERY_TARGET, baselineRho * 0.85)
+      : RHO_RECOVERY_TARGET;
+
+  return enforceGuardLimits({
+    dutyCycle: clamp01(baseDuty * 0.75),
+    localBurstFrac: clamp01(baseBurst * 0.5),
+    sectorStrobing: Math.max(1, Math.round(baseStrobing / 2)),
+    sectorsConcurrent: Math.max(1, Math.round(baseConcurrent / 2)),
+    modulationFreq_GHz: freqGHz,
+    rhoTarget: targetRho,
+  });
+};
 
 const pickRecorderMimeType = () => {
   if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) {
@@ -382,6 +683,19 @@ export function useTimeLapseRecorder({
   const overlayHitRegionsRef = useRef<OverlayHitRegistry>({ blocks: [] });
   const overlayPayloadRef = useRef<OverlayPayload | null>(null);
   const overlayHighlightRef = useRef<OverlayBlockId | null>(null);
+  const overlayDomGateRef = useRef<{ lastRender: number; lastHighlight: OverlayBlockId | null }>({
+    lastRender: 0,
+    lastHighlight: null,
+  });
+  const hudPayloadRef = useRef<HudPayload | null>(null);
+  const hudCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hudCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const frameMeterRef = useRef<FrameMeter | null>(null);
+  const canvasTrackRef = useRef<CanvasCaptureMediaStreamTrack | null>(null);
+  const restoreDomHudRef = useRef<(() => void) | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
+  const pendingUiRef = useRef<{ progress: number; frame: TLFrame | null } | null>(null);
+  const lastUiUpdateRef = useRef(0);
 
   const overlaySnapshot = useMemo(() => {
     const stored = queryClient.getQueryData(OVERLAY_STATE_QUERY_KEY);
@@ -497,6 +811,7 @@ export function useTimeLapseRecorder({
   const framesRef = useRef<TLFrame[]>([]);
   const segmentsRef = useRef<ScenarioSegment[]>([]);
   const segmentIndexRef = useRef<number>(-1);
+  const guardRecoveryScheduledRef = useRef<boolean>(false);
   const finishingRef = useRef<boolean>(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const recorderPromiseRef = useRef<Promise<Blob> | null>(null);
@@ -542,6 +857,20 @@ export function useTimeLapseRecorder({
       recorderStreamRef.current.getTracks().forEach((track) => track.stop());
       recorderStreamRef.current = null;
     }
+    canvasTrackRef.current = null;
+    frameMeterRef.current = null;
+    recordingStartedAtRef.current = null;
+    hudPayloadRef.current = null;
+    hudCtxRef.current = null;
+    if (hudCanvasRef.current) {
+      hudCanvasRef.current.width = 0;
+      hudCanvasRef.current.height = 0;
+      hudCanvasRef.current = null;
+    }
+    if (restoreDomHudRef.current) {
+      restoreDomHudRef.current();
+      restoreDomHudRef.current = null;
+    }
   }, []);
 
   const getCanvasDimensions = useCallback(() => {
@@ -580,7 +909,7 @@ export function useTimeLapseRecorder({
     }
     let captureCtx = captureCtxRef.current;
     if (!captureCtx) {
-      captureCtx = captureCanvas.getContext("2d");
+      captureCtx = captureCanvas.getContext("2d", { alpha: false });
       captureCtxRef.current = captureCtx;
     }
     if (!captureCtx) {
@@ -594,6 +923,29 @@ export function useTimeLapseRecorder({
     captureCanvas.style.height = `${dims.cssHeight}px`;
     return { canvas: captureCanvas, ctx: captureCtx, dims };
   }, [getCanvasDimensions]);
+
+  const flushUiUpdate = useCallback(
+    (now: number, payload: { progress: number; frame: TLFrame | null }, force = false) => {
+      pendingUiRef.current = payload;
+      if (!force) {
+        const minDelta = UI_UPDATE_INTERVAL_MS;
+        if (now - lastUiUpdateRef.current < minDelta) {
+          return;
+        }
+      }
+      const data = pendingUiRef.current;
+      if (!data) return;
+      pendingUiRef.current = null;
+      lastUiUpdateRef.current = now;
+      ensureMicrotask(() => {
+        setProgress(data.progress);
+        if (data.frame) {
+          setCurrentFrame(data.frame);
+        }
+      });
+    },
+    [setCurrentFrame, setProgress]
+  );
 
   const renderOverlayDom = useCallback(
     (
@@ -821,6 +1173,7 @@ export function useTimeLapseRecorder({
 
       if (!overlayEnabledRef.current) {
         overlayHitRegionsRef.current = hits;
+        overlayDomGateRef.current = { lastRender: 0, lastHighlight: null };
         renderOverlayDom(null, null, domRegions, [], null);
         ctx.restore();
         return;
@@ -1031,28 +1384,37 @@ export function useTimeLapseRecorder({
 
       ctx.restore();
       overlayHitRegionsRef.current = hits;
-      renderOverlayDom(
-        {
-          segmentLabel,
-          elapsedSeconds,
-          headerLines,
-          phaseLines,
-          sweepLines,
-          deltaLines,
-          metricsLeft: leftMetrics,
-          metricsRight: rightMetrics,
-          equationLines,
-        },
-        highlight,
-        domRegions,
-        legendEntries,
-        {
-          paddingCss: padding * invScale,
-          lineHeightCss: lineHeight * invScale,
-          fontSizeCss: fontSize * invScale,
-          swatchSizeCss: swatchSize * invScale,
-        }
-      );
+      const gate = overlayDomGateRef.current;
+      const now = performance.now();
+      const highlightChanged = gate.lastHighlight !== highlight;
+      if (highlightChanged) {
+        gate.lastHighlight = highlight;
+      }
+      if (highlightChanged || now - gate.lastRender >= UI_UPDATE_INTERVAL_MS) {
+        gate.lastRender = now;
+        renderOverlayDom(
+          {
+            segmentLabel,
+            elapsedSeconds,
+            headerLines,
+            phaseLines,
+            sweepLines,
+            deltaLines,
+            metricsLeft: leftMetrics,
+            metricsRight: rightMetrics,
+            equationLines,
+          },
+          highlight,
+          domRegions,
+          legendEntries,
+          {
+            paddingCss: padding * invScale,
+            lineHeightCss: lineHeight * invScale,
+            fontSizeCss: fontSize * invScale,
+            swatchSizeCss: swatchSize * invScale,
+          }
+        );
+      }
     },
     [ensureOverlayCanvasSize, renderOverlayDom]
   );
@@ -1147,16 +1509,61 @@ export function useTimeLapseRecorder({
   }, [overlayDom, overlayCanvas, redrawOverlay]);
 
   const compositeFrameForRecording = useCallback(() => {
+    if (!recorderRef.current || recorderRef.current.state !== "recording") {
+      return;
+    }
+
     const baseCanvas = canvasRef.current;
     if (!baseCanvas) return;
     const capture = ensureCaptureCanvas();
-    if (!capture) return;
+    if (!capture || !capture.ctx) return;
     const { canvas: captureCanvas, ctx } = capture;
+
+    let hudCanvas = hudCanvasRef.current;
+    let hudCtx = hudCtxRef.current;
+    if (!hudCanvas || !hudCtx || hudCanvas.width !== captureCanvas.width || hudCanvas.height !== captureCanvas.height) {
+      const created = makeHudCanvas(captureCanvas.width, captureCanvas.height);
+      if (created.ctx) {
+        hudCanvas = created.canvas;
+        hudCtx = created.ctx;
+        hudCanvasRef.current = hudCanvas;
+        hudCtxRef.current = hudCtx;
+      } else {
+        hudCanvasRef.current = null;
+        hudCtxRef.current = null;
+        hudCanvas = null;
+        hudCtx = null;
+      }
+    }
+
+    if (hudCanvas && hudCtx) {
+      const payload = hudPayloadRef.current;
+      if (payload) {
+        drawHud(hudCtx, payload);
+      } else {
+        hudCtx.clearRect(0, 0, hudCtx.canvas.width, hudCtx.canvas.height);
+      }
+    }
+
     ctx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
     ctx.drawImage(baseCanvas, 0, 0, captureCanvas.width, captureCanvas.height);
-    if (overlayEnabledRef.current && overlayCanvasRef.current) {
+
+    if (hudCanvasRef.current) {
+      ctx.drawImage(hudCanvasRef.current, 0, 0, captureCanvas.width, captureCanvas.height);
+    } else if (overlayEnabledRef.current && overlayCanvasRef.current) {
       ctx.drawImage(overlayCanvasRef.current, 0, 0, captureCanvas.width, captureCanvas.height);
     }
+
+    const track = canvasTrackRef.current;
+    if (track && typeof track.requestFrame === "function") {
+      try {
+        track.requestFrame();
+      } catch {
+        // ignore requestFrame failures (Safari, etc.)
+      }
+    }
+
+    frameMeterRef.current?.push(performance.now());
   }, [ensureCaptureCanvas]);
 
   useEffect(() => {
@@ -1165,7 +1572,7 @@ export function useTimeLapseRecorder({
     }
   }, [overlayEnabled, compositeFrameForRecording, status]);
 
-  const startRecorder = useCallback(() => {
+  const startRecorder = useCallback(async () => {
     if (recorderRef.current && recorderRef.current.state === "recording") {
       return;
     }
@@ -1189,15 +1596,31 @@ export function useTimeLapseRecorder({
     recorderStreamRef.current = stream;
     recorderMimeTypeRef.current = mimeType;
     recorderChunksRef.current = [];
+    frameMeterRef.current = new FrameMeter(fps);
 
-    const recorder = new MediaRecorder(stream, {
-      mimeType,
-      videoBitsPerSecond: 8_000_000,
-    });
+    const [videoTrack] = stream.getVideoTracks();
+    if (videoTrack) {
+      canvasTrackRef.current = videoTrack as CanvasCaptureMediaStreamTrack;
+      try {
+        const constraints: MediaTrackConstraints = {
+          frameRate: { ideal: fps, max: fps },
+        };
+        await videoTrack.applyConstraints?.(constraints);
+      } catch {
+        // Best-effort only; not all browsers support applying constraints to canvas tracks.
+      }
+    } else {
+      canvasTrackRef.current = null;
+    }
 
     recorderPromiseRef.current = new Promise<Blob>((resolve, reject) => {
       recorderResolveRef.current = resolve;
       recorderRejectRef.current = reject;
+    });
+
+    const recorder = new MediaRecorder(stream, {
+      mimeType,
+      videoBitsPerSecond: 8_000_000,
     });
 
     recorder.addEventListener("dataavailable", (event) => {
@@ -1230,10 +1653,23 @@ export function useTimeLapseRecorder({
       cleanupRecorder();
     });
 
-    compositeFrameForRecording();
-    const timeslice = Math.max(250, Math.round(1000 / Math.max(1, fps)));
-    recorder.start(timeslice);
+    const domRoot = overlayDomRef.current;
+    if (domRoot) {
+      const previousVisibility = domRoot.style.visibility;
+      domRoot.style.visibility = "hidden";
+      restoreDomHudRef.current = () => {
+        domRoot.style.visibility = previousVisibility;
+      };
+    } else {
+      restoreDomHudRef.current = null;
+    }
+
+    hudCanvasRef.current = null;
+    hudCtxRef.current = null;
+    recorder.start();
     recorderRef.current = recorder;
+    recordingStartedAtRef.current = performance.now();
+    compositeFrameForRecording();
   }, [cleanupRecorder, compositeFrameForRecording, ensureCaptureCanvas, fps]);
 
   const stopRecorder = useCallback(async (): Promise<Blob | null> => {
@@ -1270,12 +1706,19 @@ export function useTimeLapseRecorder({
     framesRef.current = [];
     segmentsRef.current = [];
     segmentIndexRef.current = -1;
+    guardRecoveryScheduledRef.current = false;
     finishingRef.current = false;
     baselineRef.current = null;
     baselineMetricsRef.current = null;
     overlayPayloadRef.current = null;
     overlayHitRegionsRef.current = { blocks: [] };
     overlayHighlightRef.current = null;
+    hudPayloadRef.current = null;
+    pendingUiRef.current = null;
+    lastUiUpdateRef.current = 0;
+    overlayDomGateRef.current = { lastRender: 0, lastHighlight: null };
+    hudCanvasRef.current = null;
+    hudCtxRef.current = null;
     if (overlayCanvasRef.current) {
       const ctx = overlayCanvasRef.current.getContext("2d");
       if (ctx) {
@@ -1340,45 +1783,76 @@ export function useTimeLapseRecorder({
     const freqGHz = pickNumber(state?.modulationFreq_GHz, 15) ?? 15;
     const chunk = duration / 3;
 
+    const { sweepLast, fallback } = resolveSweepContext(state);
+    const baselineRho = clampToActiveGuard(
+      pickNumber(
+        sweepLast?.pumpRatio,
+        fallback?.pumpRatio,
+        stateAny?.pump?.rho,
+        stateAny?.pump?.rho_est,
+        stateAny?.rho,
+        stateAny?.rho_est,
+      ),
+    );
+    const stableRhoTarget =
+      baselineRho ?? clampToActiveGuard(baseDuty) ?? Math.max(0, RHO_ACTIVE_LIMIT * 0.6);
+    const edgeRhoTarget = Math.min(
+      RHO_ACTIVE_LIMIT,
+      (baselineRho ?? stableRhoTarget ?? RHO_ACTIVE_LIMIT * 0.7) + 0.05,
+    );
+    const recoveryRhoTarget = Math.min(
+      RHO_RECOVERY_TARGET,
+      stableRhoTarget != null ? stableRhoTarget * 0.9 : RHO_RECOVERY_TARGET,
+    );
+
+    const stableParams = enforceGuardLimits({
+      dutyCycle: baseDuty,
+      localBurstFrac: baseBurst,
+      sectorStrobing: baseConcurrent,
+      sectorsConcurrent: baseConcurrent,
+      modulationFreq_GHz: freqGHz,
+      rhoTarget: stableRhoTarget,
+    });
+
+    const edgeParams = enforceGuardLimits({
+      dutyCycle: Math.min(RHO_ACTIVE_LIMIT, baseDuty * 1.35),
+      localBurstFrac: Math.min(RHO_ACTIVE_LIMIT, Math.max(baseBurst, baseBurst * 2.5)),
+      sectorStrobing: Math.max(1, Math.round(total / 10)),
+      sectorsConcurrent: Math.max(1, Math.round(total / 10)),
+      modulationFreq_GHz: freqGHz,
+      rhoTarget: edgeRhoTarget,
+    });
+
+    const recoveryParams = enforceGuardLimits({
+      dutyCycle: clamp01(Math.min(baseDuty, RHO_RECOVERY_TARGET)),
+      localBurstFrac: clamp01(Math.min(baseBurst, baseBurst * 0.75)),
+      sectorStrobing: Math.max(1, Math.round(total / 32)),
+      sectorsConcurrent: Math.max(1, Math.round(total / 32)),
+      modulationFreq_GHz: freqGHz,
+      rhoTarget: recoveryRhoTarget,
+    });
+
     const segments: ScenarioSegment[] = [
       {
         key: "stable",
         label: "Stable (TS >> 1)",
         startMs: 0,
         endMs: chunk,
-        params: {
-          dutyCycle: baseDuty,
-          localBurstFrac: baseBurst,
-          sectorStrobing: baseConcurrent,
-          sectorsConcurrent: baseConcurrent,
-          modulationFreq_GHz: freqGHz,
-        },
+        params: stableParams,
       },
       {
         key: "edge",
         label: "Near edge (rho*cos(phi) -> 0.95)",
         startMs: chunk,
         endMs: chunk * 2,
-        params: {
-          dutyCycle: clamp01(baseDuty * 2),
-          localBurstFrac: clamp01(Math.max(baseBurst, baseBurst * 4)),
-          sectorStrobing: Math.max(1, Math.round(total / 8)),
-          sectorsConcurrent: Math.max(1, Math.round(total / 8)),
-          modulationFreq_GHz: freqGHz,
-        },
+        params: edgeParams,
       },
       {
         key: "recovery",
         label: "Recovery (1/32 fanout)",
         startMs: chunk * 2,
         endMs: duration,
-        params: {
-          dutyCycle: baseDuty,
-          localBurstFrac: baseBurst,
-          sectorStrobing: Math.max(1, Math.round(total / 32)),
-          sectorsConcurrent: Math.max(1, Math.round(total / 32)),
-          modulationFreq_GHz: freqGHz,
-        },
+        params: recoveryParams,
       },
     ];
     return segments;
@@ -1397,7 +1871,61 @@ export function useTimeLapseRecorder({
   const applySegment = useCallback(
     (segment: ScenarioSegment | null) => {
       if (!segment) return;
-      updatePipeline.mutate(segment.params as Partial<EnergyPipelineState>);
+      const pipelineState = pipelineRef.current;
+      const paramsClone: Record<string, unknown> = {
+        ...(segment.params ?? {}),
+      };
+
+      let pumpUpdate: Record<string, unknown> | null = null;
+      if (pipelineState) {
+        const { sweepLast, fallback } = resolveSweepContext(pipelineState);
+        const pipelineAny = pipelineState as any;
+        const pumpGHz = pickSweepNumber(
+          (segment.params as any)?.modulationFreq_GHz,
+          sweepLast?.Omega_GHz,
+          fallback?.Omega_GHz,
+          pipelineAny?.pump?.Omega_GHz,
+          pipelineState.modulationFreq_GHz,
+        );
+        if (pumpGHz != null && Number.isFinite(pumpGHz)) {
+          const detuneMHz = pickSweepNumber(
+            sweepLast?.detune_MHz,
+            fallback?.detune_MHz,
+            pipelineAny?.pump?.detune_MHz,
+            pipelineAny?.pump?.detuneMHz,
+            pipelineAny?.pump?.detune_Hz != null ? pipelineAny.pump.detune_Hz / 1e6 : null,
+          );
+          const correctedGHz =
+            detuneMHz != null && Number.isFinite(detuneMHz)
+              ? pumpGHz - detuneMHz / 1e3
+              : pumpGHz;
+          if (Number.isFinite(correctedGHz)) {
+            paramsClone.modulationFreq_GHz = correctedGHz;
+            const correctedHz = correctedGHz * 1e9;
+            const pumpExisting =
+              typeof pipelineAny?.pump === "object" && pipelineAny?.pump !== null
+                ? { ...pipelineAny.pump }
+                : {};
+            pumpUpdate = {
+              ...pumpExisting,
+              Omega_GHz: correctedGHz,
+              Omega_Hz: correctedHz,
+              freq_GHz: correctedGHz,
+              freq_Hz: correctedHz,
+              detune_MHz: 0,
+              detune_Hz: 0,
+              detuneMHz: 0,
+              detuneHz: 0,
+            };
+          }
+        }
+      }
+
+      const guarded = enforceGuardLimits(paramsClone as Partial<EnergyPipelineState>);
+      if (pumpUpdate) {
+        (guarded as any).pump = pumpUpdate;
+      }
+      updatePipeline.mutate(guarded as Partial<EnergyPipelineState>);
     },
     [updatePipeline]
   );
@@ -1418,9 +1946,9 @@ export function useTimeLapseRecorder({
   }, []);
 
   const collectFrame = useCallback(
-    async (elapsedMs: number, segment: ScenarioSegment | null): Promise<void> => {
+    async (elapsedMs: number, segment: ScenarioSegment | null): Promise<TLFrame | null> => {
       const canvasEl = canvasRef.current;
-      if (!canvasEl) return;
+      if (!canvasEl) return null;
       const pipelineState = pipelineRef.current;
       const metricsState = metricsRef.current;
       const loop = lightLoopRef.current;
@@ -1699,6 +2227,48 @@ export function useTimeLapseRecorder({
 
       const phaseRad = sweepNarrative.phase_deg != null ? (sweepNarrative.phase_deg * Math.PI) / 180 : null;
       const rhoCosPhi = phaseRad != null && rho != null ? rho * Math.cos(phaseRad) : null;
+      const rhoCosAbs = rhoCosPhi != null ? Math.abs(rhoCosPhi) : null;
+      const pumpRatioAbs = pumpRatio != null ? Math.abs(pumpRatio) : null;
+      const rhoAbs = rho != null ? Math.abs(rho) : null;
+      const guardApproaching =
+        !guardRecoveryScheduledRef.current &&
+        (
+          (pumpRatioAbs != null && pumpRatioAbs >= RHO_ACTIVE_LIMIT) ||
+          (rhoAbs != null && rhoAbs >= RHO_ACTIVE_LIMIT) ||
+          (rhoCosAbs != null && rhoCosAbs >= RHO_ACTIVE_LIMIT) ||
+          (kappaEffMHz != null && kappaEffMHz <= 0)
+        );
+
+      if (guardApproaching) {
+        guardRecoveryScheduledRef.current = true;
+        const recoveryParams = buildRecoveryParams(pipelineState, baselineRef.current);
+        const recoverySegment: ScenarioSegment = {
+          key: "recovery",
+          label: "Recovery (guard)",
+          startMs: elapsedMs,
+          endMs: durationMs,
+          params: recoveryParams,
+        };
+        const nextSegments: ScenarioSegment[] = [];
+        for (const segItem of segmentsRef.current) {
+          if (segItem.startMs >= elapsedMs) {
+            continue;
+          }
+          if (segItem.endMs > elapsedMs) {
+            nextSegments.push({
+              ...segItem,
+              endMs: elapsedMs,
+            });
+          } else {
+            nextSegments.push(segItem);
+          }
+        }
+        nextSegments.push(recoverySegment);
+        segmentsRef.current = nextSegments;
+        segmentIndexRef.current = nextSegments.length - 1;
+        applySegment(recoverySegment);
+      }
+
       const equationLines: string[] = [
         `rho*cos(phi) = ${rhoCosPhi != null ? rhoCosPhi.toFixed(3) : STRING_FALLBACK}`,
         `TS = tau_LC / T_mod = ${
@@ -1774,8 +2344,22 @@ export function useTimeLapseRecorder({
         sweepLines,
         deltaLines,
         metricsLeft,
-        metricsRight,
-        equationLines,
+      metricsRight,
+      equationLines,
+    };
+
+      hudPayloadRef.current = {
+        t: frame.t,
+        TS,
+        tauLC_ms,
+        burst_ms,
+        dwell_ms,
+        rho,
+        QL: qL,
+        deff: dEff,
+        sectors: { live: liveSectors, total: totalSectors },
+        gr: { burstVsTau, tsOk, qiOk },
+        shellOffset: shellOffset ?? null,
       };
 
       drawOverlayHud(
@@ -1788,22 +2372,27 @@ export function useTimeLapseRecorder({
         equationLines,
         overlayHighlightRef.current
       );
-      compositeFrameForRecording();
 
       framesRef.current.push(frame);
-      setCurrentFrame(frame);
+      compositeFrameForRecording();
+      return frame;
     },
-    [compositeFrameForRecording, drawOverlayHud]
+    [applySegment, compositeFrameForRecording, drawOverlayHud, durationMs]
   );
 
   const finishRecording = useCallback(
     async () => {
       if (finishingRef.current) return;
       finishingRef.current = true;
+      const latestFrame =
+        framesRef.current.length > 0 ? framesRef.current[framesRef.current.length - 1] : null;
+      flushUiUpdate(performance.now(), { progress: 1, frame: latestFrame }, true);
       setStatus("processing");
       await revertBaseline();
 
       try {
+        const startedAtActual = recordingStartedAtRef.current ?? startTimeRef.current;
+        const meterSnapshot = frameMeterRef.current?.snapshot();
         const videoBlob = await stopRecorder();
         if (!videoBlob || videoBlob.size === 0) {
           throw new Error("No video frames captured - check browser recording support.");
@@ -1824,11 +2413,21 @@ export function useTimeLapseRecorder({
         const metricsUrl = URL.createObjectURL(metricsBlob);
 
         const endedAt = performance.now();
-        const startedAt = startTimeRef.current;
-        const duration = endedAt - startedAt;
+        const duration = endedAt - startedAtActual;
+        const meter = meterSnapshot ?? {
+          pushed: frames.length,
+          dropped: 0,
+          p95JitterMs: 0,
+        };
+        const durationSeconds = Math.max(duration / 1000, Number.EPSILON);
+        const achievedFpsRaw = meter.pushed / durationSeconds;
+        const achievedFps = Number.isFinite(achievedFpsRaw) ? Number(achievedFpsRaw.toFixed(2)) : 0;
+        const jitter = Number.isFinite(meter.p95JitterMs)
+          ? Number(meter.p95JitterMs.toFixed(2))
+          : 0;
 
         const summary: TimeLapseResult = {
-          startedAt,
+          startedAt: startedAtActual,
           endedAt,
           durationMs: duration,
           fps,
@@ -1839,6 +2438,13 @@ export function useTimeLapseRecorder({
           videoFileName,
           metricsBlob,
           metricsUrl,
+          metrics: {
+            targetFps: fps,
+            achievedFps,
+            framesPushed: meter.pushed,
+            framesDroppedEstimate: meter.dropped,
+            p95FrameJitterMs: jitter,
+          },
         };
         setResult(summary);
         setStatus("complete");
@@ -1848,7 +2454,7 @@ export function useTimeLapseRecorder({
         setStatus("error");
       }
     },
-    [fps, revertBaseline, stopRecorder]
+    [flushUiUpdate, fps, revertBaseline, stopRecorder]
   );
 
   const tick = useCallback(
@@ -1856,7 +2462,6 @@ export function useTimeLapseRecorder({
       const start = startTimeRef.current;
       const elapsed = timestamp - start;
       const fraction = clamp01(elapsed / durationMs);
-      setProgress(fraction);
 
       const active = activeSegmentFor(elapsed);
       if (active && active.index !== segmentIndexRef.current) {
@@ -1864,7 +2469,8 @@ export function useTimeLapseRecorder({
         applySegment(active.segment);
       }
 
-      await collectFrame(elapsed, active?.segment ?? null);
+      const frame = await collectFrame(elapsed, active?.segment ?? null);
+      flushUiUpdate(timestamp, { progress: fraction, frame: frame ?? null });
 
       if (elapsed < durationMs) {
         animationRef.current = requestAnimationFrame(tick);
@@ -1873,7 +2479,7 @@ export function useTimeLapseRecorder({
         finishRecording();
       }
     },
-    [activeSegmentFor, applySegment, collectFrame, durationMs, finishRecording]
+    [activeSegmentFor, applySegment, collectFrame, durationMs, finishRecording, flushUiUpdate]
   );
 
   const start = useCallback(async () => {
@@ -1907,6 +2513,7 @@ export function useTimeLapseRecorder({
       }
 
       framesRef.current = [];
+      guardRecoveryScheduledRef.current = false;
       segmentsRef.current = prepareSegments(pipelineState, durationMs);
       segmentIndexRef.current = -1;
       finishingRef.current = false;
@@ -1921,9 +2528,12 @@ export function useTimeLapseRecorder({
         await updatePipeline.mutateAsync(segmentsRef.current[0].params);
       }
 
-      startRecorder();
+      await startRecorder();
+      pendingUiRef.current = null;
+      lastUiUpdateRef.current = 0;
       setStatus("recording");
-      startTimeRef.current = performance.now();
+      const startedAt = recordingStartedAtRef.current ?? performance.now();
+      startTimeRef.current = startedAt;
       animationRef.current = requestAnimationFrame(tick);
     } catch (err) {
       console.error("[TimeLapse] Failed to start recording", err);

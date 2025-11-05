@@ -1,0 +1,46 @@
+{
+  "vanden-broeck-1999": [
+    {
+      "file": "client\\src\\components\\AlcubierrePanel.tsx",
+      "line": 17,
+      "context": "/** * TheoryRefs: * - vanden-broeck-1999: UI exposes gamma_VdB with provenance */ interface AlcubierrePanelProps { className?: string; onCanvasReady?: ( canvas: HTMLCanvasElemen"
+    },
+    {
+      "file": "client\\src\\components\\HelixCasimirAmplifier.tsx",
+      "line": 10,
+      "context": "/** * TheoryRefs: * - vanden-broeck-1999: amplifier chain multiplicative gamma_VdB */ Activity, Zap, Sigma, Atom, Gauge, RadioReceiver, Thermometer, CircuitBoard, S"
+    },
+    {
+      "file": "modules\\dynamic\\stress-energy-equations.ts",
+      "line": 1,
+      "context": "/** * TheoryRefs: * - vanden-broeck-1999: gamma_VdB feeds theta, T00 amplification product */ /** * Stress–Energy (pipeline-true) for Van den Broeck–Natário flow * No magic constants; re"
+    },
+    {
+      "file": "modules\\warp\\warp-module.ts",
+      "line": 1,
+      "context": "/** * TheoryRefs: * - vanden-broeck-1999: input normalization + clamps for gamma_VdB */ /** * Warp Bubble Casimir Module * Integrates Natário zero-expansion warp bubble calculations with"
+    }
+  ],
+  "ford-roman-qi-1995": [
+    {
+      "file": "client\\src\\components\\MarginHunterPanel.tsx",
+      "line": 5,
+      "context": "/** * TheoryRefs: * - ford-roman-qi-1995: panel displays live FR duty vs QI ceiling */ /** * MarginHunterPanel — SHOW-only background optimizer * --------------------------------------"
+    },
+    {
+      "file": "client\\src\\hooks\\use-energy-pipeline.ts",
+      "line": 19,
+      "context": "/** * TheoryRefs: * - ford-roman-qi-1995: FR duty clamp + scheduler spacing */ // Greens function types export type GreensKind = \"poisson\" | \"helmholtz\"; export type GreensSource = \"server\" |"
+    },
+    {
+      "file": "server\\energy-pipeline.ts",
+      "line": 387,
+      "context": "/** * TheoryRefs: * - ford-roman-qi-1995: derives dutyEffectiveFR ceiling (tau/K) */ const TOTAL_SECTORS = 400; const BURST_DUTY_LOCAL = 0.01; // 10 µs / 1 ms const Q_BURST = 1"
+    },
+    {
+      "file": "modules\\dynamic\\dynamic-casimir.ts",
+      "line": 1,
+      "context": "/** * Dynamic Casimir Effects Module * Pipeline-true implementation with Natário metric support */ /** * TheoryRefs: * - ford-roman-qi-1995: negative-energy burst windowing respects QI"
+    }
+  ]
+}

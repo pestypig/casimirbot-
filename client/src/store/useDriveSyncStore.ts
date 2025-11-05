@@ -67,6 +67,10 @@ const clampNudge = (value: number) => {
 const DEFAULT_SPLIT_FRAC = 0.6; // Mirrors server DEFAULT_NEGATIVE_FRACTION = 0.4
 const INTENT_DEADZONE = 0.18;
 const INTENT_EPS = 1e-4;
+const PHASE_EPS = 1e-3;
+const MAX_PHASE_PUSH_HZ = 30;
+const PHASE_PUSH_INTERVAL_MS = 1000 / MAX_PHASE_PUSH_HZ;
+let lastPhasePushMs = 0;
 
 const toDriveSplitPayload = (state: DriveSyncState): DriveSplitState => ({
   mode: state.splitEnabled ? "zeroBeta" : "single",
@@ -96,12 +100,24 @@ const creator: StateCreator<DriveSyncState> = (set, get) => ({
   locks: { followMode: true },
   ridgePresets: [],
 
-  setPhase: (p: number) => set((prev) => {
-    const phase01 = wrap01(p);
-    const next = { ...prev, phase01 };
-    publishDriveSplit(toDriveSplitPayload(next));
-    return { phase01 };
-  }),
+  setPhase: (p: number) =>
+    set((prev) => {
+      const phase01 = wrap01(p);
+      if (Math.abs(phase01 - prev.phase01) < PHASE_EPS) {
+        return prev;
+      }
+      const nowMs =
+        typeof performance !== "undefined" && typeof performance.now === "function"
+          ? performance.now()
+          : Date.now();
+      const shouldPublish = nowMs - lastPhasePushMs >= PHASE_PUSH_INTERVAL_MS;
+      const nextState = { ...prev, phase01 };
+      if (shouldPublish) {
+        lastPhasePushMs = nowMs;
+        publishDriveSplit(toDriveSplitPayload(nextState));
+      }
+      return { phase01 };
+    }),
   setPhaseMode: (m: PhaseMode) => set((prev) => {
     const next = { ...prev, phaseMode: m };
     publishDriveSplit(toDriveSplitPayload(next));

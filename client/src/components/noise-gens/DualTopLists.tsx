@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { fetchMoodPresets, fetchTopGenerations, fetchTopOriginals } from "@/lib/api/noiseGens";
-import type { Generation, MoodPreset, Original } from "@/types/noise-gens";
+import type { Generation, MoodPreset, Original, TempoMeta } from "@/types/noise-gens";
 import { cn } from "@/lib/utils";
 
 type DualTopListsProps = {
@@ -22,6 +22,7 @@ type DualTopListsProps = {
   onOriginalSelected: (original: Original) => void;
   onGenerationsPresenceChange?: (hasGenerations: boolean) => void;
   onMoodPresetsLoaded?: (presets: MoodPreset[]) => void;
+  sessionTempo?: TempoMeta | null;
 };
 
 type RankedOriginal = Original & { rank: number };
@@ -33,6 +34,31 @@ type ConnectorPath = {
 };
 
 const SEARCH_DEBOUNCE_MS = 250;
+const TEMPO_BOOST_WEIGHT = 0.15;
+
+function tempoBadge(tempo?: TempoMeta) {
+  if (!tempo?.bpm) return null;
+  const bpmLabel = Math.round(tempo.bpm);
+  const timeSig = tempo.timeSig || "4/4";
+  return `${bpmLabel} BPM · ${timeSig}`;
+}
+
+function matchScoreToBoost(score: number) {
+  if (!Number.isFinite(score)) return 0;
+  if (score >= 4) return 1;
+  if (score >= 3) return 0.6;
+  if (score >= 2) return 0.3;
+  return 0;
+}
+
+function tempoBoost(itemBpm?: number, sessionBpm?: number) {
+  if (!itemBpm || !sessionBpm) return 0;
+  const diff = Math.abs(itemBpm - sessionBpm);
+  if (diff <= 2) return 1;
+  if (diff >= 12) return 0;
+  const scaled = 1 - (diff - 2) / 10;
+  return Math.max(0, Math.min(1, scaled));
+}
 
 function useDebouncedValue<T>(value: T, delay: number) {
   const [debounced, setDebounced] = useState(value);
@@ -55,31 +81,64 @@ function scoreMatch(haystack: string, needle: string) {
   return -Infinity;
 }
 
+type RankingOptions<T> = {
+  sessionTempoBpm?: number;
+  getTempoBpm?: (item: T) => number | undefined;
+  tempoWeight?: number;
+};
+
 function buildRankedList<T extends { id: string; listens: number }>(
   items: T[],
   search: string,
   accessor: (item: T) => string[],
+  options?: RankingOptions<T>,
 ): Array<T & { rank: number }> {
   if (!items.length) return [];
   const rankedByListens = [...items].sort((a, b) => b.listens - a.listens);
-  const rankLookup = new Map(rankedByListens.map((item, index) => [item.id, index + 1]));
-  if (!search.trim()) {
-    return rankedByListens.map((item) => ({ ...item, rank: rankLookup.get(item.id) ?? 0 }));
-  }
-  let bestMatch: T | null = null;
-  let bestScore = -Infinity;
-  for (const item of rankedByListens) {
-    const fields = accessor(item);
-    const itemScore = Math.max(...fields.map((field) => scoreMatch(field, search)));
-    if (itemScore > bestScore) {
-      bestScore = itemScore;
-      bestMatch = item;
-    }
-  }
-  const ordered = bestMatch
-    ? [bestMatch, ...rankedByListens.filter((item) => item.id !== bestMatch?.id)]
-    : rankedByListens;
-  return ordered.map((item) => ({ ...item, rank: rankLookup.get(item.id) ?? 0 }));
+  const rankLookup = new Map<string, number>(
+    rankedByListens.map((item, index) => [item.id, index + 1]),
+  );
+  const trimmedSearch = search.trim();
+  const hasSearch = trimmedSearch.length > 0;
+  const tempoWeight = options?.tempoWeight ?? TEMPO_BOOST_WEIGHT;
+  const sessionTempoBpm = options?.sessionTempoBpm;
+  const minListens = rankedByListens[rankedByListens.length - 1]?.listens ?? 0;
+  const maxListens = rankedByListens[0]?.listens ?? 0;
+  const listensRange = Math.max(1, maxListens - minListens);
+
+  const scored = rankedByListens.map((item) => {
+    const listensScore =
+      listensRange === 0 ? 1 : (item.listens - minListens) / listensRange;
+    const textScore = hasSearch
+      ? matchScoreToBoost(
+          accessor(item).reduce((best, field) => {
+            const score = scoreMatch(field, trimmedSearch);
+            return score > best ? score : best;
+          }, -Infinity),
+        )
+      : 0;
+    const tempoScore =
+      options?.getTempoBpm && sessionTempoBpm
+        ? tempoBoost(options.getTempoBpm(item), sessionTempoBpm)
+        : 0;
+    const score = listensScore + textScore + tempoWeight * tempoScore;
+    return {
+      item,
+      rank: rankLookup.get(item.id) ?? 0,
+      score,
+      textScore,
+      tempoScore,
+    };
+  });
+
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (b.textScore !== a.textScore) return b.textScore - a.textScore;
+    if (b.tempoScore !== a.tempoScore) return b.tempoScore - a.tempoScore;
+    return a.rank - b.rank;
+  });
+
+  return scored.map(({ item, rank }) => ({ ...item, rank }));
 }
 
 function usePrefersReducedMotion() {
@@ -117,36 +176,41 @@ type OriginalRowProps = {
   selected: boolean;
   onSelect: (value: Original) => void;
   setRef: (node: HTMLDivElement | null) => void;
+  sessionTempo?: TempoMeta | null;
 };
 
-const OriginalRow = memo(({ original, selected, onSelect, setRef }: OriginalRowProps) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `original-${original.id}`,
-    data: { type: "original", original },
-  });
-  const { role: _dragRole, tabIndex: _dragTabIndex, ...draggableAttributes } = attributes;
-  const composedRef = useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      setRef(node);
-    },
-    [setNodeRef, setRef],
-  );
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        onSelect(original);
-      }
-    },
-    [onSelect, original],
-  );
-  return (
-    <div
-      ref={composedRef}
-      {...draggableAttributes}
-      {...listeners}
-      role="option"
+const OriginalRow = memo(
+  ({ original, selected, onSelect, setRef, sessionTempo }: OriginalRowProps) => {
+    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+      id: `original-${original.id}`,
+      data: { type: "original", original },
+    });
+    const { role: _dragRole, tabIndex: _dragTabIndex, ...draggableAttributes } = attributes;
+    const composedRef = useCallback(
+      (node: HTMLDivElement | null) => {
+        setNodeRef(node);
+        setRef(node);
+      },
+      [setNodeRef, setRef],
+    );
+    const handleKeyDown = useCallback(
+      (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(original);
+        }
+      },
+      [onSelect, original],
+    );
+    const badge = tempoBadge(original.tempo);
+    const tempoMatch = tempoBoost(original.tempo?.bpm, sessionTempo?.bpm);
+
+    return (
+      <div
+        ref={composedRef}
+        {...draggableAttributes}
+        {...listeners}
+        role="option"
       aria-selected={selected}
       tabIndex={0}
       onClick={() => onSelect(original)}
@@ -163,18 +227,30 @@ const OriginalRow = memo(({ original, selected, onSelect, setRef }: OriginalRowP
           ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
           : undefined,
       }}
-    >
-      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-        #{original.rank}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold">{original.title}</div>
-        <div className="text-xs text-muted-foreground">{original.artist}</div>
-      </div>
-      <div className="text-xs font-medium text-muted-foreground tabular-nums">
-        {original.listens.toLocaleString()} plays
-      </div>
-      <Button
+      >
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+          #{original.rank}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold">{original.title}</div>
+          <div className="text-xs text-muted-foreground">{original.artist}</div>
+          {badge ? (
+            <div className="mt-1">
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full bg-slate-800/60 px-2 py-0.5 text-[11px] text-slate-300",
+                  tempoMatch >= 0.85 && "bg-primary/20 text-primary-foreground",
+                )}
+              >
+                {badge}
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <div className="text-xs font-medium text-muted-foreground tabular-nums">
+          {original.listens.toLocaleString()} plays
+        </div>
+        <Button
         type="button"
         variant="ghost"
         size="sm"
@@ -187,8 +263,9 @@ const OriginalRow = memo(({ original, selected, onSelect, setRef }: OriginalRowP
         Use in Cover Creator
       </Button>
     </div>
-  );
-});
+    );
+  },
+);
 OriginalRow.displayName = "OriginalRow";
 
 type GenerationRowProps = {
@@ -220,6 +297,7 @@ export function DualTopLists({
   onOriginalSelected,
   onGenerationsPresenceChange,
   onMoodPresetsLoaded,
+  sessionTempo,
 }: DualTopListsProps) {
   const [searchOriginals, setSearchOriginals] = useState("");
   const [searchGenerations, setSearchGenerations] = useState("");
@@ -289,8 +367,12 @@ export function DualTopLists({
       originalsData ?? [],
       debouncedOriginals,
       (item) => [item.title, item.artist],
+      {
+        getTempoBpm: (item) => item.tempo?.bpm,
+        sessionTempoBpm: sessionTempo?.bpm,
+      },
     );
-  }, [originalsData, debouncedOriginals]);
+  }, [originalsData, debouncedOriginals, sessionTempo?.bpm]);
 
   const generations = useMemo<RankedGeneration[]>(() => {
     return buildRankedList(
@@ -419,13 +501,14 @@ export function DualTopLists({
                 </div>
               ) : originals.length ? (
                 originals.map((original) => (
-                  <OriginalRow
-                    key={original.id}
-                    original={original}
-                    selected={selectedOriginalId === original.id}
-                    onSelect={onOriginalSelected}
-                    setRef={setOriginalRef(original.id)}
-                  />
+                <OriginalRow
+                  key={original.id}
+                  original={original}
+                  selected={selectedOriginalId === original.id}
+                  onSelect={onOriginalSelected}
+                  setRef={setOriginalRef(original.id)}
+                  sessionTempo={sessionTempo}
+                />
                 ))
               ) : (
                 <div className="rounded-2xl bg-muted/40 p-4 text-sm text-muted-foreground">

@@ -16,6 +16,11 @@ import type {
   PhaseScheduleTelemetry,
 } from "@shared/schema";
 
+/**
+ * TheoryRefs:
+ *  - ford-roman-qi-1995: FR duty clamp + scheduler spacing
+ */
+
 // Greens function types
 export type GreensKind = "poisson" | "helmholtz";
 export type GreensSource = "server" | "client" | "none";
@@ -203,6 +208,7 @@ const ACTIVE_SLEW_HARDWARE_GUARDS = {
   modDepthLimit: 2,
   phaseLimit: 6,
   pumpLimit: 2,
+  pumpFreqLimit_GHz: 120,
   delayMs: 8,
 } as const;
 const TWO_PHASE_DEFAULT_GAPS = [20, 100, 170, 250, 320, 400] as const;
@@ -392,6 +398,14 @@ const guardActiveSlewPayload = (
     return Math.max(1, Math.min(Math.floor(numeric), guard, fallback));
   };
 
+  const guardPumpFreqLimit = (value: unknown, guard: number) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      return guard;
+    }
+    return Math.max(0.01, Math.min(numeric, guard));
+  };
+
   const baseHardwareProfile = {
     ...(dynamicConfig?.sweep?.hardwareProfile ?? {}),
     ...(baseSweep.hardwareProfile ?? {}),
@@ -495,6 +509,10 @@ const guardActiveSlewPayload = (
       baseHardwareProfile.pumpLimit,
       ACTIVE_SLEW_HARDWARE_GUARDS.pumpLimit,
       pumpCountForHardware,
+    ),
+    pumpFreqLimit_GHz: guardPumpFreqLimit(
+      baseHardwareProfile.pumpFreqLimit_GHz,
+      ACTIVE_SLEW_HARDWARE_GUARDS.pumpFreqLimit_GHz,
     ),
     delayMs: Math.max(
       Number.isFinite(Number(baseHardwareProfile.delayMs))

@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Noisegen 4-bar Sample",
+  "type": "object",
+  "required": [
+    "version",
+    "song_id",
+    "window_id",
+    "bpm",
+    "time_sig",
+    "start_bar",
+    "end_bar",
+    "start_ms",
+    "end_ms",
+    "features",
+    "teacher_params"
+  ],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "song_id": { "type": "string" },
+    "window_id": { "type": "string" },
+    "bpm": { "type": "number" },
+    "time_sig": { "type": "string", "pattern": "^[0-9]+/[0-9]+$" },
+    "offset_ms": { "type": "number" },
+    "start_bar": { "type": "integer", "minimum": 1 },
+    "end_bar": { "type": "integer", "minimum": 1 },
+    "start_ms": { "type": "number" },
+    "end_ms": { "type": "number" },
+    "key": { "type": "string" },
+    "idi": { "type": "number", "minimum": 0, "maximum": 1 },
+    "idi_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "immersion": {
+      "type": "object",
+      "properties": {
+        "timing": { "type": "number" },
+        "am": { "type": "number" },
+        "harm": { "type": "number" },
+        "cross": { "type": "number" },
+        "texture": { "type": "number" },
+        "spaceDyn": { "type": "number" },
+        "resolve4_low": { "type": "number" },
+        "resolve4_high": { "type": "number" },
+        "resolve8_low": { "type": "number" },
+        "resolve8_high": { "type": "number" },
+        "bassline_diversity": { "type": "number" },
+        "melody_division_rate": { "type": "number" },
+        "dyadness": { "type": "number" },
+        "chordness": { "type": "number" }
+      },
+      "additionalProperties": false
+    },
+    "features": {
+      "type": "object",
+      "required": ["bark", "loudness", "onset_flux"],
+      "properties": {
+        "bark": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "centroid": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "rolloff": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "loudness": {
+          "type": "array",
+          "items": { "type": "number" }
+        },
+        "onset_flux": {
+          "type": "array",
+          "items": { "type": "number" }
+        }
+      }
+    },
+    "helix": {
+      "type": "object",
+      "properties": {
+        "rc": { "type": "number" },
+        "T": { "type": "number" },
+        "peaks": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      }
+    },
+    "kb": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "similarity": { "type": "number" }
+      }
+    },
+    "teacher_params": {
+      "type": "object",
+      "required": ["eq", "reverb", "chorus", "tape", "comp", "limiter"],
+      "properties": {
+        "eq": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "f": { "type": "number" },
+              "q": { "type": "number" },
+              "gain": { "type": "number" }
+            }
+          }
+        },
+        "reverb": {
+          "type": "object",
+          "properties": {
+            "ir": { "type": "string" },
+            "mix": { "type": "number" },
+            "predelay_ms": { "type": "number" }
+          }
+        },
+        "chorus": {
+          "type": "object",
+          "properties": {
+            "rate_hz": { "type": "number" },
+            "depth": { "type": "number" },
+            "mix": { "type": "number" }
+          }
+        },
+        "tape": {
+          "type": "object",
+          "properties": {
+            "wow": { "type": "number" },
+            "flutter": { "type": "number" },
+            "sat": { "type": "number" }
+          }
+        },
+        "comp": {
+          "type": "object",
+          "properties": {
+            "thresh_db": { "type": "number" },
+            "ratio": { "type": "number" },
+            "attack_ms": { "type": "number" },
+            "release_ms": { "type": "number" }
+          }
+        },
+        "limiter": {
+          "type": "object",
+          "properties": {
+            "ceiling_db": { "type": "number" }
+          }
+        }
+      }
+    }
+  }
+}

@@ -58,6 +58,43 @@ const explainSchema = z
   })
   .strict();
 
+const tempoMetaSchema = z
+  .object({
+    bpm: z.number().min(40).max(250),
+    timeSig: z.string().regex(/^\d+\/\d+$/),
+    offsetMs: z.number().min(-2000).max(2000),
+    barsInLoop: z.number().int().min(1).max(256).optional(),
+  })
+  .strict();
+
+const setTempoSchema = z
+  .object({
+    op: z.literal("set_tempo"),
+    tempo: tempoMetaSchema,
+  })
+  .strict();
+
+const setBarWindowSchema = z
+  .object({
+    op: z.literal("set_bar_window"),
+    startBar: z.number().int().min(1),
+    endBar: z.number().int().min(2),
+  })
+  .strict();
+
+const setKbTextureSchema = z
+  .object({
+    op: z.literal("set_kb_texture"),
+    kbId: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const renderCoverSchema = z
+  .object({
+    op: z.literal("render_cover"),
+  })
+  .strict();
+
 export const helixPlanActionSchema = z.discriminatedUnion("op", [
   setPeaksSchema,
   setRcSchema,
@@ -65,6 +102,10 @@ export const helixPlanActionSchema = z.discriminatedUnion("op", [
   moveWarpBubbleSchema,
   sweepSchema,
   explainSchema,
+  setTempoSchema,
+  setBarWindowSchema,
+  setKbTextureSchema,
+  renderCoverSchema,
 ]);
 
 export type HelixPlanAction = z.infer<typeof helixPlanActionSchema>;
@@ -123,6 +164,10 @@ export const helixPlanJsonSchema = {
         { $ref: "#/$defs/MoveWarpBubble" },
         { $ref: "#/$defs/Sweep" },
         { $ref: "#/$defs/Explain" },
+        { $ref: "#/$defs/SetTempo" },
+        { $ref: "#/$defs/SetBarWindow" },
+        { $ref: "#/$defs/SetKBTexture" },
+        { $ref: "#/$defs/RenderCover" },
       ],
     },
     Peak: {
@@ -201,6 +246,65 @@ export const helixPlanJsonSchema = {
         op: { const: "explain" },
         why: { type: "string", minLength: 3 },
       },
+    },
+    TempoMeta: {
+      type: "object",
+      required: ["bpm", "timeSig", "offsetMs"],
+      properties: {
+        bpm: { type: "number", minimum: 40, maximum: 250 },
+        timeSig: { type: "string", pattern: "^\\d+/\\d+$" },
+        offsetMs: { type: "number", minimum: -2000, maximum: 2000 },
+        barsInLoop: { type: "integer", minimum: 1, maximum: 256 },
+      },
+      additionalProperties: false,
+    },
+    SetTempo: {
+      type: "object",
+      required: ["op", "tempo"],
+      properties: {
+        op: { const: "set_tempo" },
+        tempo: { $ref: "#/$defs/TempoMeta" },
+      },
+      additionalProperties: false,
+    },
+    BarWindow: {
+      type: "object",
+      required: ["startBar", "endBar"],
+      properties: {
+        startBar: { type: "integer", minimum: 1 },
+        endBar: { type: "integer", minimum: 1 },
+      },
+      additionalProperties: false,
+    },
+    SetBarWindow: {
+      allOf: [
+        { $ref: "#/$defs/BarWindow" },
+        {
+          type: "object",
+          required: ["op"],
+          properties: {
+            op: { const: "set_bar_window" },
+          },
+          additionalProperties: false,
+        },
+      ],
+    },
+    SetKBTexture: {
+      type: "object",
+      required: ["op", "kbId"],
+      properties: {
+        op: { const: "set_kb_texture" },
+        kbId: { type: ["string", "null"] },
+      },
+      additionalProperties: false,
+    },
+    RenderCover: {
+      type: "object",
+      required: ["op"],
+      properties: {
+        op: { const: "render_cover" },
+      },
+      additionalProperties: false,
     },
   },
 } as const satisfies Record<string, unknown>;

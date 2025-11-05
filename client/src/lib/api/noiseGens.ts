@@ -5,6 +5,8 @@ import type {
   Original,
   JobStatus,
   HelixPacket,
+  CoverJobRequest,
+  CoverJob,
 } from "@/types/noise-gens";
 
 const BASE = "/api/noise-gens";
@@ -68,6 +70,14 @@ export async function requestGeneration(payload: {
   return parseJson<{ jobId: string }>(res);
 }
 
+export async function createCoverJob(
+  payload: CoverJobRequest,
+  signal?: AbortSignal,
+): Promise<{ id: string }> {
+  const res = await apiRequest("POST", `${BASE}/jobs`, payload, signal);
+  return parseJson<{ id: string }>(res);
+}
+
 export async function uploadOriginal(
   formData: FormData,
   signal?: AbortSignal,
@@ -100,4 +110,17 @@ export async function fetchJobStatus(
     signal,
   );
   return parseJson<{ status: JobStatus; detail?: string }>(res);
+}
+
+export async function fetchCoverJob(
+  jobId: string,
+  signal?: AbortSignal,
+): Promise<CoverJob> {
+  const res = await apiRequest(
+    "GET",
+    endpoints.jobStatus(jobId),
+    undefined,
+    signal,
+  );
+  return parseJson<CoverJob>(res);
 }

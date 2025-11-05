@@ -48,6 +48,8 @@ export function usePhaseBridge(opts?: { publishHz?: number; damp?: number }) {
   const derived = qc.getQueryData(["helix:pipeline:derived"]) as Record<string, unknown> | undefined;
   const pipelineAny = pipeline as Record<string, unknown> | undefined;
   const metricsAny = metrics as Record<string, unknown> | undefined;
+  const metricsLightCrossing = metricsAny?.lightCrossing as Record<string, unknown> | undefined;
+  const pipelineLightCrossing = pipelineAny?.lightCrossing as Record<string, unknown> | undefined;
 
   const sectorsTotalRaw = firstFinite(
     derived?.sectorsTotal,
@@ -115,6 +117,17 @@ export function usePhaseBridge(opts?: { publishHz?: number; damp?: number }) {
   noteNonFinite("pipeline.currentSector", pipelineAny?.currentSector);
   noteNonFinite("pipeline.sectorPeriod_ms", pipelineAny?.sectorPeriod_ms);
   noteNonFinite("pipeline.strobeHz", pipelineAny?.strobeHz);
+  noteNonFinite("derived.tauLC_ms", derived?.tauLC_ms);
+  noteNonFinite("metrics.lightCrossing.tauLC_ms", metricsLightCrossing?.tauLC_ms);
+  noteNonFinite("pipeline.lightCrossing.tauLC_ms", pipelineLightCrossing?.tauLC_ms);
+  noteNonFinite("pipeline.tauLC_ms", pipelineAny?.tauLC_ms);
+
+  const tauLC_ms = firstFinite(
+    derived?.tauLC_ms,
+    metricsLightCrossing?.tauLC_ms,
+    pipelineLightCrossing?.tauLC_ms,
+    pipelineAny?.tauLC_ms,
+  );
 
   const pumpPhaseServerValue = firstFinite(pipelineAny?.pumpPhase_deg, metricsAny?.pumpPhase_deg);
   const driveSyncState = useDriveSyncStore.getState();
@@ -328,12 +341,22 @@ export function usePhaseBridge(opts?: { publishHz?: number; damp?: number }) {
         Tsec_ms: sectorPeriodMs,
         at: nowTs,
         pumpPhase_deg,
+        tauLC_ms,
       };
       publish("warp:phase:stable", payload);
       publish("warp:phase", payload);
       publishRef.current = { t: nowTs, p: phase01Publish };
     }
-  }, [phase01Publish, phaseSource, sectorsTotal, sectorPeriodMs, publishHz, phaseFallback, pumpPhase_deg]);
+  }, [
+    phase01Publish,
+    phaseSource,
+    sectorsTotal,
+    sectorPeriodMs,
+    publishHz,
+    phaseFallback,
+    pumpPhase_deg,
+    tauLC_ms,
+  ]);
 
   return phase01;
 }

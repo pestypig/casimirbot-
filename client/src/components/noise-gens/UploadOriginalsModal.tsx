@@ -58,6 +58,10 @@ export function UploadOriginalsModal({
   const [instrumentalFile, setInstrumentalFile] = useState<File | null>(null);
   const [vocalFile, setVocalFile] = useState<File | null>(null);
   const [offsetMs, setOffsetMs] = useState(0);
+  const [bpm, setBpm] = useState<number | "">("");
+  const [timeSig, setTimeSig] = useState<"4/4" | "3/4" | "6/8">("4/4");
+  const [barsInLoop, setBarsInLoop] = useState<number>(8);
+  const [quantized, setQuantized] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -68,6 +72,10 @@ export function UploadOriginalsModal({
       setInstrumentalFile(null);
       setVocalFile(null);
       setOffsetMs(0);
+      setBpm("");
+      setTimeSig("4/4");
+      setBarsInLoop(8);
+      setQuantized(true);
       setIsSubmitting(false);
     }
   }, [open]);
@@ -89,6 +97,15 @@ export function UploadOriginalsModal({
     title.value.trim().length > 0 &&
     creator.value.trim().length > 0;
 
+  const tempoPreview = useMemo(() => {
+    if (typeof bpm !== "number" || Number.isNaN(bpm)) return null;
+    return {
+      bpm,
+      timeSig,
+      quantized,
+    };
+  }, [bpm, timeSig, quantized]);
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     if (!isAuthenticated) {
@@ -106,6 +123,16 @@ export function UploadOriginalsModal({
       payload.append("offsetMs", String(offsetMs));
       if (notes.trim()) {
         payload.append("notes", notes.trim());
+      }
+      if (typeof bpm === "number" && Number.isFinite(bpm)) {
+        const tempo = {
+          bpm,
+          timeSig,
+          offsetMs,
+          barsInLoop,
+          quantized,
+        };
+        payload.append("tempo", JSON.stringify(tempo));
       }
       const result = await uploadOriginal(payload);
       toast({
@@ -213,6 +240,79 @@ export function UploadOriginalsModal({
           </div>
 
           <div>
+            <Label>Tempo (optional)</Label>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                BPM
+                <Input
+                  type="number"
+                  min={40}
+                  max={250}
+                  inputMode="numeric"
+                  value={typeof bpm === "number" ? String(bpm) : ""}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (raw.trim() === "") {
+                      setBpm("");
+                      return;
+                    }
+                    const value = Number(raw);
+                    if (Number.isNaN(value)) {
+                      setBpm("");
+                      return;
+                    }
+                    const clamped = Math.max(40, Math.min(250, Math.round(value)));
+                    setBpm(clamped);
+                  }}
+                  className="rounded bg-slate-900 px-2 py-1 text-slate-100"
+                  placeholder="120"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Time signature
+                <select
+                  value={timeSig}
+                  onChange={(event) => setTimeSig(event.target.value as "4/4" | "3/4" | "6/8")}
+                  className="h-9 rounded border border-border bg-slate-900 px-2 text-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <option value="4/4">4/4</option>
+                  <option value="3/4">3/4</option>
+                  <option value="6/8">6/8</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+                Bars in loop
+                <Input
+                  type="number"
+                  min={1}
+                  max={256}
+                  inputMode="numeric"
+                  value={String(barsInLoop)}
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    if (Number.isNaN(value)) {
+                      setBarsInLoop(1);
+                      return;
+                    }
+                    const clamped = Math.max(1, Math.min(256, Math.round(value)));
+                    setBarsInLoop(clamped);
+                  }}
+                  className="rounded bg-slate-900 px-2 py-1 text-slate-100"
+                />
+              </label>
+              <label className="mt-5 inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={quantized}
+                  onChange={(event) => setQuantized(event.target.checked)}
+                  className="h-3.5 w-3.5 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                />
+                Quantize selections to bar grid
+              </label>
+            </div>
+          </div>
+
+          <div>
             <Label htmlFor="noise-upload-notes">Mix notes (optional)</Label>
             <Textarea
               id="noise-upload-notes"
@@ -232,6 +332,7 @@ export function UploadOriginalsModal({
             offsetMs={offsetMs}
             onOffsetChange={setOffsetMs}
             disabled={!instrumentalFile || !vocalFile}
+            tempo={tempoPreview ?? undefined}
           />
         </div>
 
@@ -245,7 +346,7 @@ export function UploadOriginalsModal({
             disabled={!canSubmit}
             className="min-w-[120px]"
           >
-            {isSubmitting ? "Uploading…" : "Upload"}
+            {isSubmitting ? "Uploading..." : "Upload"}
           </Button>
         </DialogFooter>
       </DialogContent>

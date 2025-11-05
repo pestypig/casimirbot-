@@ -97,6 +97,10 @@ const DEFAULT_QI_GUARD = parseEnvNumber(process.env.QI_GUARD_FRAC ?? process.env
 const DEFAULT_QI_DT_MS = parseEnvNumber(process.env.QI_DT_MS, 2);
 const DEFAULT_QI_BOUND_SCALAR = configuredQiScalarBound();
 const DEFAULT_NEGATIVE_FRACTION = 0.4;
+const DEFAULT_PUMP_FREQ_LIMIT_GHZ = Math.max(
+  0.01,
+  Math.min(parseEnvNumber(process.env.PUMP_FREQ_LIMIT_GHZ, 120), 1_000),
+);
 
 const DEFAULT_QI_SETTINGS: QiSettings = {
   sampler: 'gaussian',
@@ -341,6 +345,9 @@ export interface EnergyPipelineState {
   sectorPeriod_ms?: number;
   dutyBurst?: number;
   dutyEffective_FR?: number;
+  phase01?: number;
+  pumpPhase_deg?: number;
+  tauLC_ms?: number;
 
   // --- Compatibility / adapter fields (optional) ---
   // Alternative or legacy keys that may be emitted/consumed by adapters or clients.
@@ -377,6 +384,10 @@ const NM_TO_M = 1e-9;
 const CM2_TO_M2 = 1e-4;
 
 // ── Paper-backed constants (consolidated physics)
+/**
+ * TheoryRefs:
+ *  - ford-roman-qi-1995: derives dutyEffectiveFR ceiling (tau/K)
+ */
 const TOTAL_SECTORS    = 400;
 const BURST_DUTY_LOCAL = 0.01;   // 10 µs / 1 ms
 const Q_BURST          = 1e9;    // active-window Q for dissipation and DCE
@@ -413,6 +424,43 @@ function resolveActiveSlewLimit(value: unknown, fallback: number, min = 1, max?:
   const upper = Number.isFinite(max ?? NaN) ? Math.max(min, Number(max)) : undefined;
   const clamped = Math.floor(Math.max(min, upper != null ? Math.min(num, upper) : num));
   return clamped;
+}
+
+type PumpGuardStats = {
+  clamped: number;
+  rejected: number;
+};
+
+function normalizePumpFreqLimit(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return DEFAULT_PUMP_FREQ_LIMIT_GHZ;
+  }
+  return Math.max(0.01, Math.min(numeric, DEFAULT_PUMP_FREQ_LIMIT_GHZ));
+}
+
+function sanitizePumpFrequencies(
+  freqs: number[] | undefined,
+  limit: number,
+  stats?: PumpGuardStats,
+  digits = 6,
+): number[] {
+  if (!Array.isArray(freqs) || !freqs.length) return [];
+  const sanitized: number[] = [];
+  for (const value of freqs) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric) || numeric <= 0) {
+      if (stats) stats.rejected += 1;
+      continue;
+    }
+    let freq = numeric;
+    if (Number.isFinite(limit) && limit > 0 && freq > limit) {
+      if (stats) stats.clamped += 1;
+      freq = limit;
+    }
+    sanitized.push(freq);
+  }
+  return dedupeNumericList(sanitized, digits);
 }
 
 function pickRepresentativeValues(values: number[], limit: number): number[] {
@@ -644,6 +692,23 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     return;
   }
 
+  const hardwareProfileSeed =
+    ((state.dynamicConfig?.sweep as any)?.hardwareProfile as Record<string, unknown> | undefined) ??
+    runCfg.hardwareProfile ??
+    {};
+  const pumpFreqLimit_GHz = normalizePumpFreqLimit(
+    (hardwareProfileSeed as any).pumpFreqLimit_GHz ?? (runCfg as any).pumpFreqLimit_GHz,
+  );
+  const pumpGuardStats: PumpGuardStats = { clamped: 0, rejected: 0 };
+  runCfg.pumpFreqLimit_GHz = pumpFreqLimit_GHz;
+  runCfg.hardwareProfile = {
+    ...(runCfg.hardwareProfile ?? {}),
+    pumpFreqLimit_GHz,
+  };
+  if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
+    runCfg.pump_freq_GHz = sanitizePumpFrequencies(runCfg.pump_freq_GHz, pumpFreqLimit_GHz, pumpGuardStats);
+  }
+
   let gateAnalytics: GateAnalytics | null = null;
   const gateAnalyticsSink = (analytics: GateAnalytics | null) => {
     gateAnalytics = analytics ?? null;
@@ -681,6 +746,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     runCfg.phase_deg = pickRepresentativeValues(runCfg.phase_deg, phaseLimit);
     if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
       runCfg.pump_freq_GHz = pickRepresentativeValues(runCfg.pump_freq_GHz, pumpLimit);
+      runCfg.pump_freq_GHz = sanitizePumpFrequencies(runCfg.pump_freq_GHz, pumpFreqLimit_GHz, pumpGuardStats);
     }
 
     const requestedDelay =
@@ -696,6 +762,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
         modDepthLimit,
         phaseLimit,
         pumpLimit,
+        pumpFreqLimit_GHz,
         delayMs: runCfg.slewDelayMs,
       };
       sweepConfig.gaps_nm = [...runCfg.gaps_nm];
@@ -712,6 +779,12 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     sweepRuntime.activeSlew = true;
   } else if (sweepRuntime) {
     sweepRuntime.activeSlew = false;
+  }
+
+  if (pumpGuardStats.clamped > 0 && DEBUG_PIPE) {
+    console.warn(
+      `[PIPELINE] pump frequency guard limited ${pumpGuardStats.clamped} step(s) to <= ${pumpFreqLimit_GHz.toFixed(3)} GHz`,
+    );
   }
 
   const geometry = runCfg.geometry ?? "cpw";
@@ -731,12 +804,9 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     Array.isArray(dynamicConfig?.phase_deg)
       ? (dynamicConfig?.phase_deg as number[])[0] ?? 0
       : (dynamicConfig?.phase_deg as number) ?? 0;
-  const pumpArray = Array.isArray(runCfg.pump_freq_GHz)
-    ? runCfg.pump_freq_GHz
-    : typeof runCfg.pump_freq_GHz === "number"
-    ? [runCfg.pump_freq_GHz]
-    : [];
-  const pumpLogBase = pumpArray.length ? pumpArray[0] : base_f0 * 2;
+  const pumpArray = Array.isArray(runCfg.pump_freq_GHz) ? runCfg.pump_freq_GHz : [];
+  const pumpLogBaseSource = pumpArray.length ? pumpArray[0] : base_f0 * 2;
+  const pumpLogBase = Math.min(pumpFreqLimit_GHz, pumpLogBaseSource);
 
   const logSweep = async (
     rows: VacuumGapSweepRow[],
@@ -774,7 +844,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     const autoPumpForGap = (d_nm: number) => {
       const d_m = d_nm * 1e-9;
       const f0_auto = omega0_from_gap(d_m, base_f0, geometry, gammaGeo);
-      return [2 * f0_auto];
+      return sanitizePumpFrequencies([2 * f0_auto], pumpFreqLimit_GHz);
     };
 
     const defaultPumpListForGap = (d_nm: number) => {
@@ -782,12 +852,12 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
         return autoPumpForGap(d_nm);
       }
       if (Array.isArray(runCfg.pump_freq_GHz) && runCfg.pump_freq_GHz.length) {
-        return runCfg.pump_freq_GHz;
+        return sanitizePumpFrequencies(runCfg.pump_freq_GHz, pumpFreqLimit_GHz);
       }
       if (typeof runCfg.pump_freq_GHz === "number") {
-        return [runCfg.pump_freq_GHz];
+        return sanitizePumpFrequencies([runCfg.pump_freq_GHz], pumpFreqLimit_GHz);
       }
-      return [2 * base_f0];
+      return sanitizePumpFrequencies([2 * base_f0], pumpFreqLimit_GHz);
     };
 
     let twoPhaseEnabled =
@@ -801,7 +871,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     const computePhaseTotal = (resolver: (gap: number) => number[], depths: number[]) => {
       let total = 0;
       for (const d_nm of runCfg.gaps_nm) {
-        const pumpList = resolver(d_nm);
+        const pumpList = sanitizePumpFrequencies(resolver(d_nm), pumpFreqLimit_GHz);
         total += depths.length * pumpList.length * phaseList.length;
       }
       return total;
@@ -857,7 +927,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
       depths: number[],
     ) => {
       for (const d_nm of runCfg.gaps_nm) {
-        const pumpList = pumpResolver(d_nm);
+        const pumpList = sanitizePumpFrequencies(pumpResolver(d_nm), pumpFreqLimit_GHz, pumpGuardStats);
         if (!pumpList.length) continue;
         for (const m_pct of depths) {
           const m = m_pct / 100;
@@ -940,6 +1010,10 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
         refineModDepthList = [TWO_PHASE_MIN_MOD_DEPTH_PCT];
       }
       derivedPumpGHz = deriveMeasuredPumpFrequency(primeRows);
+      if (Number.isFinite(derivedPumpGHz) && (derivedPumpGHz ?? 0) > 0) {
+        const sanitized = sanitizePumpFrequencies([Number(derivedPumpGHz)], pumpFreqLimit_GHz, pumpGuardStats);
+        derivedPumpGHz = sanitized.length ? sanitized[0] : derivedPumpGHz;
+      }
       if (!Number.isFinite(derivedPumpGHz) || (derivedPumpGHz ?? 0) <= 0) {
         twoPhaseEnabled = false;
         sweepRuntime.total = primeSteps;
@@ -957,14 +1031,23 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
     if (!cancelled && twoPhaseEnabled && derivedPumpGHz != null) {
       topRows = [];
       state.vacuumGapSweepResults = [];
-      const pumpValue = Number(derivedPumpGHz);
-      await runPhase("refine", () => [pumpValue], refineRows, refineModDepthList);
-      if (!cancelled) {
-        if (state.dynamicConfig?.sweep) {
-          state.dynamicConfig.sweep.pump_freq_GHz = [pumpValue];
-        }
-        if (state.dynamicConfig?.sweep && refineModDepthList.length) {
-          state.dynamicConfig.sweep.mod_depth_pct = refineModDepthList.slice();
+      const refinePumpList = sanitizePumpFrequencies(
+        [Number(derivedPumpGHz)],
+        pumpFreqLimit_GHz,
+        pumpGuardStats,
+      );
+      if (!refinePumpList.length) {
+        cancelled = true;
+      } else {
+        const pumpValue = refinePumpList[0];
+        await runPhase("refine", () => refinePumpList, refineRows, refineModDepthList);
+        if (!cancelled) {
+          if (state.dynamicConfig?.sweep) {
+            state.dynamicConfig.sweep.pump_freq_GHz = [pumpValue];
+          }
+          if (state.dynamicConfig?.sweep && refineModDepthList.length) {
+            state.dynamicConfig.sweep.mod_depth_pct = refineModDepthList.slice();
+          }
         }
       }
     } else {
@@ -1094,9 +1177,7 @@ export async function orchestrateVacuumGapSweep(state: EnergyPipelineState): Pro
 }
 
 // ── Metric imports (induced surface metric on hull)
-import {
-  firstFundamentalForm,
-} from "../src/metric.js";
+import { firstFundamentalForm } from "../src/metric.js";
 
 // --- Mode power/mass policy (targets are *hit* by scaling qMechanical for power and γ_VdB for mass) ---
 // NOTE: All P_target_* values are in **watts** (W).
@@ -1188,24 +1269,31 @@ export const MODE_CONFIGS = {
   }
 };
 
-/** Ellipsoid surface area via induced metric integral (replaces Knud–Thomsen).
- *  a = Lx/2, b = Ly/2, c = Lz/2 (meters). Numerical quadrature over (θ,φ).
+/** Ellipsoid surface area via induced metric integral (replaces Knud-Thomsen).
+ *  a = Lx/2, b = Ly/2, c = Lz/2 (meters). Numerical quadrature over (theta, phi).
  */
-function surfaceAreaEllipsoidMetric(Lx_m: number, Ly_m: number, Lz_m: number,
-  nTheta = 256, nPhi = 128): number {
-  const a = Lx_m/2, b = Ly_m/2, c = Lz_m/2;
-  const dθ = (2*Math.PI) / nTheta;
-  const dφ = Math.PI / (nPhi-1); // φ ∈ [-π/2, π/2]
-  let A = 0;
-  for (let i=0; i<nTheta; i++) {
-    const θ = i * dθ;
-    for (let j=0; j<nPhi; j++) {
-      const φ = -Math.PI/2 + j * dφ;
-      const { dA } = firstFundamentalForm(a,b,c, θ, φ);
-      A += dA * dθ * dφ;
+function surfaceAreaEllipsoidMetric(
+  Lx_m: number,
+  Ly_m: number,
+  Lz_m: number,
+  nTheta = 256,
+  nPhi = 128,
+): number {
+  const a = Lx_m / 2;
+  const b = Ly_m / 2;
+  const c = Lz_m / 2;
+  const dTheta = (2 * Math.PI) / nTheta;
+  const dPhi = Math.PI / (nPhi - 1); // phi in [-pi/2, pi/2]
+  let area = 0;
+  for (let i = 0; i < nTheta; i++) {
+    const theta = i * dTheta;
+    for (let j = 0; j < nPhi; j++) {
+      const phi = -Math.PI / 2 + j * dPhi;
+      const { dA } = firstFundamentalForm(a, b, c, theta, phi);
+      area += dA * dTheta * dPhi;
     }
   }
-  return A;
+  return area;
 }
 
 // Initialize pipeline state with defaults
@@ -1689,11 +1777,29 @@ export async function calculateEnergyPipeline(
     1,
     Number.isFinite(state.sectorCount) ? state.sectorCount : DEFAULT_SECTORS_TOTAL,
   );
-  const sectorPeriodMs = Number.isFinite(state.sectorPeriod_ms)
-    ? Number(state.sectorPeriod_ms)
-    : DEFAULT_SECTOR_PERIOD_MS;
-  const phase01 =
+  const hw = state.hardwareTruth?.sectorState ?? null;
+  const hwDwellMs = Number(hw?.dwell_ms);
+  const hwBurstMs = Number(hw?.burst_ms);
+  const hwTauLcMs = Number(hw?.tauLC_ms);
+  const hwTelemetryPeriodMs = Number(hw?.phaseScheduleTelemetry?.sectorPeriod_ms);
+  const fallbackPeriodRaw = Number(state.sectorPeriod_ms);
+  let fallbackPeriod = Number.isFinite(fallbackPeriodRaw) ? fallbackPeriodRaw : DEFAULT_SECTOR_PERIOD_MS;
+  if (!(fallbackPeriod > 0)) fallbackPeriod = DEFAULT_SECTOR_PERIOD_MS;
+  let sectorPeriodMs = fallbackPeriod;
+  if (Number.isFinite(hwDwellMs) && hwDwellMs > 0) {
+    sectorPeriodMs = hwDwellMs;
+  } else if (Number.isFinite(hwTelemetryPeriodMs) && hwTelemetryPeriodMs > 0) {
+    sectorPeriodMs = hwTelemetryPeriodMs;
+  }
+  if (!(sectorPeriodMs > 0)) {
+    sectorPeriodMs = fallbackPeriod > 0 ? fallbackPeriod : DEFAULT_SECTOR_PERIOD_MS;
+  }
+  state.sectorPeriod_ms = sectorPeriodMs;
+  const normalizePhase01 = (value: number) => ((value % 1) + 1) % 1;
+  const derivedPhase01 =
     sectorPeriodMs > 0 ? ((Date.now() % sectorPeriodMs) / sectorPeriodMs) : 0;
+  const hwPhase01 = Number(hw?.phase01);
+  const phase01 = Number.isFinite(hwPhase01) ? normalizePhase01(hwPhase01) : derivedPhase01;
   const tauMs = Number.isFinite(state.qi?.tau_s_ms)
     ? Number(state.qi!.tau_s_ms)
     : DEFAULT_QI_SETTINGS.tau_s_ms;
@@ -1761,7 +1867,17 @@ export async function calculateEnergyPipeline(
     burst_ms: PAPER_DUTY.BURST_DUTY_LOCAL * T_m_s * 1e3,
     dwell_ms: T_m_s * 1e3,
   };
+  if (Number.isFinite(hwTauLcMs)) {
+    lightCrossing.tauLC_ms = hwTauLcMs;
+  }
+  if (Number.isFinite(hwBurstMs)) {
+    lightCrossing.burst_ms = hwBurstMs;
+  }
+  if (Number.isFinite(hwDwellMs)) {
+    lightCrossing.dwell_ms = hwDwellMs;
+  }
   (state as any).lightCrossing = lightCrossing;
+  (state as any).tauLC_ms = lightCrossing.tauLC_ms;
 
   // Calculate Natário metrics using pipeline state
   const natario = calculateNatarioMetric({

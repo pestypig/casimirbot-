@@ -1,0 +1,33 @@
+import { readFileSync, existsSync } from "fs";
+import { join } from "path";
+import { describe, expect, it } from "vitest";
+
+function read(relativePath: string): string {
+  const full = join(process.cwd(), relativePath);
+  if (!existsSync(full)) {
+    throw new Error(`Missing file: ${relativePath}`);
+  }
+  return readFileSync(full, "utf8");
+}
+
+describe("TheoryRefs presence", () => {
+  it("tags Ford–Roman QI in enforcing/display modules", () => {
+    expect(read("server/energy-pipeline.ts")).toMatch(/TheoryRefs:[\s\S]*ford-roman-qi-1995/);
+    expect(read("client/src/hooks/use-energy-pipeline.ts")).toMatch(/TheoryRefs:[\s\S]*ford-roman-qi-1995/);
+    expect(read("modules/dynamic/dynamic-casimir.ts")).toMatch(/TheoryRefs:[\s\S]*ford-roman-qi-1995/);
+    expect(read("client/src/components/MarginHunterPanel.tsx")).toMatch(/TheoryRefs:[\s\S]*ford-roman-qi-1995/);
+  });
+
+  it("tags Van den Broeck in geometry modules", () => {
+    expect(read("modules/dynamic/stress-energy-equations.ts")).toMatch(/TheoryRefs:[\s\S]*vanden-broeck-1999/);
+    expect(read("modules/warp/warp-module.ts")).toMatch(/TheoryRefs:[\s\S]*vanden-broeck-1999/);
+    expect(read("client/src/components/AlcubierrePanel.tsx")).toMatch(/TheoryRefs:[\s\S]*vanden-broeck-1999/);
+    expect(read("client/src/components/HelixCasimirAmplifier.tsx")).toMatch(/TheoryRefs:[\s\S]*vanden-broeck-1999/);
+  });
+});
+
+describe("Ford–Roman duty clamp symbol exists", () => {
+  it("includes a dutyEffectiveFR symbol", () => {
+    expect(read("server/energy-pipeline.ts")).toMatch(/dutyEffectiveFR|frDuty(Max|Clamp|Ceil)/i);
+  });
+});

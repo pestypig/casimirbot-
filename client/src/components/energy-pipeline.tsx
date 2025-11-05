@@ -13,6 +13,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, useSwitchMode } from "@/hooks/use-energy-pipeline";
 import { computeGreensStats, fmtExp, greensKindLabel } from "@/lib/greens";
+import { TheoryBadge } from "./common/TheoryBadge";
 
 // ---------- Green's helpers (local, no new deps) ----------
 type Vec3 = [number, number, number];
@@ -721,7 +722,13 @@ export function EnergyPipeline({ results, allowModeSwitch = false }: EnergyPipel
                 <div className="font-mono">{γ_geo}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">FR duty</div>
+                <div className="text-muted-foreground flex items-center gap-2">
+                  FR duty
+                  <TheoryBadge
+                    refs={["ford-roman-qi-1995"]}
+                    categoryAnchor="Quantum-Inequalities"
+                  />
+                </div>
                 <div className="font-mono">{(dutyEffectiveFR*100).toFixed(3)}%</div>
               </div>
             </div>

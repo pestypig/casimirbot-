@@ -1,4 +1,9 @@
 /**
+ * TheoryRefs:
+ *  - vanden-broeck-1999: input normalization + clamps for gamma_VdB
+ */
+
+/**
  * Warp Bubble Casimir Module
  * Integrates Natário zero-expansion warp bubble calculations with the module system
  */

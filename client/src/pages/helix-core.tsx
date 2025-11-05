@@ -47,6 +47,7 @@ import SweepReplayControls from "@/components/SweepReplayControls";
 import MetricAmplificationPocket from "../components/MetricAmplificationPocket";
 import VacuumContractBadge from "@/components/VacuumContractBadge";
 import DriveGuardsPanel from "@/components/DriveGuardsPanel";
+import DirectionPad from "@/components/DirectionPad";
 import { FractionalCoherenceRail } from "@/components/FractionalCoherenceRail";
 import { FractionalCoherenceGrid } from "@/components/FractionalCoherenceGrid";
 import HelixMarkIcon from "@/components/icons/HelixMarkIcon";
@@ -58,7 +59,6 @@ import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import type { VacuumGapSweepRow, RidgePreset, DynamicConfig, SweepRuntime } from "@shared/schema";
 import DeepMixingSolarView from "@/components/DeepMixingSolarView";
 import DeepMixSweetSpot from "@/components/deepmix/DeepMixSweetSpot";
-import LumaPanel from "@/components/LumaPanel";
 const DeepMixGlobePanel = lazy(() => import("@/components/deepmix/DeepMixGlobePanel"));
 import {
   DeepMixingAutopilot,
@@ -122,7 +122,6 @@ const PANEL_HASHES = {
   energyControl: "energy-control",
   complianceHud: "compliance-hud",
   vacuumSweep: "vacuum-gap-sweep",
-  lumaPanel: "helix-luma-panel",
   mainframeTerminal: "mainframe-terminal",
   operationsToolbar: "operations-toolbar",
   missionPlanner: "mission-planner",
@@ -1020,6 +1019,15 @@ const [timeLapseOverlayCanvas, setTimeLapseOverlayCanvas] = useState<HTMLCanvasE
 const [timeLapseOverlayDom, setTimeLapseOverlayDom] = useState<HTMLDivElement | null>(null);
 const [showSweepHud, setShowSweepHud] = useState(false);
 const [isThetaHullMode, setIsThetaHullMode] = useState(false);
+const [vizIntent, setVizIntent] = useState<{ rise: number; planar: number }>({ rise: 0, planar: 0 });
+const handleDirectionPadIntent = useCallback(
+  ({ rise, planar }: { rise: number; planar: number }) => {
+    setVizIntent((prev) =>
+      Math.abs(prev.rise - rise) > 1e-3 || Math.abs(prev.planar - planar) > 1e-3 ? { rise, planar } : prev
+    );
+  },
+  []
+);
 const handlePlanarVizModeChange = useCallback((mode: number) => {
   setIsThetaHullMode(mode === 3);
 }, []);
@@ -2805,6 +2813,7 @@ useEffect(() => {
               }}
               overlayHudEnabled={showSweepHud}
               onPlanarVizModeChange={handlePlanarVizModeChange}
+              vizIntent={vizIntent}
             />
             {(timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing) && (
               <div className="pointer-events-none absolute top-4 right-4 max-w-xs rounded-md border border-cyan-500/40 bg-slate-950/80 px-3 py-2 shadow-lg">
@@ -2831,13 +2840,17 @@ useEffect(() => {
         </div>
       </div>
 
-          <section
-            id={PANEL_HASHES.lumaPanel}
-            data-panel-hash={PANEL_HASHES.lumaPanel}
-            className="mb-6"
-          >
-            <LumaPanel />
-          </section>
+          <Card className="mt-4 border border-slate-800 bg-slate-900/60">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">Direction Pad</CardTitle>
+              <CardDescription className="text-xs text-slate-400">
+                Guide the hull visualization off-axis with rise and planar intents.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-2">
+              <DirectionPad className="w-full" onVizIntent={handleDirectionPadIntent} />
+            </CardContent>
+          </Card>
 
           <div className="mb-4 space-y-3">
             <div

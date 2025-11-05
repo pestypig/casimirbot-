@@ -19,6 +19,7 @@ This note scopes the follow-up work that will land the Gap × Phase × Ω sweep 
 - **Sub-threshold gating:** Skip samples where the estimated pump ratio or modulation depth drops below current mode safety envelopes. Flag them as filtered so the UI can render a hatch instead of zero gain.
 - **Jitter averaging:** Run each sample as a short Monte Carlo bundle (3–5 jittered evaluations on phase/Ω) and average the complex gain. This keeps noisy fringes from polluting the ridge capture.
 - **Linewidth collapse exit:** Track the effective linewidth (κ_eff) returned by the helper. If it collapses below a floor or diverges for consecutive samples, abort the sweep and surface a toast so the operator can widen guards.
+- **Operational guard bands:** Keep scripted sweeps inside `ρ < 0.9`, `κ_eff > 0`, and `|detune| < κ`. When live telemetry drifts toward a guard, retune the pump back to zero detune and drop into the recovery envelope before resuming the capture.
 
 ## UI Hook & Panel
 - Expose `useParametricSweepController` that wraps the module, manages lifecycle state, and emits progress snapshots to React Query.

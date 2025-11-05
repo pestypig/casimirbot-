@@ -668,6 +668,12 @@ const UpdateSchema = z.object({
   modulationFreq_GHz: z.number().min(0.001).max(1000).optional(),
   dynamicConfig: dynamicConfigUpdateSchema.optional(),
   negativeFraction: z.number().min(0).max(1).optional(),
+  dutyCycle: z.number().min(0).max(1).optional(),
+  localBurstFrac: z.number().min(0).max(1).optional(),
+  sectorsConcurrent: z.number().int().min(1).max(10_000).optional(),
+  sectorStrobing: z.number().int().min(1).max(10_000).optional(),
+  qSpoilingFactor: z.number().min(0).max(10).optional(),
+  rhoTarget: z.number().min(0).max(1).optional(),
 /* BEGIN STRAY_DUPLICATED_BLOCK - commented out to fix top-level parse errors
   if (req.method === 'OPTIONS') { setCors(res); return res.status(200).end(); }
   setCors(res);
@@ -2031,6 +2037,25 @@ export async function ingestHardwareSectorState(req: Request, res: Response) {
       const updated = await calculateEnergyPipeline(next);
       if (payload.strobeHz != null && Number.isFinite(payload.strobeHz)) {
         updated.strobeHz = payload.strobeHz;
+      }
+      if (payload.phase01 != null && Number.isFinite(payload.phase01)) {
+        const wrapped = ((payload.phase01 % 1) + 1) % 1;
+        updated.phase01 = wrapped;
+      }
+      if (payload.phaseCont != null && Number.isFinite(payload.phaseCont)) {
+        if (!updated.hardwareTruth) updated.hardwareTruth = {};
+        if (!updated.hardwareTruth.sectorState) updated.hardwareTruth.sectorState = {};
+        updated.hardwareTruth.sectorState.phaseCont = payload.phaseCont;
+      }
+      if (payload.pumpPhase_deg != null && Number.isFinite(payload.pumpPhase_deg)) {
+        updated.pumpPhase_deg = payload.pumpPhase_deg;
+      }
+      if (payload.tauLC_ms != null && Number.isFinite(payload.tauLC_ms)) {
+        updated.tauLC_ms = payload.tauLC_ms;
+        updated.lightCrossing = {
+          ...(updated.lightCrossing ?? {}),
+          tauLC_ms: payload.tauLC_ms,
+        };
       }
       if (payload.dwell_ms != null && Number.isFinite(payload.dwell_ms) && payload.dwell_ms > 0) {
         updated.sectorPeriod_ms = payload.dwell_ms;

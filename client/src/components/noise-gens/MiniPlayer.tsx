@@ -9,6 +9,7 @@ type MiniPlayerProps = {
   vocal?: File | Blob | string | null;
   offsetMs: number;
   onOffsetChange?: (offset: number) => void;
+  tempo?: { bpm: number; timeSig: string; quantized?: boolean };
   disabled?: boolean;
   className?: string;
 };
@@ -44,11 +45,13 @@ export function MiniPlayer({
   vocal,
   offsetMs,
   onOffsetChange,
+  tempo,
   disabled = false,
   className,
 }: MiniPlayerProps) {
   const instrumentalRef = useRef<HTMLAudioElement | null>(null);
   const vocalRef = useRef<HTMLAudioElement | null>(null);
+  const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const meterRafRef = useRef<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -78,6 +81,71 @@ export function MiniPlayer({
     },
     [instrumentalSrc, vocalSrc, instrumental, vocal],
   );
+
+  useEffect(() => {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+
+    const draw = () => {
+      const parent = canvas.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+      const dpr = window.devicePixelRatio ?? 1;
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      if (typeof ctx.resetTransform === "function") {
+        ctx.resetTransform();
+      }
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      if (!tempo?.bpm) {
+        return;
+      }
+
+      const beatsPerBar = Number(tempo.timeSig.split("/")[0] || 4);
+      if (!Number.isFinite(beatsPerBar) || beatsPerBar <= 0) {
+        return;
+      }
+      const msPerBeat = 60000 / tempo.bpm;
+      if (!Number.isFinite(msPerBeat) || msPerBeat <= 0) {
+        return;
+      }
+      const msPerBar = msPerBeat * beatsPerBar;
+      const baseDurationMs =
+        Number.isFinite(duration) && duration > 0 ? duration * 1000 : msPerBar * 8;
+      const visibleMs = Math.max(msPerBar, baseDurationMs);
+      let first = (-offsetMs) % msPerBar;
+      if (first < 0) {
+        first += msPerBar;
+      }
+
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 1;
+      for (let t = first; t <= visibleMs + 1; t += msPerBar) {
+        const x = (t / visibleMs) * rect.width;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, rect.height);
+        ctx.stroke();
+      }
+    };
+
+    draw();
+    window.addEventListener("resize", draw);
+    return () => {
+      window.removeEventListener("resize", draw);
+    };
+  }, [tempo?.bpm, tempo?.timeSig, offsetMs, duration]);
 
   const stopRaf = useCallback(() => {
     if (rafRef.current != null) {
@@ -200,12 +268,38 @@ export function MiniPlayer({
     stopRaf();
   }, [stopRaf]);
 
+  const snapToGrid = useCallback(
+    (value: number) => {
+      if (!tempo?.quantized || !tempo?.bpm) {
+        return value;
+      }
+      const beatsPerBar = Number(tempo.timeSig.split("/")[0] || 4);
+      if (!Number.isFinite(beatsPerBar) || beatsPerBar <= 0) {
+        return value;
+      }
+      const msPerBeat = 60000 / tempo.bpm;
+      if (!Number.isFinite(msPerBeat) || msPerBeat <= 0) {
+        return value;
+      }
+      const msPerBar = msPerBeat * beatsPerBar;
+      if (!Number.isFinite(msPerBar) || msPerBar <= 0) {
+        return value;
+      }
+      return Math.round(value / msPerBar) * msPerBar;
+    },
+    [tempo?.bpm, tempo?.quantized, tempo?.timeSig],
+  );
+
   const handleOffsetInput = useCallback(
     (value: number) => {
-      const clamped = Math.max(-OFFSET_LIMIT_MS, Math.min(OFFSET_LIMIT_MS, Math.round(value)));
+      const snapped = snapToGrid(Math.round(value));
+      const clamped = Math.max(
+        -OFFSET_LIMIT_MS,
+        Math.min(OFFSET_LIMIT_MS, Math.round(snapped)),
+      );
       onOffsetChange?.(clamped);
     },
-    [onOffsetChange],
+    [onOffsetChange, snapToGrid],
   );
 
   useEffect(() => {
@@ -332,9 +426,10 @@ export function MiniPlayer({
         </div>
       </div>
 
-      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
+      <div className="relative mt-4 h-8 w-full overflow-hidden rounded-full bg-muted/70">
+        <canvas ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden />
         <div
-          className="h-full rounded-full bg-primary/70 transition-[width]"
+          className="absolute inset-y-0 left-0 rounded-r-full bg-primary/70 transition-[width]"
           style={{ width: `${Math.round(progress * 100)}%` }}
         />
       </div>

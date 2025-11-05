@@ -8,6 +8,7 @@ Definitions
   - Uses ship-wide Ford–Roman duty (duty_FR). Linear in duty.
   - Includes the visual/mass-split calibrated γ_VdB. Emitted by server `helix-core.ts` as `thetaScale`.
   - This value is authoritative for renderer/engine uniforms.
+  > See: [Ford–Roman QI](docs/papers/ford-roman-qi-1995.md) — the τ-averaging bound sets the ceiling for FR duty in θ(t) strobing.
 
 - thetaScaleCore / thetaScaleCore_sqrtDuty (Natário diagnostic):
   - Local conservative diagnostic produced by the Natário module.
