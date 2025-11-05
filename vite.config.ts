@@ -16,6 +16,71 @@ const treeSitterSources = [
   "node_modules/tree-sitter-javascript/tree-sitter-javascript.wasm",
 ];
 
+const WEB_TREE_SITTER_ENTRY = "node_modules/web-tree-sitter/tree-sitter.js";
+const CODE_SNAPSHOT_ENTRY = "client/src/lib/code-index/snapshot.ts";
+const VIRTUAL_NODE_SHIM_PREFIX = "\0node-shim:";
+
+const toPosix = (value: string) => value.split(path.sep).join(path.posix.sep);
+
+const webTreeSitterNodeShim = () => ({
+  name: "web-tree-sitter-node-shim",
+  enforce: "pre",
+  resolveId(source: string, importer: string | undefined) {
+    if (!importer) return null;
+    const posixImporter = toPosix(importer);
+    if (posixImporter.includes(WEB_TREE_SITTER_ENTRY)) {
+      if (source === "fs/promises") return `${VIRTUAL_NODE_SHIM_PREFIX}fs-promises`;
+      if (source === "module") return `${VIRTUAL_NODE_SHIM_PREFIX}module`;
+    }
+    if (source === "crypto" && posixImporter.includes(CODE_SNAPSHOT_ENTRY)) {
+      return `${VIRTUAL_NODE_SHIM_PREFIX}crypto`;
+    }
+    return null;
+  },
+  load(id: string) {
+    switch (id) {
+      case `${VIRTUAL_NODE_SHIM_PREFIX}fs-promises`:
+        return [
+          "export async function readFile() {",
+          '  throw new Error("fs/promises is not available in the browser build.");',
+          "}",
+          "export default { readFile };",
+        ].join("\n");
+      case `${VIRTUAL_NODE_SHIM_PREFIX}module`:
+        return [
+          "export function createRequire() {",
+          '  throw new Error("module.createRequire is not available in the browser build.");',
+          "}",
+          "export default { createRequire };",
+        ].join("\n");
+      case `${VIRTUAL_NODE_SHIM_PREFIX}crypto`:
+        return [
+          "export function createHash() {",
+          '  throw new Error("crypto.createHash is not available in the browser build.");',
+          "}",
+          "export function randomUUID() {",
+          '  if (typeof globalThis.crypto?.randomUUID === \"function\") {',
+          "    return globalThis.crypto.randomUUID();",
+          "  }",
+          '  throw new Error("crypto.randomUUID is not available in this environment.");',
+          "}",
+          "export default { createHash, randomUUID };",
+        ].join("\n");
+      default:
+        return null;
+    }
+  },
+  transform(code: string, id: string) {
+    const posixId = toPosix(id);
+    if (!posixId.includes(WEB_TREE_SITTER_ENTRY)) return null;
+    const patched = code
+      .replace(/import\("fs\/promises"\)/g, 'import(/* @vite-ignore */ "fs/promises")')
+      .replace(/import\("module"\)/g, 'import(/* @vite-ignore */ "module")');
+    if (patched === code) return null;
+    return { code: patched, map: null };
+  },
+});
+
 export default defineConfig({
   plugins: [
     react(),
@@ -26,6 +91,7 @@ export default defineConfig({
         dest: "treesitter",
       })),
     }),
+    webTreeSitterNodeShim(),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
@@ -44,9 +110,20 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  worker: {
+    format: "es",
+    rollupOptions: {
+      output: {
+        format: "es",
+      },
+    },
+  },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+  },
+  optimizeDeps: {
+    exclude: ["web-tree-sitter"],
   },
   server: {
     fs: {

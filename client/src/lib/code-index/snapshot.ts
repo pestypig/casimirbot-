@@ -163,7 +163,7 @@ async function sha256Hex(bytes: Uint8Array) {
   }
 
   if (typeof process !== "undefined") {
-    const nodeCrypto = await import("crypto");
+    const nodeCrypto = await import(/* @vite-ignore */ "crypto");
     return nodeCrypto.createHash("sha256").update(Buffer.from(bytes)).digest("hex");
   }
 
