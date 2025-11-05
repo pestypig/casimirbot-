@@ -124,17 +124,23 @@ function SunMesh({ hazard01 }: { hazard01: number }) {
   const r = baseR * (1 + 0.15 * hazard01);
   const emissiveIntensity = 0.6 + 1.2 * hazard01;
 
-  return (
-    <mesh ref={ref} scale={[r, r, r]}>
-      <sphereGeometry args={[1, 96, 96]} />
-      <meshStandardMaterial
-        color="#fcbf49"
-        emissive="#ff7f11"
-        emissiveIntensity={emissiveIntensity}
-        roughness={0.4}
-        metalness={0.0}
-      />
-    </mesh>
+  return React.createElement(
+    "mesh",
+    { ref, scale: [r, r, r] } as JSX.IntrinsicElements["mesh"],
+    React.createElement(
+      "sphereGeometry",
+      { args: [1, 96, 96] } as JSX.IntrinsicElements["sphereGeometry"]
+    ),
+    React.createElement(
+      "meshStandardMaterial",
+      {
+        color: "#fcbf49",
+        emissive: "#ff7f11",
+        emissiveIntensity,
+        roughness: 0.4,
+        metalness: 0.0,
+      } as JSX.IntrinsicElements["meshStandardMaterial"]
+    )
   );
 }
 
@@ -147,17 +153,23 @@ function MixingRing({ activity01 }: { activity01: number }) {
 
   // Clamp thickness so it never vanishes or overwhelms the globe
   const tube = 0.02 + 0.10 * Math.max(0, Math.min(1, activity01));
-  return (
-    <mesh ref={ref} rotation={[Math.PI / 2, 0, 0]}>
-      <torusGeometry args={[1.2, tube, 64, 256]} />
-      <meshStandardMaterial
-        color="#ffffff"
-        emissive="#ffd166"
-        emissiveIntensity={0.4 + 0.9 * activity01}
-        roughness={0.3}
-        metalness={0.0}
-      />
-    </mesh>
+  return React.createElement(
+    "mesh",
+    { ref, rotation: [Math.PI / 2, 0, 0] } as JSX.IntrinsicElements["mesh"],
+    React.createElement(
+      "torusGeometry",
+      { args: [1.2, tube, 64, 256] } as JSX.IntrinsicElements["torusGeometry"]
+    ),
+    React.createElement(
+      "meshStandardMaterial",
+      {
+        color: "#ffffff",
+        emissive: "#ffd166",
+        emissiveIntensity: 0.4 + 0.9 * activity01,
+        roughness: 0.3,
+        metalness: 0.0,
+      } as JSX.IntrinsicElements["meshStandardMaterial"]
+    )
   );
 }
 
@@ -275,6 +287,40 @@ export default function DeepMixGlobePanel() {
   // Globe "breathing" with hazard (bigger/brighter => higher risk)
   const hazard01 = Math.min(1, Math.pow(Pfinal, 0.35));
 
+  const sceneElements = useMemo(
+    () => [
+      React.createElement(
+        "ambientLight",
+        { key: "ambient", intensity: 0.35 } as JSX.IntrinsicElements["ambientLight"]
+      ),
+      React.createElement(
+        "directionalLight",
+        {
+          key: "dir",
+          position: [2, 2, 3],
+          intensity: 1.2,
+        } as JSX.IntrinsicElements["directionalLight"]
+      ),
+      React.createElement(SunMesh, { key: "sun", hazard01 }),
+      React.createElement(MixingRing, { key: "ring", activity01: avgActivity }),
+      React.createElement(Stars, {
+        key: "stars",
+        radius: 80,
+        depth: 50,
+        count: 1800,
+        factor: 2,
+        fade: true,
+      }),
+      React.createElement(OrbitControls, {
+        key: "orbit",
+        enablePan: false,
+        minDistance: 2.2,
+        maxDistance: 6,
+      }),
+    ],
+    [avgActivity, hazard01]
+  );
+
   // Chart data
   const sweetData = sweet.map((d) => ({ ships: d.ships, hazard: d.P, pass: d.pass }));
 
@@ -290,12 +336,7 @@ export default function DeepMixGlobePanel() {
 
           <div className="h-[420px] rounded-2xl overflow-hidden border">
             <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }} onCreated={handleCanvasCreated}>
-              <ambientLight intensity={0.35} />
-              <directionalLight position={[2, 2, 3]} intensity={1.2} />
-              <SunMesh hazard01={hazard01} />
-              <MixingRing activity01={avgActivity} />
-              <Stars radius={80} depth={50} count={1800} factor={2} fade />
-              <OrbitControls enablePan={false} minDistance={2.2} maxDistance={6} />
+              {sceneElements}
             </Canvas>
           </div>
 
