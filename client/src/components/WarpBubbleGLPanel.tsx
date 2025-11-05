@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { registerWebGLContext } from "@/lib/webgl/context-pool";
 
 /**
  * WarpBubbleGLPanel — a minimal, self-contained WebGL (WebGL1/2) viewer
@@ -192,6 +193,7 @@ export default function WarpBubbleGLPanel({
 }){
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGLRenderingContext | null>(null);
+  const releaseContextRef = useRef<() => void>(() => {});
   const progRef = useRef<WebGLProgram | null>(null);
   const vboRef = useRef<WebGLBuffer | null>(null);
   const attribsRef = useRef<{ a_pos: number } | null>(null);
@@ -235,6 +237,11 @@ export default function WarpBubbleGLPanel({
     gl.bufferData(gl.ARRAY_BUFFER, grid, gl.STATIC_DRAW);
 
     glRef.current = gl; progRef.current = prog; vboRef.current = vbo;
+    releaseContextRef.current();
+    releaseContextRef.current = () => {};
+    releaseContextRef.current = registerWebGLContext(gl, {
+      label: "WarpBubbleGLPanel",
+    });
     attribsRef.current = { a_pos };
     uniformsRef.current = uniforms;
 
@@ -254,6 +261,8 @@ export default function WarpBubbleGLPanel({
         }
       } catch {}
       glRef.current = null; progRef.current = null; vboRef.current = null;
+      releaseContextRef.current();
+      releaseContextRef.current = () => {};
     };
   }, [grid]);
 

@@ -6,6 +6,7 @@ import { useHull3DSharedStore } from "@/store/useHull3DSharedStore";
 import { publish, subscribe, unsubscribe } from "@/lib/luma-bus";
 import { queryClient } from "@/lib/queryClient";
 import { RHO_COS_GUARD_LIMIT, summarizeSweepGuard } from "@/lib/sweep-guards";
+import { sweepTelemetry, type SweepSnapshot } from "@/lib/sweepTelemetry";
 import type { SweepPoint } from "@shared/schema";
 
 const OVERLAY_STATE_QUERY_KEY = ["hull3d:overlay:controls"] as const;
@@ -25,22 +26,7 @@ export type TLFrame = {
   sectors: { live: number | null; total: number | null };
   gr: { burstVsTau: boolean; tsOk: boolean; qiOk: boolean };
   qiMargin: number | null;
-  sweep: {
-    iter: number | null;
-    total: number | null;
-    gap_nm: number | null;
-    depth: number | null;
-    phase_deg: number | null;
-    pump_GHz: number | null;
-    detune_MHz: number | null;
-    kappa_MHz: number | null;
-    kappaEff_MHz: number | null;
-    pumpRatio: number | null;
-    QL: number | null;
-    quadrature_dB: number | null;
-    status: string | null;
-    guardReason: string | null;
-  } | null;
+  sweep: SweepSnapshot | null;
   deltas: {
     rho: number | null;
     TS: number | null;
@@ -51,6 +37,12 @@ export type TLFrame = {
     sectorAlpha: number[];
     shellOffset: number | null;
   };
+};
+
+type SweepSeriesEntry = { tMs: number } & SweepSnapshot;
+
+type TimeLapseSidecar = {
+  sweepSeries: SweepSeriesEntry[];
 };
 
 export type TimeLapseResult = {
@@ -71,7 +63,9 @@ export type TimeLapseResult = {
     framesPushed: number;
     framesDroppedEstimate: number;
     p95FrameJitterMs: number;
+    sidecar?: TimeLapseSidecar;
   };
+  sidecar?: TimeLapseSidecar;
 };
 
 export type TimeLapseSegmentKey = "stable" | "edge" | "recovery";
@@ -84,6 +78,10 @@ type ScenarioSegment = {
   params: Partial<EnergyPipelineState>;
 };
 
+type RecorderSidecarOptions = {
+  includeSweep?: boolean;
+};
+
 type RecorderOptions = {
   canvas: HTMLCanvasElement | null;
   overlayCanvas?: HTMLCanvasElement | null;
@@ -91,6 +89,7 @@ type RecorderOptions = {
   overlayEnabled?: boolean;
   durationMs?: number;
   fps?: number;
+  sidecar?: RecorderSidecarOptions;
 };
 
 type RecorderReturn = {
@@ -187,6 +186,90 @@ type HudPayload = {
   sectors: { live: number | null; total: number | null };
   gr: { burstVsTau: boolean; tsOk: boolean; qiOk: boolean };
   shellOffset: number | null;
+  sweep: SweepSnapshot | null;
+};
+
+const formatSweepStep = (iter: number | null, total: number | null) => {
+  const iterText = iter != null ? Math.round(iter).toLocaleString() : "--";
+  const totalText = total != null ? Math.round(total).toLocaleString() : "--";
+  return `${iterText}/${totalText}`;
+};
+
+const formatSweepValue = (value: number | null, digits = 2, suffix = "") => {
+  const text = formatHudValue(value, digits);
+  return text === "--" || !suffix ? text : `${text} ${suffix}`;
+};
+
+const drawSweepPanel = (
+  ctx: CanvasRenderingContext2D,
+  sweep: SweepSnapshot,
+  x: number,
+  y: number,
+  width: number,
+) => {
+  const padding = 8;
+  const lineHeight = 14;
+  const lines: Array<[string, string]> = [
+    ["step", formatSweepStep(sweep.iter, sweep.total)],
+    ["gap", formatSweepValue(sweep.d_nm, 0, "nm")],
+    ["depth", formatHudValue(sweep.m, 3)],
+    ["phase", formatSweepValue(sweep.phi_deg, 2, "deg")],
+    ["pump", formatSweepValue(sweep.Omega_GHz, 3, "GHz")],
+    ["detune", formatSigned(sweep.detune_MHz, 3, " MHz")],
+    ["kappa", formatSweepValue(sweep.kappa_MHz, 3, "MHz")],
+    [
+      "kappa_eff",
+      sweep.kappaEff_MHz === "THRESHOLD"
+        ? "THRESHOLD"
+        : formatSweepValue(
+            typeof sweep.kappaEff_MHz === "number" ? sweep.kappaEff_MHz : null,
+            3,
+            "MHz",
+          ),
+    ],
+    ["rho", formatHudValue(sweep.pumpRatio, 3)],
+    ["quadrature", formatSigned(sweep.G_dB, 2, " dB")],
+    ["status", sweep.status ?? "--"],
+    ["guard", sweep.guard ?? "--"],
+    [
+      "ETA",
+      sweep.etaMs != null && Number.isFinite(sweep.etaMs)
+        ? `${Math.max(0, Math.round(sweep.etaMs))} ms`
+        : "--",
+    ],
+    [
+      "slew",
+      sweep.slewDelayMs != null && Number.isFinite(sweep.slewDelayMs)
+        ? `${Math.max(0, Math.round(sweep.slewDelayMs))} ms`
+        : "--",
+    ],
+  ];
+
+  const panelHeight = lines.length * lineHeight + padding * 2;
+
+  ctx.save();
+  ctx.globalAlpha = 0.65;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(x, y, width, panelHeight);
+  ctx.globalAlpha = 1;
+
+  ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textBaseline = "top";
+  ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#fff";
+
+  let rowY = y + padding + 2;
+  const labelX = x + 4;
+  const valueX = x + 4 + 130;
+
+  for (const [label, value] of lines) {
+    ctx.fillText(label, labelX, rowY);
+    ctx.fillText(value, valueX, rowY);
+    rowY += lineHeight;
+  }
+
+  ctx.restore();
 };
 
 class FrameMeter {
@@ -307,6 +390,11 @@ const drawHud = (ctx: CanvasRenderingContext2D, payload: HudPayload) => {
   }
 
   ctx.restore();
+
+  if (payload.sweep) {
+    const sweepY = padding + panelHeight + 8;
+    drawSweepPanel(ctx, payload.sweep, padding, sweepY, panelWidth);
+  }
 };
 
 const pickSweepNumber = (...values: unknown[]): number | null => {
@@ -315,6 +403,24 @@ const pickSweepNumber = (...values: unknown[]): number | null => {
     if (num != null) return num;
   }
   return null;
+};
+
+const mergeSweepSnapshots = (
+  base: SweepSnapshot | null,
+  extra: SweepSnapshot | null,
+): SweepSnapshot | null => {
+  if (!base && !extra) return null;
+  if (!base) return extra ? { ...extra } : null;
+  if (!extra) return { ...base };
+  return {
+    ...base,
+    status: extra.status ?? base.status,
+    guard: extra.guard ?? base.guard,
+    etaMs: extra.etaMs ?? base.etaMs,
+    slewDelayMs: extra.slewDelayMs ?? base.slewDelayMs,
+    bestIdx: extra.bestIdx ?? base.bestIdx,
+    guardCap: extra.guardCap ?? base.guardCap,
+  };
 };
 
 type BaselineNarrative = {
@@ -416,9 +522,11 @@ const clampToActiveGuard = (value: unknown, limit = RHO_ACTIVE_LIMIT): number | 
   return Math.max(0, Math.min(limit, num));
 };
 
+type GuardedPipelineParams = Partial<EnergyPipelineState> & { rhoTarget?: number };
+
 const enforceGuardLimits = (
-  params: Partial<EnergyPipelineState>,
-): Partial<EnergyPipelineState> => {
+  params: GuardedPipelineParams,
+): GuardedPipelineParams => {
   const safe: Record<string, unknown> = { ...params };
   const clampField = (field: keyof EnergyPipelineState, limit = RHO_ACTIVE_LIMIT) => {
     if (Object.prototype.hasOwnProperty.call(safe, field)) {
@@ -464,7 +572,7 @@ const enforceGuardLimits = (
     }
   }
 
-  return safe as Partial<EnergyPipelineState>;
+  return safe as GuardedPipelineParams;
 };
 
 const resolveSweepContext = (state: EnergyPipelineState | undefined) => {
@@ -633,6 +741,7 @@ export function useTimeLapseRecorder({
   overlayEnabled = false,
   durationMs = DEFAULT_DURATION_MS,
   fps = DEFAULT_FPS,
+  sidecar,
 }: RecorderOptions): RecorderReturn {
   const { data: pipeline } = useEnergyPipeline({ refetchInterval: 1000 });
   const { data: metrics } = useMetrics(1500);
@@ -680,6 +789,10 @@ export function useTimeLapseRecorder({
     overlayDomRef.current = overlayDom ?? null;
   }, [overlayDom]);
 
+  useEffect(() => {
+    sidecarOptionsRef.current = sidecar;
+  }, [sidecar]);
+
   const overlayHitRegionsRef = useRef<OverlayHitRegistry>({ blocks: [] });
   const overlayPayloadRef = useRef<OverlayPayload | null>(null);
   const overlayHighlightRef = useRef<OverlayBlockId | null>(null);
@@ -690,6 +803,11 @@ export function useTimeLapseRecorder({
   const hudPayloadRef = useRef<HudPayload | null>(null);
   const hudCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const hudCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const sweepSeriesRef = useRef<SweepSeriesEntry[]>([]);
+  const sidecarOptionsRef = useRef<RecorderSidecarOptions | undefined>(sidecar);
+  const activeSidecarRef = useRef<{ includeSweep: boolean }>({
+    includeSweep: Boolean(sidecar?.includeSweep),
+  });
   const frameMeterRef = useRef<FrameMeter | null>(null);
   const canvasTrackRef = useRef<CanvasCaptureMediaStreamTrack | null>(null);
   const restoreDomHudRef = useRef<(() => void) | null>(null);
@@ -1704,6 +1822,10 @@ export function useTimeLapseRecorder({
       }
     })();
     framesRef.current = [];
+    sweepSeriesRef.current = [];
+    activeSidecarRef.current = {
+      includeSweep: Boolean(sidecarOptionsRef.current?.includeSweep),
+    };
     segmentsRef.current = [];
     segmentIndexRef.current = -1;
     guardRecoveryScheduledRef.current = false;
@@ -2194,11 +2316,11 @@ export function useTimeLapseRecorder({
       sweepLines.push(`quadrature ${quadratureLabel}`);
       sweepLines.push(`status ${sweepStatusDisplay !== STRING_FALLBACK ? sweepStatusDisplay : "n/a"}`);
       if (sweepGuardSummary) {
-        sweepLines.push(`guard ${sweepGuardSummary}`);
-      }
+      sweepLines.push(`guard ${sweepGuardSummary}`);
+    }
 
-      const sweepNarrative = {
-        iter: sweepIter,
+    const sweepNarrative = {
+      iter: sweepIter,
         total: sweepTotal,
         gap_nm: gapNm,
         depth: depthFrac,
@@ -2211,8 +2333,66 @@ export function useTimeLapseRecorder({
         QL: qlValue,
         quadrature_dB: quadratureDb,
         status: sweepStatusDisplay !== STRING_FALLBACK ? sweepStatusDisplay : fallbackStatus,
-        guardReason: sweepGuardSummary,
-      };
+      guardReason: sweepGuardSummary,
+    };
+
+    const hasPipelineSweep =
+      sweepIter != null ||
+      sweepTotal != null ||
+      gapNm != null ||
+      depthFrac != null ||
+      phaseDegSweep != null ||
+      pumpGHz != null ||
+      detuneMHz != null ||
+      kappaMHz != null ||
+      kappaEffMHz != null ||
+      pumpRatio != null ||
+      qlValue != null ||
+      quadratureDb != null ||
+      sweepGuardSummary != null ||
+      sweepRuntime?.etaMs != null ||
+      sweepRuntime?.slewDelayMs != null;
+
+    const pipelineSweep: SweepSnapshot | null = hasPipelineSweep
+      ? {
+          iter: sweepIter ?? null,
+          total: sweepTotal ?? null,
+          pct:
+            sweepIter != null && sweepTotal != null && sweepTotal > 0
+              ? Math.max(0, Math.min(100, (sweepIter / sweepTotal) * 100))
+              : null,
+          d_nm: gapNm ?? null,
+          m: depthFrac ?? null,
+          phi_deg: phaseDegSweep ?? null,
+          Omega_GHz: pumpGHz ?? null,
+          detune_MHz: detuneMHz ?? null,
+          kappa_MHz: kappaMHz ?? null,
+          kappaEff_MHz:
+            kappaEffMHz != null
+              ? kappaEffMHz
+              : sweepStatus === "UNSTABLE"
+                ? "THRESHOLD"
+                : null,
+          pumpRatio: pumpRatio ?? null,
+          G_dB: quadratureDb ?? null,
+          QL: qlValue ?? null,
+          status:
+            sweepStatusDisplay !== STRING_FALLBACK
+              ? sweepStatusDisplay
+              : fallbackStatus ?? null,
+          guard: sweepGuardSummary ?? null,
+          etaMs: asFiniteNumber(sweepRuntime?.etaMs),
+          slewDelayMs: asFiniteNumber(sweepRuntime?.slewDelayMs),
+          bestIdx: null,
+          guardCap:
+            typeof (sweepRuntime as any)?.guardCap === "boolean"
+              ? Boolean((sweepRuntime as any).guardCap)
+              : null,
+        }
+      : null;
+
+    const telemSweep = sweepTelemetry.get();
+    const mergedSweep = mergeSweepSnapshots(pipelineSweep, telemSweep);
 
       const deltaLines: string[] = [];
       if (deltaRho != null) {
@@ -2317,7 +2497,7 @@ export function useTimeLapseRecorder({
         QL: qL,
         d_eff: dEff,
         qiMargin,
-        sweep: sweepNarrative,
+        sweep: mergedSweep,
         deltas: { rho: deltaRho, TS: deltaTS, dEff: deltaDEff },
         sectors: { live: liveSectors, total: totalSectors },
         gr: { burstVsTau, tsOk, qiOk },
@@ -2354,13 +2534,14 @@ export function useTimeLapseRecorder({
         tauLC_ms,
         burst_ms,
         dwell_ms,
-        rho,
-        QL: qL,
-        deff: dEff,
-        sectors: { live: liveSectors, total: totalSectors },
-        gr: { burstVsTau, tsOk, qiOk },
-        shellOffset: shellOffset ?? null,
-      };
+      rho,
+      QL: qL,
+      deff: dEff,
+      sectors: { live: liveSectors, total: totalSectors },
+      gr: { burstVsTau, tsOk, qiOk },
+      shellOffset: shellOffset ?? null,
+      sweep: mergedSweep,
+    };
 
       drawOverlayHud(
         frame.segment,
@@ -2369,9 +2550,16 @@ export function useTimeLapseRecorder({
         phaseLines,
         sweepLines,
         deltaLines,
-        equationLines,
-        overlayHighlightRef.current
-      );
+      equationLines,
+      overlayHighlightRef.current
+    );
+
+      if (activeSidecarRef.current.includeSweep && mergedSweep) {
+        sweepSeriesRef.current.push({
+          tMs: elapsedMs,
+          ...mergedSweep,
+        });
+      }
 
       framesRef.current.push(frame);
       compositeFrameForRecording();
@@ -2407,7 +2595,17 @@ export function useTimeLapseRecorder({
         const videoUrl = URL.createObjectURL(videoBlob);
 
         const frames = framesRef.current;
-        const metricsBlob = new Blob([JSON.stringify({ frames }, null, 2)], {
+        const includeSidecar = activeSidecarRef.current.includeSweep;
+        const sidecarPayload = includeSidecar
+          ? {
+              sweepSeries: sweepSeriesRef.current.slice(),
+            }
+          : undefined;
+        const metricsPayload = {
+          frames,
+          ...(sidecarPayload ? { sidecar: sidecarPayload } : {}),
+        };
+        const metricsBlob = new Blob([JSON.stringify(metricsPayload, null, 2)], {
           type: "application/json",
         });
         const metricsUrl = URL.createObjectURL(metricsBlob);
@@ -2444,9 +2642,15 @@ export function useTimeLapseRecorder({
             framesPushed: meter.pushed,
             framesDroppedEstimate: meter.dropped,
             p95FrameJitterMs: jitter,
+            ...(sidecarPayload ? { sidecar: sidecarPayload } : {}),
           },
+          ...(sidecarPayload ? { sidecar: sidecarPayload } : {}),
         };
+        if (!includeSidecar) {
+          sweepSeriesRef.current = [];
+        }
         setResult(summary);
+        sweepSeriesRef.current = [];
         setStatus("complete");
       } catch (err) {
         console.error("[TimeLapse] Capture failed", err);
@@ -2509,12 +2713,16 @@ export function useTimeLapseRecorder({
       overlayHitRegionsRef.current = { blocks: [] };
       overlayPayloadRef.current = null;
       if (overlayCanvasRef.current) {
-        overlayCanvasRef.current.style.cursor = "default";
-      }
+      overlayCanvasRef.current.style.cursor = "default";
+    }
 
-      framesRef.current = [];
-      guardRecoveryScheduledRef.current = false;
-      segmentsRef.current = prepareSegments(pipelineState, durationMs);
+    framesRef.current = [];
+    sweepSeriesRef.current = [];
+    activeSidecarRef.current = {
+      includeSweep: Boolean(sidecarOptionsRef.current?.includeSweep),
+    };
+    guardRecoveryScheduledRef.current = false;
+    segmentsRef.current = prepareSegments(pipelineState, durationMs);
       segmentIndexRef.current = -1;
       finishingRef.current = false;
       baselineMetricsRef.current = null;

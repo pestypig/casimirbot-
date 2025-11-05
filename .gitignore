@@ -47,3 +47,8 @@ dist/public/galaxymap.png
 # Calibration artifacts and local backups
 .cal/
 *.bak
+
+# Environment variable files (keep templates tracked)
+.env
+.env.*
+!.env.example

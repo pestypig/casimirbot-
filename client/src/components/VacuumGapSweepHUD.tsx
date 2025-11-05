@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import ReversibilityBadge from "./ReversibilityBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useEnergyPipeline, type EnergyPipelineState as PipelineState } from "@/hooks/use-energy-pipeline";
 import type { SweepRuntime, SweepPoint, VacuumGapSweepRow } from "@shared/schema";
 import { summarizeSweepGuard } from "@/lib/sweep-guards";
+import { sweepTelemetry, type SweepSnapshot } from "@/lib/sweepTelemetry";
 import { useHardwareFeeds, type HardwareConnectHelp } from "@/hooks/useHardwareFeeds";
 import HardwareConnectButton from "./HardwareConnectButton";
 
@@ -96,6 +97,71 @@ function coalesceSweepRows(primary: MaybeSweepRow, fallback: MaybeSweepRow): Swe
     }
   });
   return base as unknown as SweepDisplayRow;
+}
+
+function toSnapshot(
+  row: SweepDisplayRow,
+  sweepRuntime: SweepRuntime | null,
+  guard: string | null,
+): SweepSnapshot {
+  const toFinite = (value: unknown): number | null => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
+  };
+
+  const iter = toFinite(sweepRuntime?.iter);
+  const total = toFinite(sweepRuntime?.total);
+  const pct =
+    iter != null && total != null && total > 0
+      ? Math.max(0, Math.min(100, (iter / total) * 100))
+      : null;
+
+  const rawStatus =
+    (row as SweepPoint | VacuumGapSweepRow)?.status ??
+    ((row as SweepPoint | VacuumGapSweepRow)?.stable != null
+      ? (row as SweepPoint | VacuumGapSweepRow).stable
+        ? "PASS"
+        : "WARN"
+      : null);
+  const runtimeStatus =
+    typeof sweepRuntime?.status === "string" ? sweepRuntime.status.toUpperCase() : null;
+  const status = rawStatus ?? runtimeStatus ?? null;
+
+  const rawKappaEff = (row as SweepPoint | VacuumGapSweepRow)?.kappaEff_MHz;
+  let kappaEff: number | "THRESHOLD" | null = null;
+  if (Number.isFinite(rawKappaEff ?? NaN)) {
+    kappaEff = Number(rawKappaEff);
+  } else if (status === "UNSTABLE") {
+    kappaEff = "THRESHOLD";
+  }
+
+  const guardCap =
+    typeof (sweepRuntime as any)?.guardCap === "boolean" ? Boolean((sweepRuntime as any).guardCap) : null;
+
+  return {
+    iter,
+    total,
+    pct,
+    d_nm: toFinite((row as SweepPoint | VacuumGapSweepRow)?.d_nm),
+    m: toFinite((row as SweepPoint | VacuumGapSweepRow)?.m),
+    phi_deg: toFinite((row as SweepPoint | VacuumGapSweepRow)?.phi_deg),
+    Omega_GHz: toFinite((row as SweepPoint | VacuumGapSweepRow)?.Omega_GHz),
+    detune_MHz: toFinite((row as SweepPoint | VacuumGapSweepRow)?.detune_MHz),
+    kappa_MHz: toFinite((row as SweepPoint | VacuumGapSweepRow)?.kappa_MHz),
+    kappaEff_MHz: kappaEff,
+    pumpRatio: toFinite((row as SweepPoint | VacuumGapSweepRow)?.pumpRatio),
+    G_dB: toFinite((row as SweepPoint | VacuumGapSweepRow)?.G),
+    QL: toFinite((row as SweepPoint | VacuumGapSweepRow)?.QL),
+    status,
+    guard: guard ?? null,
+    etaMs: toFinite(sweepRuntime?.etaMs),
+    slewDelayMs: toFinite(sweepRuntime?.slewDelayMs),
+    bestIdx: null,
+    guardCap,
+  };
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -227,6 +293,67 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
     }
   }, [top]);
 
+  const last = (sweep?.last ?? null) as SweepPoint | null;
+  const best = top.length ? top[0] : null;
+  const latestHistoryRow: SweepDisplayRow | null = historyRows.length
+    ? historyRows[historyRows.length - 1]
+    : null;
+
+  const rowForMetrics = useMemo<SweepDisplayRow | null>(() => {
+    if (!latestHistoryRow && !last && !best) {
+      return null;
+    }
+    // Prefer the measured history row so partially-populated sweep.last snapshots don't zero out fields mid-step.
+    return (
+      coalesceSweepRows(latestHistoryRow, last) ??
+      (latestHistoryRow as SweepDisplayRow | null) ??
+      (last as SweepDisplayRow | null) ??
+      (best as SweepDisplayRow | null) ??
+      null
+    );
+  }, [best, last, latestHistoryRow]);
+
+  const guardSummary = useMemo(
+    () => summarizeSweepGuard(rowForMetrics ?? best ?? null),
+    [best, rowForMetrics],
+  );
+
+  const snapshot = useMemo<SweepSnapshot | null>(() => {
+    if (!sweep || !rowForMetrics) {
+      return null;
+    }
+    return toSnapshot(rowForMetrics, sweep, guardSummary ?? null);
+  }, [guardSummary, rowForMetrics, sweep]);
+
+  useEffect(() => {
+    if (!snapshot) {
+      sweepTelemetry.set(null);
+      return;
+    }
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      sweepTelemetry.set(snapshot);
+      return () => {
+        sweepTelemetry.set(null);
+      };
+    }
+    let raf = 0;
+    let lastTick = 0;
+    const INTERVAL_MS = 125;
+    const tick = (ts: number) => {
+      if (ts - lastTick >= INTERVAL_MS) {
+        sweepTelemetry.set(snapshot);
+        lastTick = ts;
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    sweepTelemetry.set(snapshot);
+    raf = window.requestAnimationFrame(tick);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      sweepTelemetry.set(null);
+    };
+  }, [snapshot]);
+
   const renderRunSweepPrompt = () => {
     const badgeClass = STATUS_STYLES.IDLE;
     return (
@@ -262,20 +389,6 @@ export default function VacuumGapSweepHUD({ className }: VacuumGapSweepHUDProps)
     typeof sweep.etaMs === "number" && sweep.etaMs >= 0
       ? Math.max(0, Math.round(sweep.etaMs / 1000))
       : undefined;
-
-  const last = (sweep?.last ?? null) as SweepPoint | null;
-  const best = top.length ? top[0] : null;
-  const latestHistoryRow: SweepDisplayRow | null = historyRows.length
-    ? historyRows[historyRows.length - 1]
-    : null;
-  const rowForMetrics: SweepDisplayRow | null =
-    // Prefer the measured history row so partially-populated sweep.last snapshots don't zero out fields mid-step.
-    coalesceSweepRows(latestHistoryRow, last) ??
-    (latestHistoryRow as SweepDisplayRow | null) ??
-    (last as SweepDisplayRow | null) ??
-    (best as SweepDisplayRow | null) ??
-    null;
-  const guardSummary = summarizeSweepGuard(rowForMetrics ?? best ?? null);
 
   const statusValueRaw = formatStatus(rowForMetrics);
   const statusValue = guardSummary && statusValueRaw === "UNSTABLE" ? "WARN" : statusValueRaw;

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Canvas, useFrame, type RootState } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
+import type { WebGLRenderer } from "three";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ import {
   Tooltip,
   ReferenceLine,
 } from "recharts";
+import { registerWebGLContext } from "@/lib/webgl/context-pool";
 
 // -------------------- Types & Model --------------------
 export type DeepMixParams = {
@@ -219,6 +221,57 @@ export default function DeepMixGlobePanel() {
     return sweet.reduce((best, cur) => (cur.P < best.P ? cur : best), sweet[0]);
   }, [sweet]);
 
+  const rendererRef = useRef<WebGLRenderer | null>(null);
+  const releaseRendererRef = useRef<() => void>(() => {});
+
+  const handleCanvasCreated = useCallback(
+    (state: RootState) => {
+      const renderer = state.gl as WebGLRenderer;
+      rendererRef.current = renderer;
+
+      // Ensure previous registrations are cleared if React remounts the Canvas.
+      releaseRendererRef.current();
+      releaseRendererRef.current = () => {};
+
+      const canvas = renderer.domElement;
+      const onLost = (event: Event) => {
+        event.preventDefault();
+        console.warn("[DeepMixGlobePanel] WebGL context lost");
+      };
+      const onRestored = () => {
+        console.info("[DeepMixGlobePanel] WebGL context restored");
+      };
+
+      canvas.addEventListener("webglcontextlost", onLost, false);
+      canvas.addEventListener("webglcontextrestored", onRestored, false);
+
+      const release = registerWebGLContext(renderer.getContext(), {
+        label: "DeepMixGlobePanel",
+        onDispose: () => {
+          canvas.removeEventListener("webglcontextlost", onLost, false);
+          canvas.removeEventListener("webglcontextrestored", onRestored, false);
+          try {
+            renderer.forceContextLoss?.();
+          } catch (err) {
+            console.warn("[DeepMixGlobePanel] forceContextLoss failed", err);
+          }
+          renderer.dispose();
+        },
+      });
+
+      releaseRendererRef.current = release;
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      releaseRendererRef.current();
+      releaseRendererRef.current = () => {};
+      rendererRef.current = null;
+    };
+  }, []);
+
   // Globe "breathing" with hazard (bigger/brighter => higher risk)
   const hazard01 = Math.min(1, Math.pow(Pfinal, 0.35));
 
@@ -236,7 +289,7 @@ export default function DeepMixGlobePanel() {
           </div>
 
           <div className="h-[420px] rounded-2xl overflow-hidden border">
-            <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }}>
+            <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }} onCreated={handleCanvasCreated}>
               <ambientLight intensity={0.35} />
               <directionalLight position={[2, 2, 3]} intensity={1.2} />
               <SunMesh hazard01={hazard01} />

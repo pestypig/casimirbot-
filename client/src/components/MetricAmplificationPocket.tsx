@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef } from "react";
+import { registerWebGLContext } from "@/lib/webgl/context-pool";
 
 type MetricAmplificationPocketProps = {
   className?: string;
@@ -38,6 +39,7 @@ export default function MetricAmplificationPocket({
 }: MetricAmplificationPocketProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const glRef = useRef<WebGLRenderingContext | WebGL2RenderingContext | null>(null);
+  const releaseContextRef = useRef<() => void>(() => {});
   const programRef = useRef<WebGLProgram | null>(null);
   const attribsRef = useRef<{ a_pos: number } | null>(null);
   const buffersRef = useRef<{ tri: WebGLBuffer | null }>({ tri: null });
@@ -312,6 +314,11 @@ void main() {
       return;
     }
     glRef.current = gl;
+    releaseContextRef.current();
+    releaseContextRef.current = () => {};
+    releaseContextRef.current = registerWebGLContext(gl, {
+      label: "MetricAmplificationPocket",
+    });
     try {
       gl.getExtension?.("OES_standard_derivatives");
     } catch (err) {
@@ -401,6 +408,8 @@ void main() {
         buffersRef.current.tri = null;
       }
       glRef.current = null;
+      releaseContextRef.current();
+      releaseContextRef.current = () => {};
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

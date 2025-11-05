@@ -1018,6 +1018,7 @@ const [timeLapseCanvas, setTimeLapseCanvas] = useState<HTMLCanvasElement | null>
 const [timeLapseOverlayCanvas, setTimeLapseOverlayCanvas] = useState<HTMLCanvasElement | null>(null);
 const [timeLapseOverlayDom, setTimeLapseOverlayDom] = useState<HTMLDivElement | null>(null);
 const [showSweepHud, setShowSweepHud] = useState(false);
+const [includeSweepSidecar, setIncludeSweepSidecar] = useState(true);
 const [isThetaHullMode, setIsThetaHullMode] = useState(false);
 const [vizIntent, setVizIntent] = useState<{ rise: number; planar: number }>({ rise: 0, planar: 0 });
 const handleDirectionPadIntent = useCallback(
@@ -1031,12 +1032,17 @@ const handleDirectionPadIntent = useCallback(
 const handlePlanarVizModeChange = useCallback((mode: number) => {
   setIsThetaHullMode(mode === 3);
 }, []);
-const timeLapseRecorder = useTimeLapseRecorder({
-  canvas: timeLapseCanvas,
-  overlayCanvas: timeLapseOverlayCanvas,
-  overlayDom: timeLapseOverlayDom,
-  overlayEnabled: showSweepHud,
-});
+const timeLapseOptions = useMemo(
+  () => ({
+    canvas: timeLapseCanvas,
+    overlayCanvas: timeLapseOverlayCanvas,
+    overlayDom: timeLapseOverlayDom,
+    overlayEnabled: showSweepHud,
+    sidecar: { includeSweep: includeSweepSidecar },
+  }),
+  [timeLapseCanvas, timeLapseOverlayCanvas, timeLapseOverlayDom, showSweepHud, includeSweepSidecar],
+);
+const timeLapseRecorder = useTimeLapseRecorder(timeLapseOptions);
 const timeLapseUnlocked =
   isThetaHullMode ||
   timeLapseRecorder.isRecording ||
@@ -3088,6 +3094,21 @@ useEffect(() => {
                       <Layers className="w-4 h-4" />
                       {showSweepHud ? "SWEEP HUD On" : "SWEEP HUD"}
                     </Button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                    <Switch
+                      id="attach-sweep-sidecar"
+                      checked={includeSweepSidecar}
+                      onCheckedChange={setIncludeSweepSidecar}
+                      disabled={timeLapseRecorder.isRecording || timeLapseRecorder.isProcessing}
+                    />
+                    <Label htmlFor="attach-sweep-sidecar" className="text-xs text-slate-300">
+                      Attach sweep sidecar
+                    </Label>
+                    <span className="text-slate-500">
+                      Include sweep telemetry with the metrics download
+                    </span>
                   </div>
 
                   {(timeLapseRecorder.isRecording ||

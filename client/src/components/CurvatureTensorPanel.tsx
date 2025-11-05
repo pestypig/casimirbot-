@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { createProgram, makeGrid, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
+import { registerWebGLContext } from "@/lib/webgl/context-pool";
 import {
   AlcubierreParams,
   Vec3,
@@ -154,6 +155,7 @@ void main(){
 export default function CurvatureTensorPanel({ className }: Props){
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
+  const releaseContextRef = useRef<() => void>(() => {});
   const progRef = useRef<WebGLProgram|null>(null);
   const vboRef = useRef<WebGLBuffer|null>(null);
   const [glStatus, setGlStatus] = useState<'ok'|'no-webgl'|'compile-fail'|'context-lost'>('ok');
@@ -368,6 +370,11 @@ export default function CurvatureTensorPanel({ className }: Props){
     const gl = cv.getContext('webgl2', {antialias:true, preserveDrawingBuffer:true});
     if (!gl) { setGlStatus('no-webgl'); setGlError('WebGL2 not available (context creation failed).'); return; }
     glRef.current = gl;
+    releaseContextRef.current();
+    releaseContextRef.current = () => {};
+    releaseContextRef.current = registerWebGLContext(gl, {
+      label: "CurvatureTensorPanel",
+    });
 
     try {
       const prog = createProgram(gl, VERT, FRAG);
@@ -468,6 +475,11 @@ export default function CurvatureTensorPanel({ className }: Props){
       try { cv.removeEventListener('webglcontextrestored', onRestored as any); } catch {}
       try { if (vbo) gl.deleteBuffer(vbo); } catch {}
       try { if (progRef.current) gl.deleteProgram(progRef.current); } catch {}
+      if (glRef.current === gl) {
+        glRef.current = null;
+      }
+      releaseContextRef.current();
+      releaseContextRef.current = () => {};
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

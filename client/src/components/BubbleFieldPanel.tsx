@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useEnergyPipeline } from "@/hooks/use-energy-pipeline";
 import { createProgram, makeGrid, resizeCanvasAndViewport } from "@/lib/gl/simple-gl";
+import { registerWebGLContext } from "@/lib/webgl/context-pool";
 
 const VERT = `#version 300 es
 layout(location=0) in vec2 a_pos;           // unit square grid [-1,1]^2
@@ -57,6 +58,7 @@ void main(){
 export default function BubbleFieldPanel({ className }: {className?: string}){
   const cvRef = useRef<HTMLCanvasElement>(null);
   const glRef = useRef<WebGL2RenderingContext|null>(null);
+  const releaseContextRef = useRef<() => void>(() => {});
   const progRef = useRef<WebGLProgram|null>(null);
   const vboRef = useRef<WebGLBuffer|null>(null);
   const [res] = useState(160);
@@ -110,6 +112,11 @@ export default function BubbleFieldPanel({ className }: {className?: string}){
     const gl = cv.getContext('webgl2', {antialias:true, preserveDrawingBuffer:true});
     if (!gl) return;
     glRef.current = gl;
+    releaseContextRef.current();
+    releaseContextRef.current = () => {};
+    releaseContextRef.current = registerWebGLContext(gl, {
+      label: "BubbleFieldPanel",
+    });
 
     try {
       progRef.current = createProgram(gl, VERT, FRAG);
@@ -165,7 +172,23 @@ export default function BubbleFieldPanel({ className }: {className?: string}){
       raf = requestAnimationFrame(draw);
     };
     draw();
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      if (glRef.current === gl) {
+        if (progRef.current) {
+          gl.deleteProgram(progRef.current);
+          progRef.current = null;
+        }
+        if (vboRef.current) {
+          gl.deleteBuffer(vboRef.current);
+          vboRef.current = null;
+        }
+        glRef.current = null;
+      }
+      releaseContextRef.current();
+      releaseContextRef.current = () => {};
+    };
   }, [res, R, axes, mvp, σ, β, dir, dGate, cGain]);
 
   return (
